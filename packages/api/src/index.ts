@@ -9,6 +9,7 @@ export * from './conditions.ts';
 export * from './direct.ts';
 export * from './http.ts';
 export * from './keys.ts';
+export * from './media.ts';
 export * from './providers.ts';
 export * from './records.ts';
 export * from './storage.ts';

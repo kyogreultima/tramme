@@ -7,12 +7,14 @@
 //     kind: 'sfx' | 'music' | 'voice'; prompt: what to make, or the text to say
 //   GET  /api/voices?provider=&search=&language=&accent=&gender=   the voices a voice-over can take
 
+import { hydraceptHeaders, hydraceptSfx, hydraceptVoice } from './hydracept.ts';
 import { HttpError, json, readJson } from './http.ts';
 import type { Keys } from './keys.ts';
+import type { MediaConfig } from './media.ts';
 import type { Reach } from './providers.ts';
 
 export type SoundKind = 'sfx' | 'music' | 'voice';
-type Provider = 'elevenlabs' | 'openai' | 'gemini';
+type Provider = 'elevenlabs' | 'openai' | 'gemini' | 'hydracept';
 
 interface Ask { kind: SoundKind; prompt: string; duration?: number; voice?: string; style?: string; model?: string }
 interface Made { audio: ArrayBuffer; type: string; model: string; voice?: string }
@@ -39,7 +41,7 @@ const ELEVEN_VOICE_DEFAULT = Object.keys(ELEVEN_VOICE_MODELS)[0];
 const TAGGED = new Set(['eleven_v4', 'eleven_v4_turbo', 'eleven_v3']);
 const ELEVEN_DEFAULT_VOICE = 'JBFqnCBsd6RMkjVDRZzb';
 
-const PROVIDERS: Record<Provider, { kinds: SoundKind[]; make(key: string, ask: Ask, fetch: Reach['fetch']): Promise<Made> }> = {
+const PROVIDERS: Record<Exclude<Provider, 'hydracept'>, { kinds: SoundKind[]; make(key: string, ask: Ask, fetch: Reach['fetch']): Promise<Made> }> = {
   elevenlabs: {
     kinds: ['sfx', 'music', 'voice'],
     async make(key, ask, fetch) {
@@ -109,22 +111,42 @@ const PROVIDERS: Record<Provider, { kinds: SoundKind[]; make(key: string, ask: A
 };
 
 /** the providers connected, by kind of sound (first one used when none is named) */
-export function soundConfig(keys: Keys): Record<SoundKind, Provider[]> {
-  const has = (Object.keys(PROVIDERS) as Provider[]).filter((p) => keys.get(p));
-  return { sfx: has.filter((p) => PROVIDERS[p].kinds.includes('sfx')), music: has.filter((p) => PROVIDERS[p].kinds.includes('music')), voice: has.filter((p) => PROVIDERS[p].kinds.includes('voice')) };
+export function soundConfig(keys: Keys, media?: MediaConfig): Record<SoundKind, Provider[]> {
+  const has = (['elevenlabs', 'openai', 'gemini'] as const).filter((p) => keys.get(p));
+  const sfx: Provider[] = [], voice: Provider[] = [];
+  if (media?.provider === 'hydracept') {
+    sfx.push('hydracept');
+    voice.push('hydracept');
+  }
+  for (const p of has) {
+    if (PROVIDERS[p].kinds.includes('sfx')) sfx.push(p);
+    if (PROVIDERS[p].kinds.includes('voice')) voice.push(p);
+  }
+  return { sfx, music: has.filter((p) => PROVIDERS[p].kinds.includes('music')), voice };
 }
 
-export async function generate(req: Request, { keys, fetch }: Reach) {
+export async function generate(req: Request, { keys, fetch, media }: Reach) {
   const b = await readJson<Partial<Ask> & { provider?: string }>(req);
   if (b.kind !== 'sfx' && b.kind !== 'music' && b.kind !== 'voice') throw new HttpError(400, 'kind: sfx, music or voice');
   const prompt = typeof b.prompt === 'string' ? b.prompt.trim() : '';
   if (!prompt) throw new HttpError(400, b.kind === 'voice' ? 'the text to say is missing' : 'say what to make (prompt)');
   if (prompt.length > 4000) throw new HttpError(413, 'prompt too long (4000 characters at most)');
-  const able = soundConfig(keys)[b.kind];
+  const able = soundConfig(keys, media)[b.kind];
   const provider = (b.provider ?? able[0]) as Provider | undefined;
-  if (!provider || !PROVIDERS[provider]) {
-    const makers = (Object.keys(PROVIDERS) as Provider[]).filter((p) => PROVIDERS[p].kinds.includes(b.kind!));
-    throw new HttpError(503, `no provider for ${b.kind}: ${keys.how(makers, 'one')}`);
+  if (!provider) {
+    const makers = able;
+    throw new HttpError(503, `no provider for ${b.kind}: ${makers.length ? makers.join(', ') : keys.how(['elevenlabs'], 'one')}`);
+  }
+  if (provider === 'hydracept') {
+    if (media?.provider !== 'hydracept') throw new HttpError(503, 'Hydracept is not configured (MEDIA_PROVIDER=hydracept and HYDRACEPT_API_KEY, HYDRACEPT_PROJECT on the server)');
+    if (b.kind === 'music') throw new HttpError(400, 'hydracept does not make music');
+    const ask: Ask = { kind: b.kind, prompt, duration: typeof b.duration === 'number' ? b.duration : undefined, voice: typeof b.voice === 'string' ? b.voice : undefined, style: typeof b.style === 'string' ? b.style.slice(0, 500) : undefined, model: typeof b.model === 'string' ? b.model : undefined };
+    const run = b.kind === 'sfx'
+      ? await hydraceptSfx(media.hydracept, ask, fetch)
+      : await hydraceptVoice(media.hydracept, ask, fetch, ELEVEN_VOICE_MODELS, TAGGED, ELEVEN_DEFAULT_VOICE, ELEVEN_VOICE_DEFAULT);
+    return new Response(run.bytes, {
+      headers: { 'content-type': run.type, 'cache-control': 'no-store', 'x-tramme-provider': 'hydracept', 'x-tramme-model': run.model, ...(run.voice ? { 'x-tramme-voice': run.voice } : {}), ...hydraceptHeaders(run) },
+    });
   }
   if (!PROVIDERS[provider].kinds.includes(b.kind)) throw new HttpError(400, `${provider} does not make ${b.kind}`);
   const key = keys.get(provider);
@@ -160,9 +182,12 @@ type Labels = { accent?: string; gender?: string; age?: string; language?: strin
 const FILTERS = ['search', 'language', 'accent', 'gender', 'age'] as const;
 
 /** the voices a voice-over can take: ElevenLabs' (the account's, then its library, filtered), OpenAI's and Gemini's fixed sets */
-export async function voices(req: Request, { keys, fetch }: Reach) {
+export async function voices(req: Request, { keys, fetch, media }: Reach) {
   const q = new URL(req.url).searchParams;
-  const provider = (q.get('provider') || soundConfig(keys).voice[0]) as Provider | undefined;
+  const voiceMakers = soundConfig(keys, media).voice;
+  const listed = q.get('provider') || voiceMakers.find((p) => p === 'elevenlabs') || voiceMakers[0];
+  const provider = listed as Provider | undefined;
+  if (provider === 'hydracept') throw new HttpError(400, 'hydracept makes no voice-over list: use provider=elevenlabs or pass a voice id to generate');
   if (!provider || !PROVIDERS[provider]?.kinds.includes('voice')) throw new HttpError(provider ? 400 : 503, provider ? `${provider} makes no voice-over` : `no provider for voice: ${keys.how(['elevenlabs', 'openai', 'gemini'], 'one')}`);
   const search = (q.get('search') ?? '').toLowerCase();
   if (provider !== 'elevenlabs') {
