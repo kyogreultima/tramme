@@ -1,16 +1,12 @@
 // Hydracept durable jobs for OpenAI images and ElevenLabs SFX/voice (quote, then job, receipt id).
-//
-// Audio format: tramme expects audio/mpeg from direct ElevenLabs, but Hydracept’s published
-// contract for audio.sfx.generate.v1 and audio.voice.generate.v1 is Ogg only — catalog
-// `output.mediaType` is `audio/ogg` and docs say artifacts are Ogg, not WAV/MP3. Voice input
-// includes `outputFormatPreference` (untyped string, no enum in GET …/capabilities/… or OpenAPI);
-// SFX input has no output-format field. Do not guess provider format strings or transcode here;
-// request MP3 from Hydracept when they document a supported value.
 
 import { HttpError } from './http.ts';
 import type { HydraceptMedia } from './media.ts';
 
 const CLIENT = 'tramme-api hydracept/1';
+
+/** Hydracept audio.sfx/voice input: mp3_44100_128 → artifact mediaType audio/mpeg (tramme-compatible). */
+export const HYDRACEPT_AUDIO_MP3 = 'mp3_44100_128' as const;
 const TERMINAL = new Set(['succeeded', 'failed', 'canceled', 'cancelled']);
 const POLL_CAP_MS = 120_000;
 
@@ -211,6 +207,7 @@ export async function hydraceptSfx(
     prompt: ask.prompt,
     modelId: 'eleven_text_to_sound_v2',
     promptInfluence: 0.5,
+    outputFormatPreference: HYDRACEPT_AUDIO_MP3,
     ...(durationMs ? { durationMs } : {}),
   };
   return runJob(media, 'audio.sfx.generate.v1', input, fetch, 'eleven_text_to_sound_v2');
@@ -229,7 +226,7 @@ export async function hydraceptVoice(
   const [, id] = (ask.voice || defaultVoice).includes('/') ? ask.voice!.split('/', 2) : [null, ask.voice || defaultVoice];
   const voice = id;
   const text = ask.style && taggedModels.has(model) ? `[${ask.style}] ${ask.prompt}` : ask.prompt;
-  const input: Record<string, unknown> = { text, voiceId: voice, modelId: model };
+  const input: Record<string, unknown> = { text, voiceId: voice, modelId: model, outputFormatPreference: HYDRACEPT_AUDIO_MP3 };
   return runJob(media, 'audio.voice.generate.v1', input, fetch, model, voice);
 }
 

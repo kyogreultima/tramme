@@ -1,13 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { generate } from '../src/generate.ts';
-import { hydraceptImage, hydraceptSfx } from '../src/hydracept.ts';
+import { HYDRACEPT_AUDIO_MP3, hydraceptImage, hydraceptSfx } from '../src/hydracept.ts';
 import { generateImage } from '../src/images.ts';
 import type { Keys } from '../src/keys.ts';
 import type { MediaConfig } from '../src/media.ts';
 import { mediaConfig } from '../src/media.ts';
 
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 13, 10, 26, 10]);
-const OGG = new Uint8Array([0x4f, 0x67, 0x67, 0x53]);
+const MP3 = new Uint8Array([0xff, 0xfb, 0x90, 0x00]);
 
 const media: MediaConfig = {
   provider: 'hydracept',
@@ -30,10 +30,11 @@ const keys = (): Keys => ({
 const out = (input: string, init?: RequestInit) => fetch(input, init);
 
 function stubHydraceptJob(artifact: Uint8Array, contentType: string) {
-  const calls: { url: string; method?: string }[] = [];
+  const calls: { url: string; method?: string; body?: Record<string, unknown> }[] = [];
   vi.stubGlobal('fetch', (url: string | URL, init?: RequestInit) => {
     const u = String(url);
-    calls.push({ url: u, method: init?.method });
+    const body = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : undefined;
+    calls.push({ url: u, method: init?.method, body });
     if (u.includes('/quote')) {
       return Promise.resolve(new Response(JSON.stringify({ quoteId: 'quo_1' }), { headers: { 'content-type': 'application/json' } }));
     }
@@ -78,11 +79,14 @@ describe('hydracept jobs', () => {
     expect(new Uint8Array(run.bytes)).toEqual(PNG);
   });
 
-  it('maps sfx duration to milliseconds', async () => {
-    stubHydraceptJob(OGG, 'audio/ogg');
+  it('requests MP3 for sfx and uses the artifact mediaType', async () => {
+    const calls = stubHydraceptJob(MP3, 'audio/mpeg');
     const run = await hydraceptSfx(media.hydracept, { prompt: 'whoosh', duration: 2 }, out);
+    const job = calls.find((c) => c.url.includes('/audio.sfx.generate.v1/jobs') && c.method === 'POST');
+    expect((job?.body?.input as Record<string, unknown>)?.outputFormatPreference).toBe(HYDRACEPT_AUDIO_MP3);
     expect(run.model).toBe('eleven_text_to_sound_v2');
-    expect(run.type).toBe('audio/ogg');
+    expect(run.type).toBe('audio/mpeg');
+    expect(new Uint8Array(run.bytes)).toEqual(MP3);
   });
 });
 
@@ -98,12 +102,10 @@ describe('routes with Hydracept', () => {
     expect(res.headers.get('x-tramme-hydracept-quote')).toBe('quo_1');
   });
 
-  it('generate sfx through Hydracept by default', async () => {
-    stubHydraceptJob(OGG, 'audio/ogg');
+  it('generate sfx through Hydracept by default as audio/mpeg', async () => {
+    stubHydraceptJob(MP3, 'audio/mpeg');
     const res = await generate(new Request('http://localhost/api/generate', { method: 'POST', body: JSON.stringify({ kind: 'sfx', prompt: 'click' }) }), reach);
     expect(res.headers.get('x-tramme-provider')).toBe('hydracept');
-    // Hydracept catalog contract: audio/ogg until a documented MP3 output option exists
-    expect(res.headers.get('content-type')).toBe('audio/ogg');
-    expect(res.headers.get('content-type')).not.toBe('audio/mpeg');
+    expect(res.headers.get('content-type')).toBe('audio/mpeg');
   });
 });
