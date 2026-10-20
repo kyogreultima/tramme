@@ -17,8 +17,8 @@ ZAI_API_KEY=
 # all three; a voice-over can also come from OpenAI or Gemini with the keys above
 ELEVENLABS_API_KEY=
 
-# Optional: send pictures (OpenAI gpt-image-1) and sound effects / voice-overs (ElevenLabs)
-# through Hydracept instead of the keys above. Music still uses ElevenLabs when connected.
+# Optional: send pictures (OpenAI gpt-image-1) and sound effects, music beds, and voice-overs
+# through Hydracept instead of the provider keys above (no ELEVENLABS_API_KEY needed for those).
 # MEDIA_PROVIDER=hydracept
 # HYDRACEPT_API_KEY=
 # HYDRACEPT_PROJECT=          # cpr_… from Hydracept Studio

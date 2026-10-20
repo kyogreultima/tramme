@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { generate } from '../src/generate.ts';
-import { HYDRACEPT_AUDIO_MP3, hydraceptImage, hydraceptSfx } from '../src/hydracept.ts';
+import { HYDRACEPT_AUDIO_MP3, hydraceptImage, hydraceptMusic, hydraceptSfx } from '../src/hydracept.ts';
 import { generateImage } from '../src/images.ts';
 import type { Keys } from '../src/keys.ts';
 import type { MediaConfig } from '../src/media.ts';
@@ -88,6 +88,19 @@ describe('hydracept jobs', () => {
     expect(run.type).toBe('audio/mpeg');
     expect(new Uint8Array(run.bytes)).toEqual(MP3);
   });
+
+  it('requests MP3 for music with tramme duration mapped to durationMs', async () => {
+    const calls = stubHydraceptJob(MP3, 'audio/mpeg');
+    const run = await hydraceptMusic(media.hydracept, { prompt: 'calm piano bed', duration: 20 }, out);
+    const job = calls.find((c) => c.url.includes('/audio.music.generate.v1/jobs') && c.method === 'POST');
+    const input = job?.body?.input as Record<string, unknown>;
+    expect(input?.outputFormatPreference).toBe(HYDRACEPT_AUDIO_MP3);
+    expect(input?.forceInstrumental).toBe(true);
+    expect(input?.modelId).toBe('music_v2_5');
+    expect(input?.durationMs).toBe(20_000);
+    expect(run.model).toBe('music_v2_5');
+    expect(run.type).toBe('audio/mpeg');
+  });
 });
 
 describe('routes with Hydracept', () => {
@@ -106,6 +119,15 @@ describe('routes with Hydracept', () => {
     stubHydraceptJob(MP3, 'audio/mpeg');
     const res = await generate(new Request('http://localhost/api/generate', { method: 'POST', body: JSON.stringify({ kind: 'sfx', prompt: 'click' }) }), reach);
     expect(res.headers.get('x-tramme-provider')).toBe('hydracept');
+    expect(res.headers.get('content-type')).toBe('audio/mpeg');
+  });
+
+  it('generate music through Hydracept without an ElevenLabs key', async () => {
+    stubHydraceptJob(MP3, 'audio/mpeg');
+    const res = await generate(new Request('http://localhost/api/generate', { method: 'POST', body: JSON.stringify({ kind: 'music', prompt: 'calm piano', duration: 12 }) }), reach);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('x-tramme-provider')).toBe('hydracept');
+    expect(res.headers.get('x-tramme-model')).toBe('music_v2_5');
     expect(res.headers.get('content-type')).toBe('audio/mpeg');
   });
 });

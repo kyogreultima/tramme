@@ -213,6 +213,28 @@ export async function hydraceptSfx(
   return runJob(media, 'audio.sfx.generate.v1', input, fetch, 'eleven_text_to_sound_v2');
 }
 
+const MUSIC_MODEL = 'music_v2_5';
+
+export async function hydraceptMusic(
+  media: HydraceptMedia,
+  ask: { prompt: string; duration?: number },
+  fetch: Fetch,
+): Promise<HydraceptRun> {
+  const durationMs = ask.duration ? Math.round(clampMusicSeconds(ask.duration) * 1000) : undefined;
+  const input: Record<string, unknown> = {
+    prompt: ask.prompt,
+    modelId: MUSIC_MODEL,
+    forceInstrumental: true,
+    outputFormatPreference: HYDRACEPT_AUDIO_MP3,
+    ...(durationMs ? { durationMs } : {}),
+  };
+  return runJob(media, 'audio.music.generate.v1', input, fetch, MUSIC_MODEL);
+}
+
+function clampMusicSeconds(v: number): number {
+  return Math.min(600, Math.max(3, v));
+}
+
 export async function hydraceptVoice(
   media: HydraceptMedia,
   ask: { prompt: string; voice?: string; style?: string; model?: string },

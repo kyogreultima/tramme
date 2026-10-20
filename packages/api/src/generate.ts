@@ -7,7 +7,7 @@
 //     kind: 'sfx' | 'music' | 'voice'; prompt: what to make, or the text to say
 //   GET  /api/voices?provider=&search=&language=&accent=&gender=   the voices a voice-over can take
 
-import { hydraceptHeaders, hydraceptSfx, hydraceptVoice } from './hydracept.ts';
+import { hydraceptHeaders, hydraceptMusic, hydraceptSfx, hydraceptVoice } from './hydracept.ts';
 import { HttpError, json, readJson } from './http.ts';
 import type { Keys } from './keys.ts';
 import type { MediaConfig } from './media.ts';
@@ -113,16 +113,18 @@ const PROVIDERS: Record<Exclude<Provider, 'hydracept'>, { kinds: SoundKind[]; ma
 /** the providers connected, by kind of sound (first one used when none is named) */
 export function soundConfig(keys: Keys, media?: MediaConfig): Record<SoundKind, Provider[]> {
   const has = (['elevenlabs', 'openai', 'gemini'] as const).filter((p) => keys.get(p));
-  const sfx: Provider[] = [], voice: Provider[] = [];
+  const sfx: Provider[] = [], music: Provider[] = [], voice: Provider[] = [];
   if (media?.provider === 'hydracept') {
     sfx.push('hydracept');
+    music.push('hydracept');
     voice.push('hydracept');
   }
   for (const p of has) {
     if (PROVIDERS[p].kinds.includes('sfx')) sfx.push(p);
+    if (PROVIDERS[p].kinds.includes('music')) music.push(p);
     if (PROVIDERS[p].kinds.includes('voice')) voice.push(p);
   }
-  return { sfx, music: has.filter((p) => PROVIDERS[p].kinds.includes('music')), voice };
+  return { sfx, music, voice };
 }
 
 export async function generate(req: Request, { keys, fetch, media }: Reach) {
@@ -139,11 +141,12 @@ export async function generate(req: Request, { keys, fetch, media }: Reach) {
   }
   if (provider === 'hydracept') {
     if (media?.provider !== 'hydracept') throw new HttpError(503, 'Hydracept is not configured (MEDIA_PROVIDER=hydracept and HYDRACEPT_API_KEY, HYDRACEPT_PROJECT on the server)');
-    if (b.kind === 'music') throw new HttpError(400, 'hydracept does not make music');
     const ask: Ask = { kind: b.kind, prompt, duration: typeof b.duration === 'number' ? b.duration : undefined, voice: typeof b.voice === 'string' ? b.voice : undefined, style: typeof b.style === 'string' ? b.style.slice(0, 500) : undefined, model: typeof b.model === 'string' ? b.model : undefined };
     const run = b.kind === 'sfx'
       ? await hydraceptSfx(media.hydracept, ask, fetch)
-      : await hydraceptVoice(media.hydracept, ask, fetch, ELEVEN_VOICE_MODELS, TAGGED, ELEVEN_DEFAULT_VOICE, ELEVEN_VOICE_DEFAULT);
+      : b.kind === 'music'
+        ? await hydraceptMusic(media.hydracept, ask, fetch)
+        : await hydraceptVoice(media.hydracept, ask, fetch, ELEVEN_VOICE_MODELS, TAGGED, ELEVEN_DEFAULT_VOICE, ELEVEN_VOICE_DEFAULT);
     return new Response(run.bytes, {
       headers: { 'content-type': run.type, 'cache-control': 'no-store', 'x-tramme-provider': 'hydracept', 'x-tramme-model': run.model, ...(run.voice ? { 'x-tramme-voice': run.voice } : {}), ...hydraceptHeaders(run) },
     });
