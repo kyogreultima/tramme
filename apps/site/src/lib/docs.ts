@@ -54,6 +54,8 @@ export const DOCS: { label: string; collapsed?: boolean; pages: DocPage[] }[] = 
       { slug: 'roadmaps/generation', label: 'Generation', file: 'docs/generation-roadmap.md' },
       { slug: 'roadmaps/shorts', label: 'Shorts', file: 'docs/shorts-roadmap.md' },
       { slug: 'roadmaps/editing', label: 'Editing', file: 'docs/editing-roadmap.md' },
+      { slug: 'roadmaps/components', label: 'Components', file: 'docs/components-roadmap.md' },
+      { slug: 'roadmaps/performance', label: 'Performance', file: 'docs/performance-roadmap.md' },
       { slug: 'roadmaps/taste', label: 'Taste', file: 'docs/taste-roadmap.md' },
       { slug: 'roadmaps/apps', label: 'Desktop and mobile apps', file: 'docs/desktop-and-mobile-apps.md' },
     ],

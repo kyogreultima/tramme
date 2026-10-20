@@ -1,6 +1,6 @@
 # Performance roadmap
 
-How tramme renders faster without leaving its stack: measure where a frame's time goes, export in parallel, prepare the Evaluator for documents with hundreds of instances, and move to WebGL or to Rust compiled to WebAssembly only what a measure points at. A rewrite in pure Rust is not the plan: the browser gives text shaping, Canvas 2D, WebCodecs and the JavaScript of expressions and plugins for free, the editor stays on the web anyway, and months of rewriting would stop the work that sets tramme apart. That choice is reopened only if the measures of step 1 show the JavaScript itself is the limit.
+How tramme renders faster without leaving its stack: measure where a frame's time goes, export in parallel, prepare the Evaluator for documents with hundreds of instances, and move to WebGL or to Rust compiled to WebAssembly only what a measure points at.
 
 Status: not started. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
 
@@ -11,6 +11,7 @@ Status: not started. Tick the boxes as steps land, and keep this file as the ref
 - The Evaluator caches static properties across frames (`packages/core/src/evaluate.ts`).
 - The time per frame is measured, as a total only.
 - One page renders every frame of an export in order (`packages/cli/src/jobs.ts`).
+- An asset is stored once and referenced by id: every layer that uses it points to it, and the renderer loads and decodes it once (`packages/render/src/assets.ts`). A video asset has one decoder, with one read position, shared by all its layers (`packages/render/src/video.ts`).
 
 ## Principles
 
@@ -51,3 +52,10 @@ Done when: a distribution of several hundred instances with a time field stays w
 - [ ] Hot spots in Rust compiled to WebAssembly, only those step 1 shows: simulations, noise in bulk, sound analysis. One module, called from TypeScript, working in the editor, the export and the worker; native through Tauri on the desktop if it helps.
 
 Done when: each move is justified by a figure from step 1 and improves it, with the same pixels.
+
+### Step 5. Media used in several places
+
+- [ ] A pool of decoders per video asset: one reader per play position in use, so two layers showing the same file at different moments at the same instant (a transition between two shots of one take, a split screen, the cut-out's footage drawn over itself, the clips of a cut overlapping) each read forward instead of making the one decoder seek back and forth at every frame. Bounded (a few readers per file, the least recently used closed), the frames of one reader shared when two layers ask for the same moment.
+- [ ] The same file imported twice becomes one asset: a hash of its content computed at import, an import of a file already in the project answered with the existing asset (its id returned, nothing written), for the editor, the assistant's attachments and the sources of a film alike.
+
+Done when: a load case of step 1 with a crossfade between two shots of the same 4K file plays in the preview at the composition's frame rate where it stuttered before, with the same pixels on export; and importing the same video twice leaves one file in the project.
