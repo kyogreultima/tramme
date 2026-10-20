@@ -2,6 +2,8 @@
 
 How an agent works through the roadmaps that have not started, one item after the other, until every box is ticked: in this session or in a fresh one, with nobody re-explaining the plan. This file is the agent's brief. It is read at the start of every iteration; the roadmaps' checkboxes are the state.
 
+All the work goes on one branch, `feat/roadmap-loop`, made from the latest `develop`. Every item lands there as its own commits; nothing is merged along the way. When every box is ticked or blocked, the loop opens one pull request against `develop`, and the user reviews the whole of it.
+
 ## Scope
 
 Four roadmaps, every unticked box in them:
@@ -34,11 +36,10 @@ The order the items are taken in. It follows what each one needs from the others
 
 One iteration lands one box, or a few boxes of the same step when they only make sense together. Never a whole roadmap at once.
 
-1. **Sync.** Fetch `develop`. If a pull request of the loop is still open, finish it first (step 8 below) before taking anything new.
+1. **Sync.** Check out `feat/roadmap-loop` (create it from the latest `develop` on the very first run) and pull it. Fetch `develop`; if it moved, merge it into the branch (a merge, never a rebase: the branch is shared by every run) and run the checks before going on.
 2. **Pick.** The first unticked box in the queue's order that is not listed under "Blocked" at the end of this file.
 3. **Read.** The box, its step, the roadmap's principles, the files it names, and the code around them. Look at how the nearest existing feature is built (a tool, a node, an effect, a setting) and build the new one the same way.
-4. **Branch.** From `develop`: `feat/<roadmap>-<short-name>` (`feat/editing-speed-curves`), `perf/…` for performance.
-5. **Build.** The feature with its tests (vitest, next to the existing ones). The house rules, from the roadmaps and the repository:
+4. **Build.** The feature with its tests (vitest, next to the existing ones). The house rules, from the roadmaps and the repository:
    - Rendering stays a pure function of `t`; a model runs at authoring time and its result is saved as an asset.
    - Same pixels: an optimisation leaves exports identical, or the difference is understood and written in the pull request.
    - Every new property comes from a schema (the inspector and the validator follow); `npm run schema` regenerates the JSON schema when the document format changes.
@@ -47,14 +48,14 @@ One iteration lands one box, or a few boxes of the same step when they only make
    - No model packed in the bundle: downloaded on first use, chosen in the settings once Editing step 1 exists.
    - No provider and no key for anything in these four roadmaps: they run on the user's machine.
    - Rust only as WebAssembly, only where a measure of Performance step 1 points; never a rewrite.
-6. **Check.** `npm run typecheck` and `npm test` pass; `npm run site:build` too when a page of the docs changed. A failure is fixed, not skipped. After three honest attempts at the same failure, the box goes under "Blocked" with the reason, and the branch is pushed as it is for a human to look at.
-7. **Write it down.**
+5. **Check.** `npm run typecheck` and `npm test` pass; `npm run site:build` too when a page of the docs changed. A failure is fixed, not skipped. After three honest attempts at the same failure, the work in progress is reverted from the branch (kept as a patch under `docs/roadmap-loop/` only if it is worth resuming), the box goes under "Blocked" with the reason, and the loop takes the next box. The branch's checks always pass.
+6. **Write it down.**
    - Tick the box in its roadmap, update the roadmap's "Status" line, and add under the box what was left out, if anything.
-   - A line in `CHANGELOG.md`, under `Unreleased`, when users can see the change.
+   - A line in `CHANGELOG.md`, under `Unreleased`, for every box, always: under `Added`, `Changed` or `Fixed`, written for the people who use tramme (what they can now do, or what got faster and by how much), the way the existing entries are written. No box is ticked without its changelog line.
    - The README when a visible feature changes what it says.
-   - What could not be checked here (a phone, a Mac, iOS's Files app, a real GPU, HDR on a screen) said in the pull request and under the box: "to check on a device". It does not block the box.
-8. **Ship.** Commit and push the branch, open a pull request against `develop` titled in Conventional Commits (`feat(editor): speed curves on video and sound layers`), and merge it when its checks pass (see "Merging" below). No `Co-Authored-By` line, no mention of Claude in commits, titles or bodies.
-9. **Report.** One line to the user: the box landed, the pull request, what is next. Then the next iteration.
+   - What could not be checked here (a phone, a Mac, iOS's Files app, a real GPU, HDR on a screen) said under the box: "to check on a device", and gathered in the final pull request. It does not block the box.
+7. **Commit and push.** The code, its tests, the ticked box and the changelog line in the same commit (or a few, for a large box), its message in Conventional Commits (`feat(editor): speed curves on video and sound layers`), then push `feat/roadmap-loop`. No `Co-Authored-By` line, no mention of Claude in commits or in the pull request. Nothing is left unpushed at the end of an iteration.
+8. **Report.** One line to the user: the box landed, its commit, what is next. Then the next iteration.
 
 ## When to stop and ask
 
@@ -65,18 +66,20 @@ The loop stops and asks the user, instead of choosing, when:
 - a box contradicts a principle of its roadmap or of another one;
 - `develop` has failing checks the loop did not cause.
 
-It also stops when every box of the queue is ticked or blocked, with the list of what is blocked and why.
+It also stops when every box of the queue is ticked or blocked. Then it opens the pull request (see "The end").
 
 ## What the loop never does
 
-- Push to `main`, force-push `develop`, rewrite history that is not its own branch's.
+- Push to `main` or to `develop`, force-push anything (`feat/roadmap-loop` included: every run builds on what the previous one pushed), merge anything into `develop`.
 - Delete or rewrite a roadmap's plan to make a box easier; a plan that turns out wrong is a question for the user.
-- Merge a pull request whose checks fail.
+- Push a commit whose checks fail.
 - Add a provider, a key, an account or a server to a feature these roadmaps keep local.
 
-## Merging
+## The end
 
-Each pull request is squashed into `develop` by the loop once the CI passes (`gh pr merge --squash`), so the next iteration starts from a `develop` that holds the previous one. The user reviews after the fact, on `develop`, and can revert one squashed commit without touching the others. If the user prefers to merge by hand, the loop opens the pull request and waits: it starts the next box only once the previous one is merged.
+When the queue is done, the loop opens one pull request from `feat/roadmap-loop` against `develop`, titled `feat: the roadmap loop` (or what the work turned out to be), and does not merge it. Its body: what each roadmap gained, step by step, with the commits; the figures of Performance step 1 before and after; what is blocked and why; what must be checked on a device. The user reviews it and merges it.
+
+The CI runs on pull requests only, so until then `npm run typecheck` and `npm test`, run by the loop before every push, are the only gate: they are never skipped.
 
 ## How the loop runs
 
@@ -84,7 +87,7 @@ Three ways, the same brief:
 
 - **A scheduled task (recommended).** A fresh session every few hours, each doing as many iterations as fit, then stopping cleanly. Each run starts from what is pushed, so nothing is lost when a session ends, and each starts with a clean context. The prompt of the task:
 
-  > Work on the tramme repository (kyogreultima/tramme). Read `docs/roadmap-loop.md` on `develop` and follow it: run iterations one after the other, each landing one box of the queue, until the run's time is nearly spent or the loop says to stop. Leave nothing unpushed.
+  > Work on the tramme repository (kyogreultima/tramme). Read `docs/roadmap-loop.md` on `develop` and follow it: work on the branch `feat/roadmap-loop` (create it from the latest `develop` if it does not exist yet), run iterations one after the other, each landing one box of the queue with its changelog line, until the run's time is nearly spent or the loop says to stop. Leave nothing unpushed. Do not open the pull request before every box is ticked or blocked.
 
 - **This session, with `/loop`.** The same prompt, paced by the agent; it lasts as long as the session.
 - **By hand.** The same prompt pasted into a new session, one run at a time.
