@@ -17,7 +17,8 @@ None of them needs a provider or a key. Most are code (a curve integrated, a sha
 - **Code where code does it.** A curve, a shader or a DSP stage is preferred to a model whenever it is as good: it is exact, instant and the same on every machine.
 - **One mechanism.** Each feature is a property or an effect the inspector shows from its schema, and, when it computes something, a tool of the editor's vocabulary: the assistant runs it (`use_tool`), the user too (`/` menu). Each gets its `ai` notes (`packages/nodes/src/notes.ts`) so the assistant knows when to reach for it and when not to.
 - **Long jobs are honest.** A job that takes minutes says how long before it starts (measured on the machine), shows its progress, can be cancelled, and resumes from what it finished. The desktop app is the recommended place for them, not the only one.
-- **Licences checked before a model ships.** Each model and its weights go into `THIRD_PARTY_NOTICES.md` with their licence; a weight that forbids commercial use does not ship.
+- **Nothing in the bundle.** No model is packed with the editor or the desktop app: each is downloaded the first time its tool runs and kept in the browser's cache (`transformers-cache`, as the cut-out does), so the app weighs the same with or without these features. A user who never runs a tool never downloads its model.
+- **A default model, the user's choice beyond it.** Each tool names the model it downloads by default and its size before downloading; the user can point it at another model of the same kind (a model hub id) in the settings. The defaults are listed in `THIRD_PARTY_NOTICES.md` with their licences and allow commercial use; a model the user picks is under its own licence.
 
 ## Steps
 
@@ -83,7 +84,7 @@ Done when: a video layer ramps from 1× to 0.3× and back over two seconds, the 
 
 ### Step 10. Hesitations
 
-- [ ] Find the "uh"s and "um"s that the transcript leaves out: Whisper drops them from the text, so a voice activity detector (Silero VAD, in the browser) marks speech where the transcript has no word, and those spans are the hesitations. A disfluency-aware transcription model replaces this only if its weights allow commercial use.
+- [ ] Find the "uh"s and "um"s that the transcript leaves out: Whisper drops them from the text, so a voice activity detector (Silero VAD, in the browser) marks speech where the transcript has no word, and those spans are the hesitations. A disfluency-aware transcription model (one that writes the hesitations) can be picked instead in the settings; it is never the default unless its licence allows commercial use.
 - [ ] The `fillers` tool cuts them like `silences` does (`apps/editor/src/cuts.ts`): the layer split, the spans laid back to back, the transcript remapped and the captions reconnected.
 - [ ] Each cut listed in the proposal with a moment to hear it, so a word cut by mistake is put back in one click.
 
