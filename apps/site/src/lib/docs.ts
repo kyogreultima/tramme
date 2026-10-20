@@ -48,6 +48,7 @@ export const DOCS: { label: string; collapsed?: boolean; pages: DocPage[] }[] = 
     collapsed: true,
     pages: [
       { slug: 'roadmaps/plugins', label: 'Plugins', file: 'docs/plugins-roadmap.md' },
+      { slug: 'roadmaps/installed-plugins', label: 'Installed plugins', file: 'docs/installed-plugins-roadmap.md' },
       { slug: 'roadmaps/motion', label: 'Motion', file: 'docs/motion-roadmap.md' },
       { slug: 'roadmaps/sound', label: 'Sound', file: 'docs/sound-roadmap.md' },
       { slug: 'roadmaps/generation', label: 'Generation', file: 'docs/generation-roadmap.md' },
