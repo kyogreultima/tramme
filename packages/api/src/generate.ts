@@ -7,7 +7,7 @@
 //     kind: 'sfx' | 'music' | 'voice'; prompt: what to make, or the text to say
 //   GET  /api/voices?provider=&search=&language=&accent=&gender=   the voices a voice-over can take
 
-import { hydraceptHeaders, hydraceptMusic, hydraceptSfx, hydraceptVoice } from './hydracept.ts';
+import { fetchHydraceptVoices, hydraceptHeaders, hydraceptMusic, hydraceptSfx, hydraceptVoice, mapHydraceptVoices } from './hydracept.ts';
 import { HttpError, json, readJson } from './http.ts';
 import type { Keys } from './keys.ts';
 import type { MediaConfig } from './media.ts';
@@ -188,11 +188,15 @@ const FILTERS = ['search', 'language', 'accent', 'gender', 'age'] as const;
 export async function voices(req: Request, { keys, fetch, media }: Reach) {
   const q = new URL(req.url).searchParams;
   const voiceMakers = soundConfig(keys, media).voice;
-  const listed = q.get('provider') || voiceMakers.find((p) => p === 'elevenlabs') || voiceMakers[0];
-  const provider = listed as Provider | undefined;
-  if (provider === 'hydracept') throw new HttpError(400, 'hydracept makes no voice-over list: use provider=elevenlabs or pass a voice id to generate');
-  if (!provider || !PROVIDERS[provider]?.kinds.includes('voice')) throw new HttpError(provider ? 400 : 503, provider ? `${provider} makes no voice-over` : `no provider for voice: ${keys.how(['elevenlabs', 'openai', 'gemini'], 'one')}`);
+  const provider = (q.get('provider') || voiceMakers[0]) as Provider | undefined;
+  if (!provider) throw new HttpError(503, `no provider for voice: ${keys.how(['elevenlabs', 'openai', 'gemini'], 'one')}`);
   const search = (q.get('search') ?? '').toLowerCase();
+  if (provider === 'hydracept') {
+    if (media?.provider !== 'hydracept') throw new HttpError(503, 'Hydracept is not configured (MEDIA_PROVIDER=hydracept and HYDRACEPT_API_KEY, HYDRACEPT_PROJECT on the server)');
+    const catalog = await fetchHydraceptVoices(media.hydracept, fetch);
+    return json({ voices: mapHydraceptVoices(catalog, search) });
+  }
+  if (!PROVIDERS[provider]?.kinds.includes('voice')) throw new HttpError(400, `${provider} makes no voice-over`);
   if (provider !== 'elevenlabs') {
     const names = provider === 'openai' ? OPENAI_VOICES : GEMINI_VOICES;
     return json({ voices: names.filter((n) => !search || n.toLowerCase().includes(search)).map((name): Voice => ({ id: name, name, provider, source: 'built-in' })) });

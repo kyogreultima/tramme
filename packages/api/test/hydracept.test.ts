@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { generate } from '../src/generate.ts';
-import { HYDRACEPT_AUDIO_MP3, hydraceptImage, hydraceptMusic, hydraceptSfx } from '../src/hydracept.ts';
+import { generate, voices } from '../src/generate.ts';
+import { HYDRACEPT_AUDIO_MP3, hydraceptImage, hydraceptMusic, hydraceptSfx, mapHydraceptVoices } from '../src/hydracept.ts';
 import { generateImage } from '../src/images.ts';
 import type { Keys } from '../src/keys.ts';
 import type { MediaConfig } from '../src/media.ts';
@@ -129,5 +129,37 @@ describe('routes with Hydracept', () => {
     expect(res.headers.get('x-tramme-provider')).toBe('hydracept');
     expect(res.headers.get('x-tramme-model')).toBe('music_v2_5');
     expect(res.headers.get('content-type')).toBe('audio/mpeg');
+  });
+
+  it('lists voices from Hydracept when it is the default voice provider', async () => {
+    const calls: { url: string; headers?: HeadersInit }[] = [];
+    vi.stubGlobal('fetch', (url: string | URL, init?: RequestInit) => {
+      calls.push({ url: String(url), headers: init?.headers });
+      if (String(url).includes('/audio.voice.generate.v1/voices')) {
+        return Promise.resolve(new Response(JSON.stringify({
+          capabilityKey: 'audio.voice.generate.v1',
+          source: 'curated',
+          voices: [
+            { voiceId: 'v1', name: 'Alice', description: 'Warm narrator', previewUrl: 'https://cdn.example/p.mp3' },
+            { voiceId: 'v2', name: 'Bob' },
+          ],
+        }), { headers: { 'content-type': 'application/json' } }));
+      }
+      return Promise.resolve(new Response('unexpected', { status: 500 }));
+    });
+    const res = await voices(new Request('http://localhost/api/voices?search=ali'), reach);
+    expect(res.status).toBe(200);
+    expect(calls[0].url).toContain('/v1/capabilities/audio.voice.generate.v1/voices');
+    expect(calls[0].url).toContain('projectId=cpr_test');
+    expect((calls[0].headers as Record<string, string>).authorization).toBe('Bearer hk-test');
+    const body = await res.json() as { voices: { id: string; name: string; provider: string; source: string; preview?: string }[] };
+    expect(body.voices).toEqual([{ id: 'v1', name: 'Alice', provider: 'hydracept', source: 'library', description: 'Warm narrator', preview: 'https://cdn.example/p.mp3' }]);
+  });
+});
+
+describe('mapHydraceptVoices', () => {
+  it('maps catalog source curated to library, others to account', () => {
+    expect(mapHydraceptVoices({ capabilityKey: 'audio.voice.generate.v1', source: 'byok', voices: [{ voiceId: 'a', name: 'A' }] })[0].source).toBe('account');
+    expect(mapHydraceptVoices({ capabilityKey: 'audio.voice.generate.v1', source: 'curated', voices: [{ voiceId: 'a', name: 'A' }] })[0].source).toBe('library');
   });
 });

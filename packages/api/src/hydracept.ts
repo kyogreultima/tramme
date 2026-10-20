@@ -256,3 +256,43 @@ export async function hydraceptVoice(
 export function hydraceptHeaders(run: HydraceptRun): Record<string, string> {
   return { 'x-tramme-hydracept-receipt': run.receiptId, 'x-tramme-hydracept-quote': run.quoteId };
 }
+
+export interface HydraceptVoiceCatalog {
+  capabilityKey: string;
+  source: 'byok' | 'managed' | 'curated';
+  voices: {
+    voiceId: string;
+    name: string;
+    category?: string | null;
+    description?: string | null;
+    previewUrl?: string | null;
+  }[];
+}
+
+/** GET /v1/capabilities/audio.voice.generate.v1/voices (OpenAPI: HydraceptVoiceCatalog). */
+export async function fetchHydraceptVoices(media: HydraceptMedia, fetch: Fetch): Promise<HydraceptVoiceCatalog> {
+  const params = new URLSearchParams({ projectId: media.projectId, environment: media.environment });
+  const res = await fetch(url(media.apiUrl, `/capabilities/audio.voice.generate.v1/voices?${params}`), {
+    headers: { authorization: `Bearer ${media.apiKey}`, 'x-hydracept-client': CLIENT },
+  });
+  return readJson(res);
+}
+
+/** tramme Voice list from a Hydracept catalog (search filters name and description). */
+export function mapHydraceptVoices(
+  catalog: HydraceptVoiceCatalog,
+  search = '',
+): { id: string; name: string; provider: 'hydracept'; source: 'account' | 'library'; description?: string; preview?: string }[] {
+  const source = catalog.source === 'curated' ? 'library' as const : 'account' as const;
+  const q = search.toLowerCase();
+  return catalog.voices
+    .filter((v) => !q || v.name.toLowerCase().includes(q) || (v.description ?? '').toLowerCase().includes(q))
+    .map((v) => ({
+      id: v.voiceId,
+      name: v.name,
+      provider: 'hydracept' as const,
+      source,
+      ...(v.description ? { description: String(v.description).slice(0, 200) } : {}),
+      ...(v.previewUrl ? { preview: v.previewUrl } : {}),
+    }));
+}
