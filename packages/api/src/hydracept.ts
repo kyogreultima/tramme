@@ -1,4 +1,11 @@
 // Hydracept durable jobs for OpenAI images and ElevenLabs SFX/voice (quote, then job, receipt id).
+//
+// Audio format: tramme expects audio/mpeg from direct ElevenLabs, but Hydracept’s published
+// contract for audio.sfx.generate.v1 and audio.voice.generate.v1 is Ogg only — catalog
+// `output.mediaType` is `audio/ogg` and docs say artifacts are Ogg, not WAV/MP3. Voice input
+// includes `outputFormatPreference` (untyped string, no enum in GET …/capabilities/… or OpenAPI);
+// SFX input has no output-format field. Do not guess provider format strings or transcode here;
+// request MP3 from Hydracept when they document a supported value.
 
 import { HttpError } from './http.ts';
 import type { HydraceptMedia } from './media.ts';

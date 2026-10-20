@@ -102,6 +102,8 @@ describe('routes with Hydracept', () => {
     stubHydraceptJob(OGG, 'audio/ogg');
     const res = await generate(new Request('http://localhost/api/generate', { method: 'POST', body: JSON.stringify({ kind: 'sfx', prompt: 'click' }) }), reach);
     expect(res.headers.get('x-tramme-provider')).toBe('hydracept');
+    // Hydracept catalog contract: audio/ogg until a documented MP3 output option exists
     expect(res.headers.get('content-type')).toBe('audio/ogg');
+    expect(res.headers.get('content-type')).not.toBe('audio/mpeg');
   });
 });
