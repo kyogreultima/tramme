@@ -11,7 +11,7 @@
 // each effect, and five moments are given to check by ear: a human does the
 // final listen.
 
-import { audioClips, bandPowers, curveAt, Evaluator, integratedLoudness, loudnessSeries, pictureMotion, pointer, powerDb, soundFigures, soundMix, truePeak, type AudioClip, type Op, type QualityIssue, type SoundFigures, type ToolContext, type ToolType } from '@tramme/core';
+import { audioClips, bandPowers, noiseFigures, NOISY_SNR, curveAt, Evaluator, integratedLoudness, loudnessSeries, pictureMotion, pointer, powerDb, soundFigures, soundMix, truePeak, type AudioClip, type Op, type QualityIssue, type SoundFigures, type ToolContext, type ToolType } from '@tramme/core';
 import { mixComposition } from '@tramme/render';
 import { channelsOf, cuesOf, measure } from './sound.ts';
 import { canvas, caption, drawCurve, drawSpectrogram, drawWave, INK, mark } from './sound-pictures.ts';
@@ -203,6 +203,7 @@ export const SOUND_TEXTS = {
   voice: 'The music is only {lu} LU under the voice (8 at least): duck it',
   dip: 'The music drops {lu} LU around {t} s, unplanned',
   silence: 'Silence from {from} to {to} s, unplanned (a marker of kind silence plans one)',
+  noisy: 'The voice stands only {snr} dB over its noise ({floor} dBFS between the words): clean it (denoise)',
 };
 
 const say = (text: string, params: Record<string, string | number>) => ({ message: Object.entries(params).reduce((s, [k, v]) => s.replace(`{${k}}`, String(v)), text), say: { text, params } });
@@ -232,6 +233,16 @@ export async function soundReport(ctx: ToolContext, opts: { image?: boolean } = 
   if (tp > -1) issues.push({ check: 'sound', severity: 'warning', ...say(target === null ? SOUND_TEXTS.clips : SOUND_TEXTS.peak, { db: tp.toFixed(1), t: soundFigures(final, rate).peakAt.toFixed(2) }) });
   const f = soundFigures(final, rate);
   if (f.loudDb < -30) issues.push({ check: 'sound', severity: 'info', ...say(SOUND_TEXTS.quiet, { db: f.loudDb }) });
+  // the voice over its own noise: a floor high between the words is a voice to clean
+  if (s.voice) {
+    const v = channelsOf(s.voice), mono = new Float32Array(v[0].length);
+    for (let i = 0; i < mono.length; i++) mono[i] = (v[0][i] + (v[1] ?? v[0])[i]) / 2;
+    const n = noiseFigures(mono, rate);
+    if (n && n.snr < NOISY_SNR) {
+      const raw = clips.filter((x) => x.role === 'voice' && x.share === undefined).map((x) => x.layerId);
+      issues.push({ check: 'sound', severity: 'warning', ...(raw.length ? { layers: [...new Set(raw)] } : {}), ...say(SOUND_TEXTS.noisy, { snr: n.snr, floor: n.floorDb }) });
+    }
+  }
   // each effect: on its cue, heard over the bed
   const effects = await effectsOf(ctx, s), cues = cuesOf(ctx);
   for (const e of effects) {

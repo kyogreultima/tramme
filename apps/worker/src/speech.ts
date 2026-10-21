@@ -35,5 +35,5 @@ export async function transcribe(req: Request, env: Env) {
   }
   const words = (out.segments ?? []).flatMap((s) => (s.words ?? []).map((w) => ({ w: String(w.word ?? '').trim(), s: Number(w.start ?? 0), e: Number(w.end ?? 0) })))
     .filter((w) => w.w && Number.isFinite(w.s) && Number.isFinite(w.e));
-  return json({ words, text: out.text ?? '', language: out.transcription_info?.language, duration: out.transcription_info?.duration });
+  return json({ words, text: out.text ?? '', language: out.transcription_info?.language, duration: out.transcription_info?.duration, model: `workers-ai:${MODEL}` });
 }

@@ -150,10 +150,10 @@ export async function startCompanion(opts: { port?: number; origins?: string[]; 
         json(200, { ok: true });
       } else if (req.method === 'POST' && url.pathname === '/transcribe') {
         // speech to text on this machine, when the server has none
-        const b = await readJson(req) as { audio?: string; language?: string };
+        const b = await readJson(req) as { audio?: string; language?: string; model?: string };
         if (typeof b.audio !== 'string') { json(400, { error: 'audio expected (WAV in base64)' }); return; }
         const { transcribeLocal } = await import('./speech.ts');
-        json(200, await transcribeLocal(b.audio, b.language));
+        json(200, await transcribeLocal(b.audio, b.language, b.model));
       } else if (req.method === 'POST' && url.pathname === '/stop') {
         stopTurn();
         json(200, { ok: true });

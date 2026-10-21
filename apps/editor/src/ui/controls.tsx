@@ -406,7 +406,7 @@ export function Swatch({ color, onClick, title }: { color: string; onClick?: (e:
 }
 
 /** a colour value: hex, rgba or '@token' */
-export function ColorField({ value, tokens, onCommit, onDraft }: { value: string; tokens: Record<string, Token>; onCommit: (v: string) => void; onDraft?: (v: string) => void }) {
+export function ColorField({ value, tokens, onCommit, onDraft, onPick }: { value: string; tokens: Record<string, Token>; onCommit: (v: string) => void; onDraft?: (v: string) => void; onPick?: () => void }) {
   const [open, setOpen] = useState<HTMLElement | null>(null);
   const resolved = resolveColor(value, tokens);
   const isToken = value?.startsWith('@');
@@ -414,6 +414,7 @@ export function ColorField({ value, tokens, onCommit, onDraft }: { value: string
     <>
       <Swatch color={resolved} onClick={(e) => setOpen(open ? null : (e.currentTarget as HTMLElement))} title={t('common.pickAColor')} />
       <TextInput value={value ?? ''} mono onCommit={(v) => { const t = v.trim(); if (t.startsWith('@') ? tokens[t.slice(1)] : isColor(t)) onCommit(t); }} />
+      {onPick && <button class="icon-btn sm" style={{ flex: 'none' }} title={t('common.pickInViewport')} onClick={onPick}><Icon name="target" /></button>}
       {open && (
         <Popover anchor={open} onClose={() => setOpen(null)} class="color-pop">
           <div class="row">

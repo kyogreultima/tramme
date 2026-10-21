@@ -1,11 +1,13 @@
 // Transport and timeline: one row per layer (its clip from in to out, its
 // keyframes summarised), expandable into one row per animated property.
 // Clips move and trim, keyframes select and drag, all snapped to frames.
+// A transition is put on a cut from a clip's menu; its band over the start of
+// the incoming clip drags its length.
 
 import { signal } from '@preact/signals';
 import { useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { layerActive, pointer, staticValue, type Composition, type Keyframe, type Layer, type Op } from '@tramme/core';
-import { clickSelect, comp, commit, draft, cancelDraft, S, select, selectAll, setTime, frameStep, toggleFold, uiTime, viewDoc } from '../state.ts';
+import { clickSelect, comp, commit, draft, cancelDraft, S, select, selectAll, setTime, frameStep, toast, toggleFold, uiTime, viewDoc } from '../state.ts';
 import { animatedProps, contentEnd, crossfadeOps, flatTree, freshId, keysOf, layerName, parentOf, parseTime, propPath, rawProp, rulerLabel, shiftLayerOps, snap, splitLayerOps, subtree, timecode, topLayers, trimInOps, type TreeItem } from '../model.ts';
 import { bandOf, longPress, noBrowserMenu, openMenu, Seg, useSize } from './controls.tsx';
 import { Icon, kindColor, kindIcon } from './icons.tsx';
@@ -15,6 +17,7 @@ import { GraphEditor } from './GraphEditor.tsx';
 import { addLayerMenu, FoldButtons, openLayerMenu } from './LeftPanel.tsx';
 import { peaksOf, wavePath, wavesReady } from '../waveforms.ts';
 import { m, t, tr } from '../i18n/index.ts';
+import { outgoingOf, TRANSITION_KINDS, transitionOf, transitionPlan, type TransitionKind } from '../transitions.ts';
 
 export const pps = signal(0);              // pixels per second (0: fit)
 const expanded = signal<Set<string>>(new Set());
@@ -298,6 +301,14 @@ export function Timeline() {
         { label: t('timeline.trimEndToPlayhead'), icon: 'cutTail', disabled: !inside, onClick: () => commit(t('timeline.trimEndToPlayhead'), [{ op: 'add', path: `${lp}/out`, value: at }]) },
         { label: t('timeline.moveToPlayhead'), icon: 'arrow', disabled: at === tin, onClick: () => commit(t('timeline.moveToPlayhead'), shiftLayerOps(S.doc.peek(), compId, id, at - tin)) },
         { label: t('timeline.crossfade'), icon: 'compare', hint: t('timeline.crossfadeHint'), disabled: !fade, onClick: () => fade && commit(t('timeline.crossfade'), fade.ops) },
+        {
+          label: transitionOf(l) ? t('timeline.changeTransition') : t('timeline.addTransition'), icon: 'effects', hint: t('timeline.transitionHint'),
+          disabled: !outgoingOf(d0, compId, id),
+          onClick: () => {
+            const had = Number(staticValue(transitionOf(l)?.props?.duration)) || 0.5;
+            openMenu(e, TRANSITION_KINDS.map((kind) => ({ label: t(KIND_LABEL[kind]), onClick: () => { const ops = putTransition(compId, id, kind, had); if (ops) commit(t('timeline.transitionName', { name: t(KIND_LABEL[kind]) }), ops); } })));
+          },
+        },
         ...(media && start0 !== null ? [{
           label: looping ? t('timeline.stopTheLoop') : t('timeline.loopToTheEnd'),
           icon: 'loop' as const,
@@ -431,6 +442,7 @@ export function Timeline() {
                     {l.type === 'audio' && <ClipWave layer={l} from={a} seconds={b - a} width={(b - a) * k} />}
                     {l.type === 'video' && !S.playing.value && <ClipFilm layer={l} from={a} seconds={b - a} width={(b - a) * k} />}
                     {(l.type === 'audio' || l.type === 'video') && (b - a) * k > 60 && <ClipFades compId={compId} id={id} layer={l} seconds={b - a} k={k} />}
+                    <TransitionBand compId={compId} id={id} layer={l} k={k} />
                     {(b - a) * k > 60 && <span class="label">{layerName(id, l)}</span>}
                     <span class="edge l" onPointerDown={(e) => dragClip(e, id, 'in')} />
                     <span class="edge r" onPointerDown={(e) => dragClip(e, id, 'out')} />
@@ -513,6 +525,56 @@ function ClipFilm({ layer, from, seconds, width }: { layer: Layer; from: number;
   });
   if (!ok) return null;
   return <canvas ref={canvas} class="film" width={slots * FILM_W} height={FILM_H} aria-hidden="true" />;
+}
+
+const KIND_LABEL: Record<TransitionKind, string> = {
+  crossfade: m('timeline.kindCrossfade'), dip: m('timeline.kindDip'), push: m('timeline.kindPush'), slide: m('timeline.kindSlide'),
+  zoom: m('timeline.kindZoom'), whip: m('timeline.kindWhip'), luma: m('timeline.kindLuma'), glitch: m('timeline.kindGlitch'),
+};
+
+/** a video's length when the preview has it open: the handle after a shot's end */
+const fileLength = (asset: string) => { try { return (preview.renderer?.assets.get(asset) as { duration?: number } | undefined)?.duration; } catch { return undefined; } };
+
+/** a transition on the cut into this clip, its length: the operations, or a toast saying why not */
+function putTransition(compId: string, id: string, kind: TransitionKind, duration: number, quiet = false): Op[] | null {
+  const plan = transitionPlan(S.doc.peek(), compId, id, kind, duration, fileLength);
+  if ('error' in plan) {
+    if (!quiet) toast(plan.error === 'no-handle' ? t('timeline.noHandleLeft', { missing: (plan.missing ?? 0).toFixed(2) }) : t('timeline.noCutHere'), 'error');
+    return null;
+  }
+  return plan.ops;
+}
+
+/** the transition of a clip as a band over its start: drag its right edge to change its length */
+function TransitionBand({ compId, id, layer, k }: { compId: string; id: string; layer: Layer; k: number }) {
+  const tr0 = transitionOf(layer);
+  if (!tr0) return null;
+  const kind = (TRANSITION_KINDS as readonly string[]).includes(String(staticValue(tr0.props?.kind))) ? staticValue(tr0.props?.kind) as TransitionKind : 'crossfade';
+  const d0 = Number(staticValue(tr0.props?.duration)) || 0.5;
+  const drag = (e: PointerEvent) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const fps = comp.peek().fps, x0 = e.clientX;
+    let ops: Op[] | null = null;
+    const move = (ev: PointerEvent) => {
+      const d = snap(Math.max(1 / fps, d0 + (ev.clientX - x0) / k), fps);
+      ops = Math.abs(d - d0) < 1e-6 ? null : putTransition(compId, id, kind, d, true);
+      if (ops) draft(ops); else cancelDraft();
+    };
+    const up = () => {
+      removeEventListener('pointermove', move);
+      removeEventListener('pointerup', up);
+      if (ops) commit(t('timeline.transitionName', { name: t(KIND_LABEL[kind]) }), ops); else cancelDraft();
+    };
+    addEventListener('pointermove', move);
+    addEventListener('pointerup', up);
+  };
+  return (
+    <span class="tr-band" style={{ width: d0 * k }} title={t('timeline.transitionBand', { name: t(KIND_LABEL[kind]), seconds: d0.toFixed(2) })}>
+      <span class="tr-edge" onPointerDown={drag} />
+    </span>
+  );
 }
 
 /** the fades of a clip as two handles at its top corners: drag one, the gain follows */

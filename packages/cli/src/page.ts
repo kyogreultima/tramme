@@ -7,8 +7,8 @@
 
 import type { TrammeDoc } from '@tramme/core';
 import { builtinRegistry } from '@tramme/nodes';
-import { encodeWav, mixComposition, Renderer, type RenderOptions } from '@tramme/render';
-import { blitSandboxFrame, ensureSandboxDoc, sandboxVideoFrames } from '../../../apps/editor/src/plugins/sandbox-draw.ts';
+import { addParts, encodeWav, formatParts, mixComposition, noParts, perFrame, Renderer, type FrameParts, type RenderOptions } from '@tramme/render';
+import { blitSandboxFrame, ensureDeclared, ensureSandboxDoc, pluginItemsOf, sandboxVideoFrames } from '../../../apps/editor/src/plugins/sandbox-draw.ts';
 import { browserHost, type PluginHost } from '../../../apps/editor/src/plugins/host.ts';
 
 const q = new URLSearchParams(location.search);
@@ -30,6 +30,8 @@ async function sandboxReady(): Promise<PluginHost | null> {
   const doc = currentDoc;
   if (!sandboxOn || !doc || !(doc.plugins ?? []).length) return null;
   sandbox ??= browserHost(docUrl);
+  // the document's plugins loaded in the worker first (a url it knows is not loaded again), as the editor does
+  await ensureDeclared(sandbox, pluginItemsOf(doc, docUrl));
   ensureSandboxDoc(sandbox, {
     doc, docUrl,
     loaded: (id) => { try { return renderer.assets.get(id); } catch { return null; } },
@@ -107,17 +109,22 @@ const api = {
     for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
     return btoa(s);
   },
-  /** stream frames [f0, f1) over the WebSocket: 'yuv' (4:2:0 BT.709) or 'rgba' (straight alpha); returns ms per frame */
-  async capture(f0: number, f1: number, opts: RenderOptions = {}, kind: 'yuv' | 'rgba' = 'yuv'): Promise<number> {
+  /** stream frames [f0, f1) over the WebSocket: 'yuv' (4:2:0 BT.709) or 'rgba' (straight alpha); returns ms per frame, and its parts */
+  async capture(f0: number, f1: number, opts: RenderOptions = {}, kind: 'yuv' | 'rgba' | 'rgba64' = 'yuv', sink?: string): Promise<{ ms: number; parts: FrameParts }> {
     const { width: W, height: H, fps } = renderer.comp;
-    const ws = new WebSocket(`ws://${location.host}/__tramme/ws`);
+    const ws = new WebSocket(`ws://${location.host}/__tramme/ws${sink ? `?sink=${encodeURIComponent(sink)}` : ''}`);
     ws.binaryType = 'arraybuffer';
     await new Promise((res, rej) => { ws.onopen = res; ws.onerror = rej; });
     let waiting: (() => void) | null = null;
     ws.onmessage = () => { const r = waiting; waiting = null; r?.(); };
-    const size = kind === 'rgba' ? W * H * 4 : (W * H * 3) / 2;
+    const size = kind === 'rgba64' ? W * H * 8 : kind === 'rgba' ? W * H * 4 : (W * H * 3) / 2;
     const bufs = [new Uint8Array(size), new Uint8Array(size)];
+    // 16 bits a channel, little-endian as the page's typed arrays are (ffmpeg rgba64le)
+    const wide = kind === 'rgba64' ? bufs.map((b) => new Uint16Array(b.buffer)) : null;
     const t0 = performance.now();
+    // where the time goes: the renderer counts evaluation, drawing and video; readback and send are counted here
+    const parts = noParts();
+    renderer.times = noParts();
     const progress = (window as any).__trammeProgress as ((done: number, total: number) => void) | undefined;
     let inflight: Promise<void> | null = null;
     for (let f = f0; f < f1; f++) {
@@ -129,20 +136,29 @@ const api = {
         if (renderer.late) { ws.close(); throw new Error(`frame ${f} (${(f / fps).toFixed(2)} s) never finished: a video frame or a plugin picture did not come`); }
       }
       const buf = bufs[f & 1];
-      if (kind === 'rgba') renderer.compositor.readRGBA(buf, renderer.lastSeed);
+      const r0 = performance.now();
+      if (wide) renderer.compositor.readRGBA16(wide[f & 1]);
+      else if (kind === 'rgba') renderer.compositor.readRGBA(buf, renderer.lastSeed);
       else renderer.compositor.readYUV(buf, renderer.lastSeed);
+      const s0 = performance.now();
+      parts.readback += s0 - r0;
       if (inflight) await inflight; // one frame in flight while the next renders
+      parts.send += performance.now() - s0;
       inflight = new Promise((r) => { waiting = r; });
       ws.send(buf);
       progress?.(f - f0 + 1, f1 - f0);
       if ((f - f0) % 30 === 29 || f === f1 - 1) {
         const n = f - f0 + 1;
-        console.log(`image ${f + 1}/${f1}  ${((performance.now() - t0) / n).toFixed(0)} ms/image`);
+        const sofar = addParts({ ...parts }, renderer.times);
+        console.log(`image ${f + 1}/${f1}  ${((performance.now() - t0) / n).toFixed(0)} ms/image  (${formatParts(sofar, n)})`);
       }
     }
+    const s1 = performance.now();
     if (inflight) await inflight;
+    parts.send += performance.now() - s1;
     ws.close();
-    return (performance.now() - t0) / Math.max(1, f1 - f0);
+    const n = Math.max(1, f1 - f0);
+    return { ms: (performance.now() - t0) / n, parts: perFrame(addParts(parts, renderer.times), n) };
   },
 };
 

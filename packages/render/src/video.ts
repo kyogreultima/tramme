@@ -1,15 +1,12 @@
 // Video assets: frames decoded on demand with WebCodecs (Mediabunny), from
 // the file served with range requests, so a long video is never loaded whole.
-// Playback reads forward from a decoder kept open; a jump elsewhere starts a
-// new read there. The last few frames stay at hand (motion blur sub-frames,
-// small steps back).
+// Playback reads forward from decoders kept open, one per play position in
+// use (video-pool.ts); a jump elsewhere starts a new read there. The last few
+// frames of each stay at hand (motion blur sub-frames, small steps back).
 
-import { ALL_FORMATS, BlobSource, CanvasSink, Input, UrlSource, type WrappedCanvas } from 'mediabunny';
+import { ALL_FORMATS, BlobSource, CanvasSink, Input, UrlSource, type InputVideoTrack, type WrappedCanvas } from 'mediabunny';
 import type { VideoAsset } from '@tramme/core';
-
-const KEEP = 6;
-/** a request this far ahead of the current read continues it rather than seeking */
-const AHEAD = 2;
+import { KEEP, ReaderPool } from './video-pool.ts';
 
 export class VideoFrames implements VideoAsset {
   width = 0;
@@ -17,9 +14,7 @@ export class VideoFrames implements VideoAsset {
   duration = 0;
   hasAudio = false;
   private input: Input;
-  private sink!: CanvasSink;
-  private frames: WrappedCanvas[] = [];
-  private reader: { it: AsyncGenerator<WrappedCanvas, void, unknown>; at: number } | null = null;
+  private pool!: ReaderPool<WrappedCanvas>;
   private busy: Promise<void> = Promise.resolve();
   /** times asked for and not found (past the end, a gap): not asked again */
   private missed = new Set<number>();
@@ -37,28 +32,20 @@ export class VideoFrames implements VideoAsset {
     v.height = track.displayHeight;
     v.duration = await v.input.computeDuration();
     v.hasAudio = !!(await v.input.getPrimaryAudioTrack());
-    // a pool larger than the frames kept: a kept canvas is never reused under us
-    v.sink = new CanvasSink(track, { poolSize: KEEP + 3 });
+    v.pool = new ReaderPool(() => readerOf(track));
     return v;
   }
 
-  private find(t: number): WrappedCanvas | undefined {
-    return this.frames.find((f) => t + 1e-6 >= f.timestamp && t < f.timestamp + f.duration - 1e-6);
-  }
-
-  private keep(f: WrappedCanvas) {
-    this.frames = [...this.frames.filter((x) => x.timestamp !== f.timestamp), f].sort((a, b) => a.timestamp - b.timestamp);
-    if (this.frames.length > KEEP) this.frames.shift();
-  }
+  /** decoders opened so far (a read starting somewhere: a seek) */
+  get seeks() { return this.pool.opened; }
 
   frameAt(t: number): { image: CanvasImageSource | null; exact: boolean } {
     const time = Math.min(Math.max(0, t), Math.max(0, this.duration - 1e-3));
-    const hit = this.find(time);
+    const hit = this.pool.find(time);
     if (hit) return { image: hit.canvas as CanvasImageSource, exact: true };
     const missed = this.missed.has(Math.round(time * 1000));
     // the nearest frame decoded, while the right one comes
-    let near: WrappedCanvas | undefined;
-    for (const f of this.frames) if (!near || Math.abs(f.timestamp - time) < Math.abs(near.timestamp - time)) near = f;
+    const near = this.pool.nearest(time);
     return { image: (near?.canvas as CanvasImageSource) ?? null, exact: missed };
   }
 
@@ -70,40 +57,23 @@ export class VideoFrames implements VideoAsset {
   }
 
   private async decode(t: number) {
-    await this.read(t);
-    if (!this.find(t)) {
+    await this.pool.read(t);
+    if (!this.pool.find(t)) {
       if (this.missed.size > 200) this.missed.clear();
       this.missed.add(Math.round(t * 1000));
     }
   }
 
-  private async read(t: number) {
-    if (this.find(t)) return;
-    const r = this.reader;
-    if (r && t >= r.at && t - r.at < AHEAD) {
-      // reading forward: continue the open decoder up to t
-      for (;;) {
-        const next = await r.it.next();
-        if (next.done) { this.reader = null; break; }
-        this.keep(next.value);
-        r.at = next.value.timestamp + next.value.duration;
-        if (this.find(t)) return;
-        if (next.value.timestamp > t) return;
-      }
-    }
-    // elsewhere: a new read from t
-    await this.reader?.it.return(undefined);
-    const it = this.sink.canvases(t);
-    const first = await it.next();
-    if (first.done) { this.reader = null; return; }
-    this.keep(first.value);
-    this.reader = { it, at: first.value.timestamp + first.value.duration };
-  }
-
   dispose() {
-    this.reader?.it.return(undefined);
+    this.pool.dispose();
     this.input.dispose();
   }
+}
+
+/** a reader's decoder: a sink of its own, its canvases a ring larger than the frames it keeps, so a kept canvas is never reused under us */
+function readerOf(track: InputVideoTrack) {
+  const sink = new CanvasSink(track, { poolSize: KEEP + 3 });
+  return (t: number) => sink.canvases(t);
 }
 
 /** what a video file holds, read from its header (a new project takes its size, cadence and length) */

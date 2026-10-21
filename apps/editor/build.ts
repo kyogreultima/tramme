@@ -62,14 +62,17 @@ Disallow: /api/
 `;
 
 // built files have hashed names: they never change and stay cached. In dev the
-// names are stable: always checked again (and versioned in the page, see below)
+// names are stable: always checked again (and versioned in the page, see below).
+// The plugin sandbox may evaluate (the document's expressions, compiled there
+// when it draws whole frames): its plugins run code there anyway, what it
+// must not do is reach the network, which connect-src keeps closed.
 const HEADERS = `/assets/*
   Cache-Control: ${dev ? 'no-cache' : 'public, max-age=31536000, immutable'}
 /sw.js
   Cache-Control: no-cache
 /plugin-worker.js
   Cache-Control: no-cache
-  Content-Security-Policy: default-src 'none'; script-src 'self' blob:; connect-src 'self'; img-src 'self' data: blob:; font-src 'self' data:; style-src 'unsafe-inline'
+  Content-Security-Policy: default-src 'none'; script-src 'self' blob: 'unsafe-eval'; connect-src 'self'; img-src 'self' data: blob:; font-src 'self' data:; style-src 'unsafe-inline'
 /*
   X-Content-Type-Options: nosniff
   Referrer-Policy: same-origin

@@ -30,6 +30,7 @@ import { startProject } from './start.ts';
 import { t } from './i18n/index.ts';
 import { boot } from './mode.ts';
 import { initDesktop } from './desktop.ts';
+import { copiesFor, startInstalled } from './installed.ts';
 
 const root = document.getElementById('app')!;
 
@@ -66,6 +67,7 @@ async function openProject(id: string) {
   // the editor's tour, the first time a project opens
   setTimeout(() => offerTours('editor'), 700);
   hooks.afterSave = () => { thumbnail(); };
+  hooks.copies = copiesFor;
   if (!info.manifest.thumbnail) setTimeout(() => thumbnail(true), 1500);
   // a handle for measurements and automated checks (tramme bench); runTool runs a tool of the / menu, its events returned
   (window as any).__tramme = { S, preview, select, setTime, undo, commit, runTool };
@@ -75,6 +77,8 @@ const m = location.pathname.match(/^\/p\/([a-z0-9][a-z0-9-]{2,63})\/?$/);
 boot().then(() => {
   // the native app: a .tramme handed by the system imports like a dropped one
   initDesktop();
+  // the plugins installed on this device, read once from where they are kept
+  startInstalled();
   if (m) {
     openProject(m[1]).catch((e) => {
       S.loadError.value = (e as Error).message;

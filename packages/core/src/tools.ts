@@ -53,6 +53,8 @@ export interface ToolContext {
   signal: AbortSignal;
   /** how far a long tool is (done of total, in any unit, and the step it is at): shown on its activity line */
   progress?(done: number, total: number, step?: string): void;
+  /** a request an installed plugin declared it makes (meta.permissions): to one of its network origins, or to one of its provider routes (/api/<route>/…, with the user's keys added on the way, never seen); refused otherwise, and absent for a plugin that declares none */
+  fetch?(url: string, init?: { method?: string; headers?: Record<string, string>; body?: string | ArrayBuffer }): Promise<Response>;
 }
 
 export interface ToolOutput {

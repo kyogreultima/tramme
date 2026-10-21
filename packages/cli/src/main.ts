@@ -1,7 +1,7 @@
 // tramme: command line.
 //   tramme validate <doc>
 //   tramme still    <doc> --t 0.5,1.2 [--out dir] [--samples n] [--comp id]
-//   tramme render   <doc> [--format mp4|mov|webm|gif|png] [--out file] [--samples n] [--from s] [--to s] [--crf 16] [--mute] [--comp id]
+//   tramme render   <doc> [--format mp4|mov|webm|gif|png] [--out file] [--samples n] [--from s] [--to s] [--crf 16] [--mute] [--comp id] [--pages n] [--depth 8|10]
 //   tramme export   <doc> --format lottie|svg|wav [--t s] [--comp id] [--out file]
 //   tramme import   <animation.json> [--out folder]                     Lottie to a tramme project folder
 //   tramme film     <film.json> [--out folder] [--seed n]               a project folder built from a film description (docs/film.md)
@@ -9,6 +9,7 @@
 //   tramme unpack   <project.tramme> [--out folder]                    a .tramme archive as a project folder (checked)
 //   tramme nodes    [<doc>]                                            the node and effect vocabulary (plugins included)
 //   tramme bench    <editor url> [--layer id] [--t s]                  how the editor holds up: playback, drag, hover
+//   tramme load     [case...] [--frames n] [--out folder] [--json file] [--before file]   the load cases of bench/load: where a frame's time goes
 //   tramme check-export <doc> --format lottie|svg --t 0.5,1.5 [--out dir]   an export played back (lottie-web, Chrome) vs tramme
 //   tramme compare  <ref> <test> [--diff dir] [--threshold 16]     files, or folders paired by time
 //   tramme schema   [--out schema/tramme-1.schema.json]
@@ -23,7 +24,8 @@ import { fromLottie, toLottie, toSvg } from '@tramme/interop';
 import { fileAssetReader } from '@tramme/interop/node';
 import { launch, openDoc } from './browser.ts';
 import { compareFiles } from './compare.ts';
-import { renderAudio, renderVideo } from './jobs.ts';
+import { formatParts } from '@tramme/render/src/timing.ts';
+import { defaultPages, renderAudio, renderVideo } from './jobs.ts';
 import { VIDEO_FORMATS, type VideoFormat } from './media.ts';
 import { docRegistry, filesRegistry } from './plugins.ts';
 import { readConfig, Server } from './server.ts';
@@ -44,7 +46,7 @@ const asDoc = (p?: string) => {
   // a folder of a former name (document.trame.json, document.emotion.json) is read as well
   return [DOCUMENT, ...LEGACIES.map((l) => l.document)].map((d) => path.join(p, d)).find((f) => fs.existsSync(f)) ?? p;
 };
-if (!['compare', 'import', 'pack', 'unpack', 'bench', 'agent', 'film'].includes(cmd)) pos[0] = asDoc(pos[0])!;
+if (!['compare', 'import', 'pack', 'unpack', 'bench', 'load', 'agent', 'film'].includes(cmd)) pos[0] = asDoc(pos[0])!;
 const num = (k: string) => (flags[k] === undefined ? undefined : Number(flags[k]));
 const str = (k: string) => (typeof flags[k] === 'string' ? (flags[k] as string) : undefined);
 
@@ -103,11 +105,14 @@ async function cmdRender(file: string) {
     const format = (str('format') ?? 'mp4') as VideoFormat;
     if (!VIDEO_FORMATS.includes(format)) throw new Error(`unknown video format: ${format} (${VIDEO_FORMATS.join(', ')})`);
     const out = path.resolve(str('out') ?? path.join('out', format === 'png' ? `${stem(file)}_png` : `${stem(file)}.${format}`));
-    console.log(`rendering ${stem(file)} (${format}): ${s.info.width}x${s.info.height} at ${s.info.fps} fps`);
+    // pages rendering segments at once: as many as the machine takes, unless --pages says otherwise (1: one after the other)
+    const pages = num('pages') ?? defaultPages(s.info.width, s.info.height);
+    console.log(`rendering ${stem(file)} (${format}): ${s.info.width}x${s.info.height} at ${s.info.fps} fps${pages > 1 ? `, up to ${pages} pages at once` : ''}`);
     const r = await renderVideo(s.server, s.page, {
-      docUrl: s.docUrl, doc, compId: str('comp'), format, samples: num('samples'), from: num('from'), to: num('to'), crf: num('crf'), mute: !!flags.mute, out,
+      docUrl: s.docUrl, doc, compId: str('comp'), format, samples: num('samples'), from: num('from'), to: num('to'), crf: num('crf'), mute: !!flags.mute, out, pages, depth: num('depth') === 10 ? 10 : 8,
     });
-    console.log(`${r.frames} frames in ${r.seconds.toFixed(1)} s (${r.msPerFrame.toFixed(0)} ms/frame)${r.audio ? ', with sound' : ''} -> ${path.relative(process.cwd(), out)}`);
+    console.log(`${r.frames} frames in ${r.seconds.toFixed(1)} s (${r.msPerFrame.toFixed(0)} ms/frame${'pages' in r ? `, ${r.pages} pages` : ''})${r.audio ? ', with sound' : ''} -> ${path.relative(process.cwd(), out)}`);
+    console.log(`  per frame: ${formatParts(r.parts)}`);
   } finally { await s.close(); }
 }
 
@@ -272,6 +277,7 @@ const COMMANDS: Record<string, () => Promise<void> | void> = {
   unpack: () => cmdUnpack(pos[0]),
   nodes: () => cmdNodes(pos[0]),
   bench: async () => { const { bench } = await import('./bench.ts'); await bench(pos[0], { layer: str('layer'), t: num('t'), width: num('width'), height: num('height'), dpr: num('dpr') }); },
+  load: async () => { const { runLoad } = await import('./load.ts'); await runLoad(pos, { frames: num('frames'), out: str('out'), json: str('json'), before: str('before') }); },
   'check-export': async () => {
     const format = str('format') ?? 'lottie';
     if (format !== 'lottie' && format !== 'svg') throw new Error('check-export: --format lottie or svg');
@@ -283,7 +289,7 @@ const COMMANDS: Record<string, () => Promise<void> | void> = {
 
 const run = COMMANDS[cmd];
 if (!run) {
-  console.log('usage: tramme <validate|still|render|export|import|film|pack|unpack|nodes|compare|schema|bench|agent> ... (see the header of packages/cli/src/main.ts)');
+  console.log('usage: tramme <validate|still|render|export|import|film|pack|unpack|nodes|compare|schema|bench|load|agent> ... (see the header of packages/cli/src/main.ts)');
   process.exit(cmd ? 1 : 0);
 }
 try {

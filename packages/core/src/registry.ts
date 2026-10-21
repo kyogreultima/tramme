@@ -8,6 +8,7 @@ import type { Asset, Layer, Vec2 } from './types.ts';
 import { BUILTIN_MODIFIERS, type ModifierType } from './modifiers.ts';
 import { TOOL_NAME, type AiNotes, type KitType, type PromptType, type ToolType } from './tools.ts';
 import type { CheckType } from './checks.ts';
+import type { Instance } from './components.ts';
 
 export type PropType =
   | 'number' | 'vec2' | 'bool'
@@ -41,8 +42,14 @@ export interface PropDef {
   animatable?: boolean;
   /** null accepted as a value (paint: no fill) */
   nullable?: boolean;
-  /** text props: edited as code (monospace) */
-  format?: 'code';
+  /** text props: edited as code (monospace); path props: a tone curve (points in 0..1, a curve editor, a 1D texture in GL effects); vec2 props: a colour wheel (its angle the hue, its length the amount, up to 1) */
+  format?: 'code' | 'curve' | 'wheel';
+  /**
+   * number props: the evaluated layer also carries, under this name, the
+   * integral of the value from the layer's in point to t (a speed curve's
+   * elapsed file time): exact for a static value, by fixed steps otherwise
+   */
+  integral?: string;
 }
 
 export type PropSchema = Record<string, PropDef>;
@@ -102,8 +109,8 @@ export interface Host {
    * arrived. Exports wait for it; the preview redraws.
    */
   defer?(pending: Promise<unknown>): void;
-  /** draw another composition of the document at its local time t, from (0, 0) (nested compositions) */
-  drawComposition?(ctx: CanvasRenderingContext2D, compId: string, t: number): void;
+  /** draw another composition of the document at its local time t, from (0, 0) (nested compositions), read through an instance when it is a component; false when something in it was still loading (deferred) */
+  drawComposition?(ctx: CanvasRenderingContext2D, compId: string, t: number, instance?: Instance): boolean | void;
   /** size and duration of a composition of the document */
   compositionSize?(compId: string): { width: number; height: number; duration: number } | null;
   /**
@@ -224,6 +231,8 @@ export interface EffectType<P = any> {
   canvas2d?: {
     /** scale: canvas pixels per composition pixel (sizes in props are composition pixels) */
     filter?(props: P, scale: number): string;
+    /** how far the filter spreads the picture beyond what was drawn, in canvas pixels: only the layer's box grown by it is filtered (a filter without it runs over the whole frame) */
+    reach?(props: P, scale: number): number;
     apply?(ctx: CanvasRenderingContext2D, props: P, scale: number, host: Host): void;
   };
   /**
@@ -245,10 +254,28 @@ export const PLUGIN_API = 1;
 /** a plugin's card: who it is and the API it was written for */
 export interface PluginMeta {
   name?: string;
+  /** semver; 0.0.0 when it says none */
   version?: string;
   description?: string;
   /** the plugin API it needs (1 by default) */
   api?: number;
+  /** a stable id, `author/name`: made from the name when it says none */
+  id?: string;
+  licence?: string;
+  author?: string;
+  homepage?: string;
+  /** what an installed plugin may reach (docs/installed-plugins-roadmap.md, step 5); none when it says none */
+  permissions?: PluginPermissions;
+}
+
+/** what an installed plugin may reach: none of it unless declared */
+export interface PluginPermissions {
+  /** origins it may fetch at authoring time (`https://api.example.com`) */
+  network?: string[];
+  /** provider routes it may call with the user's keys (through the editor, never the keys) */
+  providers?: string[];
+  /** project folders it may write beyond assets/ (`renders/`) */
+  files?: string[];
 }
 
 /** what a plugin module may export to extend the vocabulary */
@@ -427,6 +454,16 @@ export const TRANSFORM_SCHEMA: PropSchema = {
   rotation: { type: 'number', default: 0, label: 'Rotation', unit: 'deg' },
   opacity: { type: 'number', default: 1, label: 'Opacity', min: 0, max: 1, step: 0.01 },
   depth: { type: 'number', default: 0, label: 'Depth', unit: 'px', step: 10, description: 'behind the screen when positive, in front when negative: parallax and depth blur with the composition camera' },
+};
+
+/** schema of a layer's drawn mask: its outline in the layer's space, how it combines with the masks before it, its edge */
+export const MASK_SCHEMA: PropSchema = {
+  path: { type: 'path', default: { v: [[-200, -150], [200, -150], [200, 150], [-200, 150]], closed: true }, label: 'Path', description: "in the layer's own space, like a shape's" },
+  mode: { type: 'enum', default: 'add', options: ['add', 'subtract', 'intersect'], label: 'Mode', animatable: false, description: 'add: shown inside; subtract: hidden inside; intersect: shown only where the masks before it and this one meet' },
+  feather: { type: 'number', default: 0, min: 0, step: 0.5, unit: 'px', label: 'Feather', description: 'a soft edge' },
+  expansion: { type: 'number', default: 0, step: 0.5, unit: 'px', label: 'Expansion', description: 'grows (or under 0, shrinks) the outline' },
+  opacity: { type: 'number', default: 1, min: 0, max: 1, step: 0.01, label: 'Opacity' },
+  invert: { type: 'bool', default: false, label: 'Invert', animatable: false, description: 'outside rather than inside' },
 };
 
 /** schema of the composition camera (2.5D): what it looks at, its zoom, and the depth blur */

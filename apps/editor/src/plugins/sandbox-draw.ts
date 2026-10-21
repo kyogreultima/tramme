@@ -73,6 +73,10 @@ const declareCache = new Map<string, PluginDecl>();
 export function sandboxDeclaration(id: string): PluginDecl | null { return declareCache.get(id) ?? null; }
 /** remembered as the sandbox reports a plugin's declarations (the page's registry may be built from them) */
 export function noteSandboxDeclaration(d: PluginDecl) { declareCache.set(d.id, d); }
+/** the plugins loaded in the sandbox, their declarations remembered (before a registry is built from them) */
+export async function ensureDeclared(host: { ensure(p: { id: string; url: string }[]): Promise<Map<string, PluginDecl>> }, plugins: { id: string; url: string }[]): Promise<void> {
+  for (const d of (await host.ensure(plugins)).values()) noteSandboxDeclaration(d);
+}
 
 const handlesFor = (type: string, props: unknown): Handle[] => (handlesCache.get(`${type}/${hash(props)}`) ?? []) as Handle[];
 const exportFor = (type: string, props: unknown) => {

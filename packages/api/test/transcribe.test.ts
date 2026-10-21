@@ -44,7 +44,7 @@ describe('transcribe', () => {
     expect(form.get('timestamp_granularities[]')).toBe('word');
     expect(form.get('language')).toBe('en');
     expect((form.get('file') as Blob).size).toBe(16);
-    expect(await res.json()).toEqual({ words: [{ w: 'hello', s: 0.1, e: 0.5 }, { w: 'there', s: 0.6, e: 1 }], text: 'hello there', language: 'english', duration: 1.2 });
+    expect(await res.json()).toEqual({ words: [{ w: 'hello', s: 0.1, e: 0.5 }, { w: 'there', s: 0.6, e: 1 }], text: 'hello there', language: 'english', duration: 1.2, model: 'openai:whisper-1' });
   });
 
   it('the language Whisper named is not sent back: it takes only codes', async () => {

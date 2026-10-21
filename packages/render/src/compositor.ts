@@ -139,6 +139,15 @@ void main(){
   o = o4;
 }`;
 
+// straight RGBA in floats, top row first, without the 8-bit dither: the
+// half-float frame read at more than 8 bits (10-bit exports, ffmpeg rgba64le)
+const FS_RGBA_DEEP = HEAD + `
+uniform sampler2D uImg; uniform ivec2 uSize;
+void main(){
+  ivec2 p = ivec2(gl_FragCoord.xy);
+  o = clamp(texelFetch(uImg, ivec2(p.x, uSize.y - 1 - p.y), 0), 0., 1.);
+}`;
+
 // straight RGBA8, top row first (ffmpeg rawvideo rgba, PNG)
 const FS_RGBA = HEAD + `
 uniform sampler2D uImg; uniform float uSeed; uniform ivec2 uSize;
@@ -203,7 +212,7 @@ export class Compositor {
   readonly software: boolean;
   private gl: WebGL2RenderingContext;
   private vao: WebGLVertexArrayObject;
-  private p: Record<'accum' | 'prefilter' | 'down' | 'up' | 'final' | 'yuv' | 'rgba', Program>;
+  private p: Record<'accum' | 'prefilter' | 'down' | 'up' | 'final' | 'yuv' | 'rgba' | 'deep', Program>;
   private srcTex!: WebGLTexture;
   private hudTex!: WebGLTexture;
   private accum!: Target;
@@ -211,9 +220,13 @@ export class Compositor {
   private finalFbo!: Target;
   private yuv!: Target;
   private rgba!: Target;
+  /** a float target and its readback, made the first time a frame is read at more than 8 bits */
+  private deep: { target: Target; floats: Float32Array } | null = null;
   /** ping-pong targets of the GLSL finishing effects, made when first needed */
   private passTargets: Target[] = [];
   private custom = new Map<string, WebGLProgram | Error>();
+  /** where an ImageBitmap is drawn before its upload, made the first time one comes */
+  private bitmapPad: OffscreenCanvasRenderingContext2D | null = null;
 
   /**
    * preserve: keep the picture after it is shown (reading the canvas later);
@@ -232,7 +245,7 @@ export class Compositor {
     this.vao = gl.createVertexArray()!;
     this.p = {
       accum: compile(gl, FS_ACCUM), prefilter: compile(gl, FS_PREFILTER), down: compile(gl, FS_DOWN),
-      up: compile(gl, FS_UP), final: compile(gl, FS_FINAL), yuv: compile(gl, FS_YUV), rgba: compile(gl, FS_RGBA),
+      up: compile(gl, FS_UP), final: compile(gl, FS_FINAL), yuv: compile(gl, FS_YUV), rgba: compile(gl, FS_RGBA), deep: compile(gl, FS_RGBA_DEEP),
     };
     this.allocate(w, h);
   }
@@ -261,7 +274,8 @@ export class Compositor {
 
   private release() {
     const gl = this.gl;
-    for (const t of [this.accum, ...this.bloom, this.finalFbo, this.yuv, this.rgba, ...this.passTargets]) { gl.deleteFramebuffer(t.fb); gl.deleteTexture(t.tex); }
+    for (const t of [this.accum, ...this.bloom, this.finalFbo, this.yuv, this.rgba, ...this.passTargets, ...(this.deep ? [this.deep.target] : [])]) { gl.deleteFramebuffer(t.fb); gl.deleteTexture(t.tex); }
+    this.deep = null;
     this.passTargets = [];
     gl.deleteTexture(this.srcTex); gl.deleteTexture(this.hudTex);
   }
@@ -293,6 +307,15 @@ export class Compositor {
   }
   private upload(tex: WebGLTexture, src: TexImageSource, premultiply: boolean) {
     const gl = this.gl;
+    // an ImageBitmap ignores the unpack flip and premultiplication (WebGL's rule): the sandbox's frames
+    // would land upside down. Drawn on a canvas first, it is uploaded like every other picture
+    if (typeof ImageBitmap !== 'undefined' && src instanceof ImageBitmap) {
+      const { width: w, height: h } = src;
+      if (!this.bitmapPad || this.bitmapPad.canvas.width !== w || this.bitmapPad.canvas.height !== h) this.bitmapPad = new OffscreenCanvas(w, h).getContext('2d')!;
+      this.bitmapPad.clearRect(0, 0, w, h);
+      this.bitmapPad.drawImage(src, 0, 0);
+      src = this.bitmapPad.canvas;
+    }
     gl.bindTexture(gl.TEXTURE_2D, tex);
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, premultiply);
@@ -399,6 +422,24 @@ export class Compositor {
     gl.uniform1i(p.u('uImg'), 0); gl.uniform1f(p.u('uSeed'), seed % 997); gl.uniform2i(p.u('uSize'), this.w, this.h);
     this.draw();
     gl.readPixels(0, 0, this.yuv.w, this.yuv.h, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+    return buf;
+  }
+
+  /**
+   * straight RGBA at 16 bits a channel (w*h*4, little-endian as ffmpeg's
+   * rgba64le), top row first, of the last finish(..., { toFbo: true }): the
+   * half-float frame without the 8-bit rounding (10-bit exports)
+   */
+  readRGBA16(buf: Uint16Array) {
+    const gl = this.gl, p = this.p.deep;
+    this.deep ??= { target: this.fbo(this.w, this.h, gl.RGBA32F), floats: new Float32Array(this.w * this.h * 4) };
+    gl.useProgram(p); this.target(this.deep.target); this.bindTex(0, this.finalFbo.tex);
+    gl.uniform1i(p.u('uImg'), 0); gl.uniform2i(p.u('uSize'), this.w, this.h);
+    this.draw();
+    const f = this.deep.floats;
+    gl.readPixels(0, 0, this.w, this.h, gl.RGBA, gl.FLOAT, f);
+    // the final frame holds straight colour already (as readRGBA reads it)
+    for (let i = 0; i < f.length; i++) buf[i] = Math.round(f[i] * 65535);
     return buf;
   }
 

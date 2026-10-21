@@ -52,7 +52,18 @@
       // requests a visitor may send through the relay (Z.AI, custom providers), per minute
       "ratelimits": [{ "name": "RELAY_LIMIT", "namespace_id": "1001", "simple": { "limit": 120, "period": 60 } }],
       // the relay passes keys in its requests: no invocation logs (they record the requests)
-      "observability": { "enabled": true, "logs": { "invocation_logs": false } }
+      "observability": { "enabled": true, "logs": { "invocation_logs": false } },
+      // branch builds (npx wrangler preview --env personal) inherit none of the above:
+      // the same vars (a preview's own address sends to APP_ORIGIN), limit and logs
+      "previews": {
+        "vars": {
+          "MODE": "personal",
+          "APP_ORIGIN": "https://app.tramme.dev",
+          "VAULT_ORIGIN": "https://cles.app.tramme.dev"
+        },
+        "ratelimits": [{ "name": "RELAY_LIMIT", "namespace_id": "1001", "simple": { "limit": 120, "period": 60 } }],
+        "observability": { "enabled": true, "logs": { "invocation_logs": false } }
+      }
     }
   }
 }

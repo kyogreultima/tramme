@@ -13,6 +13,8 @@ import { AVC_FROM_STREAM } from './avc.ts';
 import { t } from './i18n/index.ts';
 import { freshId, linkedTransform, siblingsOf } from './model.ts';
 import { canvas, CUT, distance, histogram, onDemand, peopleIn } from './perception.ts';
+import { madeBy, type ModelEntry, type ModelTask } from './models.ts';
+import { chosenModel } from './settings.ts';
 
 /** long side of the pictures the mattes are made at */
 const PROC = 1024;
@@ -22,27 +24,22 @@ const MASK = 1280;
 const LOOK = 512;
 /** seconds between two looks for the people within a shot, by default: the detector is the slow part */
 const LOOK_EVERY = 0.5;
-/** the side of the square U²-Net looks at */
-const SIDE = 320;
-
 type Subject = 'person' | 'any';
 interface Box { x: number; y: number; w: number; h: number }
 /** a look for the people: when, in which shot, what was found */
 export interface Look { t: number; shot: number; boxes: Box[] }
 
 /**
- * U²-Net weights (Apache 2.0, from rembg, 4.6 MB each), at a fixed revision:
- * trained on people for a person, on salient objects for any subject. Small
+ * The matte networks are chosen in the settings (models.ts): by default
+ * U²-Net weights (Apache 2.0, from rembg) at a fixed revision, trained on
+ * people for a person, on salient objects for any subject. Small
  * convolutional networks, so they run on modest GPUs, where the larger
  * transformer mattes (BiRefNet) exceed WebGPU's limits.
  */
-const MODELS: Record<Subject, string> = {
-  person: 'https://huggingface.co/BritishWerewolf/U-2-Net-Human-Seg/resolve/e6d4c494535f62778e47f3676a5a3674de96b844/onnx/model.onnx',
-  any: 'https://huggingface.co/BritishWerewolf/U-2-Netp/resolve/7112208dbac3a3642496c8d54e2f0f9bb3dc1dc8/onnx/model.onnx',
-};
+export const matteTask = (subject: Subject): ModelTask => (subject === 'person' ? 'cutout-person' : 'cutout-any');
 
 /** a file of the model hub, kept in the browser's cache (the one transformers.js uses) after the first download */
-async function hubFile(url: string): Promise<ArrayBuffer> {
+export async function hubFile(url: string): Promise<ArrayBuffer> {
   const cache = await caches.open('transformers-cache').catch(() => null);
   const hit = await cache?.match(url);
   if (hit) return hit.arrayBuffer();
@@ -55,30 +52,38 @@ async function hubFile(url: string): Promise<ArrayBuffer> {
 type Matting = (picture: HTMLCanvasElement) => Promise<Uint8ClampedArray>;
 /** reports how far the work is (seconds of the span done, of all), at most once a percent */
 type Progress = (done: number, total: number, step: string) => void;
-const MATTING: Partial<Record<Subject, () => Promise<Matting>>> = {};
+/** loaded mattes, by model */
+const MATTING = new Map<string, () => Promise<Matting>>();
+
+/** the model the cut-out of this subject runs on this computer */
+export const matteModel = (subject: Subject): ModelEntry => chosenModel(matteTask(subject));
 
 /** the matte of a picture, 0..255 per pixel at its size: on the GPU (WebGPU), on the processor when the GPU refuses the model */
 export function matting(subject: Subject): Promise<Matting> {
-  return (MATTING[subject] ??= onDemand('the cut-out model', async () => {
+  const entry = matteModel(subject);
+  if (entry.adapter.kind !== 'matte') throw new Error(`${entry.name} is not a matte model`);
+  const a = entry.adapter;
+  if (!MATTING.has(entry.id)) MATTING.set(entry.id, onDemand('the cut-out model', async () => {
     // transformers.js sets onnxruntime up (where its wasm files are): load it first
     await import('@huggingface/transformers');
     const ort = await import('onnxruntime-web/webgpu');
-    const model = await hubFile(MODELS[subject]);
+    const model = await hubFile(entry.source);
     const open = (ep: 'webgpu' | 'wasm') => ort.InferenceSession.create(model, { executionProviders: [ep] });
     let session = await ('gpu' in navigator ? open('webgpu').catch(() => open('wasm')) : open('wasm'));
+    const SIDE = a.side;
     const square = canvas(SIDE, SIDE), probs = canvas(SIDE, SIDE), full = canvas(1, 1), x = new Float32Array(3 * SIDE * SIDE);
-    const mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225];
+    const { mean, std } = a;
     const run = async () => {
       const out = await session.run({ [session.inputNames[0]]: new ort.Tensor('float32', x, [1, 3, SIDE, SIDE]) });
       return out[session.outputNames[0]].data as Float32Array;
     };
     let tried = false;
     return async (picture) => {
-      // the picture squeezed into the square, scaled by its brightest value and normalised (as rembg does)
+      // the picture squeezed into the square, scaled (by its brightest value for U²-Net, as rembg does) and normalised
       square.g.drawImage(picture, 0, 0, SIDE, SIDE);
       const px = square.g.getImageData(0, 0, SIDE, SIDE).data, n = SIDE * SIDE;
-      let top = 1;
-      for (let i = 0; i < n; i++) top = Math.max(top, px[i * 4], px[i * 4 + 1], px[i * 4 + 2]);
+      let top = 255;
+      if (a.byMax) { top = 1; for (let i = 0; i < n; i++) top = Math.max(top, px[i * 4], px[i * 4 + 1], px[i * 4 + 2]); }
       for (let i = 0; i < n; i++) for (let k = 0; k < 3; k++) x[k * n + i] = (px[i * 4 + k] / top - mean[k]) / std[k];
       let d: Float32Array;
       try { d = await run(); } catch (e) {
@@ -89,9 +94,10 @@ export function matting(subject: Subject): Promise<Matting> {
         d = await run();
       }
       tried = true;
-      // probabilities (the network ends on a sigmoid), back to the picture's size
+      // probabilities (U²-Net ends on a sigmoid) or values stretched from their range, back to the picture's size
+      const [lo, hi] = a.output === 'range' ? rangeOf(d, n) : [0, 1];
       const img = probs.g.createImageData(SIDE, SIDE);
-      for (let i = 0; i < n; i++) { img.data[i * 4] = img.data[i * 4 + 1] = img.data[i * 4 + 2] = d[i] * 255; img.data[i * 4 + 3] = 255; }
+      for (let i = 0; i < n; i++) { img.data[i * 4] = img.data[i * 4 + 1] = img.data[i * 4 + 2] = ((d[i] - lo) / (hi - lo || 1)) * 255; img.data[i * 4 + 3] = 255; }
       probs.g.putImageData(img, 0, 0);
       if (full.c.width !== picture.width || full.c.height !== picture.height) Object.assign(full.c, { width: picture.width, height: picture.height });
       full.g.imageSmoothingQuality = 'high';
@@ -100,7 +106,15 @@ export function matting(subject: Subject): Promise<Matting> {
       for (let i = 0; i < m.length; i++) m[i] = big[i * 4];
       return m;
     };
-  }))();
+  }));
+  return MATTING.get(entry.id)!();
+}
+
+/** the lowest and highest of the first n values */
+export function rangeOf(d: ArrayLike<number>, n = d.length): [number, number] {
+  let lo = Infinity, hi = -Infinity;
+  for (let i = 0; i < n; i++) { if (d[i] < lo) lo = d[i]; if (d[i] > hi) hi = d[i]; }
+  return n ? [lo, hi] : [0, 1];
 }
 
 /** where people are, 0..1 per pixel of a w × h picture: their boxes (0..1) widened for hair and arms, with feathered edges; 0 where nobody is */
@@ -316,7 +330,7 @@ const cutout: ToolType<{ layer?: string; subject?: Subject; behind?: string; fro
     const { blob, frames, empty } = await matteVideo(ctx.assetUrl(asset), start + a - lin, start + b - lin, subject, every, ctx.signal, progress);
     const src = await ctx.writeFile(`assets/cutout/${source}.mp4`, blob);
     const had = !!ctx.doc.assets[mask];
-    const asAsset: Op = { op: had ? 'replace' : 'add', path: pointer('assets', mask), value: { type: 'video', src, name: t('perception.cutoutMask', { name: ctx.doc.assets[asset].name ?? asset }) } };
+    const asAsset: Op = { op: had ? 'replace' : 'add', path: pointer('assets', mask), value: { type: 'video', src, name: t('perception.cutoutMask', { name: ctx.doc.assets[asset].name ?? asset }), madeBy: [madeBy(matteModel(subject)), ...(subject === 'person' ? [madeBy(chosenModel('detection'))] : [])] } };
     const who = subject === 'person' ? 'person' : 'subject';
     return {
       ops: [asAsset, ...ops], reload: had ? [mask] : [], label: t('perception.cutoutLabel', { name: l.name ?? source }),

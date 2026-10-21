@@ -27,6 +27,8 @@ A project is a JSON file `*.tramme.json`. It is the source of truth: the editor,
 ```
 
 - Editable collections (`tokens`, `assets`, `compositions`, `layers`) are maps keyed by id (letters, digits, `_`, `-`). A patch path therefore stays valid when other items are added or removed.
+- An asset may keep `hash`, the hash of its file's content written by the editor at import: importing the same file again (from the assets panel, as an attachment of the assistant, among the sources of a new project) gives back the asset that has it, and nothing is written twice.
+- An asset a model made (a cut-out's mask, a depth map, a transcript, a track, an analysis) keeps `madeBy`, the models and versions that made it (`["u2net-human-seg@e6d4c49…", "yolos-tiny@main"]`). Choosing another model in the settings never changes it; its tool, run again, writes it anew.
 - Order lives in arrays: `order` (root stack) and `children` (groups), **from bottom to top**: the last id is drawn on top.
 - Each layer appears exactly once in the tree.
 - Time is in seconds (composition time), space in composition pixels, rotations in degrees (clockwise), scale as a factor (1 = 100%), opacity from 0 to 1.
@@ -48,6 +50,52 @@ A project is a JSON file `*.tramme.json`. It is the source of truth: the editor,
 ```
 
 Local matrix: `translate(position) · rotate(rotation) · scale(scale) · translate(-anchor)`. A group's children are drawn in the group's local space. Rectangles, ellipses and image frames are **centered on the layer's origin**; text has its origin on the baseline.
+
+### Masks
+
+A layer's `masks` cut what it draws, in order, before its effects: each is `{ id, enabled?, props }`, its props `path` (in the layer's own space, as a `shape.path` writes it, animatable), `mode` (`add`: shown inside; `subtract`: hidden inside; `intersect`: kept where the masks before it and this one meet), `feather` and `expansion` (px), `opacity` and `invert`.
+
+```json
+"masks": [{ "id": "window", "props": { "path": { "v": [[-300, -200], [300, -200], [300, 200], [-300, 200]], "closed": true }, "feather": 12 } }]
+```
+
+### Components
+
+A composition that lists `params` is a component: each parameter has a `type` (a property type: `number`, `vec2`, `color`, `text`, `asset`…), the `targets` it lands on (addresses in the composition: `card.fill`, `title.transform.position`, `glow.effects.blur.radius`, `$comp.background`), and an optional `default`, `label`, `description` (`options` for an enum). A `comp` layer holding it is an instance: its `params` give a value per parameter (any form: fixed, keyframed, an expression, a link, read in the composition holding the instance), its `overrides` set any property of the component by its address, for this instance alone. A parameter the instance leaves out takes its default; without a default its targets keep their own values. Changing the component changes every instance, except what an instance sets.
+
+```jsonc
+"card": {
+  "params": {
+    "color": { "type": "color", "targets": ["plate.fill"], "default": "@paper" },
+    "title": { "type": "text", "targets": ["label.text"] }
+  }, …
+},
+// in another composition
+"first": { "type": "comp", "props": { "comp": "card" }, "params": { "title": "Hello", "color": "@accent" }, "overrides": { "plate.radius": 32 } }
+```
+
+An instance's parameter reads as `first.params.title` (a link, an expression's `prop()`). A composition must not hold itself, through instances or not. Detaching an instance (`detachPlan` in `@tramme/core`) turns it into a group of plain layers drawing the same: the parameters and overrides written in, the keyframes moved to the holding composition's time. It is refused when the copy could not draw the same: a nested time that does not run one to one (a speed other than 1, a loop, a remap), an expression or a modifier reading the time while the copy is moved, an expression reading the component's own size or markers, a camera or finishing effects in the component.
+
+### Distributions
+
+A comp layer's `distribute` makes N instances of its component at once. `layout` places them in the layer's own space, centred on its origin: `grid` (`columns`, `spacing` [x, y]), `list` (`direction`, `spacing`), `circle` (`radius`, `start` and `sweep` in degrees, `rotate`), `path` (a `path` as a `shape.path` writes it, `rotate` along it) or `points` (the vertices of another layer's path, in the same parent). The count is `count`, else one per row of `rows` (a JSON asset holding an array), else one per point. `params` gives each parameter by a rule: a value, an expression (`index`, `count`, `row`, `random(index)`, `noise(index * 0.3)`, `t`…), or `{ "$palette": "order" | "random", "seed"?, "colors"? }` (the colours given, else the document's colour tokens). The comp layer's own `params` and `overrides` apply to every instance first. `time` plays each instance later by a time field over the instances (`mode`, `amount` and the rest as in `timeField`; `center` in the layer's space, its origin by default): a wave across a grid, a ripple from its centre, a liquid desynchronisation; an instance waiting holds the component's first pose, one past its end its last, or goes round with `loop`. Inside, each instance has its rank: `stagger`, `noise` and the expressions read the instance's `index` and `count`, and its modifiers' noise is its own.
+
+```json
+"cards": { "type": "comp", "props": { "comp": "card" }, "transform": { "position": [540, 960] },
+  "distribute": { "count": 12, "layout": { "type": "grid", "columns": 3, "spacing": [320, 220] },
+    "params": { "color": { "$palette": "order" }, "title": { "$expr": "'Card ' + (index + 1)" } } } }
+```
+
+### Styles and animations
+
+`styles` at the document's top level are sets of properties defined once, by their name on a layer (`fill`, `radius`, `transform.opacity`). A layer applies them in order with `styles: [{ "style": "ink" }, { "style": "pop", "at": 2 }]`: each sets its properties over the layer's own, the later over the earlier. Keyframed, a style is an animation: written from 0, moved by `at`. `map` applies a style's property to another one of the layer (`{ "transform.scale": "size" }`).
+
+```json
+"styles": {
+  "pop": { "props": { "transform.scale": { "$k": [{ "t": 0, "v": [0, 0], "ease": "@swift" }, { "t": 0.4, "v": [1, 1] }] } } },
+  "ink": { "props": { "fill": "@ink", "radius": 8 } }
+}
+```
 
 ## Properties: four forms
 
@@ -75,7 +123,7 @@ Wherever a color is expected (gradient stops included), `"@name"` refers to the 
 
 ### Expressions
 
-A single expression (`value + 10`) or a body with `return`. Available names: `t` (= `time`), `frame`, `fps`, `value`, `comp` (`width`, `height`, `duration`, `fps`), `prop('layer.prop')`, `token('name')`, `marker('id|kind|label')` (`{ t, frame }`), `ease(spec, x)`, `clamp`, `lerp`, `prog(t, a, b)`, `smoothstep`, `linear(t, t0, t1, v0, v1)`, `random(seed)`, `noise(x, y, z)`, `add`, `sub`, `mul`, `Math` (without `Math.random`), `audio(source)`, `events(source)` and `track(layer, name?)` (below), and the modifiers below. An expression must stay a pure function of `t`: no state, no unseeded randomness, no access to the browser.
+A single expression (`value + 10`) or a body with `return`. Available names: `t` (= `time`), `frame`, `fps`, `value`, `comp` (`width`, `height`, `duration`, `fps`), `prop('layer.prop')`, `token('name')`, `marker('id|kind|label')` (`{ t, frame }`), `ease(spec, x)`, `clamp`, `lerp`, `prog(t, a, b)`, `smoothstep`, `linear(t, t0, t1, v0, v1)`, `random(seed)`, `noise(x, y, z)`, `add`, `sub`, `mul`, `Math` (without `Math.random`), `audio(source)`, `events(source)` and `track(layer, name?, at?)` (below), `index` and `count` (the layer's rank among its siblings, bottom first, and their number; inside an instance of a distribution, the instance's), `row` (inside an instance of a distribution over data, its row), and the modifiers below. An expression must stay a pure function of `t`: no state, no unseeded randomness, no access to the browser.
 
 ### Camera (2.5D)
 
@@ -90,11 +138,14 @@ An animated property (keyframes, expression or link) can get a stack of modifier
 | `wiggle` | `freq` (Hz), `amp`, `seed`, `octaves` | adds smooth noise, different per component |
 | `loop` | `mode`: `cycle`, `pingpong`, `offset`; `start`, `end` | repeats the keyframe animation beyond the last keyframe |
 | `spring` | `freq` (Hz), `damping` (0 to 1) | each keyframe change becomes a spring's response (bounces when `damping` < 1) |
-| `stagger` | `delay` (s), `from`: `first` or `last` | offsets the animation by the layer's rank among its siblings |
+| `stagger` | `delay` (s), `from`: `first` or `last` | offsets the animation by the layer's rank among its siblings (the `rank` case of `timeField`) |
 | `noise` | `amp`, `scale`, `seed` | fractal noise fixed in time (value texture) |
 | `smooth` | `window` (s) | smooths the curve with a moving average |
 | `react` | `source` (sound or video layer id, or asset), `signal` (`beat`, `bar`, `hit`, `rms`, `low`, `mid`, `high`), `amount`, `decay` (s) | adds `amount` times the music's signal: a pulse on each beat, bar or hit, or the loudness of a band |
 | `near` | `source` (a layer, the pointer), `radius` (px), `amount` (in the property's unit), `axis` (`both`, `x`, `y`), `mode` (`lift`, `push`), `freq` (Hz), `damping` (0 to 1) | answers a moving layer: the value moves by `amount` as the pointer comes within `radius` (a smooth falloff), and springs back when it leaves. The layer and its pointer must sit in the same space (siblings, or a group at the origin); the layer's own rest position is the value the pointer moves |
+| `timeField` | `mode` (`rank`, `angle`, `distance`, `noise`), `amount` (s), `from`, `angle` (deg), `center` (px) or `source` (a layer), `scale` (px), `speed`, `seed`, `loop` | reads the property at `t − amount · d`: `d` the rank (`amount` per element), the place along the direction `angle` across the frame, the distance to `center` or to `source` out to the farthest corner, or gradient noise over the position (`scale` 0: a fixed random delay per element; `speed` drifts the field). Before or after its keyframes the property holds its ends; `loop` repeats it instead. Put the same field on every animated property of an element |
+
+A modifier's number parameter may be keyframed (`"amount": { "$k": [...] }`): it slides from one value to the next, so an animated seed or amount never jumps.
 
 ### Following the music
 
@@ -132,7 +183,7 @@ Where something filmed is over time. The `track` tool follows an object through 
   "frames": [{ "t": 3.2, "box": [0.479, 0.393, 0.068, 0.245] }, { "t": 3.3, "box": null }] }
 ```
 
-Times are those of the file and boxes `[x, y, width, height]` fractions of its picture, `null` where the object was lost; a cut ends the track. Read through a video layer, a track follows that layer: moved, scaled or cut otherwise, the object stays under its callout. Expressions read it with `track(layer, name?)`, the video layer and the track's name (its first track without one): `.found` (0 to 1: 0 when lost, out of the track or out of the layer's frame), `.box` `[x, y, width, height]`, `.center` and `.size`, in the space the video layer sits in (the composition for a layer at the root). For example a dot that rides on the car: `"position": { "$expr": "track('video', 'car').center" }`. The `callout` tool adds a `callout` layer that reads the track: brackets around the object, a label beside them.
+Times are those of the file and boxes `[x, y, width, height]` fractions of its picture, `null` where the object was lost; a cut ends the track. Read through a video layer, a track follows that layer: moved, scaled or cut otherwise, the object stays under its callout. Expressions read it with `track(layer, name?, at?)`, the video layer and the track's name (its first track without one), at the current time or at composition time `at`: `.found` (0 to 1: 0 when lost, out of the track or out of the layer's frame), `.box` `[x, y, width, height]`, `.center` and `.size`, in the space the video layer sits in (the composition for a layer at the root). For example a dot that rides on the car: `"position": { "$expr": "track('video', 'car').center" }`. The `callout` tool adds a `callout` layer that reads the track: brackets around the object, a label beside them.
 
 ## Built-in nodes
 
@@ -160,6 +211,7 @@ Each layer type declares its property schema; the inspector and the validator us
 | `rope` | `target` (a layer, the far end), `segments`, `length` (0: as it starts), `gravity`, `wind`, `damping`, `thickness`, `color`: a Verlet rope tied to the layer origin, swinging (drawn in composition space, keep its transform at rest) |
 | `cloth` | `columns`, `rows`, `width`, `height`, `gravity`, `wind`, `sway`, `stiffness`, `color`, `wireframe`: a cloth pinned along its top edge, centred on the origin, that falls and catches a breathing wind |
 | `flock` | `count`, `speed`, `cohesion`, `separation`, `alignment`, `margin`, `size`, `color`, `seed`: boids that steer together across the whole frame, deterministic on the seed (drawn in composition space) |
+| `time.shift` | `comp` (a composition), `depth` (s), `slices`, `map` (`left`, `right`, `top`, `bottom`, `centre`, `edges`, `noise`), `scale`, `smooth`: the composition read later in some places than in others, `t + d(uv)` (slit-scan, a time ripple, a liquid time). It keeps a ring of the composition's past frames as a 3D texture, reduced in size to stay within 192 MB, and stays a pure function of time: each slice is the composition at a time fixed by the frame number |
 | `code` | `module` (JS asset), `entry`, `params`: free drawing by existing code |
 | `audio` | `audio` (asset), `start`, `gain` (dB, animatable), `fadeIn`, `fadeOut` (s), `lowCut` (Hz, animatable), `highCut` (Hz, 0 for none), `eqLow`/`eqMid`/`eqHigh` (dB, the equaliser: a shelf at 120 Hz, a bell at `eqMidFreq` Hz, a shelf at 8 kHz), `compress` (0 to 1, the loud moments brought down), `reverb` (0 to 1), `rate` (speed and pitch, 1 as recorded), `role` (`effect`, `music`, `voice`, `ambience`), `weight` (`support`, `hero`), `visual` (what it underlines: `cut`, `move`, `land`, `appear`): a sound placed at the layer's in point |
 
@@ -206,7 +258,21 @@ A node may also simulate: `simulate: { init(props, host), step(state, props, dt,
 
 A plugin should say who it is: `export const meta = { name, version, description, api: 1 }`. `api` is the plugin API it was written for; a tramme with an older API refuses the plugin with a message rather than failing halfway. In TypeScript or with JSDoc, `@tramme/plugin` gives every type and `definePlugin()` for autocompletion.
 
-A plugin can be kept in the library shared by the projects (`library-add` tool, `/library-add`) and used in another project (`library-use`): it is copied into the project's `plugins/`, so the project and its archive stay self-contained.
+A plugin can be installed on the user's device (Settings, Plugins: a `.js` module, or a `.trammeplugin` package, a zip of `plugin.js` and its own files such as fonts, LUTs and pictures), or kept there from a project with `library-add`. It is then offered in every project. Its tools, checks, workflows, kits and presets run in each project's sandbox. Its nodes, effects and modifiers are copied into the project's `plugins/` (with its own files) when a layer first uses one, so the project and its archive stay self-contained. `library-use` copies one by hand. An installed plugin says more about itself in `meta`: a stable `id` (`author/name`), a `version` (semver), a `licence`, an `author`, a `homepage`, and its `permissions`. Without them, an id is made from its name and its version is `0.0.0`.
+
+```js
+export const meta = {
+  id: 'me/weather', name: 'Weather', version: '1.2.0', api: 1, licence: 'MIT',
+  // what it may reach at authoring time; nothing when it declares nothing
+  permissions: {
+    network: ['https://api.weather.example'], // origins its tools may request, with ctx.fetch
+    providers: ['generate'],                    // provider routes (/api/generate/…) called with the user's keys, which it never sees
+    files: ['data/weather'],                    // project paths it may write beyond assets/
+  },
+};
+```
+
+The user is asked before a plugin is installed, and again when an update asks for more. An installed plugin's code never runs on the page: a project that holds a copy of one draws through the sandbox. A plugin whose tools or checks fail three times in a row is stopped until the editor opens again.
 
 A node may declare `handles(props)`: points the viewport lets the user drag, in local space, each editing one property (`{ prop, at, kind: 'point' }` sets a vec2 to the point; `{ prop, at, kind: 'distance', from }` sets a number to the distance from `from`). Vector exports cannot run code: `export: { svg(props), lottie(props) }` gives SVG markup in local space and static Lottie shape items; without them the layer is left out with a warning.
 
@@ -225,7 +291,8 @@ export const tools = [{
   ai: { when: 'a night sky or a festive background', avoid: 'more than 60 stars on a small format' },
   async run({ count }, ctx) {
     // ctx: doc (with the pending proposal), compId, time, selection, registry,
-    // assetUrl(id), readText(path), files(), fileUrl(path), writeFile(path, data), renderStill(t), transcript(assetId)
+    // assetUrl(id), readText(path), files(), fileUrl(path), writeFile(path, data), renderStill(t), transcript(assetId),
+    // fetch(url, init): an installed plugin's declared requests (meta.permissions), a Response
     const ops = [/* JSON Patch operations on ctx.doc */];
     return { text: `${count} stars`, ops, label: 'Star field' };
   },
