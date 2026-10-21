@@ -13,7 +13,9 @@ import { pointer, staticValue, type Effect, type Layer, type Op, type ToolContex
 import { AVC_FROM_STREAM } from './avc.ts';
 import { t } from './i18n/index.ts';
 import { freshId, isToolAsset, linkedTransform, siblingsOf, transformOp } from './model.ts';
-import { canvas, loadImage, onDemand } from './perception.ts';
+import { canvas, loadImage, pipelineOf } from './perception.ts';
+import { chosenModel } from './settings.ts';
+import { madeBy } from './models.ts';
 
 /** long side of the pictures the model reads */
 const PROC = 512;
@@ -29,14 +31,12 @@ type DepthRun = (image: unknown) => Promise<{ depth: DepthMap }>;
 /** reports how far the work is (seconds of the span done, of all), at most once a percent */
 type Progress = (done: number, total: number, step: string) => void;
 
-/** the depth model, loaded on first use and kept; a failed load is tried again next time */
-const loadDepth = onDemand('the depth model', () => import('@huggingface/transformers').then(async ({ pipeline, RawImage }) => {
-  const make = (opts: object) => pipeline('depth-estimation', 'onnx-community/depth-anything-v2-small', opts as never);
-  const run = await ('gpu' in navigator
-    ? make({ device: 'webgpu', dtype: 'fp16' }).catch(() => make({ device: 'webgpu', dtype: 'fp32' })).catch(() => make({ dtype: 'q8' }))
-    : make({ dtype: 'q8' }));
-  return { run: run as unknown as DepthRun, picture: (c: HTMLCanvasElement) => RawImage.fromCanvas(c) };
-}));
+/** the depth model chosen in the settings (by default Depth Anything v2 small), loaded on first use and kept; a failed load is tried again next time */
+const loadDepth = async () => {
+  const { RawImage } = await import('@huggingface/transformers');
+  const run = await pipelineOf<DepthRun>(chosenModel('depth'), 'the depth model');
+  return { run, picture: (c: HTMLCanvasElement) => RawImage.fromCanvas(c) };
+};
 
 /** the depth of one picture as grey levels 0..255 (bright where near), at its own size */
 async function depthOf(model: Awaited<ReturnType<typeof loadDepth>>, picture: HTMLCanvasElement): Promise<{ grey: Uint8ClampedArray; w: number; h: number }> {
@@ -300,7 +300,7 @@ async function ensureDepth(ctx: ToolContext, source: string, progress: Progress)
   const wired = depthLayers(ctx.doc, ctx.compId, source, asset, box);
   // a photo takes a depth of field too, once (footage is given one by hand, or by photo-2.5d)
   if (l.type === 'image') wired.ops = withDepthBlur(wired.ops, l, ctx.compId, source, wired.depth);
-  const value = { type: l.type === 'video' ? 'video' : 'image', src, name: t('perception.depthLabel', { name: ctx.doc.assets[media].name ?? media }) };
+  const value = { type: l.type === 'video' ? 'video' : 'image', src, name: t('perception.depthLabel', { name: ctx.doc.assets[media].name ?? media }), madeBy: [madeBy(chosenModel('depth'))] };
   return { ops: [{ op: had ? 'replace' : 'add', path: pointer('assets', asset), value }, ...wired.ops], asset, reload: had ? [asset] : [], frames, ...(wired.framing ? { framing: wired.framing } : {}) };
 }
 

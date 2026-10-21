@@ -10,7 +10,7 @@
 // When the environment isolates errors (the editor's preview), a layer that
 // fails is drawn as a red frame and reported; the rest of the frame renders.
 
-import { layerMatrix, type BlendMode, type EvaluatedFrame, type EvaluatedLayer, type EvaluatedTransform, type Host, type Registry } from '@tramme/core';
+import { layerMatrix, pathD, type BlendMode, type Lut3D, type PathValue, type EvaluatedFrame, type EvaluatedLayer, type EvaluatedTransform, type Host, type Registry } from '@tramme/core';
 import { glPass, nodeContext, resizeNode } from './gpu.ts';
 
 const BLEND: Record<BlendMode, GlobalCompositeOperation> = {
@@ -117,6 +117,67 @@ function layerPicture(like: CanvasRenderingContext2D, id: string, env: DrawEnv):
   return off;
 }
 
+/**
+ * A layer's drawn masks, applied to its picture (`off`, in canvas pixels):
+ * each mask's outline drawn in the layer's space (`at`: the canvas transform
+ * of the layer), grown or shrunk, feathered, inverted, at its opacity, then
+ * combined with the masks before it (add: union; subtract: taken out;
+ * intersect: kept where both are). The picture keeps what they let through.
+ */
+function applyMasks(off: CanvasRenderingContext2D, masks: EvaluatedLayer['masks'], at: DOMMatrix, env: DrawEnv) {
+  const { width: w, height: h } = off.canvas;
+  const k = env.scale ? (env.scale[0] + env.scale[1]) / 2 : 1;
+  const all = env.pool.get(w, h), one = env.pool.get(w, h);
+  masks.forEach((mk, i) => {
+    const p = mk.props, mode = String(p.mode ?? 'add');
+    const feather = Math.max(0, Number(p.feather) || 0), grow = Number(p.expansion) || 0, opacity = Math.min(1, Math.max(0, Number(p.opacity ?? 1)));
+    const outline = new Path2D(pathD(p.path as PathValue));
+    one.setTransform(1, 0, 0, 1, 0, 0);
+    one.globalCompositeOperation = 'source-over';
+    one.filter = 'none';
+    one.clearRect(0, 0, w, h);
+    one.setTransform(at);
+    one.fillStyle = one.strokeStyle = '#ffffff';
+    one.lineJoin = 'round';
+    if (feather > 0) one.filter = `blur(${(feather * k) / 2}px)`;
+    one.fill(outline);
+    // grown: its edge stroked on; shrunk: its edge stroked off
+    if (grow !== 0) {
+      one.lineWidth = Math.abs(grow) * 2;
+      one.globalCompositeOperation = grow > 0 ? 'source-over' : 'destination-out';
+      one.stroke(outline);
+    }
+    // inverted: what lies outside it
+    if (p.invert === true) {
+      one.setTransform(1, 0, 0, 1, 0, 0);
+      one.filter = 'none';
+      one.globalCompositeOperation = 'xor';
+      one.fillStyle = '#ffffff';
+      one.fillRect(0, 0, w, h);
+    }
+    // what the masks before it let through: everything, when the first one takes away or intersects
+    if (i === 0 && mode !== 'add') all.fillRect(0, 0, w, h);
+    all.globalAlpha = opacity;
+    all.globalCompositeOperation = mode === 'subtract' ? 'destination-out' : mode === 'intersect' ? 'destination-in' : 'source-over';
+    all.drawImage(one.canvas, 0, 0);
+  });
+  off.save();
+  off.setTransform(1, 0, 0, 1, 0, 0);
+  off.globalAlpha = 1;
+  off.filter = 'none';
+  off.globalCompositeOperation = 'destination-in';
+  off.drawImage(all.canvas, 0, 0);
+  off.restore();
+  env.pool.release(one);
+  env.pool.release(all);
+}
+
+/** the LUT tables an effect's lut props name, as the asset store loaded them */
+const lutsOf = (env: DrawEnv, id: string) => (_name: string, value: unknown): Lut3D | null => {
+  if (typeof value !== 'string' || !value) return null;
+  try { const v = env.host(id).asset<Lut3D>(value); return v && v.kind === 'lut3d' ? v : null; } catch { return null; }
+};
+
 function drawLayer(ctx: CanvasRenderingContext2D, L: EvaluatedLayer, env: DrawEnv) {
   if (L.transform.opacity <= 0) return;
   if (!L.node.render.canvas2d && !L.node.render.gl && !L.children.length) return;
@@ -133,12 +194,16 @@ function drawLayer(ctx: CanvasRenderingContext2D, L: EvaluatedLayer, env: DrawEn
   const fx = L.effects
     .map((e) => ({ e, type: env.registry.hasEffect(e.type) ? env.registry.effect(e.type) : null }))
     .filter((x) => x.type?.stage === 'layer' && (x.type.canvas2d || x.type.gl));
-  if (fx.length) {
+  const masks = L.masks ?? [];
+  if (fx.length || masks.length) {
     const { width: w, height: h } = ctx.canvas;
     const off = env.pool.get(w, h);
     off.setTransform(ctx.getTransform());
     off.transform(m.a, m.b, m.c, m.d, m.e, m.f);
+    const at = off.getTransform();
     drawContent(off, L, env);
+    // the masks cut the picture before its effects: a feathered mask then blurs with the layer, as in an editor
+    if (masks.length) applyMasks(off, masks, at, env);
     // effect sizes are in composition pixels: they follow the render scale
     const k = env.scale ? (env.scale[0] + env.scale[1]) / 2 : 1;
     for (const { e, type } of fx) {
@@ -147,7 +212,7 @@ function drawLayer(ctx: CanvasRenderingContext2D, L: EvaluatedLayer, env: DrawEn
           // the layers named by the effect's layer props, drawn alone beside it
           const inputs: Record<string, CanvasRenderingContext2D | null> = {};
           for (const [name, d] of Object.entries(type!.props)) if (d.type === 'layer' && typeof e.props[name] === 'string' && e.props[name] !== L.id) inputs[name] = layerPicture(off, e.props[name] as string, env);
-          glPass(off, type!.gl.code, type!.props, e.props, env.t ?? 0, k, Object.fromEntries(Object.entries(inputs).map(([n, c]) => [n, c?.canvas ?? null])));
+          glPass(off, type!.gl.code, type!.props, e.props, env.t ?? 0, k, Object.fromEntries(Object.entries(inputs).map(([n, c]) => [n, c?.canvas ?? null])), L.layer.in ?? 0, lutsOf(env, L.id));
           for (const c of Object.values(inputs)) if (c) env.pool.release(c);
         } else type!.canvas2d?.apply?.(off, e.props, k, env.host(L.id));
       } catch (err) {
@@ -160,7 +225,13 @@ function drawLayer(ctx: CanvasRenderingContext2D, L: EvaluatedLayer, env: DrawEn
     ctx.globalAlpha *= L.transform.opacity;
     if (L.layer.blend && L.layer.blend !== 'normal') ctx.globalCompositeOperation = BLEND[L.layer.blend];
     if (filter) ctx.filter = filter;
-    ctx.drawImage(off.canvas, 0, 0);
+    // a filter runs over what it is given: the layer's box grown by the filters' reach, not the whole frame (outside it the layer is empty)
+    const box = filter ? filterBox(L, env, at, fx, k, w, h) : null;
+    if (box) {
+      // clipped too: the filter's own layer is as large as the clip
+      if (box.w > 0 && box.h > 0) { ctx.beginPath(); ctx.rect(box.x, box.y, box.w, box.h); ctx.clip(); ctx.drawImage(off.canvas, box.x, box.y, box.w, box.h, box.x, box.y, box.w, box.h); }
+    }
+    else ctx.drawImage(off.canvas, 0, 0);
     env.pool.release(off);
   } else {
     ctx.transform(m.a, m.b, m.c, m.d, m.e, m.f);
@@ -169,6 +240,55 @@ function drawLayer(ctx: CanvasRenderingContext2D, L: EvaluatedLayer, env: DrawEn
     drawContent(ctx, L, env);
   }
   ctx.restore();
+}
+
+type Box = { x: number; y: number; w: number; h: number };
+/** what a node may draw past its bounds (a stroke's half, a glyph's overhang), in its own pixels */
+const INK = 48;
+
+/** a layer's box on the canvas (`at`: its canvas transform), its children's included; null when one of them cannot say (no bounds, effects of its own) */
+function canvasBox(L: EvaluatedLayer, env: DrawEnv, at: DOMMatrix): Box | null {
+  let b: Box | null = null;
+  if (L.node.render.canvas2d || L.node.render.gl) {
+    // a node's bounds are its box, not always its ink: what simulates or holds a composition may draw anywhere
+    if (!L.node.bounds || L.node.simulate || L.node.composes || L.layer.type === 'comp') return null;
+    try { b = L.node.bounds(L.props, env.host(L.id)); } catch { return null; }
+    if (!b) return null;
+    // strokes, glyphs and antialiasing reach past the box: a margin in composition pixels
+    const m = INK + 0.05 * Math.max(b.w, b.h);
+    b = { x: b.x - m, y: b.y - m, w: b.w + 2 * m, h: b.h + 2 * m };
+  }
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  if (b) for (const [x, y] of [[b.x, b.y], [b.x + b.w, b.y], [b.x, b.y + b.h], [b.x + b.w, b.y + b.h]]) {
+    const px = at.a * x + at.c * y + at.e, py = at.b * x + at.d * y + at.f;
+    x0 = Math.min(x0, px); y0 = Math.min(y0, py); x1 = Math.max(x1, px); y1 = Math.max(y1, py);
+  }
+  for (const c of L.children) {
+    if (c.effects.length || c.node.composes) return null;
+    const m = localMatrix(c.transform), cb = canvasBox(c, env, at.multiply(m));
+    if (!cb) return null;
+    x0 = Math.min(x0, cb.x); y0 = Math.min(y0, cb.y); x1 = Math.max(x1, cb.x + cb.w); y1 = Math.max(y1, cb.y + cb.h);
+  }
+  return x0 === Infinity ? { x: 0, y: 0, w: 0, h: 0 } : { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+}
+
+/**
+ * The part of a layer's picture its filters need to run over: its box grown
+ * by what each filter spreads, in whole pixels, within the canvas (empty
+ * when it falls outside); null for the whole frame, when a filter does not
+ * say how far it reaches or an effect draws by code.
+ */
+export function filterBox(L: EvaluatedLayer, env: DrawEnv, at: DOMMatrix, fx: { e: { props: Record<string, unknown> }; type: { canvas2d?: { filter?: unknown; reach?: (p: any, k: number) => number; apply?: unknown }; gl?: unknown } | null }[], k: number, w: number, h: number): Box | null {
+  let reach = 0;
+  for (const { e, type } of fx) {
+    if (type!.gl || type!.canvas2d?.apply || !type!.canvas2d?.reach) return null;
+    reach += type!.canvas2d.reach(e.props, k);
+  }
+  const b = canvasBox(L, env, at);
+  if (!b || !Number.isFinite(reach)) return null;
+  const x0 = Math.max(0, Math.floor(b.x - reach)), y0 = Math.max(0, Math.floor(b.y - reach));
+  const x1 = Math.min(w, Math.ceil(b.x + b.w + reach)), y1 = Math.min(h, Math.ceil(b.y + b.h + reach));
+  return { x: x0, y: y0, w: Math.max(0, x1 - x0), h: Math.max(0, y1 - y0) };
 }
 
 /** draw layers over what the context already holds (nested compositions) */
@@ -200,7 +320,7 @@ function adjustOver(ctx: CanvasRenderingContext2D, L: EvaluatedLayer, env: DrawE
       if (type!.gl) {
         const inputs: Record<string, CanvasRenderingContext2D | null> = {};
         for (const [name, d] of Object.entries(type!.props)) if (d.type === 'layer' && typeof e.props[name] === 'string' && e.props[name] !== L.id) inputs[name] = layerPicture(off, e.props[name] as string, env);
-        glPass(off, type!.gl.code, type!.props, e.props, env.t ?? 0, k, Object.fromEntries(Object.entries(inputs).map(([n, c]) => [n, c?.canvas ?? null])));
+        glPass(off, type!.gl.code, type!.props, e.props, env.t ?? 0, k, Object.fromEntries(Object.entries(inputs).map(([n, c]) => [n, c?.canvas ?? null])), L.layer.in ?? 0, lutsOf(env, L.id));
         for (const c of Object.values(inputs)) if (c) env.pool.release(c);
       } else type!.canvas2d?.apply?.(off, e.props, k, env.host(L.id));
     } catch (err) {

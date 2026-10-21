@@ -54,7 +54,7 @@ One iteration lands one box, or a few boxes of the same step when they only make
    - A line in `CHANGELOG.md`, under `Unreleased`, for every box, always: under `Added`, `Changed` or `Fixed`, written for the people who use tramme (what they can now do, or what got faster and by how much), the way the existing entries are written. No box is ticked without its changelog line.
    - The README when a visible feature changes what it says.
    - What could not be checked here (a phone, a Mac, iOS's Files app, a real GPU, HDR on a screen) said under the box: "to check on a device", and gathered in the final pull request. It does not block the box.
-7. **Commit and push.** The code, its tests, the ticked box and the changelog line in the same commit (or a few, for a large box), its message in Conventional Commits (`feat(editor): speed curves on video and sound layers`), then push `feat/roadmap-loop`. No `Co-Authored-By` line, no mention of Claude in commits or in the pull request. Nothing is left unpushed at the end of an iteration.
+7. **Commit and push.** The code, its tests, the ticked box and the changelog line in the same commit (or a few, for a large box), its message in Conventional Commits (`feat(editor): speed curves on video and sound layers`), then push `feat/roadmap-loop`. The commits are the user's: before the first one, `git config user.name KYOGRE` and `git config user.email aziz@kyogre.dev`, never Claude as author or committer. No `Co-Authored-By` line, no mention of Claude in commits or in the pull request. Nothing is left unpushed at the end of an iteration.
 8. **Report.** One line to the user: the box landed, its commit, what is next. Then the next iteration.
 
 ## When to stop and ask
@@ -99,3 +99,6 @@ Before the first run, the environment must install and test the repository: Node
 Boxes the loop could not land, with why. The loop adds to this list; the user clears it.
 
 - Installed plugins, step 8 (the marketplace): waits for tramme's API.
+- Editing, step 12, voice and music apart (Demucs in ONNX): no ONNX export of Demucs whose inputs are known could be fetched or checked from the loop's container; it needs one, then runs through the long-job runner of step 13.
+- Editing, step 14, HDR (PQ, HLG): waits by design for Canvas 2D above 8 bits; exports stay SDR, at 10 bits where possible.
+- Components, step 5, the volume view: written in its roadmap as "later"; nothing in the queue asks for it yet.

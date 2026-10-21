@@ -26,7 +26,7 @@ function inputLine(schema?: JsonSchema): string {
 
 /** an entry of the vocabulary: its name, its line in the index, its full description */
 interface Entry { name: string; head: string; props: string; ai?: AiNotes; full: Record<string, unknown> }
-type Section = 'nodes' | 'effects' | 'modifiers' | 'tools';
+export type Section = 'nodes' | 'effects' | 'modifiers' | 'tools';
 const HEADINGS: Record<Section, string> = {
   nodes: 'Nodes (type, title, category):',
   effects: 'Effects (type, title, stage):',
@@ -57,10 +57,29 @@ function entries(reg: Registry): Record<Section, Entry[]> {
   };
 }
 
-/** every node, effect, modifier and tool in a line or two: properties as name:type=default, notes on when to use it */
-export function vocabularyIndex(reg: Registry): string {
-  const out: string[] = [];
-  for (const [section, list] of Object.entries(entries(reg)) as [Section, Entry[]][]) {
+/** an entry brought by a plugin installed on the device (not the project's own): left out of the index, found by a search */
+export type InstalledEntry = (section: Section, name: string, from?: string) => boolean;
+
+/** what a search reads of an entry: its name, its line, its notes */
+const said = (e: Entry) => `${e.name} ${e.head} ${e.ai ? JSON.stringify(e.ai) : ''}`.toLowerCase();
+
+/**
+ * Every node, effect, modifier and tool in a line or two: properties as
+ * name:type=default, notes on when to use it. The installed plugins' entries
+ * are left out (counted); a query keeps the entries holding all its words,
+ * theirs included, after the built-in and the project's.
+ */
+export function vocabularyIndex(reg: Registry, opts: { query?: string; installed?: InstalledEntry } = {}): string {
+  const out: string[] = [], words = (opts.query ?? '').toLowerCase().split(/\s+/).filter(Boolean);
+  let hidden = 0, matched = 0;
+  for (const [section, all] of Object.entries(entries(reg)) as [Section, Entry[]][]) {
+    const fromOf = (e: Entry) => (e.full.from as string | undefined);
+    const mine = (e: Entry) => !!opts.installed?.(section, e.name, fromOf(e));
+    let list = all;
+    if (words.length) list = [...all.filter((e) => !mine(e)), ...all.filter(mine)].filter((e) => words.every((w) => said(e).includes(w)));
+    else { hidden += all.filter(mine).length; list = all.filter((e) => !mine(e)); }
+    matched += list.length;
+    if (words.length && !list.length) continue;
     if (out.length) out.push('');
     out.push(section === 'tools' && !list.length ? 'Tools: none.' : HEADINGS[section]);
     for (const e of list) {
@@ -69,6 +88,8 @@ export function vocabularyIndex(reg: Registry): string {
       if (n) out.push(n);
     }
   }
+  if (words.length && !matched) return `Nothing in the vocabulary holds "${opts.query}": try other words, or list_nodes without query for the index.`;
+  if (hidden) out.push('', `${hidden} more entries come from plugins installed on this device: list_nodes { query } finds them.`);
   out.push('', 'list_nodes with types gives the full entries: property labels, descriptions, ranges, examples, tool input schemas.');
   return out.join('\n');
 }

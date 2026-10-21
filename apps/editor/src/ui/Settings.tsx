@@ -7,6 +7,7 @@
 // chosen on the right; a search shows the settings matching it, whatever
 // their section.
 
+import { Plugins } from './PluginsSettings.tsx';
 import type { FunctionComponent } from 'preact';
 import { useContext, useEffect, useRef, useState } from 'preact/hooks';
 import type { SoundEntry } from '@tramme/core';
@@ -28,6 +29,7 @@ import { fromVault } from '../vault/link.ts';
 import { Providers as ProviderList, type ProviderActions } from './Providers.tsx';
 import { ViewSwitch } from './views.tsx';
 import { Confirm, norm, Row, Search, Section } from './SettingsRows.tsx';
+import { LocalModels } from './ModelsSettings.tsx';
 
 const MOTION: Record<Preferences['motion'], string> = {
   auto: m('settings.adaptsToTheMachine'),
@@ -113,6 +115,9 @@ function Preview() {
       </Row>
       <Row label={t('settings.playAtTheComposition')} hint={t('settings.likeTheExport24')}>
         <Toggle on={p.exactFrames} onChange={(v) => setPrefs({ exactFrames: v })} />
+      </Row>
+      <Row label={t('settings.playProxies')} hint={t('settings.playProxiesHint')}>
+        <Toggle on={p.proxies} onChange={(v) => { setPrefs({ proxies: v }); void preview.useProxies(v); }} />
       </Row>
       <Row label={t('settings.sandboxPreview')} hint={t('settings.sandboxPreviewHint')}>
         <Toggle on={p.sandboxPreview} onChange={(v) => { setPrefs({ sandboxPreview: v }); void preview.reloadPlugins(); }} />
@@ -433,6 +438,8 @@ const GROUPS: { title: () => string; panes: Pane[] }[] = [
       { id: 'appearance', icon: 'palette', title: () => t('settings.appearance'), body: Appearance },
       { id: 'preview', icon: 'eye', title: () => t('common.preview'), body: Preview },
       { id: 'sound', icon: 'audio', title: () => t('settings.sound'), body: Sound },
+      { id: 'models', icon: 'download', title: () => t('localModels.title'), body: LocalModels },
+      { id: 'plugins', icon: 'code', title: () => t('plugins.title'), body: Plugins },
       { id: 'tours', icon: 'help', title: () => t('common.guidedTours'), body: Tours },
       // the native app only: the projects live in a folder of this computer
       ...(tauri ? [{ id: 'storage' as SettingsSection, icon: 'folder', title: () => t('settings.storage'), body: Storage }] : []),

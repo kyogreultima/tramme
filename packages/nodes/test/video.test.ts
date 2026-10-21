@@ -36,4 +36,23 @@ describe('a video layer', () => {
     expect(draw({ start: 2, rate: 2 }, { width: 640, height: 360 }, 3).asked).toEqual([8]);
     expect(draw({ start: 1, loop: true, loopEnd: 3 }, { width: 640, height: 360 }, 5).asked[0]).toBeCloseTo(2);
   });
+
+  it('moves its picture back by its stabilisation, zoomed to keep the edges out', () => {
+    const calls: string[] = [];
+    const ctx = {
+      beginPath() {}, clip() {}, rect() {}, drawImage() { calls.push('draw'); },
+      scale: (x: number, y: number) => calls.push(`scale ${x} ${y}`),
+      translate: (x: number, y: number) => calls.push(`translate ${+x.toFixed(2)} ${+y.toFixed(2)}`),
+      rotate: (a: number) => calls.push(`rotate ${a}`),
+    } as unknown as CanvasRenderingContext2D;
+    const stab = { version: 1, kind: 'stabilize', width: 640, height: 360, zoom: 1.1, frames: [{ t: 0, x: 0.1, y: 0, a: 0.02, s: 1 }, { t: 2, x: 0.1, y: 0, a: 0.02, s: 1 }] };
+    const host = {
+      t: 1, layerIn: 0,
+      asset: (id: string) => (id === 'stab' ? stab : { width: 640, height: 360, frameAt: () => ({ image: {}, exact: true }) }),
+    } as unknown as Host;
+    const p = { video: 'clip', stabilize: 'stab', start: 0, rate: 1, loop: false, loopEnd: 0, size: [640, 360], fit: 'cover', focus: [0.5, 0.5] };
+    video.render.canvas2d!(ctx, p as never, host);
+    // the zoom, then the picture moved by 10 % of its width and turned about its centre
+    expect(calls).toEqual(['scale 1.1 1.1', 'translate 64 0', 'rotate 0.02', 'scale 1 1', 'translate 0 0', 'draw']);
+  });
 });

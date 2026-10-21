@@ -3,11 +3,13 @@
 // shown by colour and switched from its menu.
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { Evaluator, getAt, pointer, propKind, staticValue, sheetIssues, TRANSFORM_SCHEMA, MOTION_BLUR_SCHEMA, CAMERA_SCHEMA, SOUND_MIX_SCHEMA, type TrammeDoc, type Op, type Paint, type Prop, type PropDef, type PropSchema, type Token } from '@tramme/core';
-import { comp, commit, draft, cancelDraft, S, viewDoc, select, uiTime } from '../state.ts';
+import { Evaluator, getAt, pointer, propKind, staticValue, sheetIssues, TRANSFORM_SCHEMA, MOTION_BLUR_SCHEMA, CAMERA_SCHEMA, SOUND_MIX_SCHEMA, type TrammeDoc, type Op, type Paint, type Prop, type PropDef, type PropSchema, type Token, MASK_SCHEMA, curveTable, type PathValue } from '@tramme/core';
+import { comp, commit, draft, cancelDraft, S, viewDoc, select, toast, uiTime } from '../state.ts';
 import { assetData } from '../preview.ts';
 import { addModifierOps, editAtOps, fixedOps, folderOf, imagesIn, keyAtOps, keyIndexAt, keysOf, removeKeyOps, removeModifierOps, setAtOps, snap, freshId, fmtSeconds } from '../model.ts';
-import { modsOf, modifierParams } from '@tramme/core';
+import { addressDef, componentOf, detachPlan, modsOf, modifierParams, paramDef } from '@tramme/core';
+import { followTrackOps, tracksOf } from '../masks.ts';
+import { pickColor } from '../dropper.ts';
 import { ColorField, NumberField, openMenu, Popover, Select, Seg, TextInput, Toggle, type MenuItem } from './controls.tsx';
 import { Icon, kindColor, kindIcon } from './icons.tsx';
 import { mediaOf, transcribe, TranscribeButton } from './Transcribe.tsx';
@@ -78,6 +80,13 @@ function PropRow({ ctx, label, def, path, address }: { ctx: Ctx; label: string; 
       items.push('sep');
     }
     items.push({ label: t('inspector.defaultValue'), icon: 'undo', disabled: raw === undefined, onClick: () => setRaw(undefined, t('inspector.nameDefault', { name: label })) });
+    // any property of a composition can become one of its parameters: the composition is then a component
+    if (!address.startsWith('$') && !address.includes('.params.')) {
+      const c = ctx.doc.compositions[ctx.compId], exposed = Object.entries(c.params ?? {}).find(([, p]) => p.targets.includes(address));
+      items.push('sep', exposed
+        ? { label: t('inspector.removeParameter'), icon: 'x', hint: exposed[0], onClick: () => commit(t('inspector.removeParameter'), unexposeOps(ctx, exposed[0])) }
+        : { label: t('inspector.exposeAsParameter'), icon: 'sliders', onClick: () => commit(t('inspector.exposeName', { name: label }), exposeOps(ctx, address, def)) });
+    }
     openMenu(e, items);
   };
 
@@ -96,7 +105,12 @@ function PropRow({ ctx, label, def, path, address }: { ctx: Ctx; label: string; 
       <span class={`plabel${scrubLabel ? '' : ' static'}`} title={tr(def.description) || label}>{label}</span>
       <div class="pvalue">
         {editable
-          ? <Field def={def} value={value} ctx={ctx} label={label} onDraft={live} onCommit={set} />
+          ? <Field def={def} value={value} ctx={ctx} label={label} onDraft={live} onCommit={set} onPick={def.type === 'color' ? async () => {
+            // an effect's colour is picked with the effect off: a key picks the screen as filmed
+            const fx = /^(.*\/effects\/\d+)\/props\/[^/]+$/.exec(path)?.[1];
+            const hex = await pickColor(fx ? [{ op: 'add', path: `${fx}/enabled`, value: false }] : []);
+            if (hex) set(hex);
+          } : undefined} />
           : kind === 'expression'
             ? <span class="prop-note">{short(value)}</span>
             : <span class="prop-note">{short(value)}</span>}
@@ -118,6 +132,92 @@ function PropRow({ ctx, label, def, path, address }: { ctx: Ctx; label: string; 
       {error && editable && <div class="prop-extra"><div class="prop-note err">{error}</div></div>}
       {!error && <PropCheck ctx={ctx} path={path} value={value} />}
     </div>
+  );
+}
+
+/** the operations exposing a property of the composition as a parameter (named after the property, made unique) */
+function exposeOps(ctx: Ctx, address: string, def: PropDef): Op[] {
+  const c = ctx.doc.compositions[ctx.compId], cp = pointer('compositions', ctx.compId, 'params');
+  const base = address.split('.').pop()!.replace(/[^A-Za-z0-9_-]/g, '') || 'param';
+  const name = freshId(c.params ?? {}, base);
+  const p = { type: def.type, targets: [address] };
+  return c.params ? [{ op: 'add', path: `${cp}/${name}`, value: p }] : [{ op: 'add', path: cp, value: { [name]: p } }];
+}
+
+/** a parameter removed from the composition, and the values its instances gave it */
+function unexposeOps(ctx: Ctx, name: string): Op[] {
+  const c = ctx.doc.compositions[ctx.compId];
+  const ops: Op[] = Object.keys(c.params ?? {}).length > 1
+    ? [{ op: 'remove', path: pointer('compositions', ctx.compId, 'params', name) }]
+    : [{ op: 'remove', path: pointer('compositions', ctx.compId, 'params') }];
+  for (const [cid, k] of Object.entries(ctx.doc.compositions)) {
+    for (const [lid, l] of Object.entries(k.layers)) {
+      if (l.type !== 'comp' || l.props?.comp !== ctx.compId) continue;
+      if (l.params?.[name] !== undefined) ops.push({ op: 'remove', path: pointer('compositions', cid, 'layers', lid, 'params', name) });
+      if (l.distribute?.params?.[name] !== undefined) ops.push({ op: 'remove', path: pointer('compositions', cid, 'layers', lid, 'distribute', 'params', name) });
+    }
+  }
+  return ops;
+}
+
+/**
+ * A comp layer holding a component: its parameters as properties (from the
+ * component's list, like a node's schema), its overrides marked (each can be
+ * removed), its distribution in a line; open the component, or detach the
+ * instance into plain layers.
+ */
+function InstanceSection({ ctx, id }: { ctx: Ctx; id: string }) {
+  const layer = ctx.doc.compositions[ctx.compId].layers[id], inner = componentOf(ctx.doc, layer);
+  if (!inner) return null;
+  const innerId = String(staticValue(layer.props?.comp)), lp = pointer('compositions', ctx.compId, 'layers', id);
+  const params = Object.entries(inner.params ?? {}), overrides = Object.entries(layer.overrides ?? {});
+  const detach = () => {
+    const plan = detachPlan(ctx.doc, S.registry.peek(), ctx.compId, id);
+    if ('error' in plan) toast(t('inspector.cannotDetach'));
+    else commit(t('inspector.detach'), plan.ops);
+  };
+  const d = layer.distribute;
+  return (
+    <Section id="instance" title={t('inspector.instanceOf', { name: inner.name })} right={<>
+      <button class="icon-btn sm" title={t('inspector.openTheComponent')} onClick={() => { S.compId.value = innerId; select([]); }}><Icon name="comp" /></button>
+      {!d && <button class="icon-btn sm" title={t('inspector.detach')} onClick={detach}><Icon name="split" /></button>}
+    </>}>
+      {d && <div class="prop-note">{t('inspector.distribution', { n: d.count ?? '…', layout: d.layout.type })}{d.time ? ` · ${t('inspector.withTimeField')}` : ''}</div>}
+      {params.map(([name, p]) => (
+        <PropRow key={name} ctx={ctx} label={p.label || name} def={paramDef(p)} path={`${lp}/params/${name}`} address={`${id}.params.${name}`} />
+      ))}
+      {!params.length && <div class="prop-note">{t('inspector.noParameter')}</div>}
+      {overrides.length > 0 && <div class="section-label">{t('inspector.overrides')}</div>}
+      {overrides.map(([address, v]) => {
+        const def = addressDef(ctx.doc, S.registry.peek(), inner, address);
+        return (
+          <div key={address} class="prop keyed">
+            <span /><span class="plabel static mono" title={tr(def?.description)}>{address}</span>
+            <div class="pvalue"><span class="prop-note">{short(staticValue(v))}</span></div>
+            <button class="icon-btn xs" title={t('inspector.removeOverride')} onClick={() => commit(t('inspector.removeOverride'), [{ op: 'remove', path: Object.keys(layer.overrides!).length > 1 ? `${lp}${pointer('overrides', address)}` : `${lp}/overrides` }])}><Icon name="x" /></button>
+          </div>
+        );
+      })}
+    </Section>
+  );
+}
+
+/** a composition's parameters, when it exposes some: each with where it lands, removable */
+function ParamsSection({ ctx }: { ctx: Ctx }) {
+  const c = ctx.doc.compositions[ctx.compId], params = Object.entries(c.params ?? {});
+  if (!params.length) return null;
+  const users = Object.values(ctx.doc.compositions).reduce((n, k) => n + Object.values(k.layers).filter((l) => l.type === 'comp' && l.props?.comp === ctx.compId).length, 0);
+  return (
+    <Section id="params" title={t('inspector.parameters')}>
+      <div class="prop-note">{t('inspector.componentUsedN', { n: users })}</div>
+      {params.map(([name, p]) => (
+        <div key={name} class="prop">
+          <span /><span class="plabel static" title={p.description}>{p.label || name}</span>
+          <div class="pvalue"><span class="prop-note mono">{p.type} → {p.targets.join(', ')}</span></div>
+          <button class="icon-btn xs" title={t('inspector.removeParameter')} onClick={() => commit(t('inspector.removeParameter'), unexposeOps(ctx, name))}><Icon name="x" /></button>
+        </div>
+      ))}
+    </Section>
   );
 }
 
@@ -180,7 +280,10 @@ function AssetsField({ def, value, ctx, onCommit }: { def: PropDef; value: unkno
   );
 }
 
-const MOD_LABEL: Record<string, string> = { cycle: m('inspector.cycle'), pingpong: m('inspector.pingPong'), offset: m('inspector.accumulate'), first: m('inspector.first'), last: m('inspector.last') };
+const MOD_LABEL: Record<string, string> = {
+  cycle: m('inspector.cycle'), pingpong: m('inspector.pingPong'), offset: m('inspector.accumulate'), first: m('inspector.first'), last: m('inspector.last'),
+  rank: m('inspector.fieldRank'), angle: m('inspector.fieldAngle'), distance: m('inspector.fieldDistance'), noise: m('inspector.fieldNoise'),
+};
 
 /** the modifier stack of a property: one block per modifier with its parameters */
 function ModStack({ ctx, path, raw, label }: { ctx: Ctx; path: string; raw: Prop | undefined; label: string }) {
@@ -205,7 +308,19 @@ function ModStack({ ctx, path, raw, label }: { ctx: Ctx; path: string; raw: Prop
             {mt && Object.entries(mt.params).map(([k, d]) => (
               <div key={k} class="mod-param">
                 <span class="faint">{tr(d.label) || k}</span>
-                {d.type === 'enum'
+                {propKind(m[k]) === 'keyframes'
+                  // an animated parameter (a time field's amount, its seed): its keys live in the document
+                  ? <span class="faint">{t('inspector.animated')}</span>
+                  : d.type === 'bool'
+                  ? <div style={{ display: 'flex' }}><Toggle on={params[k] === true} onChange={(v) => setParam(i, k, v, `${title} : ${tr(d.label) || k}`)} /></div>
+                  : d.type === 'vec2'
+                  ? <div class="row" style={{ gap: '4px' }}>{[0, 1].map((c) => {
+                      // null: the composition's centre, as the modifier reads it
+                      const at = (Array.isArray(params[k]) ? params[k] : [ctx.doc.compositions[ctx.compId].width / 2, ctx.doc.compositions[ctx.compId].height / 2]) as [number, number];
+                      const put = (v: number) => (c ? [at[0], v] : [v, at[1]]);
+                      return <NumberField key={c} value={at[c]} step={d.step ?? 1} onDraft={(v) => setParam(i, k, put(v), '', true)} onCommit={(v) => setParam(i, k, put(v), `${title} : ${tr(d.label) || k}`)} onCancel={cancelDraft} />;
+                    })}</div>
+                  : d.type === 'enum'
                   ? <Seg value={String(params[k])} options={d.options!.map((o) => [o, t(MOD_LABEL[o] ?? ENUM_LABEL[o] ?? o)])} onChange={(v) => setParam(i, k, v, `${title} : ${tr(d.label) || k}`)} />
                   : d.type === 'layer'
                     ? <LayerParam ctx={ctx} path={`${path}/$mod/${i}/${k}`} value={params[k] == null ? '' : String(params[k])} onCommit={(v) => setParam(i, k, v, `${title} : ${tr(d.label) || k}`)} />
@@ -265,12 +380,13 @@ function LinkField({ ctx, def, value, onCommit }: { ctx: Ctx; def: PropDef; valu
 }
 
 // ── fields by type ───────────────────────────────────────────
-function Field({ def, value, ctx, label, onDraft, onCommit }: { def: PropDef; value: unknown; ctx: Ctx; label: string; onDraft: (v: unknown) => void; onCommit: (v: unknown) => void }) {
+function Field({ def, value, ctx, label, onDraft, onCommit, onPick }: { def: PropDef; value: unknown; ctx: Ctx; label: string; onDraft: (v: unknown) => void; onCommit: (v: unknown) => void; onPick?: () => void }) {
   const unit = def.unit ? UNIT[def.unit] : undefined;
   switch (def.type) {
     case 'number':
       return <NumberField value={Number(value)} step={def.step ?? (def.unit === 'px' ? 1 : 0.01)} min={def.min} max={def.max} unit={unit} onDraft={onDraft} onCommit={onCommit} onCancel={cancelDraft} />;
     case 'vec2': {
+      if (def.format === 'wheel') return <WheelField value={(value as [number, number]) ?? [0, 0]} onDraft={onDraft} onCommit={onCommit} />;
       const [x, y] = (value as number[]) ?? [0, 0];
       const step = def.step ?? (def.unit === 'px' ? 1 : 0.01);
       return <>
@@ -300,8 +416,11 @@ function Field({ def, value, ctx, label, onDraft, onCommit }: { def: PropDef; va
       const opts = Object.entries(layers).map(([id, l]) => [id, l.name ?? id] as [string, string]);
       return <Select value={String(value ?? '')} options={[['', t('inspector.none')], ...opts]} onChange={(v) => onCommit(v || null)} />;
     }
+    case 'path':
+      if (def.format === 'curve') return <CurveField value={value as PathValue | null} onDraft={onDraft} onCommit={onCommit} />;
+      return <JsonField value={value} label={label} onCommit={onCommit} />;
     case 'color':
-      return value === null ? <NullPaint onSet={() => onCommit('#FFFFFF')} /> : <ColorField value={rawColor(value)} tokens={ctx.tokens} onDraft={onDraft} onCommit={onCommit} />;
+      return value === null ? <NullPaint onSet={() => onCommit('#FFFFFF')} /> : <ColorField value={rawColor(value)} tokens={ctx.tokens} onDraft={onDraft} onCommit={onCommit} onPick={onPick} />;
     case 'paint':
       return <PaintField value={value as Paint} ctx={ctx} onCommit={onCommit} onDraft={onDraft} />;
     case 'assets':
@@ -321,6 +440,8 @@ function Field({ def, value, ctx, label, onDraft, onCommit }: { def: PropDef; va
 }
 
 const ENUM_LABEL: Record<string, string> = {
+  subtract: m('inspector.maskSubtract'), intersect: m('inspector.maskIntersect'),
+  pitch: m('inspector.voicePitch'), robot: m('inspector.voiceRobot'), telephone: m('inspector.voiceTelephone'), radio: m('inspector.voiceRadio'), megaphone: m('inspector.voiceMegaphone'), echo: m('inspector.voiceEcho'),
   left: m('inspector.left'), center: m('inspector.center'), right: m('inspector.right'), cover: m('inspector.cover'), contain: m('inspector.contain'), fill: m('inspector.stretch'), none: m('inspector.none'),
   butt: m('inspector.butt'), round: m('inspector.round'), square: m('common.square'), miter: m('inspector.miter'), bevel: m('inspector.bevel'), alphabetic: m('inspector.alphabetic'), top: m('inspector.top'), middle: m('inspector.middle'), bottom: m('inspector.bottom'),
   normal: m('inspector.normal'), multiply: m('inspector.multiply'), screen: m('inspector.screen'), overlay: m('inspector.overlay'), darken: m('inspector.darken'), lighten: m('inspector.lighten'), add: m('inspector.additive'),
@@ -329,6 +450,90 @@ const ENUM_LABEL: Record<string, string> = {
 
 const rawColor = (v: unknown) => (typeof v === 'string' ? v : '#000000');
 const NullPaint = ({ onSet }: { onSet: () => void }) => <button class="btn sm ghost" onClick={onSet}><Icon name="plus" />{t('inspector.add')}</button>;
+
+/**
+ * A colour wheel: the hues around a disc, the point's angle the hue it leans
+ * toward, its distance from the centre the amount. Drag the point;
+ * double-click puts it back in the centre.
+ */
+function WheelField({ value, onDraft, onCommit }: { value: [number, number]; onDraft: (v: unknown) => void; onCommit: (v: unknown) => void }) {
+  const R = 36, [x, y] = value;
+  const round = (v: number) => +v.toFixed(3);
+  const drag = (e: PointerEvent) => {
+    e.preventDefault();
+    const svg = e.currentTarget as SVGSVGElement;
+    let last: unknown = null;
+    const at = (ev: PointerEvent) => {
+      const r = svg.getBoundingClientRect();
+      let dx = ((ev.clientX - r.left) / r.width) * 2 - 1, dy = -(((ev.clientY - r.top) / r.height) * 2 - 1);
+      const k = Math.hypot(dx, dy);
+      if (k > 1) { dx /= k; dy /= k; }
+      last = [round(dx), round(dy)];
+      onDraft(last);
+    };
+    at(e);
+    const up = () => { removeEventListener('pointermove', at); removeEventListener('pointerup', up); if (last) onCommit(last); };
+    addEventListener('pointermove', at);
+    addEventListener('pointerup', up);
+  };
+  return (
+    <svg class="wheel-field" viewBox={`${-R - 2} ${-R - 2} ${2 * R + 4} ${2 * R + 4}`} width={2 * R + 4} height={2 * R + 4} onPointerDown={drag as never} onDblClick={() => onCommit([0, 0])}>
+      <line class="cross" x1={-R} y1={0} x2={R} y2={0} /><line class="cross" x1={0} y1={-R} x2={0} y2={R} />
+      <circle class="pt" cx={x * R} cy={-y * R} r={4} />
+    </svg>
+  );
+}
+
+/**
+ * A tone curve: its points over a square from black (0) to white (1), the
+ * curve drawn through them as the effect reads it. Drag a point; click the
+ * square to add one; double-click a point (not an end) to take it out.
+ */
+function CurveField({ value, onDraft, onCommit }: { value: PathValue | null; onDraft: (v: unknown) => void; onCommit: (v: unknown) => void }) {
+  const S_ = 120, pts = ((value?.v ?? [[0, 0], [1, 1]]) as number[][]).map((p) => [p[0], p[1]]).sort((a, b) => a[0] - b[0]);
+  const table = curveTable(pts, 64);
+  const line = Array.from(table, (y, i) => `${(i / 63) * S_},${(1 - y) * S_}`).join(' ');
+  const write = (next: number[][]) => ({ v: next.map(([x, y]) => [+x.toFixed(3), +y.toFixed(3)]).sort((a, b) => a[0] - b[0]), closed: false });
+  const at = (e: PointerEvent, svg: SVGSVGElement): [number, number] => {
+    const r = svg.getBoundingClientRect();
+    return [Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), Math.min(1, Math.max(0, 1 - (e.clientY - r.top) / r.height))];
+  };
+  const drag = (e: PointerEvent, i: number, list: number[][]) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const svg = (e.currentTarget as SVGElement).ownerSVGElement ?? (e.currentTarget as SVGSVGElement);
+    let last: unknown = null;
+    const move = (ev: PointerEvent) => {
+      const [x, y] = at(ev, svg), next = list.map((p) => [...p]);
+      // the ends keep their place on the x axis; the others stay between their neighbours
+      const lo = i === 0 ? 0 : list[i - 1][0] + 0.01, hi = i === list.length - 1 ? 1 : list[i + 1][0] - 0.01;
+      next[i] = [i === 0 || i === list.length - 1 ? list[i][0] : Math.min(hi, Math.max(lo, x)), y];
+      last = write(next);
+      onDraft(last);
+    };
+    const up = () => { removeEventListener('pointermove', move); removeEventListener('pointerup', up); if (last) onCommit(last); };
+    addEventListener('pointermove', move);
+    addEventListener('pointerup', up);
+  };
+  const add = (e: PointerEvent) => {
+    const [x] = at(e, e.currentTarget as SVGSVGElement);
+    if (pts.some((p) => Math.abs(p[0] - x) < 0.02)) return;
+    const next = [...pts, [x, table[Math.round(x * 63)]]].sort((a, b) => a[0] - b[0]);
+    onCommit(write(next));
+  };
+  return (
+    <svg class="curve-field" viewBox={`0 0 ${S_} ${S_}`} width={S_} height={S_} onPointerDown={add as never}>
+      {[0.25, 0.5, 0.75].map((g) => <g key={g}><line class="grid" x1={g * S_} y1={0} x2={g * S_} y2={S_} /><line class="grid" x1={0} y1={g * S_} x2={S_} y2={g * S_} /></g>)}
+      <line class="diag" x1={0} y1={S_} x2={S_} y2={0} />
+      <polyline class="curve" points={line} />
+      {pts.map((p, i) => (
+        <circle key={i} class="pt" cx={p[0] * S_} cy={(1 - p[1]) * S_} r={4.5}
+          onPointerDown={(e) => drag(e as unknown as PointerEvent, i, pts)}
+          onDblClick={(e) => { e.stopPropagation(); if (i > 0 && i < pts.length - 1) onCommit(write(pts.filter((_, j) => j !== i))); }} />
+      ))}
+    </svg>
+  );
+}
 
 function JsonField({ value, onCommit }: { value: unknown; label: string; onCommit: (v: unknown) => void }) {
   const [bad, setBad] = useState(false);
@@ -458,12 +663,14 @@ function LayerInspector({ ctx, id }: { ctx: Ctx; id: string }) {
           <SchemaRows ctx={ctx} schema={TRANSFORM_SCHEMA} basePath={`${lp}/transform`} baseAddress={`${id}.transform`} />
         </Section>
       ) : null}
+      {layer.type === 'comp' && <InstanceSection ctx={ctx} id={id} />}
       {node && grouped(node.props, node.title).map(([g, schema]) => (
         <Section key={g} id={`${layer.type}.${g}`} title={tr(g)}>
           <SchemaRows ctx={ctx} schema={schema} basePath={`${lp}/props`} baseAddress={id} />
         </Section>
       ))}
       {!node && <div class="empty"><Icon name="alert" />{t('inspector.unknownTypeTypeAdd', { type: layer.type })}</div>}
+      {node && layer.type !== 'audio' && <MasksSection ctx={ctx} base={lp} id={id} masks={layer.masks || []} />}
       {node && layer.type !== 'audio' && <EffectsSection ctx={ctx} base={lp} address={`${id}.effects`} effects={layer.effects || []} stage="layer" title={t('inspector.effects')} />}
     </>
   );
@@ -556,6 +763,40 @@ function SpeechSection({ asset }: { asset: string }) {
   );
 }
 
+/** the drawn masks of a layer: add (a rectangle over the layer, to edit in the viewport), toggle, remove, reorder, their props */
+function MasksSection({ ctx, base, id, masks }: { ctx: Ctx; base: string; id: string; masks: import('@tramme/core').Mask[] }) {
+  const add = () => {
+    const mid = freshId(Object.fromEntries(masks.map((x) => [x.id, 1])), 'mask');
+    // a rectangle over what the layer draws, when it knows its bounds
+    let b: { x: number; y: number; w: number; h: number } | null = null;
+    try { const L = ctx.ev.layerAt(id, ctx.t, ctx.compId); b = L.node.bounds?.(L.props, {} as never) ?? null; } catch { /* the default rectangle */ }
+    const path = b ? { v: [[b.x, b.y], [b.x + b.w, b.y], [b.x + b.w, b.y + b.h], [b.x, b.y + b.h]], closed: true } : MASK_SCHEMA.path.default;
+    const value = { id: mid, props: { path } };
+    commit(t('inspector.addAMask'), masks.length ? [{ op: 'add', path: `${base}/masks/-`, value }] : [{ op: 'add', path: `${base}/masks`, value: [value] }]);
+  };
+  return (
+    <Section id="masks" title={t('inspector.masks')} right={<button class="icon-btn sm" title={t('inspector.addAMask')} onClick={add}><Icon name="plus" /></button>}>
+      {masks.length === 0 && <div class="faint" style={{ padding: '2px 0 4px' }}>{t('inspector.noMasks')}</div>}
+      {masks.map((mk, i) => (
+        <div key={mk.id} class="fx">
+          <div class="fx-head">
+            <Toggle on={mk.enabled !== false} onChange={(v) => commit(v ? t('inspector.enableMask') : t('inspector.disableMask'), setAtOps(ctx.doc, `${base}/masks/${i}/enabled`, v))} />
+            <span class="fx-title">{mk.id}</span>
+            <button class="icon-btn xs" title={t('inspector.followATrack')} onClick={(e) => {
+              const tracks = tracksOf(ctx.doc, ctx.compId);
+              if (!tracks.length) { toast(t('inspector.noTrackYet')); return; }
+              openMenu(e, tracks.map(([video, track, name]) => ({ label: `${name} · ${ctx.doc.compositions[ctx.compId].layers[video]?.name ?? video}`, icon: 'target' as const, onClick: () => commit(t('inspector.followATrack'), followTrackOps(ctx.doc, ctx.compId, id, mk.id, video, track, ctx.t)) })));
+            }}><Icon name="target" /></button>
+            <button class="icon-btn xs" title={t('inspector.moveUp')} disabled={i === 0} onClick={() => commit(t('inspector.maskOrder'), [{ op: 'move', from: `${base}/masks/${i}`, path: `${base}/masks/${i - 1}` }])}><Icon name="chevronDown" class="flip" /></button>
+            <button class="icon-btn xs" title={t('common.remove')} onClick={() => commit(t('common.removeName', { name: mk.id }), [{ op: 'remove', path: `${base}/masks/${i}` }])}><Icon name="x" /></button>
+          </div>
+          {mk.enabled !== false && <SchemaRows ctx={ctx} schema={MASK_SCHEMA} basePath={`${base}/masks/${i}/props`} baseAddress={`${id}.masks.${mk.id}`} />}
+        </div>
+      ))}
+    </Section>
+  );
+}
+
 /** a list of effects (layer or composition) with their props, add / toggle / remove / reorder */
 function EffectsSection({ ctx, base, address, effects, stage, title }: { ctx: Ctx; base: string; address: string; effects: import('@tramme/core').Effect[]; stage: 'layer' | 'finish'; title: string }) {
   const reg = S.registry.value;
@@ -612,6 +853,7 @@ function CompInspector({ ctx }: { ctx: Ctx }) {
         <div class="prop"><span /><span class="plabel static">{t('common.duration')}</span><div class="pvalue"><NumberField value={c.duration} step={1 / c.fps} min={1 / c.fps} unit="s" onCommit={(v) => setComp('duration', +v.toFixed(4), t('common.duration'))} /></div><span /></div>
         <PropRow ctx={ctx} label={t('inspector.background')} def={{ type: 'color', default: null, nullable: true }} path={`${cp}/background`} address="$comp.background" />
       </Section>
+      <ParamsSection ctx={ctx} />
       <Section id="blur" title={t('common.motionBlur')}>
         {c.motionBlur
           ? <SchemaRows ctx={ctx} schema={MOTION_BLUR_SCHEMA} basePath={`${cp}/motionBlur`} baseAddress="$comp.motionBlur" />

@@ -31,8 +31,13 @@ export interface ExprScope {
   audio(source: string): AudioReader;
   /** an event list at this instant (running totals, the latest event): its asset id */
   events(source: string): EventsReader;
-  /** where a tracked object of a video layer is at this instant: the layer id, and the track's name or asset id (its first track by default) */
-  track(layer: string, name?: string): TrackReader;
+  /** where a tracked object of a video layer is at this instant (or at composition time `at`): the layer id, and the track's name or asset id (its first track by default) */
+  track(layer: string, name?: string, at?: number): TrackReader;
+  /** the layer's rank among its siblings (bottom first) and their number; an instance of a distribution: its rank among the instances */
+  index?: number;
+  count?: number;
+  /** an instance of a distribution over a data asset: its row */
+  row?: unknown;
 }
 
 const SAFE_MATH: Math = Object.freeze(Object.assign(
@@ -59,6 +64,8 @@ const HELPERS = {
 };
 
 const SCOPE = ['t', 'time', 'frame', 'fps', 'value', 'comp', 'prop', 'token', 'marker', 'ease', 'audio', 'events', 'track'] as const;
+/** names added later: the body runs in a scope of its own, so an expression that declares one of them still compiles */
+const LATE_SCOPE = ['index', 'count', 'row'] as const;
 const HELPER_NAMES = Object.keys(HELPERS);
 const HELPER_VALUES = Object.values(HELPERS);
 const BLOCKED = [
@@ -80,15 +87,15 @@ export function compileExpr(src: string): CompiledExpr {
   // globals once; the inner one is strict: no implicit globals, no `this`.
   let fn: Function;
   try {
-    const outer = new Function(...HELPER_NAMES, ...BLOCKED, `return function (${SCOPE.join(', ')}) {\n"use strict";\n${body}\n};`);
+    const outer = new Function(...HELPER_NAMES, ...BLOCKED, `return function (${[...SCOPE, ...LATE_SCOPE].join(', ')}) {\n"use strict";\nreturn (() => {\n${body}\n})();\n};`);
     fn = outer(...HELPER_VALUES, ...BLOCKED.map(() => undefined));
   } catch (e) {
     throw new SyntaxError(`invalid expression (${(e as Error).message}): ${src}`);
   }
-  const compiled: CompiledExpr = (s) => fn(s.t, s.t, s.frame, s.fps, s.value, s.comp, s.prop, s.token, s.marker, s.ease, s.audio, s.events, s.track);
+  const compiled: CompiledExpr = (s) => fn(s.t, s.t, s.frame, s.fps, s.value, s.comp, s.prop, s.token, s.marker, s.ease, s.audio, s.events, s.track, s.index ?? 0, s.count ?? 1, s.row);
   cache.set(src, compiled);
   return compiled;
 }
 
 /** names an expression can use, for the editor's completion and the AI's documentation */
-export const EXPRESSION_NAMES = [...SCOPE, ...HELPER_NAMES];
+export const EXPRESSION_NAMES = [...SCOPE, ...LATE_SCOPE, ...HELPER_NAMES];

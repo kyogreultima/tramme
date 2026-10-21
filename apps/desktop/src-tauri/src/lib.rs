@@ -65,6 +65,16 @@ fn desktop_set_home(home: String) -> Result<serde_json::Value, String> {
 // ── the way out to the providers, keys put back on the way (fetch.rs) ──
 
 /// sends a request of the page; its answer comes back over `events`
+/// the folder of the installed plugins, shown in the system's file manager
+/// (made first, so the settings' "Open the folder" always opens one)
+#[tauri::command]
+fn desktop_open_plugins() -> Result<(), String> {
+    let dir = store::home().join("library").join("plugins");
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let opener = if cfg!(target_os = "macos") { "open" } else if cfg!(windows) { "explorer" } else { "xdg-open" };
+    std::process::Command::new(opener).arg(&dir).spawn().map(|_| ()).map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 fn desktop_fetch(id: u32, request: fetch::Outbound, events: tauri::ipc::Channel<fetch::Event>) -> Result<(), String> {
     let keys = keys::KeyStore::system().map_err(|e| e.message)?;
@@ -107,7 +117,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             desktop_state, desktop_pick_home, desktop_set_home, desktop_pending_name, desktop_pending_bytes,
-            desktop_fetch, desktop_fetch_abort
+            desktop_fetch, desktop_fetch_abort, desktop_open_plugins
         ])
         .register_asynchronous_uri_scheme_protocol(SCHEME, |_ctx, request, responder| {
             // answered off the main thread: the storage does disk I/O

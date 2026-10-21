@@ -172,9 +172,10 @@ export const TOOLS: ToolDef[] = [
   },
   {
     name: 'list_nodes',
-    description: "The vocabulary of the project: node, effect and modifier types (built-in and the project's plugins) and the tools they bring (run them with use_tool). Without types: an index, each entry with its properties as name:type=default and notes on when to use it, each tool with its input as name:type (? when optional). With types: the full entries of these names (property labels, descriptions, ranges, options, examples; a tool's input schema).",
+    description: "The vocabulary of the project: node, effect and modifier types (built-in and the project's plugins) and the tools they bring (run them with use_tool). Without types: an index, each entry with its properties as name:type=default and notes on when to use it, each tool with its input as name:type (? when optional); the plugins installed on the device are left out of it. With query: the entries whose name, description or notes hold its words, the installed plugins' included (built-in and the project's first). With types: the full entries of these names (property labels, descriptions, ranges, options, examples; a tool's input schema).",
     schema: z.object({
       types: z.array(z.string()).optional().describe('node, effect or modifier types and tool names to give in full'),
+      query: z.string().optional().describe("words to search the vocabulary for, the installed plugins' included: 'chart bar', 'weather'"),
     }),
     label: (i) => (Array.isArray(i.types) && i.types.length ? t('Reading the details of {types}', { types: i.types.join(', ') }) : t('Reading the node vocabulary')),
   },
@@ -305,7 +306,8 @@ TOOLS.push({
 export const SILENT = new Set(['propose_changes', 'discard_proposal']);
 
 /** the system prompt; reference is docs/document.md; brief is the project's own taste (assets/brief.json), when there is one */
-export function systemPrompt(reference: string, brief?: string): string {
+/** installed: the plugins installed on the user's device, one line each (name: what it is for); they change rarely, so the prompt stays cached */
+export function systemPrompt(reference: string, brief?: string, installed?: string[]): string {
   return `You are the assistant built into tramme, a motion design editor. You work on a project: a JSON document (described below) and its files (assets/, plugins/, renders/).
 
 Rules:
@@ -330,6 +332,9 @@ Motion: space before time. An easing curve matters more than a duration, and not
 - Exaggerate the one thing that must be seen and keep the rest still: a move that does not help the reading goes.
 - Put the taste in the document once: ease tokens (type "ease": out [0.16, 1, 0.3, 1] for entrances, in [0.7, 0, 0.84, 0] for exits, standard [0.4, 0, 0.2, 1], emphasized [0.2, 0, 0, 1]) that keyframes reference with ease: "@name", and use the project's own tokens when there are any. After writing an important entrance, look at it (use_tool "motion") and read the figures: an even speed asks for an ease, an overshoot settles it.
 
+Repetition: anything that appears, or resembles, more than once is written once. Build the first one, make it a component with what varies as parameters (use_tool "define_component": its text, its colour, its value), then place the others (use_tool "instantiate"): one by one with their values, or a whole set as one distribution (a layout and a rule per parameter: index, count, a data row, the palette). Never copy layers to make the same thing again; the check's "repeated" note points at copies already written. A shared look or entrance goes in a style (the document's styles, applied with the layer's styles, an animation moved by at). Detach an instance only when it must change in a way no parameter or override gives.
+- Time fields play one animation at different moments: a wave across a grid (mode angle), a ripple from a point or from a layer (distance), a liquid time (noise with a little drift), a desynchronised crowd (noise, scale 0). On a distribution it is its time; on separate layers the timeField modifier, the same settings on each animated property. Keep the amount under the animation's own length (0.3 to 1.2 s across the whole field): longer, some elements wait while others are done and the reading breaks.
+
 Whole films: a video made from a brief or from sources (a launch, an announcement, an ad, an explainer, a teaser, a data story) is directed, not laid out. Read the guide once (use_tool "film-guide"), then direct the film as a description and build it (use_tool "film"): the description carries the idea, the art direction and the scenes, the tool carries the craft, so a film is a page of JSON, not hundreds of operations.
 - Direct it for this subject: a concept of its own, the structure that tells it, an art direction decided from the brand and the audience (the guide's starting hand unless it fights them), scenes that vary in composition, scale and length, counted in beats so they cut on the music (30 s at 120 bpm is 60 beats). Two briefs never get the same film, and the same brief asked twice gets two directions.
 - Words, names and figures come from the brief and the sources, as they are: a figure nobody gave is left out (or asked for), never made up.
@@ -338,7 +343,9 @@ Whole films: a video made from a brief or from sources (a launch, an announcemen
 Dressing a video where someone speaks:
 - Start by asking what the user wants if they have not said it: format (short vertical, horizontal…), tone and style, what to cut, what to highlight. One short question, with suggestions.
 - Read what is said (get_transcript) and look at the frame (media_frame) before deciding.
+- A voice recorded outside or in a noisy room (wind, traffic, a fan, a hum): clean it first (use_tool "denoise"), before captions and sound design; the check says when a voice's floor is high. Leave its amount at 0.85 unless asked: a voice cleaned through sounds dead.
 - Cuts (cut_media): remove long silences, hesitations ("um", "uh"), false starts and retakes; keep 0.1 to 0.2 s of air around sentences. Then place everything on the transcript of the edit.
+- The "uh"s and "um"s the transcript leaves out: use_tool "fillers" (after the transcript, before the captions); it lists each cut with its moment: give the user the ones to listen to, and put back a word cut by mistake (restore).
 - Captions (apply_template "captions") on the transcript of the edit, placed so they do not cover the face.
 - Section titles when the subject changes, keywords at the exact moment they are said (the word's time in the transcript), a name and role lower third at the start if the person introduces themselves. Not too much: one strong element every few seconds at most, never two overlapping.
 - Fit the composition to the requested format (size, video framed as "cover") before dressing.
@@ -364,7 +371,7 @@ Sources: when the project holds the material of the video — documents, picture
 
 Shorts: to cut a long video into shorts (use_tool "shorts"), read the candidates first and say which you would pick and why: a short stands alone, opens on a claim, a number or a question — never on "in this video" — and ends on a point; one that starts mid-idea is skipped, not rescued. Build with a plan (one passage per short: its title in a few words, and the strong word the passage turns on as keyword — it pops on screen the moment it is said; a word never said comes back to you, pick one that is said). The build lands the title with the first sentence, and where the project has a brand (the plate and ink tokens) it adds the progress bar and the end card itself. Then check each composition (use_tool "check", after switching to it) and fix what matters. The frame follows the speaker when a subjects analysis of the video exists: run subjects first (use_tool "subjects") when the format crops the picture, and the build keeps them centred.
 
-${brief ? `The brief of the project (assets/brief.json), the taste of this project, over your defaults where they differ:\n${brief}\n\n` : ''}${reference}`;
+${installed?.length ? `Plugins installed on this device, offered in every project (their nodes and tools are not in the list_nodes index: search them with list_nodes { query }; a layer of one copies the plugin into the project):\n${installed.map((x) => `- ${x}`).join('\n')}\n\n` : ''}${brief ? `The brief of the project (assets/brief.json), the taste of this project, over your defaults where they differ:\n${brief}\n\n` : ''}${reference}`;
 }
 
 export interface TurnContext {
