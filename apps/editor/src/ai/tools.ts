@@ -4,6 +4,7 @@
 // project's text files, and the tools its plugins bring. The document itself
 // only changes through proposals the user applies.
 
+import { installedTypes } from '../installed.ts';
 import { applyOps, Evaluator, getAt, isTranscript, pointer, remapTranscript, silences, toolInputIssues, toolOutput, validate, type TrammeDoc, type Op, type Registry, type ToolContext, type Transcript } from '@tramme/core';
 import { DOCUMENT, isChatPath, MANIFEST, pathIssue, srcPath } from '@tramme/project';
 import { VideoFrames } from '@tramme/render';
@@ -16,7 +17,7 @@ import { describeOp, freshId } from '../model.ts';
 import { analyses, jpegOf, loadImage } from '../perception.ts';
 import { safeName } from '../files.ts';
 import { transcriptFor, transcriptIdOf } from '../speech.ts';
-import { TEMPLATES } from '../templates.ts';
+import { placeTemplate, TEMPLATES } from '../templates.ts';
 import { S } from '../state.ts';
 import { t } from '../i18n/index.ts';
 
@@ -197,7 +198,9 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
         }
         case 'list_nodes': {
           const reg = await this.registry(this.liveDoc());
-          return text(Array.isArray(input.types) && input.types.length ? vocabularyDetail(reg, input.types.map(String)) : vocabularyIndex(reg));
+          // the installed plugins' entries: tools by where they come from, the rest by the types they brought
+          const installed = (section: string, name: string, from?: string) => (section === 'tools' ? !!from?.startsWith('installed:') : installedTypes.has(`${section.slice(0, -1)}:${name}`));
+          return text(Array.isArray(input.types) && input.types.length ? vocabularyDetail(reg, input.types.map(String)) : vocabularyIndex(reg, { query: typeof input.query === 'string' ? input.query : undefined, installed }));
         }
         case 'evaluate': {
           const doc = this.liveDoc(), reg = await this.registry(doc);
@@ -226,7 +229,7 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
           const tpl = TEMPLATES[String(input.template)];
           if (!tpl) return text(`unknown template: ${input.template} (${Object.keys(TEMPLATES).join(', ')})`, true);
           const doc = this.liveDoc(), compId = input.compId && doc.compositions[input.compId] ? input.compId : S.compId.peek() in doc.compositions ? S.compId.peek() : doc.root;
-          const { label, ops } = tpl.build(doc, compId, { at: Number(input.at ?? 0), duration: input.duration, text: input.text, subtitle: input.subtitle, transcript: input.transcript, place: input.place });
+          const { label, ops } = placeTemplate(doc, compId, String(input.template), { at: Number(input.at ?? 0), duration: input.duration, text: input.text, subtitle: input.subtitle, transcript: input.transcript, place: input.place });
           return await this.propose(label, ops);
         }
         default: return text(`unknown tool: ${name}`, true);

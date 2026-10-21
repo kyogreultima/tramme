@@ -86,7 +86,7 @@ const EXT: [(&str, &[&str]); 3] = [
         &[
             "png", "jpg", "jpeg", "webp", "gif", "avif", "svg", "ttf", "otf", "woff", "woff2",
             "wav", "mp3", "ogg", "m4a", "flac", "mp4", "webm", "mov", "json", "js", "mjs", "pdf",
-            "md", "markdown",
+            "md", "markdown", "cube",
         ],
     ),
     ("plugins", &["js", "mjs"]),
@@ -109,6 +109,7 @@ pub fn mime_of(path: &str) -> &'static str {
         "woff2" => "font/woff2",
         "pdf" => "application/pdf",
         "md" | "markdown" => "text/markdown; charset=utf-8",
+        "cube" => "text/plain; charset=utf-8",
         "wav" => "audio/wav",
         "mp3" => "audio/mpeg",
         "ogg" => "audio/ogg",

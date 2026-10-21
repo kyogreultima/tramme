@@ -1,16 +1,30 @@
 // Speech to text on this machine, for the companion: Whisper run locally with
 // transformers.js (no account, no key). The model downloads once, on first
 // use, into the user's cache. Same input and output as the Worker's route:
-// a WAV chunk (16 kHz mono) in, words with their timing out.
+// a WAV chunk (16 kHz mono) in, words with their timing out. The model is
+// the one chosen in the editor's settings (Models, Transcription), unless
+// TRAMME_WHISPER_MODEL names another for this machine.
 
-const MODEL = process.env.TRAMME_WHISPER_MODEL ?? 'Xenova/whisper-small';
+import { asrWords } from '@tramme/core';
+
+const DEFAULT_MODEL = 'Xenova/whisper-small';
 
 type Asr = (audio: Float32Array, opts: Record<string, unknown>) => Promise<{ text: string; chunks?: { text: string; timestamp: [number, number | null] }[] }>;
-let asr: Promise<Asr> | null = null;
+const loaded = new Map<string, Promise<Asr>>();
 
-function model(): Promise<Asr> {
-  asr ??= import('@huggingface/transformers').then(async ({ pipeline }) => (await pipeline('automatic-speech-recognition', MODEL, { dtype: 'q8' } as never)) as unknown as Asr);
-  return asr;
+/** the model a request runs: the machine's override, else the one the editor asks for (a model hub id), else the default */
+export function whisperModel(asked?: unknown, env = process.env.TRAMME_WHISPER_MODEL): string {
+  if (env) return env;
+  return typeof asked === 'string' && /^[A-Za-z0-9][\w.-]*\/[\w.-]+$/.test(asked) ? asked : DEFAULT_MODEL;
+}
+
+function model(id: string): Promise<Asr> {
+  if (!loaded.has(id)) {
+    const p = import('@huggingface/transformers').then(async ({ pipeline }) => (await pipeline('automatic-speech-recognition', id, { dtype: 'q8' } as never)) as unknown as Asr);
+    // a model that failed to load is tried again next time
+    loaded.set(id, p.catch((e) => { loaded.delete(id); throw e; }));
+  }
+  return loaded.get(id)!;
 }
 
 /** 16-bit PCM WAV (mono) as samples between -1 and 1 */
@@ -31,11 +45,12 @@ function pcm(wav: Buffer): { samples: Float32Array; rate: number } {
   throw new Error('WAV without data');
 }
 
-export async function transcribeLocal(audioBase64: string, language?: string) {
+export async function transcribeLocal(audioBase64: string, language?: string, asked?: string) {
   const { samples, rate } = pcm(Buffer.from(audioBase64, 'base64'));
   if (rate !== 16000) throw new Error(`16 kHz expected (got ${rate} Hz)`);
-  const run = await model();
+  const id = whisperModel(asked);
+  const run = await model(id);
   const out = await run(samples, { return_timestamps: 'word', chunk_length_s: 30, ...(language ? { language } : {}), task: 'transcribe' });
-  const words = (out.chunks ?? []).map((c) => ({ w: c.text.trim(), s: c.timestamp[0], e: c.timestamp[1] ?? c.timestamp[0] })).filter((w) => w.w);
-  return { words, text: out.text.trim(), language, duration: samples.length / rate };
+  const words = asrWords(out);
+  return { words, text: out.text.trim(), language, duration: samples.length / rate, model: id };
 }

@@ -120,7 +120,7 @@ Anyone opens the address and works at once: no account, nothing kept on the serv
    npm run deploy:personal   # builds the editor, then wrangler deploy --env personal
    ```
 
-   The personal Worker is `tramme`, the private one `tramme-private`: both can live side by side. Deploying from the Git repository (Workers Builds, on the `tramme` Worker): build command `npm run build`, deploy command `npx wrangler deploy -c apps/worker/wrangler.jsonc --env personal`.
+   The personal Worker is `tramme`, the private one `tramme-private`: both can live side by side. Deploying from the Git repository (Workers Builds, on the `tramme` Worker): build command `npm run build`, deploy command `npx wrangler deploy -c apps/worker/wrangler.jsonc --env personal`, preview command (the other branches) `npx wrangler preview -c apps/worker/wrangler.jsonc --env personal`, which reads the `previews` block of `env.personal`.
 
 Any other address of this Worker (its `workers.dev` one, previews) sends to `APP_ORIGIN`. Until both addresses are set, it answers 503.
 

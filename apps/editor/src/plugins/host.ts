@@ -65,6 +65,12 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string): 
     if (a.kind === 'writeFile') return (ctx as ToolContext).writeFile(a.path, 'text' in a.data ? a.data.text : new Blob([a.data.bytes]));
     if (a.kind === 'renderStill') return (ctx as ToolContext).renderStill(a.t, a.compId);
     if (a.kind === 'transcript') return (ctx as ToolContext).transcript(a.assetId, { ask: a.ask });
+    if (a.kind === 'fetch') {
+      const go = (ctx as ToolContext).fetch;
+      if (!go) throw new Error('this plugin declared no network access (meta.permissions)');
+      // the answer as plain data: the worker makes it a Response again
+      return go(a.url, { method: a.method, headers: a.headers, body: a.body }).then(async (r) => ({ status: r.status, headers: Object.fromEntries(r.headers), body: await r.arrayBuffer() }));
+    }
     return (ctx as CheckContext).data(a.assetId);
   };
 

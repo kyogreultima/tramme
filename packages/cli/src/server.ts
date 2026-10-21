@@ -63,6 +63,8 @@ export class Server {
   readonly config: ProjectConfig;
   /** receives each binary WebSocket message; the page waits for the ack before sending the next */
   sink: ((buf: Buffer) => Promise<void> | void) | null = null;
+  /** sinks by name, for pages rendering at once (a parallel export): a page connects to /__tramme/ws?sink=<name> */
+  readonly sinks = new Map<string, (buf: Buffer) => Promise<void> | void>();
   private http: http.Server;
   private handlers: Handler[] = [];
   private files = new Map<string, { text: string; type: string }>();
@@ -76,10 +78,11 @@ export class Server {
       res.end(String((e as Error).message || e));
     }));
     const wss = new WebSocketServer({ server: this.http, path: '/__tramme/ws', maxPayload: 512 * 1024 * 1024 });
-    wss.on('connection', (sock) => {
+    wss.on('connection', (sock, req) => {
       let chain = Promise.resolve();
+      const name = new URL(req.url ?? '', 'http://x').searchParams.get('sink');
       sock.on('message', (data: Buffer) => {
-        chain = chain.then(() => this.sink?.(data)).then(() => sock.send('ok')).catch((e) => console.error(e));
+        chain = chain.then(() => (name ? this.sinks.get(name) : this.sink)?.(data)).then(() => sock.send('ok')).catch((e) => console.error(e));
       });
     });
   }

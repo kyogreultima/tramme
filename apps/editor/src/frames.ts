@@ -8,8 +8,9 @@ import type { TrammeDoc } from '@tramme/core';
 import { Renderer } from '@tramme/render';
 import { editorRegistry } from './vocabulary.ts';
 import { attachIsolated, filterModule, pluginHost } from './plugins/index.ts';
-import { declarationsModule, ensureSandboxDoc, pluginItemsOf, sandboxDeclaration, sandboxVideoFrames } from './plugins/sandbox-draw.ts';
+import { declarationsModule, ensureDeclared, ensureSandboxDoc, pluginItemsOf, sandboxDeclaration, sandboxVideoFrames } from './plugins/sandbox-draw.ts';
 import { prefs } from './settings.ts';
+import { sandboxedDoc } from './installed.ts';
 import { S } from './state.ts';
 
 /** a renderer of its own (never the preview's) and the stills it draws */
@@ -25,8 +26,8 @@ export class Stills {
     const base = new URL(S.docUrl.peek(), location.href).href;
     if (!this.renderer) {
       // the flag: the sandbox owns the plugins' modules, the registry takes its declarations
-      const sandboxed = prefs.peek().sandboxPreview && (doc.plugins ?? []).length > 0;
-      if (sandboxed) await pluginHost(base).ensure(pluginItemsOf(doc, base));
+      const sandboxed = sandboxedDoc(doc);
+      if (sandboxed) await ensureDeclared(pluginHost(base), pluginItemsOf(doc, base));
       this.renderer = await Renderer.open(doc, editorRegistry(), base, this.canvas, { compId: id, raster: 'gpu', pluginModule: sandboxed ? undefined : filterModule, sandboxModules: sandboxed, sandboxDeclarations: sandboxed ? (pid) => declarationsModule(sandboxDeclaration(pid)!, pid) : undefined });
     }
     // the same version again: its simulations stay computed
@@ -43,7 +44,7 @@ export class Stills {
     const c = doc.compositions[compId];
     const k = Math.min(1, width / c.width);
     // the flag: the picture comes from the sandbox, videos decoded here
-    if (prefs.peek().sandboxPreview && (doc.plugins ?? []).length) {
+    if (sandboxedDoc(doc)) {
       const docUrl = new URL(S.docUrl.peek(), location.href).href;
       ensureSandboxDoc(pluginHost(docUrl), { doc, docUrl, loaded: (id) => { try { return r.assets.get(id); } catch { return null; } } });
       const videos = await sandboxVideoFrames(r, doc, t);

@@ -72,6 +72,22 @@ describe("the assistant's tools", () => {
     expect(index.length).toBeLessThan(full.length / 2);
   });
 
+  it('leaves the installed plugins out of the index, and finds them by a search', () => {
+    const reg = builtinRegistry().registerTool(...REVIEW_TOOLS);
+    reg.use({ tools: [{ name: 'weather-today', description: 'the forecast as a card', run: () => '' }] }, 'installed:weather.js');
+    reg.use({ tools: [{ name: 'brand-check', description: 'the forecast colours of the brand', run: () => '' }] }, 'brand');
+    const installed = (_s: string, _n: string, from?: string) => !!from?.startsWith('installed:');
+    const index = vocabularyIndex(reg, { installed });
+    expect(index).not.toContain('weather-today');
+    expect(index).toContain('brand-check');
+    expect(index).toContain('1 more entries come from plugins installed');
+    const found = vocabularyIndex(reg, { installed, query: 'Forecast' });
+    // the project's own first, the installed after, nothing else
+    expect(found.indexOf('brand-check')).toBeLessThan(found.indexOf('weather-today'));
+    expect(found).not.toContain('motion(');
+    expect(vocabularyIndex(reg, { installed, query: 'zebra crossing' })).toMatch(/^Nothing in the vocabulary/);
+  });
+
   it('gives the full entries asked for, and names the ones it does not know', () => {
     const reg = builtinRegistry().registerTool(...REVIEW_TOOLS);
     const type = reg.listNodes()[0].type;

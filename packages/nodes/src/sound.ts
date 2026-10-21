@@ -18,6 +18,9 @@ export const SOUND_PROPS: PropSchema = {
   eqHigh: { type: 'number', default: 0, min: -24, max: 12, step: 0.5, unit: 'dB', label: 'High', group, animatable: false, description: 'air and brightness over, or the hiss tamed under; 0 leaves it as recorded' },
   compress: { type: 'number', default: 0, min: 0, max: 1, step: 0.05, label: 'Compress', group, animatable: false, description: 'how hard the loud moments are brought down (a voice kept level, a hero that never jumps out): 0 leaves the dynamics as recorded, 1 is radio-announcer tight' },
   reverb: { type: 'number', default: 0, min: 0, max: 1, step: 0.05, label: 'Reverb', group, animatable: false, description: 'share of room sound, 0 (dry) to 1' },
+  voice: { type: 'enum', default: 'none', options: ['none', 'pitch', 'robot', 'telephone', 'radio', 'megaphone', 'echo'], label: 'Voice', group, animatable: false, description: 'an effect on the sound: its pitch moved (semitones), a robot, a telephone, a radio, a megaphone, an echo' },
+  semitones: { type: 'number', default: 0, min: -12, max: 12, step: 0.5, label: 'Semitones', group, animatable: false, description: 'the pitch moved, its length kept (the pitch voice)' },
+  clean: { type: 'number', default: 0, min: 0, max: 1, step: 0.05, label: 'Clean voice', group, animatable: false, description: 'how much of the voice cleaned by the denoise tool plays instead of the recorded one: 0 the original, 1 all cleaned (a voice sounds dead there), 0.8 to 0.9 keeps it alive' },
 };
 
 /** an audio layer's place in the mix: its bus, its weight, what it underlines in the picture (the sound checks read them) */
@@ -29,5 +32,6 @@ export const MIX_PROPS: PropSchema = {
 
 /** an audio layer's own: its playback speed, the pitch with it */
 export const RATE_PROP: PropSchema = {
-  rate: { type: 'number', default: 1, min: 0.25, max: 4, step: 0.05, unit: 'x', label: 'Speed', group, animatable: false, description: 'playback speed, the pitch with it: under 1 lower and longer, over 1 higher and shorter' },
+  keepPitch: { type: 'bool', default: false, label: 'Keep the pitch', group, animatable: false, description: 'at another speed (or along a speed curve), the voice keeps its pitch' },
+  rate: { type: 'number', default: 1, min: -4, max: 4, step: 0.05, unit: 'x', label: 'Speed', group, integral: 'rateElapsed', description: 'playback speed, the pitch with it: under 1 lower and longer, over 1 higher and shorter; 0 holds the frame, under 0 plays backwards. Animated, it ramps (a speed curve): the file runs at the integral of the speed' },
 };

@@ -17,7 +17,7 @@ export function QuestionDialog() {
   return (
     <Modal title={q.title} onClose={() => answer(false)}>
       <div class="modal-body">
-        <p>{q.text}</p>
+        <p style={{ whiteSpace: 'pre-line' }}>{q.text}</p>
         <div class="modal-foot">
           <button class="btn ghost" onClick={() => answer(false)}>{t('common.cancel')}</button>
           <button class="btn primary" onClick={() => answer(true)}>{q.yes}</button>

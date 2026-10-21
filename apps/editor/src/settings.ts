@@ -4,6 +4,7 @@
 // quality), and how the sound tools work by default.
 
 import { effect, signal } from '@preact/signals';
+import { MODEL_TASKS, resolveModel, type ModelEntry, type ModelTask } from './models.ts';
 
 export interface Preferences {
   /** interface language: the browser's (French or English), or chosen */
@@ -40,11 +41,17 @@ export interface Preferences {
   /** what the preview plays at, 0 to 1, and muted; the exports keep the mix as it is */
   previewVolume: number;
   previewMuted: boolean;
+  /** the preview plays a video's proxy when it has one (the exports always read the original) */
+  proxies: boolean;
+  /** the model each local tool downloads and runs, per task: a model's id, or 'hub:owner/name'; missing, the default (models.ts) */
+  models: Partial<Record<ModelTask, string>>;
+  /** installed plugins turned off on this device (their file names) */
+  pluginsOff: string[];
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
   language: 'auto', theme: 'studio', view: 'studio', motion: 'auto', still: 'display', blur: 'document', exactFrames: true, sandboxPreview: false,
-  effectsDb: -8, musicDb: -14, duckDb: -12, varySounds: true, confirmPaid: true, paidPerTurn: 10, voiceProvider: 'auto', voice: '', voiceModel: '', previewVolume: 1, previewMuted: false,
+  effectsDb: -8, musicDb: -14, duckDb: -12, varySounds: true, confirmPaid: true, paidPerTurn: 10, voiceProvider: 'auto', voice: '', voiceModel: '', previewVolume: 1, previewMuted: false, proxies: true, models: {}, pluginsOff: [],
 };
 
 // ── themes and views ─────────────────────────────────────────
@@ -120,6 +127,10 @@ function load(): Preferences {
     if (!VOICE_PROVIDERS.includes(p.voiceProvider)) p.voiceProvider = d.voiceProvider;
     if (typeof p.voice !== 'string') p.voice = d.voice;
     if (typeof p.voiceModel !== 'string') p.voiceModel = d.voiceModel;
+    p.proxies = p.proxies !== false;
+    const models = p.models && typeof p.models === 'object' ? p.models : {};
+    p.models = Object.fromEntries(MODEL_TASKS.filter((k) => typeof models[k] === 'string').map((k) => [k, models[k]]));
+    p.pluginsOff = Array.isArray(p.pluginsOff) ? p.pluginsOff.filter((x) => typeof x === 'string') : [];
     return p;
   } catch { return { ...DEFAULT_PREFERENCES }; }
 }
@@ -130,6 +141,9 @@ export function setPrefs(patch: Partial<Preferences>) {
   prefs.value = { ...prefs.peek(), ...patch };
   try { localStorage.setItem(KEY, JSON.stringify(prefs.peek())); } catch { /* private mode: for this session only */ }
 }
+
+/** the model a local tool runs for a task on this computer */
+export const chosenModel = (task: ModelTask): ModelEntry => resolveModel(task, prefs.peek().models[task]);
 
 /** back to the defaults; the language stays as chosen */
 export function resetPrefs() { setPrefs({ ...DEFAULT_PREFERENCES, language: prefs.peek().language }); }
@@ -164,7 +178,7 @@ effect(() => {
 /** the settings dialog, opened from the top bar, the home screen or Ctrl+, */
 export const settingsOpen = signal(false);
 
-export type SettingsSection = 'appearance' | 'preview' | 'sound' | 'tours' | 'storage' | 'model' | 'providers' | 'behavior' | 'connection';
+export type SettingsSection = 'plugins' | 'appearance' | 'preview' | 'sound' | 'models' | 'tours' | 'storage' | 'model' | 'providers' | 'behavior' | 'connection';
 /** the section shown: the last one opened, or the one asked for */
 export const settingsSection = signal<SettingsSection>('appearance');
 export function openSettings(section?: SettingsSection) {

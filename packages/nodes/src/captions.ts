@@ -2,14 +2,17 @@
 // they are said, the word being spoken set apart. Groups break at pauses and
 // sentence ends. The layer's in point reads the transcript from `start`, like
 // a video layer: a transcript in the time of an uncut video lines up with it,
-// a transcript remapped after cuts starts at 0.
+// a transcript remapped after cuts starts at 0. Following a video or sound
+// layer, the words keep that layer's file time instead: its start, its loop
+// and its speed curve.
 
-import { captionGroups, isTranscript, type CaptionGroup, type NodeType, type Paint, type Transcript, type Vec2 } from '@tramme/core';
+import { captionGroups, isTranscript, mediaTime, type CaptionGroup, type NodeType, type Paint, type Transcript, type Vec2 } from '@tramme/core';
 import { canvasPaint, roundRect } from './paint.ts';
 
 interface CaptionProps {
   transcript: string | null;
   start: number;
+  follow: string | null;
   maxWords: number;
   maxChars: number;
   font: string | null;
@@ -43,12 +46,20 @@ const clamp = (x: number) => Math.max(0, Math.min(1, x));
 const easeOut = (x: number) => 1 - Math.pow(1 - x, 3);
 const back = (x: number) => { const c = 1.7; return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); };
 
+/** the transcript time shown at host.t: the followed layer's file time, or start plus the time since the in point */
+function transcriptTime(p: CaptionProps, host: Parameters<NonNullable<NodeType<CaptionProps>['render']['canvas2d']>>[2]): number {
+  const L = p.follow ? host.layer?.(p.follow) : null;
+  if (L) return mediaTime(L.props as never, host.t, L.in);
+  return p.start + (host.t - (host.layerIn ?? 0));
+}
+
 export const captions: NodeType<CaptionProps> = {
   type: 'captions', title: 'Captions', category: 'Text',
   description: 'the words of a transcript, when they are spoken',
   props: {
     transcript: { type: 'asset', default: null, nullable: true, assetType: 'json', label: 'Transcript', animatable: false },
     start: { type: 'number', default: 0, step: 0.01, unit: 's', label: 'Start in the transcript', animatable: false, description: "the transcript time at the layer's in point" },
+    follow: { type: 'layer', default: null, nullable: true, label: 'Follows', animatable: false, description: "a video or sound layer whose file the transcript is in: the words keep its time, through its start, loop and speed curve (start is then unused)" },
     maxWords: { type: 'number', default: 4, min: 1, max: 12, step: 1, label: 'Words at a time', animatable: false, group: 'Rhythm' },
     maxChars: { type: 'number', default: 28, min: 6, max: 80, step: 1, label: 'Letters at a time', animatable: false, group: 'Rhythm' },
     font: { type: 'asset', default: null, nullable: true, assetType: 'font', label: 'Font', group: 'Typography' },
@@ -73,7 +84,7 @@ export const captions: NodeType<CaptionProps> = {
       if (!p.transcript) return;
       const t = host.asset<unknown>(p.transcript);
       if (!isTranscript(t)) return;
-      const T = p.start + (host.t - (host.layerIn ?? 0));
+      const T = transcriptTime(p, host);
       const groups = groupsOf(t, Math.round(p.maxWords), Math.round(p.maxChars));
       const g = groups.find((x) => T >= x.s - 0.05 && T < x.e);
       if (!g) return;

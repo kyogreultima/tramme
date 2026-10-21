@@ -1,7 +1,9 @@
 // Graph editor: value curves of the selected layers' animated properties.
 // A segment's ease is a cubic Bézier normalised to the segment (time and
 // value), so its two handles are drawn in value space and dragging them
-// rewrites the ease of that segment. Keys move in time and value.
+// rewrites the ease of that segment. Keys move in time and value. With a
+// video or sound layer selected, speed presets write its speed curve around
+// the playhead.
 
 import { signal } from '@preact/signals';
 import { useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
@@ -12,7 +14,8 @@ import { animatedProps, keysOf, layerName, propPath, rulerLabel, snap, timecode 
 import { bandOf, noBrowserMenu } from './controls.tsx';
 import { Icon } from './icons.tsx';
 import { propLabel } from './Timeline.tsx';
-import { t } from '../i18n/index.ts';
+import { m, t } from '../i18n/index.ts';
+import { SPEED_PRESETS, speedKeys, type SpeedPreset } from '../speed.ts';
 
 const hidden = signal<Set<string>>(new Set());
 const COLORS = ['#ff7a7a', '#7ad67a', '#7aa8ff', '#f2b54d', '#e07a8e', '#4fd1c5'];
@@ -22,6 +25,32 @@ interface Channel { id: string; layer: string; prop: string; comp: number; type:
 const PRESETS: [string, EaseSpec][] = [
   [t('common.linear'), 'linear'], [t('common.hold'), 'hold'], [t('curves.smooth'), [0.42, 0, 0.58, 1]], [t('common.in'), [0.42, 0, 1, 1]], [t('common.out'), [0, 0, 0.58, 1]],
 ];
+
+const SPEED_LABEL: Record<SpeedPreset, string> = {
+  rampIn: m('curves.speedRampIn'), rampOut: m('curves.speedRampOut'), hero: m('curves.speedHero'), bullet: m('curves.speedBullet'),
+};
+
+/** the speed presets for the selected video and sound layers, written around the playhead */
+function SpeedPresets({ empty }: { empty: boolean }) {
+  const c = comp.value, compId = S.compId.value, now = uiTime.value;
+  const media = S.selection.value.filter((id) => c.layers[id]?.type === 'video' || c.layers[id]?.type === 'audio');
+  if (!media.length) return null;
+  const apply = (preset: SpeedPreset) => {
+    const ops: Op[] = media.map((id) => {
+      const l = c.layers[id];
+      return { op: 'add', path: propPath(compId, id, 'rate'), value: { $k: speedKeys(preset, now, l.in ?? 0, l.out ?? c.duration) } };
+    });
+    commit(t('curves.speedCurveName', { name: t(SPEED_LABEL[preset]) }), ops);
+  };
+  return (
+    <div class={`graph-presets speed${empty ? ' alone' : ''}`}>
+      <span class="faint" style={{ padding: '0 6px', alignSelf: 'center', fontSize: 11 }}>{t('curves.speed')}</span>
+      {SPEED_PRESETS.map((p) => (
+        <button key={p} class="btn sm ghost" title={t('curves.speedPresetHint', { name: t(SPEED_LABEL[p]) })} onClick={() => apply(p)}>{t(SPEED_LABEL[p])}</button>
+      ))}
+    </div>
+  );
+}
 
 function bezierOf(spec: EaseSpec | undefined, tokens: Record<string, { type: string; value: unknown }>): Bezier | 'hold' {
   if (spec === undefined || spec === 'linear') return [1 / 3, 1 / 3, 2 / 3, 2 / 3];
@@ -236,7 +265,7 @@ export function GraphEditor() {
   return (
     <div class="graph" ref={host} onContextMenu={noBrowserMenu}>
       {channels.length === 0 ? (
-        <div class="empty" style={{ height: '100%' }}><Icon name="curve" />{t('curves.selectAnAnimatedLayer')}</div>
+        <><div class="empty" style={{ height: '100%' }}><Icon name="curve" />{t('curves.selectAnAnimatedLayer')}</div><SpeedPresets empty /></>
       ) : (
         <>
           <svg onPointerDown={bgDown}>
@@ -290,6 +319,7 @@ export function GraphEditor() {
               <button key={label} class="btn sm ghost" disabled={!sel1} title={sel1 ? t('curves.applyNameToThe', { name: label }) : t('curves.selectAKeyframe')} onClick={() => applyEase(spec)}>{label}</button>
             ))}
           </div>
+          <SpeedPresets empty={false} />
         </>
       )}
     </div>
