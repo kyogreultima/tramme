@@ -48,7 +48,7 @@ npx wrangler r2 bucket create tramme-projects
 # Cloudflare Access: an application on the domain, then ACCESS_TEAM_DOMAIN and ACCESS_AUD in apps/worker/wrangler.jsonc
 npm run deploy
 # optional: provider keys (Anthropic, OpenAI, Gemini, OpenRouter, Z.AI, ElevenLabs, custom) in the editor's Settings, Providers
-# optional: Hydracept for pictures, sfx/music/voice, and voice listing on the Worker (MEDIA_PROVIDER=hydracept, HYDRACEPT_API_KEY, HYDRACEPT_PROJECT in apps/worker/.dev.vars or wrangler secrets; no ElevenLabs key required when Hydracept is enabled)
+# optional, private mode only: Hydracept for pictures, sfx/music/voice, and voice listing on the Worker (MEDIA_PROVIDER=hydracept, HYDRACEPT_API_KEY, HYDRACEPT_PROJECT in apps/worker/.dev.vars or wrangler secrets; no ElevenLabs key required when Hydracept is enabled)
 ```
 
 ## Commands

@@ -16,6 +16,7 @@ import { claude, claudeConfig } from './claude.ts';
 import { generate, soundConfig, voices } from './generate.ts';
 import { failure, json } from './http.ts';
 export { ELEVEN_VOICE_MODELS, type Voice } from './generate.ts';
+export { HYDRACEPT_VOICE_MODELS } from './hydracept.ts';
 import { generateImage, imageConfig } from './images.ts';
 import type { Keys } from './keys.ts';
 import { llm, llmConfig, models } from './llm.ts';

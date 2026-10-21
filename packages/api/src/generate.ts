@@ -146,7 +146,7 @@ export async function generate(req: Request, { keys, fetch, media }: Reach) {
       ? await hydraceptSfx(media.hydracept, ask, fetch)
       : b.kind === 'music'
         ? await hydraceptMusic(media.hydracept, ask, fetch)
-        : await hydraceptVoice(media.hydracept, ask, fetch, ELEVEN_VOICE_MODELS, TAGGED, ELEVEN_DEFAULT_VOICE, ELEVEN_VOICE_DEFAULT);
+        : await hydraceptVoice(media.hydracept, ask, fetch, TAGGED, ELEVEN_DEFAULT_VOICE);
     return new Response(run.bytes, {
       headers: { 'content-type': run.type, 'cache-control': 'no-store', 'x-tramme-provider': 'hydracept', 'x-tramme-model': run.model, ...(run.voice ? { 'x-tramme-voice': run.voice } : {}), ...hydraceptHeaders(run) },
     });

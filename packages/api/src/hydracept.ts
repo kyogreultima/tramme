@@ -7,8 +7,24 @@ const CLIENT = 'tramme-api hydracept/1';
 
 /** Hydracept audio.sfx/voice input: mp3_44100_128 → artifact mediaType audio/mpeg (tramme-compatible). */
 export const HYDRACEPT_AUDIO_MP3 = 'mp3_44100_128' as const;
-const TERMINAL = new Set(['succeeded', 'failed', 'canceled', 'cancelled']);
-const POLL_CAP_MS = 120_000;
+const TERMINAL = new Set(['succeeded', 'failed', 'canceled', 'cancelled', 'needs_attention']);
+const IMAGE_POLL_MS = 180_000;
+const SFX_POLL_MS = 120_000;
+const MUSIC_POLL_MS = 360_000;
+const VOICE_POLL_MS = 300_000;
+/** Hydracept rejects SFX prompts over 450 characters (overflow: reject). */
+const SFX_PROMPT_MAX = 450;
+/** Hydracept clamps music to 300 seconds. */
+const MUSIC_MAX_SECONDS = 300;
+/** Voice models Hydracept can execute, as the editor's picker labels them. */
+export const HYDRACEPT_VOICE_MODELS: Record<string, string> = {
+  eleven_v4: 'Eleven v4',
+  eleven_multilingual_v2: 'Multilingual v2',
+  eleven_turbo_v2_5: 'Turbo v2.5',
+  eleven_flash_v2_5: 'Flash v2.5',
+};
+const HYDRACEPT_VOICE_MODEL_IDS = new Set(Object.keys(HYDRACEPT_VOICE_MODELS));
+const HYDRACEPT_VOICE_DEFAULT = 'eleven_v4';
 
 type Fetch = (input: string, init?: RequestInit) => Promise<Response>;
 
@@ -87,19 +103,36 @@ async function quote(media: HydraceptMedia, capability: string, input: Record<st
     method: 'POST', headers: authHeaders(media.apiKey), body: JSON.stringify(body),
   });
   const q = await readJson<Record<string, unknown>>(res);
+  if (q.status === 'pricing_inputs_required') {
+    const missing = Array.isArray(q.missing) ? (q.missing as unknown[]).map(String).join(', ') : 'more input';
+    throw new HttpError(422, `hydracept: quote requires ${missing}`);
+  }
   return quoteIdOf(q);
 }
 
-async function submitJob(media: HydraceptMedia, capability: string, input: Record<string, unknown>, fetch: Fetch): Promise<string> {
+async function submitJob(
+  media: HydraceptMedia,
+  capability: string,
+  input: Record<string, unknown>,
+  quoteId: string,
+  fetch: Fetch,
+): Promise<string> {
   const body = {
     context: context(media),
     input,
-    execution: execution(media),
+    execution: { ...execution(media), quoteId },
     idempotencyKey: idempotencyKey(),
   };
-  const res = await fetch(url(media.apiUrl, `/capabilities/${encodeURIComponent(capability)}/jobs`), {
+  const send = () => fetch(url(media.apiUrl, `/capabilities/${encodeURIComponent(capability)}/jobs`), {
     method: 'POST', headers: authHeaders(media.apiKey), body: JSON.stringify(body),
   });
+  // Same idempotency key on the retry: a lost response must not start a second job.
+  let res: Response;
+  try {
+    res = await send();
+  } catch {
+    res = await send();
+  }
   const j = await readJson<JobPayload>(res);
   const jobId = j.jobId ?? j.id;
   if (!jobId) throw new HttpError(502, 'hydracept: no job id in the submit answer');
@@ -111,8 +144,8 @@ async function getJob(media: HydraceptMedia, jobId: string, fetch: Fetch): Promi
   return readJson(res);
 }
 
-async function pollJob(media: HydraceptMedia, jobId: string, fetch: Fetch): Promise<JobPayload> {
-  const deadline = Date.now() + POLL_CAP_MS;
+async function pollJob(media: HydraceptMedia, jobId: string, fetch: Fetch, capMs: number): Promise<JobPayload> {
+  const deadline = Date.now() + capMs;
   let job = await getJob(media, jobId, fetch);
   while (!TERMINAL.has(String(job.status ?? '').toLowerCase())) {
     if (Date.now() >= deadline) throw new HttpError(504, 'hydracept: the job did not finish in time');
@@ -122,8 +155,9 @@ async function pollJob(media: HydraceptMedia, jobId: string, fetch: Fetch): Prom
   }
   const status = String(job.status ?? '').toLowerCase();
   if (status !== 'succeeded') {
-    const msg = job.error?.message ?? job.error?.code ?? status;
-    throw new HttpError(status === 'failed' ? 502 : 400, `hydracept: ${msg}`);
+    const msg = job.error?.message ?? job.error?.code
+      ?? (status === 'needs_attention' ? 'the job needs attention in Hydracept Studio' : status);
+    throw new HttpError(status === 'failed' || status === 'needs_attention' ? 502 : 400, `hydracept: ${msg}`);
   }
   return job;
 }
@@ -160,11 +194,12 @@ async function runJob(
   input: Record<string, unknown>,
   fetch: Fetch,
   model: string,
+  pollCapMs: number,
   voice?: string,
 ): Promise<HydraceptRun> {
   const quoteId = await quote(media, capability, input, fetch);
-  const jobId = await submitJob(media, capability, input, fetch);
-  const job = await pollJob(media, jobId, fetch);
+  const jobId = await submitJob(media, capability, input, quoteId, fetch);
+  const job = await pollJob(media, jobId, fetch, pollCapMs);
   const receiptId = await receiptIdFor(media, jobId, job, fetch);
   const { artifactId, type } = firstArtifact(job);
   const bytes = await downloadArtifact(media, jobId, artifactId, fetch);
@@ -179,7 +214,7 @@ export function hydraceptImageSize(ratio: string): { width: number; height: numb
   return { width: 1024, height: 1024 };
 }
 
-const IMAGE_MODEL = 'gpt-image-1';
+const IMAGE_MODEL = 'gpt-image-2.5-flare';
 
 export async function hydraceptImage(
   media: HydraceptMedia,
@@ -194,7 +229,7 @@ export async function hydraceptImage(
     model: IMAGE_MODEL,
     ...(ask.quality ? { quality: ask.quality } : {}),
   };
-  return runJob(media, 'image.generate.v1', input, fetch, IMAGE_MODEL);
+  return runJob(media, 'image.generate.v1', input, fetch, IMAGE_MODEL, IMAGE_POLL_MS);
 }
 
 export async function hydraceptSfx(
@@ -202,6 +237,9 @@ export async function hydraceptSfx(
   ask: { prompt: string; duration?: number },
   fetch: Fetch,
 ): Promise<HydraceptRun> {
+  if (ask.prompt.length > SFX_PROMPT_MAX) {
+    throw new HttpError(413, `hydracept: sound effects take at most ${SFX_PROMPT_MAX} characters`);
+  }
   const durationMs = ask.duration ? Math.round(Math.min(30, Math.max(0.5, ask.duration)) * 1000) : undefined;
   const input: Record<string, unknown> = {
     prompt: ask.prompt,
@@ -210,10 +248,10 @@ export async function hydraceptSfx(
     outputFormatPreference: HYDRACEPT_AUDIO_MP3,
     ...(durationMs ? { durationMs } : {}),
   };
-  return runJob(media, 'audio.sfx.generate.v1', input, fetch, 'eleven_text_to_sound_v2');
+  return runJob(media, 'audio.sfx.generate.v1', input, fetch, 'eleven_text_to_sound_v2', SFX_POLL_MS);
 }
 
-const MUSIC_MODEL = 'music_v2_5';
+const MUSIC_MODEL = 'music_v2';
 
 export async function hydraceptMusic(
   media: HydraceptMedia,
@@ -228,28 +266,26 @@ export async function hydraceptMusic(
     outputFormatPreference: HYDRACEPT_AUDIO_MP3,
     ...(durationMs ? { durationMs } : {}),
   };
-  return runJob(media, 'audio.music.generate.v1', input, fetch, MUSIC_MODEL);
+  return runJob(media, 'audio.music.generate.v1', input, fetch, MUSIC_MODEL, MUSIC_POLL_MS);
 }
 
 function clampMusicSeconds(v: number): number {
-  return Math.min(600, Math.max(3, v));
+  return Math.min(MUSIC_MAX_SECONDS, Math.max(3, v));
 }
 
 export async function hydraceptVoice(
   media: HydraceptMedia,
   ask: { prompt: string; voice?: string; style?: string; model?: string },
   fetch: Fetch,
-  voiceModels: Record<string, string>,
   taggedModels: Set<string>,
   defaultVoice: string,
-  defaultModel: string,
 ): Promise<HydraceptRun> {
-  const model = ask.model && ask.model in voiceModels ? ask.model : defaultModel;
+  const model = ask.model && HYDRACEPT_VOICE_MODEL_IDS.has(ask.model) ? ask.model : HYDRACEPT_VOICE_DEFAULT;
   const [, id] = (ask.voice || defaultVoice).includes('/') ? ask.voice!.split('/', 2) : [null, ask.voice || defaultVoice];
   const voice = id;
   const text = ask.style && taggedModels.has(model) ? `[${ask.style}] ${ask.prompt}` : ask.prompt;
   const input: Record<string, unknown> = { text, voiceId: voice, modelId: model, outputFormatPreference: HYDRACEPT_AUDIO_MP3 };
-  return runJob(media, 'audio.voice.generate.v1', input, fetch, model, voice);
+  return runJob(media, 'audio.voice.generate.v1', input, fetch, model, VOICE_POLL_MS, voice);
 }
 
 /** response headers that carry Hydracept ids (never secrets) */

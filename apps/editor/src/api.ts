@@ -75,6 +75,8 @@ export interface ServerConfig {
   sound?: Record<'sfx' | 'music' | 'voice', string[]>;
   /** providers that make pictures */
   images?: string[];
+  /** server-side media routing (Hydracept); absent when media uses provider keys */
+  media?: { provider: 'hydracept' };
 }
 
 /** a sound made by a provider: the file and what made it */

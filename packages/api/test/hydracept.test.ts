@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { generate, voices } from '../src/generate.ts';
-import { HYDRACEPT_AUDIO_MP3, hydraceptImage, hydraceptMusic, hydraceptSfx, mapHydraceptVoices } from '../src/hydracept.ts';
+import { HYDRACEPT_AUDIO_MP3, hydraceptImage, hydraceptMusic, hydraceptSfx, hydraceptVoice, mapHydraceptVoices } from '../src/hydracept.ts';
 import { generateImage } from '../src/images.ts';
 import type { Keys } from '../src/keys.ts';
 import type { MediaConfig } from '../src/media.ts';
@@ -73,7 +73,9 @@ describe('hydracept jobs', () => {
     const calls = stubHydraceptJob(PNG, 'image/png');
     const run = await hydraceptImage(media.hydracept, { prompt: 'a lighthouse', ratio: '16:9', quality: 'high' }, out);
     expect(calls[0].url).toContain('/capabilities/image.generate.v1/quote');
-    expect(calls.some((c) => c.url.includes('/capabilities/image.generate.v1/jobs') && c.method === 'POST')).toBe(true);
+    const job = calls.find((c) => c.url.includes('/capabilities/image.generate.v1/jobs') && c.method === 'POST');
+    expect((job?.body?.input as Record<string, unknown>)?.model).toBe('gpt-image-2.5-flare');
+    expect((job?.body?.execution as Record<string, unknown>)?.quoteId).toBe('quo_1');
     expect(run.receiptId).toBe('rcpt_1');
     expect(run.quoteId).toBe('quo_1');
     expect(new Uint8Array(run.bytes)).toEqual(PNG);
@@ -96,10 +98,53 @@ describe('hydracept jobs', () => {
     const input = job?.body?.input as Record<string, unknown>;
     expect(input?.outputFormatPreference).toBe(HYDRACEPT_AUDIO_MP3);
     expect(input?.forceInstrumental).toBe(true);
-    expect(input?.modelId).toBe('music_v2_5');
+    expect(input?.modelId).toBe('music_v2');
     expect(input?.durationMs).toBe(20_000);
-    expect(run.model).toBe('music_v2_5');
+    expect(run.model).toBe('music_v2');
     expect(run.type).toBe('audio/mpeg');
+  });
+
+  it('clamps Hydracept music to the 300 s contract', async () => {
+    const calls = stubHydraceptJob(MP3, 'audio/mpeg');
+    await hydraceptMusic(media.hydracept, { prompt: 'long bed', duration: 600 }, out);
+    const job = calls.find((c) => c.url.includes('/audio.music.generate.v1/jobs') && c.method === 'POST');
+    expect((job?.body?.input as Record<string, unknown>)?.durationMs).toBe(300_000);
+  });
+
+  it('rejects SFX prompts over the 450 character Hydracept limit', async () => {
+    const calls = stubHydraceptJob(MP3, 'audio/mpeg');
+    await expect(
+      hydraceptSfx(media.hydracept, { prompt: 'x'.repeat(451) }, out),
+    ).rejects.toThrow(/450 characters/);
+    expect(calls).toHaveLength(0);
+  });
+
+  it('keeps voice on Hydracept-supported models and falls back for others', async () => {
+    const calls = stubHydraceptJob(MP3, 'audio/mpeg');
+    await hydraceptVoice(
+      media.hydracept,
+      { prompt: 'hello', voice: 'owner/voice-1', model: 'eleven_flash_v2_5', style: 'whisper' },
+      out,
+      new Set(['eleven_v4', 'eleven_flash_v2_5']),
+      'default-voice',
+    );
+    let job = calls.find((c) => c.url.includes('/audio.voice.generate.v1/jobs') && c.method === 'POST');
+    let input = job?.body?.input as Record<string, unknown>;
+    expect(input?.modelId).toBe('eleven_flash_v2_5');
+    expect(input?.voiceId).toBe('voice-1');
+    expect(input?.text).toBe('[whisper] hello');
+
+    calls.length = 0;
+    await hydraceptVoice(
+      media.hydracept,
+      { prompt: 'hello', model: 'eleven_v3' },
+      out,
+      new Set(['eleven_v4']),
+      'default-voice',
+    );
+    job = calls.find((c) => c.url.includes('/audio.voice.generate.v1/jobs') && c.method === 'POST');
+    input = job?.body?.input as Record<string, unknown>;
+    expect(input?.modelId).toBe('eleven_v4');
   });
 });
 
@@ -127,7 +172,7 @@ describe('routes with Hydracept', () => {
     const res = await generate(new Request('http://localhost/api/generate', { method: 'POST', body: JSON.stringify({ kind: 'music', prompt: 'calm piano', duration: 12 }) }), reach);
     expect(res.status).toBe(200);
     expect(res.headers.get('x-tramme-provider')).toBe('hydracept');
-    expect(res.headers.get('x-tramme-model')).toBe('music_v2_5');
+    expect(res.headers.get('x-tramme-model')).toBe('music_v2');
     expect(res.headers.get('content-type')).toBe('audio/mpeg');
   });
 
