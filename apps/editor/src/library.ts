@@ -7,13 +7,18 @@ import { signal } from '@preact/signals';
 import { pointer, type Op, type ToolType } from '@tramme/core';
 import { api } from './api.ts';
 import { t } from './i18n/index.ts';
+import { installed, installedCode, installFile, storageKind } from './installed.ts';
 
 const NAME = /^[a-z0-9][a-z0-9_-]{0,62}\.(js|mjs)$/;
 
 /** the plugins of the library, as last listed (pickers of the / menu) */
 export const libraryList = signal<{ name: string; size: number; modified: string }[]>([]);
 export async function refreshLibrary() {
-  try { libraryList.value = await api.library(); } catch { /* no server: no library */ }
+  let list: { name: string; size: number; modified: string }[] = [];
+  try { list = await api.library(); } catch { /* no server: no library */ }
+  // the plugins kept in a picked folder, beside the library's components
+  if (storageKind.peek() === 'folder') list = [...list.filter((f) => f.name.startsWith('component-')), ...installed.peek().map((p) => ({ name: p.file, size: p.size, modified: p.modified }))];
+  libraryList.value = list;
 }
 
 const keep: ToolType<{ plugin: string; name?: string }> = {
@@ -34,7 +39,8 @@ const keep: ToolType<{ plugin: string; name?: string }> = {
     if (code === null) throw new Error(`file not found: ${a.src}`);
     const file = (name ?? a.src.split('/').pop() ?? '').toLowerCase();
     if (!NAME.test(file)) throw new Error(`invalid name "${file}": lower case letters, digits, - and _, then .js`);
-    await api.libraryPut(file, code);
+    // installed on this device: the Plugins section of the settings lists it, every project can use it
+    await installFile(file, code);
     await refreshLibrary();
     return { text: `Plugin "${plugin}" kept in the library as ${file}; other projects can use it with library-use.`, notice: t('library.kept', { name: file }) };
   },
@@ -46,7 +52,8 @@ const use: ToolType<{ name: string }> = {
   ai: { when: 'the user mentions a plugin of theirs from another project; list_nodes shows its nodes and tools once added' },
   async run({ name }, ctx) {
     if (!NAME.test(name)) throw new Error(`invalid name "${name}"`);
-    const code = await api.libraryGet(name);
+    if (name.startsWith('component-')) throw new Error(`${name} is a component, not a plugin: bring it in with component-use`);
+    const code = storageKind.peek() === 'folder' ? await installedCode(name) : await api.libraryGet(name);
     const id = name.replace(/\.(js|mjs)$/, '').replace(/[^A-Za-z0-9_-]/g, '-').slice(0, 64);
     const path = await ctx.writeFile(`plugins/${name}`, code);
     const had = ctx.doc.assets[id];

@@ -5,9 +5,9 @@
 // registry entries whose calls bridge there. The assistant's surface does not
 // change: use_tool and list_nodes speak in names and schemas as before.
 
-import type { PluginModule, Registry, TrammeDoc } from '@tramme/core';
+import type { PluginModule, Registry, ToolContext, TrammeDoc } from '@tramme/core';
 import type { PluginHost } from './host.ts';
-import { noteSandboxDeclaration, sandboxNode } from './sandbox-draw.ts';
+import { declarationsModule, noteSandboxDeclaration, sandboxNode } from './sandbox-draw.ts';
 
 /**
  * What the page's registry takes from a plugin module: the tools and checks
@@ -37,7 +37,7 @@ const attached = new WeakMap<Registry, { host: PluginHost; done: Set<string> }>(
  * loaded again. One plugin that cannot load keeps none of the others out;
  * the refusals are thrown together once all the others are attached.
  */
-export async function attachIsolated(registry: Registry, host: PluginHost, doc: TrammeDoc, urlOf: (id: string) => string | null): Promise<void> {
+export async function attachIsolated(registry: Registry, host: PluginHost, doc: TrammeDoc, urlOf: (id: string) => string | null, context?: (id: string, ctx: ToolContext) => ToolContext): Promise<void> {
   const list = (doc.plugins ?? []).map((id) => ({ id, url: urlOf(id) })).filter((p): p is { id: string; url: string } => !!p.url);
   if (!list.length) return;
   let seen = attached.get(registry);
@@ -52,7 +52,7 @@ export async function attachIsolated(registry: Registry, host: PluginHost, doc: 
       noteSandboxDeclaration(d);
       if (d.tools.length || d.checks.length) {
         registry.use({
-          tools: d.tools.map((t) => ({ ...t, run: (input, ctx) => host.runTool(t.name, input, ctx) })),
+          tools: d.tools.map((t) => ({ ...t, run: (input, ctx) => host.runTool(t.name, input, context ? context(p.id, ctx) : ctx) })),
           checks: d.checks.map((c) => ({ ...c, run: (ctx) => host.runCheck(c.name, ctx) })),
         }, p.id);
       }
@@ -62,3 +62,60 @@ export async function attachIsolated(registry: Registry, host: PluginHost, doc: 
   }));
   if (refused.length) throw new Error(refused.join('; '));
 }
+
+/**
+ * The installed plugins of this device in a project (docs/installed-plugins-roadmap.md,
+ * step 3): loaded in the project's sandbox only, never on the page, and
+ * offered through the registry as the project's own are: their tools and
+ * checks bridged there, their workflows, kits and presets as the plain data
+ * the sandbox declares. What the registry has already (tramme's, the
+ * project's plugins) wins: a name is never taken from them, so a project
+ * opens the same on any device. Their nodes, effects and modifiers draw
+ * only once copied into a project (step 4). Idempotent per registry and url,
+ * like attachIsolated; the refusals are thrown together, named.
+ */
+export interface InstalledHooks {
+  /** each type a plugin brought (node:…, effect:…, modifier:…), told on every call */
+  brought?(id: string, key: string): void;
+  /** the tool context a plugin's tool gets (its permissions) */
+  context?(id: string, ctx: ToolContext): ToolContext;
+  /** around each call of its tools and checks (its failures counted) */
+  around?<T>(id: string, run: () => Promise<T>): Promise<T>;
+}
+
+export async function attachInstalled(registry: Registry, host: PluginHost, list: { id: string; url: string; name: string }[], hooks: InstalledHooks = {}): Promise<void> {
+  const { brought } = hooks, around = <T>(id: string, run: () => Promise<T>) => (hooks.around ? hooks.around(id, run) : run());
+  if (!list.length) return;
+  let seen = attachedInstalled.get(registry);
+  if (seen?.host !== host) attachedInstalled.set(registry, seen = { host, done: new Set(), keys: new Map() });
+  const { done, keys } = seen;
+  const missing = list.filter((p) => !done.has(`${p.id}\n${p.url}`));
+  // what each one brought, told again on every call (the caller's map follows the registry)
+  const tell = () => { for (const p of list) for (const k of keys.get(p.id) ?? []) brought?.(p.id, k); };
+  if (!missing.length) { tell(); return; }
+  const refused: string[] = [];
+  await Promise.all(missing.map(async (p) => {
+    try {
+      const d = (await host.ensure([{ id: p.id, url: p.url }])).get(p.id)!;
+      // what draws, from its declarations (drawn by the sandbox until the copy of step 4 is in the project)
+      const draws = declarationsModule(d, p.id);
+      const nodes = (draws.nodes ?? []).filter((n) => !registry.hasNode(n.type));
+      const effects = (draws.effects ?? []).filter((e) => !registry.hasEffect(e.type));
+      const modifiers = (draws.modifiers ?? []).filter((m) => !registry.hasModifier(m.type));
+      keys.set(p.id, [...nodes.map((n) => `node:${n.type}`), ...effects.map((e) => `effect:${e.type}`), ...modifiers.map((m) => `modifier:${m.type}`)]);
+      const free = <T extends { name: string }>(xs: T[] | undefined, taken: { name: string }[]) => (xs ?? []).filter((x) => !taken.some((y) => y.name === x.name));
+      registry.use({
+        meta: d.meta, nodes, effects, modifiers,
+        tools: d.tools.filter((t) => !registry.hasTool(t.name)).map((t) => ({ ...t, run: (input, ctx) => around(p.id, () => host.runTool(t.name, input, hooks.context ? hooks.context(p.id, ctx) : ctx)) })),
+        checks: free(d.checks, registry.listChecks().map((c) => c.check)).map((c) => ({ ...c, run: (ctx) => around(p.id, () => host.runCheck(c.name, ctx)) })),
+        prompts: free(d.prompts, registry.listPrompts().map((x) => x.prompt)),
+        kits: free(d.kits, registry.listKits().map((x) => x.kit)),
+        presets: free(d.presets, registry.listPresets().map((x) => x.preset)),
+      }, p.id);
+    } catch (e) { refused.push(`${p.name}: ${(e as Error).message}`); }
+    done.add(`${p.id}\n${p.url}`);
+  }));
+  tell();
+  if (refused.length) throw new Error(refused.join('; '));
+}
+const attachedInstalled = new WeakMap<Registry, { host: PluginHost; done: Set<string>; keys: Map<string, string[]> }>();

@@ -14,15 +14,19 @@ const notchAtMost = (x: number) => [...NOTCHES].reverse().find((k) => k <= x + 1
 export const previewInfo = signal({ scale: 1, still: 1, motion: 0.5 });
 
 import { effect, signal } from '@preact/signals';
-import { audioClips, soundMix, type TrammeDoc, type EvaluatedFrame } from '@tramme/core';
+import { audioClips, clipFileTime, curveAt, needsPitch, soundMix, type TrammeDoc, type EvaluatedFrame } from '@tramme/core';
 import { editorRegistry } from './vocabulary.ts';
-import { clipChain, masterGainDb, mixBus, playClip, Renderer } from '@tramme/render';
+import { clipChain, loadPitch, masterGainDb, mixBus, playClip, Renderer } from '@tramme/render';
 import { comp, compIdOf, S, setRegistry, setTime, toast, viewDoc } from './state.ts';
-import { attachIsolated, filterModule, pluginHost } from './plugins/index.ts';
-import { bindSandbox, blitSandboxFrame, declarationsModule, ensureSandboxDoc, pluginItemsOf, resetSandbox, sandboxDeclaration, sandboxVideoFrames, type SandboxContext } from './plugins/sandbox-draw.ts';
+import { attachInstalled, attachIsolated, filterModule, pluginHost } from './plugins/index.ts';
+import { copiesIn, copyId, counted, installed, installedFor, installedTypes, offIn, permitted, sandboxedDoc, stopped, STRIKES } from './installed.ts';
+import { bindSandbox, blitSandboxFrame, declarationsModule, ensureDeclared, ensureSandboxDoc, pluginItemsOf, resetSandbox, sandboxDeclaration, sandboxVideoFrames, type SandboxContext } from './plugins/sandbox-draw.ts';
 import { t } from './i18n/index.ts';
 import { prefs } from './settings.ts';
 import { syncPluginTours } from './tours/index.ts';
+
+/** the slowest pace a media element takes (browsers refuse less): slower, it waits */
+const MIN_ELEMENT_RATE = 0.0625;
 
 class Preview {
   readonly canvas: HTMLCanvasElement;
@@ -88,10 +92,10 @@ class Preview {
     });
     try {
       const doc0 = S.doc.peek();
-      const sandboxed = prefs.peek().sandboxPreview && (doc0.plugins ?? []).length > 0;
+      const sandboxed = sandboxedDoc(doc0);
       // the sandbox's declarations are needed before the renderer opens: it registers from them, and the modules never load on the page
-      if (sandboxed) await pluginHost(new URL(S.docUrl.peek(), location.href).href).ensure(pluginItemsOf(doc0, new URL(S.docUrl.peek(), location.href).href));
-      this.renderer = await Renderer.open(doc0, editorRegistry(), new URL(S.docUrl.peek(), location.href).href, this.canvas, { compId: compIdOf(doc0), raster: 'gpu', scale: S.previewScale.peek(), preserve: false, isolate: true, pluginModule: sandboxed ? undefined : filterModule, sandboxModules: sandboxed, sandboxDeclarations: sandboxed ? (id) => declarationsModule(sandboxDeclaration(id)!, id) : undefined });
+      if (sandboxed) await ensureDeclared(pluginHost(new URL(S.docUrl.peek(), location.href).href), pluginItemsOf(doc0, new URL(S.docUrl.peek(), location.href).href));
+      this.renderer = await Renderer.open(doc0, editorRegistry(), new URL(S.docUrl.peek(), location.href).href, this.canvas, { compId: compIdOf(doc0), raster: 'gpu', scale: S.previewScale.peek(), preserve: false, isolate: true, proxies: prefs.peek().proxies, pluginModule: filterModule, sandboxModules: sandboxed, sandboxDeclarations: (id) => declarationsModule(sandboxDeclaration(id)!, id) });
       this.applied = doc0;
       await this.attachPlugins();
       setRegistry(this.renderer.registry);
@@ -115,6 +119,14 @@ class Preview {
     effect(() => { void S.solo.value; if (S.playing.value) this.play(); else this.stopAudio(); });
     effect(() => { void S.previewScale.value; void prefs.value; this.invalidate(); });
     effect(() => { const p = prefs.value; if (this.master) this.master.gain.value = p.previewMuted ? 0 : p.previewVolume; });
+    let seenInstalled = installed.peek(), seenStopped = 0;
+    // the installed plugins changed, or one was stopped for the session: the registry is built again
+    effect(() => {
+      const now = installed.value, off = stopped.value.size;
+      if (now === seenInstalled && off === seenStopped) return;
+      seenInstalled = now; seenStopped = off;
+      this.installedChanged().catch((e) => console.warn('[installed plugins]', (e as Error).message));
+    });
   }
 
   /** the tours exported by the project's plugins join the editor's */
@@ -135,16 +147,41 @@ class Preview {
     const r = this.renderer;
     if (!r) return;
     const doc = this.applied ?? S.doc.peek();
-    if (!(doc.plugins ?? []).length) return;
+    // the plugins installed on this device, in the project's sandbox (its own plugins win a shared name: attached first)
+    const mine = installedFor(doc);
+    if (!(doc.plugins ?? []).length && !mine.length) return;
     try {
       await attachIsolated(r.registry, pluginHost(new URL(S.docUrl.peek(), location.href).href), doc, (id) => {
         const url = r.assets.url(id);
         // an edited plugin file: a fresh url, so the sandbox imports it again
         return reload.includes(id) ? `${url}${url.includes('?') ? '&' : '?'}pw=${++this.bust}` : url;
+      }, (id, ctx) => {
+        // a copy of an installed plugin keeps the permissions the user granted it, where it is installed
+        const p = installed.peek().find((x) => copyId(x) === id && copiesIn(doc)[x.manifest.id] !== undefined);
+        return p ? permitted(ctx, p) : ctx;
       });
     } catch (e) {
       toast(t('editor.pluginSandbox', { error: (e as Error).message }), 'error', 9000);
     }
+    try {
+      const byId = new Map(mine.map((p) => [p.id, p.plugin]));
+      installedTypes.clear();
+      await attachInstalled(r.registry, pluginHost(new URL(S.docUrl.peek(), location.href).href), mine.map((p) => ({ id: p.id, url: p.url, name: p.plugin.manifest.name })), {
+        brought: (id, key) => installedTypes.set(key, byId.get(id)!),
+        context: (id, ctx) => permitted(ctx, byId.get(id)!),
+        around: (id, run) => counted(byId.get(id)!, run, (p) => toast(t('plugins.stopped', { name: p.manifest.name, n: STRIKES }), 'error', 9000)),
+      });
+    } catch (e) {
+      toast(t('editor.installedRefused', { error: (e as Error).message }), 'error', 9000);
+    }
+  }
+
+  /** the installed plugins changed (installed, updated, turned off): the registry is built again without the old ones */
+  private async installedChanged() {
+    if (!this.renderer || !this.applied) return;
+    await this.renderer.setDoc(this.applied, { compId: compIdOf(this.applied), fresh: true });
+    await this.attachPlugins();
+    setRegistry(this.renderer.registry);
   }
 
   /** apply the latest wanted document, one at a time (asset loading is async) */
@@ -156,7 +193,14 @@ class Preview {
     this.busy = true;
     try {
       // a drag's draft comes from a valid document: no need to validate it again
-      await this.renderer.setDoc(doc, { compId, trusted: doc === S.draft.peek() });
+      // a project that turns an installed plugin off or on: the registry is built again
+      const fresh = !!this.applied && offIn(doc).join('\n') !== offIn(this.applied).join('\n');
+      // a copy of an installed plugin entered the project (or left it): its plugins move to the sandbox (or back), their modules loaded again
+      const sandboxed = sandboxedDoc(doc), base = new URL(S.docUrl.peek(), location.href).href;
+      const reload = sandboxed !== this.renderer.sandboxModules ? (doc.plugins ?? []) : [];
+      this.renderer.sandboxModules = this.renderer.assets.sandboxModules = sandboxed;
+      if (sandboxed) await ensureDeclared(pluginHost(base), pluginItemsOf(doc, base));
+      await this.renderer.setDoc(doc, { compId, trusted: doc === S.draft.peek(), fresh, reload });
       this.applied = doc;
       await this.attachPlugins();
       setRegistry(this.renderer.registry);
@@ -182,11 +226,18 @@ class Preview {
     this.invalidate();
   }
 
+  /** the proxies setting changed: the videos that have one open again, the proxy or the original */
+  async useProxies(on: boolean) {
+    if (!this.renderer || !this.applied) return;
+    this.renderer.assets.useProxies = on;
+    await this.reload(Object.entries(this.applied.assets).filter(([, a]) => a.type === 'video' && a.proxy).map(([id]) => id));
+  }
+
   /** the sandbox-preview flag changed: the registry is rebuilt from the other source (declarations or real modules) */
   async reloadPlugins() {
     const doc = this.applied;
     if (!doc || !this.renderer) { await this.start(); return; }
-    this.renderer.sandboxModules = prefs.peek().sandboxPreview;
+    this.renderer.sandboxModules = sandboxedDoc(doc);
     this.renderer.assets.sandboxModules = this.renderer.sandboxModules;
     await this.reload((doc.plugins ?? []).concat(Object.entries(doc.assets).filter(([, a]) => a.type === 'module').map(([id]) => id)));
   }
@@ -264,7 +315,7 @@ class Preview {
     this.setScale(r, moving || scrubbing ? this.motionScale(still) : still, still);
     const t0 = performance.now();
     try {
-      if (prefs.peek().sandboxPreview) {
+      if (prefs.peek().sandboxPreview || r.sandboxModules) {
         // the whole picture comes from the sandbox (docs/evaluator-sandbox.md): modifiers, effects and simulations never run here
         if (!this.sandboxBusy) {
           this.sandboxBusy = true;
@@ -409,6 +460,8 @@ class Preview {
     this.levelOf(doc, compId);
     const sounds = clips.filter((c) => doc.assets[c.asset].type !== 'video');
     const bufs = await Promise.all(sounds.map((c) => this.buffer(r.assets.url(c.asset))));
+    // the pitch worklet, before the clock starts
+    if (clips.some(needsPitch)) await loadPitch(ctx).catch(() => {});
     if (!S.playing.peek()) return;
     const startAt = ctx.currentTime + 0.03;
     this.clock = { at: startAt, t0: from, audio: true };
@@ -424,15 +477,30 @@ class Preview {
     for (const c of clips.filter((x) => doc.assets[x.asset].type === 'video')) {
       const el = new Audio(r.assets.url(c.asset));
       el.preload = 'auto';
-      el.playbackRate = c.rate;
-      ctx.createMediaElementSource(el).connect(clipChain(ctx, c, bus(c), startAt, from));
+      el.playbackRate = Math.max(MIN_ELEMENT_RATE, c.rate);
+      // the pitch goes with the speed, as in the exports, unless the layer keeps it: the browser does it for an element
+      el.preservesPitch = c.keepPitch;
+      ctx.createMediaElementSource(el).connect(clipChain(ctx, { ...c, keepPitch: false }, bus(c), startAt, from));
       const skip = Math.max(0, from - c.at);
       // the element is timed like the file: the seek lands at the file's time (the pace included), wrapped into a loop it is past
       const looping = c.loopStart !== undefined && c.loopEnd !== undefined && c.loopEnd > c.loopStart;
       const loopStart = Math.max(0, c.loopStart ?? 0), len = (c.loopEnd ?? 0) - loopStart;
-      const raw = c.offset + skip * c.rate;
+      const raw = clipFileTime(c, c.at + skip);
       const at = looping && raw > loopStart && len > 0 ? loopStart + ((raw - loopStart) % len) : raw;
-      const begin = () => { el.currentTime = at; el.play().catch(() => {}); };
+      const begin = () => {
+        el.currentTime = at;
+        el.play().catch(() => {});
+        // a speed curve steers the element as it plays; under its slowest pace, it waits (a frozen frame is silent)
+        const curve = c.rateCurve;
+        if (!curve) return;
+        const steer = setInterval(() => {
+          const now = this.clock.t0 + (this.audio!.currentTime - this.clock.at), rate = curveAt(curve, now);
+          if (rate < MIN_ELEMENT_RATE) { if (!el.paused) el.pause(); return; }
+          el.playbackRate = rate;
+          if (el.paused && now < c.at + c.duration) el.play().catch(() => {});
+        }, 40);
+        this.timers.push(steer as unknown as ReturnType<typeof setTimeout>);
+      };
       // a looped section: the element cannot loopStart like a buffer, the wrap keeps it close (the exports are exact)
       if (looping) el.addEventListener('timeupdate', () => { if (el.currentTime >= c.loopEnd!) el.currentTime -= len; });
       const wait = Math.max(0, c.at - from) * 1000 + 30;

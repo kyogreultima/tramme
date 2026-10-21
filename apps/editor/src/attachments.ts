@@ -3,12 +3,15 @@
 // document so the assistant can place them. Images are shown to Claude;
 // what sounds and videos say is read through its tools once the user has
 // transcribed them (the Transcribe button on the file, or a yes when the
-// assistant asks); documents (PDF) are read with the sources tool.
+// assistant asks); documents (PDF) are read with the sources tool. A picture,
+// sound or video already in the project is attached as the asset that has it,
+// nothing written again.
 
 import { signal } from '@preact/signals';
 import { pointer, type TrammeDoc } from '@tramme/core';
 import { api } from './api.ts';
 import { safeName, takenPaths, upload } from './files.ts';
+import { assetWithHash, contentHash } from './hash.ts';
 import { loadImage } from './perception.ts';
 import { kindOf, shrunk, type FileKind } from './sources.ts';
 import { freshId } from './model.ts';
@@ -39,12 +42,19 @@ export async function attachFiles(files: File[]) {
     if (kind === 'file' && !/\.(json|svg|js|mjs)$/i.test(f.name)) { toast(t('attachments.nameImageSoundVideo', { name: f.name }), 'error'); continue; }
     attaching.value++;
     try {
+      const media = kind !== 'file' && kind !== 'document';
+      const hash = media ? await contentHash(f) : undefined;
+      const have = hash ? assetWithHash(S.doc.peek(), hash) : undefined;
+      if (have) {
+        pending.value = [...pending.peek(), { path: S.doc.peek().assets[have].src, name: f.name, kind, size: f.size, asset: have }];
+        continue;
+      }
       const path = await upload(taken, `assets/chat/${safeName(f.name)}`, f);
       let asset: string | undefined;
-      if (kind !== 'file' && kind !== 'document') {
+      if (media) {
         const doc = S.doc.peek();
         asset = freshId(doc.assets, safeName(f.name).replace(/\.[^.]+$/, '').slice(0, 40) || kind);
-        commit(t('attachments.attachmentName', { name: f.name }), [{ op: 'add', path: pointer('assets', asset), value: { type: kind, src: path, name: f.name.replace(/\.[^.]+$/, '') } }]);
+        commit(t('attachments.attachmentName', { name: f.name }), [{ op: 'add', path: pointer('assets', asset), value: { type: kind, src: path, name: f.name.replace(/\.[^.]+$/, ''), hash } }]);
       }
       pending.value = [...pending.peek(), { path, name: f.name, kind, size: f.size, asset }];
     } catch (e) {

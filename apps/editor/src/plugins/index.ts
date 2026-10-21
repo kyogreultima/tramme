@@ -15,5 +15,5 @@ export function pluginHost(docUrl: string): PluginHost {
   return current.host;
 }
 
-export { attachIsolated, filterModule } from './vocabulary.ts';
+export { attachInstalled, attachIsolated, filterModule } from './vocabulary.ts';
 export { browserHost, type PluginHost } from './host.ts';

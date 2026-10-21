@@ -4,8 +4,8 @@
 // out for the composition's format. The assistant uses them so the result is
 // clean and consistent; the user can edit every layer afterwards.
 
-import { pointer, type Op, type TrammeDoc } from '@tramme/core';
-import { freshId } from './model.ts';
+import { pointer, type ComponentParam, type Layer, type Op, type TrammeDoc } from '@tramme/core';
+import { freshId, slug } from './model.ts';
 import { locale, t } from './i18n/index.ts';
 
 export interface TemplateArgs {
@@ -181,3 +181,61 @@ export const TEMPLATES: Record<string, Template> = {
     },
   },
 };
+
+/** the dressings that become components: their look built once per format, each use an instance with its words */
+const AS_COMPONENT = new Set(['title', 'keyword', 'lower-third', 'end-card']);
+
+/** a short stable hash of a text (the component of a look) */
+function shortHash(s: string): string {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
+  return (h >>> 0).toString(36);
+}
+
+/**
+ * A dressing placed as an instance of a library component
+ * (docs/components-roadmap.md, step 4): the template built once from 0 in a
+ * composition of the format (its look, its motion), saved as the component
+ * `tpl-<template>-<hash>` with its words as parameters (text, subtitle), and
+ * an instance at `at` with this use's words. Two keywords of the same look
+ * share one component; the instance can be detached into its layers. The
+ * captions and the progress bar, one layer each, stay layers.
+ */
+export function placeTemplate(doc: TrammeDoc, compId: string, name: string, a: TemplateArgs): { label: string; ops: Op[] } {
+  const tpl = TEMPLATES[name];
+  if (!tpl) throw new Error(`unknown template: ${name}`);
+  if (!AS_COMPONENT.has(name)) return tpl.build(doc, compId, a);
+  const c = doc.compositions[compId], scratch = '__template';
+  const tmp: TrammeDoc = { ...doc, compositions: { ...doc.compositions, [scratch]: { name: tpl.title, width: c.width, height: c.height, fps: c.fps, duration: c.duration, layers: {}, order: [] } } };
+  const built = tpl.build(tmp, scratch, { ...a, at: 0 });
+  const layers: Record<string, Layer> = {};
+  let order: string[] = [];
+  const base = pointer('compositions', scratch, 'layers');
+  for (const op of built.ops) {
+    if (op.op === 'add' && op.path.startsWith(`${base}/`)) layers[op.path.slice(base.length + 1)] = op.value as Layer;
+    if (op.op === 'replace' && op.path === pointer('compositions', scratch, 'order')) order = op.value as string[];
+  }
+  const texts = order.filter((id) => layers[id].type === 'text');
+  const params: Record<string, ComponentParam> = {}, values: Record<string, unknown> = {};
+  (['text', 'subtitle'] as const).forEach((p, i) => {
+    const id = texts[i];
+    if (!id) return;
+    params[p] = { type: 'text', targets: [`${id}.text`] };
+    values[p] = layers[id].props?.text;
+  });
+  const duration = Math.max(0.1, ...order.map((id) => layers[id].out ?? 0));
+  // the look without the words and the names: two uses that differ by their words share it
+  const look = Object.fromEntries(order.map((id) => { const { name: _n, ...l } = layers[id]; return [id, texts.includes(id) ? { ...l, props: { ...l.props, text: '' } } : l]; }));
+  const id = `tpl-${slug(name)}-${shortHash(JSON.stringify({ look, order, w: c.width, h: c.height, fps: c.fps, duration }))}`;
+  const ops: Op[] = [];
+  if (!doc.compositions[id]) {
+    ops.push({ op: 'add', path: pointer('compositions', id), value: { name: `${tpl.title} (${c.width}×${c.height})`, width: c.width, height: c.height, fps: c.fps, duration, layers, order, params } });
+  }
+  const { add, done } = adder(doc, compId);
+  add(slug(name) || 'dressing', {
+    type: 'comp', name: built.label, in: a.at, out: +(a.at + duration).toFixed(4),
+    transform: { position: [c.width / 2, c.height / 2] },
+    props: { comp: id }, params: values,
+  });
+  return { label: built.label, ops: [...ops, ...done()] };
+}

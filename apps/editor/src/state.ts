@@ -117,6 +117,20 @@ export function load(doc: TrammeDoc, project: Manifest, docUrl: string, etag: st
 /** apply a transaction; returns false (and tells the user) when the document would become invalid */
 export function commit(label: string, ops: Op[], source = 'user'): boolean {
   if (!history || !ops.length) { S.draft.value = null; return false; }
+  // a layer, an effect or a modifier of an installed plugin: the plugin is copied into the project in the same step (one undo removes both)
+  const copies = hooks.copies?.(history.doc, ops);
+  if (copies) {
+    const id = S.project.peek().id;
+    Promise.all(copies.files.map(([path, blob]) => api.write(id, path, blob, blob.type ? { type: blob.type } : {})))
+      .then(() => { if (apply(label, copies.ops, source)) toast(t('plugins.copied', { names: copies.names.join(', ') }), 'info'); })
+      .catch((e) => { S.draft.value = null; toast((e as Error).message, 'error', 7000); });
+    return true;
+  }
+  return apply(label, ops, source);
+}
+
+function apply(label: string, ops: Op[], source: string): boolean {
+  if (!history) return false;
   try {
     history.apply({ label, ops, source });
   } catch (e) {
@@ -220,7 +234,11 @@ export function rejectProposal() {
 
 // ── autosave ─────────────────────────────────────────────────
 /** called after each save (the thumbnail follows) */
-export const hooks = { afterSave: null as null | (() => void) };
+export const hooks = {
+  afterSave: null as null | (() => void),
+  /** what a change needs copied into the project, and its files (installed.ts, set when a project opens) */
+  copies: null as null | ((doc: TrammeDoc, ops: Op[]) => { ops: Op[]; files: [string, Blob][]; names: string[] } | null),
+};
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let conflict = false;
 

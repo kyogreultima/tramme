@@ -57,6 +57,13 @@
 .set-list-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .set-list .faint { font-size: var(--fs-sm); white-space: nowrap; }
 .set-list li.on { background: var(--accent-soft); border-radius: var(--r-sm); }
+/* the models: a task's choice and its download or delete side by side; what to know of a model other than the default, under its row */
+.models-actions { align-items: center; gap: 4px; }
+.set-row + .models-note { box-shadow: none; display: flex; gap: 6px; align-items: flex-start; margin-top: -10px; padding-top: 0; }
+.models-note + .set-row { box-shadow: 0 -1px 0 var(--line); }
+.models-note svg.i { width: 13px; height: 13px; flex: none; margin-top: 2px; }
+.models-hub { flex: 1; align-items: center; }
+.models-hub > .field { flex: 1; width: auto; min-width: 0; }
 /* a row whose control is wide (the theme previews): the label and the hint above, the control below */
 .set-row.stack { grid-template-columns: 1fr; }
 .set-row.stack .set-control { justify-content: flex-start; }

@@ -34,31 +34,97 @@ export const isTrack = (x: unknown): x is Track =>
 export const trackId = (asset: string, name: string) => `track-${asset}-${name}`.slice(0, 64);
 
 // ── a media layer's clock ────────────────────────────────────
-/** what plays a file: where in it the layer starts, its pace, its looped section (the section from start to loopEnd) */
-export interface MediaClock { start?: number; rate?: number; loop?: boolean; loopEnd?: number }
+/**
+ * What plays a file: where in it the layer starts, its pace, its looped
+ * section (the section from start to loopEnd). `rateElapsed`, when the rate is
+ * a curve, is the file time played since the layer's in point (the integral
+ * of the rate, from the Evaluator): it then stands for rate × elapsed time.
+ */
+export interface MediaClock { start?: number; rate?: number; loop?: boolean; loopEnd?: number; rateElapsed?: number }
+
+/** steps of the fixed-step integration, per stretch between two keyframes */
+export const INTEGRAL_STEPS = 32;
+
+/**
+ * ∫ f from a to b (negative when b < a), cut at the breaks given (the
+ * keyframes' times) and integrated by Simpson's rule over INTEGRAL_STEPS
+ * steps per stretch: exact for a value held or changing linearly, and the
+ * same on every machine for any curve.
+ */
+export function integrate(f: (t: number) => number, a: number, b: number, breaks: readonly number[] = []): number {
+  if (b === a) return 0;
+  if (b < a) return -integrate(f, b, a, breaks);
+  const cuts = [a, ...[...breaks].filter((x) => x > a && x < b).sort((x, y) => x - y), b];
+  let sum = 0;
+  for (let i = 0; i + 1 < cuts.length; i++) {
+    const lo = cuts[i], hi = cuts[i + 1], n = INTEGRAL_STEPS, h = (hi - lo) / n;
+    // values just inside the stretch at its ends: a hold keyframe jumps at its time
+    let s = f(lo + h * 1e-9) + f(hi - h * 1e-9);
+    for (let k = 1; k < n; k++) s += (k % 2 ? 4 : 2) * f(lo + k * h);
+    sum += (s * h) / 3;
+  }
+  return sum;
+}
 
 /** a layer's clock from its props as written, for the editor's tools (static values; an animated one counts as its default) */
 export function mediaClockOf(props: Record<string, unknown> | undefined): MediaClock {
   const v = (k: string) => staticValue(props?.[k]);
-  return { start: Number(v('start')) || 0, rate: Number(v('rate')) || 1, loop: v('loop') === true, loopEnd: Number(v('loopEnd')) || 0 };
+  const rate = Number(v('rate'));
+  return { start: Number(v('start')) || 0, rate: Number.isFinite(rate) ? rate : 1, loop: v('loop') === true, loopEnd: Number(v('loopEnd')) || 0 };
 }
 
 /** the time in its file a video or sound layer plays at composition time t (looping, the section starts over): the video node's clock */
 export function mediaTime(p: MediaClock, t: number, layerIn: number): number {
-  const start = Number(p.start) || 0, s = start + (t - layerIn) * (Number(p.rate) || 1);
+  const start = Number(p.start) || 0;
+  const s = start + (typeof p.rateElapsed === 'number' ? p.rateElapsed : (t - layerIn) * rateOf(p));
   const len = (Number(p.loopEnd) || 0) - start;
   if (p.loop !== true || len <= 0.001) return Math.max(0, s);
   return start + (((s - start) % len) + len) % len;
 }
 
+/** a clock's rate: 1 when missing or unreadable, 0 (a held frame) kept */
+const rateOf = (p: MediaClock) => (Number.isFinite(Number(p.rate)) && p.rate !== undefined ? Number(p.rate) : 1);
+
 /** the composition times at which a layer plays a moment of its file, within [layerIn, layerOut): once, or once per turn of its loop */
-export function mediaMoments(p: MediaClock, fileTime: number, layerIn: number, layerOut: number): number[] {
-  const start = Number(p.start) || 0, rate = Number(p.rate) || 1, len = (Number(p.loopEnd) || 0) - start;
+export function mediaMoments(p: MediaClock, fileTime: number, layerIn: number, layerOut: number, elapsedAt?: (t: number) => number): number[] {
+  if (elapsedAt) return curveMoments(p, fileTime, layerIn, layerOut, elapsedAt);
+  const start = Number(p.start) || 0, rate = rateOf(p), len = (Number(p.loopEnd) || 0) - start;
+  // a held frame: the moment it holds plays all along, shown at the in point
+  if (rate === 0) return Math.abs(fileTime - start) < 1e-6 ? [layerIn] : [];
   const first = layerIn + (fileTime - start) / rate;
   if (p.loop !== true || len <= 0.001) return first >= layerIn && first < layerOut ? [first] : [];
   if (fileTime < start || fileTime >= start + len) return [];
   const out: number[] = [];
   for (let t = first; t < layerOut; t += len / rate) out.push(t);
+  return out;
+}
+
+/** looks per second when a speed curve is inverted: a moment is found between two looks, then to the microsecond */
+const LOOKS = 120;
+
+/**
+ * mediaMoments for a speed curve: the composition times at which the file
+ * time (start + elapsed, looped) crosses fileTime, found between looks
+ * LOOKS a second and narrowed by bisection. One moment while the speed stays
+ * positive; several when it turns back, or holds over it (its first moment).
+ */
+function curveMoments(p: MediaClock, fileTime: number, layerIn: number, layerOut: number, elapsedAt: (t: number) => number): number[] {
+  const at = (t: number) => mediaTime({ ...p, rateElapsed: elapsedAt(t) }, t, layerIn) - fileTime;
+  const out: number[] = [], n = Math.max(1, Math.ceil((layerOut - layerIn) * LOOKS));
+  let t0 = layerIn, v0 = at(t0);
+  if (Math.abs(v0) < 1e-9) out.push(t0);
+  for (let i = 1; i <= n; i++) {
+    const t1 = Math.min(layerOut, layerIn + (i * (layerOut - layerIn)) / n), v1 = at(t1);
+    if (v0 < 0 !== v1 < 0 && Math.abs(v1) >= 1e-9 && Math.abs(v0) >= 1e-9) {
+      let lo = t0, hi = t1, vlo = v0;
+      for (let k = 0; k < 40 && hi - lo > 1e-7; k++) {
+        const mid = (lo + hi) / 2, vm = at(mid);
+        if (vm < 0 === vlo < 0) { lo = mid; vlo = vm; } else hi = mid;
+      }
+      out.push((lo + hi) / 2);
+    } else if (Math.abs(v1) < 1e-9 && t1 < layerOut && Math.abs(v0) >= 1e-9) out.push(t1);
+    t0 = t1; v0 = v1;
+  }
   return out;
 }
 

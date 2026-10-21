@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { Renderer } from '../src/renderer.ts';
+import { noParts } from '../src/timing.ts';
 
-/** what a frame waits for, without a canvas: settle reads only the pending list */
-const waiting = (...pending: Promise<unknown>[]) => Object.assign(Object.create(Renderer.prototype), { pending, late: false }) as Renderer;
+/** what a frame waits for, without a canvas: settle reads only the pending list (and counts the wait) */
+const waiting = (...pending: Promise<unknown>[]) => Object.assign(Object.create(Renderer.prototype), { pending, late: false, times: noParts() }) as Renderer;
 const never = () => new Promise<void>(() => {});
 
 describe('a frame waiting for what it lacks', () => {
@@ -16,6 +17,13 @@ describe('a frame waiting for what it lacks', () => {
     const r = waiting(never());
     expect(await r.settle(20)).toBe(false);
     expect(r.late).toBe(true);
+  });
+
+  it('counts the wait as time spent on video', async () => {
+    const r = waiting(new Promise((res) => setTimeout(res, 30)));
+    await r.settle();
+    expect(r.times.video).toBeGreaterThanOrEqual(20);
+    expect(r.times.draw).toBe(0);
   });
 
   it('stops at once when the export is cancelled', async () => {

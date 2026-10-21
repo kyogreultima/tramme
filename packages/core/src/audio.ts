@@ -6,7 +6,7 @@
 // mix the same clips with one mixer (@tramme/render, audio.ts).
 
 import { propKind, sampleKeyframes, staticValue } from './props.ts';
-import { mediaTime } from './track.ts';
+import { integrate, mediaTime } from './track.ts';
 import type { Composition, Keyframe, TrammeDoc } from './types.ts';
 
 /** what a sound is in the mix: effects share the room, music and ambience are the bed, the voice leads */
@@ -38,8 +38,19 @@ export interface AudioClip {
   /** seconds of fade at each end */
   fadeIn: number;
   fadeOut: number;
-  /** playback speed, pitch with it: 1 as recorded */
+  /** its share of a voice played with its cleaned copy (dB, already in gainDb and the envelope); none when it plays alone */
+  share?: number;
+  /** a transition's crossfade (composition times): in, the clip rises over the window; out, it falls and stays silent after */
+  cross?: { in?: [number, number]; out?: [number, number] };
+  /** an effect on the sound (none, pitch, robot, telephone, radio, megaphone, echo) and the semitones of the pitch voice */
+  voice: string;
+  semitones: number;
+  /** the pitch kept against the speed (a pitch shift by its inverse) */
+  keepPitch: boolean;
+  /** playback speed, pitch with it: 1 as recorded (its value at `at` when it moves) */
   rate: number;
+  /** the speed over time when it is animated (a speed curve): [composition time, speed] from the layer's in point to the clip's end, 0 and over (a sound does not play backwards) */
+  rateCurve?: [number, number][] | null;
   /** looping: the section [loopStart, loopEnd] (file seconds) starts over while the clip runs */
   loopStart?: number;
   loopEnd?: number;
@@ -99,14 +110,19 @@ export function audioClips(doc: TrammeDoc, compId: string): AudioClip[] {
       at = Math.max(at, g.in ?? 0); end = Math.min(end, g.out ?? comp.duration);
     }
     if (hidden || end <= at) continue;
-    const duration = end - at, rate = clamp(num(staticValue(props.rate), 1), 0.25, 4);
+    const rateCurve = envelopeOf(props.rate, layer.in ?? 0, end, doc)?.map(([t, v]) => [t, clamp(v, 0, 4)] as [number, number]) ?? null;
+    const duration = end - at, rate = rateCurve ? curveAt(rateCurve, at) : clamp(num(staticValue(props.rate), 1), 0, 4);
     const envelope = envelopeOf(props.gain, at, end, doc), lowCutCurve = envelopeOf(props.lowCut, at, end, doc);
     const role = staticValue(props.role), visual = staticValue(props.visual);
     const start = Math.max(0, num(staticValue(props.start), 0));
     // looping: the section [start, loopEnd] wraps as long as the layer runs
     const loopEnd = num(staticValue(props.loopEnd), 0), loops = staticValue(props.loop) === true && loopEnd > start + 0.01;
     // where the clip starts in its file: the video node's clock, so picture and sound agree
-    const offset = mediaTime({ start, rate, loop: loops, loopEnd }, at, layer.in ?? 0);
+    const offset = mediaTime({ start, rate, loop: loops, loopEnd, ...(rateCurve ? { rateElapsed: curveIntegral(rateCurve, layer.in ?? 0, at) } : {}) }, at, layer.in ?? 0);
+    // a cleaned voice beside its source: both play in step, mixed by the layer's clean amount
+    const cleanAmount = clamp(num(staticValue(props.clean), 0), 0, 1), cleaned = doc.assets[asset].clean;
+    const withClean = cleanAmount > 0 && !!cleaned && doc.assets[cleaned]?.type === 'audio';
+    const first = clips.length;
     clips.push({
       layerId, asset, at, duration,
       // unsaid: a video's sound is someone speaking; a sound is what its names say, an effect otherwise
@@ -121,6 +137,10 @@ export function audioClips(doc: TrammeDoc, compId: string): AudioClip[] {
       fadeIn: clamp(num(staticValue(props.fadeIn), 0), 0, duration),
       fadeOut: clamp(num(staticValue(props.fadeOut), 0), 0, duration),
       rate,
+      ...(rateCurve ? { rateCurve } : {}),
+      voice: typeof staticValue(props.voice) === 'string' ? String(staticValue(props.voice)) : 'none',
+      semitones: clamp(num(staticValue(props.semitones), 0), -12, 12),
+      keepPitch: staticValue(props.keepPitch) === true,
       lowCut: Math.max(0, lowCutCurve ? lowCutCurve[0][1] : num(staticValue(props.lowCut), 0)),
       lowCutCurve,
       highCut: Math.max(0, num(staticValue(props.highCut), 0)),
@@ -131,8 +151,37 @@ export function audioClips(doc: TrammeDoc, compId: string): AudioClip[] {
       compress: clamp(num(staticValue(props.compress), 0), 0, 1),
       reverb: clamp(num(staticValue(props.reverb), 0), 0, 1),
     });
+    if (withClean) {
+      // the voice is the sum of both: the original lowered, the cleaned one beside it (identical in their speech, so the voice keeps its level)
+      const orig = clips[first], db = (k: number) => 20 * Math.log10(k);
+      const shift = (c: AudioClip, k: number): AudioClip => ({ ...c, share: db(k), gainDb: c.gainDb + db(k), envelope: c.envelope?.map(([t, v]) => [t, v + db(k)] as [number, number]) ?? null });
+      const clean = shift({ ...orig, asset: cleaned! }, cleanAmount);
+      if (cleanAmount >= 1) clips[first] = clean;
+      else { clips[first] = shift(orig, 1 - cleanAmount); clips.push(clean); }
+    }
   }
+  crossfades(comp, clips);
   return clips.sort((a, b) => a.at - b.at);
+}
+
+/**
+ * The sounds of two shots joined by a transition cross with the picture, by
+ * default: over the transition's window, the incoming clip rises and the
+ * outgoing one falls (equal power), the outgoing silent after it.
+ */
+function crossfades(comp: Composition, clips: AudioClip[]) {
+  // a layer may play two clips (its voice and the same cleaned): both cross
+  const byLayer = new Map<string, AudioClip[]>();
+  for (const c of clips) byLayer.set(c.layerId, [...(byLayer.get(c.layerId) ?? []), c]);
+  for (const [id, layer] of Object.entries(comp.layers)) {
+    for (const e of layer.effects ?? []) {
+      if (e.type !== 'fx.transition' || e.enabled === false || staticValue(e.props?.sound) === false) continue;
+      const from = staticValue(e.props?.from), duration = num(staticValue(e.props?.duration), 0.5);
+      const start = layer.in ?? 0, window: [number, number] = [start, start + Math.max(0.01, duration)];
+      for (const c of byLayer.get(id) ?? []) c.cross = { ...c.cross, in: window };
+      for (const c of typeof from === 'string' ? byLayer.get(from) ?? [] : []) c.cross = { ...c.cross, out: window };
+    }
+  }
 }
 
 /** how a composition's sound is finished (its `sound` settings): the loudness of the master, null as mixed; the share of the room the effects have in common */
@@ -154,16 +203,52 @@ export function curveAt(e: [number, number][], t: number): number {
   return t <= t0 ? v0 : t >= t1 ? v1 : v0 + ((v1 - v0) * (t - t0)) / (t1 - t0);
 }
 
+/** ∫ of a sampled curve (linear between its samples) from a to b: exact, the samples cut it */
+export function curveIntegral(e: [number, number][], a: number, b: number): number {
+  return integrate((t) => curveAt(e, t), a, b, e.map(([t]) => t));
+}
+
+/**
+ * The file time a clip plays at composition time t (no loop wrap): its
+ * offset, then the file at its speed, or at the integral of its speed curve.
+ */
+export function clipFileTime(c: AudioClip, t: number): number {
+  return c.offset + (c.rateCurve ? curveIntegral(c.rateCurve, c.at, t) : (t - c.at) * c.rate);
+}
+
 /** the clip's gain (linear, 1 = as recorded) at composition time t: its curve or its level, times its fades */
 export function gainAt(c: AudioClip, t: number): number {
   const dB = c.envelope ? curveAt(c.envelope, t) : c.gainDb;
   const end = c.at + c.duration;
   const fade = Math.min(1, c.fadeIn > 0 ? (t - c.at) / c.fadeIn : 1, c.fadeOut > 0 ? (end - t) / c.fadeOut : 1);
-  return Math.pow(10, dB / 20) * Math.max(0, fade);
+  return Math.pow(10, dB / 20) * Math.max(0, fade) * crossAt(c, t);
 }
 
-/** whether the clip's gain moves (a curve or fades): it is then sampled over time */
-export const gainMoves = (c: AudioClip) => !!c.envelope || c.fadeIn > 0 || c.fadeOut > 0;
+/** a crossfade's share of the clip at t: equal power, so the two clips keep the level between them */
+function crossAt(c: AudioClip, t: number): number {
+  const x = (w: [number, number]) => Math.min(1, Math.max(0, (t - w[0]) / (w[1] - w[0])));
+  let k = 1;
+  if (c.cross?.in) k *= Math.sin((Math.PI / 2) * x(c.cross.in));
+  if (c.cross?.out) { const o = x(c.cross.out); k *= o >= 1 ? 0 : Math.cos((Math.PI / 2) * o); }
+  return k;
+}
+
+/**
+ * The pitch ratio a clip's voice stage applies at t: the semitones of the
+ * pitch voice, and the inverse of its speed when it keeps its pitch; 1 when
+ * it moves nothing (no worklet then).
+ */
+export function pitchRatio(c: AudioClip, t: number): number {
+  let k = c.voice === 'pitch' ? Math.pow(2, c.semitones / 12) : 1;
+  if (c.keepPitch) { const rate = c.rateCurve ? curveAt(c.rateCurve, t) : c.rate; if (rate > 0.05) k /= rate; }
+  return Math.min(4, Math.max(0.25, k));
+}
+
+/** whether a clip needs the pitch worklet */
+export const needsPitch = (c: AudioClip) => (c.voice === 'pitch' && c.semitones !== 0) || (c.keepPitch && (!!c.rateCurve || Math.abs(c.rate - 1) > 1e-6));
+
+/** whether the clip's gain moves (a curve, fades, a crossfade): it is then sampled over time */
+export const gainMoves = (c: AudioClip) => !!c.envelope || c.fadeIn > 0 || c.fadeOut > 0 || !!c.cross;
 
 // ── what a sound is like ─────────────────────────────────────
 export interface SoundFigures {

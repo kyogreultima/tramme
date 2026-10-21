@@ -4,7 +4,8 @@
 
 import { pointer, type Op, type ToolContext, type ToolType } from '@tramme/core';
 import { canvas, loadImage } from './perception.ts';
-import { keep, matting } from './cutout.ts';
+import { keep, matteModel, matting } from './cutout.ts';
+import { madeBy } from './models.ts';
 import { freshId, isToolAsset, linkedTransform, mediaAssetsOf, siblingsOf } from './model.ts';
 import { t } from './i18n/index.ts';
 
@@ -40,7 +41,7 @@ export const REMOVEBG_TOOLS: ToolType[] = [
       const path = await ctx.writeFile(`assets/cutout/${id}.png`, blob);
       const nid = `${id}-cut`.slice(0, 64);
       const had = !!ctx.doc.assets[nid];
-      const ops: Op[] = [{ op: had ? 'replace' : 'add', path: pointer('assets', nid), value: { type: 'image', src: path, name: ctx.doc.assets[id].name ? `${ctx.doc.assets[id].name} cut out` : nid } }];
+      const ops: Op[] = [{ op: had ? 'replace' : 'add', path: pointer('assets', nid), value: { type: 'image', src: path, name: ctx.doc.assets[id].name ? `${ctx.doc.assets[id].name} cut out` : nid, madeBy: [madeBy(matteModel(subject))] } }];
       const comp = ctx.doc.compositions[ctx.compId];
       // run again, the layer that already shows the cut keeps showing it (its asset is replaced and reloaded): no second copy
       const shown = Object.keys(comp.layers).find((x) => comp.layers[x].type === 'image' && comp.layers[x].props?.image === nid);

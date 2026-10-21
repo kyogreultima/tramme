@@ -57,7 +57,7 @@ const mockCtx = () => {
 const clip = (sound: Partial<AudioClip>): AudioClip => ({
   layerId: 'a', role: 'effect', weight: 'support', asset: 'snd', at: 0, offset: 0, duration: 1,
   gainDb: 0, envelope: null, fadeIn: 0, fadeOut: 0, rate: 1, lowCut: 0, lowCutCurve: null, highCut: 0,
-  eqLow: 0, eqMid: 0, eqMidFreq: 1000, eqHigh: 0, compress: 0, reverb: 0, ...sound,
+  eqLow: 0, eqMid: 0, eqMidFreq: 1000, eqHigh: 0, compress: 0, reverb: 0, voice: 'none', semitones: 0, keepPitch: false, ...sound,
 });
 
 describe('clipChain', () => {

@@ -143,6 +143,7 @@ export const api = {
     return r.text();
   },
   libraryPut: (name: string, code: string) => call<{ name: string; size: number }>(`/api/library/${encodeURIComponent(name)}`, { method: 'PUT', headers: { 'content-type': 'text/javascript' }, body: code }),
+  libraryDelete: (name: string) => call<unknown>(`/api/library/${encodeURIComponent(name)}`, { method: 'DELETE' }),
 
   // ── the sound library, shared by the projects ──────────────────
   sounds: () => call<{ name: string; size: number; modified: string; entry?: unknown }[]>('/api/sounds'),

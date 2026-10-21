@@ -6,6 +6,7 @@
 // models (Ollama, LM Studio) straight from the browser. The conversation is
 // shared by all of them.
 
+import { installed, offIn } from '../installed.ts';
 import { computed, signal } from '@preact/signals';
 import { addUsage, CLI_DEFAULT, COMPANION_PORT, DEFAULT_MODEL, EFFORTS, effortFor, effortLevels, ENGINE_MODELS, ENGINES, engineOf, LOCAL_URL, modelLabel, modelName, MODELS, NO_USAGE, pickModel, PROVIDER_LABEL, providerOf, REMOTE, setTranslator, slotOf, systemPrompt, userPrompt, type Effort, type Engine, type TurnContext } from '@tramme/assistant';
 import { CHAT, CHAT_INDEX, chatPath } from '@tramme/project';
@@ -415,7 +416,10 @@ export async function* ask(p: AskPayload, signal: AbortSignal): AsyncGenerator<A
   // the project's brief, when there is one, rides in the system prompt: the assistant follows it from the first word
   let brief: string | null = null;
   try { brief = (await api.readText(S.project.peek().id, 'assets/brief.json'))?.text ?? null; } catch { brief = null; }
-  const system = systemPrompt(reference, brief ?? undefined);
+  // the installed plugins, named once (enabled, not turned off here): the assistant searches them when the project's own vocabulary falls short
+  const offHere = offIn(S.doc.peek());
+  const mine = installed.peek().filter((x) => x.enabled && !offHere.includes(x.manifest.id)).map((x) => `${x.manifest.name}${x.manifest.description ? `: ${x.manifest.description}` : ''}`);
+  const system = systemPrompt(reference, brief ?? undefined, mine);
   const target = route === 'local' ? { url: localBase() } : route === 'remote' ? { url: `/api/llm/${encodeURIComponent(slotOf(model))}` } : undefined;
   // Claude by its model id; a command line by its own model name, none for its default
   const asked = engine === 'claude' ? model : modelName(model) === CLI_DEFAULT ? '' : modelName(model);

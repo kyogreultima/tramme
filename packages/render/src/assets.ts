@@ -2,7 +2,7 @@
 // never waits and never depends on timing. Paths resolve against the
 // document's URL. sync() follows edits: only new or changed assets load.
 
-import type { Asset, TrammeDoc } from '@tramme/core';
+import { parseCube, type Asset, type TrammeDoc } from '@tramme/core';
 import { VideoFrames } from './video.ts';
 
 /** the longest side, in pixels, of an SVG drawn without a size of its own */
@@ -45,6 +45,18 @@ export class AssetStore {
   private pageFontsStuck = false;
   /** the sandbox owns the project's plugin modules: sync skips them, their code never loads here */
   sandboxModules = false;
+  /** a video with a proxy plays its proxy (the editor's preview, when its setting asks); exports always read the original */
+  useProxies = false;
+
+  /** what a loaded asset is kept under: its entry, and for a video with a proxy, which of the two plays */
+  private keyOf(a: Asset): string {
+    return JSON.stringify(a) + (this.proxyOf(a) ? '|proxy' : '');
+  }
+
+  /** the proxy a video plays instead of itself, if it has one and proxies are on */
+  private proxyOf(a: Asset): string | null {
+    return this.useProxies && a.type === 'video' && a.proxy && this.doc.assets[a.proxy]?.type === 'video' ? a.proxy : null;
+  }
 
   constructor(doc: TrammeDoc, docUrl: string) {
     this.doc = doc;
@@ -79,11 +91,11 @@ export class AssetStore {
       if (this.sandboxModules && a.type === 'module' && (doc.plugins || []).includes(id)) { this.loaded.delete(id); return; }
       const have = this.loaded.get(id);
       if (have && !reload.includes(id)) {
-        if (have.entry === a) return;
-        const key = JSON.stringify(a);
+        const key = this.keyOf(a);
+        if (have.entry === a && have.key === key) return;
         if (have.key === key) { have.entry = a; return; }
       }
-      const key = JSON.stringify(a);
+      const key = this.keyOf(a);
       try {
         this.loaded.set(id, { key, entry: a, value: await this.load(id, a) });
       } catch (e) {
@@ -121,12 +133,19 @@ export class AssetStore {
       }
       case 'module':
         return import(/* @vite-ignore */ this.version ? `${url}${url.includes('?') ? '&' : '?'}v=${this.version}` : url);
-      case 'video':
-        return VideoFrames.open(url);
+      case 'video': {
+        const proxy = this.proxyOf(a);
+        return VideoFrames.open(proxy ? this.url(proxy) : url);
+      }
       case 'json': {
         const r = await fetch(url);
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
+      }
+      case 'lut': {
+        const r = await fetch(url);
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return parseCube(await r.text());
       }
       default:
         return url;

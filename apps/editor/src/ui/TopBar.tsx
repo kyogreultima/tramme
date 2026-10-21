@@ -11,7 +11,7 @@ import { safeName, takenPaths, upload } from '../files.ts';
 import { canRedo, canUndo, comp, commit, redo, redoLabel, S, saveNow, toast, undo, undoLabel } from '../state.ts';
 import { ago, contentEnd, fmtSeconds, snap } from '../model.ts';
 import { shortsOf } from '../shorts.ts';
-import { openMenu, Popover, Select, type MenuItem } from './controls.tsx';
+import { openMenu, Popover, Select, Toggle, type MenuItem } from './controls.tsx';
 import { VIDEO, WEB_FORMATS, type WebFormat } from '../formats.ts';
 import { Icon } from './icons.tsx';
 import { LogoMark } from './Logo.tsx';
@@ -118,6 +118,8 @@ type ExpState = { done: number; total: number } | Done | { error: string };
 const expState = signal<ExpState | null>(null);
 const expFormat = signal<WebFormat>('mp4');
 const expSamples = signal('doc');
+/** 10 bits a channel (MP4, WebM), when this browser encodes it */
+const expDeep = signal(false);
 const expBatch = signal<{ i: number; n: number; name: string } | null>(null);
 const expAbort: { current: AbortController | null } = { current: null };
 const expStop = { current: false };
@@ -128,6 +130,16 @@ function ExportPop({ anchor, onClose }: { anchor: HTMLElement; onClose: () => vo
   const format = expFormat.value, samples = expSamples.value, state = expState.value, batch = expBatch.value;
   const setFormat = (id: WebFormat) => { expFormat.value = id; expState.value = null; };
   const video = VIDEO.has(format);
+  // a 10-bit codec this browser encodes at this size, asked before the export offers it (undefined: still asking)
+  const deepable = format === 'mp4' || format === 'webm';
+  const [deepLabel, setDeepLabel] = useState<string | null | undefined>(undefined);
+  useEffect(() => {
+    if (!deepable) return;
+    let live = true;
+    setDeepLabel(undefined);
+    import('@tramme/render').then(({ deepCodec }) => deepCodec(format, c.width, c.height)).then((d) => { if (live) setDeepLabel(d?.label ?? null); }).catch(() => { if (live) setDeepLabel(null); });
+    return () => { live = false; };
+  }, [format, c.width, c.height]);
   // the shorts of the document, named short-* by the build: exported one by one, in the format chosen above
   const shorts = shortsOf(S.doc.value);
   // time left empty after the last layer: the composition can be brought back to its content before the export
@@ -142,6 +154,7 @@ function ExportPop({ anchor, onClose }: { anchor: HTMLElement; onClose: () => vo
       const r = await exportInBrowser(S.doc.peek(), new URL(S.docUrl.peek(), location.href).href, expFormat.value, {
         compId: S.compId.peek(), registry: S.registry.peek(), t: at, signal: expAbort.current.signal,
         samples: expSamples.value === 'doc' ? undefined : Number(expSamples.value),
+        depth: expDeep.value && deepable && deepLabel ? 10 : 8,
         onProgress: (done, total) => { if (done % 3 === 0 || done === total) expState.value = { done, total }; },
       });
       const stem = safeName(S.project.peek().name);
@@ -204,6 +217,11 @@ function ExportPop({ anchor, onClose }: { anchor: HTMLElement; onClose: () => vo
       </div>}
       {video && <div class="row"><span class="muted">{t('topbar.blur')}</span>
         <Select value={samples} options={[['doc', t('topbar.documentSetting')], ['1', t('topbar.noBlurFast')], ['8', t('topbar.nSubFrames', { n: 8 })], ['16', t('topbar.nSubFrames', { n: 16 })]]} onChange={(v) => { expSamples.value = v; }} />
+      </div>}
+      {deepable && <div class="row"><span class="muted">{t('topbar.tenBit')}</span>
+        {deepLabel
+          ? <span title={deepLabel} style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Toggle on={expDeep.value} onChange={(v) => { expDeep.value = v; }} /><span class="faint" style={{ fontSize: 11 }}>{deepLabel}</span></span>
+          : <span class="faint" style={{ fontSize: 11 }}>{deepLabel === null ? t('topbar.tenBitUnavailable') : t('common.searching')}</span>}
       </div>}
       {state && 'total' in state && video && <>
         <div class="progress"><i style={{ width: `${(100 * state.done) / Math.max(1, state.total)}%` }} /></div>

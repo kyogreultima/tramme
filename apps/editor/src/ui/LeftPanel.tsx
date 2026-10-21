@@ -12,7 +12,11 @@ import { preview } from '../preview.ts';
 import { fromLottie } from '@tramme/interop';
 import { mediaOf, TranscribeButton, transcribeItem } from './Transcribe.tsx';
 import { safeName, takenPaths, upload } from '../files.ts';
+import { askUser } from '../confirm.ts';
+import { assetWithHash, contentHash } from '../hash.ts';
 import { m, t, tr } from '../i18n/index.ts';
+import { listCommands } from '../ai/commands.ts';
+import { runCommand } from '../ai/conversation.ts';
 
 const tab = signal<'layers' | 'assets' | 'tokens'>('layers');
 
@@ -414,7 +418,7 @@ function LayerTree() {
 
 // ── assets ───────────────────────────────────────────────────
 const ASSET_ICON: Record<string, string> = { image: 'image', font: 'text', audio: 'audio', video: 'film', module: 'code', json: 'code', model: 'box' };
-const ASSET_LABEL: Record<string, string> = { image: m('panel.images'), font: m('panel.fonts'), audio: m('panel.sounds'), video: m('panel.videos'), module: m('panel.code'), json: m('panel.data'), model: m('panel.models') };
+const ASSET_LABEL: Record<string, string> = { image: m('panel.images'), font: m('panel.fonts'), audio: m('panel.sounds'), video: m('panel.videos'), module: m('panel.code'), json: m('panel.data'), model: m('panel.models'), lut: m('panel.luts') };
 
 function typeOfFile(name: string): Asset['type'] | null {
   const ext = name.toLowerCase().split('.').pop()!;
@@ -425,6 +429,7 @@ function typeOfFile(name: string): Asset['type'] | null {
   if (['glb', 'gltf'].includes(ext)) return 'model';
   if (['js', 'mjs'].includes(ext)) return 'module';
   if (ext === 'json') return 'json';
+  if (ext === 'cube') return 'lut';
   return null;
 }
 
@@ -470,6 +475,8 @@ export async function importFiles(files: FileList | File[]) {
   const images = Array.from(files).filter((f) => typeOfFile(f.name) === 'image');
   const stem = images.length > 1 ? commonStem(images.map((f) => f.name)) : null;
   const folder = stem ? `assets/${safeName(stem)}` : 'assets';
+  // a file already in the project (or twice in this import) is answered with its asset, nothing written
+  const added = new Map<string, string>(), already: string[] = [];
   for (const f of Array.from(files)) {
     if (/\.json$/i.test(f.name)) {
       try { await importLottie(f); } catch (e) { toast(t('panel.couldNotImportLottie', { error: (e as Error).message }), 'error'); }
@@ -477,20 +484,40 @@ export async function importFiles(files: FileList | File[]) {
     }
     const type = typeOfFile(f.name);
     if (!type) { toast(t('panel.unsupportedFormatName', { name: f.name }), 'error'); continue; }
-    let src: string;
+    let src: string, hash: string;
     try {
+      hash = await contentHash(f);
+      const have = assetWithHash(doc, hash) ?? added.get(hash);
+      if (have) { already.push(t('panel.nameIsAsset', { name: f.name, asset: have })); continue; }
       paths ??= await takenPaths();
       src = await upload(paths, `${type === 'image' ? folder : 'assets'}/${safeName(f.name)}`, f);
     } catch (e) { toast(t('panel.couldNotImportName', { name: f.name, error: (e as Error).message }), 'error'); continue; }
     const id = freshId(taken, f.name.replace(/\.[^.]+$/, '').toLowerCase().replace(/[^a-z0-9_-]+/g, '-'));
     taken[id] = 1;
-    const asset: Asset = { type, src, name: f.name.replace(/\.[^.]+$/, '') };
+    added.set(hash, id);
+    const asset: Asset = { type, src, name: f.name.replace(/\.[^.]+$/, ''), hash };
     if (type === 'font') asset.family = asset.name;
     ops.push({ op: 'add' as const, path: pointer('assets', id), value: asset });
   }
   if (ops.length && commit(ops.length > 1 ? t('panel.importNFiles', { n: ops.length }) : t('panel.importName', { name: (ops[0].value as Asset).name ?? '' }), ops) && stem) {
     toast(t('panel.nDrawingsInFolder', { n: images.length, folder }), 'info', 9000);
   }
+  if (already.length) toast(t('panel.alreadyInProject', { list: already.join(', ') }), 'info', 8000);
+  // a video this machine decodes slower than it plays: a proxy offered (measured on a second of it)
+  for (const o of ops) {
+    const a = o.value as Asset, f = Array.from(files).find((x) => x.name.replace(/\.[^.]+$/, '') === a.name);
+    if (a.type === 'video' && f) void offerProxy(o.path.split('/').pop()!, f);
+  }
+}
+
+async function offerProxy(id: string, file: File) {
+  const { decodeRate, playsPoorly, proxySize } = await import('../proxy.ts');
+  const rate = await decodeRate(file).catch(() => null);
+  if (!rate || !proxySize(rate.width, rate.height) || !playsPoorly(rate.fps, rate.fileFps)) return;
+  if (!(await askUser(t('panel.proxyTitle'), t('panel.proxyText', { name: file.name, fps: Math.round(rate.fps), need: Math.round(rate.fileFps) }), t('panel.makeProxy')))) return;
+  const { listCommands } = await import('../ai/commands.ts'), { runCommand } = await import('../ai/conversation.ts');
+  const cmd = listCommands(S.registry.peek()).find((c) => c.name === 'proxy');
+  if (cmd) await runCommand(cmd, { video: id });
 }
 
 function Compositions() {
@@ -509,6 +536,8 @@ function Compositions() {
       { label: t('common.open'), icon: 'comp', onClick: () => { S.compId.value = id; select([]); } },
       { label: t('panel.insertAsLayer'), icon: 'plus', disabled: id === active, onClick: () => insertLayer({ type: 'comp', name: c.name, transform: { position: [doc.compositions[active].width / 2, doc.compositions[active].height / 2] }, props: { comp: id } }, id) },
       { label: t('panel.mainComposition'), icon: doc.root === id ? 'check' : 'film', disabled: doc.root === id, onClick: () => commit(t('panel.mainComposition'), [{ op: 'replace', path: '/root', value: id }]) },
+      // a component goes to the library shared by the projects
+      ...(c.params && id !== doc.root ? [{ label: t('panel.keepInLibrary'), icon: 'download' as const, onClick: () => { const cmd = listCommands(S.registry.peek()).find((x) => x.name === 'component-keep'); if (cmd) void runCommand(cmd, { component: id }); } }] : []),
       'sep',
       { label: t('common.delete'), icon: 'trash', disabled: doc.root === id, onClick: () => { if (commit(t('panel.deleteName2', { name: c.name }), [{ op: 'remove', path: pointer('compositions', id) }])) { if (active === id) S.compId.value = doc.root; } } },
     ]);
@@ -519,9 +548,9 @@ function Compositions() {
       {Object.entries(doc.compositions).map(([id, c]) => (
         <div key={id} class={`list-row${id === active ? ' on' : ''}`} onClick={() => { S.compId.value = id; select([]); }}
           onPointerDown={(e) => longPress(e, (pos) => menu(pos, id))} onContextMenu={(e) => menu(e, id)}>
-          <span class="thumb"><Icon name={doc.root === id ? 'film' : 'comp'} /></span>
-          <span class="name">{c.name}</span>
-          <span class="meta mono">{c.width}×{c.height} · {c.duration} s</span>
+          <span class="thumb"><Icon name={doc.root === id ? 'film' : c.params ? 'sliders' : 'comp'} /></span>
+          <span class="name" title={c.params ? t('panel.componentWith', { params: Object.keys(c.params).join(', ') }) : undefined}>{c.name}</span>
+          <span class="meta mono">{c.params ? `${t('panel.component')} · ` : ''}{c.width}×{c.height} · {c.duration} s</span>
         </div>
       ))}
     </div>

@@ -35,6 +35,8 @@ export interface ModifierContext {
    * everything that drives it. Null when the layer has no usable position.
    */
   position?(id: string, t?: number): Vec2 | null;
+  /** the composition's width and height (a time field's angle and distance cross it) */
+  size?: Vec2;
 }
 
 export interface ModifierType {
@@ -126,16 +128,112 @@ export const spring: ModifierType = {
   },
 };
 
+/**
+ * A time field's settings: how far behind each element runs. `rank`: by its
+ * rank, `amount` seconds per element; `angle`: by where it lies along the
+ * direction `angle` (degrees, 0: left to right), `amount` seconds to cross
+ * the whole field; `distance`: by its distance to `center` (or to the layer
+ * `source`), `amount` seconds out to the farthest corner; `noise`: by
+ * gradient noise over its position (`scale` px a feature, 0: a fixed random
+ * delay per element; `speed` drifts the field), between 0 and `amount`.
+ */
+export interface TimeField {
+  mode: 'rank' | 'angle' | 'distance' | 'noise';
+  amount: number;
+  from?: 'first' | 'last';
+  angle?: number;
+  center?: Vec2;
+  scale?: number;
+  speed?: number;
+  seed?: number;
+  octaves?: number;
+}
+
+/**
+ * How many seconds an element runs behind (d · amount, d in 0..1 except by
+ * rank): at `pos`, of rank `index` among `count`, at time t; the field
+ * spans the points `extent` (the frame's corners, or every instance), which
+ * scale the angle and the distance. Continuous in the position, the time,
+ * the amount and the seed: a seed or an amount animated slides, never jumps.
+ */
+export function timeDelay(f: TimeField, pos: Vec2, index: number, count: number, extent: Vec2[], t: number, center?: Vec2): number {
+  return fieldOf(f, extent, center)(pos[0], pos[1], index, count, t);
+}
+
+/**
+ * The same delay as a function of the element, its field read once (the
+ * span of the extent along the angle, the farthest point from the centre):
+ * a field over N elements costs N, not N².
+ */
+export function fieldOf(f: TimeField, extent: Vec2[], center?: Vec2): (x: number, y: number, index: number, count: number, t: number) => number {
+  switch (f.mode) {
+    case 'rank': return (_x, _y, index, count) => f.amount * (f.from === 'last' ? count - 1 - index : index);
+    case 'angle': {
+      const a = ((f.angle ?? 0) * Math.PI) / 180, ca = Math.cos(a), sa = Math.sin(a);
+      let lo = Infinity, hi = -Infinity;
+      for (const p of extent) { const d = p[0] * ca + p[1] * sa; if (d < lo) lo = d; if (d > hi) hi = d; }
+      return hi > lo ? (x, y) => (f.amount * (x * ca + y * sa - lo)) / (hi - lo) : () => 0;
+    }
+    case 'distance': {
+      const c = center ?? f.center ?? [0, 0];
+      let far = 1e-9;
+      for (const p of extent) far = Math.max(far, Math.hypot(p[0] - c[0], p[1] - c[1]));
+      return (x, y) => f.amount * Math.min(1, Math.hypot(x - c[0], y - c[1]) / far);
+    }
+    case 'noise': {
+      const seed = f.seed ?? 0, scale = f.scale ?? 300;
+      if (scale <= 0) {
+        // a fixed random delay per element; a seed between two whole ones blends theirs
+        const s0 = Math.floor(seed), k = seed - s0, r = (index: number, s: number) => hash(index * 977 + s * 7919 + 13);
+        return (_x, _y, index) => f.amount * (r(index, s0) * (1 - k) + r(index, s0 + 1) * k);
+      }
+      return (x, y, _i, _n, t) => {
+        const n = fbm(x / scale, y / scale + seed * 1.37, t * (f.speed ?? 0) + seed * 0.71, f.octaves ?? 2);
+        return f.amount * Math.min(1, Math.max(0, (n + 1) / 2));
+      };
+    }
+  }
+}
+
+/** a local time inside a span [a, b]: repeated when `loop`, else held at its ends */
+export function boundTime(t: number, a: number, b: number, loop: boolean): number {
+  if (!(b > a)) return t;
+  if (loop) return a + ((((t - a) % (b - a)) + (b - a)) % (b - a));
+  return Math.min(b, Math.max(a, t));
+}
+
+export const timeField: ModifierType = {
+  type: 'timeField', title: 'Time field', description: 'reads the animation later for some elements than for others: by rank, along a direction, by distance to a point or a layer, or by noise (a wave, a ripple, a liquid time)',
+  params: {
+    mode: { type: 'enum', default: 'rank', options: ['rank', 'angle', 'distance', 'noise'], label: 'By' },
+    amount: { type: 'number', default: 0.5, step: 0.01, unit: 's', label: 'Delay', description: 'rank: per element; otherwise across the whole field' },
+    from: { type: 'enum', default: 'first', options: ['first', 'last'], label: 'Starting from' },
+    angle: { type: 'number', default: 0, step: 1, unit: 'deg', label: 'Direction' },
+    center: { type: 'vec2', default: null, nullable: true, unit: 'px', label: 'Centre', description: 'distance: from this point (the composition\'s centre by default)' },
+    source: { type: 'layer', default: null, nullable: true, label: 'From layer', description: 'distance: from this layer\'s position instead' },
+    scale: { type: 'number', default: 300, min: 0, step: 10, unit: 'px', label: 'Noise size', description: '0: a fixed random delay per element' },
+    speed: { type: 'number', default: 0, step: 0.05, label: 'Drift' },
+    seed: { type: 'number', default: 0, step: 1, label: 'Seed' },
+    loop: { type: 'bool', default: false, label: 'Loop', description: 'repeat the animation outside its keyframes instead of holding its ends' },
+  },
+  apply(_v, p, c) {
+    const size = c.size ?? [1920, 1080], corners: Vec2[] = [[0, 0], [size[0], 0], [size[0], size[1]], [0, size[1]]];
+    const pos = c.position?.('', c.t) ?? [size[0] / 2, size[1] / 2];
+    const center = p.mode === 'distance' ? (p.source ? c.position?.(String(p.source), c.t) ?? undefined : (p.center as Vec2 | null) ?? [size[0] / 2, size[1] / 2]) : undefined;
+    const t = c.t - timeDelay(p as TimeField, pos, c.index, c.count, corners, c.t, center);
+    // keyframes hold their ends by themselves; looped, the time goes round their span
+    return c.base(p.loop === true && c.keys?.length ? boundTime(t, c.keys[0].t, c.keys[c.keys.length - 1].t, true) : t);
+  },
+};
+
 export const stagger: ModifierType = {
   type: 'stagger', title: 'Offset', description: 'offsets the animation by the layer\'s rank among its siblings',
   params: {
     delay: { type: 'number', default: 0.06, step: 0.01, unit: 's', label: 'Offset' },
     from: { type: 'enum', default: 'first', options: ['first', 'last'], label: 'Starting from' },
   },
-  apply(_v, p, c) {
-    const rank = p.from === 'last' ? c.count - 1 - c.index : c.index;
-    return c.base(c.t - rank * p.delay);
-  },
+  // the rank case of the time field
+  apply: (v, p, c) => timeField.apply(v, { mode: 'rank', amount: p.delay, from: p.from }, c),
 };
 
 export const noise: ModifierType = {
@@ -236,10 +334,11 @@ const MODIFIER_NOTES: Record<string, AiNotes> = {
   noise: { when: 'varying a value across siblings without motion (sizes, rotations of a scatter)' },
   smooth: { when: 'softening jittery keyframes or tracked data' },
   react: { when: 'making things move with the music once it has an analysis (the beats tool): scale +0.06 on beat for a pulse, opacity on hit for flashes, position on low for a bounce', example: { type: 'react', source: 'music', signal: 'beat', amount: 0.06, decay: 0.18 } },
+  timeField: { when: 'one animation played at different moments across elements: a wave (angle), a ripple from a point or a layer (distance), a liquid time (noise with drift), a random desynchronisation (noise, scale 0); amount 0.3 to 1.2 s across the field; put it on every animated property of the element, the same settings', avoid: 'amounts longer than the animation itself, which leave elements still while others finish (the reading breaks); loop only for animations made to repeat', example: { type: 'timeField', mode: 'distance', amount: 0.8 } },
   near: { when: 'figures that answer a pointer: keyframe a small layer as the pointer, then let the shapes around it rise, sink or lean (freq 2 to 3, damping 0.45 to 0.6); the layer and its pointer must be siblings', avoid: 'amounts that break the drawing (a scale past 2, an offset past a cell): the rest pose is the picture, the pointer is a bonus', example: { type: 'near', source: 'pointer', radius: 240, amount: 1.4, axis: 'y', freq: 2.4, damping: 0.55 } },
 };
 
-export const BUILTIN_MODIFIERS = [wiggle, loop, spring, stagger, noise, smooth, react, near];
+export const BUILTIN_MODIFIERS = [wiggle, loop, spring, stagger, noise, smooth, react, near, timeField];
 for (const mod of BUILTIN_MODIFIERS) mod.ai = MODIFIER_NOTES[mod.type];
 
 /** default params filled in */

@@ -99,7 +99,7 @@ export const isMedia = (path: string) => /^(assets|renders)\/.+\.(wav|mp3|ogg|m4
 export const maxSize = (path: string) => (isMedia(path) ? LIMITS.media : LIMITS.file);
 
 const EXT: Record<string, string[]> = {
-  assets: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'avif', 'svg', 'ttf', 'otf', 'woff', 'woff2', 'wav', 'mp3', 'ogg', 'm4a', 'flac', 'mp4', 'webm', 'mov', 'json', 'js', 'mjs', 'pdf', 'md', 'markdown'],
+  assets: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'avif', 'svg', 'ttf', 'otf', 'woff', 'woff2', 'wav', 'mp3', 'ogg', 'm4a', 'flac', 'mp4', 'webm', 'mov', 'json', 'js', 'mjs', 'pdf', 'md', 'markdown', 'cube'],
   plugins: ['js', 'mjs'],
   renders: ['mp4', 'webm', 'mov', 'gif', 'png', 'zip', 'json', 'svg', 'wav'],
 };
@@ -108,7 +108,7 @@ export const MIME: Record<string, string> = {
   json: 'application/json; charset=utf-8', js: 'text/javascript; charset=utf-8', mjs: 'text/javascript; charset=utf-8',
   png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif', avif: 'image/avif', svg: 'image/svg+xml',
   ttf: 'font/ttf', otf: 'font/otf', woff: 'font/woff', woff2: 'font/woff2', pdf: 'application/pdf',
-  md: 'text/markdown; charset=utf-8', markdown: 'text/markdown; charset=utf-8',
+  md: 'text/markdown; charset=utf-8', markdown: 'text/markdown; charset=utf-8', cube: 'text/plain; charset=utf-8',
   wav: 'audio/wav', mp3: 'audio/mpeg', ogg: 'audio/ogg', m4a: 'audio/mp4', flac: 'audio/flac',
   mp4: 'video/mp4', webm: 'video/webm', mov: 'video/quicktime', zip: 'application/zip',
 };

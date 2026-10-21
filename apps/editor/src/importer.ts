@@ -14,6 +14,7 @@ import { confirmWith } from './confirm.ts';
 import { browserHost, type PluginHost } from './plugins/index.ts';
 import type { PluginDecl } from './plugins/protocol.ts';
 import { freePath, safeName } from './files.ts';
+import { contentHash } from './hash.ts';
 import { BRIEF_PATH } from './brief.ts';
 import { applyKit, briefOfKit, FONT_FILE, KIT_PATH, namesOf, readKit, relink, type Kit } from './kit.ts';
 import { kindOf, SOURCES_DIR } from './sources.ts';
@@ -31,7 +32,7 @@ export type Progress = (done: number, total: number, label: string) => void;
 export type CodeAsk = (inv: CodeInventory) => Promise<boolean>;
 
 /** the label of each kind a plugin can declare */
-const KIND_LABEL: Record<string, () => string> = {
+export const KIND_LABEL: Record<string, () => string> = {
   nodes: () => t('importer.kindNodes'),
   effects: () => t('importer.kindEffects'),
   modifiers: () => t('importer.kindModifiers'),
@@ -227,7 +228,7 @@ export async function importVideo(file: File, progress?: Progress, opts: { promp
     await api.writeAny(project.id, path, file, (sent, total) => progress?.(sent, total, path));
     const { doc } = newProject({ name, width, height, fps, duration, id: project.id });
     const asset = safeName(name).replace(/\.[^.]+$/, '').toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'video';
-    doc.assets[asset] = { type: 'video', src: path, name };
+    doc.assets[asset] = { type: 'video', src: path, name, hash: await contentHash(file) };
     const c = doc.compositions[doc.root];
     c.layers.video = { type: 'video', name, in: 0, out: duration, transform: { position: [width / 2, height / 2] }, props: { video: asset, size: [width, height], fit: 'cover' } } as never;
     c.order = ['video'];
@@ -320,15 +321,25 @@ export async function importSources(items: Picked[], progress?: Progress, opts: 
     const taken = new Set<string>(), total = usable.reduce((n, it) => n + it.file.size, 0);
     /** the folder's paths, to the project's: the kit's paths are rewritten with it */
     const moved = new Map<string, string>();
+    // the same file twice in the folder (a copy under another name): one file, one asset
+    const byHash = new Map<string, string>();
     let sent = 0;
     for (const { file, path: from } of usable) {
+      const hash = await contentHash(file), same = byHash.get(hash);
+      if (same) {
+        sent += file.size;
+        progress?.(sent, total, same);
+        for (const n of namesOf(from)) if (!moved.has(n)) moved.set(n, same);
+        continue;
+      }
       const path = freePath(taken, `${SOURCES_DIR}${safeName(file.name)}`);
+      byHash.set(hash, path);
       taken.add(path);
       await api.writeAny(project.id, path, file, (done) => progress?.(sent + done, total, path));
       sent += file.size;
       for (const n of namesOf(from)) if (!moved.has(n)) moved.set(n, path);
       const kind = kindOf(file), base = file.name.replace(/\.[^.]+$/, '');
-      if (kind === 'image' || kind === 'video' || kind === 'audio' || kind === 'model') doc.assets[freshId(doc.assets, slug(base).slice(0, 40) || kind)] = { type: kind, src: path, name: base };
+      if (kind === 'image' || kind === 'video' || kind === 'audio' || kind === 'model') doc.assets[freshId(doc.assets, slug(base).slice(0, 40) || kind)] = { type: kind, src: path, name: base, hash };
     }
     if (found) {
       applyKit(doc, found.kit, moved);

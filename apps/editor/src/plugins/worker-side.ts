@@ -7,6 +7,9 @@
 import { Registry, type CheckContext, type CheckType, type EffectType, type ModifierType, type NodeType, type PluginModule, type QualityIssue, type ToolContext, type ToolOutput } from '@tramme/core';
 import type { Ask, CheckCtxData, DrawPayload, DrawResult, FramePayload, FromWorker, PluginDecl, SandboxDoc, SchemaEffect, SchemaModifier, SchemaNode, ToWorker, ToolCtxData } from './protocol.ts';
 
+/** the sandbox id of an installed plugin (installed:<file>): the project's own plugins have the document's asset ids */
+export const INSTALLED = 'installed:';
+
 export interface WorkerSide {
   /** a message from the page */
   receive(m: ToWorker): void;
@@ -80,10 +83,15 @@ export function startWorkerSide({ post, importModule, sandbox: makeSandbox }: Wo
     modifiers: (mod.modifiers ?? []).map(schemaModifier),
     tours: (mod.tours ?? []) as unknown[],
     messages: (mod.messages ?? null) as unknown,
+    // plain data by contract; copied so a function slipped in fails here, not in postMessage
+    prompts: JSON.parse(JSON.stringify(mod.prompts ?? [])),
+    kits: JSON.parse(JSON.stringify(mod.kits ?? [])),
+    presets: JSON.parse(JSON.stringify(mod.presets ?? [])),
   });
 
   const find = (name: string): { kind: 'tool' | 'check'; run: (input: any, ctx: any) => unknown; id: string } | null => {
-    for (const [id, mod] of modules) {
+    // the project's own plugins first: an installed plugin's tool of the same name is not the one the page registered
+    for (const [id, mod] of [...modules].sort(([a], [b]) => Number(a.startsWith(INSTALLED)) - Number(b.startsWith(INSTALLED)))) {
       const tool = mod.tools?.find((t) => t.name === name);
       if (tool) return { kind: 'tool', run: tool.run, id };
       const check = mod.checks?.find((c) => c.name === name);
@@ -106,6 +114,11 @@ export function startWorkerSide({ post, importModule, sandbox: makeSandbox }: Wo
       transcript: (assetId, opts) => ask(call, { kind: 'transcript', assetId, ask: opts?.ask ?? true }),
       signal,
       progress: (done, total, step) => post({ kind: 'progress', call, done, total, step }),
+      // what the plugin declared it reaches, asked to the page, which checks it again
+      fetch: async (url, init) => {
+        const r = await ask(call, { kind: 'fetch', url: new URL(url, base).href, method: init?.method, headers: init?.headers, body: init?.body }) as { status: number; headers: Record<string, string>; body: ArrayBuffer };
+        return new Response(r.status === 204 || r.status === 304 ? null : r.body, { status: r.status, headers: r.headers });
+      },
     };
   };
 

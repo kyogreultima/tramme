@@ -119,7 +119,7 @@ export function kindIcon(type: string): IconName {
   if (type === 'image') return 'image';
   if (type === 'sequence' || type === 'video') return 'film';
   if (type === 'group') return 'group';
-  if (type === 'comp' || type === 'adjust') return 'comp';
+  if (type === 'comp' || type === 'adjust' || type === 'time.shift') return 'comp';
   if (type === 'code') return 'code';
   if (type === 'audio') return 'audio';
   if (type.startsWith('particles')) return 'particles';
@@ -132,7 +132,7 @@ export function kindColor(type: string): string {
   if (type.startsWith('shape')) return 'var(--t-shape)';
   if (type.startsWith('text')) return 'var(--t-text)';
   if (type === 'image' || type === 'video' || type === 'sequence') return 'var(--t-image)';
-  if (type === 'group' || type === 'comp' || type === 'adjust') return 'var(--t-group)';
+  if (type === 'group' || type === 'comp' || type === 'adjust' || type === 'time.shift') return 'var(--t-group)';
   if (type === 'audio') return 'var(--t-audio)';
   return 'var(--t-code)';
 }

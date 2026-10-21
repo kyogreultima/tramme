@@ -5,7 +5,7 @@
 // a context bridged over these messages. Everything that crosses is plain
 // data: live objects (elements, Path2D, functions) stay on their own side.
 
-import type { CheckType, NodeType, EffectType, PluginMeta, ToolType } from '@tramme/core';
+import type { CheckType, NodeType, EffectType, KitType, PluginMeta, PresetType, PromptType, ToolType } from '@tramme/core';
 
 /** a plugin as the sandbox sees it: its declarations, without any function */
 export interface PluginDecl {
@@ -23,6 +23,10 @@ export interface PluginDecl {
   tours: unknown[];
   /** the interface translations the module carries */
   messages: unknown;
+  /** its data exports, plain already: the workflows, the style kits, the add menu's presets (an installed plugin's reach the page only this way) */
+  prompts?: PromptType[];
+  kits?: KitType[];
+  presets?: PresetType[];
 }
 
 /** a node without its code: what a tool inside the sandbox may still read */
@@ -184,4 +188,5 @@ export type Ask =
   | { kind: 'writeFile'; path: string; data: { text: string } | { bytes: ArrayBuffer } }
   | { kind: 'renderStill'; t: number; compId?: string }
   | { kind: 'transcript'; assetId: string; ask: boolean }
-  | { kind: 'data'; assetId: string };
+  | { kind: 'data'; assetId: string }
+  | { kind: 'fetch'; url: string; method?: string; headers?: Record<string, string>; body?: string | ArrayBuffer };

@@ -16,3 +16,9 @@ declare module '*.md' {
   const text: string;
   export default text;
 }
+
+/** RNNoise compiled to WebAssembly (the denoise tool): a factory of its Emscripten module */
+declare module '@jitsi/rnnoise-wasm/dist/rnnoise-sync.js' {
+  const create: () => unknown;
+  export default create;
+}

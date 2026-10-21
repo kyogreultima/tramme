@@ -38,6 +38,19 @@ These packages end up in the editor's build (`apps/editor/dist`). The build also
 
 esbuild (MIT), TypeScript (Apache-2.0), Vitest (MIT), Wrangler (MIT OR Apache-2.0), lottie-web (MIT, used to check Lottie exports), and type packages.
 
+## Models
+
+No model is packed with the editor, the desktop app or the command line: each is downloaded from the model hub the first time its tool runs and kept in the browser's cache (the companion: the user's cache). The defaults, listed with the others in `apps/editor/src/models.ts` and in the settings' Models section, all allow commercial use. A model the user picks instead (in the settings) is under its own licence, which the settings show.
+
+| Model | License | Use |
+|---|---|---|
+| [U²-Net](https://github.com/xuebinqin/U-2-Net) human segmentation and U²-Netp, rembg's weights in ONNX (`jellybox/u2net-human-seg`, `BritishWerewolf/U-2-Netp`) | Apache-2.0 | Cut-out of a person, of any subject |
+| [YOLOS](https://github.com/hustvl/YOLOS) tiny (`Xenova/yolos-tiny`) | Apache-2.0 | Detection (people and things, for the cut-out and the tracking) |
+| [Depth Anything v2](https://github.com/DepthAnything/Depth-Anything-V2) small (`onnx-community/depth-anything-v2-small`) | Apache-2.0 | Depth (parallax, depth blur). The base and large sizes are CC-BY-NC-4.0: offered in the settings, marked not for commercial work |
+| [Whisper](https://github.com/openai/whisper) small (`Xenova/whisper-small`) | Apache-2.0 (the model card; OpenAI's release is MIT) | Transcription in the companion and in the browser |
+| [Silero VAD](https://github.com/snakers4/silero-vad) (`onnx-community/silero-vad`) | MIT | Where someone speaks (the fillers tool) |
+| [MediaPipe Face Landmarker](https://ai.google.dev/edge/mediapipe/solutions/vision/face_landmarker) | Apache-2.0 | The faces' skin (the skin tool) |
+
 ## Fonts and media
 
 The editor bundles Geist and Geist Mono ([@fontsource-variable](https://fontsource.org), SIL Open Font License 1.1); it works offline. The example projects in `examples/` (drawings, thumbnails) are part of Tramme and under the same Apache 2.0 license.

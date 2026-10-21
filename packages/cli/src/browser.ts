@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import puppeteer, { type Browser, type Page } from 'puppeteer-core';
 
-const CHROME = [
+export const CHROME = [
   process.env.CHROME_PATH,
   'C:/Program Files/Google/Chrome/Application/chrome.exe',
   'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe',

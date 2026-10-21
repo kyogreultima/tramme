@@ -1,18 +1,23 @@
 // What a sound or a video says, word by word: its audio decoded here (never
 // the whole file at once), cut into chunks of 28 s overlapping by 2 s, each
 // chunk turned to words by the server (Whisper on Workers AI, or with the
-// OpenAI key: api.reach) or, when it has none, by the local companion. The
-// transcript becomes a JSON asset of the project, beside the media. Nothing
+// OpenAI key: api.reach) or, when it has none, by the local companion, or
+// else by Whisper in this browser (the desktop app, the personal deployment):
+// the companion and the browser run the model chosen in the settings (Models,
+// Transcription). The transcript becomes a JSON asset of the project, beside the media. Nothing
 // is transcribed on its own: the user starts it (ui/Transcribe.tsx), or says
 // yes when the assistant asks.
 
 import { signal } from '@preact/signals';
 import { ALL_FORMATS, AudioBufferSink, Input, UrlSource } from 'mediabunny';
-import { mergeChunks, pointer, transcriptIdOf, type Transcript, type TranscriptWord } from '@tramme/core';
+import { asrWords, mergeChunks, pointer, transcriptIdOf, type Transcript, type TranscriptWord } from '@tramme/core';
 import { aiStatus, companionLink, refreshStatus } from './ai/index.ts';
 import { reach } from './api.ts';
 import { safeName, takenPaths, upload } from './files.ts';
 import { askUser } from './confirm.ts';
+import { pipelineOf } from './perception.ts';
+import { chosenModel } from './settings.ts';
+import { madeBy } from './models.ts';
 import { commit, S, toast } from './state.ts';
 import { m, t } from './i18n/index.ts';
 
@@ -52,10 +57,19 @@ async function chunkAudio(sink: AudioBufferSink, from: number, to: number): Prom
   return (await ctx.startRendering()).getChannelData(0);
 }
 
-type Backend = 'server' | 'companion';
+type Backend = 'server' | 'companion' | 'browser';
 
-/** one chunk to words, by the server, or by the companion when the server cannot */
-async function wordsOf(audio: string, language: string | undefined, prefer: Backend): Promise<{ words: TranscriptWord[]; language?: string; backend: Backend }> {
+type Asr = (audio: Float32Array, opts: Record<string, unknown>) => Promise<{ text: string; chunks?: { text: string; timestamp: [number, number | null] }[] }>;
+
+/** one chunk to words, by the server, or by the companion when the server cannot, or else in this browser */
+async function wordsOf(samples: Float32Array, language: string | undefined, prefer: Backend): Promise<{ words: TranscriptWord[]; language?: string; backend: Backend; model?: string }> {
+  const audio = prefer === 'browser' ? '' : base64(wav(samples, RATE));
+  const viaBrowser = async () => {
+    const model = chosenModel('transcription');
+    const run = await pipelineOf<Asr>(model, 'the transcription model');
+    const out = await run(samples, { return_timestamps: 'word', chunk_length_s: 30, ...(language ? { language } : {}), task: 'transcribe' });
+    return { words: asrWords(out), language, backend: 'browser' as const, model: madeBy(model) };
+  };
   const viaServer = async () => {
     const r = await reach('/api/transcribe', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ audio, language }) });
     const j = await r.json().catch(() => ({}));
@@ -64,17 +78,20 @@ async function wordsOf(audio: string, language: string | undefined, prefer: Back
   };
   const viaCompanion = async () => {
     const link = companionLink();
-    const r = await fetch(`${link.url}/transcribe`, { method: 'POST', headers: { authorization: `Bearer ${link.token}`, 'content-type': 'application/json' }, body: JSON.stringify({ audio, language }) });
+    const r = await fetch(`${link.url}/transcribe`, { method: 'POST', headers: { authorization: `Bearer ${link.token}`, 'content-type': 'application/json' }, body: JSON.stringify({ audio, language, model: chosenModel('transcription').source }) });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(j.error ?? t('common.companionHttpStatus', { status: r.status }));
     return { ...j, backend: 'companion' as const };
   };
   if (prefer === 'companion') return viaCompanion();
+  if (prefer === 'browser') return viaBrowser();
   try { return await viaServer(); }
   catch (e) {
     if (aiStatus.peek().companion === 'checking') await refreshStatus();
-    if (aiStatus.peek().companion !== 'ok') throw new Error(t('speech.errorTheLocalCompanion', { error: (e as Error).message }));
-    return viaCompanion();
+    if (aiStatus.peek().companion === 'ok') return viaCompanion();
+    // no server route and no companion: Whisper here, the slowest way, never a dead end
+    try { return await viaBrowser(); }
+    catch (here) { throw new Error(t('speech.errorTheLocalCompanion', { error: `${(e as Error).message}; ${(here as Error).message}` })); }
   }
 }
 
@@ -89,19 +106,19 @@ export async function transcribeUrl(url: string, opts: { language?: string; onPr
     const sink = new AudioBufferSink(track);
     const starts: number[] = [];
     for (let s = 0; s < duration; s += STEP) { starts.push(s); if (s + CHUNK >= duration) break; }
-    const chunks: { start: number; end: number; words: TranscriptWord[] }[] = [];
+    const chunks: { start: number; end: number; words: TranscriptWord[] }[] = [], models = new Set<string>();
     let language = opts.language, backend: Backend = 'server';
     for (const [i, start] of starts.entries()) {
       const end = Math.min(duration, start + CHUNK);
-      opts.onProgress?.(i, starts.length, backend === 'companion' ? m('speech.localCompanion') : m('speech.server'));
-      const audio = base64(wav(await chunkAudio(sink, start, end), RATE));
-      const r = await wordsOf(audio, language, backend);
+      opts.onProgress?.(i, starts.length, backend === 'companion' ? m('speech.localCompanion') : backend === 'browser' ? m('speech.inThisBrowser') : m('speech.server'));
+      const r = await wordsOf(await chunkAudio(sink, start, end), language, backend);
       backend = r.backend;
       language ??= r.language;
+      if (r.model) models.add(r.model);
       chunks.push({ start, end, words: r.words.map((w) => ({ w: w.w, s: +(start + w.s).toFixed(3), e: +(start + w.e).toFixed(3) })) });
     }
     opts.onProgress?.(starts.length, starts.length, m('speech.done'));
-    return { version: 1, language, duration: +duration.toFixed(3), words: mergeChunks(chunks) };
+    return { version: 1, language, duration: +duration.toFixed(3), words: mergeChunks(chunks), ...(models.size ? { madeBy: [...models] } : {}) };
   } finally {
     input.dispose();
   }
@@ -157,7 +174,7 @@ async function transcribe(assetId: string, language?: string): Promise<string> {
     const name = safeName(`${(a.src.split('/').pop() ?? assetId).replace(/\.[^.]+$/, '')}.json`);
     const path = await upload(await takenPaths(), `assets/transcripts/${name}`, new Blob([JSON.stringify(tr)], { type: 'application/json' }));
     const id = transcriptIdOf(assetId), had = !!S.doc.peek().assets[id];
-    commit(t('common.transcriptOfName', { name: a.name || assetId }), [{ op: had ? 'replace' : 'add', path: pointer('assets', id), value: { type: 'json', src: path, name: `${t('speech.transcript')} · ${a.name || assetId}` } }]);
+    commit(t('common.transcriptOfName', { name: a.name || assetId }), [{ op: had ? 'replace' : 'add', path: pointer('assets', id), value: { type: 'json', src: path, name: `${t('speech.transcript')} · ${a.name || assetId}`, ...(tr.madeBy ? { madeBy: tr.madeBy } : {}) } }]);
     toast(t('speech.transcriptReadyNWords', { n: tr.words.length, language: tr.language ?? t('speech.languageDetected') }));
     return id;
   } finally {

@@ -39,7 +39,7 @@ const KINDS = ['nodes', 'effects', 'modifiers', 'tools', 'prompts', 'checks', 'k
 const EXPORTED_KIND = /export\s+(?:const|let|var)\s+(nodes|effects|modifiers|tools|prompts|checks|kits|presets|tours)\b/g;
 
 /** a static read of the module's text (the load itself stays a question of trust) */
-function kindsOf(source: string): string[] {
+export function kindsOf(source: string): string[] {
   const found = new Set<string>();
   for (const m of source.matchAll(EXPORTED_KIND)) found.add(m[1]);
   return KINDS.filter((k) => found.has(k));

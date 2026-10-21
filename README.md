@@ -55,7 +55,7 @@ npm run deploy
 ```
 tramme validate <doc>                                 structure, references, types, plugins included
 tramme still    <doc> --t 0.5,1.2 [--samples n]       PNG stills
-tramme render   <doc> [--format mp4|mov|webm|gif|png] [--from s --to s] [--samples n] [--mute]
+tramme render   <doc> [--format mp4|mov|webm|gif|png] [--from s --to s] [--samples n] [--mute] [--pages n] [--depth 8|10]
 tramme export   <doc> --format lottie|svg|wav [--t s] vector export, or sound only
 tramme import   <animation.json> [--out folder]       Lottie to a tramme project
 tramme pack     <folder> [--out project.tramme]        a project folder as a .tramme archive (checked)
@@ -65,6 +65,7 @@ tramme agent    [--origin https://…] [--port 4317]    the assistant's local co
 tramme compare  <ref> <test> [--diff folder]          PSNR and an image of the differences
 tramme check-export <doc> --format lottie|svg --t …   export read back (lottie-web, Chrome) against tramme
 tramme bench    <url of an open project>              how the editor holds up: playback, drag, hover
+tramme load     [case…] [--json file] [--before file] the load cases of bench/load: where a frame's time goes
 tramme schema                                         regenerates the JSON schema
 ```
 

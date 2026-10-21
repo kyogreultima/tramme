@@ -14,7 +14,7 @@
 // back. The page ships the document (setDoc) and each video asset's current
 // frame (their decoding still happens there, for now).
 
-import { Evaluator, parseColor, type Host, type NodeType, type PluginModule, type TrammeDoc } from '@tramme/core';
+import { Evaluator, parseColor, type Host, type Instance, type NodeType, type PluginModule, type TrammeDoc } from '@tramme/core';
 import { builtinRegistry } from '@tramme/nodes';
 import { CanvasPool, Compositor, drawFrame, drawLayers, finishOf, subTimes } from '@tramme/render/src/index.ts';
 import { nodeContext, resizeNode } from '@tramme/render/src/gpu.ts';
@@ -132,7 +132,7 @@ export function makeSandboxDraw(modules: Map<string, PluginModule>): SandboxDraw
       assetInfo: (id) => assetInfo(id) as never,
       assetUrl: (id) => new URL(String(assetInfo(id).src), side.docUrl).href,
       compositionSize: (cid2: string) => { const c = doc.compositions[cid2]; return c ? { width: c.width, height: c.height, duration: c.duration } : null; },
-      drawComposition: (ctx: CanvasRenderingContext2D, cid2: string, t2: number) => { const fr = evaluator.frame(t2, cid2); if (fr.background) { ctx.fillStyle = fr.background; ctx.fillRect(0, 0, fr.comp.width, fr.comp.height); } drawFrame(ctx, fr, envOf(fr, cid2)); },
+      drawComposition: (ctx: CanvasRenderingContext2D, cid2: string, t2: number, inst?: Instance) => { const fr = evaluator.frame(t2, cid2, inst); if (fr.background) { ctx.fillStyle = fr.background; ctx.fillRect(0, 0, fr.comp.width, fr.comp.height); } drawFrame(ctx, fr, envOf(fr, cid2)); },
       drawLayer: (ctx: CanvasRenderingContext2D, lid: string) => { const L = layerOf(lid, f.t, cid); if (L) drawLayers(ctx, [{ ...L, layer: { ...L.layer, visible: true } }], envOf({ t: f.t }, cid)); },
       layer: (lid: string) => { const L = layerOf(lid, f.t, cid); return L ? { props: L.props, transform: L.transform, in: L.layer.in ?? 0, out: L.layer.out ?? comp.duration } : null; },
       state: (() => simsOf(cid, layerId, f.t, f)) as Host['state'],

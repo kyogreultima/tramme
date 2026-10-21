@@ -3,10 +3,11 @@
 // with the Canvas2D backend, accumulate in linear light, then finish
 // (background plate, finishing effects, grain) in the compositor.
 
-import { assertValid, DocSchema, Evaluator, parseColor, type Composition, type TrammeDoc, type EvaluatedEffect, type EvaluatedFrame, type Host, type PluginModule, type Registry } from '@tramme/core';
+import { assertValid, DocSchema, Evaluator, parseColor, type Composition, type TrammeDoc, type EvaluatedEffect, type EvaluatedFrame, type Host, type Instance, type PluginModule, type Registry } from '@tramme/core';
 import { AssetStore } from './assets.ts';
 import { CanvasPool, drawComposed, drawFrame, drawLayers, type DrawEnv, type HostFactory } from './canvas2d.ts';
 import { Compositor, type Finish, type FinishPass, type Look } from './compositor.ts';
+import { noParts, type FrameParts } from './timing.ts';
 
 export interface RenderOptions {
   /** sub-frames: overrides the composition's motion blur (1 for a fast preview) */
@@ -64,6 +65,8 @@ export interface RendererOptions {
   preserve?: boolean;
   /** true (the editor's preview): a layer or effect that fails is drawn as a red frame and listed in `errors`, the rest renders; exports keep failing */
   isolate?: boolean;
+  /** true (the editor's preview, when its setting asks): a video with a proxy plays its proxy; exports leave it out */
+  proxies?: boolean;
   /**
    * What the registry takes from a plugin module, as the caller wants it: the
    * editor strips the tools and checks, which run in its sandbox instead
@@ -103,6 +106,8 @@ export class Renderer {
   private sy = 1;
   /** seed of the last finished frame (for the YUV / RGBA dither) */
   lastSeed = 0;
+  /** time spent evaluating, drawing and waiting for video since the last reset (ms; readback and send are the export's) */
+  times: FrameParts = noParts();
   /** what the last frame drawn was missing (video frames being decoded) */
   private pending: Promise<unknown>[] = [];
   private preserve = true;
@@ -135,6 +140,7 @@ export class Renderer {
     r.sandboxModules = opts.sandboxModules ?? false;
     r.sandboxDeclarations = opts.sandboxDeclarations;
     r.assets.sandboxModules = r.sandboxModules;
+    r.assets.useProxies = opts.proxies ?? false;
     await r.setDoc(doc, { compId: opts.compId });
     return r;
   }
@@ -144,14 +150,15 @@ export class Renderer {
    * (and `reload` ones), re-registers plugins, validates, prepares new layers.
    * Throws on an invalid document and keeps the previous state.
    * trusted: the caller already validated it (an editor's drafts): no validation.
+   * fresh: the registry built again from the base and the plugins (the installed plugins attached to the old one changed).
    */
-  async setDoc(doc: TrammeDoc, { compId, reload = [], trusted = false }: { compId?: string; reload?: string[]; trusted?: boolean } = {}): Promise<void> {
+  async setDoc(doc: TrammeDoc, { compId, reload = [], trusted = false, fresh = false }: { compId?: string; reload?: string[]; trusted?: boolean; fresh?: boolean } = {}): Promise<void> {
     if (!trusted) {
       const parsed = DocSchema.safeParse(doc);
       if (!parsed.success) throw new Error(`invalid document: ${parsed.error.issues[0]?.message}`);
     }
     await this.assets.sync(doc, reload);
-    const samePlugins = this.registry && !reload.length && doc.plugins === this.doc?.plugins && (doc.plugins || []).every((id) => doc.assets[id] === this.doc.assets[id]);
+    const samePlugins = this.registry && !fresh && !reload.length && doc.plugins === this.doc?.plugins && (doc.plugins || []).every((id) => doc.assets[id] === this.doc.assets[id]);
     const registry = samePlugins ? this.registry : this.base.clone();
     if (!samePlugins) for (const id of doc.plugins || []) {
       if (this.sandboxModules) registry.use(this.sandboxDeclarations!(id), id);
@@ -211,7 +218,7 @@ export class Renderer {
     }
   }
 
-  hostFactory(f: { t: number; frame: number }, compId = this.compId): HostFactory {
+  hostFactory(f: { t: number; frame: number; instance?: Instance }, compId = this.compId): HostFactory {
     const { assets } = this;
     const comp = this.evaluator.comp(compId);
     return (layerId: string): Host => ({
@@ -221,10 +228,11 @@ export class Renderer {
       assetInfo: (id: string) => assets.info(id),
       assetUrl: (id: string) => assets.url(id),
       compositionSize: (id: string) => { const c = this.doc.compositions[id]; return c ? { width: c.width, height: c.height, duration: c.duration } : null; },
-      drawComposition: (ctx: CanvasRenderingContext2D, id: string, t: number) => this.drawNested(ctx, id, t),
-      drawLayer: (ctx: CanvasRenderingContext2D, id: string) => { const L = this.layerOf(id, f.t, compId); if (L) drawLayers(ctx, [{ ...L, layer: { ...L.layer, visible: true } }], this.env(f, compId)); },
-      layer: (id: string) => { const L = this.layerOf(id, f.t, compId); return L ? { props: L.props, transform: L.transform, in: L.layer.in ?? 0, out: L.layer.out ?? comp.duration } : null; },
-      state: <T>() => this.simState(compId, layerId, f.t) as T,
+      // false when something it shows was still loading (it was deferred): a node keeping the picture draws it again
+      drawComposition: (ctx: CanvasRenderingContext2D, id: string, t: number, instance?: Instance) => { const n = this.pending.length; this.drawNested(ctx, id, t, instance); return this.pending.length === n; },
+      drawLayer: (ctx: CanvasRenderingContext2D, id: string) => { const L = this.layerOf(id, f.t, compId, f.instance); if (L) drawLayers(ctx, [{ ...L, layer: { ...L.layer, visible: true } }], this.env(f, compId)); },
+      layer: (id: string) => { const L = this.layerOf(id, f.t, compId, f.instance); return L ? { props: L.props, transform: L.transform, in: L.layer.in ?? 0, out: L.layer.out ?? comp.duration } : null; },
+      state: <T>() => this.simState(compId, layerId, f.t, f.instance) as T,
       defer: (p: Promise<unknown>) => { this.pending.push(p); },
     });
   }
@@ -235,18 +243,19 @@ export class Renderer {
    * computed, so playing forward costs one step a frame and a jump at most
    * CHECKPOINT steps once the way there was computed.
    */
-  private simState(compId: string, id: string, t: number): unknown {
+  private simState(compId: string, id: string, t: number, instance?: Instance): unknown {
     const comp = this.doc.compositions[compId], layer = comp?.layers[id];
     const sim = layer && this.registry.hasNode(layer.type) ? this.registry.node(layer.type).simulate : undefined;
     if (!sim) return undefined;
     const CHECKPOINT = 10, fps = comp.fps, start = layer.in ?? 0;
     const target = Math.max(0, Math.round((t - start) * fps));
-    const key = `${compId}/${id}`;
+    // each instance of a component runs its own
+    const key = `${compId}/${id}${instance ? `/${instance.key}` : ''}`;
     let c = this.sims.get(key);
     if (!c) { c = { checkpoints: new Map(), last: null }; this.sims.set(key, c); }
     const at = (frame: number) => {
       const time = start + frame / fps;
-      return { props: this.evaluator.layerAt(id, time, compId).props, host: this.hostFactory({ t: time, frame: Math.round(time * fps) }, compId)(id) };
+      return { props: this.evaluator.layerAt(id, time, compId, instance).props, host: this.hostFactory({ t: time, frame: Math.round(time * fps), instance }, compId)(id) };
     };
     if (c.last?.frame === target) return c.last.state;
     // where to start: the last frame computed if it is just behind, else the highest checkpoint at or before the target
@@ -273,21 +282,21 @@ export class Renderer {
   }
 
   /** a layer at time t even when hidden or out of its range (layer inputs), or null */
-  private layerOf(id: string, t: number, compId: string) {
-    try { return this.doc.compositions[compId]?.layers[id] ? this.evaluator.layerAt(id, t, compId) : null; } catch { return null; }
+  private layerOf(id: string, t: number, compId: string, instance?: Instance) {
+    try { return this.doc.compositions[compId]?.layers[id] ? this.evaluator.layerAt(id, t, compId, instance) : null; } catch { return null; }
   }
 
-  private env(frame: { t: number; frame: number }, compId = this.compId): DrawEnv {
+  private env(frame: { t: number; frame: number; instance?: Instance }, compId = this.compId): DrawEnv {
     return {
       host: this.hostFactory(frame, compId), registry: this.registry, pool: this.pool, scale: [this.sx, this.sy], t: frame.t,
-      layerAt: (id) => this.layerOf(id, frame.t, compId),
+      layerAt: (id) => this.layerOf(id, frame.t, compId, frame.instance),
       ...(this.isolate ? { onError: (id: string, e: Error) => { this.errors.set(id, e.message); } } : {}),
     };
   }
 
   /** a nested composition at its local time: background plate, then its layers (through its own camera) */
-  private drawNested(ctx: CanvasRenderingContext2D, compId: string, t: number) {
-    const f = this.evaluator.frame(t, compId);
+  private drawNested(ctx: CanvasRenderingContext2D, compId: string, t: number, instance?: Instance) {
+    const f = this.evaluator.frame(t, compId, instance);
     if (f.background) { ctx.fillStyle = f.background; ctx.fillRect(0, 0, f.comp.width, f.comp.height); }
     drawComposed(ctx, f, this.env(f, compId));
   }
@@ -310,8 +319,14 @@ export class Renderer {
     const p = this.pending;
     this.pending = [];
     if (!p.length) return false;
-    if (limit === Infinity && !signal) { await Promise.all(p); return true; }
+    if (limit === Infinity && !signal) {
+      const t0 = performance.now();
+      await Promise.all(p);
+      this.times.video += performance.now() - t0;
+      return true;
+    }
     let timer: ReturnType<typeof setTimeout> | undefined, onAbort: (() => void) | undefined;
+    const t0 = performance.now();
     try {
       const outcome = await new Promise<'done' | 'late'>((resolve, reject) => {
         Promise.all(p).then(() => resolve('done'), reject);
@@ -327,6 +342,7 @@ export class Renderer {
     } finally {
       clearTimeout(timer);
       if (onAbort) signal?.removeEventListener('abort', onAbort);
+      this.times.video += performance.now() - t0;
     }
   }
 
@@ -360,7 +376,9 @@ export class Renderer {
    * render in between starts over.
    */
   renderSteps(t: number, opts: RenderOptions = {}): () => EvaluatedFrame | null {
+    const e0 = performance.now();
     const frame = this.evaluator.frame(t, this.compId);
+    this.times.evaluate += performance.now() - e0;
     const n = opts.samples ?? frame.motionBlur.samples;
     const times = subTimes(t, n, opts.shutter ?? frame.motionBlur.shutter, this.comp);
     let i = 0;
@@ -368,11 +386,19 @@ export class Renderer {
       if (i === 0) { this.compositor.begin(); this.pending = []; this.errors.clear(); }
       if (i < times.length) {
         const ts = times[i++];
-        this.drawScene(ts === t ? frame : this.evaluator.frame(ts, this.compId));
+        const e1 = performance.now();
+        const sub = ts === t ? frame : this.evaluator.frame(ts, this.compId);
+        const d0 = performance.now();
+        this.times.evaluate += d0 - e1;
+        this.drawScene(sub);
         this.compositor.add(this.scene, 1 / times.length);
+        this.times.draw += performance.now() - d0;
         if (i < times.length) return null;
       }
-      return this.finishFrame(frame, opts);
+      const d1 = performance.now();
+      const done = this.finishFrame(frame, opts);
+      this.times.draw += performance.now() - d1;
+      return done;
     };
   }
 

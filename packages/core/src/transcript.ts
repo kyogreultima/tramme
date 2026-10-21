@@ -24,6 +24,8 @@ export interface Transcript {
   words: TranscriptWord[];
   /** after remapTranscript: the parts of the source kept, in order, laid end to end */
   keeps?: { from: number; to: number }[];
+  /** the models that wrote it ("workers-ai:@cf/openai/whisper-large-v3-turbo", "Xenova/whisper-base", "whisper-small@main") */
+  madeBy?: string[];
 }
 
 export function isTranscript(x: unknown): x is Transcript {
@@ -98,4 +100,9 @@ export function mergeChunks(chunks: { start: number; end: number; words: Transcr
     for (const w of c.words) { const mid = (w.s + w.e) / 2; if (mid >= lo && mid < hi) out.push(w); }
   });
   return out.sort((a, b) => a.s - b.s);
+}
+
+/** Whisper's word chunks (transformers.js, return_timestamps: 'word') as words with their timing; empty ones dropped */
+export function asrWords(out: { chunks?: { text: string; timestamp: [number, number | null] }[] }): TranscriptWord[] {
+  return (out.chunks ?? []).map((c) => ({ w: c.text.trim(), s: c.timestamp[0], e: c.timestamp[1] ?? c.timestamp[0] })).filter((w) => w.w);
 }

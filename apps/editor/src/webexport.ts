@@ -9,13 +9,14 @@ import { applyPalette, GIFEncoder, quantize } from 'gifenc';
 import { zipSync } from 'fflate';
 import type { TrammeDoc, Registry } from '@tramme/core';
 import { fetchAssetReader, toLottie, toSvg } from '@tramme/interop';
-import { encodeWav, mixComposition, Renderer, SETTLE_LIMIT } from '@tramme/render';
+import { deepCodec, encodeWav, i420p10, mixComposition, Renderer, SETTLE_LIMIT } from '@tramme/render';
 
 import { AVC_FROM_STREAM } from './avc.ts';
 import type { WebFormat } from './formats.ts';
 import { filterModule, pluginHost } from './plugins/index.ts';
-import { blitSandboxFrame, declarationsModule, ensureSandboxDoc, pluginItemsOf, primeSandboxExports, sandboxDeclaration, sandboxVideoFrames } from './plugins/sandbox-draw.ts';
+import { blitSandboxFrame, declarationsModule, ensureDeclared, ensureSandboxDoc, pluginItemsOf, primeSandboxExports, sandboxDeclaration, sandboxVideoFrames } from './plugins/sandbox-draw.ts';
 import { prefs } from './settings.ts';
+import { sandboxedDoc } from './installed.ts';
 import { t } from './i18n/index.ts';
 
 export interface WebExportOptions {
@@ -27,6 +28,8 @@ export interface WebExportOptions {
   t?: number;
   onProgress?: (done: number, total: number) => void;
   signal?: AbortSignal;
+  /** MP4 and WebM: 10 bits a channel when this browser encodes it (deepCodec), read from the half-float frame */
+  depth?: 8 | 10;
 }
 
 export interface WebExportResult { blob: Blob; ext: string; warnings: string[] }
@@ -71,9 +74,9 @@ export async function exportInBrowser(doc: TrammeDoc, base: string, format: WebF
 
   const canvas = document.createElement('canvas');
   // the flag: the whole picture — plugins, modifiers, effects, simulations — is evaluated and drawn in the sandbox
-  const sandboxed = prefs.peek().sandboxPreview && (doc.plugins ?? []).length > 0;
+  const sandboxed = sandboxedDoc(doc);
   // under the flag the sandbox owns the plugins' modules: its declarations feed the registry, nothing loads on the page
-  if (sandboxed) await pluginHost(base).ensure(pluginItemsOf(doc, base));
+  if (sandboxed) await ensureDeclared(pluginHost(base), pluginItemsOf(doc, base));
   // plugin tools and checks stay where the editor put them (the sandbox); an export runs render-time code only
   const r = await Renderer.open(doc, opts.registry, base, canvas, { compId: opts.compId, pluginModule: sandboxed ? undefined : filterModule, sandboxModules: sandboxed, sandboxDeclarations: sandboxed ? (id) => declarationsModule(sandboxDeclaration(id)!, id) : undefined });
   const sandboxHost = () => pluginHost(base);
@@ -158,6 +161,12 @@ export async function exportInBrowser(doc: TrammeDoc, base: string, format: WebF
 
     if (typeof VideoEncoder === 'undefined') throw new Error(t('export.webcodecsUnavailableInThis'));
     const webm = format === 'webm';
+    // 10 bits: a codec this browser encodes so, the frames read at 16 bits; a plugin's sandbox draws at 8, so its films stay at 8
+    const tenBit = opts.depth === 10 && (format === 'mp4' || webm);
+    const deep = tenBit && !sandboxed ? await deepCodec(webm ? 'webm' : 'mp4', W, H) : null;
+    if (tenBit && !sandboxed && !deep) throw new Error(t('export.noTenBit'));
+    const deepWarn = tenBit && sandboxed ? [t('export.tenBitPlugins')] : [];
+    const wide = deep ? new Uint16Array(W * H * 4) : null, planes = deep ? new Uint16Array(W * H * 1.5) : null;
     const codec = await getFirstEncodableVideoCodec(webm ? ['vp9', 'vp8', 'av1'] : ['avc', 'vp9', 'av1'], { width: W, height: H });
     if (!codec) throw new Error(t('export.noVideoCodecAvailable', { w: W, h: H }));
     const sound = await mixAudio(r);
@@ -166,8 +175,10 @@ export async function exportInBrowser(doc: TrammeDoc, base: string, format: WebF
       const target = new BufferTarget();
       const output = new Output({ format: webm ? new WebMOutputFormat() : new Mp4OutputFormat({ fastStart: 'in-memory' }), target });
       const quality = new Quality('very-high');
-      // MP4: the visible canvas (opaque); WebM: straight RGBA frames, alpha kept
-      const video = webm
+      // 10 bits: I420P10 planes from the 16-bit frame; MP4: the visible canvas (opaque); WebM: straight RGBA frames, alpha kept
+      const video = deep
+        ? new VideoSampleSource({ codec: deep.codec, fullCodecString: deep.full, quality, keyFrameInterval: 2, hardwareAcceleration })
+        : webm
         ? new VideoSampleSource({ codec, quality, keyFrameInterval: 2, alpha: 'keep', hardwareAcceleration })
         : new CanvasSource(canvas, { codec, quality, keyFrameInterval: 2, hardwareAcceleration, ...(codec === 'avc' ? AVC_FROM_STREAM : {}) });
       output.addVideoTrack(video, { frameRate: fps });
@@ -180,7 +191,13 @@ export async function exportInBrowser(doc: TrammeDoc, base: string, format: WebF
       try {
         for (let f = 0; f < frames; f++) {
           aborted(opts.signal);
-          if (video instanceof VideoSampleSource) {
+          if (deep) {
+            await complete(f, true);
+            r.compositor.readRGBA16(wide!);
+            const sample = new VideoSample(i420p10(wide!, W, H, planes!), { format: 'I420P10', codedWidth: W, codedHeight: H, timestamp: f / fps, duration: 1 / fps });
+            await encoderStep((video as VideoSampleSource).add(sample), opts.signal);
+            sample.close();
+          } else if (video instanceof VideoSampleSource) {
             const sample = new VideoSample(await readFrame(f), { format: 'RGBA', codedWidth: W, codedHeight: H, timestamp: f / fps, duration: 1 / fps });
             await encoderStep(video.add(sample), opts.signal);
             sample.close();
@@ -206,12 +223,12 @@ export async function exportInBrowser(doc: TrammeDoc, base: string, format: WebF
     };
     const ext = webm ? 'webm' : 'mp4';
     try {
-      return { blob: await encode('no-preference'), ext, warnings: [] };
+      return { blob: await encode('no-preference'), ext, warnings: [...deepWarn, ...(deep ? [t('export.tenBitWith', { codec: deep.label })] : [])] };
     } catch (e) {
       if (!(e instanceof EncoderStalled)) throw e;
       // the hardware encoder stalled: the whole film again, encoded in software (slower, but it finishes)
       opts.onProgress?.(0, frames);
-      return { blob: await encode('prefer-software'), ext, warnings: [t('export.softwareEncoder', { s: ENCODE_LIMIT / 1000 })] };
+      return { blob: await encode('prefer-software'), ext, warnings: [...deepWarn, t('export.softwareEncoder', { s: ENCODE_LIMIT / 1000 })] };
     }
   } finally {
     r.dispose();

@@ -58,15 +58,20 @@ export function resolveTokens(type: PropType, v: unknown, tokens: Tokens): unkno
 
 // ── eases ────────────────────────────────────────────────────
 const bezierCache = new Map<string, EaseFn>();
+/** by the curve's array itself first: a keyframe's ease is found again without a key built */
+const bezierOf = new WeakMap<object, EaseFn>();
 
 /** ease function of a segment, or 'hold' */
 export function easeFn(spec: EaseSpec | undefined, tokens: Tokens): EaseFn | 'hold' {
   if (spec === undefined || spec === 'linear') return linear;
   if (spec === 'hold') return 'hold';
   if (typeof spec === 'string') return easeFn(tokenValue(tokens, spec) as EaseSpec, tokens);
+  let f = bezierOf.get(spec);
+  if (f) return f;
   const key = spec.join(',');
-  let f = bezierCache.get(key);
+  f = bezierCache.get(key);
   if (!f) { f = cubicBezier(spec[0], spec[1], spec[2], spec[3]); bezierCache.set(key, f); }
+  bezierOf.set(spec, f);
   return f;
 }
 

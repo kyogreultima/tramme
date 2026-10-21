@@ -7,7 +7,8 @@ import { parseColor } from './color.ts';
 import { compileExpr } from './expr.ts';
 import { pointer } from './ops.ts';
 import { asExpr, asKeyframed, asLink, propKind, staticValue } from './props.ts';
-import { CAMERA_SCHEMA, MOTION_BLUR_SCHEMA, SOUND_MIX_SCHEMA, TRANSFORM_SCHEMA, type PropDef, type PropSchema, type Registry } from './registry.ts';
+import { CAMERA_SCHEMA, MASK_SCHEMA, MOTION_BLUR_SCHEMA, SOUND_MIX_SCHEMA, TRANSFORM_SCHEMA, type PropDef, type PropSchema, type Registry } from './registry.ts';
+import { addressDef, componentOf, PARAM_TYPES, paramDef, paramFits } from './components.ts';
 import { DocSchema } from './schema.ts';
 import type { Composition, TrammeDoc } from './types.ts';
 
@@ -45,6 +46,21 @@ class Checker {
     (doc.plugins || []).forEach((id, i) => {
       if (doc.assets[id]?.type !== 'module') this.err(`/plugins/${i}`, `plugin "${id}" must be an asset of type module`);
     });
+    for (const [id, a] of Object.entries(doc.assets)) {
+      if (a.proxy === undefined) continue;
+      if (a.type !== 'video') this.err(pointer('assets', id, 'proxy'), 'only a video has a proxy');
+      else if (doc.assets[a.proxy]?.type !== 'video' || a.proxy === id) this.err(pointer('assets', id, 'proxy'), `the proxy "${a.proxy}" must be another video asset`);
+    }
+    for (const [id, a] of Object.entries(doc.assets)) {
+      if (a.interpolated === undefined) continue;
+      if (a.type !== 'video') this.err(pointer('assets', id, 'interpolated'), 'only a video has an interpolated copy');
+      else if (doc.assets[a.interpolated]?.type !== 'video' || a.interpolated === id) this.err(pointer('assets', id, 'interpolated'), `the interpolated copy "${a.interpolated}" must be another video asset`);
+    }
+    for (const [id, a] of Object.entries(doc.assets)) {
+      if (a.clean === undefined) continue;
+      if (a.type !== 'audio' && a.type !== 'video') this.err(pointer('assets', id, 'clean'), 'only a sound or a video has a cleaned voice');
+      else if (doc.assets[a.clean]?.type !== 'audio' || a.clean === id) this.err(pointer('assets', id, 'clean'), `the cleaned voice "${a.clean}" must be another sound asset`);
+    }
     for (const [name, tk] of Object.entries(doc.tokens)) this.token(name, tk.type, tk.value);
     for (const [cid, comp] of Object.entries(doc.compositions)) this.comp(cid, comp);
     this.nestingCycles();
@@ -126,6 +142,7 @@ class Checker {
     if (comp.sound) this.props(cid, pointer(...base, 'sound'), SOUND_MIX_SCHEMA, comp.sound);
     if (comp.camera) this.props(cid, pointer(...base, 'camera'), CAMERA_SCHEMA, comp.camera);
     this.effects(cid, pointer(...base, 'effects'), comp.effects, 'finish');
+    this.params(cid, comp);
 
     for (const [lid, layer] of Object.entries(comp.layers)) {
       const lp = pointer(...base, 'layers', lid);
@@ -143,6 +160,85 @@ class Checker {
       if (layer.transform) this.props(cid, lp + '/transform', TRANSFORM_SCHEMA, layer.transform);
       if (layer.props) this.props(cid, lp + '/props', node.props, layer.props);
       this.effects(cid, lp + '/effects', layer.effects, 'layer');
+      const masks = new Set<string>();
+      (layer.masks || []).forEach((mk, i) => {
+        if (masks.has(mk.id)) this.err(`${lp}/masks/${i}/id`, `duplicate mask id "${mk.id}"`);
+        masks.add(mk.id);
+        if (mk.props) this.props(cid, `${lp}/masks/${i}/props`, MASK_SCHEMA, mk.props);
+      });
+      this.instance(cid, lid, lp);
+      (layer.styles || []).forEach((use, i) => {
+        const style = this.doc.styles?.[use.style];
+        if (!style) return this.err(`${lp}/styles/${i}/style`, `unknown style "${use.style}"`);
+        for (const [name, v] of Object.entries(style.props)) {
+          const to = use.map?.[name] ?? name, def = addressDef(this.doc, this.reg, comp, `${lid}.${to}`);
+          if (!def) { this.err(`${lp}/styles/${i}`, `${layer.type} has no property "${to}" for the style "${use.style}"`); continue; }
+          this.prop(cid, pointer('styles', use.style, 'props', name), def, v);
+        }
+        for (const from of Object.keys(use.map || {})) if (!(from in style.props)) this.err(`${lp}/styles/${i}/map/${from}`, `the style "${use.style}" has no property "${from}"`);
+      });
+    }
+  }
+
+  /** what a composition exposes as a component: known types, targets that exist and take the type, a default of the type */
+  params(cid: string, comp: Composition) {
+    for (const [name, p] of Object.entries(comp.params || {})) {
+      const pp = pointer('compositions', cid, 'params', name);
+      if (!PARAM_TYPES.includes(p.type as never)) { this.err(pp + '/type', `unknown type "${p.type}" (one of ${PARAM_TYPES.join(', ')})`); continue; }
+      if (!p.targets.length) this.err(pp + '/targets', 'at least one target expected');
+      p.targets.forEach((target, i) => {
+        const def = addressDef(this.doc, this.reg, comp, target);
+        if (!def) this.err(`${pp}/targets/${i}`, `nothing at "${target}" in the composition`);
+        else if (!paramFits(p.type, def.type)) this.err(`${pp}/targets/${i}`, `"${target}" is ${def.type}, the parameter ${p.type}`);
+        else if (def.animatable === false && p.type !== def.type) this.err(`${pp}/targets/${i}`, `"${target}" takes only a ${def.type}`);
+      });
+      if (p.default !== undefined) { const bad = this.valueIssue(paramDef(p), p.default); if (bad) this.err(pp + '/default', bad); }
+    }
+  }
+
+  /** a distribution: its data, the layer its points come from, a rule per parameter of the component */
+  distribution(cid: string, lid: string, lp: string, innerId: string) {
+    const comp = this.doc.compositions[cid], d = comp.layers[lid].distribute!, inner = this.doc.compositions[innerId];
+    if (d.rows !== undefined && this.doc.assets[d.rows]?.type !== 'json') this.err(`${lp}/distribute/rows`, `"${d.rows}" is not a JSON asset`);
+    if (d.layout.type === 'points') {
+      const src = comp.layers[d.layout.layer], parent = (id: string) => Object.entries(comp.layers).find(([, l]) => l.children?.includes(id))?.[0];
+      if (!src) this.err(`${lp}/distribute/layout/layer`, `unknown layer "${d.layout.layer}"`);
+      else if (!this.reg.hasNode(src.type) || !Object.values(this.reg.node(src.type).props).some((p) => p.type === 'path')) this.err(`${lp}/distribute/layout/layer`, `${src.type} has no path to take points from`);
+      else if (parent(d.layout.layer) !== parent(lid)) this.err(`${lp}/distribute/layout/layer`, `"${d.layout.layer}" must have the same parent`);
+    }
+    if (d.time) {
+      this.prop(cid, `${lp}/distribute/time/amount`, { type: 'number', default: 0 }, d.time.amount);
+      if (d.time.seed !== undefined) this.prop(cid, `${lp}/distribute/time/seed`, { type: 'number', default: 0 }, d.time.seed);
+    }
+    for (const [name, rule] of Object.entries(d.params || {})) {
+      const p = inner.params?.[name], rp = `${lp}/distribute/params/${name}`;
+      if (!p) { this.err(rp, `"${innerId}" has no parameter "${name}"`); continue; }
+      if (isObj(rule) && '$palette' in rule) {
+        if (rule.$palette !== 'order' && rule.$palette !== 'random') this.err(rp + '/$palette', "'order' or 'random' expected");
+        if (p.type !== 'color' && p.type !== 'paint') this.err(rp, `the palette gives colours, "${name}" is ${p.type}`);
+        (Array.isArray(rule.colors) ? rule.colors : []).forEach((c: unknown, i: number) => { const bad = this.colorIssue(c); if (bad) this.err(`${rp}/colors/${i}`, bad); });
+      } else if (isObj(rule) && '$expr' in rule) this.expr(rp + '/$expr', rule.$expr);
+      else if (PARAM_TYPES.includes(p.type as never)) { const bad = this.valueIssue(paramDef(p), staticValue(rule)); if (bad) this.err(rp, bad); }
+    }
+  }
+
+  /** a comp layer's parameter values (in the composition holding it) and overrides (in the component) */
+  instance(cid: string, lid: string, lp: string) {
+    const layer = this.doc.compositions[cid].layers[lid];
+    if (!layer.params && !layer.overrides && !layer.distribute) return;
+    const inner = componentOf(this.doc, layer);
+    if (!inner) return this.err(lp + (layer.type === 'comp' ? '/props/comp' : '/type'), 'parameters and overrides belong to a comp layer holding a composition');
+    const innerId = String(staticValue(layer.props?.comp));
+    for (const [name, v] of Object.entries(layer.params || {})) {
+      const p = inner.params?.[name];
+      if (!p) { this.err(`${lp}/params/${name}`, `"${innerId}" has no parameter "${name}"`); continue; }
+      if (PARAM_TYPES.includes(p.type as never)) this.prop(cid, `${lp}/params/${name}`, paramDef(p), v);
+    }
+    if (layer.distribute) this.distribution(cid, lid, lp, innerId);
+    for (const [address, v] of Object.entries(layer.overrides || {})) {
+      const def = addressDef(this.doc, this.reg, inner, address);
+      if (!def) { this.err(lp + pointer('overrides', address), `nothing at "${address}" in "${innerId}"`); continue; }
+      this.prop(innerId, lp + pointer('overrides', address), def, v);
     }
   }
 
@@ -227,6 +323,8 @@ class Checker {
         if (k === 'type') continue;
         const d = schema[k];
         if (!d) { this.err(`${p}/${k}`, `unknown parameter "${k}"`); continue; }
+        // a number or a vector may be keyframed: it slides (an amount, a seed)
+        if (propKind(val) === 'keyframes' && (d.type === 'number' || d.type === 'vec2')) { this.prop('', `${p}/${k}`, { ...d, animatable: true }, { $k: (val as { $k: unknown }).$k }); continue; }
         const bad = this.valueIssue(d, val);
         if (bad) this.err(`${p}/${k}`, bad);
       }
@@ -245,6 +343,7 @@ class Checker {
     const layer = comp.layers[lid];
     if (!layer) return `unknown layer "${lid}"`;
     if (a === 'transform') return TRANSFORM_SCHEMA[b] && !rest.length ? null : `unknown transform.${b}`;
+    if (a === 'params') return addressDef(this.doc, this.reg, comp, address) ? null : `"${lid}" has no parameter "${b}"`;
     if (b !== undefined) return `invalid address "${address}"`;
     if (!this.reg.hasNode(layer.type)) return null;
     return this.reg.node(layer.type).props[a] ? null : `${layer.type} has no property "${a}"`;

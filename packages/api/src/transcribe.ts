@@ -44,5 +44,5 @@ export async function transcribe(req: Request, { keys, fetch }: Reach) {
   const out = await res.json() as WhisperOut;
   const words = (out.words ?? []).map((w) => ({ w: String(w.word ?? '').trim(), s: Number(w.start ?? 0), e: Number(w.end ?? 0) }))
     .filter((w) => w.w && Number.isFinite(w.s) && Number.isFinite(w.e));
-  return json({ words, text: out.text ?? '', language: out.language, duration: out.duration });
+  return json({ words, text: out.text ?? '', language: out.language, duration: out.duration, model: `openai:${MODEL}` });
 }

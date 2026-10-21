@@ -17,13 +17,18 @@ const token = z.strictObject({
 });
 
 const asset = z.strictObject({
-  type: z.enum(['image', 'font', 'audio', 'video', 'module', 'json', 'model']),
+  type: z.enum(['image', 'font', 'audio', 'video', 'module', 'json', 'model', 'lut']),
   src: z.string().min(1),
   name: z.string().optional(),
   family: z.string().optional(),
   weight: z.string().optional(),
   style: z.string().optional(),
   box: z.tuple([finite, finite, finite, finite]).optional(),
+  hash: z.string().optional(),
+  madeBy: z.array(z.string()).optional(),
+  proxy: z.string().optional(),
+  clean: z.string().optional(),
+  interpolated: z.string().optional(),
 });
 
 const transform = z.strictObject({
@@ -38,6 +43,59 @@ const effect = z.strictObject({
   props: z.record(z.string(), prop).optional(),
 });
 
+const mask = z.strictObject({
+  id,
+  enabled: z.boolean().optional(),
+  props: z.record(z.string(), prop).optional(),
+});
+
+const styleUse = z.strictObject({
+  style: id,
+  at: finite.optional(),
+  map: z.record(z.string(), z.string()).optional(),
+});
+
+const style = z.strictObject({
+  props: z.record(z.string(), prop),
+  description: z.string().optional(),
+});
+
+const param = z.strictObject({
+  type: z.string().min(1),
+  targets: z.array(z.string().min(1)),
+  default: z.unknown().optional(),
+  options: z.array(z.string()).optional(),
+  label: z.string().optional(),
+  description: z.string().optional(),
+});
+
+const vec2 = z.tuple([finite, finite]);
+const layout = z.discriminatedUnion('type', [
+  z.strictObject({ type: z.literal('grid'), columns: z.number().int().positive().optional(), spacing: vec2.optional() }),
+  z.strictObject({ type: z.literal('list'), direction: z.enum(['horizontal', 'vertical']).optional(), spacing: finite.optional() }),
+  z.strictObject({ type: z.literal('circle'), radius: finite.optional(), start: finite.optional(), sweep: finite.optional(), rotate: z.boolean().optional() }),
+  z.strictObject({ type: z.literal('path'), path: z.strictObject({ v: z.array(vec2), i: z.array(vec2).optional(), o: z.array(vec2).optional(), closed: z.boolean().optional() }), rotate: z.boolean().optional() }),
+  z.strictObject({ type: z.literal('points'), layer: id }),
+]);
+
+const distribution = z.strictObject({
+  count: z.number().int().nonnegative().optional(),
+  rows: id.optional(),
+  layout,
+  params: z.record(z.string(), z.unknown()).optional(),
+  time: z.strictObject({
+    mode: z.enum(['rank', 'angle', 'distance', 'noise']),
+    amount: prop,
+    from: z.enum(['first', 'last']).optional(),
+    angle: finite.optional(),
+    center: vec2.optional(),
+    scale: finite.optional(),
+    speed: finite.optional(),
+    seed: prop.optional(),
+    loop: z.boolean().optional(),
+  }).optional(),
+});
+
 const layer = z.strictObject({
   type: z.string().min(1),
   name: z.string().optional(),
@@ -50,7 +108,12 @@ const layer = z.strictObject({
   transform: transform.optional(),
   props: z.record(z.string(), prop).optional(),
   effects: z.array(effect).optional(),
+  masks: z.array(mask).optional(),
   children: z.array(id).optional(),
+  params: z.record(z.string(), prop).optional(),
+  overrides: z.record(z.string(), prop).optional(),
+  styles: z.array(styleUse).optional(),
+  distribute: distribution.optional(),
 });
 
 const marker = z.strictObject({
@@ -75,6 +138,7 @@ const composition = z.strictObject({
   sound: z.strictObject({ loudness: prop.optional(), room: prop.optional() }).optional(),
   layers: z.record(id, layer),
   order: z.array(id),
+  params: z.record(id, param).optional(),
 });
 
 export const DocSchema = z.strictObject({
@@ -83,6 +147,7 @@ export const DocSchema = z.strictObject({
   meta: z.looseObject({ title: z.string(), description: z.string().optional() }),
   tokens: z.record(id, token),
   assets: z.record(id, asset),
+  styles: z.record(id, style).optional(),
   compositions: z.record(id, composition),
   root: id,
   plugins: z.array(id).optional(),

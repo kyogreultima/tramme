@@ -9,7 +9,9 @@
     "directory": "./dist",
     // Starlight builds a 404.html: served, with a 404 status, on unknown paths
     "not_found_handling": "404-page"
-  }
+  },
+  // branch builds (npx wrangler preview): no vars nor bindings to tell apart from production
+  "previews": {}
   // To serve the site from your own domain (a zone on this Cloudflare account),
   // add routes and deploy again. Keep them in step with the editor's addresses
   // (apps/worker/wrangler.jsonc): the site at the root, the editor on a subdomain.
