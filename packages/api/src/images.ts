@@ -1,5 +1,5 @@
 // Pictures made by a provider at authoring time: OpenAI (gpt-image-1),
-// Gemini (its image model), Z.AI (CogView). The keys (settings or secrets,
+// Gemini (its image model), Z.AI (CogView), Hydracept (OpenAI images). The keys (settings or secrets,
 // see keys.ts) never reach the editor, which saves the file in the project
 // with what made it (see docs/generation-roadmap.md).
 //
@@ -9,13 +9,14 @@
 
 import { HttpError, readJson } from './http.ts';
 import { providerFailure } from './generate.ts';
+import { hydraceptHeaders, hydraceptImage, hydraceptOf } from './hydracept.ts';
 import type { Keys } from './keys.ts';
 import type { Reach } from './providers.ts';
 
-export type ImageProvider = 'openai' | 'gemini' | 'zai';
+export type ImageProvider = 'openai' | 'gemini' | 'zai' | 'hydracept';
 
 interface Ask { prompt: string; ratio: string; quality?: 'low' | 'medium' | 'high' }
-interface Made { image: ArrayBuffer; type: string; model: string }
+interface Made { image: ArrayBuffer; type: string; model: string; headers?: Record<string, string> }
 
 /** the proportions each provider takes: OpenAI three sizes, Z.AI the sizes CogView takes, Gemini as asked */
 export const RATIOS = ['21:9', '16:9', '9:16', '5:4', '4:5', '3:2', '2:3', '4:3', '3:4', '1:1'] as const;
@@ -29,7 +30,7 @@ const b64 = (s: string): ArrayBuffer => {
 
 const OPENAI_MODEL = 'gpt-image-1', GEMINI_MODEL = 'gemini-3.8-flash-image', ZAI_MODEL = 'cogview-4';
 
-export const IMAGE_PROVIDERS: Record<ImageProvider, { make(key: string, ask: Ask, fetch: Reach['fetch']): Promise<Made> }> = {
+export const IMAGE_PROVIDERS: Record<ImageProvider, { make(key: string, ask: Ask, fetch: Reach['fetch'], keys: Keys): Promise<Made> }> = {
   openai: {
     async make(key, ask, fetch) {
       const res = await fetch('https://api.openai.com/v1/images/generations', {
@@ -76,6 +77,13 @@ export const IMAGE_PROVIDERS: Record<ImageProvider, { make(key: string, ask: Ask
       return { image: await got.arrayBuffer(), type: type.startsWith('image/') ? type : 'image/png', model: ZAI_MODEL };
     },
   },
+  // after the providers of the user's own keys: picked when it is the one connected, or named
+  hydracept: {
+    async make(key, ask, fetch, keys) {
+      const run = await hydraceptImage(hydraceptOf(key, keys), ask, fetch);
+      return { image: run.bytes, type: run.type, model: run.model, headers: hydraceptHeaders(run) };
+    },
+  },
 };
 
 /** the providers connected, the first one used when none is named */
@@ -96,8 +104,8 @@ export async function generateImage(req: Request, { keys, fetch }: Reach) {
   }
   const key = keys.get(provider);
   if (!key) throw new HttpError(503, `no ${provider} key: ${keys.how([provider])}`);
-  const made = await IMAGE_PROVIDERS[provider].make(key, { prompt, ratio, quality }, fetch);
+  const made = await IMAGE_PROVIDERS[provider].make(key, { prompt, ratio, quality }, fetch, keys);
   return new Response(made.image, {
-    headers: { 'content-type': made.type, 'cache-control': 'no-store', 'x-tramme-provider': provider, 'x-tramme-model': made.model },
+    headers: { 'content-type': made.type, 'cache-control': 'no-store', 'x-tramme-provider': provider, 'x-tramme-model': made.model, ...made.headers },
   });
 }

@@ -16,3 +16,11 @@ ZAI_API_KEY=
 # Sounds made by a provider (sound effects, music, voice-overs): ElevenLabs makes
 # all three; a voice-over can also come from OpenAI or Gemini with the keys above
 ELEVENLABS_API_KEY=
+
+# Hydracept: one key for pictures (OpenAI images), sound effects, music and
+# voice-overs (ElevenLabs), with a quote, a job and a receipt for each. It can
+# also be connected in Settings, Providers. The project (cpr_...) and the
+# environment are the ones of the key, from Hydracept Studio.
+HYDRACEPT_API_KEY=
+HYDRACEPT_PROJECT=
+# HYDRACEPT_ENVIRONMENT=development

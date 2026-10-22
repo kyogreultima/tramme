@@ -4,6 +4,7 @@ import type { Keys } from '../src/keys.ts';
 
 const keys = (have = true): Keys => ({
   get: (p) => (have && p === 'openai' ? 'sk-test' : undefined),
+  field: () => undefined,
   how: () => 'connect it in Settings, Providers',
   custom: () => undefined,
   status: () => ({ providers: {} as never, custom: [] }),

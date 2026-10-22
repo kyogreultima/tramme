@@ -13,10 +13,11 @@ export const PROVIDER_ORIGINS: Record<KeyedProvider, string> = {
   openrouter: 'https://openrouter.ai',
   zai: 'https://api.z.ai',
   elevenlabs: 'https://api.elevenlabs.io',
+  hydracept: 'https://api.hydracept.com',
 };
 
-/** the providers that refuse cross-origin requests (no CORS answer to a preflight, checked on 2026-10-06) */
-const NO_CORS = new Set<KeyedProvider>(['zai']);
+/** the providers that refuse cross-origin requests (no CORS answer to a preflight, checked on 2026-10-06; Hydracept on 2026-10-21) */
+const NO_CORS = new Set<KeyedProvider>(['zai', 'hydracept']);
 
 export const BROWSER_DIRECT = PROVIDERS.filter((p) => !NO_CORS.has(p)).map((p) => PROVIDER_ORIGINS[p]);
 

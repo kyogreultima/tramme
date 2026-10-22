@@ -12,14 +12,16 @@ import { Icon } from './icons.tsx';
 import { m, t } from '../i18n/index.ts';
 
 export interface ProviderActions {
-  connect(provider: KeyedProvider, key: string): Promise<void>;
+  connect(provider: KeyedProvider, key: string, fields?: Record<string, string>): Promise<void>;
   disconnect(provider: KeyedProvider): Promise<void>;
   saveCustom(id: string, c: { label: string; base: string; key?: string }): Promise<void>;
   removeCustom(id: string): Promise<void>;
   notify(text: string, kind?: 'info' | 'error'): void;
 }
 
-interface ProviderInfo { id: KeyedProvider; name: string; hint: string; keys: string }
+/** what a provider takes next to its key (PROVIDER_FIELDS of @tramme/api), as the form asks for it */
+interface ProviderInfoField { name: string; label: string; optional?: boolean; placeholder?: string }
+interface ProviderInfo { id: KeyedProvider; name: string; hint: string; keys: string; fields?: ProviderInfoField[] }
 const PROVIDERS: ProviderInfo[] = [
   { id: 'anthropic', name: 'Anthropic', hint: m('settings.providerAnthropic'), keys: 'https://console.anthropic.com/settings/keys' },
   { id: 'openai', name: 'OpenAI', hint: m('settings.providerOpenai'), keys: 'https://platform.openai.com/api-keys' },
@@ -27,6 +29,10 @@ const PROVIDERS: ProviderInfo[] = [
   { id: 'openrouter', name: 'OpenRouter', hint: m('settings.providerOpenrouter'), keys: 'https://openrouter.ai/keys' },
   { id: 'zai', name: 'Z.AI (GLM)', hint: m('settings.providerZai'), keys: 'https://z.ai/manage-apikey/apikey-list' },
   { id: 'elevenlabs', name: 'ElevenLabs', hint: m('settings.providerElevenlabs'), keys: 'https://elevenlabs.io/app/settings/api-keys' },
+  { id: 'hydracept', name: 'Hydracept', hint: m('settings.providerHydracept'), keys: 'https://app.hydracept.com', fields: [
+    { name: 'project', label: m('settings.hydraceptProject'), placeholder: 'cpr_...' },
+    { name: 'environment', label: m('settings.hydraceptEnvironment'), optional: true, placeholder: 'development' },
+  ] },
 ];
 type CustomProvider = KeyStatus['custom'][number];
 
@@ -108,8 +114,11 @@ export function Providers({ keys, actions, intro, relayed, forget }: { keys: Key
   /** a hint, and the relay's note when the provider is reached through it */
   const via = (p: KeyedProvider | 'custom', hint?: string) => (relayed?.(p) ? [hint, t('personal.viaRelay')].filter(Boolean).join(' · ') : hint);
   const keyForm = (p: ProviderInfo) => (close: () => void) => (
-    <ProviderForm link={p.keys} onClose={close} fields={[{ name: 'key', label: t('settings.apiKey'), secret: true, placeholder: t('settings.pasteTheKey') }]}
-      onSave={async (v) => { await actions.connect(p.id, v.key); actions.notify(t('settings.providerConnected', { name: p.name })); }} />
+    <ProviderForm link={p.keys} onClose={close} fields={[
+      { name: 'key', label: t('settings.apiKey'), secret: true, placeholder: t('settings.pasteTheKey') },
+      ...(p.fields ?? []).map((f) => ({ name: f.name, label: f.label, optional: f.optional, placeholder: f.placeholder, initial: keys?.fields?.[p.id]?.[f.name] })),
+    ]}
+      onSave={async ({ key, ...fields }) => { await actions.connect(p.id, key, p.fields ? fields : undefined); actions.notify(t('settings.providerConnected', { name: p.name })); }} />
   );
   const customForm = (c?: CustomProvider) => (close: () => void) => (
     <ProviderForm onClose={close} fields={[

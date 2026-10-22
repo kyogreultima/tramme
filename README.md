@@ -47,7 +47,7 @@ On Cloudflare, in one of two modes. **Private**: the Worker serves the editor an
 npx wrangler r2 bucket create tramme-projects
 # Cloudflare Access: an application on the domain, then ACCESS_TEAM_DOMAIN and ACCESS_AUD in apps/worker/wrangler.jsonc
 npm run deploy
-# optional: provider keys (Anthropic, OpenAI, Gemini, OpenRouter, Z.AI, ElevenLabs, custom) in the editor's Settings, Providers
+# optional: provider keys (Anthropic, OpenAI, Gemini, OpenRouter, Z.AI, ElevenLabs, Hydracept with its project ID, custom) in the editor's Settings, Providers
 ```
 
 ## Commands
