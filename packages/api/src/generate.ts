@@ -1,5 +1,6 @@
 // Sounds made by a provider at authoring time: sound effects and music
-// (ElevenLabs), a voice-over (ElevenLabs, OpenAI, Gemini). The keys (settings
+// (ElevenLabs, Hydracept), a voice-over (ElevenLabs, OpenAI, Gemini,
+// Hydracept). The keys (settings
 // or secrets, see keys.ts) never reach the editor, which saves the file in the
 // project with what made it.
 //
@@ -7,17 +8,16 @@
 //     kind: 'sfx' | 'music' | 'voice'; prompt: what to make, or the text to say
 //   GET  /api/voices?provider=&search=&language=&accent=&gender=   the voices a voice-over can take
 
-import { fetchHydraceptVoices, hydraceptHeaders, hydraceptMusic, hydraceptSfx, hydraceptVoice, mapHydraceptVoices } from './hydracept.ts';
+import { fetchHydraceptVoices, hydraceptHeaders, hydraceptMusic, hydraceptOf, hydraceptSfx, hydraceptVoice, mapHydraceptVoices } from './hydracept.ts';
 import { HttpError, json, readJson } from './http.ts';
 import type { Keys } from './keys.ts';
-import type { MediaConfig } from './media.ts';
 import type { Reach } from './providers.ts';
 
 export type SoundKind = 'sfx' | 'music' | 'voice';
 type Provider = 'elevenlabs' | 'openai' | 'gemini' | 'hydracept';
 
 interface Ask { kind: SoundKind; prompt: string; duration?: number; voice?: string; style?: string; model?: string }
-interface Made { audio: ArrayBuffer; type: string; model: string; voice?: string }
+interface Made { audio: ArrayBuffer; type: string; model: string; voice?: string; headers?: Record<string, string> }
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
@@ -25,9 +25,9 @@ const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v
 export async function providerFailure(provider: string, res: Response): Promise<never> {
   let message = `HTTP ${res.status}`;
   try {
-    const j = await res.json() as { detail?: { message?: string } | string | { msg?: string }[]; error?: { message?: string } | string };
+    const j = await res.json() as { detail?: { message?: string } | string | { msg?: string }[]; error?: { message?: string } | string; message?: string };
     const d = j.detail, e = j.error;
-    message = (typeof d === 'string' ? d : Array.isArray(d) ? d.map((x) => x.msg).join('; ') : d?.message) ?? (typeof e === 'string' ? e : e?.message) ?? message;
+    message = (typeof d === 'string' ? d : Array.isArray(d) ? d.map((x) => x.msg).join('; ') : d?.message) ?? (typeof e === 'string' ? e : e?.message) ?? j.message ?? message;
   } catch { /* not JSON */ }
   throw new HttpError(res.status === 401 || res.status === 403 ? 502 : res.status >= 500 ? 502 : 400, `${provider}: ${message}`);
 }
@@ -41,7 +41,7 @@ const ELEVEN_VOICE_DEFAULT = Object.keys(ELEVEN_VOICE_MODELS)[0];
 const TAGGED = new Set(['eleven_v4', 'eleven_v4_turbo', 'eleven_v3']);
 const ELEVEN_DEFAULT_VOICE = 'JBFqnCBsd6RMkjVDRZzb';
 
-const PROVIDERS: Record<Exclude<Provider, 'hydracept'>, { kinds: SoundKind[]; make(key: string, ask: Ask, fetch: Reach['fetch']): Promise<Made> }> = {
+const PROVIDERS: Record<Provider, { kinds: SoundKind[]; make(key: string, ask: Ask, fetch: Reach['fetch'], keys: Keys): Promise<Made> }> = {
   elevenlabs: {
     kinds: ['sfx', 'music', 'voice'],
     async make(key, ask, fetch) {
@@ -108,56 +108,44 @@ const PROVIDERS: Record<Exclude<Provider, 'hydracept'>, { kinds: SoundKind[]; ma
       return { audio: audio.buffer, type: part.mime_type ?? 'audio/wav', model, voice };
     },
   },
+  // after the providers of the user's own keys: picked when it is the one connected, or named
+  hydracept: {
+    kinds: ['sfx', 'music', 'voice'],
+    async make(key, ask, fetch, keys) {
+      const media = hydraceptOf(key, keys);
+      const run = ask.kind === 'sfx' ? await hydraceptSfx(media, ask, fetch)
+        : ask.kind === 'music' ? await hydraceptMusic(media, ask, fetch)
+          : await hydraceptVoice(media, ask, fetch, TAGGED, ELEVEN_DEFAULT_VOICE);
+      return { audio: run.bytes, type: run.type, model: run.model, voice: run.voice, headers: hydraceptHeaders(run) };
+    },
+  },
 };
 
 /** the providers connected, by kind of sound (first one used when none is named) */
-export function soundConfig(keys: Keys, media?: MediaConfig): Record<SoundKind, Provider[]> {
-  const has = (['elevenlabs', 'openai', 'gemini'] as const).filter((p) => keys.get(p));
-  const sfx: Provider[] = [], music: Provider[] = [], voice: Provider[] = [];
-  if (media?.provider === 'hydracept') {
-    sfx.push('hydracept');
-    music.push('hydracept');
-    voice.push('hydracept');
-  }
-  for (const p of has) {
-    if (PROVIDERS[p].kinds.includes('sfx')) sfx.push(p);
-    if (PROVIDERS[p].kinds.includes('music')) music.push(p);
-    if (PROVIDERS[p].kinds.includes('voice')) voice.push(p);
-  }
-  return { sfx, music, voice };
+export function soundConfig(keys: Keys): Record<SoundKind, Provider[]> {
+  const has = (Object.keys(PROVIDERS) as Provider[]).filter((p) => keys.get(p));
+  return { sfx: has.filter((p) => PROVIDERS[p].kinds.includes('sfx')), music: has.filter((p) => PROVIDERS[p].kinds.includes('music')), voice: has.filter((p) => PROVIDERS[p].kinds.includes('voice')) };
 }
 
-export async function generate(req: Request, { keys, fetch, media }: Reach) {
+export async function generate(req: Request, { keys, fetch }: Reach) {
   const b = await readJson<Partial<Ask> & { provider?: string }>(req);
   if (b.kind !== 'sfx' && b.kind !== 'music' && b.kind !== 'voice') throw new HttpError(400, 'kind: sfx, music or voice');
   const prompt = typeof b.prompt === 'string' ? b.prompt.trim() : '';
   if (!prompt) throw new HttpError(400, b.kind === 'voice' ? 'the text to say is missing' : 'say what to make (prompt)');
   if (prompt.length > 4000) throw new HttpError(413, 'prompt too long (4000 characters at most)');
-  const able = soundConfig(keys, media)[b.kind];
+  const able = soundConfig(keys)[b.kind];
   const provider = (b.provider ?? able[0]) as Provider | undefined;
-  if (!provider) {
-    const makers = able;
-    throw new HttpError(503, `no provider for ${b.kind}: ${makers.length ? makers.join(', ') : keys.how(['elevenlabs'], 'one')}`);
-  }
-  if (provider === 'hydracept') {
-    if (media?.provider !== 'hydracept') throw new HttpError(503, 'Hydracept is not configured (MEDIA_PROVIDER=hydracept and HYDRACEPT_API_KEY, HYDRACEPT_PROJECT on the server)');
-    const ask: Ask = { kind: b.kind, prompt, duration: typeof b.duration === 'number' ? b.duration : undefined, voice: typeof b.voice === 'string' ? b.voice : undefined, style: typeof b.style === 'string' ? b.style.slice(0, 500) : undefined, model: typeof b.model === 'string' ? b.model : undefined };
-    const run = b.kind === 'sfx'
-      ? await hydraceptSfx(media.hydracept, ask, fetch)
-      : b.kind === 'music'
-        ? await hydraceptMusic(media.hydracept, ask, fetch)
-        : await hydraceptVoice(media.hydracept, ask, fetch, TAGGED, ELEVEN_DEFAULT_VOICE);
-    return new Response(run.bytes, {
-      headers: { 'content-type': run.type, 'cache-control': 'no-store', 'x-tramme-provider': 'hydracept', 'x-tramme-model': run.model, ...(run.voice ? { 'x-tramme-voice': run.voice } : {}), ...hydraceptHeaders(run) },
-    });
+  if (!provider || !PROVIDERS[provider]) {
+    const makers = (Object.keys(PROVIDERS) as Provider[]).filter((p) => PROVIDERS[p].kinds.includes(b.kind!));
+    throw new HttpError(503, `no provider for ${b.kind}: ${keys.how(makers, 'one')}`);
   }
   if (!PROVIDERS[provider].kinds.includes(b.kind)) throw new HttpError(400, `${provider} does not make ${b.kind}`);
   const key = keys.get(provider);
   if (!key) throw new HttpError(503, `no ${provider} key: ${keys.how([provider])}`);
   const ask: Ask = { kind: b.kind, prompt, duration: typeof b.duration === 'number' ? b.duration : undefined, voice: typeof b.voice === 'string' ? b.voice : undefined, style: typeof b.style === 'string' ? b.style.slice(0, 500) : undefined, model: typeof b.model === 'string' ? b.model : undefined };
-  const made = await PROVIDERS[provider].make(key, ask, fetch);
+  const made = await PROVIDERS[provider].make(key, ask, fetch, keys);
   return new Response(made.audio, {
-    headers: { 'content-type': made.type, 'cache-control': 'no-store', 'x-tramme-provider': provider, 'x-tramme-model': made.model, ...(made.voice ? { 'x-tramme-voice': made.voice } : {}) },
+    headers: { 'content-type': made.type, 'cache-control': 'no-store', 'x-tramme-provider': provider, 'x-tramme-model': made.model, ...(made.voice ? { 'x-tramme-voice': made.voice } : {}), ...made.headers },
   });
 }
 
@@ -184,19 +172,17 @@ const GEMINI_VOICES = ['Kore', 'Puck', 'Charon', 'Fenrir', 'Aoede', 'Leda', 'Oru
 type Labels = { accent?: string; gender?: string; age?: string; language?: string; description?: string };
 const FILTERS = ['search', 'language', 'accent', 'gender', 'age'] as const;
 
-/** the voices a voice-over can take: ElevenLabs' (the account's, then its library, filtered), OpenAI's and Gemini's fixed sets */
-export async function voices(req: Request, { keys, fetch, media }: Reach) {
+/** the voices a voice-over can take: ElevenLabs' (the account's, then its library, filtered), Hydracept's list, OpenAI's and Gemini's fixed sets */
+export async function voices(req: Request, { keys, fetch }: Reach) {
   const q = new URL(req.url).searchParams;
-  const voiceMakers = soundConfig(keys, media).voice;
-  const provider = (q.get('provider') || voiceMakers[0]) as Provider | undefined;
-  if (!provider) throw new HttpError(503, `no provider for voice: ${keys.how(['elevenlabs', 'openai', 'gemini'], 'one')}`);
+  const provider = (q.get('provider') || soundConfig(keys).voice[0]) as Provider | undefined;
+  if (!provider || !PROVIDERS[provider]?.kinds.includes('voice')) throw new HttpError(provider ? 400 : 503, provider ? `${provider} makes no voice-over` : `no provider for voice: ${keys.how((Object.keys(PROVIDERS) as Provider[]).filter((p) => PROVIDERS[p].kinds.includes('voice')), 'one')}`);
   const search = (q.get('search') ?? '').toLowerCase();
   if (provider === 'hydracept') {
-    if (media?.provider !== 'hydracept') throw new HttpError(503, 'Hydracept is not configured (MEDIA_PROVIDER=hydracept and HYDRACEPT_API_KEY, HYDRACEPT_PROJECT on the server)');
-    const catalog = await fetchHydraceptVoices(media.hydracept, fetch);
-    return json({ voices: mapHydraceptVoices(catalog, search) });
+    const key = keys.get('hydracept');
+    if (!key) throw new HttpError(503, `no hydracept key: ${keys.how(['hydracept'])}`);
+    return json({ voices: mapHydraceptVoices(await fetchHydraceptVoices(hydraceptOf(key, keys), fetch), search) });
   }
-  if (!PROVIDERS[provider]?.kinds.includes('voice')) throw new HttpError(400, `${provider} makes no voice-over`);
   if (provider !== 'elevenlabs') {
     const names = provider === 'openai' ? OPENAI_VOICES : GEMINI_VOICES;
     return json({ voices: names.filter((n) => !search || n.toLowerCase().includes(search)).map((name): Voice => ({ id: name, name, provider, source: 'built-in' })) });

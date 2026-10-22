@@ -5,16 +5,17 @@ import { bucketKeyStore, loadKeys, type KeyedProvider, type Keys, type KeyStore,
 import { HttpError, type Env } from './http.ts';
 
 /** the Worker secret of each provider, used when the settings hold no key */
-const SECRET: Record<KeyedProvider, { name: string; read(env: Env): string | undefined }> = {
+const SECRET: Record<KeyedProvider, { name: string; read(env: Env): string | undefined; fields?: Record<string, (env: Env) => string | undefined> }> = {
   anthropic: { name: 'ANTHROPIC_API_KEY', read: (e) => e.ANTHROPIC_API_KEY },
   openai: { name: 'OPENAI_API_KEY', read: (e) => e.OPENAI_API_KEY },
   gemini: { name: 'GEMINI_API_KEY', read: (e) => e.GEMINI_API_KEY },
   openrouter: { name: 'OPENROUTER_API_KEY', read: (e) => e.OPENROUTER_API_KEY },
   zai: { name: 'ZAI_API_KEY', read: (e) => e.ZAI_API_KEY ?? e.GLM_API_KEY },
   elevenlabs: { name: 'ELEVENLABS_API_KEY', read: (e) => e.ELEVENLABS_API_KEY },
+  hydracept: { name: 'HYDRACEPT_API_KEY', read: (e) => e.HYDRACEPT_API_KEY, fields: { project: (e) => e.HYDRACEPT_PROJECT, environment: (e) => e.HYDRACEPT_ENVIRONMENT } },
 };
 
-const secrets = (env: Env): Secrets => ({ read: (p) => SECRET[p].read(env), name: (p) => SECRET[p].name });
+const secrets = (env: Env): Secrets => ({ read: (p) => SECRET[p].read(env), name: (p) => SECRET[p].name, field: (p, name) => SECRET[p].fields?.[name]?.(env)?.trim() });
 
 /** the R2 bucket of the private mode */
 export function bucket(env: Env): R2Bucket {

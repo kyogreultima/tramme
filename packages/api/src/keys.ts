@@ -5,8 +5,10 @@
 // mode, see apps/editor/src/vault). On the Worker, a secret of the same
 // provider (wrangler secret put) still works; a key from the settings comes
 // first. Custom providers speak the OpenAI chat format at their own address.
+// A provider may take settings of its own next to its key (Hydracept: the
+// project the calls are billed to); they come from the same place as the key.
 //
-//   PUT    /api/keys/:provider        {key}                 connect a provider (or change its key)
+//   PUT    /api/keys/:provider        {key, ...fields}      connect a provider (or change its key)
 //   DELETE /api/keys/:provider                              disconnect it
 //   PUT    /api/keys/custom/:id       {label, base, key?}   add or change a custom provider (key kept when absent)
 //   DELETE /api/keys/custom/:id                             remove it
@@ -16,12 +18,21 @@
 import type { Bucket } from './bucket.ts';
 import { HttpError, json, readJson } from './http.ts';
 
-export const PROVIDERS = ['anthropic', 'openai', 'gemini', 'openrouter', 'zai', 'elevenlabs'] as const;
+export const PROVIDERS = ['anthropic', 'openai', 'gemini', 'openrouter', 'zai', 'elevenlabs', 'hydracept'] as const;
 export type KeyedProvider = typeof PROVIDERS[number];
+
+/** a setting a provider takes next to its key (never a secret: the editor may show it) */
+export interface ProviderField { name: string; required?: boolean }
+/** the settings of the providers that take more than a key */
+export const PROVIDER_FIELDS: Partial<Record<KeyedProvider, ProviderField[]>> = {
+  hydracept: [{ name: 'project', required: true }, { name: 'environment' }],
+};
+const fieldsOf = (p: KeyedProvider) => PROVIDER_FIELDS[p] ?? [];
 
 /** a provider of the OpenAI chat format added by the user: its name, its address (…/v1) and its key, if it takes one */
 export interface Custom { id: string; label: string; base: string; key?: string }
-export interface StoredKeys { keys: Partial<Record<KeyedProvider, string>>; custom: Custom[] }
+export type FieldValues = Partial<Record<KeyedProvider, Record<string, string>>>;
+export interface StoredKeys { keys: Partial<Record<KeyedProvider, string>>; fields?: FieldValues; custom: Custom[] }
 
 /** where the keys of the settings are kept */
 export interface KeyStore {
@@ -33,19 +44,21 @@ export interface KeyStore {
 export interface Secrets {
   read(p: KeyedProvider): string | undefined;
   name(p: KeyedProvider): string;
+  /** a setting of the provider set next to its secret (Hydracept: HYDRACEPT_PROJECT) */
+  field?(p: KeyedProvider, name: string): string | undefined;
 }
 
 /** where the key of a provider comes from: the settings, a Worker secret, or nowhere */
 export type KeySource = 'settings' | 'server' | null;
 /** what the browser may know: no key, only where each comes from */
-export interface KeyStatus { providers: Record<KeyedProvider, KeySource>; custom: { id: string; label: string; base: string; key: boolean }[] }
+export interface KeyStatus { providers: Record<KeyedProvider, KeySource>; fields?: FieldValues; custom: { id: string; label: string; base: string; key: boolean }[] }
 
 const CUSTOM_ID = /^[a-z0-9][a-z0-9-]{0,31}$/;
 const isProvider = (p: string): p is KeyedProvider => (PROVIDERS as readonly string[]).includes(p);
 
 /** a stored value as it should be, whatever was read */
 export function storedKeys(j: Partial<StoredKeys> | null | undefined): StoredKeys {
-  return { keys: j?.keys && typeof j.keys === 'object' ? j.keys : {}, custom: Array.isArray(j?.custom) ? j.custom : [] };
+  return { keys: j?.keys && typeof j.keys === 'object' ? j.keys : {}, fields: j?.fields && typeof j.fields === 'object' ? j.fields : {}, custom: Array.isArray(j?.custom) ? j.custom : [] };
 }
 
 /** the keys kept as one object of a bucket (R2 on the Worker) */
@@ -63,6 +76,8 @@ export function bucketKeyStore(bucket: Bucket, key = 'config/keys.json'): KeySto
 /** the keys of a request: read once, then asked by provider */
 export interface Keys {
   get(p: KeyedProvider): string | undefined;
+  /** a setting of the provider, from where its key comes from */
+  field(p: KeyedProvider, name: string): string | undefined;
   /** how to connect the providers named, for a message saying none is: "connect it in Settings, Providers…" */
   how(providers: KeyedProvider[], one?: 'it' | 'one'): string;
   custom(id: string): Custom | undefined;
@@ -72,13 +87,19 @@ export interface Keys {
 export async function loadKeys(store: KeyStore, secrets?: Secrets): Promise<Keys> {
   const s = await store.load();
   const secret = (p: KeyedProvider) => secrets?.read(p);
-  const source = (p: KeyedProvider): KeySource => (s.keys[p] ? 'settings' : secret(p) ? 'server' : null);
+  const stored = (p: KeyedProvider, name: string) => s.fields?.[p]?.[name] || undefined;
+  const served = (p: KeyedProvider, name: string) => secrets?.field?.(p, name) || undefined;
+  // a key counts only with the settings it needs, from the same place
+  const whole = (p: KeyedProvider, read: (p: KeyedProvider, name: string) => string | undefined) => fieldsOf(p).every((f) => !f.required || read(p, f.name));
+  const source = (p: KeyedProvider): KeySource => (s.keys[p] && whole(p, stored) ? 'settings' : secret(p) && whole(p, served) ? 'server' : null);
   return {
-    get: (p) => s.keys[p] || secret(p),
+    get: (p) => { const from = source(p); return from === 'settings' ? s.keys[p] : from === 'server' ? secret(p) : undefined; },
+    field: (p, name) => { const from = source(p); return from === 'settings' ? stored(p, name) : from === 'server' ? served(p, name) : undefined; },
     how: (providers, one = 'it') => `connect ${one} in Settings, Providers${secrets ? ` (or npx wrangler secret put ${providers.map((p) => secrets.name(p)).join(' or ')})` : ''}`,
     custom: (id) => s.custom.find((c) => c.id === id),
     status: () => ({
       providers: Object.fromEntries(PROVIDERS.map((p) => [p, source(p)])) as KeyStatus['providers'],
+      fields: Object.fromEntries(PROVIDERS.filter((p) => s.fields?.[p]).map((p) => [p, { ...s.fields![p] }])) as FieldValues,
       custom: s.custom.map(({ id, label, base, key }) => ({ id, label, base, key: !!key })),
     }),
   };
@@ -89,6 +110,14 @@ function keyOf(v: unknown, required: boolean): string | undefined {
   const k = typeof v === 'string' ? v.trim() : '';
   if (!k) { if (required) throw new HttpError(400, 'the key is missing'); return undefined; }
   if (k.length > 1000 || /\s/.test(k)) throw new HttpError(400, 'this does not look like a key (one word, without spaces)');
+  return k;
+}
+
+/** a setting typed next to a key: one short line */
+function fieldOf(v: unknown): string | undefined {
+  const k = typeof v === 'string' ? v.trim() : '';
+  if (!k) return undefined;
+  if (k.length > 200 || /\s/.test(k)) throw new HttpError(400, 'this setting is one word, without spaces');
   return k;
 }
 
@@ -131,12 +160,21 @@ export async function keysRoute(req: Request, store: KeyStore, parts: string[]):
     if (!isProvider(p)) throw new HttpError(404, `unknown provider: ${p}`);
     if (m === 'DELETE') {
       const { [p]: _, ...rest } = s.keys;
-      await store.save({ ...s, keys: rest });
+      const { [p]: __, ...fields } = s.fields ?? {};
+      await store.save({ ...s, keys: rest, fields });
       return json({ deleted: p });
     }
     if (m === 'PUT') {
-      const b = await readJson<{ key?: unknown }>(req);
-      await store.save({ ...s, keys: { ...s.keys, [p]: keyOf(b.key, true) } });
+      const b = await readJson<Record<string, unknown>>(req);
+      const key = keyOf(b.key, true)!;
+      const values: Record<string, string> = {};
+      for (const f of fieldsOf(p)) {
+        const v = fieldOf(b[f.name]);
+        if (v) values[f.name] = v;
+        else if (f.required) throw new HttpError(400, `${p} needs its ${f.name}`);
+      }
+      const { [p]: _, ...fields } = s.fields ?? {};
+      await store.save({ ...s, keys: { ...s.keys, [p]: key }, fields: Object.keys(values).length ? { ...fields, [p]: values } : fields });
       return json({ provider: p });
     }
   }

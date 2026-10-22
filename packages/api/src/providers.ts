@@ -20,25 +20,19 @@ export { HYDRACEPT_VOICE_MODELS } from './hydracept.ts';
 import { generateImage, imageConfig } from './images.ts';
 import type { Keys } from './keys.ts';
 import { llm, llmConfig, models } from './llm.ts';
-import type { MediaConfig } from './media.ts';
-import { mediaStatus } from './media.ts';
 import { transcribe, transcribeConfig } from './transcribe.ts';
 
 /** what the routes reach a provider with: the keys of this request, and the way out to the provider */
 export interface Reach {
   keys: Keys;
   fetch(input: string, init?: RequestInit): Promise<Response>;
-  /** server-side Hydracept routing (Worker secrets / vars); never sent to the browser */
-  media?: MediaConfig;
 }
 
 /** the routes of providers, under /api/ */
 export const PROVIDER_ROUTES = ['claude', 'llm', 'models', 'generate', 'voices', 'generate-image', 'transcribe'];
 
 /** what is connected, as /api/config tells it */
-export const providersConfig = (keys: Keys, media?: MediaConfig) => ({
-  claude: claudeConfig(keys), llm: llmConfig(keys), keys: keys.status(), sound: soundConfig(keys, media), images: imageConfig(keys, media), transcribe: transcribeConfig(keys), media: mediaStatus(media),
-});
+export const providersConfig = (keys: Keys) => ({ claude: claudeConfig(keys), llm: llmConfig(keys), keys: keys.status(), sound: soundConfig(keys), images: imageConfig(keys), transcribe: transcribeConfig(keys) });
 
 /** the answer of a provider route (parts: the path after /api/), or null when the request is not one */
 export async function providerRoute(req: Request, reach: Reach, parts: string[]): Promise<Response | null> {
@@ -62,7 +56,7 @@ export async function providersAnswer(req: Request, reach: Reach): Promise<Respo
   const { pathname } = new URL(req.url);
   const parts = pathname.slice('/api/'.length).split('/');
   try {
-    if (parts[0] === 'config' && req.method === 'GET') return json(providersConfig(reach.keys, reach.media));
+    if (parts[0] === 'config' && req.method === 'GET') return json(providersConfig(reach.keys));
     const res = PROVIDER_ROUTES.includes(parts[0]) ? await providerRoute(req, reach, parts) : null;
     return res ?? json({ error: `not a provider route: ${req.method} ${pathname}` }, 404);
   } catch (e) { return failure(e); }

@@ -18,14 +18,10 @@ export interface Env {
   ZAI_API_KEY?: string;
   GLM_API_KEY?: string;
   ELEVENLABS_API_KEY?: string;
-  /** optional: route image / sfx / voice through Hydracept instead of direct provider keys */
-  MEDIA_PROVIDER?: string;
+  /** Hydracept: its key, and the project (cpr_...) and environment the key belongs to */
   HYDRACEPT_API_KEY?: string;
-  HYDRACEPT_API_URL?: string;
   HYDRACEPT_PROJECT?: string;
-  HYDRACEPT_PRODUCT_ID?: string;
   HYDRACEPT_ENVIRONMENT?: string;
-  HYDRACEPT_BILLING_MODE?: string;
   /** private mode, Workers AI: speech to text (Whisper) */
   AI?: Ai;
   /** private mode, Cloudflare Access: team domain (equipe.cloudflareaccess.com) and application audience tag */

@@ -490,7 +490,7 @@ export async function providersChanged() {
   aiModels.value = { ...aiModels.peek(), remote: {} };
   await refreshStatus(true);
 }
-export async function connectProvider(provider: KeyedProvider, key: string) { await api.setKey(provider, key); await providersChanged(); }
+export async function connectProvider(provider: KeyedProvider, key: string, fields?: Record<string, string>) { await api.setKey(provider, key, fields); await providersChanged(); }
 export async function disconnectProvider(provider: KeyedProvider) { await api.removeKey(provider); await providersChanged(); }
 export async function saveCustomProvider(id: string, c: { label: string; base: string; key?: string }) { await api.setCustom(id, c); await providersChanged(); }
 export async function removeCustomProvider(id: string) { await api.removeCustom(id); await providersChanged(); }

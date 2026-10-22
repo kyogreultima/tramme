@@ -17,12 +17,10 @@ ZAI_API_KEY=
 # all three; a voice-over can also come from OpenAI or Gemini with the keys above
 ELEVENLABS_API_KEY=
 
-# Optional: send pictures, sound effects, music beds, voice-overs, and
-# GET /api/voices through Hydracept instead of the provider keys above (no ELEVENLABS_API_KEY needed).
-# MEDIA_PROVIDER=hydracept
-# HYDRACEPT_API_KEY=
-# HYDRACEPT_PROJECT=          # cpr_… from Hydracept Studio
-# HYDRACEPT_API_URL=          # optional; defaults to https://api.hydracept.com
-# HYDRACEPT_PRODUCT_ID=tramme # optional product label
-# HYDRACEPT_ENVIRONMENT=development   # must match the API key's environment (default: development)
-# HYDRACEPT_BILLING_MODE=managed   # or byok
+# Hydracept: one key for pictures (OpenAI images), sound effects, music and
+# voice-overs (ElevenLabs), with a quote, a job and a receipt for each. It can
+# also be connected in Settings, Providers. The project (cpr_...) and the
+# environment are the ones of the key, from Hydracept Studio.
+HYDRACEPT_API_KEY=
+HYDRACEPT_PROJECT=
+# HYDRACEPT_ENVIRONMENT=development

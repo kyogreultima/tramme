@@ -1,16 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { generate, voices } from '../src/generate.ts';
 import { HYDRACEPT_AUDIO_MP3, hydraceptImage, hydraceptMusic, hydraceptSfx, hydraceptVoice, mapHydraceptVoices } from '../src/hydracept.ts';
-import { generateImage } from '../src/images.ts';
-import type { Keys } from '../src/keys.ts';
-import type { MediaConfig } from '../src/media.ts';
-import { mediaConfig } from '../src/media.ts';
+import { generateImage, imageConfig } from '../src/images.ts';
+import { keysRoute, loadKeys, storedKeys, type KeyStore, type Secrets, type StoredKeys } from '../src/keys.ts';
+import { soundConfig } from '../src/generate.ts';
 
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 13, 10, 26, 10]);
 const MP3 = new Uint8Array([0xff, 0xfb, 0x90, 0x00]);
 
-const media: MediaConfig = {
-  provider: 'hydracept',
+const media = {
   hydracept: {
     apiKey: 'hk-test',
     apiUrl: 'https://api.hydracept.com',
@@ -20,12 +18,13 @@ const media: MediaConfig = {
   },
 };
 
-const keys = (): Keys => ({
-  get: () => undefined,
-  how: () => 'connect it in Settings, Providers',
-  custom: () => undefined,
-  status: () => ({ providers: {} as never, custom: [] }),
-});
+/** the keys kept in memory, as the settings or the vault keep them */
+function memory(initial: Partial<StoredKeys> = {}): KeyStore & { value: StoredKeys } {
+  const store = { value: storedKeys(initial), async load() { return store.value; }, async save(v: StoredKeys) { store.value = v; } };
+  return store;
+}
+const HYDRACEPT_ONLY = { keys: { hydracept: 'hk-test' }, fields: { hydracept: { project: 'cpr_test' } } };
+const keys = () => loadKeys(memory(HYDRACEPT_ONLY));
 
 const out = (input: string, init?: RequestInit) => fetch(input, init);
 
@@ -60,11 +59,84 @@ function stubHydraceptJob(artifact: Uint8Array, contentType: string) {
 
 afterEach(() => vi.unstubAllGlobals());
 
-describe('mediaConfig', () => {
-  it('enables Hydracept only when provider, key and project are set', () => {
-    expect(mediaConfig({})).toBeUndefined();
-    expect(mediaConfig({ MEDIA_PROVIDER: 'hydracept', HYDRACEPT_API_KEY: 'k' })).toBeUndefined();
-    expect(mediaConfig({ MEDIA_PROVIDER: 'hydracept', HYDRACEPT_API_KEY: 'k', HYDRACEPT_PROJECT: 'cpr_x' })?.hydracept.projectId).toBe('cpr_x');
+describe('Hydracept as a provider', () => {
+  it('is connected only with its key and its project, from the settings', async () => {
+    expect((await loadKeys(memory({ keys: { hydracept: 'hk' } }))).status().providers.hydracept).toBeNull();
+    const k = await loadKeys(memory(HYDRACEPT_ONLY));
+    expect(k.status().providers.hydracept).toBe('settings');
+    expect(k.get('hydracept')).toBe('hk-test');
+    expect(k.field('hydracept', 'project')).toBe('cpr_test');
+    expect(k.status().fields?.hydracept).toEqual({ project: 'cpr_test' });
+  });
+
+  it('is connected from the Worker secrets with HYDRACEPT_PROJECT', async () => {
+    const env: Record<string, string> = { HYDRACEPT_API_KEY: 'hk-server', HYDRACEPT_PROJECT: 'cpr_server' };
+    const secrets: Secrets = { read: (p) => (p === 'hydracept' ? env.HYDRACEPT_API_KEY : undefined), name: () => 'HYDRACEPT_API_KEY', field: (p, n) => (n === 'project' ? env.HYDRACEPT_PROJECT : undefined) };
+    const k = await loadKeys(memory(), secrets);
+    expect(k.status().providers.hydracept).toBe('server');
+    expect(k.field('hydracept', 'project')).toBe('cpr_server');
+  });
+
+  it('Settings, Providers keeps the project with the key, asks for it, and forgets both', async () => {
+    const store = memory();
+    const put = (body: unknown) => keysRoute(new Request('http://x/api/keys/hydracept', { method: 'PUT', body: JSON.stringify(body) }), store, ['hydracept']);
+    await expect(put({ key: 'hk' })).rejects.toMatchObject({ status: 400, message: /project/ });
+    await put({ key: 'hk', project: 'cpr_1', environment: 'production' });
+    expect(store.value.fields?.hydracept).toEqual({ project: 'cpr_1', environment: 'production' });
+    await keysRoute(new Request('http://x/api/keys/hydracept', { method: 'DELETE' }), store, ['hydracept']);
+    expect(store.value.keys.hydracept).toBeUndefined();
+    expect(store.value.fields?.hydracept).toBeUndefined();
+  });
+
+  it('comes after the user\'s own keys in automatic, and first when it is the only one', async () => {
+    const both = await loadKeys(memory({ keys: { elevenlabs: 'el', openai: 'oa', hydracept: 'hk' }, fields: { hydracept: { project: 'cpr_1' } } }));
+    expect(soundConfig(both)).toEqual({ sfx: ['elevenlabs', 'hydracept'], music: ['elevenlabs', 'hydracept'], voice: ['elevenlabs', 'openai', 'hydracept'] });
+    expect(imageConfig(both)).toEqual(['openai', 'hydracept']);
+    const only = await keys();
+    expect(soundConfig(only).sfx).toEqual(['hydracept']);
+    expect(imageConfig(only)).toEqual(['hydracept']);
+  });
+});
+
+describe('the routes, without Hydracept', () => {
+  const none = () => loadKeys(memory());
+  it('an unknown provider is a clean error', async () => {
+    await expect(generate(new Request('http://x/api/generate', { method: 'POST', body: JSON.stringify({ kind: 'sfx', prompt: 'x', provider: 'nope' }) }), { keys: await none(), fetch: out }))
+      .rejects.toMatchObject({ status: 503, message: /no provider for sfx/ });
+  });
+  it('no provider names every provider of that kind', async () => {
+    const secrets: Secrets = { read: () => undefined, name: (p) => `${p.toUpperCase()}_API_KEY` };
+    const k = await loadKeys(memory(), secrets);
+    await expect(generate(new Request('http://x/api/generate', { method: 'POST', body: JSON.stringify({ kind: 'voice', prompt: 'x' }) }), { keys: k, fetch: out }))
+      .rejects.toMatchObject({ message: /ELEVENLABS_API_KEY or OPENAI_API_KEY or GEMINI_API_KEY or HYDRACEPT_API_KEY/ });
+    await expect(generateImage(new Request('http://x/api/generate-image', { method: 'POST', body: JSON.stringify({ prompt: 'x' }) }), { keys: k, fetch: out }))
+      .rejects.toMatchObject({ message: /OPENAI_API_KEY or GEMINI_API_KEY or ZAI_API_KEY or HYDRACEPT_API_KEY/ });
+  });
+});
+
+describe('hydracept polling', () => {
+  it('never sleeps past the deadline, whatever pollAfterSeconds says', async () => {
+    vi.useFakeTimers();
+    try {
+      let polls = 0;
+      vi.stubGlobal('fetch', (u: string | URL, init?: RequestInit) => {
+        const url = String(u);
+        if (url.includes('/quote')) return Promise.resolve(new Response(JSON.stringify({ quoteId: 'q' })));
+        if (init?.method === 'POST') return Promise.resolve(new Response(JSON.stringify({ jobId: 'j' })));
+        polls++;
+        return Promise.resolve(new Response(JSON.stringify({ jobId: 'j', status: 'running', pollAfterSeconds: 3600 })));
+      });
+      const run = hydraceptSfx(media.hydracept, { prompt: 'x' }, out);
+      const settled = expect(run).rejects.toMatchObject({ status: 504 });
+      await vi.advanceTimersByTimeAsync(120_000);
+      await settled;
+      expect(polls).toBe(2);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('a refusal reads as the other providers\' do', async () => {
+    vi.stubGlobal('fetch', () => Promise.resolve(new Response(JSON.stringify({ detail: { message: 'quota exceeded' } }), { status: 402 })));
+    await expect(hydraceptSfx(media.hydracept, { prompt: 'x' }, out)).rejects.toMatchObject({ status: 400, message: 'hydracept: quota exceeded' });
   });
 });
 
@@ -149,11 +221,11 @@ describe('hydracept jobs', () => {
 });
 
 describe('routes with Hydracept', () => {
-  const reach = { keys: keys(), fetch: out, media };
+  const reach = async () => ({ keys: await keys(), fetch: out });
 
   it('generate-image names Hydracept and records receipt ids', async () => {
     stubHydraceptJob(PNG, 'image/png');
-    const res = await generateImage(new Request('http://localhost/api/generate-image', { method: 'POST', body: JSON.stringify({ prompt: 'sky' }) }), reach);
+    const res = await generateImage(new Request('http://localhost/api/generate-image', { method: 'POST', body: JSON.stringify({ prompt: 'sky' }) }), await reach());
     expect(res.status).toBe(200);
     expect(res.headers.get('x-tramme-provider')).toBe('hydracept');
     expect(res.headers.get('x-tramme-hydracept-receipt')).toBe('rcpt_1');
@@ -162,14 +234,14 @@ describe('routes with Hydracept', () => {
 
   it('generate sfx through Hydracept by default as audio/mpeg', async () => {
     stubHydraceptJob(MP3, 'audio/mpeg');
-    const res = await generate(new Request('http://localhost/api/generate', { method: 'POST', body: JSON.stringify({ kind: 'sfx', prompt: 'click' }) }), reach);
+    const res = await generate(new Request('http://localhost/api/generate', { method: 'POST', body: JSON.stringify({ kind: 'sfx', prompt: 'click' }) }), await reach());
     expect(res.headers.get('x-tramme-provider')).toBe('hydracept');
     expect(res.headers.get('content-type')).toBe('audio/mpeg');
   });
 
   it('generate music through Hydracept without an ElevenLabs key', async () => {
     stubHydraceptJob(MP3, 'audio/mpeg');
-    const res = await generate(new Request('http://localhost/api/generate', { method: 'POST', body: JSON.stringify({ kind: 'music', prompt: 'calm piano', duration: 12 }) }), reach);
+    const res = await generate(new Request('http://localhost/api/generate', { method: 'POST', body: JSON.stringify({ kind: 'music', prompt: 'calm piano', duration: 12 }) }), await reach());
     expect(res.status).toBe(200);
     expect(res.headers.get('x-tramme-provider')).toBe('hydracept');
     expect(res.headers.get('x-tramme-model')).toBe('music_v2');
@@ -192,7 +264,7 @@ describe('routes with Hydracept', () => {
       }
       return Promise.resolve(new Response('unexpected', { status: 500 }));
     });
-    const res = await voices(new Request('http://localhost/api/voices?search=ali'), reach);
+    const res = await voices(new Request('http://localhost/api/voices?search=ali'), await reach());
     expect(res.status).toBe(200);
     expect(calls[0].url).toContain('/v1/capabilities/audio.voice.generate.v1/voices');
     expect(calls[0].url).toContain('projectId=cpr_test');

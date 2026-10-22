@@ -1,7 +1,28 @@
-// Hydracept durable jobs for OpenAI images and ElevenLabs SFX/voice (quote, then job, receipt id).
+// Hydracept: OpenAI images and ElevenLabs sound effects, music and voice-overs
+// as durable jobs (a quote, then the job, then its receipt), with one key and
+// the project it belongs to (Settings, Providers, or the Worker's secrets).
 
+import { providerFailure } from './generate.ts';
 import { HttpError } from './http.ts';
-import type { HydraceptMedia } from './media.ts';
+import type { Keys } from './keys.ts';
+
+/** what a call to Hydracept needs: the key, and the project and environment it belongs to */
+export interface HydraceptMedia {
+  apiKey: string;
+  apiUrl: string;
+  productId: string;
+  projectId: string;
+  environment: string;
+}
+
+export const HYDRACEPT_API = 'https://api.hydracept.com';
+
+/** Hydracept as connected (key and project from the same place), or nothing */
+export function hydraceptOf(key: string, keys: Keys): HydraceptMedia {
+  const projectId = keys.field('hydracept', 'project');
+  if (!projectId) throw new HttpError(503, `no hydracept project: ${keys.how(['hydracept'])}`);
+  return { apiKey: key, apiUrl: HYDRACEPT_API, productId: 'tramme', projectId, environment: keys.field('hydracept', 'environment') || 'development' };
+}
 
 const CLIENT = 'tramme-api hydracept/1';
 
@@ -60,20 +81,8 @@ function url(base: string, path: string): string {
   return `${base.replace(/\/+$/, '')}${p}`;
 }
 
-async function hydraceptFailure(res: Response): Promise<never> {
-  let message = `HTTP ${res.status}`;
-  try {
-    const j = await res.json() as { detail?: { message?: string } | string; error?: { message?: string } | string; message?: string; code?: string };
-    const d = j.detail, e = j.error;
-    message = (typeof d === 'string' ? d : typeof d === 'object' && d && 'message' in d ? d.message : undefined)
-      ?? (typeof e === 'string' ? e : typeof e === 'object' && e && 'message' in e ? e.message : undefined)
-      ?? j.message ?? j.code ?? message;
-  } catch { /* not JSON */ }
-  throw new HttpError(res.status === 401 || res.status === 403 ? 502 : res.status >= 500 ? 502 : 400, `hydracept: ${message}`);
-}
-
 async function readJson<T>(res: Response): Promise<T> {
-  if (!res.ok) await hydraceptFailure(res);
+  if (!res.ok) await providerFailure('hydracept', res);
   return res.json() as Promise<T>;
 }
 
@@ -81,11 +90,8 @@ function context(media: HydraceptMedia) {
   return { productId: media.productId, projectId: media.projectId, environment: media.environment };
 }
 
-function execution(media: HydraceptMedia) {
-  return {
-    executionPreference: 'automatic',
-    ...(media.billingMode ? { billingMode: media.billingMode } : {}),
-  };
+function execution() {
+  return { executionPreference: 'automatic' };
 }
 
 function quoteIdOf(q: Record<string, unknown>): string {
@@ -98,7 +104,7 @@ function quoteIdOf(q: Record<string, unknown>): string {
 }
 
 async function quote(media: HydraceptMedia, capability: string, input: Record<string, unknown>, fetch: Fetch): Promise<string> {
-  const body = { context: context(media), input, execution: execution(media) };
+  const body = { context: context(media), input, execution: execution() };
   const res = await fetch(url(media.apiUrl, `/capabilities/${encodeURIComponent(capability)}/quote`), {
     method: 'POST', headers: authHeaders(media.apiKey), body: JSON.stringify(body),
   });
@@ -120,7 +126,7 @@ async function submitJob(
   const body = {
     context: context(media),
     input,
-    execution: { ...execution(media), quoteId },
+    execution: { ...execution(), quoteId },
     idempotencyKey: idempotencyKey(),
   };
   const send = () => fetch(url(media.apiUrl, `/capabilities/${encodeURIComponent(capability)}/jobs`), {
@@ -149,7 +155,8 @@ async function pollJob(media: HydraceptMedia, jobId: string, fetch: Fetch, capMs
   let job = await getJob(media, jobId, fetch);
   while (!TERMINAL.has(String(job.status ?? '').toLowerCase())) {
     if (Date.now() >= deadline) throw new HttpError(504, 'hydracept: the job did not finish in time');
-    const wait = Math.max(1, Number(job.pollAfterSeconds) || 2) * 1000;
+    // the wait Hydracept asks for, never past the deadline
+    const wait = Math.min(Math.max(1, Number(job.pollAfterSeconds) || 2) * 1000, deadline - Date.now());
     await new Promise((r) => setTimeout(r, wait));
     job = await getJob(media, jobId, fetch);
   }
@@ -184,7 +191,7 @@ async function downloadArtifact(media: HydraceptMedia, jobId: string, artifactId
   const res = await fetch(url(media.apiUrl, `/jobs/${encodeURIComponent(jobId)}/artifacts/${encodeURIComponent(artifactId)}`), {
     headers: { authorization: `Bearer ${media.apiKey}`, 'x-hydracept-client': CLIENT },
   });
-  if (!res.ok) await hydraceptFailure(res);
+  if (!res.ok) await providerFailure('hydracept', res);
   return res.arrayBuffer();
 }
 

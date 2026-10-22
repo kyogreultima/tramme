@@ -49,7 +49,7 @@ function Settings() {
   }, []);
   const after = (p: Promise<void>) => p.then(refresh);
   const actions: ProviderActions = {
-    connect: (p, key) => after(manage('PUT', p, { key })),
+    connect: (p, key, fields) => after(manage('PUT', p, { key, ...fields })),
     disconnect: (p) => after(manage('DELETE', p)),
     saveCustom: (id, c) => after(manage('PUT', `custom/${encodeURIComponent(id)}`, c)),
     removeCustom: (id) => after(manage('DELETE', `custom/${encodeURIComponent(id)}`)),
