@@ -2,7 +2,7 @@
 
 The general-purpose plugin packs that ship with the editor (`plugins/*.js`, listed in `plugins/index.json`, added to a project from the Code section): the ones to come, and what tramme needs first so they can exist. A pack is an ordinary plugin. It gives the assistant and the editor a new vocabulary — what they can build in one move, what they can check — for any film, never for one video.
 
-Status: steps 0 to 9 are shipped (step 5 keeps its real recordings to check on a device; step 7 keeps its set of 300 emoji to confirm on a device). Shipped packs: charts, kinetic type, physics, stick figures, icons, diagrams, UI walkthrough, accessibility checks, localization ([plugins-roadmap.md](plugins-roadmap.md), step 10). The packs after step 0 are taken in order, each one landing whole. The decisions still open are listed at the end. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
+Status: steps 0 to 10 are shipped (step 5 keeps its real recordings to check on a device; step 7 keeps its set of 300 emoji to confirm on a device). Shipped packs: charts, kinetic type, physics, stick figures, icons, diagrams, UI walkthrough, accessibility checks, localization ([plugins-roadmap.md](plugins-roadmap.md), step 10). The packs after step 0 are taken in order, each one landing whole. The decisions still open are listed at the end. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
 
 ## Why
 
@@ -148,10 +148,10 @@ Done when: "our offices in Lyon, Montreal and Dakar" gets a map with three pins 
 
 ### Step 10. Audiograms (`audiogram.js`)
 
-- [ ] A spectrum at authoring time: `analyseAudio` (`packages/core/src/analysis.ts`) gains 32 bands on a log scale at its 50 Hz rate, saved with the analysis and read in expressions by `audio(source).band(i)`.
-- [ ] The `audiogram.wave` node: the sound of a layer or an asset as bars, a mirrored waveform, a line or a ring around a picture, from the analysis (the loudness envelope and the bands), with a meter's rise and decay and a playhead; colours from the tokens.
-- [ ] The `audiogram` tool (`/audiogram`): an extract of a podcast or an interview as a clip — the cover or the speaker's picture, the name, the wave, the built-in captions, a progress bar — laid out for the format, varied by the seed.
-- [ ] Tests: the bands on synthetic tones (a 1 kHz tone lights its band), the bars at a known time.
+- [x] A spectrum at authoring time: `analyseAudio` (`packages/core/src/analysis.ts`) gains 32 bands on a log scale from 40 Hz to 16 kHz at its 50 Hz rate (an FFT of 2048 samples a frame, saved decimated to 12.5 Hz so a 30-minute analysis stays under 6 MB) and `logBands` reads one spectrum; `audio(source).band(i)` in expressions stays open, the audiogram reads the asset directly.
+- [x] The `audiogram.wave` node: the sound of a layer or an asset as bars, a mirrored waveform, a line or a ring around a picture, from the analysis (the loudness envelope and the bands), with a meter's rise and decay and a playhead; colours from the tokens.
+- [x] The `audiogram` tool (`/audiogram`): an extract of a podcast or an interview as a clip — the cover or the speaker's picture, the name, the wave, the built-in captions, a progress bar — laid out for the format, varied by the seed.
+- [x] Tests: the bands on synthetic tones (a 1 kHz tone lights its band), the bars at a known time.
 
 Done when: a podcast extract becomes a 9:16 clip whose wave moves with the voice, captioned, from one command.
 

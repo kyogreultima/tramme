@@ -36,9 +36,11 @@ import { searchEmoji } from '../../../plugins/emoji.js';
 import * as emoji from '../../../plugins/emoji.js';
 import { project, findPlace, greatCircle, zoomPath, fold } from '../../../plugins/maps.js';
 import * as maps from '../../../plugins/maps.js';
+import { barsAt } from '../../../plugins/audiogram.js';
+import * as audiogram from '../../../plugins/audiogram.js';
 
 // the packs are JavaScript on purpose: their shape is checked at runtime by Registry.use, which these tests run
-const PACKS = [charts, kinetic, a11y, physics, styk, icons, diagram, walkthrough, localize, codeview, rhythm, screencast, handmade, chat, emoji, maps] as unknown as import('@tramme/core').PluginModule[];
+const PACKS = [charts, kinetic, a11y, physics, styk, icons, diagram, walkthrough, localize, codeview, rhythm, screencast, handmade, chat, emoji, maps, audiogram] as unknown as import('@tramme/core').PluginModule[];
 
 /** the shipped index, as the script writes it: each entry's commands and their French */
 const INDEX: { file: string; name: string; description?: string; commands?: { name: string; title: string; description: string }[]; fr?: Record<string, string> }[] =
@@ -675,6 +677,46 @@ describe('maps', () => {
     const full = readFileSync(new URL('../../../plugins/maps/countries-50m.json', import.meta.url), 'utf8');
     expect(atlas.length).toBeLessThan(full.length * 0.05);
     for (const b of boxesOf(applyOps(doc, out.ops).doc)) expect(inside(b, 1920, 1080)).toBe(true);
+  });
+});
+
+describe('audiogram', () => {
+  it('the bars read the bands, linear between the frames', () => {
+    // one band, four frames: 0.2, 0.3, 0.4, 0.5 — the bars walk it
+    const bands = [[0.2, 0.3, 0.4, 0.5]];
+    expect(barsAt(bands, 10, 0.05, 1)).toEqual([0.25]); // exactly between two frames: the mean
+    expect(barsAt(bands, 10, 0.0, 1)).toEqual([0.2]);
+    expect(barsAt(bands, 10, 0.3, 1)).toEqual([0.5]);
+    // two bands, both read; an empty analysis stays silent
+    expect(barsAt([[0.2, 0.6], [0.4, 0.8]], 10, 0.05, 2).map((v) => +v.toFixed(6))).toEqual([0.4, 0.6]);
+    expect(barsAt([], 10, 0, 4)).toEqual([0, 0, 0, 0]);
+  });
+
+  it('the tool builds the clip from an analysis with bands, and refuses one without', async () => {
+    const analysis = JSON.stringify({ version: 1, kind: 'audio-analysis', duration: 60, rate: 50, envelope: { rms: [], low: [], mid: [], high: [] }, onsets: [], tempo: null, beats: [], downbeats: [], sections: [], bands: Array.from({ length: 32 }, () => [0.2, 0.5]) });
+    for (const [w, h] of [[1080, 1920], [1920, 1080]] as [number, number][]) {
+      const { doc } = newProject({ name: 'T', width: w, height: h, fps: 30, duration: 30 });
+      doc.assets.talk = { type: 'audio', src: 'assets/audio/talk.mp3', name: 'Talk' } as never;
+      doc.assets['analysis-talk'] = { type: 'json', src: 'assets/analyses/talk.json' } as never;
+      const out = await runTool(audiogram.tools[0], doc, { asset: 'talk', name: 'The Show' }, { extra: { readText: async () => analysis } });
+      const next = applyOps(doc, out.ops).doc;
+      const cid = Object.keys(next.compositions).find((k) => k.startsWith('audiogram-'))!;
+      const wave = Object.values(next.compositions[cid].layers).find((l) => l.type === 'audiogram.wave')!;
+      expect(wave.props!.analysis).toBe('analysis-talk');
+      expect(out.text).toMatch(/bands/);
+      for (const b of boxesOf(next)) expect(inside(b, w, h)).toBe(true);
+    }
+    const { doc } = newProject({ name: 'T', width: 1080, height: 1920, fps: 30, duration: 30 });
+    doc.assets.talk = { type: 'audio', src: 'assets/audio/talk.mp3' } as never;
+    doc.assets['analysis-talk'] = { type: 'json', src: 'assets/analyses/talk.json' } as never;
+    await expect(runTool(audiogram.tools[0], doc, { asset: 'talk' }, { extra: { readText: async () => '{"kind":"audio-analysis"}' } })).rejects.toThrow(/bands/);
+  });
+
+  it('the analysis asset stays bounded: 30 minutes under 6 MB', () => {
+    // the bands are saved at 12.5 Hz, two decimals: 32 bands x 22 500 frames for half an hour
+    const frame = JSON.stringify({ bands: Array.from({ length: 32 }, () => [0.42]) });
+    const perFrame = frame.length - '[]'.length;
+    expect(perFrame * 12.5 * 1800).toBeLessThan(6e6);
   });
 });
 

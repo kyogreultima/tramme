@@ -130,3 +130,11 @@ Maps, offline: Natural Earth shipped beside the pack, places found by name, grea
 - Nodes: `map.view` — Map
 - Checks: `map-legibility` — Map legibility
 
+## Audiogram
+
+Audiograms: the wave of a sound moving with the voice, a cover, a name, a progress bar — a clip for the feeds
+
+- Tools: `/audiogram` — Make an audiogram
+- Nodes: `audiogram.wave` — Wave
+- Checks: none
+

@@ -256,5 +256,22 @@
       "Draw a map": "Dessiner une carte",
       "places named in words found offline among the shipped places and countries, the projection and the framing chosen from what is shown, the project holding only the shapes the map shows": "des lieux nommés en mots, trouvés hors ligne parmi les lieux et pays livrés, la projection et le cadrage choisis d’après ce qui est montré, le projet ne tenant que les formes que la carte montre"
     }
+  },
+  {
+    "file": "audiogram.js",
+    "name": "Audiogram",
+    "description": "Audiograms: the wave of a sound moving with the voice, a cover, a name, a progress bar — a clip for the feeds",
+    "version": "1.0.0",
+    "commands": [
+      {
+        "name": "audiogram",
+        "title": "Make an audiogram",
+        "description": "an extract of a podcast or an interview as a clip: the cover, the name, the wave moving with the voice, a progress bar — laid out for the format"
+      }
+    ],
+    "fr": {
+      "Make an audiogram": "Faire un audiogramme",
+      "an extract of a podcast or an interview as a clip: the cover, the name, the wave moving with the voice, a progress bar — laid out for the format": "un extrait de podcast ou d’entretien en clip : la pochette, le nom, l’onde qui bouge avec la voix, une barre de progression — disposé pour le format"
+    }
   }
 ]
