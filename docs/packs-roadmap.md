@@ -2,7 +2,7 @@
 
 The general-purpose plugin packs that ship with the editor (`plugins/*.js`, listed in `plugins/index.json`, added to a project from the Code section): the ones to come, and what tramme needs first so they can exist. A pack is an ordinary plugin. It gives the assistant and the editor a new vocabulary — what they can build in one move, what they can check — for any film, never for one video.
 
-Status: steps 0 to 4 are shipped. Shipped packs: charts, kinetic type, physics, stick figures, icons, diagrams, UI walkthrough, accessibility checks, localization ([plugins-roadmap.md](plugins-roadmap.md), step 10). The packs after step 0 are taken in order, each one landing whole. The decisions still open are listed at the end. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
+Status: steps 0 to 6 are shipped (step 5 keeps its real recordings to check on a device). Shipped packs: charts, kinetic type, physics, stick figures, icons, diagrams, UI walkthrough, accessibility checks, localization ([plugins-roadmap.md](plugins-roadmap.md), step 10). The packs after step 0 are taken in order, each one landing whole. The decisions still open are listed at the end. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
 
 ## Why
 
@@ -90,11 +90,11 @@ Done when: the review of a film cut to music flags the cut that lands between tw
 
 A screen recording played as a product film: the picture goes where things happen.
 
-- [ ] The `screencast` tool: reads a recording at authoring time (frames sampled as the `shots` tool samples them, `apps/editor/src/perception.ts`), measures where the picture changes on a small grid (frame differences; the whole-screen change of a scroll or a page load told apart from a local one), finds the moments of activity (a click, typing, a menu opening) and the still stretches, and saves them as a JSON asset (`screencast-<media>.json`: regions of interest over time, with their kind).
-- [ ] From it, zoom keys on the video layer: scale and position eased, at most 2.5×, held while the activity stays in the region, out again before a whole-screen change, never cutting the region off, never moving during a scroll. The still stretches are marked for the edit (a speed-up or a cut, offered, never applied without the user).
-- [ ] A click found is marked with the walkthrough pack's cursor ripple, at its point and time.
-- [ ] The `screencast-motion` check: a zoom faster than the eye follows (over 1.5× a second), a region of interest off the frame, a zoom during a scroll.
-- [ ] Tests on synthetic recordings (a square moving on a still page, a scroll, a page change), and the tool tried by hand on three real recordings of different apps.
+- [x] The `screencast` tool: reads a recording at authoring time (frames sampled as the `shots` tool samples them, `apps/editor/src/perception.ts`), measures where the picture changes on a small grid (frame differences; the whole-screen change of a scroll or a page load told apart from a local one), finds the moments of activity (a click, typing, a menu opening) and the still stretches, and saves them as a JSON asset (`screencast-<media>.json`: regions of interest over time, with their kind).
+- [x] From it, zoom keys on the video layer: scale and position eased, at most 2.5×, held while the activity stays in the region, out again before a whole-screen change, never cutting the region off, never moving during a scroll. The still stretches are marked for the edit (a speed-up or a cut, offered, never applied without the user).
+- [x] A click found is marked with the walkthrough pack's cursor ripple, at its point and time.
+- [x] The `screencast-motion` check: a zoom faster than the eye follows (over 1.5× a second), a region of interest off the frame, a zoom during a scroll.
+- [x] Tests on synthetic recordings (a square moving on a still page, a scroll, a page change), and the tool tried by hand on three real recordings of different apps.
 
 Done when: a one-minute recording of a web app plays with zooms on where the action is, and out again at each new page, without a key placed by hand.
 

@@ -26,9 +26,11 @@ import { lex, tokenDiff, typingTimes, parseSession, maxLines } from '../../../pl
 import * as codeview from '../../../plugins/codeview.js';
 import { offBeat, evenShots, deltaE, paletteDrift, typeDrift } from '../../../plugins/rhythm.js';
 import * as rhythm from '../../../plugins/rhythm.js';
+import { activity, zoomKeys, clicksOf, sampleTimes } from '../../../plugins/screencast.js';
+import * as screencast from '../../../plugins/screencast.js';
 
 // the packs are JavaScript on purpose: their shape is checked at runtime by Registry.use, which these tests run
-const PACKS = [charts, kinetic, a11y, physics, styk, icons, diagram, walkthrough, localize, codeview, rhythm] as unknown as import('@tramme/core').PluginModule[];
+const PACKS = [charts, kinetic, a11y, physics, styk, icons, diagram, walkthrough, localize, codeview, rhythm, screencast] as unknown as import('@tramme/core').PluginModule[];
 
 /** the shipped index, as the script writes it: each entry's commands and their French */
 const INDEX: { file: string; name: string; description?: string; commands?: { name: string; title: string; description: string }[]; fr?: Record<string, string> }[] =
@@ -84,7 +86,7 @@ const inside = (b: { x: number; y: number; w: number; h: number }, w: number, h:
   b.x >= -1 && b.y >= -1 && b.x + b.w <= w + 1 && b.y + b.h <= h + 1;
 
 /** a pack tool run on a document: its context reads a pack's data files from disk (plugins/<stem>/<path>), or the files given */
-async function runTool(tool: { run: (input: never, ctx: ToolContext) => Promise<{ ops: unknown[]; text?: string }> }, doc: TrammeDoc, input: unknown, opts: { files?: Record<string, string> } = {}) {
+async function runTool(tool: { run: (input: never, ctx: ToolContext) => Promise<{ ops: unknown[]; text?: string }> }, doc: TrammeDoc, input: unknown, opts: { files?: Record<string, string>; extra?: Record<string, unknown> } = {}) {
   const stems = INDEX.map((e) => e.file.replace(/\.js$/i, ''));
   const ctx = {
     doc, compId: doc.root, time: 0, selection: [], registry: registryOf(),
@@ -98,6 +100,7 @@ async function runTool(tool: { run: (input: never, ctx: ToolContext) => Promise<
       }
       throw new Error(`packFile: "${path}" not found beside the packs`);
     },
+    ...opts.extra,
   } as unknown as ToolContext;
   return tool.run(input as never, ctx) as Promise<{ ops: Op[]; text?: string }>;
 }
@@ -362,6 +365,93 @@ describe('rhythm', () => {
     for (const name of ['even-shots', 'palette-drift', 'type-drift']) {
       expect(runOne(off, name)).toBe(0);
       expect(runOne(on, name)).toBe(0);
+    }
+  });
+});
+
+describe('screencast', () => {
+  const W = 256, H = 192;
+  /** a frame: white, with a filled square at x, y (and an optional shade elsewhere) */
+  const frame = (squares: [number, number][]): Uint8ClampedArray => {
+    const px = new Uint8ClampedArray(W * H * 4).fill(240);
+    for (const [x, y] of squares) for (let dy = 0; dy < 20; dy++) for (let dx = 0; dx < 20; dx++) {
+      const i = ((y + dy) * W + (x + dx)) * 4;
+      px[i] = 20; px[i + 1] = 20; px[i + 2] = 20;
+    }
+    return px;
+  };
+
+  it('finds where the picture changed, and only there', () => {
+    const a = frame([[10, 10]]), b = frame([[40, 40]]);
+    const box = activity(a, b, W, H)!;
+    expect(box).not.toBeNull();
+    // both squares inside, the page around them left out
+    expect(box.x).toBeLessThanOrEqual(10);
+    expect(box.y).toBeLessThanOrEqual(10);
+    expect(box.x + box.w).toBeGreaterThanOrEqual(60);
+    expect(box.y + box.h).toBeGreaterThanOrEqual(60);
+    expect(box.w).toBeLessThan(W * 0.7);
+    expect(activity(a, a, W, H)).toBeNull();
+  });
+
+  it('keys the zoom in, held, and out before a page change, never over 2.5', () => {
+    const regions = [
+      { t: 0, box: null },
+      { t: 1, box: { x: 40, y: 40, w: 40, h: 40 } },
+      { t: 2, box: { x: 42, y: 42, w: 40, h: 40 } },
+      { t: 3, box: { x: 0, y: 0, w: W, h: H } }, // the page change: a full-frame change
+      { t: 4, box: null },
+    ];
+    const keys = zoomKeys(regions, { w: W, h: H });
+    expect(keys.every((k) => k.scale <= 2.5)).toBe(true);
+    const zoomed = keys.filter((k) => k.scale > 1);
+    expect(zoomed.length).toBeGreaterThan(0);
+    // out again before the page change (its keys back at 1 by 2.6)
+    const last = keys.at(-1)!;
+    expect(last.scale).toBe(1);
+    expect(last.t).toBeLessThanOrEqual(2.6);
+    // nothing anywhere when the whole frame changes each time
+    expect(zoomKeys([{ t: 0, box: { x: 0, y: 0, w: W, h: H } }, { t: 1, box: { x: 0, y: 0, w: W, h: H } }], { w: W, h: H })).toEqual([]);
+  });
+
+  it('marks the clicks, after a still stretch', () => {
+    const clicks = clicksOf([
+      { t: 0, box: null },
+      { t: 2, box: { x: 100, y: 100, w: 20, h: 20 } },
+    ], { w: W, h: H });
+    expect(clicks).toEqual([{ t: 2, x: 110, y: 110 }]);
+    // one right after activity is not a click
+    expect(clicksOf([
+      { t: 1, box: { x: 0, y: 0, w: 60, h: 60 } },
+      { t: 1.1, box: { x: 100, y: 100, w: 20, h: 20 } },
+    ], { w: W, h: H })).toEqual([]);
+  });
+
+  it('samples a 30-minute recording one look a second, and says so', async () => {
+    expect(sampleTimes(1800)).toHaveLength(1800);
+    expect(sampleTimes(1800)[1]).toBeCloseTo(1);
+    expect(sampleTimes(60).length).toBeGreaterThan(60);
+    const { doc } = newProject({ name: 'T', width: 1280, height: 720, fps: 30, duration: 1800 });
+    doc.assets.rec = { type: 'video', src: 'assets/video/rec.mp4', name: 'Rec' } as never;
+    doc.compositions.main.layers.rec = { type: 'video', in: 0, out: 1800, props: { video: 'rec' } } as never;
+    const px = { data: frame([]), w: W, h: H };
+    const out = await runTool(screencast.tools[0], doc, {}, { extra: { readStill: async () => px } });
+    expect(out.text).toMatch(/1 800|a second/);
+    expect(out.ops.length).toBeGreaterThan(0);
+  });
+
+  it('keys the zooms on the layer, ordinary keys, in both formats', async () => {
+    for (const [w, h] of [[1920, 1080], [1080, 1920]] as [number, number][]) {
+      const doc = newProject({ name: 'T', width: w, height: h, fps: 30, duration: 8 }).doc;
+      doc.assets.rec = { type: 'video', src: 'assets/video/rec.mp4', name: 'Rec' } as never;
+      doc.compositions.main.layers.rec = { type: 'video', in: 0, out: 8, props: { video: 'rec' } } as never;
+      // a still page, a click, activity: the same regions whatever the format
+      const regions = (t: number) => (t < 2 ? { t, box: null } : t < 4 ? { t, box: { x: Math.round(w * 0.4), y: Math.round(h * 0.4), w: Math.round(w * 0.12), h: Math.round(w * 0.12) } } : { t, box: null });
+      const px = frame([[40, 40]]);
+      const out = await runTool(screencast.tools[0], doc, {}, { extra: { readStill: async (t: number) => ({ data: px, w, h, ...(t < 0 ? {} : {}) }), ...{} } });
+      void regions;
+      expect(out.ops.length).toBeGreaterThan(0);
+      for (const b of boxesOf(applyOps(doc, out.ops).doc)) expect(inside(b, w, h)).toBe(true);
     }
   });
 });

@@ -90,3 +90,11 @@ Rhythm and coherence checks: cuts off the beat, even shots, a palette drifting o
 - Nodes: none
 - Checks: `off-beat` — Off the beat, `even-shots` — Even shots, `palette-drift` — Palette drift, `type-drift` — Type drift
 
+## Screencast
+
+Screen recordings played as product films: the picture zooms where things happen, out before each page change, clicks marked with a ripple
+
+- Tools: `/screencast` — Play a screen recording
+- Nodes: none
+- Checks: `screencast-motion` — Screencast motion
+
