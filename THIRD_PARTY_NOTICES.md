@@ -27,6 +27,7 @@ The packs carry their data in the repository (`plugins/<pack>/`), read at author
 |---|---|---|
 | [Lucide](https://lucide.dev) (`plugins/icons/lucide.json`) | ISC | The icons pack's pictograms (converted from the SVG set) |
 | [Caveat](https://fonts.google.com/specimen/Caveat) (`plugins/handmade/Caveat-Medium.woff2`, the latin subset, weight 500) | OFL-1.1 | The handmade pack's handwritten typeface |
+| [Natural Earth](https://www.naturalearthdata.com) (`plugins/maps/*.json`, converted by `scripts/packs/maps.ts`) | Public domain | The maps pack's countries, regions and populated places |
 
 ## Command line and local tools
 

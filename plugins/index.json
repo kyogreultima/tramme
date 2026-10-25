@@ -233,5 +233,28 @@
       "Place an emoji": "Placer un emoji",
       "one or several emoji as picture layers, found by name or by the character itself, the files they use copied into the project so they draw the same everywhere": "un ou plusieurs emoji comme couches d’image, trouvés par nom ou par le caractère lui-même, les fichiers utilisés copiés dans le projet pour qu’ils se dessinent pareil partout"
     }
+  },
+  {
+    "file": "maps.js",
+    "name": "Maps",
+    "description": "Maps, offline: Natural Earth shipped beside the pack, places found by name, great circles and a smooth zoom for the flights",
+    "data": [
+      "countries-110m.json",
+      "countries-50m.json",
+      "regions-50m.json",
+      "places.json"
+    ],
+    "version": "1.0.0",
+    "commands": [
+      {
+        "name": "map",
+        "title": "Draw a map",
+        "description": "places named in words found offline among the shipped places and countries, the projection and the framing chosen from what is shown, the project holding only the shapes the map shows"
+      }
+    ],
+    "fr": {
+      "Draw a map": "Dessiner une carte",
+      "places named in words found offline among the shipped places and countries, the projection and the framing chosen from what is shown, the project holding only the shapes the map shows": "des lieux nommés en mots, trouvés hors ligne parmi les lieux et pays livrés, la projection et le cadrage choisis d’après ce qui est montré, le projet ne tenant que les formes que la carte montre"
+    }
   }
 ]

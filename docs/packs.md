@@ -122,3 +122,11 @@ Emoji as pictures: the 300 most used (Fluent Emoji Flat, MIT) shipped as SVG, fo
 - Nodes: none
 - Checks: none
 
+## Maps
+
+Maps, offline: Natural Earth shipped beside the pack, places found by name, great circles and a smooth zoom for the flights
+
+- Tools: `/map` — Draw a map
+- Nodes: `map.view` — Map
+- Checks: `map-legibility` — Map legibility
+

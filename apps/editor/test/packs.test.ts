@@ -34,9 +34,11 @@ import { parseScript, readingTime, scrollFor } from '../../../plugins/chat.js';
 import * as chat from '../../../plugins/chat.js';
 import { searchEmoji } from '../../../plugins/emoji.js';
 import * as emoji from '../../../plugins/emoji.js';
+import { project, findPlace, greatCircle, zoomPath, fold } from '../../../plugins/maps.js';
+import * as maps from '../../../plugins/maps.js';
 
 // the packs are JavaScript on purpose: their shape is checked at runtime by Registry.use, which these tests run
-const PACKS = [charts, kinetic, a11y, physics, styk, icons, diagram, walkthrough, localize, codeview, rhythm, screencast, handmade, chat, emoji] as unknown as import('@tramme/core').PluginModule[];
+const PACKS = [charts, kinetic, a11y, physics, styk, icons, diagram, walkthrough, localize, codeview, rhythm, screencast, handmade, chat, emoji, maps] as unknown as import('@tramme/core').PluginModule[];
 
 /** the shipped index, as the script writes it: each entry's commands and their French */
 const INDEX: { file: string; name: string; description?: string; commands?: { name: string; title: string; description: string }[]; fr?: Record<string, string> }[] =
@@ -618,6 +620,61 @@ describe('emoji', () => {
     const layers = Object.values(next.compositions.main.layers).filter((l) => l.type === 'image');
     expect(layers).toHaveLength(2);
     for (const b of boxesOf(next)) expect(inside(b, 1080, 1920)).toBe(true);
+  });
+});
+
+describe('maps', () => {
+  const places = JSON.parse(readFileSync(new URL('../../../plugins/maps/places.json', import.meta.url), 'utf8')).places;
+  const countries = JSON.parse(readFileSync(new URL('../../../plugins/maps/countries-110m.json', import.meta.url), 'utf8')).countries;
+
+  it('projects the world it says, the globe refusing its far side', () => {
+    expect(project('equirect', [0, 0])).toEqual([0, 0]);
+    expect(project('equirect', [90, 45])).toEqual([0.25, -0.25]);
+    expect(project('ortho', [180, 0], { center: [0, 0] })).toBeNull();
+    expect(project('ortho', [0, 0], { center: [0, 0] })).toEqual([0, 0]);
+    expect(project('naturalEarth', [180, 0])![0]).toBeCloseTo(0.5, 3);
+  });
+
+  it('finds places with accents folded, aliases known, ambiguity a question', () => {
+    expect(findPlace(places, countries, 'sao paulo')[0].name).toBe('São Paulo');
+    expect(findPlace(places, countries, 'Zurich')[0].name).toBe('Zürich');
+    // an ambiguous name: several answers, the biggest first
+    const springfield = findPlace(places, countries, 'springfield');
+    expect(springfield.length).toBeGreaterThan(1);
+    expect(springfield[0].pop).toBeGreaterThanOrEqual(springfield[1].pop);
+    expect(findPlace(places, countries, 'Paris')[0].country).toBe('France');
+    expect(findPlace(places, countries, 'NYC')[0].name).toContain('New York');
+    expect(findPlace(places, countries, 'zzzq')).toEqual([]);
+  });
+
+  it('flies the great circle the short way, and lands the zoom exactly', () => {
+    const gc = greatCircle([0, 0], [90, 0], 8);
+    expect(gc[4]).toEqual([45, 0]);
+    expect(gc[0]).toEqual([0, 0]);
+    expect(gc[8]).toEqual([90, 0]);
+    // the antimeridian: Los Angeles to Tokyo crosses the Pacific, not Europe
+    const pacific = greatCircle([-118, 34], [139.7, 35.7], 16);
+    const lons = pacific.map((p) => p[0]);
+    expect(Math.max(...lons)).toBeLessThan(180);
+    const path = zoomPath({ center: [0, 0], zoom: 1 }, { center: [10, 20], zoom: 4 });
+    expect(path(0)).toEqual({ center: [0, 0], zoom: 1 });
+    expect(path(1)).toEqual({ center: [10, 20], zoom: 4 });
+    // it zooms out on the way: the middle sees more world than either end
+    expect(path(0.5).zoom).toBeLessThan(2);
+  });
+
+  it('the tool writes only the shapes the map shows', async () => {
+    const { doc } = newProject({ name: 'T', width: 1920, height: 1080, fps: 30, duration: 6 });
+    const written = new Map<string, string>();
+    const out = await runTool(maps.tools[0], doc, { places: 'Lyon, Dakar', route: true }, { extra: { writeFile: async (p: string, d: string) => { written.set(p, d); return p; } } });
+    expect(out.ops.length).toBeGreaterThan(0);
+    const atlas = written.get([...written.keys()][0])!;
+    expect(atlas).toBeDefined();
+    const data = JSON.parse(atlas);
+    expect(data.countries.map((c: { name: string }) => c.name).sort()).toEqual(['France', 'Senegal']);
+    const full = readFileSync(new URL('../../../plugins/maps/countries-50m.json', import.meta.url), 'utf8');
+    expect(atlas.length).toBeLessThan(full.length * 0.05);
+    for (const b of boxesOf(applyOps(doc, out.ops).doc)) expect(inside(b, 1920, 1080)).toBe(true);
   });
 });
 

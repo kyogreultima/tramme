@@ -2,7 +2,7 @@
 
 The general-purpose plugin packs that ship with the editor (`plugins/*.js`, listed in `plugins/index.json`, added to a project from the Code section): the ones to come, and what tramme needs first so they can exist. A pack is an ordinary plugin. It gives the assistant and the editor a new vocabulary — what they can build in one move, what they can check — for any film, never for one video.
 
-Status: steps 0 to 8 are shipped (step 5 keeps its real recordings to check on a device; step 7 keeps its set of 300 emoji to confirm on a device). Shipped packs: charts, kinetic type, physics, stick figures, icons, diagrams, UI walkthrough, accessibility checks, localization ([plugins-roadmap.md](plugins-roadmap.md), step 10). The packs after step 0 are taken in order, each one landing whole. The decisions still open are listed at the end. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
+Status: steps 0 to 9 are shipped (step 5 keeps its real recordings to check on a device; step 7 keeps its set of 300 emoji to confirm on a device). Shipped packs: charts, kinetic type, physics, stick figures, icons, diagrams, UI walkthrough, accessibility checks, localization ([plugins-roadmap.md](plugins-roadmap.md), step 10). The packs after step 0 are taken in order, each one landing whole. The decisions still open are listed at the end. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
 
 ## Why
 
@@ -137,12 +137,12 @@ Done when: ten years of twelve entries in a CSV become a ranking race readable i
 
 ### Step 9. Maps (`maps.js`)
 
-- [ ] The data: Natural Earth (public domain) countries and first-level regions at 1:110m and 1:50m and its populated places, simplified and quantised by `scripts/packs/maps.ts` into `plugins/maps/`. The tool writes into the project only the shapes the map shows (`assets/maps/<id>.json`).
-- [ ] The `map` node: the shapes projected (equirectangular, Natural Earth, Mercator at city scale, an orthographic globe); countries filled from the tokens, the chosen ones in the accent, values on a sequential scale from plate to accent; borders, pins with their labels kept apart, routes as great circles drawn on with a dot at their head. A camera (centre, zoom, rotation) is animatable, and a flight between two places zooms out and in along the way (van Wijk and Nuij's smooth zoom).
-- [ ] The `map` tool (`/map`): places named in words found among the shipped places and countries (offline, no provider; an ambiguous name asked back), the projection and the framing chosen from what is shown, a route keyed in step with a line of voice-over when one is given.
-- [ ] The `map-legibility` check: highlighted places too small to see at their zoom, overlapping labels, a flight faster than the eye follows.
-- [ ] `export.svg` for a still map.
-- [ ] Tests: the projections (known points), the place search (accents, aliases, ambiguity), the great circle, the smooth zoom, an asset holding only what is shown.
+- [x] The data: Natural Earth (public domain) countries and first-level regions at 1:110m and 1:50m and its populated places, simplified and quantised by `scripts/packs/maps.ts` into `plugins/maps/`. The tool writes into the project only the shapes the map shows (`assets/maps/<id>.json`).
+- [x] The `map` node: the shapes projected (equirectangular, Natural Earth, Mercator at city scale, an orthographic globe); countries filled from the tokens, the chosen ones in the accent, values on a sequential scale from plate to accent; borders, pins with their labels kept apart, routes as great circles drawn on with a dot at their head. A camera (centre, zoom, rotation) is animatable, and a flight between two places zooms out and in along the way (van Wijk and Nuij's smooth zoom).
+- [x] The `map` tool (`/map`): places named in words found among the shipped places and countries (offline, no provider; an ambiguous name asked back), the projection and the framing chosen from what is shown, a route keyed in step with a line of voice-over when one is given.
+- [x] The `map-legibility` check: highlighted places too small to see at their zoom, overlapping labels, a flight faster than the eye follows.
+- [x] `export.svg` for a still map.
+- [x] Tests: the projections (known points), the place search (accents, aliases, ambiguity), the great circle, the smooth zoom, an asset holding only what is shown.
 
 Done when: "our offices in Lyon, Montreal and Dakar" gets a map with three pins and a camera travelling between them, offline, the project holding only those countries.
 
