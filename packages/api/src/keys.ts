@@ -17,17 +17,17 @@
 
 import type { Bucket } from './bucket.ts';
 import { HttpError, json, readJson } from './http.ts';
+import KEYED from './keyed-providers.json' with { type: 'json' };
 
-export const PROVIDERS = ['anthropic', 'openai', 'gemini', 'openrouter', 'zai', 'elevenlabs', 'hydracept'] as const;
-export type KeyedProvider = typeof PROVIDERS[number];
+export type KeyedProvider = keyof typeof KEYED;
 
 /** a setting a provider takes next to its key (never a secret: the editor may show it) */
 export interface ProviderField { name: string; required?: boolean }
-/** the settings of the providers that take more than a key */
-export const PROVIDER_FIELDS: Partial<Record<KeyedProvider, ProviderField[]>> = {
-  hydracept: [{ name: 'project', required: true }, { name: 'environment' }],
-};
-const fieldsOf = (p: KeyedProvider) => PROVIDER_FIELDS[p] ?? [];
+/** each provider: where it answers (its key goes nowhere else) and the settings it takes next to its key;
+ * keyed-providers.json, which the desktop app builds in too (apps/desktop/src-tauri/src/keys.rs) */
+export const KEYED_PROVIDERS: Record<KeyedProvider, { origin: string; fields?: ProviderField[] }> = KEYED;
+export const PROVIDERS = Object.keys(KEYED_PROVIDERS) as KeyedProvider[];
+const fieldsOf = (p: KeyedProvider) => KEYED_PROVIDERS[p].fields ?? [];
 
 /** a provider of the OpenAI chat format added by the user: its name, its address (…/v1) and its key, if it takes one */
 export interface Custom { id: string; label: string; base: string; key?: string }

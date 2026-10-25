@@ -3,18 +3,10 @@
 // by the Worker). Every other address (Z.AI, custom providers, a picture Z.AI
 // names) goes through the Worker's relay, which keeps nothing.
 
-import { PROVIDERS, type KeyedProvider } from './keys.ts';
+import { KEYED_PROVIDERS, PROVIDERS, type KeyedProvider } from './keys.ts';
 
 /** where each provider answers */
-export const PROVIDER_ORIGINS: Record<KeyedProvider, string> = {
-  anthropic: 'https://api.anthropic.com',
-  openai: 'https://api.openai.com',
-  gemini: 'https://generativelanguage.googleapis.com',
-  openrouter: 'https://openrouter.ai',
-  zai: 'https://api.z.ai',
-  elevenlabs: 'https://api.elevenlabs.io',
-  hydracept: 'https://api.hydracept.com',
-};
+export const PROVIDER_ORIGINS = Object.fromEntries(PROVIDERS.map((p) => [p, KEYED_PROVIDERS[p].origin])) as Record<KeyedProvider, string>;
 
 /** the providers that refuse cross-origin requests (no CORS answer to a preflight, checked on 2026-10-06; Hydracept on 2026-10-21) */
 const NO_CORS = new Set<KeyedProvider>(['zai', 'hydracept']);
