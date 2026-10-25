@@ -50,6 +50,8 @@ class Preview {
   private media: HTMLAudioElement[] = [];
   private timers: ReturnType<typeof setTimeout>[] = [];
   private clock = { at: 0, t0: 0, audio: false };
+  /** the playback started last: a start still loading its sounds when another begins (or a pause) schedules nothing */
+  private playRun = 0;
   private refineTimer: ReturnType<typeof setTimeout> | null = null;
   /** last rendered frame time (ms), shown in the transport */
   lastMs = 0;
@@ -465,6 +467,10 @@ class Preview {
 
   private async play(from = S.time.peek()) {
     this.stopAudio();
+    const run = this.playRun;
+    // the clock starts at once, before the sounds load: the frames drawn meanwhile read the new start, not the last playback
+    // (the audio context runs on while paused: its old clock would land past the end, wrap and start the sound again)
+    this.clock = { at: performance.now() / 1000, t0: from, audio: false };
     const doc = viewDoc.peek();
     // audio layers and the sound of videos, each from its in point to its out point (the cuts)
     const solo = S.solo.peek();
@@ -480,15 +486,14 @@ class Preview {
       this.level.connect(limiter).connect(this.master);
     }
     if (this.audio) await this.audio.resume();
-    this.clock = { at: this.now(), t0: from, audio: false };
-    if (!this.audio || !this.renderer || !clips.length) return;
+    if (!this.audio || !this.renderer || !clips.length || run !== this.playRun) return;
     const r = this.renderer, ctx = this.audio, compId = compIdOf(doc);
     this.levelOf(doc, compId);
     const sounds = clips.filter((c) => doc.assets[c.asset].type !== 'video');
     const bufs = await Promise.all(sounds.map((c) => this.buffer(r.assets.url(c.asset))));
     // the pitch worklet, before the clock starts
     if (clips.some(needsPitch)) await loadPitch(ctx).catch(() => {});
-    if (!S.playing.peek()) return;
+    if (!S.playing.peek() || run !== this.playRun) return;
     const startAt = ctx.currentTime + 0.03;
     this.clock = { at: startAt, t0: from, audio: true };
     // the mixer of the exports: filters, gain curves, fades, reverb and the shared room sound the same here
@@ -547,6 +552,7 @@ class Preview {
   }
 
   private stopAudio() {
+    this.playRun++;
     this.playOut?.disconnect();
     this.playOut = null;
     for (const s of this.sources) { try { s.stop(); } catch { /* not started */ } }
