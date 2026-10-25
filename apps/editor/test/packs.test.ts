@@ -30,9 +30,13 @@ import { activity, zoomKeys, clicksOf, sampleTimes } from '../../../plugins/scre
 import * as screencast from '../../../plugins/screencast.js';
 import { held, jitter, roughPath, hachure, boilAt } from '../../../plugins/handmade.js';
 import * as handmade from '../../../plugins/handmade.js';
+import { parseScript, readingTime, scrollFor } from '../../../plugins/chat.js';
+import * as chat from '../../../plugins/chat.js';
+import { searchEmoji } from '../../../plugins/emoji.js';
+import * as emoji from '../../../plugins/emoji.js';
 
 // the packs are JavaScript on purpose: their shape is checked at runtime by Registry.use, which these tests run
-const PACKS = [charts, kinetic, a11y, physics, styk, icons, diagram, walkthrough, localize, codeview, rhythm, screencast, handmade] as unknown as import('@tramme/core').PluginModule[];
+const PACKS = [charts, kinetic, a11y, physics, styk, icons, diagram, walkthrough, localize, codeview, rhythm, screencast, handmade, chat, emoji] as unknown as import('@tramme/core').PluginModule[];
 
 /** the shipped index, as the script writes it: each entry's commands and their French */
 const INDEX: { file: string; name: string; description?: string; commands?: { name: string; title: string; description: string }[]; fr?: Record<string, string> }[] =
@@ -537,6 +541,83 @@ describe('handmade', () => {
     doc.compositions.main.order = ['t'];
     const r = await runTool(handmade.tools[0], doc, { kind: 'circle', layer: 't' });
     for (const b of boxesOf(applyOps(doc, r.ops).doc)) expect(inside(b, 1080, 1920)).toBe(true);
+  });
+});
+
+describe('chat', () => {
+  it('reads the script, accents and emoji whole', () => {
+    const lines = parseScript('A: hi 👋\nB: [2s] yo');
+    expect(lines).toEqual([{ who: 'A', text: 'hi 👋' }, { who: 'B', text: 'yo', at: 2 }]);
+    const accented = parseScript('Zoé: ça va ?');
+    expect(accented).toEqual([{ who: 'Zoé', text: 'ça va ?' }]);
+  });
+
+  it('times the lines by reading', () => {
+    expect(readingTime('one two three')).toBeCloseTo(1.21, 1);
+    expect(readingTime('')).toBeCloseTo(0.9, 2);
+    // a reply that takes thought pauses longer before it types
+    const tl = chat.timeline('A: hello there\nB: a much longer answer that takes thought');
+    expect(tl.items[1].typing).toBeGreaterThan(tl.items[0].typing);
+    expect(tl.items[0].read).toBeCloseTo(readingTime('hello there'), 2);
+  });
+
+  it('keeps the last message in view', () => {
+    expect(scrollFor([100, 100, 100], 250)[2]).toBe(50);
+    expect(scrollFor([100, 100], 400)).toEqual([0, 0]);
+  });
+
+  it('the reading check flags a message pushed away too fast', () => {
+    const placed = (script: string, span: number) => ({ id: 'thread', layer: { name: 'Thread', type: 'chat.thread' }, node: { type: 'chat.thread' }, props: { script, size: 30, progress: { $k: [{ t: 0, v: 0 }, { t: span, v: 1 }] } }, opacity: 1, box: null });
+    const comp = { width: 1080, height: 1920, fps: 30, duration: 10 };
+    const run = (script: string, span: number) => chat.checks[0].run({ doc: {}, compId: 'main', comp, registry: null, evaluator: null, step: 0.25, samples: [{ t: 0, layers: [placed(script, span)] }] } as never) as { severity: string }[];
+    const script = 'A: hello there\nB: a longer answer\nC: final line';
+    expect(run(script, 12).filter((i) => i.severity === 'warning').length).toBe(0);
+    expect(run(script, 4).some((i) => i.severity === 'warning')).toBe(true);
+  });
+
+  it('the tool times a thread, full frame in 9:16 and in the phone in 16:9', async () => {
+    const script = 'A: are you seeing this?\nB: just landed 👀\nA: no way';
+    for (const [w, h] of [[1080, 1920], [1920, 1080]] as [number, number][]) {
+      const { doc } = newProject({ name: 'T', width: w, height: h, fps: 30, duration: 12 });
+      const out = await runTool(chat.tools[0], doc, { script });
+      expect(out.ops.length).toBeGreaterThan(0);
+      for (const b of boxesOf(applyOps(doc, out.ops).doc)) expect(inside(b, w, h)).toBe(true);
+      expect(out.text).toMatch(/timed by reading/);
+    }
+  });
+});
+
+describe('emoji', () => {
+  const index = {
+    emoji: [
+      { name: 'partying face', file: 'partying-face.svg', codepoint: '1F389', keywords: ['partying', 'face'] },
+      { name: 'fire', file: 'fire.svg', codepoint: '1F525', keywords: ['fire'] },
+      { name: 'sparkles', file: 'sparkles.svg', codepoint: '2728', keywords: ['sparkles'] },
+    ],
+  };
+
+  it('finds by name, keyword and character', () => {
+    expect(searchEmoji(index, 'party')).toContain('partying face');
+    expect(searchEmoji(index, 'fire')[0]).toBe('fire');
+    expect(searchEmoji(index, '🔥')[0]).toBe('fire');
+    expect(searchEmoji(index, 'zzzq')).toEqual([]);
+  });
+
+  it('places the emoji as picture layers, only the files used copied', async () => {
+    const data = readFileSync(new URL('../../../plugins/emoji/index.json', import.meta.url), 'utf8');
+    const { doc } = newProject({ name: 'T', width: 1080, height: 1920, fps: 30, duration: 6 });
+    const written = new Map<string, string>();
+    const out = await runTool(emoji.tools[0], doc, { emoji: 'fire, sparkles', layout: 'row', size: 240 }, {
+      files: { 'index.json': data },
+      extra: { writeFile: async (path: string, text: string) => { written.set(path, text as string); return path; } },
+    });
+    const next = applyOps(doc, out.ops).doc;
+    const images = Object.values(next.assets).filter((x) => x.type === 'image');
+    expect(images).toHaveLength(2);
+    expect(written.size).toBe(2);
+    const layers = Object.values(next.compositions.main.layers).filter((l) => l.type === 'image');
+    expect(layers).toHaveLength(2);
+    for (const b of boxesOf(next)) expect(inside(b, 1080, 1920)).toBe(true);
   });
 });
 

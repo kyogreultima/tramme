@@ -106,3 +106,19 @@ Made by hand: strokes that boil, motion on twos, rough sketches and annotations 
 - Nodes: `sketch.shape` — Sketch
 - Checks: none
 
+## Chat
+
+Conversations for short videos: a script timed by reading, bubbles entering, typing indicators, the thread scrolling; notifications for the cold open
+
+- Tools: `/chat` — Play a conversation
+- Nodes: `chat.thread` — Chat thread, `chat.notice` — Notification
+- Checks: `chat-reading` — Chat reading
+
+## Emoji
+
+Emoji as pictures: the 300 most used (Fluent Emoji Flat, MIT) shipped as SVG, found by name or character, drawing the same on every machine
+
+- Tools: `/emoji` — Place an emoji
+- Nodes: none
+- Checks: none
+

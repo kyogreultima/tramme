@@ -196,5 +196,42 @@
       "Annotate a layer": "Annoter une couche",
       "a rough circle, underline, box, highlight, strike or bracket around a layer, drawn on a beat after it lands, following it when it moves": "un cercle, un souligné, un cadre, un surlignage, une rature ou un crochet dessinés autour d’une couche, tracés un temps après qu’elle est posée, qui la suivent quand elle bouge"
     }
+  },
+  {
+    "file": "chat.js",
+    "name": "Chat",
+    "description": "Conversations for short videos: a script timed by reading, bubbles entering, typing indicators, the thread scrolling; notifications for the cold open",
+    "version": "1.0.0",
+    "commands": [
+      {
+        "name": "chat",
+        "title": "Play a conversation",
+        "description": "a text-message story timed by reading: bubbles entering, typing indicators, the thread scrolling — in the walkthrough pack's phone, or full frame in 9:16"
+      }
+    ],
+    "fr": {
+      "Play a conversation": "Jouer une conversation",
+      "a text-message story timed by reading: bubbles entering, typing indicators, the thread scrolling — in the walkthrough pack's phone, or full frame in 9:16": "une histoire en messages chronométrée à la lecture : des bulles qui entrent, des indicateurs de saisie, le fil qui défile — dans le téléphone du pack visite guidée, ou plein cadre en 9:16"
+    }
+  },
+  {
+    "file": "emoji.js",
+    "name": "Emoji",
+    "description": "Emoji as pictures: the 300 most used (Fluent Emoji Flat, MIT) shipped as SVG, found by name or character, drawing the same on every machine",
+    "data": [
+      "index.json"
+    ],
+    "version": "1.0.0",
+    "commands": [
+      {
+        "name": "emoji",
+        "title": "Place an emoji",
+        "description": "one or several emoji as picture layers, found by name or by the character itself, the files they use copied into the project so they draw the same everywhere"
+      }
+    ],
+    "fr": {
+      "Place an emoji": "Placer un emoji",
+      "one or several emoji as picture layers, found by name or by the character itself, the files they use copied into the project so they draw the same everywhere": "un ou plusieurs emoji comme couches d’image, trouvés par nom ou par le caractère lui-même, les fichiers utilisés copiés dans le projet pour qu’ils se dessinent pareil partout"
+    }
   }
 ]

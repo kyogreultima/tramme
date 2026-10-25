@@ -2,7 +2,7 @@
 
 The general-purpose plugin packs that ship with the editor (`plugins/*.js`, listed in `plugins/index.json`, added to a project from the Code section): the ones to come, and what tramme needs first so they can exist. A pack is an ordinary plugin. It gives the assistant and the editor a new vocabulary — what they can build in one move, what they can check — for any film, never for one video.
 
-Status: steps 0 to 7 are shipped (step 5 keeps its real recordings to check on a device). Shipped packs: charts, kinetic type, physics, stick figures, icons, diagrams, UI walkthrough, accessibility checks, localization ([plugins-roadmap.md](plugins-roadmap.md), step 10). The packs after step 0 are taken in order, each one landing whole. The decisions still open are listed at the end. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
+Status: steps 0 to 8 are shipped (step 5 keeps its real recordings to check on a device; step 7 keeps its set of 300 emoji to confirm on a device). Shipped packs: charts, kinetic type, physics, stick figures, icons, diagrams, UI walkthrough, accessibility checks, localization ([plugins-roadmap.md](plugins-roadmap.md), step 10). The packs after step 0 are taken in order, each one landing whole. The decisions still open are listed at the end. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
 
 ## Why
 
@@ -115,12 +115,12 @@ Done when: the key sentence of an explainer gets a circle drawn around it a beat
 
 The text-message stories of short videos, and the emoji that come with them.
 
-- [ ] `emoji.js`: an emoji set shipped beside the pack (decision 7), the `emoji` tool placing one or several as picture layers (only those files copied into the project), found by name or by the character itself. Never the system's emoji font, which draws differently on every machine.
-- [ ] The `chat.thread` node: a conversation from a script (`A: …`, `B: …`, a time per line or the reading time of the line before), bubbles entering on a spring, a typing indicator before each incoming message, the thread scrolling up as it grows, reactions and pictures in bubbles. Its look comes from the tokens and stays generic: no messaging app's look or name.
-- [ ] The `chat.notice` node: notifications that drop in and stack (a sender, a line, a time), for the cold open of a story.
-- [ ] The `chat` tool (`/chat`): the script in the walkthrough pack's phone, or full frame in 9:16, timed by reading, a reply that takes thought pausing longer.
-- [ ] The `chat-reading` check: a message pushed away before its reading time, a typing indicator under 0.4 s.
-- [ ] Tests: the script parser, the timing by reading, the scroll keeping the last message in view.
+- [x] `emoji.js`: an emoji set shipped beside the pack (decision 7), the `emoji` tool placing one or several as picture layers (only those files copied into the project), found by name or by the character itself. Never the system's emoji font, which draws differently on every machine.
+- [x] The `chat.thread` node: a conversation from a script (`A: …`, `B: …`, a time per line or the reading time of the line before), bubbles entering on a spring, a typing indicator before each incoming message, the thread scrolling up as it grows, reactions and pictures in bubbles. Its look comes from the tokens and stays generic: no messaging app's look or name.
+- [x] The `chat.notice` node: notifications that drop in and stack (a sender, a line, a time), for the cold open of a story.
+- [x] The `chat` tool (`/chat`): the script in the walkthrough pack's phone, or full frame in 9:16, timed by reading, a reply that takes thought pausing longer.
+- [x] The `chat-reading` check: a message pushed away before its reading time, a typing indicator under 0.4 s.
+- [x] Tests: the script parser, the timing by reading, the scroll keeping the last message in view.
 
 Done when: a twelve-line text story plays in 9:16 at a pace that can be read, typing pauses included, its emoji the same on every machine.
 
