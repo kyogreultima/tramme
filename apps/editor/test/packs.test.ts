@@ -22,9 +22,11 @@ import * as physics from '../../../plugins/physics.js';
 import * as styk from '../../../plugins/styk.js';
 import * as walkthrough from '../../../plugins/walkthrough.js';
 import * as localize from '../../../plugins/localize.js';
+import { lex, tokenDiff, typingTimes, parseSession, maxLines } from '../../../plugins/codeview.js';
+import * as codeview from '../../../plugins/codeview.js';
 
 // the packs are JavaScript on purpose: their shape is checked at runtime by Registry.use, which these tests run
-const PACKS = [charts, kinetic, a11y, physics, styk, icons, diagram, walkthrough, localize] as unknown as import('@tramme/core').PluginModule[];
+const PACKS = [charts, kinetic, a11y, physics, styk, icons, diagram, walkthrough, localize, codeview] as unknown as import('@tramme/core').PluginModule[];
 
 /** the shipped index, as the script writes it: each entry's commands and their French */
 const INDEX: { file: string; name: string; description?: string; commands?: { name: string; title: string; description: string }[]; fr?: Record<string, string> }[] =
@@ -227,6 +229,87 @@ describe('the packs index', () => {
     expect(packUpdates(doc, packs, { 'plugins/charts.js': '1.1.0' })).toEqual([]);
     expect(packUpdates(doc, packs, { 'plugins/charts.js': '1.2.0' })).toEqual([]);
     expect(packUpdates(doc, packs, { 'plugins/mine.js': '0.0.1' })).toEqual([]);
+  });
+});
+
+describe('codeview', () => {
+  it('lexes the languages it says, nothing dropped', () => {
+    expect(lex('const a = "x"; // c', 'js').map((t) => t.kind)).toEqual(['kw', 'ws', 'id', 'ws', 'op', 'ws', 'str', 'punct', 'ws', 'com']);
+    const py = lex('def f(x):\n\treturn 1', 'py');
+    expect(py[0]).toMatchObject({ text: 'def', kind: 'kw' });
+    // the newline and its tab are one whitespace token
+    expect(py.find((t) => t.text.includes('\t'))).toEqual({ text: '\n\t', kind: 'ws' });
+    expect(lex('def f(x):\n\treturn 1', 'py').map((t) => t.text).join('')).toBe('def f(x):\n\treturn 1');
+    expect(lex('s = "日本"', 'py').map((t) => t.text).join('')).toBe('s = "日本"');
+    // a token colour the eye follows: the identifier called like a function is its own kind
+    expect(lex('ship()', 'js')[0].kind).toBe('fn');
+    expect(lex('{"a": 1}', 'json').map((t) => t.kind)).toContain('type');
+    expect(lex('# head', 'sh')[0].kind).toBe('com');
+  });
+
+  it('diffs two versions by their shared tokens', () => {
+    const d = tokenDiff(lex('a+b', 'js'), lex('a-b', 'js'));
+    expect(d.kept).toEqual([[0, 0], [2, 2]]);
+    expect(d.removed).toEqual([1]);
+    expect(d.added).toEqual([1]);
+    expect(tokenDiff(lex('a', 'js'), []).kept).toEqual([]);
+    expect(tokenDiff([], lex('a', 'js')).added).toEqual([0]);
+  });
+
+  it('types at an uneven, seeded, readable rhythm', () => {
+    const a = typingTimes('hello', 1), b = typingTimes('hello', 1), c = typingTimes('hello', 2);
+    expect(a.every((t, i) => i === 0 || t > a[i - 1])).toBe(true);
+    expect(a).toEqual(b);
+    expect(a).not.toEqual(c);
+    // a pause at the line's end
+    const lines = typingTimes('ab\ncd', 3);
+    expect(lines[3] - lines[1]).toBeGreaterThan(2 / 18);
+  });
+
+  it('reads the session script', () => {
+    expect(parseSession('$ npm test\n...\n> 3 passed')).toEqual([
+      { kind: 'cmd', text: 'npm test' },
+      { kind: 'wait', text: '...', seconds: 1 },
+      { kind: 'out', text: '3 passed' },
+    ]);
+    expect(parseSession('$ build\n... 2.5')).toContainEqual({ kind: 'wait', text: '... 2.5', seconds: 2.5 });
+  });
+
+  it('the tool cuts a long file to what fits and says so, in both formats', async () => {
+    const big = Array.from({ length: 2000 }, (_, i) => `const v${i} = ${i};`).join('\n');
+    for (const [w, h] of [[1920, 1080], [1080, 1920]] as [number, number][]) {
+      const { doc } = newProject({ name: 'T', width: w, height: h, fps: 30, duration: 8 });
+      const out = await runTool(codeview.tools[0], doc, { code: big, lang: 'js', size: 24, title: 'big.js' });
+      const next = applyOps(doc, out.ops).doc;
+      const cid = Object.keys(next.compositions).find((k) => k.startsWith('code-'))!;
+      const layer = Object.values(next.compositions[cid].layers).find((l) => l.type === 'codeview.code')!;
+      const panel = layer.props!.panel as [number, number];
+      expect((layer.props!.code as string).split('\n').length).toBeLessThanOrEqual(maxLines(panel[1], 24));
+      if (w === 1920) expect(out.text).toMatch(/left out/);
+    }
+  });
+
+  it('the legibility check flags small type in either format', () => {
+    const placed = (props: object, name: string) => ({ id: name.toLowerCase(), layer: { name, type: 'codeview.code' }, node: { type: 'codeview.code' }, props, opacity: 1, box: null });
+    const run = (width: number, height: number, size: number) => codeview.checks[0].run({
+      doc: {}, compId: 'main', comp: { width, height }, registry: null, evaluator: null, step: 0.25,
+      samples: [{ t: 0, layers: [placed({ code: 'const a = 1', size, panel: [900, 500] }, 'Code')] }],
+    } as never) as { message: string }[];
+    expect(run(1920, 1080, 20).length).toBeGreaterThan(0);
+    expect(run(1080, 1920, 26).length).toBeGreaterThan(0);
+    expect(run(1920, 1080, 26)).toEqual([]);
+  });
+
+  it('falls back without a kit', async () => {
+    const doc = newProject({ name: 'T', width: 1920, height: 1080, fps: 30, duration: 6 }).doc;
+    const r = await runTool(codeview.tools[0], doc, { code: 'const a = 1;' });
+    expect(r.ops.length).toBeGreaterThan(0);
+  });
+
+  it('fits 9:16', async () => {
+    const doc = newProject({ name: 'T', width: 1080, height: 1920, fps: 30, duration: 6 }).doc;
+    const r = await runTool(codeview.tools[0], doc, { code: 'function ship(x) {\n  return x + 1;\n}', title: 'ship.js' });
+    for (const b of boxesOf(applyOps(doc, r.ops).doc)) expect(inside(b, 1080, 1920)).toBe(true);
   });
 });
 

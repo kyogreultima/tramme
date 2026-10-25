@@ -64,7 +64,7 @@
       "Lay out a walkthrough": "Monter une visite guidée",
       "a sequence of screenshots in a phone or a browser frame, one composition, a cut per screen, each with an optional caption and a slow scroll": "une suite de captures dans un cadre de téléphone ou de navigateur, une composition, une coupe par écran, chacune avec une légende optionnelle et un défilement lent"
     },
-    "version": "1.0.0"
+    "version": "1.1.0"
   },
   {
     "file": "a11y.js",
@@ -134,5 +134,22 @@
       "a flow, architecture, cycle or tree written as flowchart text (a Mermaid subset) or JSON, laid out layered, ring or hub, and built as editable boxes, labels and edges that draw themselves in reading order; one route can be highlighted": "un flux, une architecture, un cycle ou un arbre écrit en texte flowchart (un sous-ensemble de Mermaid) ou JSON, disposé en couches, anneau ou étoile, et construit en boîtes, libellés et arêtes éditables qui se tracent dans l'ordre de lecture ; une route peut être mise en avant"
     },
     "version": "1.0.0"
+  },
+  {
+    "file": "codeview.js",
+    "name": "Code view",
+    "description": "Code and a terminal on screen: a lexer's colours, typing at a human rhythm, a change between two versions, a session that runs",
+    "version": "1.0.0",
+    "commands": [
+      {
+        "name": "code-screen",
+        "title": "Show code on screen",
+        "description": "code or a terminal session in a window frame, typed at a readable rhythm, the lines that matter highlighted, a long file cut to what fits"
+      }
+    ],
+    "fr": {
+      "Show code on screen": "Montrer du code à l’écran",
+      "code or a terminal session in a window frame, typed at a readable rhythm, the lines that matter highlighted, a long file cut to what fits": "du code ou une session de terminal dans un cadre de fenêtre, tapé à un rythme lisible, les lignes qui comptent soulevées, un long fichier coupé à ce qui tient"
+    }
   }
 ]

@@ -2,7 +2,7 @@
 
 The general-purpose plugin packs that ship with the editor (`plugins/*.js`, listed in `plugins/index.json`, added to a project from the Code section): the ones to come, and what tramme needs first so they can exist. A pack is an ordinary plugin. It gives the assistant and the editor a new vocabulary — what they can build in one move, what they can check — for any film, never for one video.
 
-Status: steps 0, 1 and 2 are shipped. Shipped packs: charts, kinetic type, physics, stick figures, icons, diagrams, UI walkthrough, accessibility checks, localization ([plugins-roadmap.md](plugins-roadmap.md), step 10). The packs after step 0 are taken in order, each one landing whole. The decisions still open are listed at the end. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
+Status: steps 0 to 3 are shipped. Shipped packs: charts, kinetic type, physics, stick figures, icons, diagrams, UI walkthrough, accessibility checks, localization ([plugins-roadmap.md](plugins-roadmap.md), step 10). The packs after step 0 are taken in order, each one landing whole. The decisions still open are listed at the end. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
 
 ## Why
 
@@ -61,13 +61,15 @@ Done when: a six-step pipeline written in one line of text becomes a diagram tha
 
 Programs on screen, for developer tools and product films: code that types, changes and points at itself, and a terminal that runs.
 
-- [ ] The `codeview.code` node: code in the kit's mono typeface, coloured by a lexer written in the pack (JavaScript and TypeScript, Python, Rust, Go, shell, JSON, YAML, SQL, HTML, CSS: keywords, strings, numbers, comments, functions, punctuation), its colours derived from the tokens at a contrast of 4.5:1 at least (decision 6); line numbers, highlighted lines (the others dimmed), typing (`typed`, 0 to 1: characters at a seeded human rhythm, a pause at each line's end, the caret blinking at rest), scrolling to a line.
-- [ ] A change between two versions (`from`, `to`, `progress`): the tokens both share slide to their new place, the removed ones fade out, the new ones type in (a diff of tokens by longest common subsequence), the way a code change is shown in a talk.
-- [ ] The `codeview.terminal` node: a session written as a script (`$ npm run build`, its output, its waits): commands typed, output arriving in chunks, spinners and progress bars stepping with time, ANSI colours mapped to the tokens.
-- [ ] The window around them: the walkthrough pack's `device` node gains a `window` kind (title bar and tabs, no address bar), so tramme has one family of frames, not two.
-- [ ] The `code-screen` tool (`/code-screen`): code from the words, from a file joined to the message or from a project file, laid in the window at a size the format can read; a long file cut to the lines that matter, the rest folded; each line typed or shown for its reading time.
-- [ ] The `code-legibility` check: type under 24 px on a 1080-pixel-high frame (28 px in 9:16), more lines than fit at that size, a line typed faster than it can be read.
-- [ ] Tests: the lexer on each language (a known line into its tokens), the token diff, the typing rhythm (deterministic, ending on the full text), the terminal script and its ANSI codes.
+- [x] The `codeview.code` node: code in the kit's mono typeface, coloured by a lexer written in the pack (JavaScript and TypeScript, Python, Rust, Go, shell, JSON, YAML, SQL, HTML, CSS: keywords, strings, numbers, comments, functions, punctuation), its colours derived from the tokens at a contrast of 4.5:1 at least (decision 6); line numbers, highlighted lines (the others dimmed), typing (`typed`, 0 to 1: characters at a seeded human rhythm, a pause at each line's end, the caret blinking at rest), scrolling to a line.
+- [x] A change between two versions (`from`, `to`, `progress`): the tokens both share slide to their new place, the removed ones fade out, the new ones type in (a diff of tokens by longest common subsequence), the way a code change is shown in a talk.
+- [x] The `codeview.terminal` node: a session written as a script (`$ npm run build`, its output, its waits): commands typed, output arriving in chunks, spinners and progress bars stepping with time, ANSI colours mapped to the tokens.
+- [x] The window around them: the walkthrough pack's `device` node gains a `window` kind (title bar and tabs, no address bar), so tramme has one family of frames, not two.
+- [x] The `code-screen` tool (`/code-screen`): code from the words, from a file joined to the message or from a project file, laid in the window at a size the format can read; a long file cut to the lines that matter, the rest folded; each line typed or shown for its reading time.
+- [x] The `code-legibility` check: type under 24 px on a 1080-pixel-high frame (28 px in 9:16), more lines than fit at that size, a line typed faster than it can be read.
+- [x] Tests: the lexer on each language (a known line into its tokens), the token diff, the typing rhythm (deterministic, ending on the full text), the terminal script and its ANSI codes.
+
+  Tried in the tests on synthetic code in both formats; a developer tool's real film is to check on a device (to try: a typed build, a fixed function, a 9:16 terminal).
 
 Done when: a developer tool's film shows a command typed and run, then a function changing into its fixed version, each readable on a phone.
 

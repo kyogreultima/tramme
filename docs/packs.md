@@ -74,3 +74,11 @@ Flows, architectures, cycles and trees from flowchart text (a Mermaid subset), l
 - Nodes: none
 - Checks: `diagram-legibility` — Diagram legibility
 
+## Code view
+
+Code and a terminal on screen: a lexer's colours, typing at a human rhythm, a change between two versions, a session that runs
+
+- Tools: `/code-screen` — Show code on screen
+- Nodes: `codeview.code` — Code, `codeview.terminal` — Terminal
+- Checks: `code-legibility` — Code legibility
+
