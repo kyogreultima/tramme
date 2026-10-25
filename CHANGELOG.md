@@ -8,6 +8,10 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+### Added
+
+- **The packs' commands on the home screen**: the direction box's `/` menu lists the shipped packs' tools after the built-in ones, before a project opens — a pack command a project does not hold yet waits in the editor's box until the project's packs attach. The list comes from an index generated from the packs themselves (`npm run packs:index`: `plugins/index.json` gains each pack's commands and their French, `docs/packs.md` the site's new Packs page), which CI checks cannot go stale.
+
 ## [0.13.0] - 2026-10-25
 
 ### Added

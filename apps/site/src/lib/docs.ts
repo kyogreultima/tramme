@@ -39,6 +39,7 @@ export const DOCS: { label: string; collapsed?: boolean; pages: DocPage[] }[] = 
     pages: [
       { slug: 'document', label: 'Document format', file: 'docs/document.md' },
       { slug: 'project', label: 'Project format', file: 'docs/project.md' },
+      { slug: 'packs', label: 'Packs', file: 'docs/packs.md' },
       { slug: 'i18n', label: 'Interface languages', file: 'docs/i18n.md' },
       { slug: 'tours', label: 'Guided tours', file: 'docs/tours.md' },
     ],

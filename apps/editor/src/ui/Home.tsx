@@ -16,7 +16,8 @@ import { ago } from '../model.ts';
 import { createFromWords, droppedOf, importArchive, ImportError, importFile, importSources, importVideo, isSourceFile, isVideoFile, pickedOf, type Picked, type Progress } from '../importer.ts';
 import { kindOf } from '../sources.ts';
 import { S, toast } from '../state.ts';
-import { listCommands } from '../ai/commands.ts';
+import { listCommands, type Command } from '../ai/commands.ts';
+import { packCommands, shippedPacks } from '../packs.ts';
 import { useCommandMenu } from './composer.tsx';
 import { Modal, longPress, openMenu, Seg } from './controls.tsx';
 import { Icon } from './icons.tsx';
@@ -194,8 +195,11 @@ function DirectionBox({ busy, onStart }: { busy: boolean; onStart: (words: strin
   const add = (list: Picked[]) => setMaterial((had) => [...had, ...list.filter((p) => !had.some((h) => h.path === p.path))]);
   const ready = !busy && (words.trim().length > 0 || material.length > 0);
   const start = () => { if (!ready) return; const f = FILM_FORMATS.find(([id]) => id === format)!; onStart(words.trim(), material, [f[2], f[3]]); };
-  // the / menu, as in the message box: a workflow starts the project with it, a tool waits in the editor's box with its form
-  const commands = useMemo(() => listCommands(S.registry.value), [S.registry.value]);
+  // the / menu, as in the message box: a workflow starts the project with it, a tool waits in the editor's box with its form.
+  // The shipped packs' commands come from the index, so the menu offers them before a project holds any pack.
+  const [packCmds, setPackCmds] = useState<Command[]>([]);
+  useEffect(() => { void shippedPacks().then((p) => setPackCmds(packCommands(p))); }, []);
+  const commands = useMemo(() => [...listCommands(S.registry.value), ...packCmds], [S.registry.value, packCmds]);
   const commandMenu = useCommandMenu(words, commands, (c) => { setWords(`/${c.name} `); area.current?.focus(); });
   const chosen = (e: Event) => { const input = e.target as HTMLInputElement, list = pickedOf(input.files ?? []); input.value = ''; add(list); };
   return (

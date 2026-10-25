@@ -2,9 +2,9 @@
 // validates with its default props, the simulations are deterministic, and
 // the pure helpers (scales, layouts, contrast, retiming) answer as documented.
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { Registry, validate, type TrammeDoc, type ToolContext } from '@tramme/core';
+import { Evaluator, layerMatrix, matMul, Registry, validate, type Op, type TrammeDoc, type ToolContext } from '@tramme/core';
 import { builtinRegistry } from '@tramme/nodes';
 import { newProject } from '@tramme/project';
 import { niceMax, barSlots, linePoints, donutArcs, seriesOf } from '../../../plugins/charts.js';
@@ -25,6 +25,85 @@ import * as localize from '../../../plugins/localize.js';
 
 // the packs are JavaScript on purpose: their shape is checked at runtime by Registry.use, which these tests run
 const PACKS = [charts, kinetic, a11y, physics, styk, icons, diagram, walkthrough, localize] as unknown as import('@tramme/core').PluginModule[];
+
+/** the shipped index, as the script writes it: each entry's commands and their French */
+const INDEX: { file: string; name: string; description?: string; commands?: { name: string; title: string; description: string }[]; fr?: Record<string, string> }[] =
+  JSON.parse(readFileSync(new URL('../../../plugins/index.json', import.meta.url), 'utf8'));
+
+// packs.ts pulls the i18n module, which reads the theme at import: the few DOM bits it touches are stubbed
+vi.stubGlobal('window', { matchMedia: () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} }) });
+vi.stubGlobal('document', { hidden: true, hasFocus: () => false, documentElement: { dataset: {} }, querySelector: () => null });
+vi.stubGlobal('addEventListener', () => {});
+
+// ── the helpers every pack's tests share ─────────────────────
+
+let sharedRegistry: Registry | null = null;
+/** the built-in vocabulary with every shipped pack in it: the nodes' bounds, the tools' operations */
+const registryOf = () => (sharedRegistry ??= PACKS.reduce((reg, mod) => reg.use(mod as never, mod.meta?.name ?? 'x'), builtinRegistry().clone()));
+
+/** the last key time of a document: every layer holds its final state there */
+function lastKeyOf(doc: TrammeDoc): number {
+  let last = 0;
+  for (const comp of Object.values(doc.compositions))
+    for (const layer of Object.values(comp.layers))
+      for (const v of Object.values(layer.props ?? {})) {
+        const k = (v as { $k?: { t?: number }[] }).$k;
+        if (Array.isArray(k)) for (const key of k) last = Math.max(last, key.t ?? 0);
+      }
+  return last;
+}
+
+/** the bounds of each top-level layer, at its last key */
+function boxesOf(doc: TrammeDoc): { x: number; y: number; w: number; h: number }[] {
+  const comp = doc.compositions[doc.root], t = lastKeyOf(doc);
+  const frame = new Evaluator(doc, registryOf()).frame(t, doc.root);
+  const host = {
+    layerId: '', t, frame: Math.round(t * comp.fps), fps: comp.fps, width: comp.width, height: comp.height, duration: comp.duration,
+    asset: () => null, assetInfo: (id: string) => doc.assets[id], assetUrl: (id: string) => doc.assets[id]?.src ?? '',
+  };
+  const out: { x: number; y: number; w: number; h: number }[] = [];
+  for (const L of frame.layers) {
+    if (!comp.order.includes(L.id)) continue;
+    let r: { x: number; y: number; w: number; h: number } | null = null;
+    try { r = L.node.bounds?.(L.props, host as never) ?? null; } catch { r = null; }
+    if (!r) continue;
+    const m = matMul([1, 0, 0, 1, 0, 0], layerMatrix(L.transform));
+    const pts = [[r.x, r.y], [r.x + r.w, r.y], [r.x, r.y + r.h], [r.x + r.w, r.y + r.h]].map(([x, y]) => [m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5]]);
+    const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+    out.push({ x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) });
+  }
+  return out;
+}
+
+/** inside the frame (a pixel of slack for the rounding of the bounds) */
+const inside = (b: { x: number; y: number; w: number; h: number }, w: number, h: number) =>
+  b.x >= -1 && b.y >= -1 && b.x + b.w <= w + 1 && b.y + b.h <= h + 1;
+
+/** a pack tool run on a document: its context reads a pack's data files from disk (plugins/<stem>/<path>), or the files given */
+async function runTool(tool: { run: (input: never, ctx: ToolContext) => Promise<{ ops: unknown[]; text?: string }> }, doc: TrammeDoc, input: unknown, opts: { files?: Record<string, string> } = {}) {
+  const stems = INDEX.map((e) => e.file.replace(/\.js$/i, ''));
+  const ctx = {
+    doc, compId: doc.root, time: 0, selection: [], registry: registryOf(),
+    assetUrl: () => '', fileUrl: () => '', readText: async () => null,
+    files: async () => [], signal: new AbortController().signal,
+    writeFile: async (p: string) => p, renderStill: async () => '',
+    packFile: async (path: string) => {
+      if (opts.files?.[path] !== undefined) return opts.files[path];
+      for (const c of [`plugins/${path}`, ...stems.map((s) => `plugins/${s}/${path}`)]) {
+        try { return readFileSync(new URL(`../../../${c}`, import.meta.url), 'utf8'); } catch { /* next place */ }
+      }
+      throw new Error(`packFile: "${path}" not found beside the packs`);
+    },
+  } as unknown as ToolContext;
+  return tool.run(input as never, ctx) as Promise<{ ops: Op[]; text?: string }>;
+}
+
+/** the document after the tool's operations (a copy: the ops apply on a clean sheet) */
+function applyOps(doc: TrammeDoc, ops: { op: string; path: string; value?: unknown }[]): { doc: TrammeDoc } {
+  const next = JSON.parse(JSON.stringify(doc)) as TrammeDoc;
+  for (const op of ops) applyOp(next, op);
+  return { doc: next };
+}
 
 describe('the packs register', () => {
   it('each module registers into a registry without error', () => {
@@ -111,6 +190,28 @@ describe('the packs register', () => {
       const missing = stringsOf(mod).filter((s) => !(s in fr));
       expect(missing, `${entry.file}: not translated: ${missing.slice(0, 8).join(' | ')}${missing.length > 8 ? ` (+${missing.length - 8})` : ''}`).toEqual([]);
     }
+  });
+});
+
+describe('the packs index', () => {
+  it('the index lists every tool of every pack', () => {
+    for (const mod of PACKS) {
+      const stem = (mod.meta as { id: string }).id.split('/')[1];
+      const entry = INDEX.find((e) => e.file === `${stem}.js`);
+      expect(entry, `${stem}.js: not in the index`).toBeTruthy();
+      expect(entry!.commands?.map((c) => c.name), stem).toEqual((mod.tools ?? []).map((t) => t.name));
+    }
+  });
+
+  it('the index carries the French of each command', () => {
+    for (const entry of INDEX) for (const c of entry.commands ?? []) expect(entry.fr?.[c.title], `${entry.file}: ${c.title}`).toBeDefined();
+  });
+
+  it('packCommands offers them as tools of their pack', async () => {
+    const { packCommands } = await import('../src/packs.ts');
+    const cmds = packCommands([{ file: 'icons.js', name: 'Icons', commands: [{ name: 'icon', title: 'Icons', description: 'd' }] }]);
+    expect(cmds[0]).toMatchObject({ kind: 'tool', name: 'icon', from: 'Icons' });
+    expect(cmds[0].input).toBeUndefined();
   });
 });
 

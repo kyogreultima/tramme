@@ -2,7 +2,7 @@
 
 The small things between the big ones: playback that can be reasoned about, the desktop app that asks for attention when a question waits, the packs' commands on the home screen before a project opens, and the editor conveniences a day of use asks for. None of them is a roadmap of its own worth of work; together they are the difference between a tool that works and one that feels finished.
 
-Status: nothing landed yet. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
+Status: steps 1 to 3 done. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
 
 ## Why
 
@@ -31,7 +31,7 @@ Done when: a question that waits while the user is elsewhere shows the window as
 
 ### Step 3. The packs' commands on the home screen, an index that cannot go stale, and the Packs docs page
 
-- [ ] The home screen's command menu lists the shipped packs' tools after the built-in ones, before a project opens — from an index generated from the packs themselves (`plugins/index.json` gaining each pack's commands and their French), so a pack's command cannot go missing. A command of a pack the project does not hold yet waits in the composer until the pack attaches. The site grows a Packs page generated from the same index, and CI checks the index is not stale.
+- [x] The home screen's command menu lists the shipped packs' tools after the built-in ones, before a project opens — from an index generated from the packs themselves (`plugins/index.json` gaining each pack's commands and their French), so a pack's command cannot go missing. A command of a pack the project does not hold yet waits in the composer until the pack attaches. The site grows a Packs page generated from the same index, and CI checks the index is not stale.
 
 Done when: a user on the home screen can run `/icon` or `/diagram` and lands in a project that holds the pack.
 
