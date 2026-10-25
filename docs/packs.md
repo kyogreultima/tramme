@@ -82,3 +82,11 @@ Code and a terminal on screen: a lexer's colours, typing at a human rhythm, a ch
 - Nodes: `codeview.code` — Code, `codeview.terminal` — Terminal
 - Checks: `code-legibility` — Code legibility
 
+## Rhythm
+
+Rhythm and coherence checks: cuts off the beat, even shots, a palette drifting off the tokens, near-duplicate type sizes
+
+- Tools: none
+- Nodes: none
+- Checks: `off-beat` — Off the beat, `even-shots` — Even shots, `palette-drift` — Palette drift, `type-drift` — Type drift
+

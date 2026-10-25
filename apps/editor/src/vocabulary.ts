@@ -76,7 +76,7 @@ export const EDITOR_PROMPTS: PromptType[] = [
   },
   {
     name: 'review', title: 'Review the composition', description: 'checks the key moments and fixes what is wrong',
-    prompt: 'Review the composition: run the check tool (use_tool "check") and read its issues and contact sheet, look closer at the entrances and transitions that matter with the motion tool, and judge what the checks cannot: contrast, hierarchy, rhythm, elements over a face. Propose fixes for what you find, then run check again.',
+    prompt: 'Review the composition: run the check tool (use_tool "check") and read its issues and contact sheet, look closer at the entrances and transitions that matter with the motion tool, and judge what the checks cannot: contrast, hierarchy, rhythm, elements over a face. When the film has music (a beats analysis), add the rhythm pack so the check tool reads its off-beat and even-shots checks too, and move the cuts they flag onto the beats they name. Propose fixes for what you find, then run check again.',
   },
   {
     name: 'polish', title: 'Polish the motion', description: 'brings the movement to standard: easings, durations, stagger, arcs, settles',

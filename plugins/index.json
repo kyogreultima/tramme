@@ -151,5 +151,13 @@
       "Show code on screen": "Montrer du code à l’écran",
       "code or a terminal session in a window frame, typed at a readable rhythm, the lines that matter highlighted, a long file cut to what fits": "du code ou une session de terminal dans un cadre de fenêtre, tapé à un rythme lisible, les lignes qui comptent soulevées, un long fichier coupé à ce qui tient"
     }
+  },
+  {
+    "file": "rhythm.js",
+    "name": "Rhythm",
+    "description": "Rhythm and coherence checks: cuts off the beat, even shots, a palette drifting off the tokens, near-duplicate type sizes",
+    "version": "1.0.0",
+    "commands": [],
+    "fr": {}
   }
 ]

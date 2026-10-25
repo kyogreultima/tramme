@@ -2,7 +2,7 @@
 
 The general-purpose plugin packs that ship with the editor (`plugins/*.js`, listed in `plugins/index.json`, added to a project from the Code section): the ones to come, and what tramme needs first so they can exist. A pack is an ordinary plugin. It gives the assistant and the editor a new vocabulary — what they can build in one move, what they can check — for any film, never for one video.
 
-Status: steps 0 to 3 are shipped. Shipped packs: charts, kinetic type, physics, stick figures, icons, diagrams, UI walkthrough, accessibility checks, localization ([plugins-roadmap.md](plugins-roadmap.md), step 10). The packs after step 0 are taken in order, each one landing whole. The decisions still open are listed at the end. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
+Status: steps 0 to 4 are shipped. Shipped packs: charts, kinetic type, physics, stick figures, icons, diagrams, UI walkthrough, accessibility checks, localization ([plugins-roadmap.md](plugins-roadmap.md), step 10). The packs after step 0 are taken in order, each one landing whole. The decisions still open are listed at the end. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
 
 ## Why
 
@@ -77,12 +77,12 @@ Done when: a developer tool's film shows a command typed and run, then a functio
 
 Checks only, like the accessibility pack: what a motion designer catches in a film that is right frame by frame and wrong as a whole. None of the built-in checks looks at it today.
 
-- [ ] `off-beat`: when the film's music has a beats analysis (the `beats` tool), cuts and scene changes (in points of video layers and nested compositions, scene markers) more than 70 ms from the nearest beat; the issue names that beat, and a bar line at a section change.
-- [ ] `even-shots`: four shots or more of nearly the same length (their spread under 15 % of their mean). The film plods: vary them.
-- [ ] `palette-drift`: fills and strokes written as colours outside the tokens and far from all of them (ΔE over 10), or more than five colours on screen at once.
-- [ ] `type-drift`: more than two typefaces in one film, or near-duplicate sizes on one frame (two sizes within 10 % of each other).
-- [ ] The `/review` workflow adds the pack when the film has music; the issues say what to do, as the taste checks do.
-- [ ] Tests on built documents: on and off the beat, even and varied shots, colours in and out of the tokens.
+- [x] `off-beat`: when the film's music has a beats analysis (the `beats` tool), cuts and scene changes (in points of video layers and nested compositions, scene markers) more than 70 ms from the nearest beat; the issue names that beat, and a bar line at a section change.
+- [x] `even-shots`: four shots or more of nearly the same length (their spread under 15 % of their mean). The film plods: vary them.
+- [x] `palette-drift`: fills and strokes written as colours outside the tokens and far from all of them (ΔE over 10), or more than five colours on screen at once.
+- [x] `type-drift`: more than two typefaces in one film, or near-duplicate sizes on one frame (two sizes within 10 % of each other).
+- [x] The `/review` workflow adds the pack when the film has music; the issues say what to do, as the taste checks do.
+- [x] Tests on built documents: on and off the beat, even and varied shots, colours in and out of the tokens.
 
 Done when: the review of a film cut to music flags the cut that lands between two beats, names the beat to move it to, and stays silent on a film that already lands on them.
 

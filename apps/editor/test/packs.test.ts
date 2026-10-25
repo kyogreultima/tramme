@@ -24,9 +24,11 @@ import * as walkthrough from '../../../plugins/walkthrough.js';
 import * as localize from '../../../plugins/localize.js';
 import { lex, tokenDiff, typingTimes, parseSession, maxLines } from '../../../plugins/codeview.js';
 import * as codeview from '../../../plugins/codeview.js';
+import { offBeat, evenShots, deltaE, paletteDrift, typeDrift } from '../../../plugins/rhythm.js';
+import * as rhythm from '../../../plugins/rhythm.js';
 
 // the packs are JavaScript on purpose: their shape is checked at runtime by Registry.use, which these tests run
-const PACKS = [charts, kinetic, a11y, physics, styk, icons, diagram, walkthrough, localize, codeview] as unknown as import('@tramme/core').PluginModule[];
+const PACKS = [charts, kinetic, a11y, physics, styk, icons, diagram, walkthrough, localize, codeview, rhythm] as unknown as import('@tramme/core').PluginModule[];
 
 /** the shipped index, as the script writes it: each entry's commands and their French */
 const INDEX: { file: string; name: string; description?: string; commands?: { name: string; title: string; description: string }[]; fr?: Record<string, string> }[] =
@@ -310,6 +312,57 @@ describe('codeview', () => {
     const doc = newProject({ name: 'T', width: 1080, height: 1920, fps: 30, duration: 6 }).doc;
     const r = await runTool(codeview.tools[0], doc, { code: 'function ship(x) {\n  return x + 1;\n}', title: 'ship.js' });
     for (const b of boxesOf(applyOps(doc, r.ops).doc)) expect(inside(b, 1080, 1920)).toBe(true);
+  });
+});
+
+describe('rhythm', () => {
+  const analysis = { kind: 'audio-analysis', beats: [1.0, 2.5], downbeats: [1.0], sections: [], duration: 6, rate: 50, envelope: { rms: [], low: [], mid: [], high: [] } };
+  const build = (cutAt: [number, number]) => {
+    const { doc } = newProject({ name: 'T', width: 1920, height: 1080, fps: 30, duration: 6 });
+    doc.assets['analysis-music'] = { type: 'json', src: 'assets/analyses/music.json' } as never;
+    doc.compositions.main.layers.a = { type: 'video', in: 0, out: cutAt[0], props: { video: 'v' } } as never;
+    doc.compositions.main.layers.b = { type: 'video', in: cutAt[1], out: 6, props: { video: 'v' } } as never;
+    const ctx = { doc, compId: 'main', comp: doc.compositions.main, registry: null, evaluator: null, step: 0.25, samples: [], data: (id: string) => (id === 'analysis-music' ? analysis : undefined) };
+    return ctx as never;
+  };
+  const runOne = (ctx: never, name: string) => (rhythm.checks.find((c) => c.name === name)!.run(ctx) as unknown[]).length;
+
+  it('hears the cuts that miss the beats', () => {
+    expect(offBeat([1.0, 2.04], [1.0, 2.5], 30)).toEqual([2.04]);
+    expect(offBeat([1.0, 2.5], [1.0, 2.5], 30)).toEqual([]);
+  });
+
+  it('hears a film that plods', () => {
+    expect(evenShots([2, 2.1, 1.95, 2.05])).toBe(true);
+    expect(evenShots([1, 3, 2, 5])).toBe(false);
+    expect(evenShots([2, 2, 2])).toBe(false);
+  });
+
+  it('reads the distance of two colours as the eye does', () => {
+    expect(deltaE('#ffffff', '#ffffff')).toBe(0);
+    expect(deltaE('#ff0000', '#fe0101')).toBeLessThan(10);
+    expect(deltaE('#ff0000', '#00ff00')).toBeGreaterThan(10);
+    expect(paletteDrift(['#ff0000'], ['#fe0101']).far).toEqual([]);
+    expect(paletteDrift(['#ff0000'], ['#00ff00']).far).toEqual(['#ff0000']);
+    expect(paletteDrift(['#ff0000'], []).tooMany).toBe(false);
+  });
+
+  it('flags the type a scale would not', () => {
+    expect(typeDrift(['A', 'B', 'C'], [40, 42])).toEqual({ faces: true, sizes: [[40, 42]] });
+    expect(typeDrift(['A'], [40, 43.5])).toEqual({ faces: false, sizes: [[40, 43.5]] });
+    expect(typeDrift(['A'], [40, 44.5])).toEqual({ faces: false, sizes: [] });
+    expect(typeDrift(['A', 'B'], [40, 60, 90])).toEqual({ faces: false, sizes: [] });
+    expect(typeDrift(['A', 'B'], [40, 40])).toEqual({ faces: false, sizes: [] });
+  });
+
+  it('the four checks flag the off-beat film alone, and stay silent on the one that lands', () => {
+    const off = build([1.0, 2.04]), on = build([1.0, 2.5]);
+    expect(runOne(off, 'off-beat')).toBe(1);
+    expect(runOne(on, 'off-beat')).toBe(0);
+    for (const name of ['even-shots', 'palette-drift', 'type-drift']) {
+      expect(runOne(off, name)).toBe(0);
+      expect(runOne(on, name)).toBe(0);
+    }
   });
 });
 
