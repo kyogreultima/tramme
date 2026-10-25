@@ -38,9 +38,11 @@ import { project, findPlace, greatCircle, zoomPath, fold } from '../../../plugin
 import * as maps from '../../../plugins/maps.js';
 import { barsAt } from '../../../plugins/audiogram.js';
 import * as audiogram from '../../../plugins/audiogram.js';
+import { parseTex, layout, matchSymbols } from '../../../plugins/math.js';
+import * as math from '../../../plugins/math.js';
 
 // the packs are JavaScript on purpose: their shape is checked at runtime by Registry.use, which these tests run
-const PACKS = [charts, kinetic, a11y, physics, styk, icons, diagram, walkthrough, localize, codeview, rhythm, screencast, handmade, chat, emoji, maps, audiogram] as unknown as import('@tramme/core').PluginModule[];
+const PACKS = [charts, kinetic, a11y, physics, styk, icons, diagram, walkthrough, localize, codeview, rhythm, screencast, handmade, chat, emoji, maps, audiogram, math] as unknown as import('@tramme/core').PluginModule[];
 
 /** the shipped index, as the script writes it: each entry's commands and their French */
 const INDEX: { file: string; name: string; description?: string; commands?: { name: string; title: string; description: string }[]; fr?: Record<string, string> }[] =
@@ -717,6 +719,52 @@ describe('audiogram', () => {
     const frame = JSON.stringify({ bands: Array.from({ length: 32 }, () => [0.42]) });
     const perFrame = frame.length - '[]'.length;
     expect(perFrame * 12.5 * 1800).toBeLessThan(6e6);
+  });
+});
+
+describe('math', () => {
+  const glyphs = JSON.parse(readFileSync(new URL('../../../plugins/math/glyphs.json', import.meta.url), 'utf8'));
+  const B = String.fromCharCode(92);
+
+  it('parses the subset it says, and names its errors', () => {
+    const f = parseTex(B + 'frac{a}{b}');
+    expect(f.t).toBe('frac');
+    expect((f as { a: { ch: string } }).a.ch).toBe('a');
+    expect((f as { b: { ch: string } }).b.ch).toBe('b');
+    expect(() => parseTex(B + 'foo')).toThrow(/position 0/);
+    expect(parseTex('x^2')).toMatchObject({ t: 'script', base: { ch: 'x' }, sup: { ch: '2' } });
+    expect(parseTex(B + 'alpha')).toEqual({ t: 'sym', ch: 'α' });
+    expect((parseTex(B + 'begin{pmatrix} a & b ' + B + B + ' c & d ' + B + 'end{pmatrix}') as { rows: unknown[][] }).rows).toHaveLength(2);
+    expect(parseTex(B + 'sum_{i=1}^{n}')).toMatchObject({ t: 'big', ch: '∑' });
+  });
+
+  it('lays x^2 with the 2 smaller and higher, the same every time', () => {
+    const L = layout(parseTex('x^2'), 48, glyphs);
+    const x = L.placed.find((p) => p.glyph === 'x')!;
+    const two = L.placed.find((p) => p.glyph === '2')!;
+    expect(two.scale).toBeLessThan(x.scale);
+    expect(two.y).toBeLessThan(x.y);
+    expect(JSON.stringify(L)).toBe(JSON.stringify(layout(parseTex('x^2'), 48, glyphs)));
+  });
+
+  it('matches the symbols two formulas share, the a with the a', () => {
+    const A = layout(parseTex('a+b'), 48, glyphs), Bm = layout(parseTex('b+a'), 48, glyphs);
+    const pairs = matchSymbols(A, Bm);
+    const ofA = (i: number) => A.placed[i].glyph, ofB = (j: number) => Bm.placed[j].glyph;
+    expect(pairs.map(([i, j]) => [ofA(i), ofB(j)])).toContainEqual(['a', 'a']);
+    expect(pairs.map(([i, j]) => [ofA(i), ofB(j)])).toContainEqual(['b', 'b']);
+    expect(pairs).toHaveLength(3);
+  });
+
+  it('the tool lays the formula and copies the glyphs, in both formats', async () => {
+    for (const [w, h] of [[1920, 1080], [1080, 1920]] as [number, number][]) {
+      const { doc } = newProject({ name: 'T', width: w, height: h, fps: 30, duration: 8 });
+      const out = await runTool(math.tools[0], doc, { tex: 'a^2 + b^2 = c^2' });
+      const next = applyOps(doc, out.ops).doc;
+      expect(Object.values(next.assets).some((x) => x.name === 'Math glyphs')).toBe(true);
+      expect(out.text).toMatch(/STIX Two Math/);
+      for (const b of boxesOf(next)) expect(inside(b, w, h)).toBe(true);
+    }
   });
 });
 

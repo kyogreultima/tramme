@@ -2,7 +2,7 @@
 
 The general-purpose plugin packs that ship with the editor (`plugins/*.js`, listed in `plugins/index.json`, added to a project from the Code section): the ones to come, and what tramme needs first so they can exist. A pack is an ordinary plugin. It gives the assistant and the editor a new vocabulary — what they can build in one move, what they can check — for any film, never for one video.
 
-Status: steps 0 to 10 are shipped (step 5 keeps its real recordings to check on a device; step 7 keeps its set of 300 emoji to confirm on a device). Shipped packs: charts, kinetic type, physics, stick figures, icons, diagrams, UI walkthrough, accessibility checks, localization ([plugins-roadmap.md](plugins-roadmap.md), step 10). The packs after step 0 are taken in order, each one landing whole. The decisions still open are listed at the end. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
+Status: steps 0 to 11 are shipped (step 5 keeps its real recordings to check on a device; step 7 keeps its set of 300 emoji to confirm on a device). Shipped packs: charts, kinetic type, physics, stick figures, icons, diagrams, UI walkthrough, accessibility checks, localization ([plugins-roadmap.md](plugins-roadmap.md), step 10). The packs after step 0 are taken in order, each one landing whole. The decisions still open are listed at the end. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
 
 ## Why
 
@@ -157,10 +157,10 @@ Done when: a podcast extract becomes a 9:16 clip whose wave moves with the voice
 
 ### Step 11. Formulas (`math.js`)
 
-- [ ] A TeX subset laid out by the pack (fractions, scripts, roots, sums and integrals with limits, small matrices, Greek letters, operators and arrows, `\text`, `\color`) in an OpenType math font fetched once like a kit's font (STIX Two Math or Latin Modern Math, OFL), with the font's math constants (decision 2).
-- [ ] The `math.formula` node: the formula drawn glyph by glyph, written on in reading order, its parts coloured; a change between two formulas, the symbols they share moving to their new places and the others leaving and arriving, the way a proof unfolds on a board.
-- [ ] The `formula` tool (`/formula`) and the `formula-legibility` check: type under its size for the format, a formula on screen for less than its reading time (slower than text).
-- [ ] Tests: the boxes of known formulas, the matching of symbols between two formulas, determinism.
+- [x] A TeX subset laid out by the pack (fractions, scripts, roots, sums and integrals with limits, small matrices, Greek letters, operators and arrows, `\text`, `\color`) in an OpenType math font fetched once like a kit's font (STIX Two Math or Latin Modern Math, OFL), with the font's math constants (decision 2).
+- [x] The `math.formula` node: the formula drawn glyph by glyph, written on in reading order, its parts coloured; a change between two formulas, the symbols they share moving to their new places and the others leaving and arriving, the way a proof unfolds on a board.
+- [x] The `formula` tool (`/formula`) and the `formula-legibility` check: type under its size for the format, a formula on screen for less than its reading time (slower than text).
+- [x] Tests: the boxes of known formulas, the matching of symbols between two formulas, determinism.
 
 Done when: an explainer writes a² + b² = c², rearranges it into c = √(a² + b²) with the symbols moving to their places, and plots it with step 8's `chart.function`.
 

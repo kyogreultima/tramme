@@ -138,3 +138,11 @@ Audiograms: the wave of a sound moving with the voice, a cover, a name, a progre
 - Nodes: `audiogram.wave` — Wave
 - Checks: none
 
+## Math
+
+Formulas: a TeX subset laid out glyph by glyph in STIX Two Math, written on or changing like a proof on a board
+
+- Tools: `/formula` — Show a formula
+- Nodes: `math.formula` — Formula
+- Checks: `formula-legibility` — Formula legibility
+
