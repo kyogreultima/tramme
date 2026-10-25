@@ -23,6 +23,7 @@ import type { Command } from './commands.ts';
 import { describe, imageBlocks, type Attachment } from '../attachments.ts';
 import { locale, t } from '../i18n/index.ts';
 import { personal } from '../mode.ts';
+import { shippedPacks } from '../packs.ts';
 
 export interface AiSettings {
   model: string;
@@ -419,6 +420,9 @@ export async function* ask(p: AskPayload, signal: AbortSignal): AsyncGenerator<A
   // the installed plugins, named once (enabled, not turned off here): the assistant searches them when the project's own vocabulary falls short
   const offHere = offIn(S.doc.peek());
   const mine = installed.peek().filter((x) => x.enabled && !offHere.includes(x.manifest.id)).map((x) => `${x.manifest.name}${x.manifest.description ? `: ${x.manifest.description}` : ''}`);
+  // the packs that ship with the editor, named in one line: reachable without being in the project
+  const packs = await shippedPacks();
+  if (packs.length) mine.push(`Packs of the editor: ${packs.map((x) => x.name).join(', ')} — usable even when the project holds none; the first use adds the pack to the project.`);
   const system = systemPrompt(reference, brief ?? undefined, mine);
   const target = route === 'local' ? { url: localBase() } : route === 'remote' ? { url: `/api/llm/${encodeURIComponent(slotOf(model))}` } : undefined;
   // Claude by its model id; a command line by its own model name, none for its default
@@ -490,7 +494,7 @@ export async function providersChanged() {
   aiModels.value = { ...aiModels.peek(), remote: {} };
   await refreshStatus(true);
 }
-export async function connectProvider(provider: KeyedProvider, key: string) { await api.setKey(provider, key); await providersChanged(); }
+export async function connectProvider(provider: KeyedProvider, key: string, fields?: Record<string, string>) { await api.setKey(provider, key, fields); await providersChanged(); }
 export async function disconnectProvider(provider: KeyedProvider) { await api.removeKey(provider); await providersChanged(); }
 export async function saveCustomProvider(id: string, c: { label: string; base: string; key?: string }) { await api.setCustom(id, c); await providersChanged(); }
 export async function removeCustomProvider(id: string) { await api.removeCustom(id); await providersChanged(); }

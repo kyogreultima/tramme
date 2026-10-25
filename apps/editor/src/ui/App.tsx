@@ -43,9 +43,9 @@ function Atelier() {
         </main>
         <div class="resizer v" title={t('app.dragToResize')} {...rightHandle('x', -1)} />
         <aside class="col right">
-          <div class="inspector-wrap panel panel-body" data-tour="inspector" style={{ flex: 1 }}><Inspector /></div>
+          <div class="inspector-wrap panel panel-body" data-tour="inspector" style={{ flex: 1, minHeight: 96 }}><Inspector /></div>
           <div class="resizer h" data-tour="ai-resizer" title={t('app.resizeChat')} {...aiHandle('y', -1)} />
-          <Assistant style={{ height: aiH, flex: 'none' }} />
+          <Assistant style={{ height: aiH, flex: '0 1 auto' }} />
         </aside>
       </div>
       <nav class="mobile-tabs">

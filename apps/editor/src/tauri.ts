@@ -85,6 +85,7 @@ function outbound(input: string, init?: RequestInit): Promise<Response> {
 /** the keys as the provider routes take them: a stand-in for each one the app keeps */
 const standIns = (s: KeyStatus): StoredKeys => ({
   keys: Object.fromEntries(Object.entries(s.providers).filter(([, source]) => source).map(([p]) => [p, `tramme-key:${p}`])),
+  fields: s.fields,
   custom: s.custom.map(({ id, label, base, key }) => ({ id, label, base, ...(key ? { key: `tramme-key:custom:${id}` } : {}) })),
 });
 

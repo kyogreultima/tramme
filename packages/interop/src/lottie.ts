@@ -181,13 +181,21 @@ class Exporter {
           : layer.type === 'shape.ellipse'
             ? { ty: 'el', d: 1, p: { a: 0, k: [0, 0] }, s: this.prop(compId, `${id}.size`, P('size'), def('size'), (v) => (v as number[]).map(r3), range) }
             : { ty: 'sh', d: 1, ks: this.pathProp(compId, id, P('path'), range) };
-        const items: Json[] = [geo];
         const fill = this.paint(compId, id, 'fill', range, false);
         const stroke = this.paint(compId, id, 'stroke', range, true);
-        if (stroke) items.push(stroke);
-        if (fill) items.push(fill);
-        items.push({ ty: 'tr', p: { a: 0, k: [0, 0] }, a: { a: 0, k: [0, 0] }, s: { a: 0, k: [100, 100] }, r: { a: 0, k: 0 }, o: { a: 0, k: 100 } });
-        return { ...this.base(compId, id, layer, range, ind, 4), ks: this.transform(compId, id, layer, range), shapes: [{ ty: 'gr', nm: name, it: items }] };
+        const trItem = (): Json => ({ ty: 'tr', p: { a: 0, k: [0, 0] }, a: { a: 0, k: [0, 0] }, s: { a: 0, k: [100, 100] }, r: { a: 0, k: 0 }, o: { a: 0, k: 100 } });
+        // the trim, only on layers that carry one (old documents export unchanged); the fill keeps its own group, whole
+        const trim = P('trimStart') !== undefined || P('trimEnd') !== undefined || P('trimOffset') !== undefined;
+        const tm: Json | null = trim
+          ? { ty: 'tm', s: this.prop(compId, `${id}.trimStart`, P('trimStart'), { type: 'number', default: 0 }, (v) => r3((v as number) * 100), range), e: this.prop(compId, `${id}.trimEnd`, P('trimEnd'), { type: 'number', default: 1 }, (v) => r3((v as number) * 100), range), o: this.prop(compId, `${id}.trimOffset`, P('trimOffset'), { type: 'number', default: 0 }, (v) => r3((v as number) * 360), range), m: 1 }
+          : null;
+        // Lottie draws its first item on top, so the stroke always leads its fill. Untrimmed: one group, as
+        // before the trim existed. Trimmed: the trim would cut the fill too, so the fill keeps a group of its
+        // own, under the stroke's
+        const shapes: Json[] = tm
+          ? [{ ty: 'gr', nm: name, it: [geo, ...(stroke ? [stroke] : []), tm, trItem()] }, ...(fill ? [{ ty: 'gr', nm: name, it: [geo, fill, trItem()] }] : [])]
+          : [{ ty: 'gr', nm: name, it: [geo, ...(stroke ? [stroke] : []), ...(fill ? [fill] : []), trItem()] }];
+        return { ...this.base(compId, id, layer, range, ind, 4), ks: this.transform(compId, id, layer, range), shapes };
       }
       case 'text': return this.text(compId, id, layer, range, ind);
       case 'image': return this.image(compId, id, layer, range, ind);

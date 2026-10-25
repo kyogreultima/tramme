@@ -162,7 +162,7 @@ const walkthrough = {
   },
 };
 
-export const meta = { name: 'walkthrough', version: '1.0.0', description: 'A phone or browser frame for screenshots, a clicking cursor, and a tool that lays out the walkthrough', api: 1 };
+export const meta = { id: 'tramme/walkthrough', name: 'walkthrough', version: '1.0.0', description: 'A phone or browser frame for screenshots, a clicking cursor, and a tool that lays out the walkthrough', api: 1 };
 export const nodes = [device, cursor];
 export const tools = [walkthrough];
 export const presets = [
@@ -175,5 +175,14 @@ export const messages = {
     'Device': 'Appareil', 'Cursor': 'Curseur', 'Screenshot': 'Capture', 'Scroll': 'Défilement', 'Address': 'Adresse',
     'Frame': 'Cadre', 'Shadow': 'Ombre', 'Size': 'Taille', 'Font': 'Police', 'Position': 'Position', 'Click': 'Clic',
     'Color': 'Couleur', 'Scale': 'Échelle', 'Lay out a walkthrough': 'Monter une visite guidée',
+    '0: the top of the screenshot; animate it for the pan': '0 : le haut de la capture ; animez-le pour le panoramique',
+    'browser only: the address in the bar': 'navigateur seulement : l\'adresse dans la barre',
+    '0 at rest; key it up and down at each tap: it draws the ripple': '0 au repos ; keyframez-le en haut et en bas à chaque tap : il dessine l\'onde',
+    'a sequence of screenshots in a phone or a browser frame, one composition, a cut per screen, each with an optional caption and a slow scroll': 'une suite de captures dans un cadre de téléphone ou de navigateur, une composition, une coupe par écran, chacune avec une légende optionnelle et un défilement lent',
+    'Phone with screenshot': 'Téléphone avec capture',
+    'a phone frame, its screen to fill': 'un cadre de téléphone, son écran à remplir',
+    'Browser with screenshot': 'Navigateur avec capture',
+    'a browser window with its address bar': 'une fenêtre de navigateur avec sa barre d\'adresse',
+    'a pointer with its click ripple': 'un pointeur avec l\'onde de son clic',
   },
 };

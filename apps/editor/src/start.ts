@@ -10,7 +10,7 @@
 
 import { aiRoute, chat, refreshStatus } from './ai/index.ts';
 import { send } from './ai/conversation.ts';
-import { listCommands } from './ai/commands.ts';
+import { listCommands, parseCommand } from './ai/commands.ts';
 import { draft, pending } from './attachments.ts';
 import { startKey, type Start } from './importer.ts';
 import { S } from './state.ts';
@@ -44,11 +44,18 @@ function greet(text: string) {
   S.mobileTab.value = 'ai';
 }
 
-/** the words the project was made with, sent at once with the workflow that fits; no model to send them to: they wait in the box */
+/**
+ * The words the project was made with, sent at once with the workflow that
+ * fits, or with the command they name (/name), as the message box sends it;
+ * a tool named alone waits in the box with its form. No model to send them
+ * to: they wait in the box.
+ */
 async function begin(words: string, workflow?: string) {
+  const commands = listCommands(S.registry.peek()), typed = parseCommand(words, commands), named = typed?.cmd;
+  if (named?.kind === 'tool' && !typed!.rest) { draft.value = words; return; }
   if (!aiRoute.peek()) await refreshStatus();
-  const cmd = workflow ? listCommands(S.registry.peek()).find((c) => c.name === workflow && c.kind === 'prompt') : undefined;
-  if (!aiRoute.peek()) { draft.value = cmd ? `/${cmd.name} ${words}` : words; return; }
+  const cmd = named ?? (workflow ? commands.find((c) => c.name === workflow && c.kind === 'prompt') : undefined);
+  if (!aiRoute.peek()) { draft.value = cmd && !named ? `/${cmd.name} ${words}` : words; return; }
   send(words, cmd ? { command: { cmd } } : {});
 }
 

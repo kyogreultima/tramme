@@ -129,22 +129,17 @@ describe('recipes', () => {
     const doc = await use(project(), 'map-journey', { stops: '0.2,0.3 0.5,0.6 0.8,0.4', names: 'Paris, Lyon, Marseille' });
     const c = doc.compositions.main;
     const path = Object.values(c.layers).find((l) => l.type === 'shape.path' && l.name?.includes('route'))!;
-    expect(path.effects?.[0]?.props).toMatchObject({ source: 'journey-reveal', mode: 'alpha' });
+    expect(path.effects ?? []).toEqual([]); // no matte: the line draws itself with its trim
     expect((path.props!.path as { v: unknown[][] }).v).toHaveLength(3);
     const dot = c.layers['journey-dot'];
     expect((dot.transform!.position as { $k: unknown[] }).$k).toHaveLength(3);
-    const reveal = c.layers['journey-reveal'];
-    expect(reveal.visible).toBe(false);
-    // the reveal keeps pace with the dot: a key at each arrival, never two at the same time
+    // the trim keeps pace with the dot: a key at the start and at each arrival, the same moments, ending whole
     const at = (k: { $k: { t: number }[] }) => k.$k.map((x) => x.t);
-    expect(at(reveal.transform!.scale as never)).toEqual(at(dot.transform!.position as never));
-    // the rect (drawn centred on its origin) covers the stops' bounds top to bottom: anchored mid-height on its starting edge
-    const [w, h] = reveal.props!.size as [number, number], [ax, ay] = reveal.transform!.anchor as [number, number];
-    const [, py] = reveal.transform!.position as [number, number];
-    expect(ay).toBe(0);
-    expect(ax).toBe(-w / 2);
-    expect(py - h / 2).toBeLessThanOrEqual(0.3 * 1920);
-    expect(py + h / 2).toBeGreaterThanOrEqual(0.6 * 1920);
+    const trim = path.props!.trimEnd as { $k: { t: number; v: number }[] };
+    expect(trim.$k.length).toBe(3);
+    expect(at(trim).slice(1)).toEqual(at(dot.transform!.position as never).slice(1));
+    expect(trim.$k[0].v).toBe(0);
+    expect(trim.$k.at(-1)!.v).toBe(1);
   });
 
   it('split the frame into sliding panels', async () => {

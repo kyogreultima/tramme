@@ -109,11 +109,13 @@ const localizeApply = {
   },
 };
 
-export const meta = { name: 'localize', version: '1.0.0', description: 'Captions and shorts in other languages: the model translates, the tools retime and duplicate', api: 1 };
+export const meta = { id: 'tramme/localize', name: 'localize', version: '1.0.0', description: 'Captions and shorts in other languages: the model translates, the tools retime and duplicate', api: 1 };
 export const tools = [localize, localizeApply];
 export const messages = {
   fr: {
     'Prepare a translation': 'Préparer une traduction', 'Apply a translation': 'Appliquer une traduction',
     'Transcript': 'Transcription', 'Languages': 'Langues', 'Language': 'Langue', 'Translated sentences': 'Phrases traduites',
+    'cuts a transcript into numbered sentences for the model to translate: the answer says what to hand back to localize-apply': 'découpe une transcription en phrases numérotées pour que le modèle les traduise : la réponse dit quoi rendre à localize-apply',
+    'a translated array of sentences becomes a transcript asset retimed over the original, and the compositions captioning the original are duplicated for the language': 'une liste de phrases traduites devient un actif de transcription recalé sur l\'original, et les compositions qui sous-titrent l\'original sont dupliquées pour la langue',
   },
 };

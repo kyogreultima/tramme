@@ -23,6 +23,34 @@ export const ATTACHABLE = 'image/*,audio/*,video/*,.pdf,application/pdf,.md,.mar
 /** files dropped or picked: joined to the next message */
 export const join = (list: FileList | File[] | null | undefined) => { const f = Array.from(list ?? []); if (f.length) attachFiles(f); };
 
+/**
+ * The / menu of a box (the message box, the home's direction box): the
+ * commands matching what is typed after a / at its start, tools first then
+ * workflows (the order the keys move in). `keyDown` says whether the key was
+ * the menu's; `typed` reopens it after the user typed.
+ */
+export function useCommandMenu(text: string, commands: Command[], onPick: (c: Command) => void) {
+  const [hi, setHi] = useState(0);
+  const [off, setOff] = useState(false);
+  const typing = /^\/([\w.-]*)$/.exec(text);
+  const found = typing && !off ? matchCommands(commands, typing[1], tr).slice(0, 30) : [];
+  const matches = [...found.filter((c) => c.kind === 'tool'), ...found.filter((c) => c.kind === 'prompt')];
+  const open = matches.length > 0, at = Math.min(hi, matches.length - 1);
+  const pick = (c: Command) => { setHi(0); onPick(c); };
+  const keyDown = (e: KeyboardEvent) => {
+    if (!open) return false;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') setHi((i) => (i + (e.key === 'ArrowDown' ? 1 : matches.length - 1)) % matches.length);
+    else if ((e.key === 'Enter' && !e.shiftKey) || e.key === 'Tab') pick(matches[at]);
+    else if (e.key === 'Escape') setOff(true);
+    else return false;
+    e.preventDefault();
+    return true;
+  };
+  const typed = () => { setOff(false); setHi(0); };
+  const view = open ? <CommandMenu list={matches} hi={at} onHover={setHi} onPick={pick} /> : null;
+  return { open, view, keyDown, typed };
+}
+
 /** the commands matching what follows the /, tools first then workflows (the order the keys move in) */
 function CommandMenu({ list, hi, onHover, onPick }: { list: Command[]; hi: number; onHover: (i: number) => void; onPick: (c: Command) => void }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -113,13 +141,9 @@ export function Composer({ placeholder, anchor, tools, context, onSent, area: gi
   // the / menu: the tools and workflows of the vocabulary (the editor's and the project's plugins)
   const reg = S.registry.value;
   const commands = useMemo(() => listCommands(reg), [reg]);
-  const [hi, setHi] = useState(0);
-  const [menuOff, setMenuOff] = useState(false);
   const [form, setForm] = useState<{ name: string; values: Record<string, unknown> }>({ name: '', values: {} });
-  const typing = /^\/([\w.-]*)$/.exec(text);
-  const found = typing && !menuOff ? matchCommands(commands, typing[1], tr).slice(0, 30) : [];
-  const matches = [...found.filter((c) => c.kind === 'tool'), ...found.filter((c) => c.kind === 'prompt')];
-  const menu = matches.length > 0;
+  const pick = (c: Command) => { setText(`/${c.name} `); setForm({ name: c.name, values: {} }); area.current?.focus(); };
+  const commandMenu = useCommandMenu(text, commands, pick), menu = commandMenu.open;
   // the library's plugins, fresh for its pickers whenever the menu opens
   useEffect(() => { if (menu) refreshLibrary(); }, [menu]);
   const parsed = menu ? null : parseCommand(text, commands);
@@ -128,7 +152,6 @@ export function Composer({ placeholder, anchor, tools, context, onSent, area: gi
   const fields = cmd?.kind === 'tool' ? fieldsOf(cmd.input, S.doc.value, S.compId.value, reg, S.selection.value) : [];
   const input = inputOf(fields, values);
   const direct = cmd?.kind === 'tool' && !parsed!.rest && ready(fields, input);
-  const pick = (c: Command) => { setText(`/${c.name} `); setHi(0); setForm({ name: c.name, values: {} }); area.current?.focus(); };
   const run = () => { if (!cmd || !direct || busy) return; setText(''); runCommand(cmd, input); onSent?.(); };
   const submit = () => {
     const v = text.trim();
@@ -142,16 +165,12 @@ export function Composer({ placeholder, anchor, tools, context, onSent, area: gi
     onSent?.();
   };
   const keyDown = (e: KeyboardEvent) => {
-    if (menu) {
-      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); setHi((i) => (i + (e.key === 'ArrowDown' ? 1 : matches.length - 1)) % matches.length); return; }
-      if ((e.key === 'Enter' && !e.shiftKey) || e.key === 'Tab') { e.preventDefault(); pick(matches[Math.min(hi, matches.length - 1)]); return; }
-      if (e.key === 'Escape') { e.preventDefault(); setMenuOff(true); return; }
-    }
+    if (commandMenu.keyDown(e)) return;
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); }
   };
   return (
     <div class="composer-wrap">
-      {menu && <CommandMenu list={matches} hi={Math.min(hi, matches.length - 1)} onHover={setHi} onPick={pick} />}
+      {commandMenu.view}
       <div class="composer" data-tour={tour}>
         {cmd && <CommandCard cmd={cmd} fields={fields} values={values} busy={busy} canRun={direct} onRun={run}
           onChange={(k, v) => setForm({ name: cmd.name, values: { ...values, [k]: v } })} />}
@@ -165,7 +184,7 @@ export function Composer({ placeholder, anchor, tools, context, onSent, area: gi
           onPaste={(e) => { const imgs = Array.from(e.clipboardData?.files ?? []).filter((f) => f.type.startsWith('image/')); if (imgs.length) { e.preventDefault(); join(imgs); } }}
           placeholder={available ? placeholder : t('assistant.unavailableSlash')}
           role="combobox" aria-expanded={menu} aria-autocomplete="list"
-          onInput={(e) => { setText((e.target as HTMLTextAreaElement).value); setMenuOff(false); setHi(0); }}
+          onInput={(e) => { setText((e.target as HTMLTextAreaElement).value); commandMenu.typed(); }}
           onKeyDown={keyDown} />
         <div class="bar">
           <button class="icon-btn sm" title={t('assistant.attachImagesSoundsOr')} disabled={!available} onClick={() => files.current?.click()}><Icon name="attach" /></button>

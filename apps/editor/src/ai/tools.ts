@@ -199,7 +199,7 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
         case 'list_nodes': {
           const reg = await this.registry(this.liveDoc());
           // the installed plugins' entries: tools by where they come from, the rest by the types they brought
-          const installed = (section: string, name: string, from?: string) => (section === 'tools' ? !!from?.startsWith('installed:') : installedTypes.has(`${section.slice(0, -1)}:${name}`));
+          const installed = (section: string, name: string, from?: string) => (section === 'tools' ? !!from && (from.startsWith('installed:') || from.startsWith('packs:')) : installedTypes.has(`${section.slice(0, -1)}:${name}`));
           return text(Array.isArray(input.types) && input.types.length ? vocabularyDetail(reg, input.types.map(String)) : vocabularyIndex(reg, { query: typeof input.query === 'string' ? input.query : undefined, installed }));
         }
         case 'evaluate': {

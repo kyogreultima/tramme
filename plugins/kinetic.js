@@ -121,7 +121,7 @@ const node = {
   },
 };
 
-export const meta = { name: 'kinetic', version: '1.0.0', description: 'Text that moves letter by letter: typewriter, wave, scatter, drop, mask', api: 1 };
+export const meta = { id: 'tramme/kinetic', name: 'kinetic', version: '1.0.0', description: 'Text that moves letter by letter: typewriter, wave, scatter, drop, mask', api: 1 };
 export const nodes = [node];
 export const presets = [
   { name: 'kinetic-scatter', title: 'Kinetic text · scatter', category: 'Text', description: 'a line gathering from a scatter', layer: { type: 'text.kinetic', name: 'Kinetic text', props: { text: 'Make it move', mode: 'scatter' } } },
@@ -134,5 +134,9 @@ export const messages = {
     'Per letter': 'Par lettre', 'Per-letter move': 'Mouvement par lettre', 'Font': 'Police',
     'a line gathering from a scatter': 'une ligne qui se rassemble d\'un nuage de lettres',
     'a line typed on': 'une ligne tapée sous vos yeux',
+    'several lines with line breaks': 'plusieurs lignes avec des retours à la ligne',
+    'the delay between two characters': 'le délai entre deux caractères',
+    'Kinetic text · scatter': 'Texte cinétique · dispersion',
+    'Kinetic text · typewriter': 'Texte cinétique · machine à écrire',
   },
 };

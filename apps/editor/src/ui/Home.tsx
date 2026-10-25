@@ -7,7 +7,7 @@
 // animation are a menu away; each card opens its project, its menu renames,
 // duplicates, saves the archive on the computer or deletes.
 
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { Manifest } from '@tramme/project';
 import { api, ApiError } from '../api.ts';
 import { saveBlob } from '../download.ts';
@@ -15,7 +15,9 @@ import { safeName } from '../files.ts';
 import { ago } from '../model.ts';
 import { createFromWords, droppedOf, importArchive, ImportError, importFile, importSources, importVideo, isSourceFile, isVideoFile, pickedOf, type Picked, type Progress } from '../importer.ts';
 import { kindOf } from '../sources.ts';
-import { toast } from '../state.ts';
+import { S, toast } from '../state.ts';
+import { listCommands } from '../ai/commands.ts';
+import { useCommandMenu } from './composer.tsx';
 import { Modal, longPress, openMenu, Seg } from './controls.tsx';
 import { Icon } from './icons.tsx';
 import { LogoMark } from './Logo.tsx';
@@ -192,6 +194,9 @@ function DirectionBox({ busy, onStart }: { busy: boolean; onStart: (words: strin
   const add = (list: Picked[]) => setMaterial((had) => [...had, ...list.filter((p) => !had.some((h) => h.path === p.path))]);
   const ready = !busy && (words.trim().length > 0 || material.length > 0);
   const start = () => { if (!ready) return; const f = FILM_FORMATS.find(([id]) => id === format)!; onStart(words.trim(), material, [f[2], f[3]]); };
+  // the / menu, as in the message box: a workflow starts the project with it, a tool waits in the editor's box with its form
+  const commands = useMemo(() => listCommands(S.registry.value), [S.registry.value]);
+  const commandMenu = useCommandMenu(words, commands, (c) => { setWords(`/${c.name} `); area.current?.focus(); });
   const chosen = (e: Event) => { const input = e.target as HTMLInputElement, list = pickedOf(input.files ?? []); input.value = ''; add(list); };
   return (
     <div class="hero">
@@ -201,8 +206,10 @@ function DirectionBox({ busy, onStart }: { busy: boolean; onStart: (words: strin
         onDragOver={(e) => { if (e.dataTransfer?.types.includes('Files')) { e.preventDefault(); e.stopPropagation(); } }}
         onDrop={(e) => { if (!e.dataTransfer) return; e.preventDefault(); e.stopPropagation(); droppedOf(e.dataTransfer).then((list) => add(list.filter((p) => isSourceFile(p.file)))); }}>
         <textarea ref={area} value={words} placeholder={t('home.heroPlaceholder')} autoFocus
-          onInput={(e) => setWords((e.target as HTMLTextAreaElement).value)}
-          onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); start(); } }} />
+          role="combobox" aria-expanded={commandMenu.open} aria-autocomplete="list"
+          onInput={(e) => { setWords((e.target as HTMLTextAreaElement).value); commandMenu.typed(); }}
+          onKeyDown={(e) => { if (commandMenu.keyDown(e)) return; if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); start(); } }} />
+        {commandMenu.view}
         {material.length > 0 && (
           <div class="brief-files">
             {material.map((p) => (

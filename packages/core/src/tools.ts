@@ -39,6 +39,13 @@ export interface ToolContext {
   assetUrl(id: string): string;
   /** a text file of the project, or null when there is none */
   readText(path: string): Promise<string | null>;
+  /**
+   * a data file that ships beside a pack of the editor (`plugins/<pack>/`),
+   * read at authoring time from the editor's own origin; offered only to a
+   * plugin whose meta.id is a shipped pack's (`tramme/<pack>`), absent in the
+   * command line. The data is never copied into the project.
+   */
+  packFile?(path: string): Promise<string>;
   /** the files of the project (path, bytes), the ones the document does not reference included (documents brought in) */
   files(): Promise<{ path: string; size: number }[]>;
   /** absolute URL of a file of the project */

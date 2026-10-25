@@ -115,6 +115,7 @@ pub fn run() {
             }
         }))
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
         .invoke_handler(tauri::generate_handler![
             desktop_state, desktop_pick_home, desktop_set_home, desktop_pending_name, desktop_pending_bytes,
             desktop_fetch, desktop_fetch_abort, desktop_open_plugins

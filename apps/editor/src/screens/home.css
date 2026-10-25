@@ -30,10 +30,12 @@ a.brand:hover { background: var(--hover); }
 .hero { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 44px 24px 8px; text-align: center; }
 .hero h1 { margin: 0; font: 650 var(--fs-hero)/1.04 var(--ui); letter-spacing: -0.035em; }
 .hero-sub { margin: 0 0 10px; color: var(--text-2); font-size: 15.5px; }
-.brief-box { width: min(760px, 100%); border-radius: var(--r-xl); background: var(--surface); box-shadow: var(--shadow-2); text-align: left; transition: box-shadow var(--t-fast) var(--ease); }
+.brief-box { position: relative; width: min(760px, 100%); border-radius: var(--r-xl); background: var(--surface); box-shadow: var(--shadow-2); text-align: left; transition: box-shadow var(--t-fast) var(--ease); }
 .brief-box:focus-within { box-shadow: var(--shadow-2), 0 0 0 2px var(--accent-line); }
 .brief-box textarea { display: block; width: 100%; min-height: 92px; padding: 18px 20px 26px; border: 0; outline: none; resize: none; background: transparent; color: var(--text); font: 400 15.5px/1.55 var(--ui); user-select: text; }
 .brief-box textarea::placeholder { color: var(--text-3); }
+/* the « / » menu, under the box: the box sits near the top of the page */
+.brief-box .command-menu { top: calc(100% + 6px); bottom: auto; left: 0; right: 0; }
 .brief-files { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 16px 6px; }
 .brief-bar { display: flex; align-items: center; gap: 6px; padding: 8px 10px 10px 12px; }
 .brief-bar .grow { flex: 1; }

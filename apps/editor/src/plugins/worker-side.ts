@@ -100,7 +100,7 @@ export function startWorkerSide({ post, importModule, sandbox: makeSandbox }: Wo
     return null;
   };
 
-  const toolContext = (call: number, data: ToolCtxData, registry: Registry, signal: AbortSignal): ToolContext => {
+  const toolContext = (call: number, data: ToolCtxData, registry: Registry, signal: AbortSignal, metaId: string | null): ToolContext => {
     const doc = data.doc as ToolContext['doc'];
     const base = data.docUrl;
     return {
@@ -108,6 +108,8 @@ export function startWorkerSide({ post, importModule, sandbox: makeSandbox }: Wo
       assetUrl: (id) => { const src = doc.assets[id]?.src; if (!src) throw new Error(`unknown asset: ${id}`); return new URL(src, base).href; },
       fileUrl: (path) => new URL(path, base).href,
       readText: (path) => ask(call, { kind: 'readText', path }),
+      // a shipped pack's data files, from the editor's own origin (the page fetches them)
+      ...(metaId && metaId.startsWith('tramme/') ? { packFile: (path: string) => ask(call, { kind: 'packFile', path }) } : {}),
       files: () => ask(call, { kind: 'files' }),
       writeFile: async (path, d) => ask(call, { kind: 'writeFile', path, data: typeof d === 'string' ? { text: d } : { bytes: await d.arrayBuffer() } }),
       renderStill: (t, compId) => ask(call, { kind: 'renderStill', t, compId }),
@@ -200,7 +202,7 @@ export function startWorkerSide({ post, importModule, sandbox: makeSandbox }: Wo
         controllers.set(m.call, controller);
         const registry = schemaRegistryOf([...modules.values()]);
         const ctx: ToolContext | CheckContext = m.kind === 'tool'
-          ? toolContext(m.call, m.ctx, registry, controller.signal)
+          ? toolContext(m.call, m.ctx, registry, controller.signal, modules.get(found.id)?.meta?.id ?? null)
           : checkContext(m.call, m.ctx, registry);
         const input = m.kind === 'tool' ? m.input : ctx;
         void (async () => {
