@@ -126,12 +126,12 @@ Done when: a twelve-line text story plays in 9:16 at a pace that can be read, ty
 
 ### Step 8. Charts, further (`charts.js` 1.1)
 
-- [ ] `chart.race`: a ranking over time from a table of periods by entries (a CSV or JSON asset): bars sliding to their new rank, values rolling, the period shown large, the leaders kept in view; the `chart` tool takes `kind: 'race'`.
-- [ ] `chart.scatter`: points, and bubbles sized by a value, moving between periods with their trails, labels kept apart.
-- [ ] `chart.function`: axes with readable ticks (the pack's `niceMax`), a curve of x sampled by the tool and drawn on, a point travelling along it, a tangent or the area under it — the plotting the formulas of step 11 need, kept here instead of copied there.
-- [ ] CSV read by the `chart` tool: separators, quotes, decimal commas.
-- [ ] `chart-readability` covers them: overlapping labels, more than 12 entries racing at once in 9:16.
-- [ ] Tests: ranks over time (ties, entries arriving and leaving), the CSV reader, the ticks of a function.
+- [x] `chart.race`: a ranking over time from a table of periods by entries (a CSV or JSON asset): bars sliding to their new rank, values rolling, the period shown large, the leaders kept in view; the `chart` tool takes `kind: 'race'`.
+- [x] `chart.scatter`: points, and bubbles sized by a value, moving between periods with their trails, labels kept apart.
+- [x] `chart.function`: axes with readable ticks (the pack's `niceMax`), a curve of x sampled by the tool and drawn on, a point travelling along it, a tangent or the area under it — the plotting the formulas of step 11 need, kept here instead of copied there.
+- [x] CSV read by the `chart` tool: separators, quotes, decimal commas.
+- [x] `chart-readability` covers them: overlapping labels, more than 12 entries racing at once in 9:16.
+- [x] Tests: ranks over time (ties, entries arriving and leaving), the CSV reader, the ticks of a function.
 
 Done when: ten years of twelve entries in a CSV become a ranking race readable in 9:16.
 

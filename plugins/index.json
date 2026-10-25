@@ -7,14 +7,14 @@
       {
         "name": "chart",
         "title": "Add a chart",
-        "description": "a bar, line or donut chart from a JSON data set of the project (a list of { label, value }), sized and placed in the composition, with an optional title above it"
+        "description": "a bar, line, donut, race, scatter or function chart from a JSON data set of the project or from a CSV (separators, quotes and decimal commas read), sized and placed in the composition, with an optional title above it"
       }
     ],
     "fr": {
       "Add a chart": "Ajouter un graphique",
-      "a bar, line or donut chart from a JSON data set of the project (a list of { label, value }), sized and placed in the composition, with an optional title above it": "un histogramme, une courbe ou un anneau depuis un jeu de données JSON du projet (une liste de { label, value }), dimensionné et placé dans la composition, avec un titre optionnel au-dessus"
+      "a bar, line, donut, race, scatter or function chart from a JSON data set of the project or from a CSV (separators, quotes and decimal commas read), sized and placed in the composition, with an optional title above it": "un histogramme, une courbe, un anneau, une course, un nuage ou une fonction depuis un jeu de données JSON du projet ou depuis un CSV (séparateurs, guillemets et virgules décimales lus), dimensionné et placé dans la composition, avec un titre optionnel au-dessus"
     },
-    "version": "1.0.0"
+    "version": "1.1.0"
   },
   {
     "file": "kinetic.js",

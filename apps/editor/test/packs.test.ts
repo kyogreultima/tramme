@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import { Evaluator, layerMatrix, matMul, Registry, validate, type Op, type TrammeDoc, type ToolContext } from '@tramme/core';
 import { builtinRegistry } from '@tramme/nodes';
 import { newProject } from '@tramme/project';
-import { niceMax, barSlots, linePoints, donutArcs, seriesOf } from '../../../plugins/charts.js';
+import { niceMax, barSlots, linePoints, donutArcs, seriesOf, parseCsv, csvNumber, ranksOver, ticks, tableOf } from '../../../plugins/charts.js';
 import { charState, bounce, lineStart } from '../../../plugins/kinetic.js';
 import { parseColor, lum, contrast, flashRate } from '../../../plugins/a11y.js';
 import { sentencesOf, retimed } from '../../../plugins/localize.js';
@@ -654,6 +654,57 @@ describe('charts', () => {
   it('the data comes from the values, normalised', () => {
     expect(seriesOf({ values: [{ label: 'A', value: 1 }, { label: 'B', value: 'x' }] }, {} as never)).toEqual([{ label: 'A', value: 1 }]);
     expect(seriesOf({ values: null, data: 'd' }, { asset: () => ({ series: [{ label: 'X', value: 3 }] }) } as never)).toEqual([{ label: 'X', value: 3 }]);
+  });
+
+  it('1.1: reads a CSV the way spreadsheets write them', () => {
+    expect(parseCsv('a;b\n"x;y";1,5')).toEqual([['a', 'b'], ['x;y', '1,5']]);
+    expect(parseCsv('a,b,c\n1,"x, y",3')).toEqual([['a', 'b', 'c'], ['1', 'x, y', '3']]);
+    expect(parseCsv('a\tb\n1\t"say ""hi"""')).toEqual([['a', 'b'], ['1', 'say "hi"']]);
+    expect(csvNumber('1,5')).toBe(1.5);
+    expect(csvNumber('2.5')).toBe(2.5);
+    // the ranks over time, ties by name, entries arriving and leaving
+    const ranks = ranksOver([{ period: '2000', values: { b: 2, a: 2, c: 1 } }, { period: '2001', values: { a: 5, d: 3 } }]);
+    expect(ranks[0].rank).toEqual({ a: 1, b: 2, c: 3 });
+    expect(ranks[1].rank).toEqual({ a: 1, d: 2 });
+    expect(ticks(0, 97)).toEqual([0, 20, 40, 60, 80, 100]);
+  });
+
+  it('1.1: the race tool reads a 200-entry CSV, keeps the leaders, says the cut', async () => {
+    const names = Array.from({ length: 200 }, (_, i) => `entry-${String(i + 1).padStart(3, '0')}`);
+    const header = ['period', ...names].join(';');
+    const rows = [0, 1, 2, 3].map((p) => ['20' + p, ...names.map((n, i) => String(i + p).replace('.', ','))].join(';'));
+    const csv = [header, ...rows].join('\n');
+    for (const [w, h, cap] of [[1080, 1920, 12], [1920, 1080, 20]] as [number, number, number][]) {
+      const { doc } = newProject({ name: 'T', width: w, height: h, fps: 30, duration: 10 });
+      doc.assets.race = { type: 'json', src: 'assets/data/race.csv', name: 'Race' } as never;
+      const out = await runTool(charts.tools[0], doc, { data: 'race', kind: 'race' }, { extra: { readText: async () => csv } });
+      const next = applyOps(doc, out.ops).doc;
+      const layer = Object.values(Object.values(next.compositions).find((c) => Object.values(c.layers).some((l) => l.type === 'chart.race'))!.layers).find((l) => l.type === 'chart.race')!;
+      expect(layer.props!.entries).toBe(cap);
+      expect((layer.props!.table as { values: Record<string, number> }[])[0].values && Object.keys((layer.props!.table as { values: Record<string, number> }[])[0].values)).toHaveLength(cap);
+      expect(out.text).toMatch(/left out/);
+      for (const b of boxesOf(next)) expect(inside(b, w, h)).toBe(true);
+    }
+  });
+
+  it('1.1: the race tool reads a decimal comma as a number', () => {
+    const csv = 'period;Alpha;Beta\n2000;"1,5";2\n2001;3;"0,5"';
+    const table = tableOf(csv);
+    expect(table[0].values).toEqual({ Alpha: 1.5, Beta: 2 });
+    expect(table[1].values).toEqual({ Alpha: 3, Beta: 0.5 });
+  });
+
+  it('1.1: the readability check flags 13 entries racing in 9:16 and colliding labels', () => {
+    const placed = (type: string, props: object, name: string) => ({ id: name.toLowerCase(), layer: { name, type }, node: { type }, props, opacity: 1, box: null });
+    const run = (width: number, height: number, layers: object[]) => charts.checks[0].run({
+      doc: {}, compId: 'main', comp: { width, height }, registry: null, evaluator: null, step: 0.25,
+      samples: [{ t: 0, layers }],
+    } as never) as { message: string }[];
+    const race = (entries: number) => placed('chart.race', { table: [{ period: 'p', values: {} }], entries }, 'Race');
+    expect(run(1080, 1920, [race(13)]).length).toBeGreaterThan(0);
+    expect(run(1080, 1920, [race(12)]).every((i) => !i.message.includes('racing'))).toBe(true);
+    const scatter = placed('chart.scatter', { labels: true, values: [{ name: 'A', x: 10, y: 10 }, { name: 'B', x: 12, y: 12 }] }, 'Scatter');
+    expect(run(1920, 1080, [scatter]).some((i) => i.message.includes('collide'))).toBe(true);
   });
 });
 
