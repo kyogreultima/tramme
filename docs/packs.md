@@ -98,3 +98,11 @@ Screen recordings played as product films: the picture zooms where things happen
 - Nodes: none
 - Checks: `screencast-motion` — Screencast motion
 
+## Handmade
+
+Made by hand: strokes that boil, motion on twos, rough sketches and annotations drawn around what matters
+
+- Tools: `/annotate` — Annotate a layer
+- Nodes: `sketch.shape` — Sketch
+- Checks: none
+

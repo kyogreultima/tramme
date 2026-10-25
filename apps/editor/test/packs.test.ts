@@ -28,9 +28,11 @@ import { offBeat, evenShots, deltaE, paletteDrift, typeDrift } from '../../../pl
 import * as rhythm from '../../../plugins/rhythm.js';
 import { activity, zoomKeys, clicksOf, sampleTimes } from '../../../plugins/screencast.js';
 import * as screencast from '../../../plugins/screencast.js';
+import { held, jitter, roughPath, hachure, boilAt } from '../../../plugins/handmade.js';
+import * as handmade from '../../../plugins/handmade.js';
 
 // the packs are JavaScript on purpose: their shape is checked at runtime by Registry.use, which these tests run
-const PACKS = [charts, kinetic, a11y, physics, styk, icons, diagram, walkthrough, localize, codeview, rhythm, screencast] as unknown as import('@tramme/core').PluginModule[];
+const PACKS = [charts, kinetic, a11y, physics, styk, icons, diagram, walkthrough, localize, codeview, rhythm, screencast, handmade] as unknown as import('@tramme/core').PluginModule[];
 
 /** the shipped index, as the script writes it: each entry's commands and their French */
 const INDEX: { file: string; name: string; description?: string; commands?: { name: string; title: string; description: string }[]; fr?: Record<string, string> }[] =
@@ -453,6 +455,88 @@ describe('screencast', () => {
       expect(out.ops.length).toBeGreaterThan(0);
       for (const b of boxesOf(applyOps(doc, out.ops).doc)) expect(inside(b, w, h)).toBe(true);
     }
+  });
+});
+
+describe('handmade', () => {
+  it('holds a value on its block of frames, whichever instant of it asks', () => {
+    expect(held(0.1, 30, 2)).toBe(held(0.066, 30, 2));
+    expect(held(5 / 30, 30, 2)).toBe(held(4 / 30, 30, 2));
+    expect(held(7 / 30, 30, 2)).not.toBe(held(4 / 30, 30, 2));
+  });
+
+  it('nudges by the seed and the step, the same every time', () => {
+    expect(jitter(7, 3, 0.6)).toEqual(jitter(7, 3, 0.6));
+    expect(jitter(7, 3, 0.6)).not.toEqual(jitter(8, 3, 0.6));
+    expect(jitter(7, 4, 0.6)).not.toEqual(jitter(7, 3, 0.6));
+    expect(Math.abs(jitter(7, 3, 0.6)[0])).toBeLessThanOrEqual(0.6);
+  });
+
+  it('draws the same hand for the same seed, another for another', () => {
+    const b = { x: 0, y: 0, w: 300, h: 160 };
+    expect(roughPath('rect', b, 7)).toEqual(roughPath('rect', b, 7));
+    expect(JSON.stringify(roughPath('rect', b, 7))).not.toBe(JSON.stringify(roughPath('rect', b, 8)));
+    for (const kind of ['line', 'arrow', 'rect', 'ellipse', 'bracket'] as const) {
+      const paths = roughPath(kind, b, 3);
+      expect(paths.length).toBeGreaterThanOrEqual(2);
+      for (const p of paths) {
+        expect(p.v.length).toBeGreaterThan(1);
+        expect(p.closed).toBe(false);
+      }
+    }
+    const hatch = hachure(b, -41, 10, 5);
+    expect(hatch.length).toBeGreaterThan(3);
+    for (const p of hatch) expect(p.v).toHaveLength(2);
+    expect(hachure(b, -41, 10, 5)).toEqual(hatch);
+  });
+
+  it('the twos hold a linear key across its block, and boil answers any frame in any order', () => {
+    const linear = (t: number) => t * 30;
+    const ctxAt = (t: number) => ({ t, fps: 30, base: linear, keys: null, keyValues: null, index: 0, count: 1, seed: 3 });
+    const mod = handmade.modifiers[0];
+    expect(mod.type).toBe('twos');
+    expect(mod.apply(linear(4 / 30), { n: 2, jitter: 0 }, ctxAt(4 / 30))).toBe(mod.apply(linear(5 / 30), { n: 2, jitter: 0 }, ctxAt(5 / 30)));
+    expect(mod.apply(linear(6 / 30), { n: 2, jitter: 0 }, ctxAt(6 / 30))).not.toBe(mod.apply(linear(4 / 30), { n: 2, jitter: 0 }, ctxAt(4 / 30)));
+    // any frame in any order: the boil offset at 37 is the one reached after 0 to 36
+    const alone = boilAt(37, 1, 1.5, 2);
+    let reached: number[] | null = null;
+    for (let f = 0; f <= 37; f++) reached = boilAt(f, 1, 1.5, 2);
+    expect(reached).toEqual(alone);
+  });
+
+  it('the annotation follows a moving layer, its keys one offset away', async () => {
+    const { doc } = newProject({ name: 'T', width: 1920, height: 1080, fps: 30, duration: 6 });
+    doc.compositions.main.layers.t = {
+      type: 'text', name: 'Key line', in: 0, out: 6,
+      transform: { position: { $k: [{ t: 0, v: [400, 300] }, { t: 2, v: [900, 500] }] } },
+      props: { text: 'the number that matters', size: 64 },
+    } as never;
+    doc.compositions.main.order = ['t'];
+    const out = await runTool(handmade.tools[0], doc, { kind: 'circle', layer: 't' });
+    const next = applyOps(doc, out.ops).doc;
+    const mark = Object.values(next.compositions.main.layers).find((l) => l.type === 'sketch.shape')!;
+    const keys = (mark.transform!.position as { $k: { t: number; v: number[] }[] }).$k;
+    expect(keys.map((k) => k.t)).toEqual([0, 2]);
+    // the same offset at both keys: the mark rides the layer
+    expect(keys[0].v[0] - 400).toBeCloseTo(keys[1].v[0] - 900, 0);
+    expect(keys[0].v[1] - 300).toBeCloseTo(keys[1].v[1] - 500, 0);
+    expect(validate(next, registryOf())).toEqual([]);
+  });
+
+  it('falls back without a kit', async () => {
+    const doc = newProject({ name: 'T', width: 1920, height: 1080, fps: 30, duration: 6 }).doc;
+    doc.compositions.main.layers.t = { type: 'text', name: 'Line', props: { text: 'hold this', size: 64 } } as never;
+    doc.compositions.main.order = ['t'];
+    const r = await runTool(handmade.tools[0], doc, { kind: 'underline' });
+    expect(r.ops.length).toBeGreaterThan(0);
+  });
+
+  it('fits 9:16', async () => {
+    const doc = newProject({ name: 'T', width: 1080, height: 1920, fps: 30, duration: 6 }).doc;
+    doc.compositions.main.layers.t = { type: 'text', name: 'Line', props: { text: 'the point', size: 72, align: 'center' }, transform: { position: [540, 900] } } as never;
+    doc.compositions.main.order = ['t'];
+    const r = await runTool(handmade.tools[0], doc, { kind: 'circle', layer: 't' });
+    for (const b of boxesOf(applyOps(doc, r.ops).doc)) expect(inside(b, 1080, 1920)).toBe(true);
   });
 });
 

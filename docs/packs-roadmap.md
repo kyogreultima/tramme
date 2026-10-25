@@ -2,7 +2,7 @@
 
 The general-purpose plugin packs that ship with the editor (`plugins/*.js`, listed in `plugins/index.json`, added to a project from the Code section): the ones to come, and what tramme needs first so they can exist. A pack is an ordinary plugin. It gives the assistant and the editor a new vocabulary — what they can build in one move, what they can check — for any film, never for one video.
 
-Status: steps 0 to 6 are shipped (step 5 keeps its real recordings to check on a device). Shipped packs: charts, kinetic type, physics, stick figures, icons, diagrams, UI walkthrough, accessibility checks, localization ([plugins-roadmap.md](plugins-roadmap.md), step 10). The packs after step 0 are taken in order, each one landing whole. The decisions still open are listed at the end. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
+Status: steps 0 to 7 are shipped (step 5 keeps its real recordings to check on a device). Shipped packs: charts, kinetic type, physics, stick figures, icons, diagrams, UI walkthrough, accessibility checks, localization ([plugins-roadmap.md](plugins-roadmap.md), step 10). The packs after step 0 are taken in order, each one landing whole. The decisions still open are listed at the end. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
 
 ## Why
 
@@ -102,12 +102,12 @@ Done when: a one-minute recording of a web app plays with zooms on where the act
 
 Warmth for explainers: strokes that boil, annotations drawn around what matters, motion on twos.
 
-- [ ] The `fx.boil` layer effect (GLSL): a small displacement by noise, drawn again every 2 or 3 frames, so a machine-drawn line trembles like one drawn by hand; its amplitude in pixels, held between changes.
-- [ ] The `twos` modifier: any value held for 2 frames (or n), with a small seeded jitter at each change, for stop motion and cut-out paper.
-- [ ] The `sketch` node: rough shapes (line, arrow, rectangle, ellipse, hachured fill), each drawn as two seeded passes that overshoot their corners — rough.js's idea, in the pack's own code — that draw themselves (`progress`).
-- [ ] The `annotate` tool: a circle, an underline, a box, a marker highlight, a strike or a bracket around a layer, drawn on a beat after the layer lands; its box measured by the tool, its moves followed through `host.layer`. A single word of a text layer once the text node gives word boxes, not before.
-- [ ] A `sketchbook` kit: a paper plate, a graphite ink, a handwritten typeface (OFL), slower curves.
-- [ ] Tests: the rough strokes deterministic per seed, the holds of `twos`, an annotation following a moving layer.
+- [x] The `fx.boil` layer effect (GLSL): a small displacement by noise, drawn again every 2 or 3 frames, so a machine-drawn line trembles like one drawn by hand; its amplitude in pixels, held between changes.
+- [x] The `twos` modifier: any value held for 2 frames (or n), with a small seeded jitter at each change, for stop motion and cut-out paper.
+- [x] The `sketch` node: rough shapes (line, arrow, rectangle, ellipse, hachured fill), each drawn as two seeded passes that overshoot their corners — rough.js's idea, in the pack's own code — that draw themselves (`progress`).
+- [x] The `annotate` tool: a circle, an underline, a box, a marker highlight, a strike or a bracket around a layer, drawn on a beat after the layer lands; its box measured by the tool, its moves followed through `host.layer`. A single word of a text layer once the text node gives word boxes, not before.
+- [x] A `sketchbook` kit: a paper plate, a graphite ink, a handwritten typeface (OFL), slower curves.
+- [x] Tests: the rough strokes deterministic per seed, the holds of `twos`, an annotation following a moving layer.
 
 Done when: the key sentence of an explainer gets a circle drawn around it a beat after it lands, the shapes boil, and two renders are identical.
 

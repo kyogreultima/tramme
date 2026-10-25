@@ -19,6 +19,15 @@ These packages end up in the editor's build (`apps/editor/dist`). The build also
 
 **About mediabunny (MPL-2.0).** The MPL is a file-level copyleft: if you modify mediabunny's own files and distribute the result, those files must stay under the MPL and their source must be available. Using it unmodified, as Tramme does, places no requirement on Tramme's own code.
 
+## Data shipped beside the packs
+
+The packs carry their data in the repository (`plugins/<pack>/`), read at authoring time; only what a tool used is written into a project.
+
+| Data | License | Use |
+|---|---|---|
+| [Lucide](https://lucide.dev) (`plugins/icons/lucide.json`) | ISC | The icons pack's pictograms (converted from the SVG set) |
+| [Caveat](https://fonts.google.com/specimen/Caveat) (`plugins/handmade/Caveat-Medium.woff2`, the latin subset, weight 500) | OFL-1.1 | The handmade pack's handwritten typeface |
+
 ## Command line and local tools
 
 | Package | License | Use |

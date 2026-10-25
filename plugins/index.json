@@ -176,5 +176,25 @@
       "Play a screen recording": "Jouer une capture d’écran",
       "a recording as a product film: the picture zooms where things happen and out before each page change, a click found is marked with the cursor's ripple": "une capture jouée comme un film produit : l’image zoome là où ça se passe et dézoome avant chaque changement de page, un clic repéré est marqué de l’onde du curseur"
     }
+  },
+  {
+    "file": "handmade.js",
+    "name": "Handmade",
+    "description": "Made by hand: strokes that boil, motion on twos, rough sketches and annotations drawn around what matters",
+    "data": [
+      "Caveat-Medium.woff2"
+    ],
+    "version": "1.0.0",
+    "commands": [
+      {
+        "name": "annotate",
+        "title": "Annotate a layer",
+        "description": "a rough circle, underline, box, highlight, strike or bracket around a layer, drawn on a beat after it lands, following it when it moves"
+      }
+    ],
+    "fr": {
+      "Annotate a layer": "Annoter une couche",
+      "a rough circle, underline, box, highlight, strike or bracket around a layer, drawn on a beat after it lands, following it when it moves": "un cercle, un souligné, un cadre, un surlignage, une rature ou un crochet dessinés autour d’une couche, tracés un temps après qu’elle est posée, qui la suivent quand elle bouge"
+    }
   }
 ]
