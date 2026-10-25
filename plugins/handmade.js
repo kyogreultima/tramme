@@ -404,6 +404,8 @@ export const messages = {
     'the layer to annotate; the selected one, or the only one': 'la couche à annoter ; la sélection, ou la seule',
     'how far the mark sits from the layer, as a share of its size (0.12 by default)': 'à quelle distance la marque tient de la couche, en part de sa taille (0,12 par défaut)',
     'another hand, another seed': 'une autre main, une autre graine',
+    'another seed, another hand': 'une autre graine, une autre main',
+    'the marks draw themselves on': 'les marques se tracent seules',
     'a token reference (@accent) or a colour; the accent by default': 'une référence de token (@accent) ou une couleur ; l’accent par défaut',
     'the one thing that matters on screen gets its mark, a beat after it lands: a circle on the number, an underline on the sentence, a bracket gathering the list': 'la seule chose qui compte à l’écran reçoit sa marque, un temps après qu’elle est posée : un cercle sur le chiffre, un souligné sur la phrase, un crochet qui rassemble la liste',
     'annotating every layer (the marks argue with each other), a mark on a layer that rotates or scales as it moves (the mark follows the position, not the spin), marks without a beat of air after the layer lands': 'annoter chaque couche (les marques se disputent), une marque sur une couche qui tourne ou change d’échelle en bougeant (la marque suit la position, pas la rotation), des marques sans un temps d’air après la pose de la couche',
