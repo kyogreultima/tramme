@@ -116,6 +116,9 @@ function Preview() {
       <Row label={t('settings.playAtTheComposition')} hint={t('settings.likeTheExport24')}>
         <Toggle on={p.exactFrames} onChange={(v) => setPrefs({ exactFrames: v })} />
       </Row>
+      <Row label={t('settings.scrubAudio')} hint={t('settings.scrubAudioHint')}>
+        <Toggle on={p.scrubAudio} onChange={(v) => setPrefs({ scrubAudio: v })} />
+      </Row>
       <Row label={t('settings.playProxies')} hint={t('settings.playProxiesHint')}>
         <Toggle on={p.proxies} onChange={(v) => { setPrefs({ proxies: v }); void preview.useProxies(v); }} />
       </Row>

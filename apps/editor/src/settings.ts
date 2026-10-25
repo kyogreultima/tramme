@@ -21,6 +21,8 @@ export interface Preferences {
   blur: 'document' | 'limited' | 'off';
   /** playback draws the composition's own frames (24, 30 i/s…), as the export, instead of every screen refresh */
   exactFrames: boolean;
+  /** dragging the playhead plays a short window of the sound at each step */
+  scrubAudio: boolean;
   /** experimental: the whole picture — built-ins, plugins, modifiers, effects, simulations — is evaluated and drawn in the project's sandbox */
   sandboxPreview: boolean;
   /** sound: the level (dB) of the effects the tools place, of the music beds, and how much a music drops under a voice */
@@ -52,7 +54,7 @@ export interface Preferences {
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
-  language: 'auto', theme: 'studio', view: 'studio', motion: 'auto', still: 'display', blur: 'document', exactFrames: true, sandboxPreview: false,
+  language: 'auto', theme: 'studio', view: 'studio', motion: 'auto', still: 'display', blur: 'document', exactFrames: true, scrubAudio: true, sandboxPreview: false,
   effectsDb: -8, musicDb: -14, duckDb: -12, varySounds: true, confirmPaid: true, paidPerTurn: 10, voiceProvider: 'auto', voice: '', voiceModel: '', previewVolume: 1, previewMuted: false, proxies: true, models: {}, pluginsOff: [], recentCommands: [],
 };
 
@@ -104,6 +106,7 @@ function load(): Preferences {
     if (!['display', 'full'].includes(p.still)) p.still = DEFAULT_PREFERENCES.still;
     if (!['document', 'limited', 'off'].includes(p.blur)) p.blur = DEFAULT_PREFERENCES.blur;
     p.exactFrames = p.exactFrames !== false;
+    p.scrubAudio = p.scrubAudio !== false;
     p.sandboxPreview = p.sandboxPreview === true;
     // the theme preference: the former mode + per-mode themes collapse into one theme
     const legacyTheme = (saved as { theme?: unknown }).theme, legacyMode = (saved as { mode?: unknown }).mode;

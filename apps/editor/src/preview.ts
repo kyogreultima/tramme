@@ -23,7 +23,7 @@ import { copiesIn, copyId, counted, installed, installedFor, installedTypes, off
 import { bindSandbox, blitSandboxFrame, declarationsModule, ensureDeclared, ensureSandboxDoc, pluginItemsOf, resetSandbox, sandboxDeclaration, sandboxVideoFrames, type SandboxContext } from './plugins/sandbox-draw.ts';
 import { t } from './i18n/index.ts';
 import { prefs } from './settings.ts';
-import { clockTime, step, Runs, type Clock } from './playclock.ts';
+import { clockTime, scrubWindow, step, Runs, type Clock } from './playclock.ts';
 import { packAsInstalled, packBySrc, packContext, shippedPacks } from './packs.ts';
 import { syncPluginTours } from './tours/index.ts';
 
@@ -62,6 +62,8 @@ class Preview {
   private motion = { scale: 0.5, ceiling: 2, calm: 0, intervals: [] as number[], last: 0 };
   /** when the time last changed while paused (scrubbing the playhead) */
   private scrubAt = 0;
+  /** when the scrub's sound last played (the window waits its 60 ms) */
+  private scrubPlayedAt = -1e9;
   /** counter for re-loading an edited plugin in the sandbox */
   private bust = 0;
   /** one sandbox frame in flight (the flag's draw path) */
@@ -114,7 +116,7 @@ class Preview {
     let lastT = -1;
     effect(() => {
       const t = S.time.value, playing = S.playing.value;
-      if (!playing && t !== lastT) this.scrubAt = performance.now();
+      if (!playing && t !== lastT) { this.scrubAt = performance.now(); this.scrub(t); }
       if (!playing) this.playedFrame = -1;
       lastT = t;
       this.invalidate();
@@ -539,8 +541,28 @@ class Preview {
     }
   }
 
-  /** the loudness gain of the master for this mix: measured once per mix (in the background the first time), then set on the level */
-  private levelOf(doc: TrammeDoc, compId: string) {
+  /** the sound heard while the playhead is dragged: 80 ms of the decoded buffers around `t`, at most every 60 ms;
+   *  never the videos' (their sound streams from the file) */
+  private scrub(t: number) {
+    const p = prefs.peek();
+    if (!p.scrubAudio || p.previewMuted || !this.audio || !this.renderer || S.playing.peek()) return;
+    const w = scrubWindow(t, this.scrubPlayedAt, performance.now());
+    if (!w) return;
+    this.scrubPlayedAt = performance.now();
+    const doc = viewDoc.peek(), solo = S.solo.peek();
+    const clips = audioClips(doc, compIdOf(doc)).filter((c) => t >= c.at && t < c.at + c.duration && doc.assets[c.asset].type !== 'video' && (!solo.size || solo.has(c.layerId)));
+    for (const c of clips) {
+      void this.buffer(this.renderer.assets.url(c.asset)).then((buf) => {
+        if (!buf || !this.audio || S.playing.peek()) return;
+        const src = playClip(this.audio, c, buf, this.level ?? this.master!, this.audio.currentTime + 0.005, w.from);
+        if (!src) return;
+        this.sources.push(src);
+        src.stop(this.audio.currentTime + 0.005 + w.dur);
+      });
+    }
+  }
+
+  /** the loudness gain of the master for this mix: measured once per mix (in the background the first time), then set on the level */  private levelOf(doc: TrammeDoc, compId: string) {
     const r = this.renderer!, key = JSON.stringify([soundMix(doc.compositions[compId]), audioClips(doc, compId)]);
     let p = this.levels.get(key);
     if (!p) {

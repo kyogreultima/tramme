@@ -42,3 +42,12 @@ export class Runs {
     return run === this.latest;
   }
 }
+
+/**
+ * The sound heard while the playhead is dragged: a window from `t` to play,
+ * or null when the last one is not 60 ms old yet (a stutter is worse than
+ * silence). `last` and `now` are in milliseconds (performance.now()).
+ */
+export function scrubWindow(t: number, last: number, now: number): { from: number; dur: number } | null {
+  return now - last < 60 ? null : { from: t, dur: 0.08 };
+}

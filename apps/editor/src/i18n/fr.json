@@ -862,6 +862,8 @@
     "connectionHint": "Le compagnon tourne sur cet ordinateur : l'assistant y passe par votre connexion Claude Code, plutôt que par une clé.",
     "limited": "Limité",
     "playAtTheComposition": "Lecture aux images de la composition",
+    "scrubAudio": "Entendre le son pendant le scrub",
+    "scrubAudioHint": "Déplacer la tête de lecture joue une courte fenêtre du son à chaque pas, assez pour entendre le moment d’une coupe ou d’un effet. Le son des vidéos n’est pas scrubbé.",
     "likeTheExport24": "Comme l'export : 24 images par seconde pour une composition à 24 i/s, plutôt qu'une à chaque rafraîchissement de l'écran. Plus léger, sans perte.",
     "sandboxPreview": "Dessiner l'aperçu dans le bac à sable des plugins (expérimental)",
     "sandboxPreviewHint": "Toute l'image, built-ins et plugins : modificateurs, effets et simulations sont évalués et dessinés dans le worker du projet ; le dessin, les outils et les vérifications d'un plugin ne s'exécutent plus dans la page. Les images vidéo sont toujours décodées ici ; un scrub peut montrer l'image précédente un instant.",

@@ -2,7 +2,7 @@
 
 The small things between the big ones: playback that can be reasoned about, the desktop app that asks for attention when a question waits, the packs' commands on the home screen before a project opens, and the editor conveniences a day of use asks for. None of them is a roadmap of its own worth of work; together they are the difference between a tool that works and one that feels finished.
 
-Status: steps 1 to 4 done. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
+Status: steps 1 to 5 done. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
 
 ## Why
 
@@ -43,7 +43,7 @@ Done when: the commands a user actually runs are the ones the menu opens with.
 
 ### Step 5. Hearing the sound while scrubbing
 
-- [ ] Dragging the playhead plays a short window of the sound at each step (80 ms, at most every 60 ms, only while dragging, never the video's streamed sound), with a setting to turn it off (on by default).
+- [x] Dragging the playhead plays a short window of the sound at each step (80 ms, at most every 60 ms, only while dragging, never the video's streamed sound), with a setting to turn it off (on by default).
 
 Done when: scrubbing a cut lands on the sound the way an editor's scrub does — enough to hear the moment, never a stutter.
 

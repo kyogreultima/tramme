@@ -862,6 +862,8 @@
     "connectionHint": "The companion runs on this computer: the assistant uses your Claude Code login through it, rather than a key.",
     "limited": "Limited",
     "playAtTheComposition": "Play at the composition's frames",
+    "scrubAudio": "Hear the sound while scrubbing",
+    "scrubAudioHint": "Dragging the playhead plays a short window of the sound at each step, enough to hear the moment a cut or a hit lands. The videos' own sound is not scrubbed.",
     "likeTheExport24": "Like the export: 24 frames per second for a 24 fps composition, rather than one at every screen refresh. Lighter, with no loss.",
     "sandboxPreview": "Draw the preview in the plugin sandbox (experimental)",
     "sandboxPreviewHint": "The whole picture, built-ins and plugins alike: modifiers, effects and simulations are evaluated and drawn in the project's worker, so a plugin's draw, tools and checks never run in the page. Video frames are still decoded here; scrubbing may show the previous picture for a moment.",
