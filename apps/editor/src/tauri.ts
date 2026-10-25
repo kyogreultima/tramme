@@ -27,6 +27,8 @@ export interface NativeWindow {
   isMaximized: () => Promise<boolean>;
   isFullscreen: () => Promise<boolean>;
   onResized: (handler: () => void) => Promise<() => void>;
+  /** the window manager's attention: 1 critical (Windows, Linux), 2 informational (a bounce of the Dock on macOS), null to stop */
+  requestUserAttention: (kind: 1 | 2 | null) => Promise<void>;
 }
 
 export const tauri: Tauri | undefined = typeof window !== 'undefined' ? (window as unknown as { __TAURI__?: Tauri }).__TAURI__ : undefined;

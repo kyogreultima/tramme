@@ -5,13 +5,17 @@
 
 import { useEffect } from 'preact/hooks';
 import { answer, chatShown, question } from '../confirm.ts';
-import { away, notify } from '../notify.ts';
+import { attend, away, notify } from '../notify.ts';
 import { Modal } from './controls.tsx';
 import { t } from '../i18n/index.ts';
 
 export function QuestionDialog() {
   const q = question.value;
-  useEffect(() => { if (q && away()) notify(q.title, q.text); }, [q]);
+  useEffect(() => {
+    if (!q || (q.inChat && chatShown.value > 0)) return;
+    if (away()) notify(q.title, q.text, 'info', { attention: true });
+    attend();
+  }, [q]);
   // asked during a turn of the assistant: in the conversation, when one is on screen
   if (!q || (q.inChat && chatShown.value > 0)) return null;
   return (
