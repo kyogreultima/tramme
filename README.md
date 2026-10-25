@@ -47,7 +47,7 @@ On Cloudflare, in one of two modes. **Private**: the Worker serves the editor an
 npx wrangler r2 bucket create tramme-projects
 # Cloudflare Access: an application on the domain, then ACCESS_TEAM_DOMAIN and ACCESS_AUD in apps/worker/wrangler.jsonc
 npm run deploy
-# optional: provider keys (Anthropic, OpenAI, Gemini, OpenRouter, Z.AI, ElevenLabs, custom) in the editor's Settings, Providers
+# optional: provider keys (Anthropic, OpenAI, Gemini, OpenRouter, Z.AI, ElevenLabs, Hydracept with its project ID, custom) in the editor's Settings, Providers
 ```
 
 ## Commands
@@ -104,7 +104,7 @@ examples/
 - An imported file is checked before it enters storage: format structure, document, loaded plugins, present assets. An imported project always gets a new id.
 - Top bar: back to projects, name, autosave (refused if the document changed in another tab), the view, undo and redo (Ctrl+Z, Ctrl+Shift+Z), composition, format, frame rate, export (in the studio, the format, frame rate and length in one menu).
 - Left: layer tree (drag and drop, rename, hide, precompose), compositions and assets (import by drag and drop, Lottie included), brand tokens.
-- Packs: general-purpose plugins ship with the editor — charts, kinetic type, physics, UI walkthrough, accessibility checks, localization — and the Code section of the left panel adds one to the project in a click. Plugins can bring their own translations: [docs/i18n.md](docs/i18n.md).
+- Packs: general-purpose plugins ship with the editor — charts, kinetic type, physics, stick figures, icons, diagrams, UI walkthrough, accessibility checks, localization — and the Code section of the left panel adds one to the project in a click. Plugins can bring their own translations: [docs/i18n.md](docs/i18n.md).
 - Languages: English and French (settings, Appearance; automatic from the browser). Plugins can bring their own translations: [docs/i18n.md](docs/i18n.md).
 - Guided tours (? button): the home screen and the editor introduce themselves the first time they open; other tours (drawn animation, assistant) wait in the help menu. A plugin or a script can add its own: [docs/tours.md](docs/tours.md).
 - Settings (gear, Ctrl+,): dark, light gray or system theme; preview quality per computer, while playing (automatic from the frame rate reached, full, half, quarter) and when still (displayed size or full resolution), preview motion blur (document, limited, off), playback at the composition's frames; the assistant's model and access. Exports always stay at full quality. The preview stays sharp when still, and its final image is computed in slices without freezing the interface.

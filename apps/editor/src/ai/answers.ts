@@ -89,7 +89,7 @@ export function vocabularyIndex(reg: Registry, opts: { query?: string; installed
     }
   }
   if (words.length && !matched) return `Nothing in the vocabulary holds "${opts.query}": try other words, or list_nodes without query for the index.`;
-  if (hidden) out.push('', `${hidden} more entries come from plugins installed on this device: list_nodes { query } finds them.`);
+  if (hidden) out.push('', `${hidden} more entries come from the editor's packs and the plugins installed on this device: list_nodes { query } finds them; drawing with one adds it to the project with your changes.`);
   out.push('', 'list_nodes with types gives the full entries: property labels, descriptions, ranges, examples, tool input schemas.');
   return out.join('\n');
 }

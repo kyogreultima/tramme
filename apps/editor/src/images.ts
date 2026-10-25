@@ -71,7 +71,7 @@ const generateImage: ToolType<{ prompt: string; name?: string; ratio?: Ratio | '
       name: { type: 'string', title: 'Name', description: 'of the file, lower case; the same name makes the picture again' },
       ratio: { enum: ['auto', ...RATIOS], title: 'Proportions', description: "auto: the composition's" },
       quality: { enum: ['low', 'medium', 'high'], title: 'Quality', description: 'low costs less: a draft, a texture; high: a picture that stays on screen' },
-      provider: { enum: ['openai', 'gemini', 'zai'], title: 'Provider', description: 'the first one the server has a key for by default' },
+      provider: { enum: ['openai', 'gemini', 'zai', 'hydracept'], title: 'Provider', description: 'the first one the server has a key for by default' },
       fit: { enum: ['cover', 'contain'], title: 'Fit', description: 'cover: fills the frame, cropped to it (a background); contain: shown whole, bands around it (a prop, a logo)' },
       at: { type: 'number', minimum: 0, title: 'Start (s)', description: '0 by default: the whole composition' },
       duration: { type: 'number', minimum: 0.1, title: 'Length (s)', description: 'to the end of the composition by default' },

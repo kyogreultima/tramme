@@ -1,0 +1,9 @@
+{
+  "anthropic": { "origin": "https://api.anthropic.com" },
+  "openai": { "origin": "https://api.openai.com" },
+  "gemini": { "origin": "https://generativelanguage.googleapis.com" },
+  "openrouter": { "origin": "https://openrouter.ai" },
+  "zai": { "origin": "https://api.z.ai" },
+  "elevenlabs": { "origin": "https://api.elevenlabs.io" },
+  "hydracept": { "origin": "https://api.hydracept.com", "fields": [{ "name": "project", "required": true }, { "name": "environment" }] }
+}

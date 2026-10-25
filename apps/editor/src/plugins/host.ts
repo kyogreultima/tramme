@@ -61,6 +61,11 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string): 
 
   const answer = (ctx: ToolContext | CheckContext, a: Ask): unknown | Promise<unknown> => {
     if (a.kind === 'readText') return (ctx as ToolContext).readText(a.path);
+    if (a.kind === 'packFile') {
+      const read = (ctx as ToolContext).packFile;
+      if (!read) throw new Error("packFile: only the editor's own packs reach their data here");
+      return read(a.path);
+    }
     if (a.kind === 'files') return (ctx as ToolContext).files();
     if (a.kind === 'writeFile') return (ctx as ToolContext).writeFile(a.path, 'text' in a.data ? a.data.text : new Blob([a.data.bytes]));
     if (a.kind === 'renderStill') return (ctx as ToolContext).renderStill(a.t, a.compId);

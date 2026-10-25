@@ -342,7 +342,9 @@ export function copiesFor(doc: TrammeDoc, ops: Op[]): { ops: Op[]; files: [strin
   let next: TrammeDoc;
   try { next = applyOps(doc, ops).doc; } catch { return null; }
   const own = new Set(next.plugins ?? []), need = new Map<string, Installed>();
-  for (const k of typesOf(next)) { const p = installedTypes.get(k); if (p && !own.has(copyId(p))) need.set(p.file, p); }
+  // a module the project already holds by its file (a pack added from the Code section) is not copied again
+  const held = new Set(Object.values(next.assets).filter((x) => x.type === 'module').map((x) => x.src));
+  for (const k of typesOf(next)) { const p = installedTypes.get(k); if (p && !own.has(copyId(p)) && !held.has(`plugins/${p.file}`)) need.set(p.file, p); }
   if (!need.size) return null;
   const out = { ops: [...ops], files: [] as [string, Blob][], names: [] as string[] };
   for (const p of need.values()) {

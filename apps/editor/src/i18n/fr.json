@@ -973,6 +973,9 @@
     "providerOpenrouter": "Des centaines de modèles avec un seul compte",
     "providerZai": "Les modèles GLM",
     "providerElevenlabs": "Effets sonores, musiques et voix off",
+    "providerHydracept": "Images, effets sonores, musiques et voix off avec une seule clé, un devis et un reçu pour chacun",
+    "hydraceptProject": "ID du projet",
+    "hydraceptEnvironment": "Environnement (facultatif)",
     "customProvider": "Fournisseur personnalisé",
     "providerCustom": "Tout service au format de chat OpenAI, par son URL de base (DeepSeek, Groq, Mistral…)",
     "save": "Enregistrer",
@@ -1911,6 +1914,7 @@
     "composition times, e.g. [1.2, 3.5] or \"1.2, 3.5\"": "temps de la composition, par exemple [1.2, 3.5] ou « 1.2, 3.5 »",
     "copies a sound of this project into the library shared by the projects, described so a search finds it": "copie un son de ce projet dans la bibliothèque partagée par les projets, décrit pour qu'une recherche le trouve",
     "elevenlabs": "ElevenLabs",
+    "hydracept": "Hydracept",
     "gemini": "Gemini",
     "gives the video its sound: effects on the moments that matter, a bed if it needs one, levels under the voice": "donne son son à la vidéo : des effets sur les moments qui comptent, un fond si elle en a besoin, des niveaux sous la voix",
     "has a provider make a sound effect, a music bed or a voice-over (the server's keys), saves it in the project with what made it and places it": "fait créer par un fournisseur un effet sonore, un fond musical ou une voix off (avec les clés du serveur), l'enregistre dans le projet avec ce qui l'a créé et le place",
@@ -2278,7 +2282,14 @@
     "moments kept between now and the delay: more is smoother and costs memory": "instants gardés entre maintenant et le retard : plus, c'est plus fluide et plus coûteux en mémoire",
     "patches across the height, for the noise map": "taches sur la hauteur, pour la carte de bruit",
     "the picture to displace in time (put a video in a composition to displace it)": "l'image à déplacer dans le temps (mettez une vidéo dans une composition pour la déplacer)",
-    "where the delay is: left, right, top, bottom grow it across the frame (slit-scan), centre from the middle out, edges from the sides in, noise in patches": "où se trouve le retard : gauche, droite, haut, bas le font croître à travers l'image (slit-scan), centre du milieu vers l'extérieur, bords des côtés vers l'intérieur, bruit par taches"
+    "where the delay is: left, right, top, bottom grow it across the frame (slit-scan), centre from the middle out, edges from the sides in, noise in patches": "où se trouve le retard : gauche, droite, haut, bas le font croître à travers l'image (slit-scan), centre du milieu vers l'extérieur, bords des côtés vers l'intérieur, bruit par taches",
+    "Trim start": "Début du tracer",
+    "Trim end": "Fin du tracer",
+    "Trim offset": "Décalage du tracer",
+    "Trim": "Tracer",
+    "the stroke drawn from this fraction of the outline's length; draw it on by animating this from 0, or the end from 0": "le trait dessiné à partir de cette fraction de la longueur du contour ; dessinez-le en animant cette valeur depuis 0, ou la fin depuis 0",
+    "the stroke drawn up to this fraction; under the start, the two swap (as in Lottie)": "le trait dessiné jusqu'à cette fraction ; sous le début, les deux s'échangent (comme dans Lottie)",
+    "shifts the window along the outline; keyframed, a run chases itself around the shape": "décale la fenêtre le long du contour ; keyframé, un segment se poursuit autour de la forme"
   },
   "personal": {
     "cannotStart": "tramme ne peut pas démarrer ici",

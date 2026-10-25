@@ -6,20 +6,22 @@
 
 import type { ComponentChildren } from 'preact';
 import { useState } from 'preact/hooks';
-import type { KeyedProvider, KeyStatus } from '@tramme/api';
+import { KEYED_PROVIDERS, type KeyedProvider, type KeyStatus } from '@tramme/api';
 import { Confirm, Row, Section, norm } from './SettingsRows.tsx';
 import { Icon } from './icons.tsx';
 import { m, t } from '../i18n/index.ts';
 
 export interface ProviderActions {
-  connect(provider: KeyedProvider, key: string): Promise<void>;
+  connect(provider: KeyedProvider, key: string, fields?: Record<string, string>): Promise<void>;
   disconnect(provider: KeyedProvider): Promise<void>;
   saveCustom(id: string, c: { label: string; base: string; key?: string }): Promise<void>;
   removeCustom(id: string): Promise<void>;
   notify(text: string, kind?: 'info' | 'error'): void;
 }
 
-interface ProviderInfo { id: KeyedProvider; name: string; hint: string; keys: string }
+/** how the form asks for each setting a provider takes next to its key (the settings: KEYED_PROVIDERS of @tramme/api) */
+interface ProviderInfoField { label: string; placeholder?: string }
+interface ProviderInfo { id: KeyedProvider; name: string; hint: string; keys: string; fields?: Record<string, ProviderInfoField> }
 const PROVIDERS: ProviderInfo[] = [
   { id: 'anthropic', name: 'Anthropic', hint: m('settings.providerAnthropic'), keys: 'https://console.anthropic.com/settings/keys' },
   { id: 'openai', name: 'OpenAI', hint: m('settings.providerOpenai'), keys: 'https://platform.openai.com/api-keys' },
@@ -27,6 +29,10 @@ const PROVIDERS: ProviderInfo[] = [
   { id: 'openrouter', name: 'OpenRouter', hint: m('settings.providerOpenrouter'), keys: 'https://openrouter.ai/keys' },
   { id: 'zai', name: 'Z.AI (GLM)', hint: m('settings.providerZai'), keys: 'https://z.ai/manage-apikey/apikey-list' },
   { id: 'elevenlabs', name: 'ElevenLabs', hint: m('settings.providerElevenlabs'), keys: 'https://elevenlabs.io/app/settings/api-keys' },
+  { id: 'hydracept', name: 'Hydracept', hint: m('settings.providerHydracept'), keys: 'https://app.hydracept.com', fields: {
+    project: { label: m('settings.hydraceptProject'), placeholder: 'cpr_...' },
+    environment: { label: m('settings.hydraceptEnvironment'), placeholder: 'development' },
+  } },
 ];
 type CustomProvider = KeyStatus['custom'][number];
 
@@ -107,10 +113,16 @@ export function Providers({ keys, actions, intro, relayed, forget }: { keys: Key
   const custom = keys?.custom ?? [];
   /** a hint, and the relay's note when the provider is reached through it */
   const via = (p: KeyedProvider | 'custom', hint?: string) => (relayed?.(p) ? [hint, t('personal.viaRelay')].filter(Boolean).join(' · ') : hint);
-  const keyForm = (p: ProviderInfo) => (close: () => void) => (
-    <ProviderForm link={p.keys} onClose={close} fields={[{ name: 'key', label: t('settings.apiKey'), secret: true, placeholder: t('settings.pasteTheKey') }]}
-      onSave={async (v) => { await actions.connect(p.id, v.key); actions.notify(t('settings.providerConnected', { name: p.name })); }} />
-  );
+  const keyForm = (p: ProviderInfo) => (close: () => void) => {
+    const settings = KEYED_PROVIDERS[p.id].fields;
+    return (
+      <ProviderForm link={p.keys} onClose={close} fields={[
+        { name: 'key', label: t('settings.apiKey'), secret: true, placeholder: t('settings.pasteTheKey') },
+        ...(settings ?? []).map((f) => ({ name: f.name, label: p.fields?.[f.name]?.label ?? f.name, optional: !f.required, placeholder: p.fields?.[f.name]?.placeholder, initial: keys?.fields?.[p.id]?.[f.name] })),
+      ]}
+        onSave={async ({ key, ...fields }) => { await actions.connect(p.id, key, settings ? fields : undefined); actions.notify(t('settings.providerConnected', { name: p.name })); }} />
+    );
+  };
   const customForm = (c?: CustomProvider) => (close: () => void) => (
     <ProviderForm onClose={close} fields={[
       { name: 'label', label: t('settings.providerName'), initial: c?.label, placeholder: 'DeepSeek' },

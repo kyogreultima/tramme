@@ -23,6 +23,7 @@ import { copiesIn, copyId, counted, installed, installedFor, installedTypes, off
 import { bindSandbox, blitSandboxFrame, declarationsModule, ensureDeclared, ensureSandboxDoc, pluginItemsOf, resetSandbox, sandboxDeclaration, sandboxVideoFrames, type SandboxContext } from './plugins/sandbox-draw.ts';
 import { t } from './i18n/index.ts';
 import { prefs } from './settings.ts';
+import { packAsInstalled, packBySrc, packContext, shippedPacks } from './packs.ts';
 import { syncPluginTours } from './tours/index.ts';
 
 /** the slowest pace a media element takes (browsers refuse less): slower, it waits */
@@ -49,6 +50,8 @@ class Preview {
   private media: HTMLAudioElement[] = [];
   private timers: ReturnType<typeof setTimeout>[] = [];
   private clock = { at: 0, t0: 0, audio: false };
+  /** the playback started last: a start still loading its sounds when another begins (or a pause) schedules nothing */
+  private playRun = 0;
   private refineTimer: ReturnType<typeof setTimeout> | null = null;
   /** last rendered frame time (ms), shown in the transport */
   lastMs = 0;
@@ -147,9 +150,11 @@ class Preview {
     const r = this.renderer;
     if (!r) return;
     const doc = this.applied ?? S.doc.peek();
+    // the packs that ship with the editor, for the project's own copies' data and for the assistant's reach
+    const packs = await shippedPacks();
     // the plugins installed on this device, in the project's sandbox (its own plugins win a shared name: attached first)
     const mine = installedFor(doc);
-    if (!(doc.plugins ?? []).length && !mine.length) return;
+    if (!(doc.plugins ?? []).length && !mine.length && !packs.length) return;
     try {
       await attachIsolated(r.registry, pluginHost(new URL(S.docUrl.peek(), location.href).href), doc, (id) => {
         const url = r.assets.url(id);
@@ -158,7 +163,10 @@ class Preview {
       }, (id, ctx) => {
         // a copy of an installed plugin keeps the permissions the user granted it, where it is installed
         const p = installed.peek().find((x) => copyId(x) === id && copiesIn(doc)[x.manifest.id] !== undefined);
-        return p ? permitted(ctx, p) : ctx;
+        if (p) return permitted(ctx, p);
+        // a copy of one of the editor's packs reads the pack's own data
+        const pack = packBySrc(packs, doc.assets[id]?.src);
+        return pack ? packContext(pack, ctx) : ctx;
       });
     } catch (e) {
       toast(t('editor.pluginSandbox', { error: (e as Error).message }), 'error', 9000);
@@ -173,6 +181,26 @@ class Preview {
       });
     } catch (e) {
       toast(t('editor.installedRefused', { error: (e as Error).message }), 'error', 9000);
+    }
+    // the editor's packs, reached the way the installed plugins are: their tools and checks bridged from the
+    // sandbox, their nodes and presets offered until the project holds them; a proposal that draws with one
+    // copies it in (installedTypes), the version recorded. A pack that cannot load is left out, never the others.
+    try {
+      const settled = await Promise.allSettled(packs.map((p) => packAsInstalled(p)));
+      for (const s of settled) if (s.status === 'rejected') console.error('[packs]', s.reason);
+      const asInstalled = settled.flatMap((s) => (s.status === 'fulfilled' ? [s.value] : []));
+      const held = new Set(Object.values(doc.assets ?? {}).filter((x) => x.type === 'module').map((x) => x.src));
+      const list = asInstalled
+        .filter((p) => !held.has(`plugins/${p.file}`))
+        .map((p) => ({ id: `packs:${p.file}`, url: `/plugins/${p.file}`, name: p.manifest.name }));
+      const byId = new Map(asInstalled.map((p) => [`packs:${p.file}`, p]));
+      const entryOf = new Map(packs.map((p) => [p.file, p]));
+      await attachInstalled(r.registry, pluginHost(new URL(S.docUrl.peek(), location.href).href), list, {
+        brought: (id, key) => { const p = byId.get(id); if (p) installedTypes.set(key, p); },
+        context: (id, ctx) => { const p = byId.get(id); const pack = p && entryOf.get(p.file); return pack ? packContext(pack, ctx) : ctx; },
+      });
+    } catch (e) {
+      console.error('[packs]', e);
     }
   }
 
@@ -439,6 +467,10 @@ class Preview {
 
   private async play(from = S.time.peek()) {
     this.stopAudio();
+    const run = this.playRun;
+    // the clock starts at once, before the sounds load: the frames drawn meanwhile read the new start, not the last playback
+    // (the audio context runs on while paused: its old clock would land past the end, wrap and start the sound again)
+    this.clock = { at: performance.now() / 1000, t0: from, audio: false };
     const doc = viewDoc.peek();
     // audio layers and the sound of videos, each from its in point to its out point (the cuts)
     const solo = S.solo.peek();
@@ -454,15 +486,14 @@ class Preview {
       this.level.connect(limiter).connect(this.master);
     }
     if (this.audio) await this.audio.resume();
-    this.clock = { at: this.now(), t0: from, audio: false };
-    if (!this.audio || !this.renderer || !clips.length) return;
+    if (!this.audio || !this.renderer || !clips.length || run !== this.playRun) return;
     const r = this.renderer, ctx = this.audio, compId = compIdOf(doc);
     this.levelOf(doc, compId);
     const sounds = clips.filter((c) => doc.assets[c.asset].type !== 'video');
     const bufs = await Promise.all(sounds.map((c) => this.buffer(r.assets.url(c.asset))));
     // the pitch worklet, before the clock starts
     if (clips.some(needsPitch)) await loadPitch(ctx).catch(() => {});
-    if (!S.playing.peek()) return;
+    if (!S.playing.peek() || run !== this.playRun) return;
     const startAt = ctx.currentTime + 0.03;
     this.clock = { at: startAt, t0: from, audio: true };
     // the mixer of the exports: filters, gain curves, fades, reverb and the shared room sound the same here
@@ -521,6 +552,7 @@ class Preview {
   }
 
   private stopAudio() {
+    this.playRun++;
     this.playOut?.disconnect();
     this.playOut = null;
     for (const s of this.sources) { try { s.stop(); } catch { /* not started */ } }

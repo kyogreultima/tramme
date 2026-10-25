@@ -34,7 +34,7 @@ export interface Preferences {
   /** paid generations a turn of the assistant may make when its changes apply without the user (nothing is asked then) */
   paidPerTurn: number;
   /** voice-overs: the provider (auto: the first the server has a key for) and the voice ('' for its own) */
-  voiceProvider: 'auto' | 'elevenlabs' | 'openai' | 'gemini';
+  voiceProvider: 'auto' | 'elevenlabs' | 'openai' | 'gemini' | 'hydracept';
   voice: string;
   /** the ElevenLabs voice model ('' for the newest, Eleven v4) */
   voiceModel: string;
@@ -80,7 +80,7 @@ export const THEMES: ThemeInfo[] = [
 const BAR: Record<string, string> = { studio: '#090f13', obsidian: '#050708', carbon: '#101010', dusk: '#150f0a', paper: '#f0f4f7', linen: '#f7f3ec', porcelain: '#eef2f6' };
 /** the views, in the order they are offered */
 export const VIEWS: View[] = ['studio', 'atelier'];
-const VOICE_PROVIDERS = ['auto', 'elevenlabs', 'openai', 'gemini'] as const;
+const VOICE_PROVIDERS = ['auto', 'elevenlabs', 'openai', 'gemini', 'hydracept'] as const;
 
 /** a number kept within its range, the default when it is not one */
 const within = (v: unknown, d: number, lo: number, hi: number) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d);

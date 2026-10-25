@@ -4,9 +4,11 @@
 // key once, on the routes of packages/api keys.ts (same checks, same answers),
 // and then only learns which providers are connected (/api/config). The custom
 // providers' names and addresses, which are not secret, stay in the app's
-// settings; their keys in the keychain too, as `custom:<id>`.
+// settings; their keys in the keychain too, as `custom:<id>`. The settings a
+// provider takes next to its key (Hydracept: its project) are not secret
+// either: they stay in the app's settings.
 //
-//   PUT    /api/keys/:provider        {key}                 connect a provider (or change its key)
+//   PUT    /api/keys/:provider        {key, ...fields}      connect a provider (or change its key)
 //   DELETE /api/keys/:provider                              disconnect it
 //   PUT    /api/keys/custom/:id       {label, base, key?}   add or change a custom provider (key kept when absent)
 //   DELETE /api/keys/custom/:id                             remove it
@@ -14,19 +16,33 @@
 
 use crate::store::{self, http_err, HttpError, Res};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{json, Map, Value};
+use std::collections::BTreeMap;
 use std::path::PathBuf;
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
 
-/// the providers and where each answers (packages/api direct.ts): a key goes nowhere else
-pub const PROVIDERS: [(&str, &str); 6] = [
-    ("anthropic", "https://api.anthropic.com"),
-    ("openai", "https://api.openai.com"),
-    ("gemini", "https://generativelanguage.googleapis.com"),
-    ("openrouter", "https://openrouter.ai"),
-    ("zai", "https://api.z.ai"),
-    ("elevenlabs", "https://api.elevenlabs.io"),
-];
+/// the providers of packages/api, built into the app: never read from the page, which could send a key elsewhere
+const KEYED: &str = include_str!("../../../../packages/api/src/keyed-providers.json");
+
+/// a provider: where it answers (a key goes nowhere else) and the settings it takes next to its key
+#[derive(Debug, Deserialize)]
+pub struct Provider {
+    pub origin: String,
+    #[serde(default)]
+    pub fields: Vec<Field>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Field {
+    pub name: String,
+    #[serde(default)]
+    pub required: bool,
+}
+
+pub fn providers() -> &'static BTreeMap<String, Provider> {
+    static LIST: OnceLock<BTreeMap<String, Provider>> = OnceLock::new();
+    LIST.get_or_init(|| serde_json::from_str(KEYED).expect("packages/api/src/keyed-providers.json"))
+}
 
 const SERVICE: &str = "tramme";
 
@@ -107,6 +123,18 @@ fn key_of(v: Option<&Value>, required: bool) -> Res<Option<String>> {
     Ok(Some(k.to_string()))
 }
 
+/// a setting typed next to a key: one short line
+fn field_of(v: Option<&Value>) -> Res<Option<String>> {
+    let k = v.and_then(Value::as_str).unwrap_or("").trim();
+    if k.is_empty() {
+        return Ok(None);
+    }
+    if k.chars().count() > 200 || k.chars().any(char::is_whitespace) {
+        return http_err(400, "this setting is one word, without spaces");
+    }
+    Ok(Some(k.to_string()))
+}
+
 /// an address of the chat format, without its trailing slash
 fn base_of(v: Option<&Value>) -> Res<String> {
     let raw = v.and_then(Value::as_str).unwrap_or("").trim().trim_end_matches('/');
@@ -137,6 +165,20 @@ impl KeyStore {
         store::write_setting(&self.settings, "custom", json!(list))
     }
 
+    /// the settings of the providers, by provider: `{"hydracept": {"project": "cpr_…"}}`
+    pub fn fields(&self) -> Map<String, Value> {
+        store::read_setting(&self.settings, "fields").and_then(|v| v.as_object().cloned()).unwrap_or_default()
+    }
+
+    fn save_fields(&self, fields: Map<String, Value>) -> Res<()> {
+        store::write_setting(&self.settings, "fields", Value::Object(fields))
+    }
+
+    /// whether a provider is connected: its key, and the settings it needs (packages/api loadKeys)
+    fn connected(&self, p: &str, provider: &Provider, fields: &Map<String, Value>) -> bool {
+        self.key(p).is_some() && provider.fields.iter().all(|f| !f.required || fields.get(p).and_then(|v| v.get(&f.name)).is_some())
+    }
+
     /// the key of a provider (`openai`…) or of a custom one (`custom:<id>`)
     pub fn key(&self, slot: &str) -> Option<String> {
         self.secrets.get(slot)
@@ -147,14 +189,15 @@ impl KeyStore {
         if let Some(id) = slot.strip_prefix("custom:") {
             return self.customs().into_iter().find(|c| c.id == id).and_then(|c| origin(&c.base));
         }
-        PROVIDERS.iter().find(|(p, _)| *p == slot).map(|(_, o)| o.to_string())
+        providers().get(slot).map(|p| p.origin.clone())
     }
 
-    /// what the page may know (packages/api KeyStatus): which providers are connected, never their keys
+    /// what the page may know (packages/api KeyStatus): which providers are connected and their settings, never their keys
     pub fn status(&self) -> Value {
-        let providers: serde_json::Map<String, Value> = PROVIDERS
+        let fields = self.fields();
+        let providers: Map<String, Value> = providers()
             .iter()
-            .map(|(p, _)| (p.to_string(), if self.key(p).is_some() { json!("settings") } else { Value::Null }))
+            .map(|(p, provider)| (p.clone(), if self.connected(p, provider, &fields) { json!("settings") } else { Value::Null }))
             .collect();
         let custom: Vec<Value> = self
             .customs()
@@ -164,7 +207,7 @@ impl KeyStore {
                 json!({ "id": c.id, "label": c.label, "base": c.base, "key": key })
             })
             .collect();
-        json!({ "providers": providers, "custom": custom })
+        json!({ "providers": providers, "fields": fields, "custom": custom })
     }
 
     /// a request of /api/keys (parts: the decoded path after /api/keys/)
@@ -174,13 +217,14 @@ impl KeyStore {
         let customs = self.customs();
         match (parts.first().map(String::as_str), parts.get(1).map(String::as_str), parts.len(), method) {
             (None, _, _, "DELETE") => {
-                for (p, _) in PROVIDERS {
+                for p in providers().keys() {
                     self.secrets.delete(p)?;
                 }
                 for c in &customs {
                     self.secrets.delete(&format!("custom:{}", c.id))?;
                 }
                 self.save_customs(&[])?;
+                self.save_fields(Map::new())?;
                 Ok(json!({ "deleted": "all" }))
             }
             (Some("custom"), Some(id), 2, _) => {
@@ -217,17 +261,35 @@ impl KeyStore {
                 }
             }
             (Some(p), None, 1, _) if p != "custom" => {
-                if !PROVIDERS.iter().any(|(name, _)| *name == p) {
-                    return http_err(404, format!("unknown provider: {p}"));
-                }
+                let Some(provider) = providers().get(p) else { return http_err(404, format!("unknown provider: {p}")) };
+                let mut fields = self.fields();
                 match method {
                     "DELETE" => {
                         self.secrets.delete(p)?;
+                        if fields.remove(p).is_some() {
+                            self.save_fields(fields)?;
+                        }
                         Ok(json!({ "deleted": p }))
                     }
                     "PUT" => {
-                        let key = key_of(read()?.get("key"), true)?.unwrap_or_default();
+                        let b = read()?;
+                        let key = key_of(b.get("key"), true)?.unwrap_or_default();
+                        let mut values = Map::new();
+                        for f in &provider.fields {
+                            match field_of(b.get(&f.name))? {
+                                Some(v) => {
+                                    values.insert(f.name.clone(), json!(v));
+                                }
+                                None if f.required => return http_err(400, format!("{p} needs its {}", f.name)),
+                                None => {}
+                            }
+                        }
                         self.secrets.set(p, &key)?;
+                        fields.remove(p);
+                        if !values.is_empty() {
+                            fields.insert(p.to_string(), Value::Object(values));
+                        }
+                        self.save_fields(fields)?;
                         Ok(json!({ "provider": p }))
                     }
                     _ => http_err(404, "unknown keys route"),
@@ -326,10 +388,37 @@ pub mod tests {
     }
 
     #[test]
+    fn a_provider_keeps_its_settings_next_to_its_key() {
+        let dir = tempfile::tempdir().unwrap();
+        let keys = memory_store(&dir);
+        assert_eq!(keys.route("PUT", &parts("hydracept"), br#"{"key":"hk"}"#).unwrap_err().message, "hydracept needs its project");
+        assert_eq!(keys.route("PUT", &parts("hydracept"), br#"{"key":"hk","project":"a b"}"#).unwrap_err().status, 400);
+        assert_eq!(keys.key("hydracept"), None);
+        keys.route("PUT", &parts("hydracept"), br#"{"key":"hk","project":" cpr_1 ","environment":"","other":"x"}"#).unwrap();
+        let status = keys.status();
+        assert_eq!(status["providers"]["hydracept"], json!("settings"));
+        assert_eq!(status["fields"], json!({ "hydracept": { "project": "cpr_1" } }));
+        assert!(!status.to_string().contains("\"hk\""));
+        keys.route("DELETE", &parts("hydracept"), b"").unwrap();
+        assert_eq!(keys.key("hydracept"), None);
+        assert!(keys.fields().is_empty());
+    }
+
+    #[test]
+    fn a_key_without_the_settings_it_needs_is_not_connected() {
+        let dir = tempfile::tempdir().unwrap();
+        let keys = memory_store(&dir);
+        keys.secrets.set("hydracept", "hk").unwrap();
+        assert_eq!(keys.status()["providers"]["hydracept"], Value::Null);
+    }
+
+    #[test]
     fn where_each_key_may_go() {
         let dir = tempfile::tempdir().unwrap();
         let keys = memory_store(&dir);
         assert_eq!(keys.origin_of("anthropic").as_deref(), Some("https://api.anthropic.com"));
+        assert_eq!(keys.origin_of("hydracept").as_deref(), Some("https://api.hydracept.com"));
+        assert!(providers().values().all(|p| origin(&p.origin).as_deref() == Some(p.origin.as_str())));
         assert_eq!(keys.origin_of("custom:none"), None);
         assert_eq!(keys.origin_of("nobody"), None);
         assert_eq!(origin("https://API.openai.com:443/v1/x").as_deref(), Some("https://api.openai.com"));

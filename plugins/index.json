@@ -1,8 +1,50 @@
 [
-  { "file": "charts.js", "name": "Charts", "description": "Bar, line and donut charts from a data set, animated, with a layout tool and a readability check" },
-  { "file": "kinetic.js", "name": "Kinetic type", "description": "Text that moves letter by letter: typewriter, wave, scatter, drop, mask" },
-  { "file": "physics.js", "name": "Physics", "description": "Confetti, bouncing balls, a rope, and letters that drop and settle — deterministic simulations" },
-  { "file": "walkthrough.js", "name": "UI walkthrough", "description": "A phone or browser frame for screenshots, a clicking cursor, and a tool that lays the walkthrough out" },
-  { "file": "a11y.js", "name": "Accessibility checks", "description": "Text size, contrast, blinking and time-to-read, checked with the others" },
-  { "file": "localize.js", "name": "Localization", "description": "Captions and shorts in other languages: the assistant translates, the tools retime and duplicate" }
+  {
+    "file": "charts.js",
+    "name": "Charts",
+    "description": "Bar, line and donut charts from a data set, animated, with a layout tool and a readability check"
+  },
+  {
+    "file": "kinetic.js",
+    "name": "Kinetic type",
+    "description": "Text that moves letter by letter: typewriter, wave, scatter, drop, mask"
+  },
+  {
+    "file": "physics.js",
+    "name": "Physics",
+    "description": "Confetti, bouncing balls, a rope, and letters that drop and settle — deterministic simulations"
+  },
+  {
+    "file": "styk.js",
+    "name": "Stick figures",
+    "description": "Pivot-style stick figures: fixed-length segments posed by joint angles, two-bone IK or stretch, with a walk cycle, a figure tool and a pose check"
+  },
+  {
+    "file": "walkthrough.js",
+    "name": "UI walkthrough",
+    "description": "A phone or browser frame for screenshots, a clicking cursor, and a tool that lays the walkthrough out"
+  },
+  {
+    "file": "a11y.js",
+    "name": "Accessibility checks",
+    "description": "Text size, contrast, blinking and time-to-read, checked with the others"
+  },
+  {
+    "file": "localize.js",
+    "name": "Localization",
+    "description": "Captions and shorts in other languages: the assistant translates, the tools retime and duplicate"
+  },
+  {
+    "file": "icons.js",
+    "name": "Icons",
+    "description": "Lucide icons as editable stroke groups, found by name, tag or words, laid in a row, a grid or a list, drawing themselves in the film's colours",
+    "data": [
+      "lucide.json"
+    ]
+  },
+  {
+    "file": "diagram.js",
+    "name": "Diagrams",
+    "description": "Flows, architectures, cycles and trees from flowchart text (a Mermaid subset), laid out layered, ring or hub, drawn as editable boxes and self-drawing edges, with a legibility check"
+  }
 ]
