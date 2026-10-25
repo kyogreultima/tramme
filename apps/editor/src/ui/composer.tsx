@@ -8,9 +8,10 @@ import type { ComponentChildren, RefObject } from 'preact';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { aiRoute } from '../ai/index.ts';
 import { running, runCommand, send, stop, type Anchor } from '../ai/conversation.ts';
-import { fieldsOf, inputOf, listCommands, matchCommands, parseCommand, ready, type Command, type Field } from '../ai/commands.ts';
+import { fieldsOf, inputOf, listCommands, matchCommands, parseCommand, ranked, ready, type Command, type Field } from '../ai/commands.ts';
 import { refreshLibrary } from '../library.ts';
 import { attachFiles, attaching, draft, pending, removePending } from '../attachments.ts';
+import { commandUsed, prefs } from '../settings.ts';
 import { S, toast } from '../state.ts';
 import { FileChip } from './chat.tsx';
 import { Select, Toggle } from './controls.tsx';
@@ -33,10 +34,10 @@ export function useCommandMenu(text: string, commands: Command[], onPick: (c: Co
   const [hi, setHi] = useState(0);
   const [off, setOff] = useState(false);
   const typing = /^\/([\w.-]*)$/.exec(text);
-  const found = typing && !off ? matchCommands(commands, typing[1], tr).slice(0, 30) : [];
+  const found = typing && !off ? ranked(matchCommands(commands, typing[1], tr), prefs.value.recentCommands, typing[1]).slice(0, 30) : [];
   const matches = [...found.filter((c) => c.kind === 'tool'), ...found.filter((c) => c.kind === 'prompt')];
   const open = matches.length > 0, at = Math.min(hi, matches.length - 1);
-  const pick = (c: Command) => { setHi(0); onPick(c); };
+  const pick = (c: Command) => { setHi(0); commandUsed(c.name); onPick(c); };
   const keyDown = (e: KeyboardEvent) => {
     if (!open) return false;
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') setHi((i) => (i + (e.key === 'ArrowDown' ? 1 : matches.length - 1)) % matches.length);

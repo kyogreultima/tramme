@@ -47,11 +47,13 @@ export interface Preferences {
   models: Partial<Record<ModelTask, string>>;
   /** installed plugins turned off on this device (their file names) */
   pluginsOff: string[];
+  /** the / menu's commands used last, its first lines when it opens empty (at most six) */
+  recentCommands: string[];
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
   language: 'auto', theme: 'studio', view: 'studio', motion: 'auto', still: 'display', blur: 'document', exactFrames: true, sandboxPreview: false,
-  effectsDb: -8, musicDb: -14, duckDb: -12, varySounds: true, confirmPaid: true, paidPerTurn: 10, voiceProvider: 'auto', voice: '', voiceModel: '', previewVolume: 1, previewMuted: false, proxies: true, models: {}, pluginsOff: [],
+  effectsDb: -8, musicDb: -14, duckDb: -12, varySounds: true, confirmPaid: true, paidPerTurn: 10, voiceProvider: 'auto', voice: '', voiceModel: '', previewVolume: 1, previewMuted: false, proxies: true, models: {}, pluginsOff: [], recentCommands: [],
 };
 
 // ── themes and views ─────────────────────────────────────────
@@ -131,6 +133,7 @@ function load(): Preferences {
     const models = p.models && typeof p.models === 'object' ? p.models : {};
     p.models = Object.fromEntries(MODEL_TASKS.filter((k) => typeof models[k] === 'string').map((k) => [k, models[k]]));
     p.pluginsOff = Array.isArray(p.pluginsOff) ? p.pluginsOff.filter((x) => typeof x === 'string') : [];
+    p.recentCommands = Array.isArray(p.recentCommands) ? p.recentCommands.filter((x) => typeof x === 'string').slice(0, 6) : [];
     return p;
   } catch { return { ...DEFAULT_PREFERENCES }; }
 }
@@ -144,6 +147,12 @@ export function setPrefs(patch: Partial<Preferences>) {
 
 /** the model a local tool runs for a task on this computer */
 export const chosenModel = (task: ModelTask): ModelEntry => resolveModel(task, prefs.peek().models[task]);
+
+/** a command of the / menu was used: it opens the menu first, at most six kept */
+export function commandUsed(name: string) {
+  const rec = prefs.peek().recentCommands, next = [name, ...rec.filter((n) => n !== name)].slice(0, 6);
+  if (next.some((n, i) => n !== rec[i])) setPrefs({ recentCommands: next });
+}
 
 /** back to the defaults; the language stays as chosen */
 export function resetPrefs() { setPrefs({ ...DEFAULT_PREFERENCES, language: prefs.peek().language }); }

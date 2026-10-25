@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { applyOps, validate, type ToolContext, type TrammeDoc } from '@tramme/core';
 import { newProject } from '@tramme/project';
-import { fieldsOf, inputOf, listCommands, matchCommands, parseCommand, ready } from '../src/ai/commands.ts';
+import { fieldsOf, inputOf, listCommands, matchCommands, parseCommand, ranked, ready, type Command } from '../src/ai/commands.ts';
 import { editorRegistry } from '../src/vocabulary.ts';
 
 const sky = {
@@ -44,6 +44,15 @@ describe('the / menu', () => {
     expect(parseCommand('/demo.stars  denser at the top ', list)).toMatchObject({ cmd: { name: 'demo.stars' }, rest: 'denser at the top' });
     expect(parseCommand('/nothing here', list)).toBeNull();
     expect(parseCommand('make a title', list)).toBeNull();
+  });
+
+  it('opens on what was used last, and searches unchanged', () => {
+    const cmd = (name: string): Command => ({ kind: 'tool', name, title: name.toUpperCase(), description: `the ${name} command`, from: 'tramme' });
+    const [a, b, c] = [cmd('a'), cmd('b'), cmd('c')];
+    expect(ranked([a, b, c], ['c'], '')[0]).toBe(c);
+    expect(ranked([a, b, c], ['c', 'b'], '').map((x) => x.name)).toEqual(['c', 'b', 'a']);
+    expect(ranked([a, b, c], ['zz'], '')).toEqual([a, b, c]);
+    expect(ranked([a, b, c], ['c'], 'a')).toEqual(matchCommands([a, b, c], 'a'));
   });
 
   it('builds a form from the input schema and reads it back', () => {
