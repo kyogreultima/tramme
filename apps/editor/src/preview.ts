@@ -23,6 +23,7 @@ import { copiesIn, copyId, counted, installed, installedFor, installedTypes, off
 import { bindSandbox, blitSandboxFrame, declarationsModule, ensureDeclared, ensureSandboxDoc, pluginItemsOf, resetSandbox, sandboxDeclaration, sandboxVideoFrames, type SandboxContext } from './plugins/sandbox-draw.ts';
 import { t } from './i18n/index.ts';
 import { prefs } from './settings.ts';
+import { packAsInstalled, packBySrc, packContext, shippedPacks } from './packs.ts';
 import { syncPluginTours } from './tours/index.ts';
 
 /** the slowest pace a media element takes (browsers refuse less): slower, it waits */
@@ -147,9 +148,11 @@ class Preview {
     const r = this.renderer;
     if (!r) return;
     const doc = this.applied ?? S.doc.peek();
+    // the packs that ship with the editor, for the project's own copies' data and for the assistant's reach
+    const packs = await shippedPacks();
     // the plugins installed on this device, in the project's sandbox (its own plugins win a shared name: attached first)
     const mine = installedFor(doc);
-    if (!(doc.plugins ?? []).length && !mine.length) return;
+    if (!(doc.plugins ?? []).length && !mine.length && !packs.length) return;
     try {
       await attachIsolated(r.registry, pluginHost(new URL(S.docUrl.peek(), location.href).href), doc, (id) => {
         const url = r.assets.url(id);
@@ -158,7 +161,10 @@ class Preview {
       }, (id, ctx) => {
         // a copy of an installed plugin keeps the permissions the user granted it, where it is installed
         const p = installed.peek().find((x) => copyId(x) === id && copiesIn(doc)[x.manifest.id] !== undefined);
-        return p ? permitted(ctx, p) : ctx;
+        if (p) return permitted(ctx, p);
+        // a copy of one of the editor's packs reads the pack's own data
+        const pack = packBySrc(packs, doc.assets[id]?.src);
+        return pack ? packContext(pack, ctx) : ctx;
       });
     } catch (e) {
       toast(t('editor.pluginSandbox', { error: (e as Error).message }), 'error', 9000);
@@ -173,6 +179,26 @@ class Preview {
       });
     } catch (e) {
       toast(t('editor.installedRefused', { error: (e as Error).message }), 'error', 9000);
+    }
+    // the editor's packs, reached the way the installed plugins are: their tools and checks bridged from the
+    // sandbox, their nodes and presets offered until the project holds them; a proposal that draws with one
+    // copies it in (installedTypes), the version recorded. A pack that cannot load is left out, never the others.
+    try {
+      const settled = await Promise.allSettled(packs.map((p) => packAsInstalled(p)));
+      for (const s of settled) if (s.status === 'rejected') console.error('[packs]', s.reason);
+      const asInstalled = settled.flatMap((s) => (s.status === 'fulfilled' ? [s.value] : []));
+      const held = new Set(Object.values(doc.assets ?? {}).filter((x) => x.type === 'module').map((x) => x.src));
+      const list = asInstalled
+        .filter((p) => !held.has(`plugins/${p.file}`))
+        .map((p) => ({ id: `packs:${p.file}`, url: `/plugins/${p.file}`, name: p.manifest.name }));
+      const byId = new Map(asInstalled.map((p) => [`packs:${p.file}`, p]));
+      const entryOf = new Map(packs.map((p) => [p.file, p]));
+      await attachInstalled(r.registry, pluginHost(new URL(S.docUrl.peek(), location.href).href), list, {
+        brought: (id, key) => { const p = byId.get(id); if (p) installedTypes.set(key, p); },
+        context: (id, ctx) => { const p = byId.get(id); const pack = p && entryOf.get(p.file); return pack ? packContext(pack, ctx) : ctx; },
+      });
+    } catch (e) {
+      console.error('[packs]', e);
     }
   }
 

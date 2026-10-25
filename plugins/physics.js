@@ -301,7 +301,7 @@ const textDrop = {
   },
 };
 
-export const meta = { name: 'physics', version: '1.0.0', description: 'Confetti, bouncing balls, a rope and letters that drop: four simulated nodes', api: 1 };
+export const meta = { id: 'tramme/physics', name: 'physics', version: '1.0.0', description: 'Confetti, bouncing balls, a rope and letters that drop: four simulated nodes', api: 1 };
 export const nodes = [confetti, bounce, rope, textDrop];
 export const presets = [
   { name: 'phys-confetti', title: 'Confetti burst', category: 'Physics', description: '120 pieces falling with wind', layer: { type: 'phys.confetti', name: 'Confetti', props: { size: [1200, 800] } } },
@@ -317,5 +317,14 @@ export const messages = {
     'Bounce': 'Rebond', 'Box': 'Boîte', 'Segments': 'Segments', 'Sag': 'Affaissement', 'Pinned': 'Attachée',
     'Thickness': 'Épaisseur', 'Color': 'Couleur', 'Text': 'Texte', 'Between letters': 'Entre les lettres',
     'Falls from': 'Tombe de', 'Size': 'Corps', 'Weight': 'Graisse', 'Font': 'Police',
+    'pieces that reach the floor are thrown back to the top': 'les mordeaux qui touchent le sol sont renvoyés en haut',
+    'how much longer than the span the rope is': 'de combien la corde dépasse sa portée',
+    'which ends are nailed to the frame': 'quelles extrémités sont clouées au cadre',
+    'in letter heights': 'en hauteurs de lettre',
+    'Confetti burst': 'Éclat de confettis',
+    '120 pieces falling with wind': '120 mordeaux qui tombent avec du vent',
+    'ten balls loose in a box': 'dix balles livrées à elles-mêmes dans une boîte',
+    'a sagging rope pinned at both ends': 'une corde qui affaisse, attachée aux deux bouts',
+    'a word that falls and settles': 'un mot qui tombe et se pose',
   },
 };

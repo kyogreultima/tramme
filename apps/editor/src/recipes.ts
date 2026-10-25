@@ -526,20 +526,13 @@ const mapJourney: ToolType<{ stops: string; names?: string; map?: string; at?: n
     const { add, done } = adder(doc, ctx.compId);
     const fadeOut = { $k: [{ t: r(end - 0.35), v: 1, ease: s.exit }, { t: end, v: 0 }] };
     if (a.map) add('journey-map', { type: 'image', name: doc.assets[a.map]?.name ?? a.map, in: at, out: end, transform: { position: [r(c.width / 2), r(c.height / 2)], scale: { $k: [{ t: at, v: [1, 1], ease: s.standard }, { t: end, v: [1.05, 1.05] }] }, opacity: fadeOut }, props: { image: a.map, size: [c.width, c.height], fit: 'cover' } });
-    const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]), pad = u * 0.06;
-    const bx = Math.min(...xs) - pad, by = Math.min(...ys) - pad, bw = Math.max(...xs) - bx + pad, bh = Math.max(...ys) - by + pad;
-    // the line is revealed by a hidden rectangle that grows from the first stop's side, in step with the dot (the rect is drawn centred on its origin: its anchor sits on the starting edge)
-    const ltr = pts[0][0] <= pts[pts.length - 1][0];
-    const reach = (x: number) => Math.min(1, Math.max(0, Math.abs(x - (ltr ? bx : bx + bw)) / bw));
-    // stop i + 1 is reached at arriveAt[i + 1] (arriveAt[0] is the start, the first key's); each leg eased like the dot's
-    const revealKeys: Record<string, unknown>[] = [{ t: start, v: [reach(pts[0][0]), 1], ease: s.enter }];
-    pts.slice(1).forEach((p, i) => {
-      const v = reach(p[0]), prev = (revealKeys[revealKeys.length - 1].v as Vec2)[0];
-      revealKeys.push({ t: arriveAt[i + 1], v: [ltr ? Math.max(prev, v) : Math.min(prev, v), 1], ease: s.enter });
-    });
-    // the anchor sits on the middle of the starting edge, the position at the middle height of the bounds: the rect covers them top to bottom
-    const reveal = add('journey-reveal', { type: 'shape.rect', name: 'Journey · reveal', visible: false, in: at, out: end, transform: { anchor: [ltr ? -r(bw / 2) : r(bw / 2), 0], position: [r(ltr ? bx : bx + bw), r(by + bh / 2)], scale: { $k: revealKeys } }, props: { size: [r(bw), r(bh)], fill: '#FFFFFF' } });
-    add('journey-path', { type: 'shape.path', name: 'Journey · route', in: at, out: end, transform: { position: [0, 0], opacity: fadeOut }, effects: [{ id: 'reveal', type: 'fx.matte', props: { source: reveal, mode: 'alpha' } }], props: { path: { v: pts, closed: false }, stroke: s.accent, strokeWidth: r(Math.max(3, u * 0.012)), lineCap: 'round', lineJoin: 'round' } });
+    // the line draws itself with the path's trim, in step with the dot: the fraction of the route's length at each stop,
+    // keyed at the same moments with the same eases (the dot rides the legs linearly, the trim follows their lengths)
+    let walked = 0;
+    const fracs = pts.map((p, i) => (i === 0 ? 0 : (walked += lens[i - 1]) / totalLen));
+    const trimKeys: Record<string, unknown>[] = [{ t: start, v: 0, ease: s.enter }];
+    pts.slice(1).forEach((_, i) => { trimKeys.push({ t: arriveAt[i + 1], v: fracs[i + 1], ease: s.enter }); });
+    add('journey-path', { type: 'shape.path', name: 'Journey · route', in: at, out: end, transform: { position: [0, 0], opacity: fadeOut }, props: { path: { v: pts, closed: false }, stroke: s.accent, strokeWidth: r(Math.max(3, u * 0.012)), lineCap: 'round', lineJoin: 'round', trimStart: 0, trimEnd: { $k: trimKeys } } });
     add('journey-dot', { type: 'shape.ellipse', name: 'Journey · dot', in: at, out: end, transform: { position: { $k: dotKeys }, opacity: fadeOut }, props: { size: [r(u * 0.03), r(u * 0.03)], fill: s.accent2 } });
     pts.forEach(([x, y], i) => {
       add(`journey-stop-${i + 1}`, { type: 'shape.ellipse', name: `Stop ${i + 1}`, in: at, out: end, transform: { position: [x, y], scale: { $k: [{ t: r(arriveAt[i] - 0.15), v: [0, 0], ease: POP }, { t: r(arriveAt[i] + s.pace * 0.5), v: [1, 1] }] }, opacity: fadeOut }, props: { size: [r(u * 0.022), r(u * 0.022)], fill: plate } });

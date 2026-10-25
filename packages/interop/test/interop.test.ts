@@ -80,6 +80,37 @@ describe('import Lottie', () => {
   });
 });
 
+describe('export of a stroke and its trim', () => {
+  // one rectangle in the hello fixture's composition, with the given props
+  const boxDoc = (props: Record<string, unknown>): TrammeDoc => {
+    const doc = load('packages/interop/test/fixtures/hello.tramme.json');
+    const comp = doc.compositions[doc.root];
+    comp.layers = { box: { type: 'shape.rect', name: 'Box', props: { size: [200, 100], radius: 0, fill: '#ff0000', stroke: '#0000ff', strokeWidth: 4, ...props } } } as never;
+    comp.order = ['box'];
+    return doc;
+  };
+  const shapesOf = (doc: TrammeDoc) => toLottie(doc, reg).lottie.layers.find((l: any) => l.nm === 'Box').shapes as any[];
+
+  it('Lottie keeps the fill of an untrimmed shape, in one group under its stroke', () => {
+    const shapes = shapesOf(boxDoc({}));
+    expect(shapes).toHaveLength(1);
+    expect(shapes[0].it.map((x: any) => x.ty)).toEqual(['rc', 'st', 'fl', 'tr']);
+  });
+
+  it('Lottie draws a trimmed stroke over its whole fill', () => {
+    const shapes = shapesOf(boxDoc({ trimStart: 0, trimEnd: 0.5, trimOffset: 0 }));
+    expect(shapes).toHaveLength(2);
+    expect(shapes[0].it.map((x: any) => x.ty)).toEqual(['rc', 'st', 'tm', 'tr']); // first: on top
+    expect(shapes[1].it.map((x: any) => x.ty)).toEqual(['rc', 'fl', 'tr']);
+  });
+
+  it('SVG starts a trimmed rectangle where the preview and Lottie do', () => {
+    const trimmed = toSvg(boxDoc({ trimStart: 0, trimEnd: 0.5, trimOffset: 0 }), reg, 0).svg;
+    expect(trimmed).toMatch(/<path d="M100,-50L100,50L-100,50L-100,-50L100,-50Z"[^>]*pathLength="1"/);
+    expect(toSvg(boxDoc({}), reg, 0).svg).toMatch(/<rect x="-100" y="-50" width="200" height="100"/);
+  });
+});
+
 describe('export SVG', () => {
   it('shapes, gradients, clip, filters, text, as vectors', () => {
     const doc = load('packages/interop/test/fixtures/hello.tramme.json');

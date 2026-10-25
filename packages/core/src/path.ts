@@ -83,6 +83,81 @@ export function pathD(pv: PathValue): string {
   return d;
 }
 
+/** the path flattened into a chain of points, every segment cut into `steps` runs */
+export function flattenPath(pv: PathValue, steps = 24): Vec2[] {
+  const n = pv.v.length;
+  if (n < 2) return pv.v.slice();
+  const pts: Vec2[] = [];
+  const push = (p: Vec2) => { const last = pts[pts.length - 1]; if (!last || last[0] !== p[0] || last[1] !== p[1]) pts.push(p); };
+  const count = pv.closed ? n : n - 1;
+  for (let s = 0; s < count; s++) {
+    const b = (s + 1) % n;
+    const [P0, P1, P2, P3] = segment(pv, s, b);
+    for (let k = s === 0 ? 0 : 1; k <= steps; k++) {
+      const u = k / steps, w = 1 - u;
+      push([w * w * w * P0[0] + 3 * w * w * u * P1[0] + 3 * w * u * u * P2[0] + u * u * u * P3[0], w * w * w * P0[1] + 3 * w * w * u * P1[1] + 3 * w * u * u * P2[1] + u * u * u * P3[1]]);
+    }
+  }
+  return pts;
+}
+
+const flattenCache = new WeakMap<PathValue, Map<number, { pts: Vec2[]; runs: number[]; total: number }>>();
+
+/** the path's cumulative run lengths, from its flattened form (cached per path value and fineness) */
+export function pathRuns(pv: PathValue, steps = 24): { pts: Vec2[]; runs: number[]; total: number } {
+  let bySteps = flattenCache.get(pv);
+  const hit = bySteps?.get(steps);
+  if (hit) return hit;
+  const pts = flattenPath(pv, steps);
+  const runs: number[] = [];
+  let total = 0;
+  for (let k = 1; k < pts.length; k++) {
+    const run = Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]);
+    runs.push(run);
+    total += run;
+  }
+  const out = { pts, runs, total };
+  if (!bySteps) flattenCache.set(pv, (bySteps = new Map()));
+  bySteps.set(steps, out);
+  return out;
+}
+
+/** the path's length, by the flattened form */
+export function pathLength(pv: PathValue, steps = 24): number {
+  return pathRuns(pv, steps).total;
+}
+
+// ── trim: the stroke that draws itself ───────────────────────
+
+/** the trim of a stroke, as fractions of the path's length */
+export interface TrimProps { trimStart: number; trimEnd: number; trimOffset: number }
+
+/** whether a trim leaves anything out (the defaults draw the whole stroke) */
+export const isTrimmed = (p: Partial<TrimProps>): boolean =>
+  (p.trimStart ?? 0) !== 0 || (p.trimEnd ?? 1) !== 1 || (p.trimOffset ?? 0) !== 0;
+
+/**
+ * The trimmed windows of a path, as fractions of its length, by Lottie's
+ * rule (lottie-web's trim): start and end clamped to 0..1 and swapped when
+ * the end comes before the start, the window then shifted by offset and
+ * wrapped past the path's end. Null when the whole stroke shows; an empty
+ * list when start meets end and nothing shows; otherwise one run [a, b] or
+ * the two of a window that crosses the path's end.
+ */
+export function trimRuns(p: TrimProps): [number, number][] | null {
+  const mod = (x: number) => ((x % 1) + 1) % 1;
+  const r9 = (x: number) => Math.round(x * 1e9) / 1e9;
+  const clamp = (x: number, d: number) => (Number.isFinite(x) ? Math.min(1, Math.max(0, x)) : d);
+  let s = clamp(p.trimStart, 0), e = clamp(p.trimEnd, 1);
+  if (e < s) [s, e] = [e, s];
+  const off = mod(Number.isFinite(p.trimOffset) ? p.trimOffset : 0);
+  const len = e - s;
+  if (len >= 1) return null; // the whole outline: the whole stroke shows
+  if (len === 0) return []; // start meets end: nothing shows
+  const a = r9(mod(s + off)), end = a + len;
+  return end <= 1 ? [[a, r9(end)]] : [[a, 1], [0, r9(end - 1)]];
+}
+
 /** the path with a vertex splitting segment seg at u (de Casteljau): each half keeps its ends' tangents */
 export function insertPathVertex(p: PathValue, seg: number, u: number): PathValue {
   const n = p.v.length;

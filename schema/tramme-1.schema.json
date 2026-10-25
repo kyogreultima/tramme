@@ -124,6 +124,12 @@
           },
           "proxy": {
             "type": "string"
+          },
+          "clean": {
+            "type": "string"
+          },
+          "interpolated": {
+            "type": "string"
           }
         },
         "required": [

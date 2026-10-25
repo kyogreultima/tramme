@@ -2282,7 +2282,14 @@
     "moments kept between now and the delay: more is smoother and costs memory": "instants gardés entre maintenant et le retard : plus, c'est plus fluide et plus coûteux en mémoire",
     "patches across the height, for the noise map": "taches sur la hauteur, pour la carte de bruit",
     "the picture to displace in time (put a video in a composition to displace it)": "l'image à déplacer dans le temps (mettez une vidéo dans une composition pour la déplacer)",
-    "where the delay is: left, right, top, bottom grow it across the frame (slit-scan), centre from the middle out, edges from the sides in, noise in patches": "où se trouve le retard : gauche, droite, haut, bas le font croître à travers l'image (slit-scan), centre du milieu vers l'extérieur, bords des côtés vers l'intérieur, bruit par taches"
+    "where the delay is: left, right, top, bottom grow it across the frame (slit-scan), centre from the middle out, edges from the sides in, noise in patches": "où se trouve le retard : gauche, droite, haut, bas le font croître à travers l'image (slit-scan), centre du milieu vers l'extérieur, bords des côtés vers l'intérieur, bruit par taches",
+    "Trim start": "Début du tracer",
+    "Trim end": "Fin du tracer",
+    "Trim offset": "Décalage du tracer",
+    "Trim": "Tracer",
+    "the stroke drawn from this fraction of the outline's length; draw it on by animating this from 0, or the end from 0": "le trait dessiné à partir de cette fraction de la longueur du contour ; dessinez-le en animant cette valeur depuis 0, ou la fin depuis 0",
+    "the stroke drawn up to this fraction; under the start, the two swap (as in Lottie)": "le trait dessiné jusqu'à cette fraction ; sous le début, les deux s'échangent (comme dans Lottie)",
+    "shifts the window along the outline; keyframed, a run chases itself around the shape": "décale la fenêtre le long du contour ; keyframé, un segment se poursuit autour de la forme"
   },
   "personal": {
     "cannotStart": "tramme ne peut pas démarrer ici",

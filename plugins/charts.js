@@ -327,7 +327,7 @@ const chartCheck = {
 };
 const name = (placed) => placed.layer.name ?? placed.id;
 
-export const meta = { name: 'charts', version: '1.0.0', description: 'Bar, line and donut charts from a data set, with a layout tool and a readability check', api: 1 };
+export const meta = { id: 'tramme/charts', name: 'charts', version: '1.0.0', description: 'Bar, line and donut charts from a data set, with a layout tool and a readability check', api: 1 };
 export const nodes = [barNode, lineNode, donutNode];
 export const tools = [chartTool];
 export const checks = [chartCheck];
@@ -344,5 +344,18 @@ export const messages = {
     'Thickness': 'Épaisseur', 'Centre text': 'Texte central', 'Percents': 'Pourcentages',
     'Data set': 'Jeu de données', 'Chart title': 'Titre du graphique', 'Add a chart': 'Ajouter un graphique',
     'a value over time (a price, an audience, a temperature): a rise or a fall is the story, so crop the scale to it and let the line draw itself': 'une valeur dans le temps (un cours, une audience, une température) : la hausse ou la baisse est l\'histoire — resserrez l\'échelle sur elle et laissez la courbe se tracer',
+    'a JSON file of the project: a list of { label, value } (or { series: […] }); empty: the values below': 'un fichier JSON du projet : une liste de { label, value } (ou { series: […] }); vide : les valeurs ci-dessous',
+    '[{ label, value }, …] used when there is no data set': '[{ label, value }, …] utilisées quand il n\'y a pas de jeu de données',
+    '0: the data\'s own maximum, rounded to a readable grid': '0 : le maximum des données, arrondi à une grille lisible',
+    '0: from the chart\'s size': '0 : selon la taille du graphique',
+    'numbers only, left to right; the labels of a line chart are written as text layers': 'nombres seulement, de gauche à droite ; les libellés d\'une courbe s\'écrivent en calques de texte',
+    'Line': 'Courbe',
+    '[{ label, value }, …]': '[{ label, value }, …]',
+    'of the radius': 'du rayon',
+    'a bar, line or donut chart from a JSON data set of the project (a list of { label, value }), sized and placed in the composition, with an optional title above it': 'un histogramme, une courbe ou un anneau depuis un jeu de données JSON du projet (une liste de { label, value }), dimensionné et placé dans la composition, avec un titre optionnel au-dessus',
+    'Chart readability': 'Lisibilité d\'un graphique',
+    'a chart with too many categories, or labels too long for their bars, is a chart nobody reads': 'un graphique à trop de catégories, ou aux libellés trop longs pour ses barres, est un graphique que personne ne lit',
+    'four quarters, on the accent': 'quatre trimestres, sur l\'accent',
+    'four shares with their percents': 'quatre parts avec leurs pourcentages',
   },
 };

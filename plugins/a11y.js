@@ -136,10 +136,14 @@ const checks = [
   },
 ];
 
-export const meta = { name: 'a11y', version: '1.0.0', description: 'Accessibility checks: text size, contrast, blinking, time to read', api: 1 };
+export const meta = { id: 'tramme/a11y', name: 'a11y', version: '1.0.0', description: 'Accessibility checks: text size, contrast, blinking, time to read', api: 1 };
 export { checks };
 export const messages = {
   fr: {
     'Text size': 'Corps du texte', 'Text contrast': 'Contraste du texte', 'Blinking': 'Clignotement', 'Time to read': 'Temps de lecture',
+    'under about 3 % of the frame\'s short side, text is unreadable on a phone': 'sous environ 3 % du petit côté du cadre, le texte est illisible sur un téléphone',
+    'text too close in colour to what sits behind it (3:1 for large text, WCAG)': 'un texte trop proche en couleur de ce qui est derrière lui (3:1 pour les grands textes, WCAG)',
+    'something appearing and disappearing more than 3 times a second (photosensitivity)': 'quelque chose qui apparaît et disparaît plus de 3 fois par seconde (photosensibilité)',
+    'a line of text on screen for less than 0.6 s cannot be read': 'une ligne de texte à l\'écran moins de 0,6 s ne peut pas être lue',
   },
 };
