@@ -6,14 +6,19 @@ All the work goes on one branch, `feat/roadmap-loop`, made from the latest `deve
 
 ## Scope
 
-Four roadmaps, every unticked box in them:
+Five roadmaps whole and four in part, every unticked box in them:
 
 - [performance-roadmap.md](performance-roadmap.md)
 - [components-roadmap.md](components-roadmap.md)
 - [editing-roadmap.md](editing-roadmap.md)
 - [installed-plugins-roadmap.md](installed-plugins-roadmap.md)
+- [polish-roadmap.md](polish-roadmap.md)
+- [packs-roadmap.md](packs-roadmap.md)
+- The generation roadmap ([generation-roadmap.md](generation-roadmap.md)), steps 2 to 4 only
+- The shorts roadmap ([shorts-roadmap.md](shorts-roadmap.md)), steps 2 and 5
+- The sound roadmap ([sound-roadmap.md](sound-roadmap.md)), step 2 only
 
-The others (generation, sound, shorts, plugins) keep their own pace and are out of the loop.
+The others (plugins) keep their own pace and are out of the loop.
 
 ## The queue
 
@@ -31,6 +36,11 @@ The order the items are taken in. It follows what each one needs from the others
 10. Performance, step 4 — only what the measures point at.
 11. Components, step 6 — the cut per pixel, said in its roadmap to come later.
 12. Installed plugins, step 8 — the marketplace: blocked until tramme has its API. The loop does not start it; it lists it as blocked and stops there.
+13. Polish, all steps.
+14. Packs, steps 3 to 17, in order.
+15. Generation, steps 2 to 4.
+16. Shorts, steps 2 and 5.
+17. Sound, step 2.
 
 ## One iteration
 
@@ -62,6 +72,7 @@ One iteration lands one box, or a few boxes of the same step when they only make
 The loop stops and asks the user, instead of choosing, when:
 
 - the roadmap leaves a product decision open (a default the user would notice, a change to the document format that is not an addition, a new dependency over 1 MB in the editor's bundle);
+- a pack's data needs choosing by hand (the CC0 sound recordings of Sound step 2);
 - a model's or a library's licence is unclear or forbids commercial use;
 - a box contradicts a principle of its roadmap or of another one;
 - `develop` has failing checks the loop did not cause.

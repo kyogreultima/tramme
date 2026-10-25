@@ -218,10 +218,26 @@ Done when: a logo given as an SVG turns on a turntable under the studio light, a
 Open, for the author. Each step names the one it waits on; the recommended choice comes first.
 
 1. **The sandbox for packs.** Once the assistant adds a pack, does it draw on the page like the editor's own code (recommended: the packs ship with the editor and are reviewed in this repository), or through the sandbox like an installed plugin (one rule for all, at the sandbox's speed)?
+
+   Taken (2026-10-25): on the page (already how packs draw once copied).
 2. **Formulas.** A TeX subset laid out by the pack in an OpenType math font (recommended: light, enough for explainers), or MathJax fetched on first use (complete TeX, about 2 MB, run in the sandbox).
+
+   Taken (2026-10-25): a TeX subset laid out by the pack, in STIX Two Math (OFL).
 3. **Rigid bodies.** A small engine in the pack, for boxes, circles and convex shapes (recommended), or planck.js (MIT, about 200 KB) vendored into it.
+
+   Taken (2026-10-25): a small engine in the pack.
 4. **Text in 3D.** Paths only to start (recommended), or opentype.js (MIT, about 170 KB) in the tool to read glyph outlines.
+
+   Taken (2026-10-25): paths only.
 5. **Diagram layouts.** Written in the pack (recommended), or dagre (MIT) vendored.
+
+   Taken (2026-10-25): written in the pack (shipped).
 6. **Code colouring.** A lexer written in the pack (recommended), or Prism (MIT) vendored with its grammars.
+
+   Taken (2026-10-25): a lexer written in the pack.
 7. **Emoji.** Fluent Emoji Flat (MIT) or Noto Emoji (Apache-2.0); the few hundred most used (recommended) or the whole set (tens of megabytes beside the editor).
+
+   Taken (2026-10-25): Fluent Emoji Flat (MIT), the 300 most used.
 8. **The roadmap loop.** Whether this roadmap joins the queue of [roadmap-loop.md](roadmap-loop.md), and at which place.
+
+   Taken (2026-10-25): it joins the queue, after Polish and before the other roadmaps' open boxes (queue item 14).
