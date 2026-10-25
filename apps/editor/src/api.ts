@@ -123,7 +123,7 @@ export const api = {
   models: () => call<Record<string, { id: string; label: string; effort?: true }[] | { error: string }>>('/api/models', undefined, reach),
 
   // ── the providers' keys (private mode, desktop app): sent once, kept by the server or the system keychain, never read back ──
-  setKey: (provider: KeyedProvider, key: string) => call<{ provider: string }>(`/api/keys/${provider}`, jsonInit('PUT', { key })),
+  setKey: (provider: KeyedProvider, key: string, fields?: Record<string, string>) => call<{ provider: string }>(`/api/keys/${provider}`, jsonInit('PUT', { key, ...fields })),
   removeKey: (provider: KeyedProvider) => call<{ deleted: string }>(`/api/keys/${provider}`, { method: 'DELETE' }),
   /** a custom provider of the chat format; no key: the one it has is kept */
   setCustom: (id: string, c: { label: string; base: string; key?: string }) => call<KeyStatus['custom'][number]>(`/api/keys/custom/${encodeURIComponent(id)}`, jsonInit('PUT', c)),

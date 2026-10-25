@@ -11,7 +11,7 @@ import { Plugins } from './PluginsSettings.tsx';
 import type { FunctionComponent } from 'preact';
 import { useContext, useEffect, useRef, useState } from 'preact/hooks';
 import type { SoundEntry } from '@tramme/core';
-import { ELEVEN_VOICE_MODELS } from '@tramme/api';
+import { ELEVEN_VOICE_MODELS, HYDRACEPT_VOICE_MODELS } from '@tramme/api';
 import { api, type Voice } from '../api.ts';
 import { EffortPicker, ModelPicker } from './ModelPicker.tsx';
 import { aiSettings, aiStatus, connectProvider, disconnectProvider, ensureStatus, providersChanged, refreshStatus, removeCustomProvider, saveCustomProvider, serverName, setAiSettings, statusLabels } from '../ai/index.ts';
@@ -235,8 +235,16 @@ function VoicePicker() {
   );
 }
 
+/** the providers that make a voice-over, in the order the server picks them (soundConfig of @tramme/api) */
+const VOICE_ORDER = ['elevenlabs', 'openai', 'gemini', 'hydracept'] as const;
+
 function Sound() {
   const p = prefs.value;
+  // the provider that says a voice-over: the one chosen, or in automatic the first one connected
+  const providers = aiStatus.value.keys?.providers;
+  const speaker = p.voiceProvider === 'auto' ? VOICE_ORDER.find((v) => providers?.[v]) : p.voiceProvider;
+  useEffect(() => { ensureStatus(); }, []);
+  const voiceModels = speaker === 'hydracept' ? HYDRACEPT_VOICE_MODELS : speaker === 'elevenlabs' || speaker === undefined ? ELEVEN_VOICE_MODELS : null;
   return (
     <Section title={t('settings.sound')} hint={t('settings.soundHint')}>
       <Row label={t('settings.previewVolume')} hint={t('settings.previewVolumeHint')}>
@@ -265,13 +273,13 @@ function Sound() {
       </Row>
       <Row label={t('settings.voiceOver')} hint={t('settings.voiceOverHint')}>
         <div class="set-pair">
-          <Select value={p.voiceProvider} options={[['auto', t('common.automatic')], ['elevenlabs', 'ElevenLabs'], ['openai', 'OpenAI'], ['gemini', 'Gemini']]} onChange={(v) => setPrefs({ voiceProvider: v as Preferences['voiceProvider'] })} />
+          <Select value={p.voiceProvider} options={[['auto', t('common.automatic')], ['elevenlabs', 'ElevenLabs'], ['openai', 'OpenAI'], ['gemini', 'Gemini'], ['hydracept', 'Hydracept']]} onChange={(v) => setPrefs({ voiceProvider: v as Preferences['voiceProvider'] })} />
           <div class="field"><input value={p.voice} placeholder={t('settings.voicePlaceholder')} onChange={(e) => setPrefs({ voice: (e.target as HTMLInputElement).value.trim() })} /></div>
         </div>
       </Row>
-      {(p.voiceProvider === 'auto' || p.voiceProvider === 'elevenlabs') && (
+      {voiceModels && (
         <Row label={t('settings.voiceModel')} hint={t('settings.voiceModelHint')}>
-          <Select value={p.voiceModel} options={Object.entries(ELEVEN_VOICE_MODELS).map(([id, name], i) => [i ? id : '', i ? name : t('settings.voiceModelDefault', { name })])} onChange={(v) => setPrefs({ voiceModel: v })} />
+          <Select value={voiceModels[p.voiceModel] ? p.voiceModel : ''} options={Object.entries(voiceModels).map(([id, name], i) => [i ? id : '', i ? name : t('settings.voiceModelDefault', { name })])} onChange={(v) => setPrefs({ voiceModel: v })} />
         </Row>
       )}
       <VoicePicker />

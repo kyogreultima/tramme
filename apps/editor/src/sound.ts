@@ -418,7 +418,7 @@ const generateSound: ToolType<{ kind: 'sfx' | 'music' | 'voice'; prompt: string;
       duration: { type: 'number', minimum: 0.5, maximum: 600, title: 'Length (s)', description: 'sfx up to 30 s; music from 3 s' },
       voice: { type: 'string', title: 'Voice', description: 'voice-over: a voice of the provider, as the voices tool lists it (ElevenLabs: its id; Gemini: Kore, Puck, Charon…; OpenAI: alloy, coral, sage…)' },
       style: { type: 'string', title: 'Style', description: 'voice-over: how it is said ("warm and calm", "energetic"); with ElevenLabs v4 or v3 it becomes an audio tag, an accent included ("said warmly in a Beninese French accent", "whispers")' },
-      provider: { enum: ['elevenlabs', 'openai', 'gemini'], title: 'Provider', description: 'voice-over: the one of the Sound settings by default; otherwise the first one the server has a key for' },
+      provider: { enum: ['elevenlabs', 'openai', 'gemini', 'hydracept'], title: 'Provider', description: 'voice-over: the one of the Sound settings by default; otherwise the first one the server has a key for' },
       ...PLACING,
       keep: { type: 'boolean', title: 'Keep in the library', description: 'also keep it in the library shared by the projects' },
     },
@@ -566,7 +566,7 @@ const voices: ToolType<{ provider?: string; search?: string; language?: string; 
   input: {
     type: 'object',
     properties: {
-      provider: { enum: ['elevenlabs', 'openai', 'gemini'], title: 'Provider', description: 'the one of the Sound settings by default' },
+      provider: { enum: ['elevenlabs', 'openai', 'gemini', 'hydracept'], title: 'Provider', description: 'the one of the Sound settings by default' },
       search: { type: 'string', title: 'Search', description: 'words of its name or description: "narrator", "warm", "deep"' },
       language: { type: 'string', title: 'Language', description: 'ISO code: fr, en, es…' },
       accent: { type: 'string', title: 'Accent', description: '"african", "parisian", "british"…' },
