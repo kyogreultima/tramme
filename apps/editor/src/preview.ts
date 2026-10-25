@@ -23,6 +23,7 @@ import { copiesIn, copyId, counted, installed, installedFor, installedTypes, off
 import { bindSandbox, blitSandboxFrame, declarationsModule, ensureDeclared, ensureSandboxDoc, pluginItemsOf, resetSandbox, sandboxDeclaration, sandboxVideoFrames, type SandboxContext } from './plugins/sandbox-draw.ts';
 import { t } from './i18n/index.ts';
 import { prefs } from './settings.ts';
+import { clockTime, step, Runs, type Clock } from './playclock.ts';
 import { packAsInstalled, packBySrc, packContext, shippedPacks } from './packs.ts';
 import { syncPluginTours } from './tours/index.ts';
 
@@ -49,9 +50,9 @@ class Preview {
   /** sound of video layers: media elements playing their cut, and the timers that start and stop them */
   private media: HTMLAudioElement[] = [];
   private timers: ReturnType<typeof setTimeout>[] = [];
-  private clock = { at: 0, t0: 0, audio: false };
+  private clock: Clock = { at: 0, t0: 0, audio: false };
   /** the playback started last: a start still loading its sounds when another begins (or a pause) schedules nothing */
-  private playRun = 0;
+  private runs = new Runs();
   private refineTimer: ReturnType<typeof setTimeout> | null = null;
   /** last rendered frame time (ms), shown in the transport */
   lastMs = 0;
@@ -457,17 +458,15 @@ class Preview {
 
   private advance() {
     const c = comp.peek();
-    let t = this.clock.t0 + (this.now() - this.clock.at);
-    if (t >= c.duration) {
-      if (S.loop.peek()) { t = t % c.duration; this.play(t); }
-      else { setTime(c.duration); S.playing.value = false; return; }
-    }
-    S.time.value = t;
+    const s = step(this.clock, this.now(), c.duration, S.loop.peek());
+    if (s.wrap) { this.play(s.t); return; }
+    if (s.end) { setTime(c.duration); S.playing.value = false; return; }
+    S.time.value = s.t;
   }
 
   private async play(from = S.time.peek()) {
     this.stopAudio();
-    const run = this.playRun;
+    const run = this.runs.begin();
     // the clock starts at once, before the sounds load: the frames drawn meanwhile read the new start, not the last playback
     // (the audio context runs on while paused: its old clock would land past the end, wrap and start the sound again)
     this.clock = { at: performance.now() / 1000, t0: from, audio: false };
@@ -486,14 +485,14 @@ class Preview {
       this.level.connect(limiter).connect(this.master);
     }
     if (this.audio) await this.audio.resume();
-    if (!this.audio || !this.renderer || !clips.length || run !== this.playRun) return;
+    if (!this.audio || !this.renderer || !clips.length || !this.runs.live(run)) return;
     const r = this.renderer, ctx = this.audio, compId = compIdOf(doc);
     this.levelOf(doc, compId);
     const sounds = clips.filter((c) => doc.assets[c.asset].type !== 'video');
     const bufs = await Promise.all(sounds.map((c) => this.buffer(r.assets.url(c.asset))));
     // the pitch worklet, before the clock starts
     if (clips.some(needsPitch)) await loadPitch(ctx).catch(() => {});
-    if (!S.playing.peek() || run !== this.playRun) return;
+    if (!S.playing.peek() || !this.runs.live(run)) return;
     const startAt = ctx.currentTime + 0.03;
     this.clock = { at: startAt, t0: from, audio: true };
     // the mixer of the exports: filters, gain curves, fades, reverb and the shared room sound the same here
@@ -525,7 +524,7 @@ class Preview {
         const curve = c.rateCurve;
         if (!curve) return;
         const steer = setInterval(() => {
-          const now = this.clock.t0 + (this.audio!.currentTime - this.clock.at), rate = curveAt(curve, now);
+          const now = clockTime(this.clock, this.audio!.currentTime), rate = curveAt(curve, now);
           if (rate < MIN_ELEMENT_RATE) { if (!el.paused) el.pause(); return; }
           el.playbackRate = rate;
           if (el.paused && now < c.at + c.duration) el.play().catch(() => {});
@@ -552,7 +551,7 @@ class Preview {
   }
 
   private stopAudio() {
-    this.playRun++;
+    this.runs.cancel();
     this.playOut?.disconnect();
     this.playOut = null;
     for (const s of this.sources) { try { s.stop(); } catch { /* not started */ } }
