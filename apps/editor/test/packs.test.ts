@@ -213,6 +213,21 @@ describe('the packs index', () => {
     expect(cmds[0]).toMatchObject({ kind: 'tool', name: 'icon', from: 'Icons' });
     expect(cmds[0].input).toBeUndefined();
   });
+
+  it('a project\'s older copy of a pack is offered its update', async () => {
+    const { packUpdates } = await import('../src/packs.ts');
+    const { doc } = newProject({ name: 'T', width: 1000, height: 600, fps: 30, duration: 2 });
+    doc.assets.charts = { type: 'module', src: 'plugins/charts.js', name: 'Charts' } as never;
+    doc.assets.mine = { type: 'module', src: 'plugins/mine.js', name: 'Mine' } as never;
+    const packs = [{ file: 'charts.js', name: 'Charts', version: '1.1.0' }, { file: 'icons.js', name: 'Icons', version: '1.0.0' }];
+    expect(packUpdates(doc, packs, { 'plugins/charts.js': '1.0.0' })).toEqual([
+      { assetId: 'charts', name: 'Charts', file: 'charts.js', from: '1.0.0', to: '1.1.0' },
+    ]);
+    // the same version, a newer copy, and a file that is not a pack's: nothing offered
+    expect(packUpdates(doc, packs, { 'plugins/charts.js': '1.1.0' })).toEqual([]);
+    expect(packUpdates(doc, packs, { 'plugins/charts.js': '1.2.0' })).toEqual([]);
+    expect(packUpdates(doc, packs, { 'plugins/mine.js': '0.0.1' })).toEqual([]);
+  });
 });
 
 describe('charts', () => {

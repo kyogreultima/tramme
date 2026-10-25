@@ -13,21 +13,24 @@
     "fr": {
       "Add a chart": "Ajouter un graphique",
       "a bar, line or donut chart from a JSON data set of the project (a list of { label, value }), sized and placed in the composition, with an optional title above it": "un histogramme, une courbe ou un anneau depuis un jeu de données JSON du projet (une liste de { label, value }), dimensionné et placé dans la composition, avec un titre optionnel au-dessus"
-    }
+    },
+    "version": "1.0.0"
   },
   {
     "file": "kinetic.js",
     "name": "Kinetic type",
     "description": "Text that moves letter by letter: typewriter, wave, scatter, drop, mask",
     "commands": [],
-    "fr": {}
+    "fr": {},
+    "version": "1.0.0"
   },
   {
     "file": "physics.js",
     "name": "Physics",
     "description": "Confetti, bouncing balls, a rope, and letters that drop and settle — deterministic simulations",
     "commands": [],
-    "fr": {}
+    "fr": {},
+    "version": "1.0.0"
   },
   {
     "file": "styk.js",
@@ -43,7 +46,8 @@
     "fr": {
       "Stick figure": "Silhouette",
       "adds a Pivot-style stick figure layer: the blue man or the plain black one, or the man already walking (a 1 s walk cycle keyframed pose by pose), at a scale and a colour": "ajoute un calque de silhouette à la Pivot : l'homme en bleu ou le noir et fin, ou l'homme déjà en marche (un pas d'1 s, posé keyframe par keyframe), à une échelle et une couleur"
-    }
+    },
+    "version": "1.0.0"
   },
   {
     "file": "walkthrough.js",
@@ -59,14 +63,16 @@
     "fr": {
       "Lay out a walkthrough": "Monter une visite guidée",
       "a sequence of screenshots in a phone or a browser frame, one composition, a cut per screen, each with an optional caption and a slow scroll": "une suite de captures dans un cadre de téléphone ou de navigateur, une composition, une coupe par écran, chacune avec une légende optionnelle et un défilement lent"
-    }
+    },
+    "version": "1.0.0"
   },
   {
     "file": "a11y.js",
     "name": "Accessibility checks",
     "description": "Text size, contrast, blinking and time-to-read, checked with the others",
     "commands": [],
-    "fr": {}
+    "fr": {},
+    "version": "1.0.0"
   },
   {
     "file": "localize.js",
@@ -89,7 +95,8 @@
       "cuts a transcript into numbered sentences for the model to translate: the answer says what to hand back to localize-apply": "découpe une transcription en phrases numérotées pour que le modèle les traduise : la réponse dit quoi rendre à localize-apply",
       "Apply a translation": "Appliquer une traduction",
       "a translated array of sentences becomes a transcript asset retimed over the original, and the compositions captioning the original are duplicated for the language": "une liste de phrases traduites devient un actif de transcription recalé sur l'original, et les compositions qui sous-titrent l'original sont dupliquées pour la langue"
-    }
+    },
+    "version": "1.0.0"
   },
   {
     "file": "icons.js",
@@ -108,7 +115,8 @@
     "fr": {
       "Icons": "Icônes",
       "finds pictograms by name, tag or a few words and lays them as editable stroke groups: a row, a grid, or one beside each line of a list; when the words are vague, the candidates come back as a contact sheet": "trouve des pictogrammes par nom, étiquette ou quelques mots et les pose en groupes de traits éditables : en ligne, en grille, ou à côté de chaque ligne d'une liste ; quand les mots sont vagues, les candidates reviennent en planche"
-    }
+    },
+    "version": "1.0.0"
   },
   {
     "file": "diagram.js",
@@ -124,6 +132,7 @@
     "fr": {
       "Diagram": "Diagramme",
       "a flow, architecture, cycle or tree written as flowchart text (a Mermaid subset) or JSON, laid out layered, ring or hub, and built as editable boxes, labels and edges that draw themselves in reading order; one route can be highlighted": "un flux, une architecture, un cycle ou un arbre écrit en texte flowchart (un sous-ensemble de Mermaid) ou JSON, disposé en couches, anneau ou étoile, et construit en boîtes, libellés et arêtes éditables qui se tracent dans l'ordre de lecture ; une route peut être mise en avant"
-    }
+    },
+    "version": "1.0.0"
   }
 ]

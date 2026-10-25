@@ -813,6 +813,10 @@
     "addPack": "Ajouter un pack",
     "noPacks": "Aucun pack livré avec cette version",
     "packAdded": "Pack « {name} » ajouté",
+    "updateTo": "Mettre à jour vers {version}",
+    "packOlderHere": "Ce projet tient {name} en {from} ; l’éditeur livre {to}.",
+    "packUpdated": "{name} mis à jour vers {version}",
+    "couldNotUpdatePack": "Impossible de mettre à jour le pack : {error}",
     "couldNotAddPack": "Impossible d'ajouter le pack : {error}"
   },
   "models": {

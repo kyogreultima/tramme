@@ -17,6 +17,7 @@ const packsMdUrl = new URL('docs/packs.md', root);
 const check = process.argv.includes('--check');
 
 interface PackModule {
+  meta?: { version?: string };
   tools?: { name: string; title?: string; description: string }[];
   nodes?: { type: string; title: string }[];
   checks?: { name: string; title: string }[];
@@ -27,6 +28,8 @@ interface Entry {
   name: string;
   description?: string;
   data?: string[];
+  /** the version the pack's module declares, for the update offers of a project's copy */
+  version?: string;
   commands?: { name: string; title: string; description: string }[];
   fr?: Record<string, string>;
 }
@@ -37,6 +40,7 @@ const shapes = new Map<string, { nodes: { type: string; title: string }[]; check
 
 for (const entry of index) {
   const mod: PackModule = await import(new URL(`plugins/${entry.file}`, root).href);
+  entry.version = mod.meta?.version;
   entry.commands = (mod.tools ?? []).map((t) => ({ name: t.name, title: t.title ?? t.name, description: t.description }));
   shapes.set(entry.file, {
     nodes: (mod.nodes ?? []).map((n) => ({ type: n.type, title: n.title })),

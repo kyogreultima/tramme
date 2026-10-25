@@ -10,6 +10,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Added
 
+- **A project's older copy of a pack offered its update**: the Code section lists an "Update to {version}" beside a copy of a shipped pack older than the editor's, written in place with its version recorded, the way an installed plugin's copy already is.
 - **The sound heard while scrubbing**: dragging the playhead plays a short window of the sound at each step (80 ms, at most every 60 ms, never the videos' own streamed sound), enough to hear the moment a cut or a hit lands; a setting turns it off (on by default).
 - **The `/` menu remembers what is used**: the commands a user actually runs open the menu first (at most six kept on this machine), and the search is unchanged once something is typed.
 - **The packs' commands on the home screen**: the direction box's `/` menu lists the shipped packs' tools after the built-in ones, before a project opens — a pack command a project does not hold yet waits in the editor's box until the project's packs attach. The list comes from an index generated from the packs themselves (`npm run packs:index`: `plugins/index.json` gains each pack's commands and their French, `docs/packs.md` the site's new Packs page), which CI checks cannot go stale.

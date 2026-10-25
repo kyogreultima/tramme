@@ -813,6 +813,10 @@
     "addPack": "Add a pack",
     "noPacks": "No packs shipped with this build",
     "packAdded": "Pack \"{name}\" added",
+    "updateTo": "Update to {version}",
+    "packOlderHere": "This project holds {name} at {from}; the editor ships {to}.",
+    "packUpdated": "{name} updated to {version}",
+    "couldNotUpdatePack": "Could not update the pack: {error}",
     "couldNotAddPack": "Could not add the pack: {error}"
   },
   "models": {
