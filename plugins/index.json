@@ -293,5 +293,13 @@
       "Show a formula": "Montrer une formule",
       "a TeX formula laid out in STIX Two Math, written on or changing into a second one, the font's glyph table copied into the project so it draws the same everywhere": "une formule TeX disposée en STIX Two Math, écrite ou changeant en une seconde, la table de glyphes de la police copiée dans le projet pour qu’elle se dessine pareil partout"
     }
+  },
+  {
+    "file": "matter.js",
+    "name": "Matter",
+    "description": "Morphs, liquids and paper: one shape becoming another without twisting, seeded blobs, a torn sheet crossing the frame",
+    "version": "1.0.0",
+    "commands": [],
+    "fr": {}
   }
 ]

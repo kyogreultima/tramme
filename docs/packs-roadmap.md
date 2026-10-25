@@ -2,7 +2,7 @@
 
 The general-purpose plugin packs that ship with the editor (`plugins/*.js`, listed in `plugins/index.json`, added to a project from the Code section): the ones to come, and what tramme needs first so they can exist. A pack is an ordinary plugin. It gives the assistant and the editor a new vocabulary — what they can build in one move, what they can check — for any film, never for one video.
 
-Status: steps 0 to 11 are shipped (step 5 keeps its real recordings to check on a device; step 7 keeps its set of 300 emoji to confirm on a device). Shipped packs: charts, kinetic type, physics, stick figures, icons, diagrams, UI walkthrough, accessibility checks, localization ([plugins-roadmap.md](plugins-roadmap.md), step 10). The packs after step 0 are taken in order, each one landing whole. The decisions still open are listed at the end. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
+Status: steps 0 to 12 are shipped (step 5 keeps its real recordings to check on a device; step 7 keeps its set of 300 emoji to confirm on a device). Shipped packs: charts, kinetic type, physics, stick figures, icons, diagrams, UI walkthrough, accessibility checks, localization ([plugins-roadmap.md](plugins-roadmap.md), step 10). The packs after step 0 are taken in order, each one landing whole. The decisions still open are listed at the end. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
 
 ## Why
 
@@ -168,10 +168,10 @@ Done when: an explainer writes a² + b² = c², rearranges it into c = √(a² +
 
 The row the plugins roadmap left open ("Matter and transitions"), apart from the cloth already shipped.
 
-- [ ] The `morph` node: one shape becoming another (`PathValue`s from path layers or step 0's SVG reader): both resampled along their length, their starts and directions matched so nothing twists, several contours paired by area and place, the extra ones growing from a point; `progress` animatable.
-- [ ] The `liquid` node: seeded blobs that merge and part (a field of circles traced by marching squares); as a transition, a liquid flooding the frame from one side and draining to the next scene.
-- [ ] The `paper` node: a torn-paper transition, its edge torn by seeded noise, with its fibres and its shadow, crossing the frame and revealing what is under.
-- [ ] Tests: resampled lengths, matched starts (no twist), marching squares on known fields, determinism.
+- [x] The `morph` node: one shape becoming another (`PathValue`s from path layers or step 0's SVG reader): both resampled along their length, their starts and directions matched so nothing twists, several contours paired by area and place, the extra ones growing from a point; `progress` animatable.
+- [x] The `liquid` node: seeded blobs that merge and part (a field of circles traced by marching squares); as a transition, a liquid flooding the frame from one side and draining to the next scene.
+- [x] The `paper` node: a torn-paper transition, its edge torn by seeded noise, with its fibres and its shadow, crossing the frame and revealing what is under.
+- [x] Tests: resampled lengths, matched starts (no twist), marching squares on known fields, determinism.
 
 Done when: an icon morphs into another without twisting, and a liquid and a torn paper pass between two scenes, the same in every render.
 

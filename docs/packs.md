@@ -146,3 +146,11 @@ Formulas: a TeX subset laid out glyph by glyph in STIX Two Math, written on or c
 - Nodes: `math.formula` — Formula
 - Checks: `formula-legibility` — Formula legibility
 
+## Matter
+
+Morphs, liquids and paper: one shape becoming another without twisting, seeded blobs, a torn sheet crossing the frame
+
+- Tools: none
+- Nodes: `matter.morph` — Morph, `matter.liquid` — Liquid, `matter.paper` — Paper
+- Checks: none
+

@@ -40,9 +40,11 @@ import { barsAt } from '../../../plugins/audiogram.js';
 import * as audiogram from '../../../plugins/audiogram.js';
 import { parseTex, layout, matchSymbols } from '../../../plugins/math.js';
 import * as math from '../../../plugins/math.js';
+import { resample, bestStart, marchingSquares, tornEdge, liquidField } from '../../../plugins/matter.js';
+import * as matter from '../../../plugins/matter.js';
 
 // the packs are JavaScript on purpose: their shape is checked at runtime by Registry.use, which these tests run
-const PACKS = [charts, kinetic, a11y, physics, styk, icons, diagram, walkthrough, localize, codeview, rhythm, screencast, handmade, chat, emoji, maps, audiogram, math] as unknown as import('@tramme/core').PluginModule[];
+const PACKS = [charts, kinetic, a11y, physics, styk, icons, diagram, walkthrough, localize, codeview, rhythm, screencast, handmade, chat, emoji, maps, audiogram, math, matter] as unknown as import('@tramme/core').PluginModule[];
 
 /** the shipped index, as the script writes it: each entry's commands and their French */
 const INDEX: { file: string; name: string; description?: string; commands?: { name: string; title: string; description: string }[]; fr?: Record<string, string> }[] =
@@ -764,6 +766,67 @@ describe('math', () => {
       expect(Object.values(next.assets).some((x) => x.name === 'Math glyphs')).toBe(true);
       expect(out.text).toMatch(/STIX Two Math/);
       for (const b of boxesOf(next)) expect(inside(b, w, h)).toBe(true);
+    }
+  });
+});
+
+describe('matter', () => {
+  const square = { v: [[0, 0], [100, 0], [100, 100], [0, 100]], closed: true };
+
+  it('walks a path at equal speed, its starts matched without a twist', () => {
+    // nine points on a 100-square: the samples land on its corners, so the chords are the arcs
+    const pts = resample(square, 9);
+    expect(pts).toHaveLength(9);
+    for (let i = 1; i < pts.length; i++) {
+      const seg = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+      expect(Math.abs(seg - 50)).toBeLessThan(1e-6);
+    }
+    const eight = resample(square, 8);
+    expect(eight).toHaveLength(8);
+    // an asymmetric shape's list rotated by 2: the answer is 2 (a square is its own every quarter turn)
+    const blob = { v: [[0, 0], [120, -30], [200, 40], [160, 140], [40, 180], [-60, 120], [-80, 10]], closed: true };
+    const shape = resample(blob, 24);
+    const shift = shape.slice(-2).concat(shape.slice(0, -2)); // its vertex 0 stands where a's vertex 2 was
+    expect(bestStart(shape, shift)).toBe(2);
+    expect(bestStart(shape, shape)).toBe(0);
+  });
+
+  it('traces a circle the marching squares find whole, within a cell', () => {
+    const R = 60, cx = 100, cy = 100;
+    const loops = marchingSquares((x: number, y: number) => Math.hypot(x - cx, y - cy) < R ? 1 : 0, 200, 200, 10, 0.5);
+    // the field is a step: take a smoother one for the interpolation
+    const soft = marchingSquares((x: number, y: number) => 1 - Math.hypot(x - cx, y - cy) / R, 200, 200, 10, 0.001);
+    expect(loops.length).toBeGreaterThanOrEqual(1);
+    expect(soft).toHaveLength(1);
+    const loop = soft[0];
+    const dists = loop.map((pt: number[]) => Math.hypot(pt[0] - cx, pt[1] - cy));
+    expect(Math.max(...dists)).toBeLessThan(R + 10);
+    expect(Math.min(...dists)).toBeGreaterThan(R - 10);
+    // closed: the loop comes back to its start
+    expect(loop[0]).toEqual(loop[loop.length - 1]);
+  });
+
+  it('the liquid answers any frame in any order, the paper torn by its seed', () => {
+    const alone = JSON.stringify(liquidField(3, 50 / 30, 6));
+    let reached = '';
+    for (let f = 0; f <= 50; f++) reached = JSON.stringify(liquidField(3, f / 30, 6));
+    expect(reached).toBe(alone);
+    expect(JSON.stringify(liquidField(3, 50 / 30, 6))).toBe(JSON.stringify(liquidField(3, 50 / 30, 6)));
+    expect(JSON.stringify(liquidField(4, 50 / 30, 6))).not.toBe(alone);
+    const e = tornEdge(400, 7, 16);
+    expect(e.length).toBeGreaterThan(8);
+    expect(tornEdge(400, 7, 16)).toEqual(e);
+    expect(JSON.stringify(tornEdge(400, 8, 16))).not.toBe(JSON.stringify(e));
+  });
+
+  it('the nodes draw from the tokens, any frame in any order', async () => {
+    for (const [w, h] of [[1920, 1080], [1080, 1920]] as [number, number][]) {
+      const { doc } = newProject({ name: 'T', width: w, height: h, fps: 30, duration: 4 });
+      doc.tokens.accent = { type: 'color', value: '#2EC4B6' } as never;
+      doc.compositions.main.layers.m = { type: 'matter.morph', props: { progress: { $k: [{ t: 0, v: 0 }, { t: 1.2, v: 1 }] } } } as never;
+      doc.compositions.main.layers.l = { type: 'matter.liquid', in: 1, out: 4, props: { progress: 1 } } as never;
+      doc.compositions.main.order = ['m', 'l'];
+      expect(validate(doc, registryOf())).toEqual([]);
     }
   });
 });
