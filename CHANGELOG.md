@@ -8,6 +8,8 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-10-25
+
 ### Added
 
 - **Diagrams pack** (`plugins/diagram.js`, [packs-roadmap.md](docs/packs-roadmap.md), step 2): flows, architectures, cycles and trees written as flowchart text (a Mermaid subset: `A[Label] --> B(Round)`, `C{Decision}`, `-->|label|`, `---`, `-.->`, `subgraph`; `LR`, `TB`, `RL` or `BT` to force a direction, left out to let the format pick it — left to right in 16:9, top to bottom in 9:16; errors name their line) or the same as JSON. The parser reads it; a layout written in the pack, pure and deterministic, places it — layered (ranks by longest path, crossings reduced by barycentres, coordinates balanced), a ring for cycles, a hub for stars — and the `diagram` tool (`/diagram`) expands it into ordinary layers: boxes (`shape.rect`, the kit's radius), labels (wrapped, sized to the format), edges (`shape.path` with their arrowheads, drawn on with the trim between their ends' arrivals), revealed in reading order with an uneven stagger, in one group; a `highlight` node dims the rest and lifts one route through the graph in the accent. The `diagram-legibility` check flags a label overflowing its box or set too small, an edge crossing a label, and more boxes than the format holds at once (about 12 in 16:9, 8 in 9:16).
@@ -437,7 +439,8 @@ First public release.
 
 - Cloudflare Worker serving the editor and the API, projects stored in R2, access protected by Cloudflare Access.
 
-[Unreleased]: ../../compare/v0.12.0...HEAD
+[Unreleased]: ../../compare/v0.13.0...HEAD
+[0.13.0]: ../../compare/v0.12.0...v0.13.0
 [0.12.0]: ../../compare/v0.11.1...v0.12.0
 [0.11.1]: ../../compare/v0.11.0...v0.11.1
 [0.11.0]: ../../compare/v0.10.0...v0.11.0
