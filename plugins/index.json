@@ -317,5 +317,22 @@
     "version": "1.0.0",
     "commands": [],
     "fr": {}
+  },
+  {
+    "file": "extrude.js",
+    "name": "Logos in 3D",
+    "description": "Logos in 3D: the path layers of a logo extruded with a bevel into a .glb, turning under the built-in 3D model layer",
+    "version": "1.0.0",
+    "commands": [
+      {
+        "name": "extrude",
+        "title": "Extrude a logo in 3D",
+        "description": "the path layers of a logo or an icon (a group from the svg-paths tool, or one path) extruded with a bevel into a .glb model, drawn by the built-in 3D model layer turning on its turntable"
+      }
+    ],
+    "fr": {
+      "Extrude a logo in 3D": "Extruder un logo en 3D",
+      "the path layers of a logo or an icon (a group from the svg-paths tool, or one path) extruded with a bevel into a .glb model, drawn by the built-in 3D model layer turning on its turntable": "les couches de tracé d’un logo ou d’une icône (un groupe de l’outil svg-paths, ou un seul tracé) extrudées avec un biseau en un modèle .glb, dessiné par la couche de modèle 3D intégrée qui tourne sur son plateau"
+    }
   }
 ]

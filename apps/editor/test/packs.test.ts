@@ -44,10 +44,12 @@ import { resample, bestStart, marchingSquares, tornEdge, liquidField, pairContou
 import * as matter from '../../../plugins/matter.js';
 import * as print from '../../../plugins/print.js';
 import * as qr from '../../../plugins/qr.js';
+import * as extrude from '../../../plugins/extrude.js';
+import { parseGltf } from '../../../packages/nodes/src/gltf.ts';
 import { stepWorld } from '../../../plugins/physics.js';
 
 // the packs are JavaScript on purpose: their shape is checked at runtime by Registry.use, which these tests run
-const PACKS = [charts, kinetic, a11y, physics, styk, icons, diagram, walkthrough, localize, codeview, rhythm, screencast, handmade, chat, emoji, maps, audiogram, math, matter, print, qr] as unknown as import('@tramme/core').PluginModule[];
+const PACKS = [charts, kinetic, a11y, physics, styk, icons, diagram, walkthrough, localize, codeview, rhythm, screencast, handmade, chat, emoji, maps, audiogram, math, matter, print, qr, extrude] as unknown as import('@tramme/core').PluginModule[];
 
 /** the shipped index, as the script writes it: each entry's commands and their French */
 const INDEX: { file: string; name: string; description?: string; commands?: { name: string; title: string; description: string }[]; fr?: Record<string, string> }[] =
@@ -1836,5 +1838,72 @@ describe('qr', () => {
     expect(run(placed({ ink: '#ffffff', plate: '#111111' })).join()).toMatch(/light modules on a dark plate/);
     expect(run(placed({ ink: '#9a9a9a' })).join()).toMatch(/under 4:1/);
     expect(run(placed({}, { out: 2 })).join()).toMatch(/3 s/);
+  });
+});
+
+describe('extrude', () => {
+  const sq = (x: number, y: number, w: number) => [[x, y], [x + w, y], [x + w, y + w], [x, y + w]] as [number, number][];
+  const triArea = (pts: number[][], t: number[]) => {
+    let s = 0;
+    for (let k = 0; k < t.length; k += 3) { const [a, b, c] = [pts[t[k]], pts[t[k + 1]], pts[t[k + 2]]]; s += ((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])) / 2; }
+    return s;
+  };
+
+  it('triangulates a shape with holes: every triangle facing up, the holes left empty', () => {
+    const shapes = extrude.shapesOf([sq(0, 0, 10), sq(2, 2, 2), sq(6, 6, 2)]);
+    expect(shapes).toHaveLength(1);
+    expect(shapes[0].holes).toHaveLength(2);
+    const { points, triangles } = extrude.triangulate(shapes[0].outer, shapes[0].holes);
+    // n + 2h - 2 triangles, their areas summing to the outline less its holes
+    expect(triangles.length / 3).toBe(12 + 2 * 2 - 2);
+    expect(triArea(points, triangles)).toBeCloseTo(100 - 4 - 4, 6);
+    for (let k = 0; k < triangles.length; k += 3) expect(triArea(points, triangles.slice(k, k + 3))).toBeGreaterThan(0);
+  });
+
+  it('triangulates a concave outline, and an island inside a hole stays solid', () => {
+    const L = [[0, 0], [6, 0], [6, 2], [2, 2], [2, 6], [0, 6]] as [number, number][];
+    const { points, triangles } = extrude.triangulate(L);
+    expect(triArea(points, triangles)).toBeCloseTo(6 * 2 + 2 * 4, 6);
+    // a target: a disc, its hole, a dot inside the hole
+    const shapes = extrude.shapesOf([sq(0, 0, 12), sq(3, 3, 6), sq(5, 5, 2)]);
+    expect(shapes).toHaveLength(2);
+    expect(shapes.map((x: { holes: unknown[] }) => x.holes.length).sort()).toEqual([0, 1]);
+  });
+
+  it('writes a .glb the 3D model node reads back, a primitive per colour', () => {
+    const shape = extrude.shapesOf([sq(-1, -1, 2), sq(-0.4, -0.4, 0.8)])[0];
+    const mesh = extrude.extrudeShape(shape, 0.5, 0.05);
+    const glb = extrude.writeGlb([{ ...mesh, color: [1, 0, 0, 1] }, { ...extrude.extrudeShape(extrude.shapesOf([sq(2, 2, 1)])[0], 0.5, 0), color: [0, 0, 1, 1] }]);
+    const model = parseGltf(glb.buffer.slice(glb.byteOffset, glb.byteOffset + glb.byteLength));
+    expect(model.roots[0].prims).toHaveLength(2);
+    expect(model.roots[0].prims[0].color).toEqual([1, 0, 0, 1]);
+    expect(model.roots[0].prims[0].positions.length).toBe(mesh.positions.length);
+    expect(Array.from(model.roots[0].prims[0].indices)).toEqual(mesh.indices);
+    // the solid is closed: as deep as asked, front and back faces facing out
+    const zs = mesh.positions.filter((_: number, i: number) => i % 3 === 2);
+    expect(Math.max(...zs) - Math.min(...zs)).toBeCloseTo(0.5, 6);
+    expect(model.radius).toBeGreaterThan(1);
+  });
+
+  it('the tool extrudes a group of paths into a turning model, the flat logo hidden', async () => {
+    const { doc } = newProject({ name: 'T', width: 1920, height: 1080, fps: 30, duration: 6 });
+    const pv = (pts: [number, number][]) => ({ v: pts, closed: true });
+    doc.compositions.main.layers.outer = { type: 'shape.path', props: { path: pv(sq(0, 0, 200)), fill: '@accent' } } as never;
+    doc.compositions.main.layers.hole = { type: 'shape.path', props: { path: pv(sq(60, 60, 80)), fill: '@accent' } } as never;
+    doc.compositions.main.layers.logo = { type: 'group', name: 'Logo', transform: { anchor: [100, 100], position: [960, 540], scale: [2, 2] }, children: ['outer', 'hole'] } as never;
+    doc.compositions.main.order = ['logo'];
+    const written: Record<string, Blob> = {};
+    const out = await runTool(extrude.tools[0], doc, { layer: 'logo' }, { extra: { writeFile: async (p: string, d: Blob) => { written[p] = d; return p; } } });
+    const next = applyOps(doc, out.ops as never).doc;
+    const model = Object.values(next.compositions.main.layers).find((l) => l.type === 'model.3d')!;
+    expect(model.props).toMatchObject({ spin: 30, light: 'studio' });
+    expect(model.transform!.position).toEqual([960, 540]);
+    expect(next.compositions.main.layers.logo.visible).toBe(false);
+    const file = Object.values(written)[0];
+    const glb = parseGltf(await file.arrayBuffer());
+    expect(glb.roots[0].prims).toHaveLength(1);
+    // the accent, as a linear colour
+    expect(glb.roots[0].prims[0].color[1]).toBeGreaterThan(glb.roots[0].prims[0].color[0]);
+    await expect(runTool(extrude.tools[0], doc, { layer: 'hole', bevel: 0 })).resolves.toBeTruthy();
   });
 });

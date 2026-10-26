@@ -113,3 +113,4 @@ Boxes the loop could not land, with why. The loop adds to this list; the user cl
 - Editing, step 12, voice and music apart (Demucs in ONNX): no ONNX export of Demucs whose inputs are known could be fetched or checked from the loop's container; it needs one, then runs through the long-job runner of step 13.
 - Editing, step 14, HDR (PQ, HLG): waits by design for Canvas 2D above 8 bits; exports stay SDR, at 10 bits where possible.
 - Components, step 5, the volume view: written in its roadmap as "later"; nothing in the queue asks for it yet.
+- Packs, step 17, text extruded: decision 4 took paths only, so the pack reads no glyph outlines; type is outlined in the SVG first. It waits for a font reader (opentype.js was the other option).

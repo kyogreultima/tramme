@@ -170,3 +170,11 @@ QR codes written in the pack's own code: square, rounded or dotted modules, a lo
 - Nodes: `qr.code` — QR code
 - Checks: `qr-scannable` — QR scannable
 
+## Logos in 3D
+
+Logos in 3D: the path layers of a logo extruded with a bevel into a .glb, turning under the built-in 3D model layer
+
+- Tools: `/extrude` — Extrude a logo in 3D
+- Nodes: none
+- Checks: none
+
