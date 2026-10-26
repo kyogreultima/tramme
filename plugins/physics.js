@@ -274,12 +274,13 @@ const textDrop = {
       chars.forEach((ch, i) => {
         const b = s.world?.bodies?.[i];
         const w = widths[i];
-        if (b) {
-          const waiting = s.t < (s.started?.[i] ?? 0);
+        // a letter shows once its fall has started (the ones still waiting are not hung in the air)
+        if (b && s.t >= (s.started?.[i] ?? 0)) {
           ctx.save();
-          ctx.translate(waiting ? (b.homeX ?? b.x) + w / 2 : b.x, waiting ? (b.homeY ?? b.y) : b.y);
+          ctx.translate(b.x, b.y);
           ctx.rotate(b.angle || 0);
-          ctx.fillText(ch, -w / 2, p.size * 0.47);
+          ctx.textAlign = 'center';
+          ctx.fillText(ch, 0, p.size * 0.47);
           ctx.restore();
         }
         x += w;
@@ -365,9 +366,6 @@ function contact(a, b) {
   const best = { nx, ny, pen: ref.depth, px: deep[0].vx, py: deep[0].vy };
   best.twin = deep[1] ? { px: deep[1].vx, py: deep[1].vy } : null;
   return best;
-  // the normal faces from A toward B, whatever edge the vertex was nearest
-  if (best && best.pen > 0 && best.nx * (b.x - a.x) + best.ny * (b.y - a.y) < 0) best = { nx: -best.nx, ny: -best.ny, pen: best.pen, px: best.px, py: best.py };
-  return best && best.pen > 0 ? best : null;
 }
 
 /**
@@ -529,7 +527,8 @@ function dropWorld(p, widths) {
     x += w;
     return body;
   });
-  bodies.push({ id: 'floor', kind: 'box', x: 0, y: p.size * 0.52, w: total * 4, h: 80, static: true, mass: 0, inertia: 0, restitution: 0.1, friction: 0.6 });
+  // the floor's top is the line's baseline: a letter at rest stands where the text would
+  bodies.push({ id: 'floor', kind: 'box', x: 0, y: 40, w: total * 4, h: 80, static: true, mass: 0, inertia: 0, restitution: 0.1, friction: 0.6 });
   return { gravity: [0, 2600], bodies };
 }
 

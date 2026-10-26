@@ -49,12 +49,12 @@ export function assetFile(type: string, name: string, data: Uint8Array): AssetFi
 }
 
 /**
- * readAsset for the exporters in a browser: images and fonts of the document
+ * readAsset for the exporters in a browser: images, fonts and JSON data of the document
  * fetched first (relative srcs resolve against base), then read at once.
  */
 export async function fetchAssetReader(doc: TrammeDoc, base: string): Promise<AssetReader> {
   const files = new Map<string, AssetFile>();
-  await Promise.all(Object.entries(doc.assets).filter(([, a]) => a.type === 'image' || a.type === 'font').map(async ([id, a]) => {
+  await Promise.all(Object.entries(doc.assets).filter(([, a]) => a.type === 'image' || a.type === 'font' || a.type === 'json').map(async ([id, a]) => {
     const r = await fetch(new URL(a.src, base));
     if (r.ok) files.set(id, assetFile(a.type, a.src, new Uint8Array(await r.arrayBuffer())));
   }));

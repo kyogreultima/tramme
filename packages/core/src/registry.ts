@@ -125,6 +125,13 @@ export interface Host {
   state?<T = unknown>(): T;
 }
 
+/** what a node's SVG export reads besides its props: the composition's size, the content of a JSON asset (null when it is not there) */
+export interface SvgHost {
+  width: number;
+  height: number;
+  json(assetId: string): unknown;
+}
+
 export interface NodeType<P = any> {
   type: string;
   title: string;
@@ -159,7 +166,7 @@ export interface NodeType<P = any> {
    */
   handles?(props: P): Handle[];
   /** how the node goes into vector exports, where code cannot run: SVG markup in local space, Lottie shape items (static) */
-  export?: { svg?(props: P): string; lottie?(props: P): unknown[] };
+  export?: { svg?(props: P, host?: SvgHost): string; lottie?(props: P): unknown[] };
   render: {
     canvas2d?(ctx: CanvasRenderingContext2D, props: P, host: Host): void;
     /**

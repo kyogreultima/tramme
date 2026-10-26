@@ -6,12 +6,85 @@
 // same seed, the same picture, any frame in any order.
 
 // ── the paths ────────────────────────────────────────────────
-/** a PathValue's outline as a polyline: its vertices (the tangent points already included in them) */
+/**
+ * A PathValue's outline as a polyline: its vertices, its Béziers (the in and
+ * out tangents, relative to their vertex) flattened in 16 runs a segment, the
+ * closing segment included and ending back on the first vertex.
+ */
 function pointsOf(path) {
-  const v = (path && Array.isArray(path.v)) ? path.v : [];
-  const pts = v.map((p) => [Number(p?.[0]) || 0, Number(p?.[1]) || 0]);
-  if (path?.closed && pts.length > 1) pts.push([pts[0][0], pts[0][1]]);
+  const v = (path && Array.isArray(path.v)) ? path.v.map((p) => [Number(p?.[0]) || 0, Number(p?.[1]) || 0]) : [];
+  const n = v.length;
+  if (n < 2) return v;
+  const zero = [0, 0];
+  const pts = [v[0]];
+  const seg = (a, b) => {
+    const o = path.o?.[a] ?? zero, i = path.i?.[b] ?? zero;
+    if (!o[0] && !o[1] && !i[0] && !i[1]) { pts.push(v[b]); return; }
+    const P0 = v[a], P1 = [v[a][0] + o[0], v[a][1] + o[1]], P2 = [v[b][0] + i[0], v[b][1] + i[1]], P3 = v[b];
+    for (let k = 1; k <= 16; k++) {
+      const u = k / 16, w = 1 - u;
+      pts.push([w * w * w * P0[0] + 3 * w * w * u * P1[0] + 3 * w * u * u * P2[0] + u * u * u * P3[0], w * w * w * P0[1] + 3 * w * w * u * P1[1] + 3 * w * u * u * P2[1] + u * u * u * P3[1]]);
+    }
+  };
+  for (let k = 0; k < n - 1; k++) seg(k, k + 1);
+  if (path.closed) seg(n - 1, 0);
   return pts;
+}
+
+/** the signed area of a closed polyline (its winding: positive one way, negative the other) */
+const signedArea = (pts) => {
+  let s = 0;
+  for (let i = 0; i < pts.length; i++) { const a = pts[i], b = pts[(i + 1) % pts.length]; s += a[0] * b[1] - b[0] * a[1]; }
+  return s / 2;
+};
+
+/** the outline a morph walks: n points at equal arc length, the closing one dropped (it is the first) */
+function outlineOf(path, n) {
+  return path?.closed ? resample(path, n + 1).slice(0, n) : resample(path, n);
+}
+
+/**
+ * The second outline put in step with the first: wound the same way (a
+ * shape walked backwards would turn inside out on the way) and rotated to the
+ * start that meets the first with the least travel — nothing twists.
+ */
+export function aligned(A, B) {
+  const same = Math.sign(signedArea(A)) === Math.sign(signedArea(B)) || !signedArea(A) || !signedArea(B);
+  const b = same ? B : [...B].reverse();
+  const k = bestStart(A, b);
+  return b.map((_, i) => b[(i + k) % b.length]);
+}
+
+/** a shape as contours: one PathValue, or a list of them (a logo of several pieces) */
+const contoursOf = (x) => (Array.isArray(x) ? x : x ? [x] : []).filter((c) => c && Array.isArray(c.v) && c.v.length > 1);
+
+/**
+ * The contours of two shapes paired for a morph: by size, then by place (the
+ * biggest with the biggest), the ones left over growing from, or shrinking
+ * to, a point at their centre. Each pair is [a, b] outlines of n points.
+ */
+export function pairContours(a, b, n = 96) {
+  const prep = (list) => list.map((c) => {
+    const pts = outlineOf(c, n);
+    const cx = pts.reduce((s, p) => s + p[0], 0) / (pts.length || 1), cy = pts.reduce((s, p) => s + p[1], 0) / (pts.length || 1);
+    return { pts, area: Math.abs(signedArea(pts)), cx, cy };
+  }).filter((c) => c.pts.length >= 3).sort((x, y) => y.area - x.area);
+  const A = prep(contoursOf(a)), B = prep(contoursOf(b));
+  const pairs = [];
+  const used = new Set();
+  for (const ca of A) {
+    // the biggest left of the other shape, the nearest among those of a like size
+    let best = -1, bestCost = Infinity;
+    B.forEach((cb, j) => {
+      if (used.has(j)) return;
+      const cost = Math.abs(Math.log((cb.area + 1) / (ca.area + 1))) * 200 + Math.hypot(cb.cx - ca.cx, cb.cy - ca.cy);
+      if (cost < bestCost) { bestCost = cost; best = j; }
+    });
+    if (best >= 0) { used.add(best); pairs.push([ca.pts, aligned(ca.pts, B[best].pts)]); }
+    else pairs.push([ca.pts, ca.pts.map(() => [ca.cx, ca.cy])]);
+  }
+  B.forEach((cb, j) => { if (!used.has(j)) pairs.push([cb.pts.map(() => [cb.cx, cb.cy]), cb.pts]); });
+  return pairs;
 }
 
 /** the total length of a polyline */
@@ -171,38 +244,49 @@ export function tornEdge(len, seed = 0, rough = 14) {
 // ── the liquid field ─────────────────────────────────────────
 /**
  * The field of the liquid at t: seeded blobs drifting slowly, each a
- * metaphoric circle whose radius breathes. A pure function of t — the same
- * frame asked alone or reached after every one before it gives the same
- * answer, so the drawing is the same in any order.
+ * metaball whose radius breathes. A pure function of t — the same frame
+ * asked alone or reached after every one before it gives the same answer,
+ * so the drawing is the same in any order. `speed` scales the drift (lava
+ * slow at 1: a turn of a blob's loop in about 25 s).
  */
-export function liquidField(seed, t, blobs = 7, span = 1) {
+export function liquidField(seed, t, blobs = 7, speed = 1) {
   const out = [];
   for (let k = 0; k < blobs; k++) {
     const n1 = hash2(seed * 131 + k, 3), n2 = hash2(seed * 131 + k, 41), n3 = hash2(seed * 131 + k, 97);
-    // each blob drifts on its own slow loop, its radius breathing on a tick
-    const tick = Math.floor(t / 0.12);
-    const phase = tick * 0.35 + n1 * Math.PI * 2;
+    // each blob drifts on its own slow loop, its radius breathing with it
+    const phase = t * speed * (0.18 + n3 * 0.14) + n1 * Math.PI * 2;
     out.push({
       x: 0.5 + Math.cos(phase + n2 * 6) * (0.16 + n2 * 0.22),
       y: 0.5 + Math.sin(phase * 0.8 + n3 * 6) * (0.16 + n3 * 0.22),
       r: 0.16 + n1 * 0.12 + 0.03 * Math.sin(phase * 1.3),
     });
   }
-  void span;
   return out;
 }
 
-/** the field a blob field paints: 1 inside the union, falling to 0 outside */
-function fieldOf(blobs) {
+/** the field a blob field paints: the blobs' influences summed (metaballs), so two near ones merge before they touch */
+function fieldOf(blobs, aspect = 1) {
   return (x, y) => {
-    const u = x, v = y;
     let s = 0;
     for (const b of blobs) {
-      const d2 = ((u - b.x) ** 2 + (v - b.y) ** 2) / (b.r * b.r);
-      s = Math.max(s, Math.max(0, 1 - d2));
+      // the radius in the frame's shorter side, so a blob stays round in any format
+      const dx = (x - b.x) * aspect, dy = y - b.y;
+      const d2 = (dx * dx + dy * dy) / (b.r * b.r);
+      s += d2 < 4 ? (1 - d2 / 4) ** 2 : 0;
     }
     return s;
   };
+}
+
+/**
+ * The value the liquid's contour is traced on, at a point of the frame (0 to
+ * 1 each way): the blobs alone (`blobs`, grown in with the progress), or the
+ * flood (`flood`), the blobs riding a front that crosses from the left with
+ * the progress and covers the whole frame at 1.
+ */
+export function liquidValue(mode, field, x, y, u) {
+  if (mode === 'flood') return field(x, y) * 0.35 + (u * 2.6 - 0.8 - x) * 2.2;
+  return field(x, y) - (1 - u) * 1.2;
 }
 
 // ── the nodes ────────────────────────────────────────────────
@@ -212,12 +296,20 @@ function tracePath(ctx, pts, close) {
   if (close) ctx.closePath();
 }
 
+/** a morph's pairs, memoised on its shapes: resampling and matching are the same every frame */
+const pairsCache = new Map();
+function pairsOf(a, b, n) {
+  const key = JSON.stringify([a, b, n]);
+  if (!pairsCache.has(key)) { if (pairsCache.size > 16) pairsCache.clear(); pairsCache.set(key, pairContours(a, b, n)); }
+  return pairsCache.get(key);
+}
+
 const morphNode = {
   type: 'matter.morph', title: 'Morph', category: 'Matter',
-  description: 'one shape becoming another: both walked again at equal arc length, their starts matched so nothing twists, the points travelling with the progress',
-  ai: { when: 'an icon becoming another (a seed into a sprout, a phone into a checkmark), a logo changing as the scene changes; give both shapes the same vertex count in spirit — the pack resamples them anyway', avoid: 'morphing between shapes the eye cannot bridge (a circle into a paragraph), a progress keyed faster than 0.6 s, two morphs crossing at once' },
+  description: 'one shape becoming another: both walked again at equal arc length, wound the same way and their starts matched so nothing twists, several contours paired by size and place, the points travelling with the progress',
+  ai: { when: 'an icon becoming another (a seed into a sprout, a phone into a checkmark), a logo changing as the scene changes; the shapes are path values (an icon\'s contours, an SVG through svg-paths), one or a list — the pack resamples them anyway', avoid: 'morphing between shapes the eye cannot bridge (a circle into a paragraph), a progress keyed faster than 0.6 s, two morphs crossing at once' },
   props: {
-    a: { type: 'json', default: { v: [[-120, -120], [120, -120], [120, 120], [-120, 120]], closed: true }, label: 'From', animatable: false, description: 'a PathValue: { v: [[x, y], …], closed }' },
+    a: { type: 'json', default: { v: [[-120, -120], [120, -120], [120, 120], [-120, 120]], closed: true }, label: 'From', animatable: false, description: 'a PathValue { v: [[x, y], …], i?, o?, closed } or a list of them' },
     b: { type: 'json', default: { v: [[0, -150], [142, 46], [-88, 46], [88, 46], [-142, 46]], closed: true }, label: 'To', animatable: false },
     progress: { type: 'number', default: 0, min: 0, max: 1, step: 0.001, label: 'Progress', description: '0: the first shape; key it to travel' },
     points: { type: 'integer', default: 96, min: 8, max: 512, label: 'Points', animatable: false },
@@ -226,24 +318,27 @@ const morphNode = {
     strokeWidth: { type: 'number', default: 0, min: 0, unit: 'px', label: 'Stroke width' },
   },
   bounds(p) {
-    const xs = pointsOf(p.a).concat(pointsOf(p.b)).map((q) => q[0]), ys = pointsOf(p.a).concat(pointsOf(p.b)).map((q) => q[1]);
-    if (!xs.length) return { x: -120, y: -120, w: 240, h: 240 };
+    const all = [...contoursOf(p.a), ...contoursOf(p.b)].flatMap(pointsOf);
+    if (!all.length) return { x: -120, y: -120, w: 240, h: 240 };
+    const xs = all.map((q) => q[0]), ys = all.map((q) => q[1]);
     const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
     return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
   },
   render: {
-    canvas2d(ctx, p, host) {
-      void host;
-      const A = resample(p.a, p.points ?? 96), B = resample(p.b, p.points ?? 96);
-      if (A.length < 3 || B.length < 3) return;
-      const start = bestStart(A, B);
+    canvas2d(ctx, p) {
+      const pairs = pairsOf(p.a, p.b, Math.round(p.points ?? 96));
+      if (!pairs.length) return;
       const u = Math.min(1, Math.max(0, p.progress));
       const eased = 1 - Math.pow(1 - u, 3);
-      const pts = A.map(([x, y], i) => {
-        const [bx, by] = B[(i + start) % B.length];
-        return [x + (bx - x) * eased, y + (by - y) * eased];
-      });
-      tracePath(ctx, pts, true);
+      ctx.beginPath();
+      for (const [A, B] of pairs) {
+        A.forEach(([x, y], i) => {
+          const [bx, by] = B[i];
+          const px = x + (bx - x) * eased, py = y + (by - y) * eased;
+          if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+        });
+        ctx.closePath();
+      }
       if (p.fill) { ctx.fillStyle = p.fill; ctx.fill('evenodd'); }
       if (p.stroke && p.strokeWidth > 0) { ctx.strokeStyle = p.stroke; ctx.lineWidth = p.strokeWidth; ctx.lineJoin = 'round'; ctx.stroke(); }
     },
@@ -253,11 +348,13 @@ const morphNode = {
 const liquidNode = {
   type: 'matter.liquid', title: 'Liquid', category: 'Matter',
   description: 'seeded blobs that merge and part, traced by marching squares; as a transition, a flood that crosses the frame and drains',
-  ai: { when: 'a transition between two scenes (a liquid flooding across, then draining) or a backing shape that breathes behind a title; the seed makes it yours, the same every render', avoid: 'a liquid over text (it eats it), blobs drifting faster than lava, more than nine blobs', },
+  ai: { when: 'a transition between two scenes (mode flood: key the progress 0 to 1 over the cut to cover, 1 to 0 to drain) or a backing shape that breathes behind a title (mode blobs); the seed makes it yours, the same every render', avoid: 'a liquid over text (it eats it), blobs drifting faster than lava, more than nine blobs' },
   props: {
     seed: { type: 'integer', default: 1, min: 0, label: 'Seed', description: 'another seed, another liquid' },
     blobs: { type: 'integer', default: 6, min: 2, max: 12, label: 'Blobs', animatable: false },
-    progress: { type: 'number', default: 1, min: 0, max: 1, step: 0.001, label: 'Progress', description: '1: the liquid settled on screen; key 0 to 1 to flood it in' },
+    mode: { type: 'enum', default: 'blobs', options: ['blobs', 'flood'], label: 'Mode', animatable: false, description: 'blobs: the shapes alone; flood: a front crossing the frame from the left' },
+    progress: { type: 'number', default: 1, min: 0, max: 1, step: 0.001, label: 'Progress', description: 'blobs: 1 settled on screen, key 0 to 1 to grow them in; flood: 0 nothing, 1 the frame covered' },
+    speed: { type: 'number', default: 1, min: 0, max: 4, step: 0.05, label: 'Drift', animatable: false, description: 'how fast the blobs drift (1: lava)' },
     cell: { type: 'number', default: 14, min: 4, unit: 'px', label: 'Grid', animatable: false },
     fill: { type: 'paint', default: '@accent', label: 'Liquid' },
     size: { type: 'vec2', default: [900, 560], label: 'Size', unit: 'px' },
@@ -266,27 +363,46 @@ const liquidNode = {
   path({ size: [w, h] }) { const s = new Path2D(); s.rect(-w / 2, -h / 2, w, h); return s; },
   render: {
     canvas2d(ctx, p, host) {
-      void host;
       const [w, h] = p.size;
       if (w <= 0 || h <= 0) return;
-      const blobs = liquidField(p.seed ?? 1, host.t - (host.layerIn ?? 0), p.blobs ?? 6);
-      const field = fieldOf(blobs);
-      const level = 0.5;
-      // the flood: the level sweeps with the progress (0: nothing; 1: the whole union)
+      const blobs = liquidField(p.seed ?? 1, host.t - (host.layerIn ?? 0), p.blobs ?? 6, p.speed ?? 1);
+      const field = fieldOf(blobs, w / h);
       const u = Math.min(1, Math.max(0, p.progress));
-      const loops = marchingSquares((x, y) => field(x / w, y / h) - (1 - u) * 1.2, w, h, p.cell ?? 14, level);
+      // the contour traced a cell outside the frame on every side, so a covered frame closes its loop past the edges
+      const c = p.cell ?? 14;
+      const W = w + 2 * c, H = h + 2 * c;
+      // the outermost samples are dry: a frame covered whole still has a contour, just past its edges
+      const loops = marchingSquares((x, y) => (x <= 0 || y <= 0 || x >= W - 1e-6 || y >= H - 1e-6 ? -1 : liquidValue(p.mode, field, (x - c) / w, (y - c) / h, u)), W, H, c, 0.5);
+      ctx.save();
+      ctx.beginPath(); ctx.rect(-w / 2, -h / 2, w, h); ctx.clip();
+      // the field is read in the frame's corner space: drawn back around the layer's centre
+      ctx.translate(-w / 2 - c, -h / 2 - c);
       ctx.fillStyle = p.fill;
-      for (const loop of loops) { tracePath(ctx, loop, true); ctx.fill('evenodd'); }
+      ctx.beginPath();
+      for (const loop of loops) loop.forEach(([x, y], i) => { if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); });
+      ctx.fill('evenodd');
+      ctx.restore();
     },
   },
 };
 
+/** the sheet's outline at a progress: a frame-wide sheet whose leading and trailing edges are torn, crossing from left to right */
+export function sheetOf(w, h, u, seed = 1, rough = 16) {
+  const tall = h * 1.6, half = w * 0.62;
+  const cx = -w * 1.3 + u * w * 2.6;
+  const lead = tornEdge(tall, seed, rough), trail = tornEdge(tall, seed + 53, rough);
+  // the edges run top to bottom: the noise moves them across, the length runs down
+  const right = lead.map(([along, off]) => [cx + half + off, along - tall / 2]);
+  const left = trail.map(([along, off]) => [cx - half + off, along - tall / 2]).reverse();
+  return { outline: [...right, ...left], lead: right };
+}
+
 const paperNode = {
   type: 'matter.paper', title: 'Paper', category: 'Matter',
-  description: 'a torn sheet crossing the frame: its edge torn by seeded noise, its fibres and its shadow, revealing what is under as it passes',
-  ai: { when: 'a transition with a hand-made feel: a sheet sweeping across between two scenes, torn edge leading; the seed keeps it the same in every render', avoid: 'more than one sheet at a time, a sweep faster than 0.5 s, a paper colour fighting the scenes it covers' },
+  description: 'a torn sheet crossing the frame: its edges torn by seeded noise, its fibres and its shadow, covering the frame at the cut and revealing what is under as it passes',
+  ai: { when: 'a transition with a hand-made feel: a sheet sweeping across between two scenes, torn edge leading, the cut hidden at the middle of its sweep; the seed keeps it the same in every render', avoid: 'more than one sheet at a time, a sweep faster than 0.5 s, a paper colour fighting the scenes it covers' },
   props: {
-    progress: { type: 'number', default: 0, min: 0, max: 1, step: 0.001, label: 'Progress', description: '0: off screen left; 1: gone right; key it over the cut' },
+    progress: { type: 'number', default: 0, min: 0, max: 1, step: 0.001, label: 'Progress', description: '0: off screen left; 0.5: the frame covered (put the cut there); 1: gone right' },
     angle: { type: 'number', default: -6, min: -45, max: 45, unit: '°', label: 'Angle', animatable: false },
     seed: { type: 'integer', default: 1, min: 0, label: 'Seed' },
     rough: { type: 'number', default: 16, min: 2, unit: 'px', label: 'Roughness' },
@@ -294,35 +410,33 @@ const paperNode = {
     shadow: { type: 'bool', default: true, label: 'Shadow', animatable: false },
     fibres: { type: 'bool', default: true, label: 'Fibres', animatable: false },
   },
-  bounds(p, host) { return { x: -host.width, y: -host.height, w: host.width * 2, h: host.height * 2 }; },
+  bounds(p, host) { return { x: -host.width / 2, y: -host.height / 2, w: host.width, h: host.height }; },
   render: {
     canvas2d(ctx, p, host) {
       const w = host.width, h = host.height;
       const u = Math.min(1, Math.max(0, p.progress));
-      // the sheet's torn edge crosses the frame; before and after, the sheet is out
-      const x = -w * 1.15 + u * w * 2.3;
-      const edge = tornEdge(h * 1.3, p.seed ?? 1, p.rough ?? 16);
+      if (u <= 0 || u >= 1) return;
+      const { outline, lead } = sheetOf(w, h, u, p.seed ?? 1, p.rough ?? 16);
       ctx.save();
       ctx.rotate(((p.angle ?? 0) * Math.PI) / 180);
-      const sheet = [[x, -h], ...edge.map(([ex, ey]) => [x + ex - h * 0.65, ey - h * 0.65]), [x + h * 1.3, -h], [x + h * 1.3, h], [x, h]];
       if (p.shadow) {
         ctx.fillStyle = 'rgba(0,0,0,0.28)';
         ctx.save(); ctx.translate(w * 0.012, h * 0.008);
-        tracePath(ctx, sheet, true); ctx.fill();
+        tracePath(ctx, outline, true); ctx.fill();
         ctx.restore();
       }
       ctx.fillStyle = p.paper;
-      tracePath(ctx, sheet, true); ctx.fill();
+      tracePath(ctx, outline, true); ctx.fill();
       if (p.fibres) {
-        // the fibres: short strokes off the torn edge, seeded
+        // the fibres: short strokes off the torn leading edge, seeded
         ctx.strokeStyle = 'rgba(0,0,0,0.16)';
         ctx.lineWidth = 1;
-        for (let k = 0; k < edge.length; k += 2) {
-          const [ex, ey] = edge[k];
+        for (let k = 0; k < lead.length; k += 2) {
+          const [ex, ey] = lead[k];
           const n = hash2(p.seed ?? 1, k * 7);
           ctx.beginPath();
-          ctx.moveTo(x + ex - h * 0.65, ey - h * 0.65);
-          ctx.lineTo(x + ex - h * 0.65 - 3 - n * 6, ey - h * 0.65 + (n - 0.5) * 8);
+          ctx.moveTo(ex, ey);
+          ctx.lineTo(ex + 3 + n * 6, ey + (n - 0.5) * 8);
           ctx.stroke();
         }
       }
@@ -335,6 +449,15 @@ export const meta = { id: 'tramme/matter', name: 'matter', version: '1.0.0', des
 export const nodes = [morphNode, liquidNode, paperNode];
 export const messages = {
   fr: {
+    "one shape becoming another: both walked again at equal arc length, wound the same way and their starts matched so nothing twists, several contours paired by size and place, the points travelling with the progress": "une forme qui devient une autre : toutes deux reparcourues à pas égal, tournant dans le même sens et leurs départs appariés pour que rien ne se torde, plusieurs contours appariés par taille et par place, les points qui voyagent avec la progression",
+    "a PathValue { v: [[x, y], …], i?, o?, closed } or a list of them": "un PathValue { v: [[x, y], …], i?, o?, closed } ou une liste de PathValue",
+    "Mode": "Mode",
+    "blobs: the shapes alone; flood: a front crossing the frame from the left": "blobs : les formes seules ; flood : un front qui traverse le cadre depuis la gauche",
+    "blobs: 1 settled on screen, key 0 to 1 to grow them in; flood: 0 nothing, 1 the frame covered": "blobs : 1 posées à l’écran, keyframez de 0 à 1 pour les faire grandir ; flood : 0 rien, 1 le cadre couvert",
+    "Drift": "Dérive",
+    "how fast the blobs drift (1: lava)": "la vitesse de dérive des gouttes (1 : de la lave)",
+    "a torn sheet crossing the frame: its edges torn by seeded noise, its fibres and its shadow, covering the frame at the cut and revealing what is under as it passes": "une feuille déchirée qui traverse le cadre : ses bords déchirés par un bruit semé, ses fibres et son ombre, couvrant le cadre à la coupe et révélant ce qui est dessous en passant",
+    "0: off screen left; 0.5: the frame covered (put the cut there); 1: gone right": "0 : hors écran à gauche ; 0,5 : le cadre couvert (la coupe se place là) ; 1 : partie à droite",
     'Morph': 'Morphing', 'Liquid': 'Liquide', 'Paper': 'Papier',
     'From': 'Depuis', 'To': 'Vers', 'Points': 'Points', 'Fill': 'Remplissage', 'Stroke': 'Trait', 'Stroke width': 'Épaisseur du trait',
     'Progress': 'Progression', 'Size': 'Taille', 'Seed': 'Graine', 'Blobs': 'Gouttes', 'Grid': 'Grille', 'Angle': 'Angle', 'Roughness': 'Rugosité', 'Paper': 'Papier', 'Shadow': 'Ombre', 'Fibres': 'Fibres',

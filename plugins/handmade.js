@@ -183,8 +183,10 @@ const twos = {
     const amt = p.jitter ?? 0.6;
     if (!amt || !Number.isFinite(amt)) return v;
     const [dx, dy] = jitter(ctx.seed, block, amt);
-    if (typeof v === 'number') return v + dx;
-    if (Array.isArray(v) && v.every((x) => typeof x === 'number')) return v.map((x, i) => x + (i % 2 === 0 ? dx : dy));
+    // the jitter is in px on a position; on a factor (a scale, an opacity: every value within 4) it is a hundredth of that
+    const k = (xs) => (xs.every((x) => Math.abs(x) <= 4) ? 0.01 : 1);
+    if (typeof v === 'number') return v + dx * k([v]);
+    if (Array.isArray(v) && v.every((x) => typeof x === 'number')) { const f = k(v); return v.map((x, i) => x + (i % 2 === 0 ? dx : dy) * f); }
     return v;
   },
 };
@@ -251,15 +253,19 @@ const sketchShape = {
 };
 
 // ── the annotate tool ────────────────────────────────────────
+/** a property's value at t: its key at or before t when it is keyed, else itself */
+function keyedAt(prop, t) {
+  const k = prop?.$k;
+  if (!Array.isArray(k) || !k.length) return prop;
+  let v = k[0].v;
+  for (const key of k) if (key.t <= (t ?? 0) + 1e-6) v = key.v;
+  return v;
+}
+
 /** the value of a position at t: its key at or before, else its static value, else the frame's centre */
 function positionAt(transform, comp, t) {
-  const pos = transform?.position, k = pos?.$k;
-  if (Array.isArray(k) && k.length) {
-    let v = k[0].v;
-    for (const key of k) if (key.t <= (t ?? 0) + 1e-6) v = key.v;
-    return Array.isArray(v) ? v : [comp.width / 2, comp.height / 2];
-  }
-  return Array.isArray(pos) ? pos : [comp.width / 2, comp.height / 2];
+  const v = keyedAt(transform?.position, t);
+  return Array.isArray(v) ? v : [comp.width / 2, comp.height / 2];
 }
 
 /** the box of a layer, from its own props and its node's bounds (a text's box estimated as the checks do) */
@@ -274,7 +280,10 @@ function boxOf(ctx, layerId, t) {
     assetInfo: (id) => ctx.doc.assets[id], assetUrl: (id) => ctx.doc.assets[id]?.src ?? '',
   };
   let r = null;
-  try { r = node?.bounds?.(layer.props, host) ?? null; } catch { r = null; }
+  // the props as they stand at t: a keyed one read at its key at or before t
+  const props = Object.fromEntries(Object.entries(layer.props ?? {}).map(([k, v]) => [k, keyedAt(v, t)]));
+  const defaults = Object.fromEntries(Object.entries(node?.props ?? {}).map(([k, d]) => [k, d.default]));
+  try { r = node?.bounds?.({ ...defaults, ...props }, host) ?? null; } catch { r = null; }
   if (!r && layer.type === 'text') {
     const size = Number(layer.props?.size) || 64, lines = String(layer.props?.text ?? '').split('\n');
     const w = Math.max(...lines.map((l) => l.length)) * size * 0.56, h = size * (1 + (lines.length - 1) * (Number(layer.props?.lineHeight) || 1.2));
@@ -283,7 +292,7 @@ function boxOf(ctx, layerId, t) {
     r = { x, y, w, h };
   }
   if (!r) return null;
-  const pos = positionAt(layer.transform, comp, t), s = layer.transform?.scale;
+  const pos = positionAt(layer.transform, comp, t), s = keyedAt(layer.transform?.scale, t);
   const sx = Array.isArray(s) ? s[0] : 1, sy = Array.isArray(s) ? s[1] : 1;
   return { x: pos[0] + r.x * sx, y: pos[1] + r.y * sy, w: r.w * sx, h: r.h * sy };
 }
@@ -330,7 +339,6 @@ const annotate = {
     const tokens = ctx.doc.tokens ?? {};
     const colorOf = (name, fallback) => (tokens[name]?.type === 'color' ? `@${name}` : fallback);
     const accent = typeof a.color === 'string' && a.color ? a.color : colorOf('accent', '#2EC4B6');
-    const ink = colorOf('ink', colorOf('text', '#F4F5F7'));
     // the mark drawn on a beat after the layer lands, on the kit's draw-on
     const at = +Math.max(0, (target.in ?? 0) + 0.25).toFixed(3);
     const draw = 0.55;
@@ -348,8 +356,8 @@ const annotate = {
       props: {
         kind: plan.kind, w: Math.round(plan.box.w), h: Math.round(plan.box.h), seed: a.seed ?? 1,
         ...(plan.fill ? { fill: plan.fill, gap: plan.gap } : {}),
-        stroke: plan.fill ? accent : accent, fillPaint: accent,
-        progress: { $k: [{ t: at, v: 0, ease: [0.16, 1, 0.3, 1] }, { t: +(at + draw).toFixed(3), v: 1 }] },
+        stroke: accent, fillPaint: accent,
+        progress: { $k: [{ t: at, v: 0, ease: tokens.enter?.type === 'ease' ? '@enter' : [0.16, 1, 0.3, 1] }, { t: +(at + draw).toFixed(3), v: 1 }] },
       },
     } }];
     if (!(comp.order ?? []).includes(nid)) ops.push({ op: 'add', path: `/compositions/${ctx.compId}/order/-`, value: nid });

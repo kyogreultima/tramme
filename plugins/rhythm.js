@@ -58,7 +58,7 @@ export function paletteDrift(colours, tokens) {
   const outside = (colours ?? []).filter((c) => (tokens ?? []).every((t) => deltaE(c, t) > 10));
   const distinct = new Set(outside.map((c) => lab(c)?.map((x) => Math.round(x)).join(',')));
   distinct.delete(undefined);
-  return { far: outside, tooMany: distinct.size > 5 };
+  return { far: outside, tooMany: distinct.size > 5, count: distinct.size };
 }
 
 /** the type a frame carries: more than two faces, and pairs of sizes within 10 % of each other */
@@ -148,9 +148,9 @@ const checks = [
           }
         }
         const colours = [...onScreen];
-        const { far, tooMany } = paletteDrift(colours, tokens);
+        const { far, tooMany, count } = paletteDrift(colours, tokens);
         if (far.length) out.push({ check: 'palette-drift', severity: 'warning', t: sample.t, message: `${far.slice(0, 3).join(', ')}${far.length > 3 ? ` and ${far.length - 3} more` : ''} sit far from every token of the palette — write them as tokens (@ink, @accent) or bring them to the palette` });
-        if (tooMany) out.push({ check: 'palette-drift', severity: 'warning', t: sample.t, message: `${colours.length} colours on screen at once, none of them a token — more than five reads as noise; fold them into the palette` });
+        if (tooMany) out.push({ check: 'palette-drift', severity: 'warning', t: sample.t, message: `${count} colours on screen at once, none of them a token — more than five reads as noise; fold them into the palette` });
       }
       return out;
     },
@@ -167,7 +167,7 @@ const checks = [
       if (faces.size > 2) out.push({ check: 'type-drift', severity: 'warning', message: `${faces.size} typefaces in one film — more than two reads as unfinished; keep the film\'s face and its mono` });
       for (const sample of ctx.samples) {
         const sizes = [...new Set(sample.layers
-          .filter((p) => (p.textSize ?? Number(p.props.size)) > 0 && p.opacity >= 0.5)
+          .filter((p) => p.text !== undefined && (p.textSize ?? Number(p.props.size)) > 0 && p.opacity >= 0.5)
           .map((p) => Math.round(p.textSize ?? Number(p.props.size))))];
         const { sizes: pairs } = typeDrift([], sizes);
         if (pairs.length) out.push({ check: 'type-drift', severity: 'warning', t: sample.t, message: `two sizes within 10 % of each other on one frame (${pairs[0].join(' and ')} px) — one of them is a mistake; keep a scale the film reads` });
@@ -183,7 +183,7 @@ export const messages = {
   fr: {
     'Off the beat': 'Hors du temps', 'Even shots': 'Plans jumeaux', 'Palette drift': 'Palette qui dérive', 'Type drift': 'Typographie qui dérive',
     'a cut landing more than 2 frames from every beat of the music (the film needs a beats analysis): the issue names the beat to move it to': 'une coupe qui tombe à plus de 2 images de chaque temps de la musique (le film demande une analyse de beats) : le problème nomme le temps où la déplacer',
-    'four shots or more of nearly the same length (their spread under 15 % of their mean): the film plods': 'quatre plans ou presque de même longueur (leur écart sous 15 % de leur moyenne) : le film traîne',
+    'four shots or more of nearly the same length (their spread under 15 % of their mean): the film plods': 'quatre plans ou plus de presque même longueur (leur écart sous 15 % de leur moyenne) : le film traîne',
     'colours written outside the tokens and far from all of them (ΔE over 10), or more than five colours on screen at once': 'des couleurs écrites hors des tokens et loin de chacun (ΔE au-dessus de 10), ou plus de cinq couleurs à l’écran à la fois',
     'more than two typefaces in one film, or near-duplicate sizes on one frame (two sizes within 10 % of each other)': 'plus de deux typographies dans un film, ou des corps quasi identiques sur une image (deux corps à moins de 10 % l’un de l’autre)',
   },

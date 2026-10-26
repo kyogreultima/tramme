@@ -42,6 +42,7 @@ const PY_KW = ['def', 'return', 'if', 'elif', 'else', 'for', 'while', 'in', 'not
 const RS_KW = ['fn', 'let', 'mut', 'const', 'struct', 'enum', 'impl', 'trait', 'pub', 'use', 'mod', 'match', 'if', 'else', 'loop', 'while', 'for', 'in', 'return', 'break', 'continue', 'where', 'async', 'await', 'move', 'ref', 'dyn', 'crate', 'self', 'Self', 'super', 'as', 'type', 'unsafe', 'extern', 'static', 'true', 'false'];
 const GO_KW = ['func', 'package', 'import', 'var', 'const', 'type', 'struct', 'interface', 'map', 'chan', 'go', 'defer', 'if', 'else', 'for', 'range', 'return', 'switch', 'case', 'default', 'break', 'continue', 'fallthrough', 'select', 'goto', 'nil', 'true', 'false'];
 const SH_KW = ['if', 'then', 'else', 'elif', 'fi', 'for', 'while', 'do', 'done', 'case', 'esac', 'function', 'return', 'export', 'local', 'source', 'set', 'shift', 'trap', 'in'];
+const SQL_KW = ['select', 'from', 'where', 'and', 'or', 'not', 'insert', 'into', 'values', 'update', 'set', 'delete', 'create', 'table', 'drop', 'alter', 'add', 'join', 'left', 'right', 'inner', 'outer', 'on', 'as', 'group', 'by', 'order', 'having', 'limit', 'offset', 'distinct', 'union', 'all', 'null', 'is', 'in', 'like', 'between', 'case', 'when', 'then', 'else', 'end', 'primary', 'key', 'foreign', 'references', 'index', 'with', 'returning', 'asc', 'desc', 'true', 'false', 'count', 'sum', 'avg', 'min', 'max'];
 
 const STR = /"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'|`(?:[^`\\]|\\.)*`/y;
 const NUM = /0[xXbBoO][0-9a-fA-F_]+n?|\d[\d_]*(?:\.\d[\d_]*)?(?:[eE][+-]?\d+)?n?/y;
@@ -63,12 +64,15 @@ const RULES = {
   json: [[WS, 'ws'], [/"(?:[^"\\]|\\.)*"(?=[ \t]*:)/y, 'type'], [/"(?:[^"\\]|\\.)*"/y, 'str'], [/-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/y, 'num'], [/\b(?:true|false|null)\b/y, 'kw'], [OP, 'op'], [/[{}[\],:]/y, 'punct']],
   css: [[WS, 'ws'], [/\/\*[\s\S]*?(?:\*\/|$)/y, 'com'], [STR, 'str'], [/@[\w-]+/y, 'kw'], [/\d+(?:\.\d+)?(?:px|em|rem|vh|vw|vmin|s|ms|deg|%)?/y, 'num'], [/[-a-zA-Z]+(?=[ \t]*:)/y, 'type'], [/[.#][\w-]+/y, 'fn'], [/[a-zA-Z-][\w-]*/y, 'id'], [OP, 'op'], [/[{}();,]/y, 'punct']],
   html: [[WS, 'ws'], [/<!--[\s\S]*?(?:-->|$)/y, 'com'], [/<!DOCTYPE[^>]*>/iy, 'kw'], [/<\/?[a-zA-Z][\w-]*/y, 'kw'], [/"[^"]*"|'[^']*'/y, 'str'], [/[a-zA-Z-]+(?==)/y, 'type'], [/[<>\/=]/y, 'punct'], [/&[\w#]+;/y, 'num'], [/[^\s<]+/y, 'id']],
+  yaml: [[WS, 'ws'], [/#[^\n]*/y, 'com'], [/---|\.\.\./y, 'punct'], [/[\w.-]+(?=[ \t]*:(?:\s|$))/y, 'type'], [STR, 'str'], [/(?:true|false|null|yes|no|on|off|~)(?=\s|$)/iy, 'kw'], [/-?\d+(?:\.\d+)?(?=\s|$|,|\])/y, 'num'], [/[&*][\w-]+/y, 'fn'], [/[:\-|>[\]{},?]/y, 'punct'], [/[^\s#:,[\]{}]+/y, 'id']],
+  sql: [[WS, 'ws'], [/--[^\n]*|\/\*[\s\S]*?(?:\*\/|$)/y, 'com'], [/'(?:[^']|'')*'/y, 'str'], [/"(?:[^"]|"")*"/y, 'type'], [NUM, 'num'], [new RegExp(`(?:${SQL_KW.join('|')})\\b`, 'iy'), 'kw'], [FN, 'fn'], [ID, 'id'], [/[<>!=]=?|\|\||[-+*/%]/y, 'op'], [/[(),;.]/y, 'punct']],
 };
+const LANGS = Object.keys(RULES);
 
 /**
  * Code into tokens, one pass of sticky regexes per language, the whole text
  * kept (nothing dropped, the fallback one code point at a time). `lang`:
- * 'js', 'ts', 'py', 'rs', 'go', 'sh', 'json', 'css' or 'html'.
+ * 'js', 'ts', 'py', 'rs', 'go', 'sh', 'json', 'yaml', 'sql', 'css' or 'html'.
  */
 export function lex(code, lang = 'js') {
   const rules = RULES[lang] ?? RULES.js;
@@ -126,10 +130,43 @@ export function tokenDiff(a, b) {
 }
 
 // ── the terminal session ─────────────────────────────────────
+/** an ANSI escape as a session writes it: the ESC character, or its spellings "\e[", "\x1b[", "\033[" */
+const ANSI = /(?:\u001b|\\e|\\x1b|\\033)\[([\d;]*)m/g;
+
+/** the colour an SGR code asks, as the pack's own names: the tokens stand for the terminal's palette */
+function sgrColour(codes, prev) {
+  let c = prev;
+  for (const n of codes) {
+    if (n === 0 || n === 39 || n === 22) c = null;
+    else if (n === 2 || n === 90) c = 'dim';
+    else if ([32, 34, 36, 92, 94, 96].includes(n)) c = 'accent';
+    else if ([31, 33, 35, 91, 93, 95].includes(n)) c = 'accent2';
+    else if (n === 1 || n === 37 || n === 97) c = 'bright';
+  }
+  return c;
+}
+
+/** a line's ANSI colours into runs of text: { text, colour } with colour null, 'dim', 'accent', 'accent2' or 'bright' */
+export function ansiRuns(line) {
+  const runs = [];
+  let colour = null, last = 0;
+  const src = String(line ?? '');
+  for (const m of src.matchAll(ANSI)) {
+    if (m.index > last) runs.push({ text: src.slice(last, m.index), colour });
+    colour = sgrColour((m[1] || '0').split(';').map(Number), colour);
+    last = m.index + m[0].length;
+  }
+  if (last < src.length) runs.push({ text: src.slice(last), colour });
+  return runs.filter((r) => r.text.length);
+}
+
+const plain = (s) => String(s ?? '').replace(ANSI, '');
+
 /**
  * A session written as a script: a line `$ cmd` is a command typed, `...`
- (or `…`, with optional seconds: `... 2.5`) a wait, `> line` (or a bare
- * line) output arriving.
+ * (or `…`, with optional seconds: `... 2.5`) a wait, `[###] 2.5 label` a
+ * progress bar filling over its seconds, `> line` (or a bare line) output
+ * arriving; ANSI colours (`\e[32m`) are read on the output.
  */
 export function parseSession(script) {
   const out = [];
@@ -137,12 +174,14 @@ export function parseSession(script) {
     const line = raw.replace(/\s+$/, '');
     if (!line.trim()) continue;
     let m = /^\$\s?(.*)$/.exec(line);
-    if (m) { out.push({ kind: 'cmd', text: m[1] }); continue; }
+    if (m) { out.push({ kind: 'cmd', text: plain(m[1]) }); continue; }
     m = /^(?:\.{3}|…)(?:[ \t]+(\d+(?:\.\d+)?))?$/.exec(line.trim());
     if (m) { out.push({ kind: 'wait', text: line.trim(), seconds: m[1] ? Number(m[1]) : 1 }); continue; }
+    m = /^\[#+\](?:[ \t]+(\d+(?:\.\d+)?))?(?:[ \t]+(.*))?$/.exec(line.trim());
+    if (m) { out.push({ kind: 'bar', text: plain(m[2] ?? ''), seconds: m[1] ? Number(m[1]) : 1.5 }); continue; }
     m = /^>\s?(.*)$/.exec(line);
-    if (m) { out.push({ kind: 'out', text: m[1] }); continue; }
-    out.push({ kind: 'out', text: line });
+    if (m) { out.push({ kind: 'out', text: plain(m[1]), runs: ansiRuns(m[1]) }); continue; }
+    out.push({ kind: 'out', text: plain(line), runs: ansiRuns(line) });
   }
   return out;
 }
@@ -154,7 +193,7 @@ function sessionTimeline(script) {
   return items.map((it) => {
     let dur;
     if (it.kind === 'cmd') dur = (typingTimes(it.text, 7).pop() ?? 0) + 0.35;
-    else if (it.kind === 'wait') dur = it.seconds ?? 1;
+    else if (it.kind === 'wait' || it.kind === 'bar') dur = it.seconds ?? 1;
     else dur = 0.3 + Math.min(1.1, it.text.length / 45);
     const win = { ...it, at: +t.toFixed(3), until: +(t + dur).toFixed(3) };
     t += dur;
@@ -207,6 +246,41 @@ export function maxLines(panelHeight, size) {
 
 const easeOut = (p) => 1 - Math.pow(1 - Math.min(1, Math.max(0, p)), 3);
 
+// ── readable colours ─────────────────────────────────────────
+const rgbOf = (c) => {
+  const m = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(String(c ?? '').trim());
+  if (!m) return null;
+  const h = m[1].length === 3 ? m[1].split('').map((x) => x + x).join('') : m[1];
+  return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
+};
+const lumOf = (rgb) => {
+  const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+  return 0.2126 * f(rgb[0]) + 0.7152 * f(rgb[1]) + 0.0722 * f(rgb[2]);
+};
+
+/** the contrast of two hex colours (WCAG), Infinity when one is not a hex colour */
+export function contrastOf(a, b) {
+  const A = rgbOf(a), B = rgbOf(b);
+  if (!A || !B) return Infinity;
+  const la = lumOf(A), lb = lumOf(B);
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+}
+
+/** a token's colour moved away from the plate (toward white on a dark one, black on a light one) until it reads at `min`:1; a colour that is not hex stays as given */
+export function readable(colour, plate, min = 4.5) {
+  const C = rgbOf(colour), P = rgbOf(plate);
+  if (!C || !P || contrastOf(colour, plate) >= min) return colour;
+  const to = lumOf(P) < 0.18 ? 255 : 0;
+  for (let k = 1; k <= 10; k++) {
+    const hex = `#${C.map((v) => Math.round(v + ((to - v) * k) / 10).toString(16).padStart(2, '0')).join('')}`;
+    if (contrastOf(hex, plate) >= min) return hex;
+  }
+  return to ? '#ffffff' : '#000000';
+}
+
+/** the node's colours, each read against its panel */
+const paletteOf = (p) => ({ ink: readable(p.ink, p.plate), accent: readable(p.accent, p.plate), accent2: readable(p.accent2 ?? p.accent, p.plate) });
+
 // ── the code node ────────────────────────────────────────────
 function familyOf(p, host) {
   if (!p.font) return 'ui-monospace, Menlo, Consolas, "Liberation Mono", monospace';
@@ -219,7 +293,7 @@ const codeNode = {
   ai: { when: 'a developer tool\'s film: a function typed, a change shown (fill "from" with the previous version and key "progress"), lines highlighted while the voice points at them; keep to the lines that matter', avoid: 'a whole file at once (cut it to the lines the voice speaks about), type under 24 px, code as a picture the viewer cannot read in time; the code view is never for prose' },
   props: {
     code: { type: 'string', default: 'const ready = true;\nship();', label: 'Code', description: 'the code shown, in the language set; multiline' },
-    lang: { type: 'enum', default: 'js', options: ['js', 'ts', 'py', 'rs', 'go', 'sh', 'json', 'css', 'html'], label: 'Language', animatable: false },
+    lang: { type: 'enum', default: 'js', options: LANGS, label: 'Language', animatable: false },
     from: { type: 'string', default: '', label: 'Previous version', description: 'the code it changes from: the tokens both share slide, the rest leaves and arrives, over "progress"' },
     progress: { type: 'number', default: 1, min: 0, max: 1, step: 0.001, label: 'Progress', description: '1: the whole code shown (or the change done); key it for the typing' },
     highlight: { type: 'array', default: [], items: { type: 'integer' }, label: 'Highlight', description: 'the lines (1-based) to lift; the others dim, the view scrolls to the first' },
@@ -252,7 +326,8 @@ const codeNode = {
       ctx.beginPath(); ctx.roundRect(-w / 2, -h / 2, w, h, Math.min(18, size)); ctx.fill();
       // the highlighted lines' band, under everything
       const bandY = (n) => -h / 2 + pad + (n - start) * lineH;
-      ctx.fillStyle = p.ink;
+      const pal = paletteOf(p);
+      ctx.fillStyle = pal.ink;
       for (const n of hl) {
         if (n < start || n >= start + visible) continue;
         ctx.globalAlpha = 0.08;
@@ -261,13 +336,14 @@ const codeNode = {
       }
       // the line numbers
       ctx.textAlign = 'right'; ctx.textBaseline = 'top';
-      ctx.fillStyle = p.ink;
+      ctx.fillStyle = pal.ink;
       ctx.globalAlpha = 0.35;
       const gutter = Math.max(2, String(lineCount).length);
       for (let n = start; n < Math.min(lineCount, start + visible); n++) ctx.fillText(String(n + 1), -w / 2 + pad + gutter * size * 0.32, bandY(n) + (lineH - size) / 2);
       ctx.globalAlpha = 1;
       const x0 = -w / 2 + pad + gutter * size * 0.32 + size * 0.9;
-      const kindColor = (kind) => (kind === 'kw' || kind === 'fn') ? p.accent : kind === 'str' ? p.accent2 : p.ink;
+      const kindColor = (kind) => (kind === 'kw' || kind === 'fn') ? pal.accent : kind === 'str' ? pal.accent2 : pal.ink;
+      const inView = (n) => n >= start && n < start + visible;
       const dimmed = (n) => hl.length > 0 && !hl.includes(n);
       ctx.textAlign = 'left';
       const drawSeg = (text, kind, x, y, alpha) => {
@@ -287,7 +363,8 @@ const codeNode = {
         const from = flat(src), to = flat(tgt);
         const { kept, removed, added } = once(`D\u0000${source.length}\u0000${target.length}\u0000${lex(source, p.lang).length}\u0000${lex(target, p.lang).length}\u0000${source}\u0000${target}`, () => tokenDiff(lex(source, p.lang), lex(target, p.lang)));
         const e = easeOut(p.progress);
-        const pos = (lines, map, i) => { const at = map.get(i); return at ? { x: x0 + at.x, y: bandY(Math.max(start, Math.min(at.line, start + visible - 1))), line: at.line } : null; };
+        // a token on a line outside the panel's window is not drawn (never piled on the window's edge)
+        const pos = (lines, map, i) => { const at = map.get(i); return at && inView(at.line) ? { x: x0 + at.x, y: bandY(at.line), line: at.line } : null; };
         for (const [ia, ib] of kept) {
           const a = pos(src, from, ia), b = pos(tgt, to, ib);
           if (!a || !b) continue;
@@ -314,32 +391,36 @@ const codeNode = {
           if (shown / Math.max(1, added.length) > e2) { caretAt = { x: b.x, y: b.y }; break; }
           drawSeg(seg.text, seg.kind, b.x, b.y, dimmed(b.line) ? 0.35 : 1);
         }
-        if (caretAt && Math.floor(host.frame ?? 0) % 30 < 18) { ctx.fillStyle = p.accent; ctx.fillRect(caretAt.x, caretAt.y + size * 0.1, Math.max(2, size * 0.09), size); }
+        if (caretAt && Math.floor(host.frame ?? 0) % 30 < 18) { ctx.fillStyle = pal.accent; ctx.fillRect(caretAt.x, caretAt.y + size * 0.1, Math.max(2, size * 0.09), size); }
       } else if (p.progress < 0.999) {
         // the typing: characters at the seeded rhythm, the caret after the last one
         const times = once(`T\u0000${target}\u0000${p.lang}`, () => typingTimes(target, 7, 18));
         const total = (times[times.length - 1] ?? 0) + 0.6;
         const now = p.progress * total;
         const lines = layoutLines(target, p.lang, ctx, size);
-        // characters shown, counted along the whole text
+        // characters shown, counted in code points along the whole text, its line breaks included
         let shownChars = 0;
         for (const t of times) if (t <= now) shownChars++;
         let walked = 0, caret = null;
         outer:
-        for (let n = start; n < Math.min(lines.length, start + visible); n++) {
+        for (let n = 0; n < lines.length; n++) {
+          if (n > 0) walked++; // the line break before this line
           let x = 0;
           for (const seg of lines[n]) {
+            const chars = [...seg.text];
             const remain = shownChars - walked;
-            walked += seg.text.length;
+            walked += chars.length;
+            if (!inView(n)) { if (remain < chars.length) break outer; continue; }
             if (remain <= 0) { caret = { x: x0 + x, y: bandY(n) }; break outer; }
-            const text = seg.text.slice(0, remain);
+            const text = chars.slice(0, remain).join('');
             drawSeg(text, seg.kind, x0 + x, bandY(n), dimmed(n) ? 0.35 : 1);
-            if (remain < seg.text.length) { caret = { x: x0 + x + ctx.measureText(text).width, y: bandY(n) }; break outer; }
+            if (remain < chars.length) { caret = { x: x0 + x + ctx.measureText(text).width, y: bandY(n) }; break outer; }
             x += seg.w;
           }
-          caret = { x: x0 + x, y: bandY(n) };
+          if (inView(n)) caret = { x: x0 + x, y: bandY(n) };
+          if (shownChars - walked <= 0) break;
         }
-        if (caret && Math.floor(host.frame ?? 0) % 30 < 18) { ctx.fillStyle = p.accent; ctx.fillRect(caret.x, caret.y + size * 0.1, Math.max(2, size * 0.09), size); }
+        if (caret && Math.floor(host.frame ?? 0) % 30 < 18) { ctx.fillStyle = pal.accent; ctx.fillRect(caret.x, caret.y + size * 0.1, Math.max(2, size * 0.09), size); }
       } else {
         // at rest: the whole code, read from the panel's top
         const lines = layoutLines(target, p.lang, ctx, size);
@@ -352,7 +433,8 @@ const codeNode = {
   export: {
     svg(p) {
       // a still: the code as text, coloured, the whole of it (progress held at its value)
-      const ink = typeof p.ink === 'string' ? p.ink : '#e6edf3', accent = typeof p.accent === 'string' ? p.accent : '#2ec4b6', accent2 = typeof p.accent2 === 'string' ? p.accent2 : accent;
+      const plate = typeof p.plate === 'string' ? p.plate : '#0D1117';
+      const ink = readable(typeof p.ink === 'string' ? p.ink : '#e6edf3', plate), accent = readable(typeof p.accent === 'string' ? p.accent : '#2ec4b6', plate), accent2 = typeof p.accent2 === 'string' ? readable(p.accent2, plate) : accent;
       const color = (kind) => (kind === 'kw' || kind === 'fn') ? accent : kind === 'str' ? accent2 : ink;
       const [w, h] = p.panel;
       const size = p.size, lineH = size * 1.55, pad = Math.max(14, size * 0.55);
@@ -361,7 +443,7 @@ const codeNode = {
       if (p.progress < 0.999) {
         const times = typingTimes(shown, 7, 18), total = (times[times.length - 1] ?? 0) + 0.6;
         let n = 0; for (const t of times) if (t <= p.progress * total) n++;
-        shown = shown.slice(0, n);
+        shown = [...shown].slice(0, n).join('');
       }
       const lines = lex(shown, p.lang);
       const rows = [];
@@ -377,7 +459,8 @@ const codeNode = {
       const body = rows.map((row, n) => row.map((seg) =>
         `<tspan x="${(pad + seg.x).toFixed(1)}" y="${(pad + n * lineH + size).toFixed(1)}" fill="${color(seg.kind)}"${seg.kind === 'com' ? ' fill-opacity="0.55"' : ''}>${esc(seg.part)}</tspan>`
       ).join('')).join('');
-      return `<rect x="0" y="0" width="${w}" height="${h}" rx="14" fill="${typeof p.plate === 'string' ? p.plate : '#0D1117'}"/><text font-family="ui-monospace, Menlo, Consolas, monospace" font-size="${size}">${body}</text>`;
+      // the node's own space is centred on the layer, as on the canvas
+      return `<g transform="translate(${-w / 2} ${-h / 2})"><rect x="0" y="0" width="${w}" height="${h}" rx="14" fill="${plate}"/><text font-family="ui-monospace, Menlo, Consolas, monospace" font-size="${size}">${body}</text></g>`;
     },
   },
 };
@@ -390,12 +473,13 @@ const terminalNode = {
   description: 'a session that runs: commands typed at a human rhythm, output arriving in chunks, waits holding, a spinner stepping with time',
   ai: { when: 'a build or a test run under the voice: "$ npm run build", its output, a "..." wait between them; keep the session to what the film needs', avoid: 'a session longer than six or seven lines, output nobody reads, a wait without anything happening on the picture' },
   props: {
-    script: { type: 'string', default: '$ npm run build\nvite v5 building...\n> built in 1.2s', label: 'Session', description: 'lines "$ command", "..." (with seconds: "... 2.5") and "> output"' },
+    script: { type: 'string', default: '$ npm run build\nvite v5 building...\n> built in 1.2s', label: 'Session', description: 'lines "$ command", "..." (with seconds: "... 2.5"), "[###] 2 label" for a progress bar and "> output" (ANSI colours read)' },
     progress: { type: 'number', default: 1, min: 0, max: 1, step: 0.001, label: 'Progress', description: '1: the session over; key it to run it' },
     size: { type: 'number', default: 26, min: 8, step: 1, unit: 'px', label: 'Type size' },
     panel: { type: 'vec2', default: [960, 560], label: 'Panel', unit: 'px', animatable: false },
     ink: { type: 'paint', default: '@text', label: 'Text colour' },
     accent: { type: 'paint', default: '@accent', label: 'Accent' },
+    accent2: { type: 'paint', default: '@accent', label: 'Second accent' },
     plate: { type: 'paint', default: '#0D1117', label: 'Panel' },
     font: { type: 'asset', assetType: 'font', default: null, nullable: true, label: 'Font', animatable: false },
   },
@@ -406,6 +490,7 @@ const terminalNode = {
       if (w <= 0 || h <= 0) return;
       const size = p.size, lineH = size * 1.55, pad = Math.max(14, size * 0.55);
       ctx.font = `500 ${size}px ${familyOf(p, host)}`;
+      const pal = paletteOf(p);
       const timeline = once(`S\u0000${p.script}`, () => sessionTimeline(p.script));
       const total = timeline.length ? timeline[timeline.length - 1].until : 1;
       const now = p.progress * total;
@@ -418,8 +503,19 @@ const terminalNode = {
           const typed = times.filter((t) => t <= now - it.at).length;
           rows.push({ kind: 'prompt', text: it.text.slice(0, typed), typing: typed < it.text.length });
         } else if (it.kind === 'out') {
-          const shown = Math.min(it.text.length, Math.ceil(((now - it.at) / 0.3) * it.text.length));
-          rows.push({ kind: 'out', text: it.text.slice(0, shown) });
+          // the output arrives in chunks: its runs cut where the arriving share stands
+          let left = Math.min(it.text.length, Math.ceil(((now - it.at) / 0.3) * it.text.length));
+          const runs = [];
+          for (const r of it.runs ?? [{ text: it.text, colour: null }]) {
+            if (left <= 0) break;
+            runs.push({ text: r.text.slice(0, left), colour: r.colour });
+            left -= r.text.length;
+          }
+          rows.push({ kind: 'out', runs });
+        } else if (it.kind === 'bar') {
+          // a progress bar stepping with time, full once its seconds are over
+          const u = Math.min(1, Math.max(0, (now - it.at) / Math.max(0.05, it.until - it.at)));
+          rows.push({ kind: 'bar', text: it.text, u });
         } else if (now < it.until) {
           rows.push({ kind: 'wait', text: SPIN[Math.floor(host.frame ?? 0) % SPIN.length] });
         }
@@ -432,22 +528,38 @@ const terminalNode = {
       shownRows.forEach((row, k) => {
         const y = -h / 2 + pad + k * lineH;
         if (row.kind === 'prompt') {
-          ctx.fillStyle = p.accent;
+          ctx.fillStyle = pal.accent;
           ctx.globalAlpha = 0.9;
           ctx.fillText('$', -w / 2 + pad, y);
           ctx.globalAlpha = 1;
-          ctx.fillStyle = p.ink;
+          ctx.fillStyle = pal.ink;
           ctx.fillText(row.text, -w / 2 + pad + size * 0.9, y);
-          if (row.typing && Math.floor(host.frame ?? 0) % 30 < 18) { ctx.fillStyle = p.accent; ctx.fillRect(-w / 2 + pad + size * 0.9 + ctx.measureText(row.text).width, y + size * 0.1, Math.max(2, size * 0.09), size); }
+          if (row.typing && Math.floor(host.frame ?? 0) % 30 < 18) { ctx.fillStyle = pal.accent; ctx.fillRect(-w / 2 + pad + size * 0.9 + ctx.measureText(row.text).width, y + size * 0.1, Math.max(2, size * 0.09), size); }
         } else if (row.kind === 'wait') {
-          ctx.fillStyle = p.accent;
+          ctx.fillStyle = pal.accent;
           ctx.globalAlpha = 0.8;
           ctx.fillText(row.text, -w / 2 + pad, y);
           ctx.globalAlpha = 1;
+        } else if (row.kind === 'bar') {
+          const cells = 24, full = Math.round(row.u * cells);
+          let x = -w / 2 + pad;
+          if (row.text) { ctx.fillStyle = pal.ink; ctx.globalAlpha = 0.85; ctx.fillText(row.text, x, y); x += ctx.measureText(`${row.text} `).width; }
+          ctx.fillStyle = pal.accent; ctx.globalAlpha = 1;
+          ctx.fillText('█'.repeat(full), x, y);
+          const wFull = ctx.measureText('█'.repeat(full)).width;
+          ctx.globalAlpha = 0.3;
+          ctx.fillText('█'.repeat(cells - full), x + wFull, y);
+          ctx.globalAlpha = 0.85; ctx.fillStyle = pal.ink;
+          ctx.fillText(` ${Math.round(row.u * 100)}%`, x + ctx.measureText('█'.repeat(cells)).width, y);
+          ctx.globalAlpha = 1;
         } else {
-          ctx.fillStyle = p.ink;
-          ctx.globalAlpha = 0.85;
-          ctx.fillText(row.text, -w / 2 + pad, y);
+          let x = -w / 2 + pad;
+          for (const r of row.runs) {
+            ctx.fillStyle = r.colour === 'accent' ? pal.accent : r.colour === 'accent2' ? pal.accent2 : pal.ink;
+            ctx.globalAlpha = r.colour === 'dim' ? 0.5 : r.colour === 'bright' || r.colour === 'accent' || r.colour === 'accent2' ? 1 : 0.85;
+            ctx.fillText(r.text, x, y);
+            x += ctx.measureText(r.text).width;
+          }
           ctx.globalAlpha = 1;
         }
       });
@@ -466,7 +578,7 @@ const codeScreen = {
     properties: {
       code: { type: 'string', title: 'Code', description: 'the code, or a session ("$ npm test", "> 3 passed", "...") for a terminal' },
       fixed: { type: 'string', title: 'Fixed version', description: 'when given, the code changes into it: the tokens both share slide, the rest leaves and arrives' },
-      lang: { enum: ['js', 'ts', 'py', 'rs', 'go', 'sh', 'json', 'css', 'html'], title: 'Language', description: 'js by default' },
+      lang: { enum: LANGS, title: 'Language', description: 'js by default' },
       title: { type: 'string', title: 'Window title', description: 'the file name, in the bar' },
       lines: { type: 'array', title: 'Highlight', items: { type: 'integer' }, description: 'the lines (1-based) to lift; the view scrolls to the first' },
       size: { type: 'number', title: 'Type size', description: '24 px at least on a 1080-high frame, 28 in 9:16; larger by default' },
@@ -490,15 +602,17 @@ const codeScreen = {
     const fit = maxLines(screenH, size);
     const lines = code.split('\n');
     const hl = (a.lines ?? []).map((n) => Number(n)).filter((n) => Number.isInteger(n) && n >= 1);
-    let first = hl.length ? Math.min(...hl) - 1 : 0;
-    let shown = lines, cut = 0, windowed = false;
+    const first = hl.length ? Math.min(...hl) - 1 : 0;
+    let shown = lines, cut = 0, at = 0;
     if (lines.length > fit) {
-      windowed = true;
-      const keep = Math.min(fit, lines.length);
-      const at = Math.max(0, Math.min(first - Math.floor(keep / 3), lines.length - keep));
-      shown = lines.slice(at, at + keep);
-      cut = lines.length - keep;
+      at = Math.max(0, Math.min(first - Math.floor(fit / 3), lines.length - fit));
+      shown = lines.slice(at, at + fit);
+      cut = lines.length - fit;
     }
+    // the highlighted lines counted in the window shown, the ones cut away dropped
+    const lifted = hl.map((n) => n - at).filter((n) => n >= 1 && n <= shown.length);
+    // the fixed version cut to the same window, so the change reads line for line
+    const fixed = a.fixed ? (cut ? String(a.fixed).split('\n').slice(at, at + fit).join('\n') : String(a.fixed)) : '';
     const shownCode = shown.join('\n');
     const chars = shownCode.length;
     const seconds = Math.round(Math.max(3, Math.min(14, a.seconds ?? chars / 26 + 2)) * 100) / 100;
@@ -518,18 +632,18 @@ const codeScreen = {
     layers.frame = {
       type: 'ui.device', name: a.title ? `Window ${a.title}` : 'Window', in: 0, out: dur,
       transform: { position: [Math.round(comp.width / 2), Math.round(comp.height / 2)] },
-      props: { device: 'window', size: [frameW, frameH], url: a.title ?? '', plate },
+      props: { device: 'window', size: [frameW, frameH], url: a.title ?? '' },
     };
     order.push('frame');
     layers.screen = {
       type: isSession(code) ? 'codeview.terminal' : 'codeview.code', name: a.title || 'Code', in: 0, out: dur,
       transform: { position: [Math.round(comp.width / 2), Math.round(comp.height / 2 + barH / 2)] },
       props: isSession(code)
-        ? { script: shownCode, size, panel: [screenW, screenH], ink, accent, plate, ...(font ? { font } : {}), progress: { $k: [{ t: 0.15, v: 0 }, { t: r2(0.15 + typeDur), v: 1 }] } }
+        ? { script: shownCode, size, panel: [screenW, screenH], ink, accent, accent2, plate, ...(font ? { font } : {}), progress: { $k: [{ t: 0.15, v: 0 }, { t: r2(0.15 + typeDur), v: 1 }] } }
         : {
             code: shownCode, lang, size, panel: [screenW, screenH], ink, accent, accent2, plate, ...(font ? { font } : {}),
-            ...(hl.length ? { highlight: hl } : {}),
-            ...(a.fixed ? { from: shownCode, code: String(a.fixed) } : {}),
+            ...(lifted.length ? { highlight: lifted } : {}),
+            ...(fixed ? { from: shownCode, code: fixed } : {}),
             progress: { $k: [{ t: 0.15, v: 0 }, { t: r2(0.15 + typeDur), v: 1 }] },
           },
     };
@@ -540,7 +654,7 @@ const codeScreen = {
     const cutNote = cut ? ` showing ${shown.length} of ${lines.length} lines (${cut} left out — highlight the lines that matter, or split the file across scenes)` : '';
     return {
       ops, label: 'Code on screen',
-      text: `The code fills a window of ${frameW}×${frameH} at ${size} px (the floor at this format is ${floor} px), ${typeDur} s of typing then held to ${seconds} s${a.fixed ? ', changing into the fixed version' : ''}${hl.length ? `, lines ${hl.join(', ')} highlighted` : ''}.${cutNote} The composition "Code" is its own scene: move the window, retime the typing on the layer's progress, edit the code in the inspector.`,
+      text: `The code fills a window of ${frameW}×${frameH} at ${size} px (the floor at this format is ${floor} px), ${typeDur} s of typing then held to ${seconds} s${a.fixed ? ', changing into the fixed version' : ''}${lifted.length ? `, lines ${lifted.map((n) => n + at).join(', ')} highlighted` : ''}.${cutNote} The composition "Code" is its own scene: move the window, retime the typing on the layer's progress, edit the code in the inspector.`,
     };
   },
 };
@@ -586,6 +700,11 @@ export const tools = [codeScreen];
 export const checks = [codeLegibility];
 export const messages = {
   fr: {
+    "lines \"$ command\", \"...\" (with seconds: \"... 2.5\"), \"[###] 2 label\" for a progress bar and \"> output\" (ANSI colours read)": "lignes « $ commande », « ... » (avec des secondes : « ... 2,5 »), « [###] 2 libellé » pour une barre de progression et « > sortie » (couleurs ANSI lues)",
+    "the code, or a session (\"$ npm test\", \"> 3 passed\", \"...\") for a terminal": "le code, ou une session (« $ npm test », « > 3 passed », « ... ») pour un terminal",
+    "Fixed version": "Version corrigée",
+    "Window title": "Titre de la fenêtre",
+    "Seconds on screen": "Secondes à l’écran",
     'Code': 'Code', 'Terminal': 'Terminal', 'Show code on screen': 'Montrer du code à l’écran', 'Code legibility': 'Lisibilité du code',
     'Language': 'Langage', 'Previous version': 'Version précédente', 'Progress': 'Progression', 'Highlight': 'Lignes soulignées',
     'Type size': 'Corps', 'Panel': 'Panneau', 'Code colour': 'Couleur du code', 'Accent': 'Accent', 'Second accent': 'Second accent', 'Font': 'Police',

@@ -266,12 +266,12 @@
       {
         "name": "audiogram",
         "title": "Make an audiogram",
-        "description": "an extract of a podcast or an interview as a clip: the cover, the name, the wave moving with the voice, a progress bar — laid out for the format"
+        "description": "an extract of a podcast or an interview as a clip: the cover, the name, the wave moving with the voice, the words said, a progress bar — laid out for the format"
       }
     ],
     "fr": {
       "Make an audiogram": "Faire un audiogramme",
-      "an extract of a podcast or an interview as a clip: the cover, the name, the wave moving with the voice, a progress bar — laid out for the format": "un extrait de podcast ou d’entretien en clip : la pochette, le nom, l’onde qui bouge avec la voix, une barre de progression — disposé pour le format"
+      "an extract of a podcast or an interview as a clip: the cover, the name, the wave moving with the voice, the words said, a progress bar — laid out for the format": "un extrait de podcast ou d’entretien en clip : la pochette, le nom, l’onde qui bouge avec la voix, les mots dits, une barre de progression — disposé pour le format"
     }
   },
   {

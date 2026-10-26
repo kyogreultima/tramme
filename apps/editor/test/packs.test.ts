@@ -22,11 +22,11 @@ import * as physics from '../../../plugins/physics.js';
 import * as styk from '../../../plugins/styk.js';
 import * as walkthrough from '../../../plugins/walkthrough.js';
 import * as localize from '../../../plugins/localize.js';
-import { lex, tokenDiff, typingTimes, parseSession, maxLines } from '../../../plugins/codeview.js';
+import { lex, tokenDiff, typingTimes, parseSession, maxLines, ansiRuns, readable, contrastOf } from '../../../plugins/codeview.js';
 import * as codeview from '../../../plugins/codeview.js';
 import { offBeat, evenShots, deltaE, paletteDrift, typeDrift } from '../../../plugins/rhythm.js';
 import * as rhythm from '../../../plugins/rhythm.js';
-import { activity, zoomKeys, clicksOf, sampleTimes } from '../../../plugins/screencast.js';
+import { activity, zoomKeys, clicksOf, sampleTimes, positionFor } from '../../../plugins/screencast.js';
 import * as screencast from '../../../plugins/screencast.js';
 import { held, jitter, roughPath, hachure, boilAt } from '../../../plugins/handmade.js';
 import * as handmade from '../../../plugins/handmade.js';
@@ -34,18 +34,19 @@ import { parseScript, readingTime, scrollFor } from '../../../plugins/chat.js';
 import * as chat from '../../../plugins/chat.js';
 import { searchEmoji } from '../../../plugins/emoji.js';
 import * as emoji from '../../../plugins/emoji.js';
-import { project, findPlace, greatCircle, zoomPath, fold } from '../../../plugins/maps.js';
+import { project, findPlace, greatCircle, zoomPath, fold, toFrame, placeLabels, flightKeys, routeShare } from '../../../plugins/maps.js';
 import * as maps from '../../../plugins/maps.js';
-import { barsAt } from '../../../plugins/audiogram.js';
+import { barsAt, meterAt, soundTime } from '../../../plugins/audiogram.js';
 import * as audiogram from '../../../plugins/audiogram.js';
 import { parseTex, layout, matchSymbols } from '../../../plugins/math.js';
 import * as math from '../../../plugins/math.js';
-import { resample, bestStart, marchingSquares, tornEdge, liquidField } from '../../../plugins/matter.js';
+import { resample, bestStart, marchingSquares, tornEdge, liquidField, pairContours, aligned, sheetOf } from '../../../plugins/matter.js';
 import * as matter from '../../../plugins/matter.js';
+import * as print from '../../../plugins/print.js';
 import { stepWorld } from '../../../plugins/physics.js';
 
 // the packs are JavaScript on purpose: their shape is checked at runtime by Registry.use, which these tests run
-const PACKS = [charts, kinetic, a11y, physics, styk, icons, diagram, walkthrough, localize, codeview, rhythm, screencast, handmade, chat, emoji, maps, audiogram, math, matter] as unknown as import('@tramme/core').PluginModule[];
+const PACKS = [charts, kinetic, a11y, physics, styk, icons, diagram, walkthrough, localize, codeview, rhythm, screencast, handmade, chat, emoji, maps, audiogram, math, matter, print] as unknown as import('@tramme/core').PluginModule[];
 
 /** the shipped index, as the script writes it: each entry's commands and their French */
 const INDEX: { file: string; name: string; description?: string; commands?: { name: string; title: string; description: string }[]; fr?: Record<string, string> }[] =
@@ -110,14 +111,20 @@ async function runTool(tool: { run: (input: never, ctx: ToolContext) => Promise<
     writeFile: async (p: string) => p, renderStill: async () => '',
     packFile: async (path: string) => {
       if (opts.files?.[path] !== undefined) return opts.files[path];
-      for (const c of [`plugins/${path}`, ...stems.map((s) => `plugins/${s}/${path}`)]) {
+      // the packs' folders first: the index of the packs (plugins/index.json) is no pack's data
+      for (const c of [...stems.map((s) => `plugins/${s}/${path}`), `plugins/${path}`]) {
         try { return readFileSync(new URL(`../../../${c}`, import.meta.url), 'utf8'); } catch { /* next place */ }
       }
       throw new Error(`packFile: "${path}" not found beside the packs`);
     },
     ...opts.extra,
   } as unknown as ToolContext;
-  return tool.run(input as never, ctx) as Promise<{ ops: Op[]; text?: string }>;
+  const out = await (tool.run(input as never, ctx) as Promise<{ ops: Op[]; text?: string }>);
+  // what a tool writes is a document the validator accepts (the assets it names written beside it)
+  const next = applyOps(doc, out.ops as never).doc;
+  const issues = validate(next, registryOf());
+  expect(issues, `the tool's operations: ${JSON.stringify(issues.slice(0, 4))}`).toEqual([]);
+  return out;
 }
 
 /** the document after the tool's operations (a copy: the ops apply on a clean sheet) */
@@ -125,6 +132,23 @@ function applyOps(doc: TrammeDoc, ops: { op: string; path: string; value?: unkno
   const next = JSON.parse(JSON.stringify(doc)) as TrammeDoc;
   for (const op of ops) applyOp(next, op);
   return { doc: next };
+}
+
+/** a 2D context that only records what is drawn: the nodes' render code run headless (it throws where the code would) */
+function recorder(): CanvasRenderingContext2D & { calls: string[] } {
+  const calls: string[] = [];
+  const state: Record<string, unknown> = { globalAlpha: 1, font: '10px sans-serif' };
+  const target = {
+    calls,
+    measureText: (s: string) => ({ width: String(s).length * 10 }),
+    createLinearGradient: () => ({ addColorStop: () => {} }),
+    createRadialGradient: () => ({ addColorStop: () => {} }),
+    getImageData: () => ({ data: new Uint8ClampedArray(4) }),
+  } as Record<string, unknown>;
+  return new Proxy(target, {
+    get: (t, k: string) => (k in t ? t[k] : k in state ? state[k] : (...args: unknown[]) => { calls.push(`${k}(${args.map((a) => (typeof a === 'number' ? Math.round(a) : typeof a)).join(',')})`); }),
+    set: (_t, k: string, v) => { state[k] = v; return true; },
+  }) as never;
 }
 
 describe('the packs register', () => {
@@ -147,6 +171,26 @@ describe('the packs register', () => {
         doc.compositions[doc.root].order = ['a'];
         const issues = validate(doc, reg);
         expect(issues, `${node.type}: ${JSON.stringify(issues)}`).toEqual([]);
+      }
+    }
+  });
+
+  it('every preset sets only the properties its effects and layers declare', () => {
+    const index: { file: string }[] = JSON.parse(readFileSync(new URL('../../../plugins/index.json', import.meta.url), 'utf8'));
+    const modules = (import.meta as ImportMeta & { glob: (p: string, o: { eager: true }) => Record<string, unknown> }).glob('../../../plugins/*.js', { eager: true }) as Record<string, import('@tramme/core').PluginModule>;
+    for (const entry of index) {
+      const mod = modules[`../../../plugins/${entry.file}`];
+      const reg = builtinRegistry().clone().use(mod as never, entry.file);
+      for (const preset of (mod.presets ?? []) as { name: string; effects?: { type: string; props?: Record<string, unknown> }[]; layer?: { type: string; props?: Record<string, unknown> } }[]) {
+        for (const fx of preset.effects ?? []) {
+          const def = reg.listEffects().find((e) => e.type === fx.type);
+          expect(def, `${entry.file} ${preset.name}: effect ${fx.type}`).toBeTruthy();
+          for (const k of Object.keys(fx.props ?? {})) expect(def!.props, `${entry.file} ${preset.name}: ${fx.type} has no "${k}"`).toHaveProperty(k);
+        }
+        if (preset.layer) {
+          const node = reg.node(preset.layer.type);
+          for (const k of Object.keys(preset.layer.props ?? {})) expect(node?.props, `${entry.file} ${preset.name}: ${preset.layer.type} has no "${k}"`).toHaveProperty(k);
+        }
       }
     }
   });
@@ -181,7 +225,15 @@ describe('the packs register', () => {
       out.push(m.title, m.description);
       for (const [k, d] of Object.entries(m.params)) prop(k, d as never);
     }
-    for (const t of mod.tools ?? []) { if (t.title) out.push(t.title); out.push(t.description); }
+    for (const t of mod.tools ?? []) {
+      if (t.title) out.push(t.title);
+      out.push(t.description);
+      // the form of the / menu shows each field's title and description, translated
+      for (const f of Object.values((t.input as { properties?: Record<string, { title?: string; description?: string }> } | undefined)?.properties ?? {})) {
+        if (f.title) out.push(f.title);
+        if (f.description) out.push(f.description);
+      }
+    }
     for (const c of mod.checks ?? []) { if (c.title) out.push(c.title); out.push(c.description); }
     for (const k of mod.kits ?? []) { if (k.title) out.push(k.title); out.push(k.description); }
     for (const p of mod.presets ?? []) { if (p.title) out.push(p.title); if (p.description) out.push(p.description); }
@@ -243,7 +295,7 @@ describe('the packs index', () => {
     doc.assets.mine = { type: 'module', src: 'plugins/mine.js', name: 'Mine' } as never;
     const packs = [{ file: 'charts.js', name: 'Charts', version: '1.1.0' }, { file: 'icons.js', name: 'Icons', version: '1.0.0' }];
     expect(packUpdates(doc, packs, { 'plugins/charts.js': '1.0.0' })).toEqual([
-      { assetId: 'charts', name: 'Charts', file: 'charts.js', from: '1.0.0', to: '1.1.0' },
+      { assetId: 'charts', name: 'Charts', file: 'charts.js', src: 'plugins/charts.js', from: '1.0.0', to: '1.1.0' },
     ]);
     // the same version, a newer copy, and a file that is not a pack's: nothing offered
     expect(packUpdates(doc, packs, { 'plugins/charts.js': '1.1.0' })).toEqual([]);
@@ -290,9 +342,36 @@ describe('codeview', () => {
     expect(parseSession('$ npm test\n...\n> 3 passed')).toEqual([
       { kind: 'cmd', text: 'npm test' },
       { kind: 'wait', text: '...', seconds: 1 },
-      { kind: 'out', text: '3 passed' },
+      { kind: 'out', text: '3 passed', runs: [{ text: '3 passed', colour: null }] },
     ]);
     expect(parseSession('$ build\n... 2.5')).toContainEqual({ kind: 'wait', text: '... 2.5', seconds: 2.5 });
+    // a progress bar filling over its seconds, its label kept
+    expect(parseSession('[###] 2 installing')).toEqual([{ kind: 'bar', text: 'installing', seconds: 2 }]);
+  });
+
+  it('maps the ANSI colours of the output to the tokens, written either way', () => {
+    const ESC = String.fromCharCode(27), B = String.fromCharCode(92);
+    expect(ansiRuns(`${ESC}[32mok${ESC}[0m done`)).toEqual([{ text: 'ok', colour: 'accent' }, { text: ' done', colour: null }]);
+    expect(ansiRuns(`${B}e[31mfail${B}e[0m`)).toEqual([{ text: 'fail', colour: 'accent2' }]);
+    expect(ansiRuns(`${B}x1b[2mdim`)).toEqual([{ text: 'dim', colour: 'dim' }]);
+    // the plain text of a line drops the codes
+    expect(parseSession(`> ${ESC}[32m3 passed${ESC}[0m`)[0].text).toBe('3 passed');
+  });
+
+  it('lexes YAML and SQL', () => {
+    const yaml = lex('name: tramme\nport: 8080 # dev', 'yaml').filter((t) => t.kind !== 'ws');
+    expect(yaml.map((t) => t.kind)).toEqual(['type', 'punct', 'id', 'type', 'punct', 'num', 'com']);
+    const sql = lex("SELECT name FROM users WHERE id = 'a';", 'sql').filter((t) => t.kind !== 'ws');
+    expect(sql.slice(0, 4).map((t) => t.kind)).toEqual(['kw', 'id', 'kw', 'id']);
+    expect(sql.find((t) => t.text === "'a'")?.kind).toBe('str');
+  });
+
+  it('reads its colours at 4.5:1 against the panel', () => {
+    expect(contrastOf(readable('#2a2f36', '#0D1117'), '#0D1117')).toBeGreaterThanOrEqual(4.5);
+    expect(contrastOf(readable('#e0e0e0', '#ffffff'), '#ffffff')).toBeGreaterThanOrEqual(4.5);
+    // already readable: unchanged; a token not resolved to hex: unchanged
+    expect(readable('#ffffff', '#0D1117')).toBe('#ffffff');
+    expect(readable('@accent', '#0D1117')).toBe('@accent');
   });
 
   it('the tool cuts a long file to what fits and says so, in both formats', async () => {
@@ -419,6 +498,8 @@ describe('screencast', () => {
     ];
     const keys = zoomKeys(regions, { w: W, h: H });
     expect(keys.every((k) => k.scale <= 2.5)).toBe(true);
+    // never faster than the check allows (1.5× a second)
+    for (let i = 1; i < keys.length; i++) if (keys[i].t > keys[i - 1].t) expect(Math.abs(keys[i].scale - keys[i - 1].scale) / (keys[i].t - keys[i - 1].t)).toBeLessThanOrEqual(1.5 + 1e-6);
     const zoomed = keys.filter((k) => k.scale > 1);
     expect(zoomed.length).toBeGreaterThan(0);
     // out again before the page change (its keys back at 1 by 2.6)
@@ -449,6 +530,7 @@ describe('screencast', () => {
     const { doc } = newProject({ name: 'T', width: 1280, height: 720, fps: 30, duration: 1800 });
     doc.assets.rec = { type: 'video', src: 'assets/video/rec.mp4', name: 'Rec' } as never;
     doc.compositions.main.layers.rec = { type: 'video', in: 0, out: 1800, props: { video: 'rec' } } as never;
+    doc.compositions.main.order = ['rec'];
     const px = { data: frame([]), w: W, h: H };
     const out = await runTool(screencast.tools[0], doc, {}, { extra: { readStill: async () => px } });
     expect(out.text).toMatch(/1 800|a second/);
@@ -459,14 +541,15 @@ describe('screencast', () => {
     for (const [w, h] of [[1920, 1080], [1080, 1920]] as [number, number][]) {
       const doc = newProject({ name: 'T', width: w, height: h, fps: 30, duration: 8 }).doc;
       doc.assets.rec = { type: 'video', src: 'assets/video/rec.mp4', name: 'Rec' } as never;
-      doc.compositions.main.layers.rec = { type: 'video', in: 0, out: 8, props: { video: 'rec' } } as never;
+      doc.compositions.main.layers.rec = { type: 'video', in: 0, out: 8, transform: { position: [w / 2, h / 2] }, props: { video: 'rec', size: [w, h] } } as never;
+      doc.compositions.main.order = ['rec'];
       // a still page, a click, activity: the same regions whatever the format
       const regions = (t: number) => (t < 2 ? { t, box: null } : t < 4 ? { t, box: { x: Math.round(w * 0.4), y: Math.round(h * 0.4), w: Math.round(w * 0.12), h: Math.round(w * 0.12) } } : { t, box: null });
       const px = frame([[40, 40]]);
       const out = await runTool(screencast.tools[0], doc, {}, { extra: { readStill: async (t: number) => ({ data: px, w, h, ...(t < 0 ? {} : {}) }), ...{} } });
       void regions;
       expect(out.ops.length).toBeGreaterThan(0);
-      for (const b of boxesOf(applyOps(doc, out.ops).doc)) expect(inside(b, w, h)).toBe(true);
+      for (const b of boxesOf(applyOps(doc, out.ops).doc)) expect(inside(b, w, h), `${w}x${h} ${JSON.stringify(b)} ${JSON.stringify(out.ops.map((o) => o.path))}`).toBe(true);
     }
   });
 });
@@ -565,9 +648,27 @@ describe('chat', () => {
     expect(readingTime('one two three')).toBeCloseTo(1.21, 1);
     expect(readingTime('')).toBeCloseTo(0.9, 2);
     // a reply that takes thought pauses longer before it types
-    const tl = chat.timeline('A: hello there\nB: a much longer answer that takes thought');
-    expect(tl.items[1].typing).toBeGreaterThan(tl.items[0].typing);
+    const tl = chat.timeline('A: hello there\nB: ok\nA: a much longer answer that takes thought');
+    expect(tl.items[2].typing).toBeGreaterThan(tl.items[0].typing);
     expect(tl.items[0].read).toBeCloseTo(readingTime('hello there'), 2);
+    // the owner of the phone (the second voice) sends: no typing indicator before their lines
+    expect(tl.items[1].typing).toBe(0);
+  });
+
+  it('keeps each sender on their side, however many lines they send in a row', () => {
+    expect(chat.sidesOf(parseScript('A: hi\nA: you there?\nB: yes\nB: why\nA: look'))).toEqual([false, false, true, true, false]);
+  });
+
+  it('drops the notifications one after the other over the progress', () => {
+    const wins = [0, 1, 2].map((i) => chat.noticeWindow(i, 3));
+    for (const w of wins) expect(w.from + w.span).toBeLessThanOrEqual(1);
+    expect(wins[1].from).toBeGreaterThan(wins[0].from);
+    expect(wins[2].from).toBeGreaterThan(wins[1].from);
+  });
+
+  it('cuts a line into text and the pack\'s emoji pictures', () => {
+    expect(chat.runsOf('so 👀 now', { '👀': 'emoji-eyes' })).toEqual([{ text: 'so ' }, { emoji: 'emoji-eyes', ch: '👀' }, { text: ' now' }]);
+    expect(chat.runsOf('plain', {})).toEqual([{ text: 'plain' }]);
   });
 
   it('keeps the last message in view', () => {
@@ -636,7 +737,8 @@ describe('maps', () => {
 
   it('projects the world it says, the globe refusing its far side', () => {
     expect(project('equirect', [0, 0])).toEqual([0, 0]);
-    expect(project('equirect', [90, 45])).toEqual([0.25, -0.25]);
+    // the plate carrée is twice as wide as it is tall: a degree is a degree each way
+    expect(project('equirect', [90, 45])).toEqual([0.25, -0.125]);
     expect(project('ortho', [180, 0], { center: [0, 0] })).toBeNull();
     expect(project('ortho', [0, 0], { center: [0, 0] })).toEqual([0, 0]);
     expect(project('naturalEarth', [180, 0])![0]).toBeCloseTo(0.5, 3);
@@ -743,8 +845,11 @@ describe('math', () => {
 
   it('lays x^2 with the 2 smaller and higher, the same every time', () => {
     const L = layout(parseTex('x^2'), 48, glyphs);
-    const x = L.placed.find((p) => p.glyph === 'x')!;
-    const two = L.placed.find((p) => p.glyph === '2')!;
+    // the variable in the font's math italic, the figure upright
+    const x = L.placed.find((p) => p.id === 'x#1')!;
+    const two = L.placed.find((p) => p.id === '2#1')!;
+    expect(x.glyph).toBe('𝑥');
+    expect(two.glyph).toBe('2');
     expect(two.scale).toBeLessThan(x.scale);
     expect(two.y).toBeLessThan(x.y);
     expect(JSON.stringify(L)).toBe(JSON.stringify(layout(parseTex('x^2'), 48, glyphs)));
@@ -753,7 +858,8 @@ describe('math', () => {
   it('matches the symbols two formulas share, the a with the a', () => {
     const A = layout(parseTex('a+b'), 48, glyphs), Bm = layout(parseTex('b+a'), 48, glyphs);
     const pairs = matchSymbols(A, Bm);
-    const ofA = (i: number) => A.placed[i].glyph, ofB = (j: number) => Bm.placed[j].glyph;
+    const sym = (id: string) => id.split('#')[0];
+    const ofA = (i: number) => sym(A.placed[i].id), ofB = (j: number) => sym(Bm.placed[j].id);
     expect(pairs.map(([i, j]) => [ofA(i), ofB(j)])).toContainEqual(['a', 'a']);
     expect(pairs.map(([i, j]) => [ofA(i), ofB(j)])).toContainEqual(['b', 'b']);
     expect(pairs).toHaveLength(3);
@@ -1360,3 +1466,249 @@ function applyOp(doc: TrammeDoc, op: { op: string; path: string; value?: unknown
   if (last === '-' && op.op === 'add' && Array.isArray(container)) container.push(op.value);
   else container[last] = op.value;
 }
+
+describe('the fixes of the packs', () => {
+  const host = (extra: Record<string, unknown> = {}) => ({ layerId: 'a', t: 1, frame: 30, fps: 30, width: 1920, height: 1080, duration: 6, asset: () => null, assetInfo: () => ({}), assetUrl: () => '', ...extra }) as never;
+
+  it('screencast: the zoom brings the action to the centre without showing past the picture\'s edge', () => {
+    const frame = { w: 1920, h: 1080 };
+    // a point right of centre at 2x: the picture moves left, its right edge stays on the frame's
+    const P = positionFor([1500, 540], 2, frame);
+    expect(P[0]).toBeLessThan(960);
+    expect(P[0]).toBeGreaterThanOrEqual(960 - 960);
+    // a corner asks too much: clamped so the picture still covers the frame
+    const C = positionFor([1920, 1080], 2, frame);
+    expect(C).toEqual([0, 0]);
+    expect(positionFor([200, 200], 1, frame)).toEqual([960, 540]);
+  });
+
+  it('screencast: the tool keys scale and position on the composition\'s clock, from the layer\'s start', async () => {
+    const W = 320, H = 180;
+    const page = (dot: boolean) => { const px = new Uint8ClampedArray(W * H * 4).fill(240); if (dot) for (let y = 60; y < 90; y++) for (let x = 200; x < 230; x++) { const i = (y * W + x) * 4; px[i] = px[i + 1] = px[i + 2] = 20; } return px; };
+    const { doc } = newProject({ name: 'T', width: W, height: H, fps: 30, duration: 10 });
+    doc.assets.rec = { type: 'video', src: 'assets/video/rec.mp4', name: 'Rec' } as never;
+    doc.compositions.main.layers.rec = { type: 'video', in: 1, out: 9, transform: { position: [W / 2, H / 2] }, props: { video: 'rec', size: [W, H] } } as never;
+    doc.compositions.main.order = ['rec'];
+    // a mark blinks on the page from 2 s to 5 s of the recording: activity at each look
+    const out = await runTool(screencast.tools[0], doc, { layer: 'rec' }, { extra: { readStill: async (t: number) => ({ data: page(t >= 2 && t < 5 && Math.round(t * 2) % 2 === 0), w: W, h: H }) } });
+    const scale = out.ops.find((o) => o.path.endsWith('/transform/scale')) as { value: { $k: { t: number; v: number[] }[] } } | undefined;
+    const position = out.ops.find((o) => o.path.endsWith('/transform/position')) as { value: { $k: { t: number; v: number[] }[] } } | undefined;
+    expect(scale && position).toBeTruthy();
+    // the recording's 2 s are the composition's 3 s
+    expect(scale!.value.$k[0].t).toBeGreaterThanOrEqual(3 - 1e-6);
+    expect(position!.value.$k.map((k) => k.t)).toEqual(scale!.value.$k.map((k) => k.t));
+    // the zoomed keys move the picture toward the mark (right and up of centre: the layer goes left and down)
+    const zoomed = position!.value.$k.find((_, i) => scale!.value.$k[i].v[0] > 1.05)!;
+    expect(zoomed.v[0]).toBeLessThan(W / 2);
+    // its own check stays silent on what it keyed
+    const next = applyOps(doc, out.ops as never).doc;
+    const issues = screencast.checks[0].run({ doc: next, compId: 'main', comp: next.compositions.main, samples: [], data: () => null } as never) as unknown[];
+    expect(issues).toEqual([]);
+  });
+
+  it('audiogram: the wave shows the extract, not the whole sound, and its meter falls back slowly', () => {
+    expect(soundTime({ from: 30, span: 10, progress: 0.5 }, 120)).toBeCloseTo(35, 6);
+    expect(soundTime({ progress: 1 }, 60)).toBeCloseTo(59.99, 2);
+    // a band loud at 1 s then silent: just after, the meter still shows it, fading
+    const bands = [[0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0]];
+    const now = barsAt(bands, 4, 1.25, 1)[0], meter = meterAt(bands, 4, 1.25, 1)[0];
+    expect(now).toBe(0);
+    expect(meter).toBeGreaterThan(0.2);
+    expect(meterAt(bands, 4, 2, 1)[0]).toBe(0);
+  });
+
+  it('audiogram: the bars stay in their box, every style drawn without error', () => {
+    const analysis = { duration: 4, rate: 50, bandsRate: 12.5, bands: Array.from({ length: 32 }, () => Array(50).fill(1)) };
+    for (const style of ['bars', 'mirror', 'line', 'ring']) {
+      const ctx = recorder();
+      audiogram.nodes[0].render.canvas2d!(ctx, { analysis: 'a', style, count: 16, fill: '#fff', ink: '#fff', from: 0, span: 4, progress: 0.5, size: [400, 100] } as never, host({ asset: () => analysis }));
+      for (const c of ctx.calls.filter((x) => x.startsWith('roundRect('))) {
+        const [, y, , h] = c.slice(10, -1).split(',').map(Number);
+        expect(y).toBeGreaterThanOrEqual(-51);
+        expect(y + h).toBeLessThanOrEqual(51);
+      }
+    }
+  });
+
+  it('audiogram: a video\'s sound plays from the video itself, the tool\'s operations valid', async () => {
+    const analysis = JSON.stringify({ version: 1, kind: 'audio-analysis', duration: 60, rate: 50, envelope: { rms: [], low: [], mid: [], high: [] }, onsets: [], tempo: null, beats: [], downbeats: [], sections: [], bands: Array.from({ length: 32 }, () => [0.2, 0.5]) });
+    const { doc } = newProject({ name: 'T', width: 1080, height: 1920, fps: 30, duration: 30 });
+    doc.assets.talk = { type: 'video', src: 'assets/video/talk.mp4', name: 'Talk' } as never;
+    doc.assets['analysis-talk'] = { type: 'json', src: 'assets/analyses/talk.json' } as never;
+    doc.assets['transcription-talk'] = { type: 'json', src: 'assets/transcripts/talk.json' } as never;
+    const out = await runTool(audiogram.tools[0], doc, { asset: 'talk', at: 12, duration: 20 }, { extra: { readText: async () => analysis } });
+    const comp = Object.values(applyOps(doc, out.ops).doc.compositions).find((c) => c.name.startsWith('Audiogram'))!;
+    const layers = Object.values(comp.layers);
+    expect(layers.find((l) => l.type === 'video')?.props).toMatchObject({ video: 'talk', start: 12 });
+    expect(layers.find((l) => l.type === 'audiogram.wave')?.props).toMatchObject({ from: 12, span: 20 });
+    expect(layers.find((l) => l.type === 'captions')?.props).toMatchObject({ transcript: 'transcription-talk', start: 12 });
+  });
+
+  it('codeview: a highlighted line keeps its place when the file is cut to what fits', async () => {
+    const big = Array.from({ length: 400 }, (_, i) => `const v${i + 1} = ${i + 1};`).join('\n');
+    const { doc } = newProject({ name: 'T', width: 1920, height: 1080, fps: 30, duration: 10 });
+    const out = await runTool(codeview.tools[0], doc, { code: big, lines: [300] });
+    const comp = Object.values(applyOps(doc, out.ops).doc.compositions).find((c) => c.name.startsWith('Code'))!;
+    const screen = Object.values(comp.layers).find((l) => l.type === 'codeview.code')!;
+    const code = String(screen.props!.code).split('\n'), hl = screen.props!.highlight as number[];
+    expect(hl).toHaveLength(1);
+    expect(code[hl[0] - 1]).toBe('const v300 = 300;');
+  });
+
+  it('codeview: the typing reveals the text in order, line breaks counted', () => {
+    const code = 'ab\ncd\nef';
+    const at = (progress: number) => {
+      const ctx = recorder();
+      codeview.nodes[0].render.canvas2d!(ctx, { code, lang: 'js', from: '', progress, highlight: [], size: 20, panel: [600, 400], ink: '#ffffff', accent: '#2ec4b6', accent2: '#2ec4b6', plate: '#0d1117', font: null } as never, host());
+      return ctx.calls.filter((c) => c.startsWith('fillText(string')).length;
+    };
+    // more text drawn as the typing goes on, all of it at the end
+    expect(at(0.3)).toBeLessThanOrEqual(at(0.7));
+    expect(at(0.998)).toBeGreaterThanOrEqual(at(0.7));
+  });
+
+  it('math: a change between two formulas draws, centred on the layer', () => {
+    const glyphs = JSON.parse(readFileSync(new URL('../../../plugins/math/glyphs.json', import.meta.url), 'utf8'));
+    for (const progress of [0, 0.5, 1]) {
+      const ctx = recorder();
+      expect(() => math.nodes[0].render.canvas2d!(ctx, { tex: 'a^2 + b^2 = c^2', to: 'c = \\sqrt{a^2 + b^2}', glyphs: 'g', progress, size: 48, colours: {}, fill: '#fff', accent: '#2ec4b6', accent2: '#2ec4b6' } as never, host({ asset: () => glyphs }))).not.toThrow();
+      // the first move is the centring: half the formula's width to the left
+      const first = ctx.calls.find((c) => c.startsWith('translate('))!;
+      expect(Number(first.slice(10).split(',')[0])).toBeLessThan(0);
+    }
+    // \text and \color read; a symbol the font lacks is refused by the tool before anything is written
+    expect(() => parseTex('\\color{accent}{x} + \\text{area}')).not.toThrow();
+  });
+
+  it('math: the tool reuses the glyph table a project already holds', async () => {
+    const { doc } = newProject({ name: 'T', width: 1920, height: 1080, fps: 30, duration: 6 });
+    const first = await runTool(math.tools[0], doc, { tex: 'a + b' });
+    const after = applyOps(doc, first.ops).doc;
+    const second = await runTool(math.tools[0], after, { tex: 'x^2' });
+    expect(second.ops.filter((o) => o.path.startsWith('/assets/'))).toEqual([]);
+    await expect(runTool(math.tools[0], doc, { tex: 'a ⊕ b' })).rejects.toThrow(/no glyph/);
+  });
+
+  it('matter: contours paired by size, wound alike, the extra one growing from a point', () => {
+    const sq = (x: number, y: number, s: number) => ({ v: [[x, y], [x + s, y], [x + s, y + s], [x, y + s]], closed: true });
+    const pairs = pairContours([sq(0, 0, 100)], [sq(0, 0, 100), sq(300, 0, 20)], 16);
+    expect(pairs).toHaveLength(2);
+    // the small square of the second shape grows from its centre
+    const grow = pairs[1];
+    expect(new Set(grow[0].map((p: number[]) => p.join(','))).size).toBe(1);
+    // a shape walked the other way is turned round before the morph
+    const A = resample(sq(0, 0, 100), 9).slice(0, 8), B = [...A].reverse();
+    expect(aligned(A, B)).toEqual(A);
+  });
+
+  it('matter: the morph reads the Béziers, not only the vertices', () => {
+    // a circle of four vertices and their tangents: its outline is round, not a diamond
+    const k = 55.2;
+    const circle = { v: [[100, 0], [0, 100], [-100, 0], [0, -100]], i: [[0, -k], [k, 0], [0, k], [-k, 0]], o: [[0, k], [-k, 0], [0, -k], [k, 0]], closed: true };
+    const pts = resample(circle, 33);
+    for (const [x, y] of pts) expect(Math.hypot(x, y)).toBeGreaterThan(97);
+  });
+
+  it('matter: the flood covers the frame at 1 and leaves it dry at 0; the paper covers it at the cut', () => {
+    const draw = (progress: number) => {
+      const ctx = recorder();
+      matter.nodes[1].render.canvas2d!(ctx, { seed: 1, blobs: 6, mode: 'flood', progress, speed: 1, cell: 20, fill: '#fff', size: [400, 240] } as never, host());
+      return ctx.calls.filter((c) => c.startsWith('lineTo(')).length;
+    };
+    expect(draw(0)).toBe(0);
+    expect(draw(1)).toBeGreaterThan(0);
+    const { outline } = sheetOf(1920, 1080, 0.5, 1, 16);
+    const xs = outline.map((p: number[]) => p[0]), ys = outline.map((p: number[]) => p[1]);
+    expect(Math.min(...xs)).toBeLessThan(-960);
+    expect(Math.max(...xs)).toBeGreaterThan(960);
+    expect(Math.min(...ys)).toBeLessThan(-540);
+    expect(Math.max(...ys)).toBeGreaterThan(540);
+  });
+
+  it('maps: the camera\'s centre lands in the middle, the world one aspect in any format', () => {
+    for (const kind of ['equirect', 'naturalEarth', 'mercator', 'ortho']) {
+      const c = toFrame(kind, [4.83, 45.76], [4.83, 45.76], 6, 1080)!;
+      expect(Math.abs(c[0])).toBeLessThan(1e-6);
+      expect(Math.abs(c[1])).toBeLessThan(1e-6);
+    }
+    // a degree east and a degree north cover the same pixels at the equator (equirect)
+    const e = toFrame('equirect', [1, 0], [0, 0], 1, 1000)!, n = toFrame('equirect', [0, 1], [0, 0], 1, 1000)!;
+    expect(Math.abs(e[0])).toBeCloseTo(Math.abs(n[1]), 6);
+  });
+
+  it('maps: labels kept apart, a flight never faster than the eye, the routes drawn in turn', () => {
+    const pins = [{ name: 'Lyon', x: 0, y: 0 }, { name: 'Grenoble', x: 30, y: 4 }, { name: 'Dakar', x: 400, y: 300 }];
+    const labels = placeLabels(pins, (s: string) => s.length * 12, 20);
+    const boxes = labels.map((l, i) => l && { x: l.align === 'left' ? l.x : l.align === 'right' ? l.x - pins[i].name.length * 12 : l.x - (pins[i].name.length * 12) / 2, y: l.y - 10, w: pins[i].name.length * 12, h: 20 });
+    for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
+      const a = boxes[i], b = boxes[j];
+      if (a && b) expect(a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y).toBe(false);
+    }
+    const f = flightKeys([{ lon: 4.8, lat: 45.7 }, { lon: -17.4, lat: 14.7 }], 12, { center: [-6, 30], zoom: 3 });
+    for (let k = 1; k < f.keys.length; k++) {
+      const dt = f.keys[k].t - f.keys[k - 1].t;
+      if (dt > 0.05) expect(Math.abs(Math.log2(f.keys[k].z / f.keys[k - 1].z)) / dt).toBeLessThanOrEqual(1.7);
+    }
+    expect(f.keys.at(-1)).toMatchObject({ x: -6, y: 30, z: 3 });
+    expect(routeShare(0.5, 0, 2)).toBe(1);
+    expect(routeShare(0.5, 1, 2)).toBe(0);
+  });
+
+  it('maps: a still map exports its countries, routes and pins as SVG', () => {
+    const shapes = { countries: [{ name: 'France', rings: [{ pts: [[-4, 48], [8, 49], [7, 43], [-1, 43]] }] }] };
+    const svg = maps.nodes[0].export!.svg!({ shapes: 'atlas', projection: 'mercator', centerX: 2, centerY: 46, zoom: 8, highlight: ['France'], pins: [{ name: 'Lyon', lon: 4.8, lat: 45.7 }], routes: [], progress: 1, land: '#2b3440', plate: '#0e1420', accent: '#2ec4b6', ink: '#f4f5f7', labels: true, font: null } as never, { width: 1920, height: 1080, json: () => shapes });
+    expect(svg).toMatch(/<path d="M/);
+    expect(svg).toMatch(/fill="#2ec4b6"/);
+    expect(svg).toMatch(/>Lyon</);
+  });
+
+  it('charts: a function needs no data set, a scatter reads its points, a race runs over the composition', async () => {
+    const { doc } = newProject({ name: 'T', width: 1080, height: 1920, fps: 30, duration: 12 });
+    const fn = await runTool(charts.tools[0], doc, { kind: 'function', points: [[0, 0], [0.5, 0.25], [1, 1]] });
+    expect(fn.ops.length).toBeGreaterThan(0);
+    doc.assets.pts = { type: 'json', src: 'assets/data/pts.json' } as never;
+    const sc = await runTool(charts.tools[0], doc, { data: 'pts', kind: 'scatter' }, { extra: { readText: async () => JSON.stringify([{ name: 'A', x: 1, y: 2 }, { name: 'B', x: 3, y: 1 }]) } });
+    const scatter = sc.ops.find((o) => (o as { value?: { type?: string } }).value?.type === 'chart.scatter') as { value: { props: { values: unknown[] } } };
+    expect(scatter.value.props.values).toHaveLength(2);
+    doc.assets.race = { type: 'json', src: 'assets/data/race.csv' } as never;
+    const csv = 'year,A,B\n2000,1,2\n2001,3,1\n2002,4,5';
+    const rc = await runTool(charts.tools[0], doc, { data: 'race', kind: 'race' }, { extra: { readText: async () => csv } });
+    const race = rc.ops.find((o) => (o as { value?: { type?: string } }).value?.type === 'chart.race') as { value: { props: { progress: { $k: { t: number }[] } } } };
+    expect(race.value.props.progress.$k.at(-1)!.t).toBeGreaterThan(2);
+  });
+
+  it('chat: the thread lives in the phone\'s screen, inside the frame in 16:9', async () => {
+    const { doc } = newProject({ name: 'T', width: 1920, height: 1080, fps: 30, duration: 12 });
+    const out = await runTool(chat.tools[0], doc, { script: 'A: hi\nB: hello 👀\nA: so?' });
+    const comp = Object.values(applyOps(doc, out.ops).doc.compositions).find((c) => c.name === 'Chat')!;
+    const thread = comp.layers.thread, phone = comp.layers.phone;
+    const [sw, sh] = thread.props!.screen as number[], [pw, ph] = phone.props!.size as number[];
+    expect(sw).toBeLessThan(pw);
+    expect(sh).toBeLessThan(ph);
+    expect(ph).toBeLessThanOrEqual(1080);
+    expect(out.text).toMatch(/emoji tool/);
+  });
+
+  it('emoji: a chat thread\'s emoji become the pack\'s pictures', async () => {
+    const { doc } = newProject({ name: 'T', width: 1080, height: 1920, fps: 30, duration: 6 });
+    doc.compositions.main.layers.thread = { type: 'chat.thread', props: { script: 'A: look 🔥\nB: wow 👍🏽' } } as never;
+    doc.compositions.main.order = ['thread'];
+    const out = await runTool(emoji.tools[0], doc, { layer: 'thread' }, { extra: { writeFile: async (p: string) => p } });
+    const map = (out.ops.find((o) => o.path.endsWith('/props/emoji')) as { value: Record<string, string> }).value;
+    expect(Object.keys(map)).toContain('🔥');
+    expect(Object.keys(map)).toContain('👍🏽');
+  });
+
+  it('handmade: twos jitter a position by pixels, a factor by a hundredth of that', () => {
+    const at = (v: unknown) => handmade.modifiers[0].apply(v, { n: 2, jitter: 4 }, { t: 0.5, fps: 30, base: () => v, seed: 3 } as never);
+    const moved = at([500, 300]) as number[];
+    expect(Math.abs(moved[0] - 500) + Math.abs(moved[1] - 300)).toBeGreaterThan(0.01);
+    const scale = at([1, 1]) as number[];
+    expect(Math.abs(scale[0] - 1)).toBeLessThanOrEqual(0.04);
+  });
+
+  it('print: the risograph preset sets the inks the riso pass reads', () => {
+    const riso = print.presets.find((p) => p.name === 'risograph')!;
+    expect(Object.keys(riso.effects![0].props!)).toEqual(expect.arrayContaining(['inkA', 'inkB']));
+  });
+});

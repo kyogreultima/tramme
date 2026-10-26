@@ -30,14 +30,25 @@ describe('audio analysis', () => {
     // a 1 kHz tone for 4 s
     const tone = new Float32Array(RATE * 4);
     for (let i = 0; i < tone.length; i++) tone[i] = 0.5 * Math.sin((2 * Math.PI * 1000 * i) / RATE);
-    const a = analyseAudio(tone, RATE);
-    expect(a.bands).toHaveLength(32);
+    const a = analyseAudio(tone, RATE), bands = a.bands!;
+    expect(bands).toHaveLength(32);
+    expect(a.bandsRate).toBe(12.5);
     // the band whose edges bracket 1000 Hz
     const lo = 40, hi = Math.min(16000, RATE / 2 - 1);
     const held = Array.from({ length: 32 }, (_, b) => [lo * Math.pow(hi / lo, b / 32), lo * Math.pow(hi / lo, (b + 1) / 32)] as [number, number])
       .findIndex(([f0, f1]) => f0 <= 1000 && 1000 < f1);
-    const loudest = a.bands.reduce((best, band, i) => (band.reduce((x, y) => x + y, 0) > a.bands[best].reduce((x, y) => x + y, 0) ? i : best), 0);
+    const loudest = bands.reduce((best, band, i) => (band.reduce((x, y) => x + y, 0) > bands[best].reduce((x, y) => x + y, 0) ? i : best), 0);
     expect(loudest).toBe(held);
+  });
+
+  it('the bands stay low in a silence: a quiet frame is not lifted to the top', () => {
+    // a second of tone, then a second of silence
+    const s = new Float32Array(RATE * 2);
+    for (let i = 0; i < RATE; i++) s[i] = 0.5 * Math.sin((2 * Math.PI * 1000 * i) / RATE);
+    const bands = analyseAudio(s, RATE).bands!;
+    const late = bands.map((band) => band[band.length - 2]);
+    expect(Math.max(...late)).toBeLessThan(0.05);
+    expect(Math.max(...bands.map((band) => Math.max(...band)))).toBeCloseTo(1, 1);
   });
 
   const a = analyseAudio(groove(), RATE);

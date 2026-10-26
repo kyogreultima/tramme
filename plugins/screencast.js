@@ -59,13 +59,18 @@ function scaleFor(box, frame, maxScale) {
   return Math.min(maxScale, Math.max(1, s));
 }
 
+/** the zoom's pace: under the 1.5× a second the screencast-motion check holds, with room for the keys' rounding */
+const ZOOM_RATE = 1.4;
+/** how long a zoom from 1 to `scale` takes at that pace (half a second at least) */
+const rampFor = (scale) => Math.max(0.5, (scale - 1) / ZOOM_RATE);
+
 /**
  * The zoom keys of a recording, from its regions of interest over time: in
- * when a region appears (eased over half a second), held while the region
+ * when a region appears (eased, at most 1.5× a second), held while the region
  * stays, out before a whole-screen change (a page change covers more than
- * 60 % of the frame), never over `maxScale`, never moving during a scroll.
- * The keys are { t, scale, x, y }: the layer's scale, and the point of the
- * picture (frame pixels) kept in view.
+ * 60 % of the frame), never over `maxScale`, never moving during a scroll,
+ * and never overlapping the next zoom. The keys are { t, scale, x, y }: the
+ * zoom, and the point of the picture (frame pixels) brought to the centre.
  */
 export function zoomKeys(regions, frame, maxScale = 2.5) {
   const keys = [];
@@ -92,18 +97,51 @@ export function zoomKeys(regions, frame, maxScale = 2.5) {
   if (run) holds.push(run);
   // the next page change after each hold: the zoom is out 0.4 s before it
   const changes = regions.filter((r) => !r.box || area(r.box) > PAGE * frameArea).map((r) => r.t);
-  holds.forEach((hold, k) => {
+  let free = -Infinity; // the zoom before is out by then
+  for (const hold of holds) {
     const scale = scaleFor(hold.box, frame, maxScale);
-    if (scale <= 1.02) return;
-    const c = centre(hold.box);
+    if (scale <= 1.02) continue;
+    const c = centre(hold.box), x = Math.round(c.x), y = Math.round(c.y);
+    const start = Math.max(hold.from, free);
     const next = changes.find((t) => t > hold.to);
-    const outAt = next !== undefined ? Math.min(hold.to + 0.4, next - 0.4 - 0.5) : hold.to + 0.4;
-    keys.push({ t: +hold.from.toFixed(3), scale: 1, x: Math.round(c.x), y: Math.round(c.y) });
-    keys.push({ t: +(hold.from + 0.5).toFixed(3), scale: +scale.toFixed(3), x: Math.round(c.x), y: Math.round(c.y) });
-    keys.push({ t: +Math.max(hold.from + 0.5, outAt).toFixed(3), scale: +scale.toFixed(3), x: Math.round(c.x), y: Math.round(c.y) });
-    keys.push({ t: +Math.max(hold.from + 0.5, outAt + 0.5).toFixed(3), scale: 1, x: Math.round(c.x), y: Math.round(c.y) });
-  });
-  return keys.sort((a, b) => a.t - b.t);
+    // the time until the page changes bounds the zoom: in and out at the pace allowed, a smaller zoom when the time is short
+    const room = next !== undefined ? next - 0.4 - start : Infinity;
+    const zoom = Math.min(scale, 1 + (ZOOM_RATE * room) / 2);
+    if (zoom <= 1.02) continue;
+    const ramp = Math.min(rampFor(zoom), room / 2);
+    const outAt = Math.max(start + ramp, next !== undefined ? Math.min(hold.to + 0.4, next - 0.4 - ramp) : hold.to + 0.4);
+    keys.push({ t: +start.toFixed(3), scale: 1, x, y });
+    keys.push({ t: +(start + ramp).toFixed(3), scale: +zoom.toFixed(3), x, y });
+    keys.push({ t: +outAt.toFixed(3), scale: +zoom.toFixed(3), x, y });
+    keys.push({ t: +(outAt + ramp).toFixed(3), scale: 1, x, y });
+    free = outAt + ramp;
+  }
+  return keys;
+}
+
+/** the zoom at t between its keys (linear: the ripple of a click needs where the picture stands, not the curve) */
+export function zoomAt(keys, t) {
+  if (!keys.length || t <= keys[0].t) return keys[0] ?? { scale: 1, x: 0, y: 0 };
+  for (let i = 1; i < keys.length; i++) {
+    const a = keys[i - 1], b = keys[i];
+    if (t <= b.t) {
+      const u = b.t > a.t ? (t - a.t) / (b.t - a.t) : 1;
+      return { scale: a.scale + (b.scale - a.scale) * u, x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u };
+    }
+  }
+  return keys[keys.length - 1];
+}
+
+/**
+ * The layer's position that brings a point of the picture to the frame's
+ * centre at a zoom: the picture filling the frame at `base` (its position at
+ * zoom 1), its edges never pulled inside the frame.
+ */
+export function positionFor(point, zoom, frame, base = [frame.w / 2, frame.h / 2]) {
+  const cx = frame.w / 2, cy = frame.h / 2;
+  const slackX = ((zoom - 1) * frame.w) / 2, slackY = ((zoom - 1) * frame.h) / 2;
+  const px = cx - zoom * (point[0] - base[0]), py = cy - zoom * (point[1] - base[1]);
+  return [Math.round(Math.min(cx + slackX, Math.max(cx - slackX, px))), Math.round(Math.min(cy + slackY, Math.max(cy - slackY, py)))];
 }
 
 /**
@@ -165,25 +203,24 @@ const screencast = {
     const read = typeof ctx.readStill === 'function'
       ? (t) => ctx.readStill(t)
       : async (t) => decodeStill(await ctx.renderStill(+(t + (layer.in ?? 0)).toFixed(3)));
-    const stills = [];
-    for (let k = 0; k < times.length; k++) {
-      if (ctx.signal.aborted) throw new Error('stopped');
-      if (k % 8 === 0) ctx.progress?.(k, times.length);
-      stills.push(await read(times[k]));
-    }
-    // the regions of interest, from one still to the next
+    // the regions of interest, from one still to the next: only the last still is kept (a long
+    // recording would not fit in memory as pictures), its box brought to the composition's pixels
     const regions = [];
     let prev = null;
     for (let k = 0; k < times.length; k++) {
-      const px = stills[k];
+      if (ctx.signal.aborted) throw new Error('stopped');
+      if (k % 8 === 0) ctx.progress?.(k, times.length);
+      const px = await read(times[k]);
       if (!px || !px.data) { regions.push({ t: times[k], box: null }); prev = null; continue; }
-      const box = prev ? activity(prev.data, px.data, px.w ?? w, px.h ?? h, a.cell ?? 32) : null;
-      regions.push({ t: times[k], box });
-      prev = px;
+      const pw = px.w ?? w, ph = px.h ?? h;
+      const found = prev && prev.w === pw && prev.h === ph ? activity(prev.data, px.data, pw, ph, a.cell ?? 32) : null;
+      const sx = w / pw, sy = h / ph;
+      regions.push({ t: times[k], box: found ? { x: found.x * sx, y: found.y * sy, w: found.w * sx, h: found.h * sy, amount: found.amount } : null });
+      prev = { data: px.data, w: pw, h: ph };
     }
     const data = { version: 1, kind: 'screencast', source: asset, width: w, height: h, regions: regions.map((r) => ({ t: r.t, box: r.box, kind: !r.box ? 'still' : area(r.box) > 0.6 * w * h ? 'page' : area(r.box) < 0.03 * w * h ? 'click' : 'activity' })) };
     const path = await ctx.writeFile(`assets/screencast/${asset}.json`, JSON.stringify(data));
-    // the zooms on the layer: scale and focus, as ordinary keys
+    // the zooms on the layer: scale and position, as ordinary keys
     const keys = zoomKeys(regions, { w, h }, a.maxScale ?? 2.5);
     const clicks = clicksOf(regions, { w, h });
     const ops = [];
@@ -193,19 +230,35 @@ const screencast = {
       sid = `screencast-${asset}`;
       ops.push({ op: 'add', path: `/assets/${sid}`, value: { type: 'json', src: path, name: `Screencast · ${media.name ?? asset}` } });
     }
+    // the keys are on the composition's clock: the recording's times start at the layer's in point
+    const t0 = layer.in ?? 0, at = (t) => +(t + t0).toFixed(3);
     if (keys.length) {
-      const scale = keys.map((k) => ({ t: k.t, v: [k.scale, k.scale] }));
-      const focus = keys.map((k) => ({ t: k.t, v: [+(k.x / w).toFixed(4), +(k.y / h).toFixed(4)] }));
-      ops.push({ op: 'replace', path: `/compositions/${ctx.compId}/layers/${chosen}/transform/scale`, value: { $k: scale } });
-      ops.push({ op: 'replace', path: `/compositions/${ctx.compId}/layers/${chosen}/props/focus`, value: { $k: focus } });
+      // the zoom over the layer's own scale, the point of action brought to the centre by its position
+      const s0 = Array.isArray(layer.transform?.scale) ? layer.transform.scale : [1, 1];
+      const p0 = Array.isArray(layer.transform?.position) ? layer.transform.position : [w / 2, h / 2];
+      const EASE = [0.42, 0, 0.58, 1];
+      const scale = keys.map((k) => ({ t: at(k.t), v: [+(s0[0] * k.scale).toFixed(4), +(s0[1] * k.scale).toFixed(4)], ease: EASE }));
+      const position = keys.map((k) => ({ t: at(k.t), v: k.scale === 1 ? [...p0] : positionFor([k.x, k.y], k.scale, { w, h }, p0), ease: EASE }));
+      ops.push({ op: layer.transform?.scale === undefined ? 'add' : 'replace', path: `/compositions/${ctx.compId}/layers/${chosen}/transform/scale`, value: { $k: scale } });
+      ops.push({ op: layer.transform?.position === undefined ? 'add' : 'replace', path: `/compositions/${ctx.compId}/layers/${chosen}/transform/position`, value: { $k: position } });
     }
-    // a click found is marked with the walkthrough pack's cursor ripple
+    // a click found is marked with the walkthrough pack's cursor ripple, where the zoom shows its point at that moment
+    const taken = new Set(Object.keys(comp.layers));
+    const p0 = Array.isArray(layer.transform?.position) ? layer.transform.position : [w / 2, h / 2];
+    const onScreen = (c) => {
+      const z = zoomAt(keys, c.t);
+      if (z.scale === 1) return [c.x, c.y];
+      const P = positionFor([z.x, z.y], z.scale, { w, h }, p0);
+      return [Math.round(P[0] + z.scale * (c.x - p0[0])), Math.round(P[1] + z.scale * (c.y - p0[1]))];
+    };
     clicks.forEach((c, k) => {
-      const id = `click-${k + 1}`;
+      let id = `click-${k + 1}`;
+      for (let n = 2; taken.has(id); n++) id = `click-${k + 1}-${n}`;
+      taken.add(id);
       ops.push({ op: 'add', path: `/compositions/${ctx.compId}/layers/${id}`, value: {
-        type: 'ui.cursor', name: `Click ${k + 1}`, in: Math.max(0, c.t - 0.3), out: Math.min(comp.duration, c.t + 0.6),
-        transform: { position: [c.x, c.y] },
-        props: { pos: [0, 0], click: { $k: [{ t: c.t, v: 0 }, { t: +(c.t + 0.16).toFixed(3), v: 1 }, { t: +(c.t + 0.5).toFixed(3), v: 0 }] } },
+        type: 'ui.cursor', name: `Click ${k + 1}`, in: Math.max(0, at(c.t) - 0.3), out: Math.min(comp.duration, at(c.t) + 0.6),
+        transform: { position: onScreen(c) },
+        props: { pos: [0, 0], click: { $k: [{ t: at(c.t), v: 0 }, { t: at(c.t + 0.16), v: 1 }, { t: at(c.t + 0.5), v: 0 }] } },
       } });
       ops.push({ op: 'add', path: `/compositions/${ctx.compId}/order/-`, value: id });
     });
@@ -221,10 +274,10 @@ const screencast = {
       ops, label: `Screencast · ${media.name ?? asset}`,
       text: [
         `${regions.length} look(s) of the recording (one every ${duration > 900 ? 'second — the 30 minutes are capped at 1 800' : 'half second'}), saved as asset "${sid}".`,
-        keys.length ? `${keys.filter((k) => k.scale > 1).length ? 'Zooms keyed' : 'No zoom worth keying'}: the layer's scale and focus move where the action is, out again before each page change.` : 'Nothing moves locally: no zoom keyed.',
+        keys.length ? `${keys.filter((k) => k.scale > 1).length ? 'Zooms keyed' : 'No zoom worth keying'}: the layer's scale and position move where the action is, out again before each page change.` : 'Nothing moves locally: no zoom keyed.',
         clicks.length ? `${clicks.length} click(s) marked with the cursor's ripple, at ${clicks.map((c) => `${c.t.toFixed(1)} s`).join(', ')}.` : 'No click found.',
         quiet.length && a.speedUp !== false ? `Still stretches for the edit: ${quiet.slice(0, 8).map((s) => `${s.from.toFixed(1)}–${s.to.toFixed(1)} s`).join(', ')}${quiet.length > 8 ? ` and ${quiet.length - 8} more` : ''} — a speed-up or a cut, on your word.` : '',
-        'The keys are ordinary: move a zoom on the layer\'s scale and focus, delete a ripple, edit the regions in the asset.',
+        'The keys are ordinary: move a zoom on the layer\'s scale and position, delete a ripple, edit the regions in the asset.',
       ].filter(Boolean).join('\n'),
     };
   },
@@ -256,6 +309,19 @@ const screencastMotion = {
           if (fx < 0 || fx > 1 || fy < 0 || fy > 1) {
             out.push({ check: 'screencast-motion', severity: 'warning', t: Number(key.t), message: `${name}: the focus leaves the picture at ${Number(key.t).toFixed(1)} s — keep it inside, or the zoom shows past the recording's edge` });
           }
+        }
+      }
+      // the zoomed picture moved by its position: it keeps covering the frame (a recording filling it at zoom 1)
+      const pos = l.transform?.position;
+      if (pos && typeof pos === 'object' && Array.isArray(pos.$k)) {
+        const W = ctx.comp.width, H = ctx.comp.height;
+        const base = Number(scale.$k[0]?.v?.[0] ?? 1) || 1;
+        for (const key of pos.$k) {
+          const sk = scale.$k.find((s) => Math.abs(Number(s.t) - Number(key.t)) < 1e-3);
+          if (!sk || !Array.isArray(key.v)) continue;
+          const zoom = (Number(sk.v?.[0] ?? sk.v) || 1) / base;
+          const dx = Math.abs(key.v[0] - W / 2) - ((zoom - 1) * W) / 2, dy = Math.abs(key.v[1] - H / 2) - ((zoom - 1) * H) / 2;
+          if (zoom > 1.01 && (dx > 2 || dy > 2)) out.push({ check: 'screencast-motion', severity: 'warning', t: Number(key.t), message: `${name}: at ${Number(key.t).toFixed(1)} s the zoom shows past the recording's edge — bring its position back toward the centre` });
         }
       }
     }

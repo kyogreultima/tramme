@@ -191,6 +191,13 @@ export const presets = [
 ];
 export const messages = {
   fr: {
+    "Screens": "Écrans",
+    "the screenshots, in the order they are shown": "les captures, dans l’ordre où elles sont montrées",
+    "phone by default": "téléphone par défaut",
+    "Seconds per screen": "Secondes par écran",
+    "2.5 by default": "2,5 par défaut",
+    "Captions": "Légendes",
+    "one line per screen, said under it (same order)": "une ligne par écran, dite dessous (même ordre)",
     'Device': 'Appareil', 'Cursor': 'Curseur', 'Screenshot': 'Capture', 'Scroll': 'Défilement', 'Address': 'Adresse',
     'Frame': 'Cadre', 'Shadow': 'Ombre', 'Size': 'Taille', 'Font': 'Police', 'Position': 'Position', 'Click': 'Clic',
     'Color': 'Couleur', 'Scale': 'Échelle', 'Lay out a walkthrough': 'Monter une visite guidée',

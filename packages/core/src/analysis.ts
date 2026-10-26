@@ -26,8 +26,10 @@ export interface AudioAnalysis {
   downbeats: number[];
   /** where the energy changes for good (verse, chorus, drop), with the loudness that follows */
   sections: { t: number; level: number }[];
-  /** the energy of 32 log bands (40 Hz to 16 kHz), sampled at 12.5 Hz (every fourth frame of the 50 Hz rate), each band normalised on its own loudest frame — the audiogram's wave reads them */
-  bands: number[][];
+  /** the energy of 32 log bands (40 Hz to 16 kHz), sampled at `bandsRate` (every fourth frame of the 50 Hz rate), each band normalised on its own loudest frame — the audiogram's wave reads them; absent from analyses made before 0.14 */
+  bands?: number[][];
+  /** how many band frames a second (12.5) */
+  bandsRate?: number;
 }
 
 export const isAudioAnalysis = (x: unknown): x is AudioAnalysis =>
@@ -103,10 +105,13 @@ function magnitudes(window: Float32Array): Float32Array {
   return out;
 }
 
+/** the bands are kept for every fourth frame of the analysis' rate: 12.5 a second at 50 Hz */
+const BANDS_EVERY = 4;
+
 /**
  * A spectrum's energy in `count` bands on a log scale from 40 Hz to 16 kHz:
- * the mean magnitude of the bins each band spans (at least one). The bands
- * are relative: the loudest band of the frame reads 1 after normalisation.
+ * the mean magnitude of the bins each band spans (at least one), raw (the
+ * analysis normalises them over the whole sound, so a quiet frame stays quiet).
  */
 export function logBands(spectrum: Float32Array, sampleRate: number, count = 32): number[] {
   const binHz = sampleRate / 2 / spectrum.length;
@@ -119,8 +124,7 @@ export function logBands(spectrum: Float32Array, sampleRate: number, count = 32)
     for (let i = i0; i < i1; i++) s += spectrum[i];
     out[b] = s / (i1 - i0);
   }
-  const top = Math.max(...out, 1e-9);
-  return out.map((v) => +(v / top).toFixed(2));
+  return out;
 }
 
 /**
@@ -210,26 +214,31 @@ export function analyseAudio(samples: Float32Array, sampleRate: number): AudioAn
     if (Math.abs(after - before) > 0.25 && (!sections.length || marks[i] - sections.at(-1)!.t >= 4)) sections.push({ t: +marks[i].toFixed(3), level: +after.toFixed(2) });
   }
 
-  // the 32 log bands: an FFT of 2048 samples every frame (at the 50 Hz rate), saved decimated to
-  // 12.5 Hz (every fourth frame) so a 30-minute analysis stays under 6 MB — the wave reads them
-  // interpolated (the audiogram's barsAt)
+  // the 32 log bands: an FFT of 2048 samples on every fourth frame of the 50 Hz rate (12.5 Hz, only
+  // the frames that are kept are computed), so a 30-minute analysis stays under 6 MB — the wave
+  // reads them interpolated (the audiogram's barsAt)
   const N = 2048;
   const spec: number[][] = Array.from({ length: 32 }, () => []);
   const window = new Float32Array(N);
-  for (let f = 0; f < frames; f++) {
+  for (let f = 0; f < frames; f += BANDS_EVERY) {
     const at = Math.min(samples.length - N, f * hop);
     if (at < 0) { for (let b = 0; b < 32; b++) spec[b].push(0); continue; }
     for (let i = 0; i < N; i++) { const v = samples[at + i]; window[i] = v * (0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (N - 1))); }
-    const mag = magnitudes(window);
-    const frame = logBands(mag, sampleRate);
+    const frame = logBands(magnitudes(window), sampleRate);
     for (let b = 0; b < 32; b++) spec[b].push(frame[b]);
   }
-  const bandList = spec.map((band) => band.filter((_, f) => f % 4 === 0));
+  // each band on its own loudest frame (a quiet frame reads low, a silence reads 0), softened by
+  // the band's share of the loudest one so a band holding only noise stays low
+  const tops = spec.map((band) => band.reduce((m, v) => (v > m ? v : m), 0)), loudest = Math.max(1e-9, ...tops);
+  const bandList = spec.map((band, b) => {
+    const k = tops[b] > 1e-9 ? Math.sqrt(tops[b] / loudest) / tops[b] : 0;
+    return band.map((v) => +(v * k).toFixed(2));
+  });
 
   return {
     version: 1, kind: 'audio-analysis', duration: +(samples.length / sampleRate).toFixed(3), rate: RATE,
     envelope: { rms: rmsN, low: normalise(bands.low), mid: normalise(bands.mid), high: normalise(bands.high) },
-    onsets: onsets.map((t) => +t.toFixed(3)), tempo, beats, downbeats, sections, bands: bandList,
+    onsets: onsets.map((t) => +t.toFixed(3)), tempo, beats, downbeats, sections, bands: bandList, bandsRate: RATE / BANDS_EVERY,
   };
 }
 

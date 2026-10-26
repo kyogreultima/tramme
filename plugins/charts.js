@@ -342,11 +342,11 @@ const chartTool = {
       points: { type: 'array', title: 'Points', items: { type: 'array', items: { type: 'number' } }, description: 'a function only: [[x, y], …] sampled from x = 0 to 1 — computed, never guessed' },
       entries: { type: 'integer', title: 'Entries', description: 'a race only: how many race at once (12 at most in 9:16, 20 in 16:9)' },
     },
-    required: ['data'],
   },
   async run({ data, kind = 'bar', title, orientation, points, entries }, ctx) {
-    const a = ctx.doc.assets[data];
-    if (!a || a.type !== 'json') throw new Error(`${data}: a JSON asset of the project is expected (a list of { label, value })`);
+    // a function chart takes its points; every other kind reads a data set of the project
+    const a = data ? ctx.doc.assets[data] : null;
+    if (kind !== 'function' && (!a || a.type !== 'json')) throw new Error(`${data ?? 'data'}: a JSON or CSV asset of the project is expected (a list of { label, value }, a table for a race)`);
     const c = ctx.doc.compositions[ctx.compId];
     const u = Math.min(c.width, c.height);
     const portrait = c.height > c.width;
@@ -373,11 +373,19 @@ const chartTool = {
       const pts = (points ?? []).map(([x, y]) => [Number(x), Number(y)]).filter(([x, y]) => Number.isFinite(x) && Number.isFinite(y));
       if (pts.length < 2) throw new Error('a function chart takes points: [[x, y], …] sampled from x = 0 to 1 (computed, never guessed)');
       props = { points: pts };
+    } else if (kind === 'scatter') {
+      // the points of the data set: [{ name, x, y }] or { points: [...] }
+      let raw = null;
+      try { raw = JSON.parse((await ctx.readText(a.src)) ?? 'null'); } catch { raw = null; }
+      const list = (Array.isArray(raw) ? raw : raw?.points ?? []).filter((d) => d && Number.isFinite(Number(d.x)) && Number.isFinite(Number(d.y)));
+      if (!list.length) throw new Error(`${data}: a scatter takes a list of { name, x, y }`);
+      props = { values: list.map((d) => ({ name: String(d.name ?? d.label ?? ''), x: Number(d.x), y: Number(d.y), ...(Number.isFinite(Number(d.size)) ? { size: Number(d.size) } : {}) })) };
+      count = list.length;
     } else props = { data };
     const size = kind === 'donut' ? [Math.round(u * 0.52), Math.round(u * 0.52)] : [Math.round(c.width * 0.76), Math.round(c.height * (portrait ? 0.38 : 0.5))];
     if (kind === 'race' || kind === 'scatter' || kind === 'function') { size[0] = Math.round(c.width * 0.8); size[1] = Math.round(c.height * (portrait ? 0.5 : 0.62)); }
     const taken = { ...c.layers };
-    const base = `chart-${kind}-${data}`.replace(/[^a-z0-9-]/g, '-').slice(0, 60);
+    const base = `chart-${kind}-${data ?? 'curve'}`.replace(/[^a-z0-9-]/g, '-').slice(0, 60);
     let cid = base, k = 2;
     while (cid in taken) cid = `${base}-${k++}`;
     const ops = [], order = [...c.order];
@@ -385,17 +393,23 @@ const chartTool = {
     props.size = size;
     if (kind === 'bar' && orientation) props.orientation = orientation;
     if (kind !== 'donut' && accent) props.fill = '@accent';
+    // a race runs over the composition: a period a second at least, the last one held
+    if (kind === 'race' && props.table.length > 1) {
+      const end = Math.max(1.6, Math.min(c.duration - 0.8, 0.4 + (props.table.length - 1) * Math.max(1, (c.duration - 1.2) / (props.table.length - 1))));
+      props.progress = { $k: [{ t: 0.4, v: 0 }, { t: +end.toFixed(3), v: 1 }] };
+      if ((end - 0.4) / (props.table.length - 1) < 1) note += ` The composition gives each period less than a second: lengthen it to ${Math.ceil(props.table.length + 1.2)} s.`;
+    }
     ops.push({ op: 'add', path: `/compositions/${ctx.compId}/layers/${cid}`, value: { type: `chart.${kind}`, name: title ?? `${kind} chart`, transform: { position: [Math.round(c.width / 2), Math.round(c.height / 2)] }, props } });
     order.push(cid);
     if (title) {
       const tid = `${cid}-title`;
-      ops.push({ op: 'add', path: `/compositions/${ctx.compId}/layers/${tid}`, value: { type: 'text', name: 'Chart title', in: 0, transform: { position: [c.width / 2, Math.round(c.height * (portrait ? 0.12 : 0.16))] }, props: { text: title, size: Math.round(u * 0.05), weight: 800, align: 'center', color: '#FFFFFF' } } });
+      ops.push({ op: 'add', path: `/compositions/${ctx.compId}/layers/${tid}`, value: { type: 'text', name: 'Chart title', in: 0, transform: { position: [c.width / 2, Math.round(c.height * (portrait ? 0.12 : 0.16))] }, props: { text: title, size: Math.round(u * 0.05), weight: 800, align: 'center', color: ctx.doc.tokens?.text?.type === 'color' ? '@text' : '#FFFFFF' } } });
       order.push(tid);
     }
     ops.push({ op: 'replace', path: `/compositions/${ctx.compId}/order`, value: order });
     return {
       ops, label: title ?? `${kind} chart`,
-      text: `A ${kind} chart${count ? ` of ${count} entries` : ` of ${data}`} (${size[0]}×${size[1]})${title ? `, titled "${title}"` : ''}.${note} ${kind === 'race' ? `It runs on the layer's progress: key it over the composition and the bars slide to their ranks, the period large behind.` : kind === 'function' ? 'The curve draws itself; the dot travels with the "at" property, a tangent on demand.' : ''} Edit the data in the inspector.`,
+      text: `A ${kind} chart${count ? ` of ${count} entries` : ` of ${data}`} (${size[0]}×${size[1]})${title ? `, titled "${title}"` : ''}.${note} ${kind === 'race' ? `It runs on the layer's progress, keyed over the composition: the bars slide to their ranks, the period large behind.` : kind === 'function' ? 'The curve draws itself; the dot travels with the "at" property, a tangent on demand.' : ''} Edit the data in the inspector.`,
     };
   },
 };
@@ -471,6 +485,7 @@ const raceNode = {
     progress: { type: 'number', default: 1, min: 0, max: 1, step: 0.001, label: 'Progress', description: '0: the first period; key it to run the race' },
     entries: { type: 'integer', default: 10, min: 3, max: 20, label: 'Entries', description: 'how many race at once (12 at most in 9:16)' },
     fill: { type: 'paint', default: '#2EC4B6', label: 'Bars' },
+    ink: { type: 'paint', default: '@text', label: 'Text colour' },
     size: { type: 'vec2', default: [900, 560], label: 'Size', unit: 'px' },
     font: { type: 'asset', assetType: 'font', default: null, nullable: true, label: 'Font', animatable: false },
   },
@@ -495,6 +510,12 @@ const raceNode = {
       const rows = shown.length, rowH = (h - u * 0.14) / rows;
       ctx.save();
       ctx.translate(-w / 2, -h / 2);
+      // the period, large, behind the bars
+      ctx.font = FONT(p, host, Math.round(u * 0.12), 800);
+      ctx.fillStyle = p.ink; ctx.globalAlpha = 0.16;
+      ctx.textAlign = 'right'; ctx.textBaseline = 'alphabetic';
+      ctx.fillText(String(table[Math.round(fu)]?.period ?? ''), w - u * 0.02, h - u * 0.03);
+      ctx.globalAlpha = 1;
       ctx.font = FONT(p, host, Math.round(u * 0.034));
       ctx.textBaseline = 'alphabetic';
       const labelW = Math.min(w * 0.26, Math.max(...shown.map((n) => n.length), 4) * u * 0.021);
@@ -509,20 +530,15 @@ const raceNode = {
         ctx.globalAlpha = lead ? 1 : 0.78;
         ctx.beginPath(); ctx.roundRect(labelW, y, Math.max(1, bw), rowH * 0.64, Math.min(rowH * 0.32, u * 0.01)); ctx.fill();
         ctx.globalAlpha = 1;
-        ctx.fillStyle = 'rgba(128,128,128,0.92)';
+        ctx.fillStyle = p.ink; ctx.globalAlpha = 0.7;
         ctx.textAlign = 'right';
         ctx.fillText(n, labelW - u * 0.012, y + rowH * 0.58);
-        ctx.fillStyle = 'rgba(255,255,255,0.94)';
+        ctx.globalAlpha = 1;
         ctx.textAlign = 'left';
         ctx.font = FONT(p, host, Math.round(u * 0.03), 800);
         ctx.fillText(fmt(v), labelW + bw + u * 0.012, y + rowH * 0.58);
         ctx.font = FONT(p, host, Math.round(u * 0.034));
       });
-      // the period, large
-      ctx.font = FONT(p, host, Math.round(u * 0.12), 800);
-      ctx.fillStyle = 'rgba(255,255,255,0.16)';
-      ctx.textAlign = 'right';
-      ctx.fillText(String(table[Math.round(fu)]?.period ?? ''), w - u * 0.02, h - u * 0.03);
       ctx.restore();
     },
   },
@@ -538,6 +554,7 @@ const scatterNode = {
     labels: { type: 'bool', default: true, label: 'Labels', animatable: false },
     trails: { type: 'bool', default: true, label: 'Trails', animatable: false },
     fill: { type: 'paint', default: '#2EC4B6', label: 'Points' },
+    ink: { type: 'paint', default: '@text', label: 'Text colour' },
     xMax: { type: 'number', default: 0, min: 0, label: 'X to', animatable: false, description: '0: the data\'s own maximum' },
     yMax: { type: 'number', default: 0, min: 0, label: 'Y to', animatable: false },
     size: { type: 'vec2', default: [900, 560], label: 'Size', unit: 'px' },
@@ -598,7 +615,7 @@ const scatterNode = {
       if (p.labels) {
         const sides = labelSides(drawn.map((d) => ({ x: d.x / w, y: d.y / h })));
         drawn.forEach((d, i) => {
-          ctx.fillStyle = 'rgba(255,255,255,0.9)';
+          ctx.fillStyle = p.ink;
           ctx.textAlign = sides[i] > 0 ? 'left' : 'right';
           ctx.fillText(String(d.name), d.x + sides[i] * u * 0.018, d.y + u * 0.01);
         });
@@ -685,14 +702,18 @@ export const presets = [
 ];
 export const messages = {
   fr: {
+    "Kind": "Type",
+    "Title": "Titre",
+    "a line above the chart, when the chart needs one": "une ligne au-dessus du graphique, quand il en a besoin",
+    "Bar orientation": "Orientation des barres",
     'Bar chart': 'Histogramme', 'Line chart': 'Courbe', 'Donut chart': 'Anneau', 'Race chart': 'Course', 'Scatter': 'Nuage', 'Function': 'Fonction',
     'Bars': 'Barres', 'Values': 'Valeurs', 'Orientation': 'Orientation', 'Scale to': 'Échelle jusqu\'à',
     'Grid': 'Grille', 'Label size': 'Corps des étiquettes', 'Size': 'Taille', 'Font': 'Police',
-    'Curve': 'Courbure', 'Fill under': 'Remplir dessous', 'Dots': 'Points', 'Draw over': 'Tracé en',
+    'Curve': 'Courbure', 'Fill under': 'Remplir dessous', 'Dots': 'Points', 'Draw over': 'Tracé en', 'Text colour': 'Couleur du texte',
     'Thickness': 'Épaisseur', 'Centre text': 'Texte central', 'Percents': 'Pourcentages',
     'Data set': 'Jeu de données', 'Chart title': 'Titre du graphique', 'Add a chart': 'Ajouter un graphique',
     'Progress': 'Progression', 'Table': 'Table', 'Entries': 'Concurrents', 'Points': 'Points', 'Over time': 'Dans le temps', 'Labels': 'Étiquettes', 'Trails': 'Traînées',
-    'X to': 'X jusqu’à', 'Y to': 'Y jusqu’à', 'Draw over': 'Tracé en', 'Dot at': 'Point à', 'Tangent': 'Tangente', 'Area under': 'Aire dessous',
+    'X to': 'X jusqu’à', 'Y to': 'Y jusqu’à', 'Draw over': 'Tracé en', 'Text colour': 'Couleur du texte', 'Dot at': 'Point à', 'Tangent': 'Tangente', 'Area under': 'Aire dessous',
     '0: the first period; key it to run the race': '0 : la première période ; keyframez-le pour lancer la course',
     'how many race at once (12 at most in 9:16)': 'combien courent en même temps (12 au plus en 9:16)',
     '[{ period, values: { name: value } }, …] — the chart tool builds it from a CSV': '[{ period, values: { name: valeur } }, …] — l’outil graphique le construit depuis un CSV',
@@ -707,7 +728,7 @@ export const messages = {
     'two measures together (spend against reach, years against life): the points move between the periods and their trails tell where they came from; label only the points the voice names': 'deux mesures ensemble (dépense contre portée, années contre vie) : les points voyagent entre les périodes et leurs traînées disent d’où ils viennent ; n’étiquetez que les points que la voix nomme',
     'more than 30 points, labels on every point (they collide — the check says so), a story the axes do not tell': 'plus de 30 points, des étiquettes sur chaque point (elles se heurtent — la vérification le dit), une histoire que les axes ne racontent pas',
     'a curve the tool sampled (the tool takes the points; the node never computes): a formula drawn on, a dot travelling along it, the area under it filling; the pack\'s ticks keep the axes readable': 'une courbe échantillonnée par l’outil (l’outil prend les points ; le nœud ne calcule jamais) : une formule qui se trace, un point qui voyage le long, l’aire dessous qui se remplit ; les graduations du pack gardent les axes lisibles',
-    'points the model invented without computing (a wrong curve is worse than none), more than two curves on one frame, a tangent nobody asked for': 'des points inventés sans calcul (une courbe fausse vaut mieux que pas de courbe… non : une courbe fausse est pire), plus de deux courbes sur une image, une tangente que personne ne demande',
+    'points the model invented without computing (a wrong curve is worse than none), more than two curves on one frame, a tangent nobody asked for': 'des points inventés sans calcul (une courbe fausse est pire que pas de courbe), plus de deux courbes sur une image, une tangente que personne ne demande',
     'a bar, line, donut, race, scatter or function chart from a JSON data set of the project or from a CSV (separators, quotes and decimal commas read), sized and placed in the composition, with an optional title above it': 'un histogramme, une courbe, un anneau, une course, un nuage ou une fonction depuis un jeu de données JSON du projet ou depuis un CSV (séparateurs, guillemets et virgules décimales lus), dimensionné et placé dans la composition, avec un titre optionnel au-dessus',
     'bar by default; a race takes a table of periods by entries, a function the sampled points': 'histogramme par défaut ; une course prend une table de périodes par concurrents, une fonction les points échantillonnés',
     'a function only: [[x, y], …] sampled from x = 0 to 1 — computed, never guessed': 'pour une fonction : [[x, y], …] échantillonné de x = 0 à 1 — calculé, jamais deviné',

@@ -143,7 +143,7 @@ const duotone = {
 export const meta = { id: 'tramme/print', name: 'print', version: '1.0.0', description: 'Print looks: halftone, riso inks, grain and duotone — as GLSL passes and stacked presets', api: 1 };
 export const effects = [halftone, riso, grain, duotone];
 export const presets = [
-  { name: 'risograph', title: 'Risograph', category: 'Print', description: 'two inks a little off register, over paper grain', effects: [{ type: 'print.riso', props: { inks: ['@accent', '#F25022'], misregister: 3, grain: 0.35 } }] },
+  { name: 'risograph', title: 'Risograph', category: 'Print', description: 'two inks a little off register, over paper grain', effects: [{ type: 'print.riso', props: { inkA: '@accent', inkB: '#F25022', misregister: 3, grain: 0.35 } }] },
   { name: 'newsprint', title: 'Newsprint', category: 'Print', description: 'one black ink as halftone dots at 45°', effects: [{ type: 'print.halftone', props: { cell: 6, angle: 45, ink: '#14100C' } }, { type: 'print.grain', props: { amount: 0.16, size: 1 } }] },
   { name: 'two-tone', title: 'Two-tone', category: 'Print', description: 'the picture between two brand colours, with a whisper of grain', effects: [{ type: 'print.duotone', props: { dark: '#101B2D', light: '#F2E9DC' } }, { type: 'print.grain', props: { amount: 0.1, size: 1.4 } }] },
 ];
