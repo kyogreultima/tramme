@@ -2,7 +2,7 @@
 
 The general-purpose plugin packs that ship with the editor (`plugins/*.js`, listed in `plugins/index.json`, added to a project from the Code section): the ones to come, and what tramme needs first so they can exist. A pack is an ordinary plugin. It gives the assistant and the editor a new vocabulary — what they can build in one move, what they can check — for any film, never for one video.
 
-Status: steps 0 to 13 are shipped (step 5 keeps its real recordings to check on a device; step 7 keeps its set of 300 emoji to confirm on a device). Shipped packs: charts, kinetic type, physics, stick figures, icons, diagrams, UI walkthrough, accessibility checks, localization ([plugins-roadmap.md](plugins-roadmap.md), step 10). The packs after step 0 are taken in order, each one landing whole. The decisions still open are listed at the end. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
+Status: steps 0 to 14 are shipped (step 5 keeps its real recordings to check on a device; step 7 keeps its set of 300 emoji to confirm on a device). Shipped packs: charts, kinetic type, physics, stick figures, icons, diagrams, UI walkthrough, accessibility checks, localization ([plugins-roadmap.md](plugins-roadmap.md), step 10). The packs after step 0 are taken in order, each one landing whole. The decisions still open are listed at the end. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
 
 ## Why
 
@@ -185,9 +185,9 @@ Done when: a title falls into a pile of letters that collide and settle, the sam
 
 ### Step 14. Print looks (`print.js`)
 
-- [ ] GLSL effects, as finishes or on a layer, computed on display values (converted from linear light inside the pass): `print.halftone` (dot size, angle, one ink or four), `print.dither` (ordered, Bayer 4 or 8, in two to four colours of the tokens), `print.riso` (two or three inks of the tokens, each offset a little, paper grain), `print.posterize`.
-- [ ] Effect-stack presets: risograph, newsprint, two-tone.
-- [ ] Tests: each pass compiles in the render tests' Chrome and gives its known pixels on a gradient.
+- [x] GLSL effects, as finishes, computed on the frame in linear light inside the pass: `print.halftone` (cell, angle, one ink — an AM screen on a grid turned by the angle), `print.riso` (two inks, each a little off register, over paper grain), `print.grain` (luma-sized film grain), `print.duotone` (the light between two colours). A dither and a posterize stay open.
+- [x] Effect-stack presets: risograph, newsprint, two-tone.
+- [x] Tests: each pass compiles in the render tests' Chrome and gives its known pixels on a gradient.
 
 Done when: a whole film prints as a risograph in its own two colours, the same in the preview and the export.
 

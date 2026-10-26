@@ -154,3 +154,11 @@ Morphs, liquids and paper: one shape becoming another without twisting, seeded b
 - Nodes: `matter.morph` — Morph, `matter.liquid` — Liquid, `matter.paper` — Paper
 - Checks: none
 
+## Print
+
+Print looks: halftone, riso inks, grain and duotone — as GLSL passes and stacked presets
+
+- Tools: none
+- Nodes: none
+- Checks: none
+

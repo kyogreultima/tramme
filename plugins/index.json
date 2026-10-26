@@ -301,5 +301,13 @@
     "version": "1.0.0",
     "commands": [],
     "fr": {}
+  },
+  {
+    "file": "print.js",
+    "name": "Print",
+    "description": "Print looks: halftone, riso inks, grain and duotone — as GLSL passes and stacked presets",
+    "version": "1.0.0",
+    "commands": [],
+    "fr": {}
   }
 ]
