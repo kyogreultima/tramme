@@ -30,7 +30,7 @@
     "description": "Confetti, bouncing balls, a rope, and letters that drop and settle — deterministic simulations",
     "commands": [],
     "fr": {},
-    "version": "1.0.0"
+    "version": "1.1.0"
   },
   {
     "file": "styk.js",

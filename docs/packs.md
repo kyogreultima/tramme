@@ -23,7 +23,7 @@ Text that moves letter by letter: typewriter, wave, scatter, drop, mask
 Confetti, bouncing balls, a rope, and letters that drop and settle — deterministic simulations
 
 - Tools: none
-- Nodes: `phys.confetti` — Confetti, `phys.bounce` — Bouncing balls, `phys.rope` — Rope, `phys.text-drop` — Text drop
+- Nodes: `phys.confetti` — Confetti, `phys.bounce` — Bouncing balls, `phys.rope` — Rope, `phys.text-drop` — Text drop, `phys.bodies` — Bodies
 - Checks: none
 
 ## Stick figures

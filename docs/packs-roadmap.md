@@ -2,7 +2,7 @@
 
 The general-purpose plugin packs that ship with the editor (`plugins/*.js`, listed in `plugins/index.json`, added to a project from the Code section): the ones to come, and what tramme needs first so they can exist. A pack is an ordinary plugin. It gives the assistant and the editor a new vocabulary — what they can build in one move, what they can check — for any film, never for one video.
 
-Status: steps 0 to 12 are shipped (step 5 keeps its real recordings to check on a device; step 7 keeps its set of 300 emoji to confirm on a device). Shipped packs: charts, kinetic type, physics, stick figures, icons, diagrams, UI walkthrough, accessibility checks, localization ([plugins-roadmap.md](plugins-roadmap.md), step 10). The packs after step 0 are taken in order, each one landing whole. The decisions still open are listed at the end. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
+Status: steps 0 to 13 are shipped (step 5 keeps its real recordings to check on a device; step 7 keeps its set of 300 emoji to confirm on a device). Shipped packs: charts, kinetic type, physics, stick figures, icons, diagrams, UI walkthrough, accessibility checks, localization ([plugins-roadmap.md](plugins-roadmap.md), step 10). The packs after step 0 are taken in order, each one landing whole. The decisions still open are listed at the end. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
 
 ## Why
 
@@ -177,9 +177,9 @@ Done when: an icon morphs into another without twisting, and a liquid and a torn
 
 ### Step 13. Rigid bodies (`physics.js` 1.1)
 
-- [ ] The `phys.bodies` node: boxes, circles and convex shapes that fall, collide, stack and come to rest (impulses, friction, restitution, sleep), stepped through `simulate`; the bodies are the glyphs of a text, shapes or pictures, and they meet the frame's edges and floors written as segments (decision 3).
-- [ ] The text drop grows into letters that knock into each other and pile up.
-- [ ] Tests: a box at rest stays at rest, a stack of three holds, any frame is the same reached in any order.
+- [x] The `phys.bodies` node: boxes, circles and convex shapes that fall, collide, stack and come to rest (impulses, friction, restitution, sleep), stepped through `simulate`; the bodies are the glyphs of a text, shapes or pictures, and they meet the frame's edges and floors written as segments (decision 3).
+- [x] The text drop grows into letters that knock into each other and pile up.
+- [x] Tests: a box at rest stays at rest, a stack of three holds, any frame is the same reached in any order.
 
 Done when: a title falls into a pile of letters that collide and settle, the same at every frame rendered in any order.
 

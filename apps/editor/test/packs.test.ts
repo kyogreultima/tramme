@@ -42,6 +42,7 @@ import { parseTex, layout, matchSymbols } from '../../../plugins/math.js';
 import * as math from '../../../plugins/math.js';
 import { resample, bestStart, marchingSquares, tornEdge, liquidField } from '../../../plugins/matter.js';
 import * as matter from '../../../plugins/matter.js';
+import { stepWorld } from '../../../plugins/physics.js';
 
 // the packs are JavaScript on purpose: their shape is checked at runtime by Registry.use, which these tests run
 const PACKS = [charts, kinetic, a11y, physics, styk, icons, diagram, walkthrough, localize, codeview, rhythm, screencast, handmade, chat, emoji, maps, audiogram, math, matter] as unknown as import('@tramme/core').PluginModule[];
@@ -828,6 +829,66 @@ describe('matter', () => {
       doc.compositions.main.order = ['m', 'l'];
       expect(validate(doc, registryOf())).toEqual([]);
     }
+  });
+});
+
+describe('rigid bodies', () => {
+  const ground = (y = -300) => ({
+    gravity: [0, 900],
+    bodies: [
+      { id: 'b', kind: 'box', x: 0, y, w: 120, h: 120, mass: 1, inertia: 2400, restitution: 0.2, friction: 0.5 },
+      { id: 'floor', kind: 'box', x: 0, y: 60, w: 3000, h: 80, static: true, mass: 0, inertia: 0, restitution: 0.2, friction: 0.5 },
+    ],
+  });
+  const stack = () => ({
+    gravity: [0, 900],
+    bodies: [
+      { id: 'a', kind: 'box', x: 0, y: -52, w: 100, h: 100, mass: 1, inertia: 1700, restitution: 0.1, friction: 0.6 },
+      { id: 'b2', kind: 'box', x: 0, y: -154, w: 100, h: 100, mass: 1, inertia: 1700, restitution: 0.1, friction: 0.6 },
+      { id: 'c', kind: 'box', x: 0, y: -256, w: 100, h: 100, mass: 1, inertia: 1700, restitution: 0.1, friction: 0.6 },
+      { id: 'floor', kind: 'box', x: 0, y: 40, w: 3000, h: 80, static: true, mass: 0, inertia: 0, restitution: 0.1, friction: 0.6 },
+    ],
+  });
+
+  it('a box resting on the ground stays still, and sleeps', () => {
+    let w = ground();
+    for (let k = 0; k < 240; k++) w = stepWorld(w, 1 / 30);
+    const at = w.bodies[0].y;
+    for (let k = 0; k < 60; k++) w = stepWorld(w, 1 / 30);
+    expect(Math.abs(w.bodies[0].y - at)).toBeLessThan(0.5);
+    expect((w.bodies[0] as unknown as { asleep: boolean }).asleep).toBe(true);
+  });
+
+  it('a stack of three holds', () => {
+    let w = stack();
+    for (let k = 0; k < 300; k++) w = stepWorld(w, 1 / 30);
+    // the boxes stay level and roughly a hundred apart
+    for (const b of w.bodies.slice(0, 3)) expect(Math.abs((b as unknown as { angle: number }).angle)).toBeLessThan(0.1);
+    expect(w.bodies[1].y - w.bodies[0].y).toBeLessThan(-60);
+    expect(w.bodies[2].y - w.bodies[1].y).toBeLessThan(-60);
+  });
+
+  it('any frame in any order: frame 90 reached directly equals frame 90 frame by frame', () => {
+    const run = (steps: number) => { let w = stack() as never; for (let k = 0; k < steps; k++) w = stepWorld(w, 1 / 30) as never; return w; };
+    const direct = run(90);
+    let resumed = run(45);
+    for (let k = 0; k < 45; k++) resumed = stepWorld(resumed, 1 / 30) as never;
+    expect(JSON.stringify(resumed)).toBe(JSON.stringify(direct));
+  });
+
+  it('the bodies node validates and its letters pile up', async () => {
+    const { doc } = newProject({ name: 'T', width: 1920, height: 1080, fps: 30, duration: 4 });
+    doc.compositions.main.layers.p = { type: 'phys.bodies', props: {} } as never;
+    doc.compositions.main.order = ['p'];
+    expect(validate(doc, registryOf())).toEqual([]);
+    // the drop's letters are bodies now: the state carries a world
+    const node = physics.nodes.find((n) => n.type === 'phys.text-drop')!;
+    const state = node.simulate!.init({ text: 'HEY', size: 100, per: 0.05, height: 1, bounciness: 0.3 } as never, { width: 1920, height: 1080 } as never) as { world: { bodies: { id: string; static?: boolean }[] }; t: number };
+    expect(state.world.bodies.filter((b: { static?: boolean }) => !b.static)).toHaveLength(3);
+    let s: { world: { bodies: { id: string; static?: boolean; asleep?: boolean }[] }; t: number } = state;
+    for (let k = 0; k < 150; k++) s = node.simulate!.step(s, { text: 'HEY', size: 100, per: 0.05, height: 1, bounciness: 0.3 } as never, 1 / 30) as typeof s;
+    const settled = s.world.bodies.filter((b: { static?: boolean }) => !b.static);
+    expect(settled.every((b: { asleep?: boolean }) => b.asleep)).toBe(true);
   });
 });
 
