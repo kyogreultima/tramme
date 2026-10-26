@@ -17,7 +17,7 @@ import { payFor } from './confirm.ts';
 import { clip, freshId } from './model.ts';
 import { jpegOf } from './perception.ts';
 import { prefs } from './settings.ts';
-import { againPrompt, slugOf } from './images.ts';
+import { againPrompt, bitmapOf, slugOf } from './images.ts';
 import { t } from './i18n/index.ts';
 
 const RATIOS = ['16:9', '9:16'] as const;
@@ -82,19 +82,7 @@ async function recordOf(ctx: ToolContext, asset: string): Promise<Record<string,
 
 /** a still picture sent to the provider as the clip's opening frame (an image asset, or a frame of the composition) */
 async function sourceOf(ctx: ToolContext, source: string, at: number): Promise<string> {
-  let blob: Blob;
-  if (source === 'frame') {
-    const res = await fetch(await ctx.renderStill(at));
-    if (!res.ok) throw new Error(`the frame at ${at} s could not be read (HTTP ${res.status})`);
-    blob = await res.blob();
-  } else {
-    const a = ctx.doc.assets[source];
-    if (!a || a.type !== 'image') throw new Error(`${source}: an image asset of the project, or "frame" for a still of the composition, is expected`);
-    const res = await fetch(ctx.assetUrl(source));
-    if (!res.ok) throw new Error(`${source}: the picture could not be read (HTTP ${res.status})`);
-    blob = await res.blob();
-  }
-  const img = await createImageBitmap(blob);
+  const img = await bitmapOf(ctx, source, at);
   try {
     const k = Math.min(1, SIDE / Math.max(img.width, img.height));
     const c = new OffscreenCanvas(Math.max(1, Math.round(img.width * k)), Math.max(1, Math.round(img.height * k)));

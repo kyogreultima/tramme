@@ -98,7 +98,7 @@ export function paletteWords(tokens: Record<string, { type: string; value: unkno
 }
 
 /** a bitmap of an image file, a project asset or a still of the composition */
-async function bitmapOf(ctx: ToolContext, source: string, at: number): Promise<ImageBitmap> {
+export async function bitmapOf(ctx: ToolContext, source: string, at: number): Promise<ImageBitmap> {
   if (source === 'frame') {
     const url = await ctx.renderStill(at);
     return createImageBitmap(await (await fetch(url)).blob());
