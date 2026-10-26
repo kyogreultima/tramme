@@ -248,10 +248,10 @@ describe('hydracept jobs', () => {
     await hydraceptVideo(media.hydracept, { prompt: 'animate it', duration: 5, source }, out);
     const job = calls.find((c) => c.url.includes('/video.generate.v1/jobs') && c.method === 'POST');
     expect((job?.body?.input as Record<string, unknown>)?.sourceImage).toEqual(source);
-    expect((job?.body?.input as Record<string, unknown>)?.durationSeconds).toBe(4);
+    expect((job?.body?.input as Record<string, unknown>)?.durationSeconds).toBe(6);
     expect(videoSecondsOf(3)).toBe(4);
-    expect(videoSecondsOf(5.5)).toBe(6);
-    expect(videoSecondsOf(7.5)).toBe(8);
+    expect(videoSecondsOf(5)).toBe(6);
+    expect(videoSecondsOf(7)).toBe(8);
     expect(videoSecondsOf(undefined)).toBe(8);
   });
 });

@@ -34,6 +34,22 @@ export function clipRatio(w: number, h: number): Ratio {
   return w >= h ? '16:9' : '9:16';
 }
 
+/**
+ * Where a clip goes on the timeline. An explicit start is kept (clamped to the
+ * composition); from the playhead, the clip is moved back just enough to show
+ * all of it, so a clip made at the end is not cut off. `out` is clamped to the
+ * composition's end.
+ */
+export function clipPlacement(duration: number, compDuration: number, at: number | undefined, playhead: number): { at: number; out: number } {
+  const length = Math.max(0, Number.isFinite(duration) ? duration : 0);
+  const last = Math.max(0, compDuration - 0.1);
+  const asked = at === undefined ? NaN : Number(at);
+  const explicit = Number.isFinite(asked);
+  const wanted = explicit ? Math.max(0, asked) : Math.max(0, Number.isFinite(playhead) ? playhead : 0);
+  const start = explicit ? Math.min(wanted, last) : Math.max(0, Math.min(wanted, compDuration - Math.min(length, compDuration)));
+  return { at: start, out: Math.min(compDuration, start + length) };
+}
+
 /** a clip kept under assets/videos/ with its record, replaced when made again */
 async function keepClip(ctx: ToolContext, name: string, blob: Blob, made: unknown): Promise<{ asset: string; ops: Op[]; reload: string[] }> {
   const slug = slugOf(name, 'clip');
@@ -136,7 +152,7 @@ const generateVideo: ToolType<Input> = {
     },
   },
   ai: {
-    when: 'a shot needs footage the project does not hold and cannot film (a establishing shot, a texture in motion, a stylised action); a still picture that should move: give it as source. Veo takes 4, 6 or 8 seconds and bills each one, so make one clip per shot, not drafts',
+    when: 'a shot needs footage the project does not hold and cannot film (an establishing shot, a texture in motion, a stylised action); a still picture that should move: give it as source. Veo takes 4, 6 or 8 seconds and bills each one, so make one clip per shot, not drafts',
     avoid: 'clips standing in for a design the composition can move itself; words or logos drawn in the clip (they come out crooked, and text layers can translate them); the face of a real person; a clip longer than the shot needs',
     example: { prompt: 'a paper boat drifts down a rain-soaked gutter at dusk, slow push-in, shallow depth of field, no text', name: 'paper-boat', duration: 6 },
   },
@@ -157,17 +173,23 @@ const generateVideo: ToolType<Input> = {
     const source = a.source ?? (typeof before?.source === 'string' ? before.source : undefined);
     if (source && source !== 'frame' && ctx.doc.assets[source]?.type !== 'image') throw new Error(`${source}: an image asset of the project, or "frame" for a still of the composition, is expected`);
     const prompt = a.again ? againPrompt(words, a.change) : words;
-    const at = a.at ?? ctx.time;
+    const placement = clipPlacement(duration, c.duration, a.at === undefined ? undefined : Number(a.at), ctx.time);
+    // a clip made again animates the same opening frame unless another is asked for
+    const recordedFrame = Number(before?.sourceAt);
+    const frameAt = a.again && a.source === undefined && Number.isFinite(recordedFrame)
+      ? Math.max(0, Math.min(recordedFrame, c.duration))
+      : Math.max(0, Math.min(ctx.time, c.duration));
+    const at = placement.at;
     const fit = a.fit ?? 'cover', background = a.background ?? false;
     // it costs money: the user says yes first, or the turn's allowance does (as for the sounds and the pictures)
-    await payFor(t('video.paidTitle'), t('video.paidText', { prompt: clip(prompt, 140) }), t('video.paidYes'), 'use footage already in the project');
-    const still = source ? await sourceOf(ctx, source, at) : undefined;
+    await payFor(t('video.paidTitle'), t('video.paidText', { prompt: clip(prompt, 140), seconds: duration }), t('video.paidYes'), 'use footage already in the project');
+    const still = source ? await sourceOf(ctx, source, frameAt) : undefined;
     const ask: VideoAsk = { prompt, ratio, duration, provider, ...(still ? { source: still } : {}) };
     const made: MadeVideo = await api.generateVideo(ask, ctx.signal);
     const label = a.again ? String(ctx.doc.assets[a.again].name ?? a.again.replace(/^video-/, '')) : a.name ?? words.toLowerCase().split(/\s+/).slice(0, 4).join('-');
     const record: Record<string, unknown> = {
       prompt: words, provider: made.provider, model: made.model, ratio, duration, fit,
-      ...(source ? { source } : {}),
+      ...(source ? { source, ...(source === 'frame' ? { sourceAt: +frameAt.toFixed(3) } : {}) } : {}),
       ...(a.again ? { again: a.again, ...(a.change ? { change: a.change } : {}) } : {}),
       ...(before ? { before: { ...before, before: undefined } } : {}),
     };
@@ -176,10 +198,9 @@ const generateVideo: ToolType<Input> = {
     const placed = a.again ? null : place(ctx, kept.asset, label, { fit, at, duration, background });
     const ops = a.again ? (again.length ? again : kept.ops) : [...kept.ops, ...placed!.ops];
     const frame = await poster(made.blob);
-    const out = Math.min(c.duration, Math.max(0, at) + duration);
     return {
       ops, reload: a.again ? [a.again] : kept.reload, label: `Clip ${label}`,
-      text: `Clip made by ${made.provider} (${made.model}, ${ratio}, ${duration} s${source ? `, animated from ${source === 'frame' ? `the frame at ${at.toFixed(2)} s` : source}` : ''}), saved as asset ${a.again ?? kept.asset} with its record${placed ? `; layer ${placed.layer}${background ? ' in the background' : ''} from ${Math.max(0, at).toFixed(2)} s to ${out.toFixed(2)} s` : ' — made again in place: every layer showing it plays the new one'}. Look at it with media_frame at a time, and find its cuts with shots.`,
+      text: `Clip made by ${made.provider} (${made.model}, ${ratio}, ${duration} s${source ? `, animated from ${source === 'frame' ? `the frame at ${frameAt.toFixed(2)} s` : source}` : ''}), saved as asset ${a.again ?? kept.asset} with its record${placed ? `; layer ${placed.layer}${background ? ' in the background' : ''} from ${at.toFixed(2)} s to ${placement.out.toFixed(2)} s` : ' — made again in place: every layer showing it plays the new one'}. Look at it with media_frame at a time, and find its cuts with shots.`,
       ...(frame ? { images: [{ url: frame, caption: `${label} · ${made.provider}` }] } : {}),
       notice: t('video.made', { name: label, provider: made.provider, model: made.model }),
     };

@@ -144,7 +144,7 @@
   "video": {
     "made": "Clip « {name} » créé par {provider} ({model}).",
     "paidTitle": "Faire créer ce clip ?",
-    "paidText": "Un fournisseur va créer un court clip, ce qui coûte de l’argent : « {prompt} »",
+    "paidText": "Un fournisseur va créer un clip de {seconds} secondes, ce qui coûte de l’argent : « {prompt} »",
     "paidYes": "Créer le clip"
   },
   "shorts": {

@@ -251,11 +251,11 @@ export const HYDRACEPT_VIDEO_MODEL = 'veo-3.1-fast-generate-001';
 export const HYDRACEPT_VIDEO_SECONDS = [4, 6, 8] as const;
 export type HydraceptVideoSeconds = (typeof HYDRACEPT_VIDEO_SECONDS)[number];
 
-/** a length Veo takes: its nearest, 8 when none is asked */
+/** a length Veo takes: its nearest (half up), 8 when none is asked */
 export function videoSecondsOf(value: number | undefined): HydraceptVideoSeconds {
   const n = Number(value);
   if (!Number.isFinite(n)) return 8;
-  return n <= 5 ? 4 : n <= 7 ? 6 : 8;
+  return Math.min(8, Math.max(4, Math.round(n / 2) * 2)) as HydraceptVideoSeconds;
 }
 
 export interface HydraceptVideoSource {

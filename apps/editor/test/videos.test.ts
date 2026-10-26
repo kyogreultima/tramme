@@ -18,6 +18,15 @@ describe('clips', () => {
     expect(videos.clipRatio(1000, 1000)).toBe('16:9');
   });
 
+  it('places a clip from the playhead so all of it shows, and keeps an explicit start', () => {
+    expect(videos.clipPlacement(8, 10, undefined, 0)).toEqual({ at: 0, out: 8 });
+    expect(videos.clipPlacement(8, 10, undefined, 5)).toEqual({ at: 2, out: 10 });
+    expect(videos.clipPlacement(8, 10, 5, 5)).toEqual({ at: 5, out: 10 });
+    expect(videos.clipPlacement(8, 5, undefined, 0)).toEqual({ at: 0, out: 5 });
+    // past the end: a sliver at the last frame, never an invalid span
+    expect(videos.clipPlacement(8, 10, 20, 0)).toEqual({ at: 9.9, out: 10 });
+  });
+
   it('is a tool of the / menu and of the assistant, with the lengths Veo takes', () => {
     const tool = vocabulary.editorRegistry().tool('generate-video').tool;
     const props = (tool.input?.properties ?? {}) as Record<string, { enum?: unknown[]; format?: string }>;
