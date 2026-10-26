@@ -150,7 +150,10 @@ function load(): Preferences {
     if (!['auto', 'low', 'medium', 'high'].includes(p.pictureQuality)) p.pictureQuality = DEFAULT_PREFERENCES.pictureQuality;
     if (!['small', 'large'].includes(p.pictureSize)) p.pictureSize = DEFAULT_PREFERENCES.pictureSize;
     if (!['auto', 'hydracept'].includes(p.videoProvider)) p.videoProvider = DEFAULT_PREFERENCES.videoProvider;
-    if (![4, 6, 8].includes(p.videoSeconds)) p.videoSeconds = DEFAULT_PREFERENCES.videoSeconds;
+    const seconds = Number(p.videoSeconds);
+    p.videoSeconds = ([4, 6, 8] as number[]).includes(seconds)
+      ? seconds as Preferences['videoSeconds']
+      : DEFAULT_PREFERENCES.videoSeconds;
     return p;
   } catch { return { ...DEFAULT_PREFERENCES }; }
 }

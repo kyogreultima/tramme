@@ -167,8 +167,8 @@ const generateVideo: ToolType<Input> = {
       : RATIOS.includes(String(before?.ratio) as Ratio) ? String(before?.ratio) as Ratio
         : clipRatio(c.width, c.height);
     const earlier = Number(before?.duration);
-    const asked = a.duration === undefined ? undefined : Number(a.duration);
-    const duration: Seconds = asked !== undefined && (SECONDS as readonly number[]).includes(asked) ? asked as Seconds
+    const asked = Number(a.duration);
+    const duration: Seconds = Number.isFinite(asked) ? Math.min(8, Math.max(4, Math.round(asked / 2) * 2)) as Seconds
       : (SECONDS as readonly number[]).includes(earlier) ? earlier as Seconds : p.videoSeconds;
     const source = a.source ?? (typeof before?.source === 'string' ? before.source : undefined);
     if (source && source !== 'frame' && ctx.doc.assets[source]?.type !== 'image') throw new Error(`${source}: an image asset of the project, or "frame" for a still of the composition, is expected`);
