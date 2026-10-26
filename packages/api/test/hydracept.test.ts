@@ -280,6 +280,16 @@ describe('routes with Hydracept', () => {
     expect(new Uint8Array(await res.arrayBuffer())).toEqual(MP4);
   });
 
+  it('generate-video sends a still as the opening frame', async () => {
+    const calls = stubHydraceptJob(MP4, 'video/mp4');
+    const dataUrl = `data:image/png;base64,${btoa(String.fromCharCode(...PNG))}`;
+    const res = await generateVideo(new Request('http://localhost/api/generate-video', { method: 'POST', body: JSON.stringify({ prompt: 'animate it', source: dataUrl }) }), await reach());
+    expect(res.status).toBe(200);
+    const job = calls.find((c) => c.url.includes('/video.generate.v1/jobs') && c.method === 'POST');
+    expect((job?.body?.input as Record<string, unknown>)?.sourceImage).toEqual({ dataUrl, mimeType: 'image/png', filename: 'source.png' });
+    expect((job?.body?.input as Record<string, unknown>)?.durationSeconds).toBe(8);
+  });
+
   it('generate-video refuses a source that is not a picture data URL', async () => {
     stubHydraceptJob(MP4, 'video/mp4');
     await expect(generateVideo(new Request('http://localhost/api/generate-video', { method: 'POST', body: JSON.stringify({ prompt: 'x', source: 'https://example.com/a.png' }) }), await reach()))
