@@ -15,8 +15,7 @@ those videos, not general.
 ### Running a brief
 
 1. A new project in the brief's format.
-2. In the chat, `/film` followed by the brief's prompt, word for word (or the
-   prompt alone: the assistant should find the film tools by itself).
+2. In the chat, the brief's prompt, word for word.
 3. Leave the assistant alone until the turn ends: apply the changes at the end
    of the turn (settings), no answer to its questions.
 4. The turn ends with its cost: tool calls, pictures seen, tokens read (and the
@@ -42,15 +41,10 @@ those videos, not general.
 
 ### Reference
 
-Before films were written (`marketing.tramme`, 2026-10-13, a reference video to
+A reference (`marketing.tramme`, 2026-10-13, a reference video to
 recreate, Opus, effort high): 6 hours, more than two 5-hour quotas, 305 tool
 calls, 76 pictures seen, 20 plugins written by the assistant, about 10 s of a
 40 s film.
-
-A film written as a description (`docs/film.md`) costs the model the guide
-(about 3,700 tokens), a page of JSON and one contact sheet; the build itself
-takes a few seconds and no tokens. `tramme film <film.json> --out <folder>` builds a description
-without a model, to look at what the compiler makes of it.
 
 ## Load cases: where a frame's time goes
 

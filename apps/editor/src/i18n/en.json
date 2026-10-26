@@ -1346,12 +1346,6 @@
     },
     "direction": {
       "title": "Direction",
-      "theIdea": "The idea",
-      "nScenes": "{n} scenes",
-      "otherIdea": "Another idea",
-      "otherIdeaPrompt": "Propose another idea for this film: a different concept and structure, the same subject. ",
-      "otherLook": "Another look",
-      "otherLookPrompt": "Change the art direction of the film (palette, type, motion), keeping its idea: ",
       "brief": "The brief",
       "briefHint": "What tramme follows, over its own habits. It writes it from your material and your notes; correct it here.",
       "about": "About",

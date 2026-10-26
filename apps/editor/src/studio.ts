@@ -121,8 +121,8 @@ export const STAGE_LABEL: Record<Stage, string> = {
 };
 
 const READING = new Set(['get_document', 'list_nodes', 'read_file', 'list_files', 'get_transcript', 'media_frame', 'evaluate']);
-const DIRECTING = new Set(['film-guide', 'brief', 'palette']);
-const REVIEWING = new Set(['film-review', 'check', 'motion', 'subjects']);
+const DIRECTING = new Set(['brief', 'palette']);
+const REVIEWING = new Set(['check', 'motion', 'subjects']);
 const SOUND = /^(sfx|synth|generate-sound|duck|mix|cues|credits|voices|sound-)/;
 
 /** the stage of the work an item of the conversation belongs to */

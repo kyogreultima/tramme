@@ -19,7 +19,7 @@ describe('the scenes of a film', () => {
     expect(scenesOf(doc, 'main', 'Opening')).toEqual([{ id: '~opening', name: 'Opening', from: 0, to: 3 }, { id: 'a', name: 'Title', from: 3, to: 20 }]);
   });
 
-  it('are the compositions a film plays one after another, without the number the film tool puts first', () => {
+  it('are the compositions a film plays one after another, without the number put first', () => {
     const doc = docOf({
       main: comp({
         layers: {

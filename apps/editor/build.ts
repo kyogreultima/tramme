@@ -199,8 +199,6 @@ const examples = writeExamples();
 fs.cpSync(path.join(ROOT, 'sounds'), path.join(DIST, 'sounds'), { recursive: true });
 // the plugin packs shipped with the editor (the Code section of the left panel adds them to a project)
 fs.cpSync(path.join(ROOT, 'plugins'), path.join(DIST, 'plugins'), { recursive: true });
-// the fonts a film copies into its project
-fs.cpSync(path.join(ROOT, 'fonts'), path.join(DIST, 'fonts'), { recursive: true });
 // pdf.js parses documents (the sources of a project) in a worker of its own, at a fixed address (src/pdf.ts)
 fs.copyFileSync(createRequire(import.meta.url).resolve('pdfjs-dist/build/pdf.worker.min.mjs'), path.join(DIST, 'pdf.worker.mjs'));
 

@@ -1,12 +1,10 @@
-// What the assistant follows, in front of the user: the idea of the film (its
-// description, when the film tool made it), the brief (what the piece is
+// What the assistant follows, in front of the user: the brief (what the piece is
 // about, its tone, its rules: written here as well as by the assistant, it
 // wins over the assistant's defaults), the palette and the type of the
 // project, and the material it was made from. Changing the direction is a
 // note away: the buttons put the words in the direction bar.
 
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { SPEC_PATH } from '@tramme/film';
 import { api } from '../api.ts';
 import { running } from '../ai/conversation.ts';
 import { attachFiles, draft } from '../attachments.ts';
@@ -18,10 +16,7 @@ import { ATTACHABLE } from './composer.tsx';
 import { resolveColor } from './controls.tsx';
 import { Icon } from './icons.tsx';
 import { TranscribeButton } from './Transcribe.tsx';
-import { LogoMark } from './Logo.tsx';
 import { t } from '../i18n/index.ts';
-
-interface FilmIdea { title?: string; concept?: string; scenes?: unknown[]; style?: { preset?: string } }
 
 /** words to finish in the direction bar */
 function prefill(words: string) { studio.panel.value = 'notes'; draft.value = words; }
@@ -43,15 +38,13 @@ function BriefField({ label, hint, value, rows, onSave }: { label: string; hint:
 export function Direction() {
   const doc = S.doc.value, project = S.project.value.id, busy = running.value;
   const [brief, setBrief] = useState<Brief | null>(null);
-  const [film, setFilm] = useState<FilmIdea | null>(null);
   const [sources, setSources] = useState<Source[]>([]);
   const [saved, setSaved] = useState(false);
   const files = useRef<HTMLInputElement>(null);
-  // read again when the assistant is done (it may have written the brief, built the film)
+  // read again when the assistant is done (it may have written the brief)
   useEffect(() => {
     if (busy) return;
     api.readText(project, BRIEF_PATH).then((f) => setBrief(parseBrief(f?.text))).catch(() => setBrief(null));
-    api.readText(project, SPEC_PATH).then((f) => { try { setFilm(f ? JSON.parse(f.text) : null); } catch { setFilm(null); } }).catch(() => setFilm(null));
     api.info(project).then((i) => setSources(sourcesOf(S.doc.peek(), i.files))).catch(() => setSources([]));
   }, [busy, project, doc.assets]);
 
@@ -69,27 +62,9 @@ export function Direction() {
 
   const colors = Object.entries(doc.tokens ?? {}).filter(([, tk]) => tk.type === 'color').map(([name, tk]) => [name, resolveColor(String(tk.value), doc.tokens)] as const);
   const fonts = [...new Set(Object.values(doc.assets).filter((a) => a.type === 'font').map((a) => String((a as { family?: string }).family ?? a.name ?? '')).filter(Boolean))];
-  const c = doc.compositions[doc.root];
 
   return (
     <div class="direction">
-      {film && (film.concept || film.title) && (
-        <section class="dir-film">
-          <div class="dir-kicker"><LogoMark size={12} />{t('studio.direction.theIdea')}</div>
-          {film.title && <h3>{film.title}</h3>}
-          {film.concept && <p>{film.concept}</p>}
-          <div class="dir-tags">
-            {Array.isArray(film.scenes) && <span class="tag">{t('studio.direction.nScenes', { n: film.scenes.length })}</span>}
-            {film.style?.preset && <span class="tag">{film.style.preset}</span>}
-            {c && <span class="tag">{c.width}×{c.height}</span>}
-          </div>
-          <div class="dir-actions">
-            <button class="btn sm" onClick={() => prefill(t('studio.direction.otherIdeaPrompt'))}><Icon name="shuffle" />{t('studio.direction.otherIdea')}</button>
-            <button class="btn sm ghost" onClick={() => prefill(t('studio.direction.otherLookPrompt'))}><Icon name="palette" />{t('studio.direction.otherLook')}</button>
-          </div>
-        </section>
-      )}
-
       <section class="dir-section">
         <div class="dir-head"><h4>{t('studio.direction.brief')}</h4>{saved && <span class="dir-saved"><Icon name="check" />{t('topbar.saved')}</span>}</div>
         <p class="dir-hint">{t('studio.direction.briefHint')}</p>

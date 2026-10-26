@@ -51,7 +51,7 @@ describe.skipIf(!CHROME)('a parallel export, rendered', () => {
     page = b.page;
     close = async () => { await b.browser.close(); server.close(); };
   }, 120_000);
-  afterAll(async () => { await close?.(); if (dir) fs.rmSync(dir, { recursive: true, force: true }); });
+  afterAll(async () => { await close?.(); if (dir) fs.rmSync(dir, { recursive: true, force: true }); }, 60_000);
 
   it('draws the frames a single page draws, simulations started in the middle included', async () => {
     const sim = loadCases().find((c) => c.id === 'simulation')!;

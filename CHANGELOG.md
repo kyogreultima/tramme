@@ -34,6 +34,10 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 - **The desktop app asks for attention when a question waits**: while you are in another window, a question of the assistant or the editor flashes the taskbar (Windows, Linux) or bounces the Dock icon (macOS) besides its notification, until the window is focused or the question goes; in front of the window, the message alone, as before.
 - **The preview's playback clock is pinned by tests**: the wrap of a loop, the end without one, and a playback overtaken by another or by a pause are each tested, out of the preview itself; nothing changes in how it plays.
 
+### Removed
+
+- **Films from a description** (`@tramme/film`): the `film`, `film-guide` and `film-review` tools, the `/film` workflow, the film kits (midnight, daylight, poster, studio, terminal, soft, luxe, paper), `tramme film` on the command line and the fonts shipped for them. Its compiler gave every brief the same few layouts. Words written on the home screen now start the assistant directly: it directs the film with the editor's own vocabulary (compositions per scene, templates, recipes, packs, kits) and checks it with `check`. A project made by the film tool still opens: its scenes are ordinary compositions, its description an ordinary file.
+
 ### Fixed
 
 - **A folder holding 3D models imports**: bringing in sources with a .glb or .gltf among them failed as a whole, the project format refusing those files under assets/ (in the browser, on the server and in the desktop app alike); they are now kept as model assets the 3D model layer draws, a large .glb sent in parts like a video. The extrude tool's .glb is written the same way.

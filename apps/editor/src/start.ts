@@ -85,5 +85,5 @@ export function startProject() {
     greet(VIDEO_GREETING());
     return;
   }
-  if (words) begin(words, 'film');
+  if (words) begin(words);
 }

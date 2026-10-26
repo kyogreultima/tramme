@@ -162,14 +162,7 @@ button.ctx-chip:hover { background: var(--field-hover); color: var(--text); }
 
 /* ── the direction ─────────────────────────────────────────── */
 .direction { display: flex; flex-direction: column; gap: 24px; padding: 16px 16px 28px; }
-.dir-film { padding: 16px; border-radius: var(--r-lg); background: var(--surface-2); }
-.dir-kicker { display: flex; align-items: center; gap: 6px; color: var(--accent-text); font: 600 var(--fs-xs)/1 var(--ui); letter-spacing: 0.02em; }
-.dir-kicker svg.i { width: 12px; height: 12px; }
-.dir-film h3 { margin: 8px 0 6px; font-size: var(--fs-xl); letter-spacing: -0.01em; }
-.dir-film p { margin: 0; color: var(--text-2); font-size: var(--fs-md); line-height: var(--lh-text); user-select: text; }
-.dir-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
 .dir-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
-.dir-film .dir-actions { margin-top: 14px; }
 .dir-section { display: flex; flex-direction: column; gap: 10px; }
 .dir-head { display: flex; align-items: baseline; gap: 8px; }
 .dir-head h4 { margin: 0; font-size: var(--fs-md); }

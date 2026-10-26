@@ -63,7 +63,7 @@ describe.skipIf(!CHROME)('the print pack, rendered', () => {
       return (x, y) => { const i = (y * png.width + x) * 4; return [png.data[i], png.data[i + 1], png.data[i + 2]]; };
     };
   }, 120_000);
-  afterAll(async () => { await close?.(); if (dir) fs.rmSync(dir, { recursive: true, force: true }); });
+  afterAll(async () => { await close?.(); if (dir) fs.rmSync(dir, { recursive: true, force: true }); }, 60_000);
 
   it('every pass compiles', async () => {
     for (const kind of ['duotone', 'halftone', 'riso', 'grain']) {
