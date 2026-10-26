@@ -2,7 +2,7 @@
 
 How a long video becomes shorts: an hour of someone speaking holds its best moments out of order, and cutting them by hand is an evening of scrubbing, reframing and re-titling. Here the assistant reads the transcript, picks the passages that stand alone, and the tool builds one composition per short — the video framed for the format, the captions on it, a title. Each short is an ordinary composition of the project: editable, checked, exported like any other.
 
-Status: steps 1 to 4 done (step 2 keeps its open zoom line, step 4 keeps the per-short sound checks to the check tool). What is left is listed under each step. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
+Status: steps 1 to 5 done (step 4 keeps the per-short sound checks to the check tool). What is left is listed under each step. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
 
 ## Why
 
@@ -29,7 +29,9 @@ Done when: asked to cut 3 shorts from a long talk, the assistant lists the candi
 
 - [x] `focus` on the video layer (the image layer had it; the video node kept a centred cover): the point of the picture kept at the centre of the frame, animatable, the edges never shown.
 - [x] The build reads the subjects analysis of the video (`subjects-<asset>`) when there is one and animates the focus across the short: the biggest person of each analysed frame, held when nobody is found, drifts under 4 % of the picture ignored (a nervous pan is worse than a slow one).
-- [ ] The zoom settling on the subject when the picture allows it (a face small in the frame gains from a gentle push-in), and the cutout matte as the fallback when the boxes jump.
+- [x] The zoom settling on the subject when the picture allows it (a face small in the frame gains from a gentle push-in), and the cutout matte as the fallback when the boxes jump.
+
+  A person under 35 % of the picture's height (the median of the looks) gets a push-in to about 45 %, 1.25 at most, settling over the first four fifths of the short. The boxes jump when the person is lost on more than a third of the looks or leaps a quarter of the picture between looks more than once in five; then the cutout's mask of the video (when one was made) gives the centre every half second. To check on a device: a real interview cropped to 9:16.
 
 ### Step 3. The hook
 
@@ -41,4 +43,6 @@ Done when: asked to cut 3 shorts from a long talk, the assistant lists the candi
 
 ### Step 5. Candidates without speech
 
-- [ ] A match, a ride, a build-up: videos nobody speaks in get their candidates from the beats analysis (loud moments, section changes) and the shots tool (cuts), described the same way so the model picks among them unchanged.
+- [x] A match, a ride, a build-up: videos nobody speaks in get their candidates from the beats analysis (loud moments, section changes) and the shots tool (cuts), described the same way so the model picks among them unchanged.
+
+  Without a transcript, the candidates are the build-ups into a louder section (the change two thirds in) and the loudest moments (the loudness smoothed over a second), their ends snapped to a cut or a bar line within 1.5 s, overlaps kept once; from the cuts alone when there is no sound analysis. The build makes the same composition without captions, the title on the first cut or bar line.

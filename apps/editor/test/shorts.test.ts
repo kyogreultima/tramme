@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { builtinRegistry } from '@tramme/nodes';
 import { applyOps, validate, type Subjects, type ToolContext, type ToolOutput, type Transcript, type TrammeDoc } from '@tramme/core';
 import { newProject } from '@tramme/project';
-import { brandOf, candidatesOf, focusTrack, keywordAt, shortsOf, SHORTS_TOOLS, titleSpan } from '../src/shorts.ts';
+import { brandOf, candidatesOf, centroidOf, focusTrack, jumpy, keywordAt, momentsOf, pushIn, shortsOf, SHORTS_TOOLS, titleSpan } from '../src/shorts.ts';
 
 const shorts = SHORTS_TOOLS[0];
 const run = (input: unknown, ctx: ToolContext) => shorts.run(input as never, ctx) as Promise<ToolOutput>;
@@ -210,5 +210,77 @@ describe('the hook', () => {
     const pc = plain.compositions['short-plain'];
     expect(pc.duration).toBeCloseTo(8);
     expect(Object.values(pc.layers).some((l) => String(l.name).includes('Progress bar'))).toBe(false);
+  });
+});
+
+describe('the zoom and the fallbacks of the frame', () => {
+  const person = (t: number, x: number, h: number) => ({ t, boxes: [{ x, y: 0.3, w: h * 0.5, h, label: 'person', score: 0.9 }] });
+  it('a person small in the frame gains a gentle push-in, never over 1.25', () => {
+    const small: Subjects = { version: 1, kind: 'subjects', width: 2, height: 2, frames: [person(0, 0.4, 0.2), person(1, 0.4, 0.22), person(2, 0.41, 0.2)] };
+    expect(pushIn(small, 0, 3)).toBe(1.25);
+    const mid: Subjects = { ...small, frames: [person(0, 0.4, 0.32), person(1, 0.4, 0.3)] };
+    expect(pushIn(mid, 0, 3)).toBeCloseTo(1.25, 2);
+    expect(pushIn(subjects, 0, 4)).toBeNull();
+  });
+
+  it('the boxes jump when the person is lost often or leaps across the picture', () => {
+    expect(jumpy(subjects, 0, 4)).toBe(false);
+    const lost: Subjects = { ...subjects, frames: [person(0, 0.4, 0.4), { t: 1, boxes: [] }, { t: 2, boxes: [] }, person(3, 0.4, 0.4)] };
+    expect(jumpy(lost, 0, 4)).toBe(true);
+    const leaping: Subjects = { ...subjects, frames: [person(0, 0.1, 0.4), person(1, 0.7, 0.4), person(2, 0.1, 0.4), person(3, 0.7, 0.4)] };
+    expect(jumpy(leaping, 0, 4)).toBe(true);
+  });
+
+  it('reads where the white of a mask is', () => {
+    const w = 10, h = 10, px = new Uint8ClampedArray(w * h * 4);
+    for (let y = 2; y < 4; y++) for (let x = 6; x < 8; x++) { const i = (y * w + x) * 4; px[i] = px[i + 1] = px[i + 2] = 255; px[i + 3] = 255; }
+    const c = centroidOf(px, w, h)!;
+    expect(c[0]).toBeCloseTo(0.7, 6);
+    expect(c[1]).toBeCloseTo(0.3, 6);
+    expect(centroidOf(new Uint8ClampedArray(w * h * 4), w, h)).toBeNull();
+  });
+});
+
+describe('candidates without speech', () => {
+  /** a sound of 120 s: quiet, a louder section from 60 s, a peak around 95 s */
+  const analysis = () => {
+    const rate = 50, n = 120 * rate;
+    const rms = Array.from({ length: n }, (_, i) => (i < 60 * rate ? 0.2 : 0.7) + (Math.abs(i / rate - 95) < 3 ? 0.3 : 0));
+    return { version: 1, kind: 'audio-analysis', duration: 120, rate, envelope: { rms, low: rms, mid: rms, high: rms }, onsets: [], tempo: 120, beats: [], downbeats: [40, 42, 78, 80], sections: [{ t: 0, level: 0.2 }, { t: 60, level: 0.7 }] } as never;
+  };
+  const shots = { duration: 120, cuts: [41.2, 70, 72, 74, 101] };
+
+  it('finds the build-up and the loudest moment, snapped to cuts and bar lines, described in words', () => {
+    const m = momentsOf(analysis(), shots, { min: 15, max: 45 });
+    expect(m.length).toBeGreaterThanOrEqual(2);
+    const build = m.find((c) => /build-up/.test(c.text))!;
+    // the change lands two thirds in, the start on the nearest cut or bar line
+    expect(build.from).toBe(40); // 40.5 asked: the bar line at 40 is nearer than the cut at 41.2
+    expect(build.to).toBeGreaterThan(60);
+    expect(m.some((c) => /loudest moment around 9\d/.test(c.text))).toBe(true);
+    expect(m.every((c) => c.words === 0 && /cut|one shot/.test(c.text))).toBe(true);
+    // no two candidates overlap by more than half
+    for (const a of m) for (const b of m) if (a !== b) expect(Math.min(a.to, b.to) - Math.max(a.from, b.from)).toBeLessThanOrEqual(0.5 * (a.to - a.from) + 1e-6);
+  });
+
+  it('works from the cuts alone, and from nothing gives nothing', () => {
+    expect(momentsOf(null, shots).length).toBeGreaterThan(0);
+    expect(momentsOf(null, null)).toEqual([]);
+  });
+
+  it('the tool lists them for a video without a transcript, then builds without captions', async () => {
+    const d = doc();
+    delete d.assets['transcription-talk'];
+    d.assets['analysis-talk'] = { type: 'json', src: 'analysis-talk.json' };
+    d.assets['shots-talk'] = { type: 'json', src: 'shots-talk.json' };
+    const read = new Map([['analysis-talk.json', JSON.stringify(analysis())], ['shots-talk.json', JSON.stringify(shots)]]);
+    const out = await run({ asset: 'talk' }, ctxOf(d, new Map(), read));
+    expect(out.text).toMatch(/nobody speaks/);
+    const built = await run({ asset: 'talk', plan: [{ from: 41.2, to: 70, title: 'The drop' }] }, ctxOf(d, new Map(), read));
+    const next = applyOps(d, built.ops!).doc;
+    expect(validate(next, builtinRegistry())).toEqual([]);
+    const c = next.compositions['short-the-drop'];
+    expect(Object.values(c.layers).some((l) => l.type === 'captions')).toBe(false);
+    expect(Object.values(c.layers).some((l) => l.type === 'video')).toBe(true);
   });
 });
