@@ -113,6 +113,9 @@ export const meta = { id: 'tramme/localize', name: 'localize', version: '1.0.0',
 export const tools = [localize, localizeApply];
 export const messages = {
   fr: {
+    "the target languages, by name (\"French\", \"es\"…)": "les langues cibles, par leur nom (« French », « es »…)",
+    "its code or name (\"fr\", \"French\")": "son code ou son nom (« fr », « French »)",
+    "one string per sentence, in the order localize gave": "une chaîne par phrase, dans l’ordre donné par localize",
     'Prepare a translation': 'Préparer une traduction', 'Apply a translation': 'Appliquer une traduction',
     'Transcript': 'Transcription', 'Languages': 'Langues', 'Language': 'Langue', 'Translated sentences': 'Phrases traduites',
     'cuts a transcript into numbered sentences for the model to translate: the answer says what to hand back to localize-apply': 'découpe une transcription en phrases numérotées pour que le modèle les traduise : la réponse dit quoi rendre à localize-apply',

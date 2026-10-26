@@ -3,7 +3,7 @@
   "schema": "tramme/1",
   "meta": {
     "title": "Launch film",
-    "description": "A 45 s launch film for tramme, made in tramme: a ball on the beat, kinetic type, the document, modifiers, shaders, particles, a 2.5D camera, nested compositions, sound-reactive motion, the assistant, the mark. Music and sound written as code.",
+    "description": "A 45 s launch film for Tramme, made in Tramme: a ball on the beat, kinetic type, the document, modifiers, shaders, particles, a 2.5D camera, nested compositions, sound-reactive motion, the assistant, the mark. Music and sound written as code.",
     "thumbnailTime": 43
   },
   "tokens": {
@@ -41,7 +41,7 @@
     "teal": {
       "type": "color",
       "value": "#2EC4B6",
-      "description": "the accent of tramme"
+      "description": "the accent of Tramme"
     },
     "teal2": {
       "type": "color",
@@ -259,7 +259,7 @@
   "root": "main",
   "compositions": {
     "main": {
-      "name": "tramme · launch film",
+      "name": "Tramme · launch film",
       "width": 1920,
       "height": 1080,
       "fps": 30,

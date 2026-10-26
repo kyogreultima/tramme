@@ -278,7 +278,7 @@ export async function startUpload(bucket: Bucket, id: string, req: Request) {
   const b = await readJson<{ path?: string; size?: number }>(req);
   const path = String(b.path ?? '');
   checkPath(path);
-  if (!isMedia(path)) throw new HttpError(400, 'multipart upload: sounds and videos only');
+  if (!isMedia(path)) throw new HttpError(400, 'multipart upload: sounds, videos and 3D models (.glb) only');
   if (!(Number(b.size) > 0) || Number(b.size) > LIMITS.media) throw new HttpError(413, 'file too large');
   const up = await bucket.createMultipartUpload(key(id, path), { httpMetadata: { contentType: mimeOf(path) } });
   return json({ uploadId: up.uploadId, partSize: LIMITS.part }, 201);

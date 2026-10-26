@@ -257,7 +257,7 @@ async function rename(value: string) {
   if (!name || name === S.project.peek().name) return;
   try {
     S.project.value = await api.update(S.project.peek().id, { name });
-    document.title = `${name} · tramme`;
+    document.title = `${name} · Tramme`;
     if (S.doc.peek().meta.title !== name) commit(t('topbar.projectName'), [{ op: 'replace', path: '/meta/title', value: name }]);
   } catch (e) { toast(t('common.couldNotRenameError', { error: (e as Error).message }), 'error'); }
 }
@@ -307,7 +307,7 @@ export function TopBar() {
   const choice: FormatChoice = { fmt, fps: c.fps, setFormat, setFps: (n) => commit(t('common.frameRate'), [{ op: 'replace', path: `${cp}/fps`, value: n }]), comps: comps.length > 1 ? comps.map(([id, x]) => [id, x.name] as [string, string]) : [] };
   return (
     <header class={`topbar${studio ? ' in-studio' : ''}`} {...windowBar}>
-      <a class="brand" href="/" title={t('topbar.allProjects')} onClick={leave}><LogoMark /><span>tramme</span></a>
+      <a class="brand" href="/" title={t('topbar.allProjects')} onClick={leave}><LogoMark /><span>Tramme</span></a>
       <span class="sep" />
       <div class="project" data-tour="project">
         <input class="title" value={project.name} spellcheck={false} aria-label={t('topbar.projectName')}

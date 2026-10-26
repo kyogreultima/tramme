@@ -53,7 +53,7 @@ describe('plugin tools', () => {
 
 describe('plugin manifest', () => {
   it('refuses a plugin written for a newer plugin API, with the way out', () => {
-    expect(() => new Registry().use({ meta: { name: 'future', api: 2 }, tools: [stars] }, 'sky')).toThrow(/sky \(future\) needs the plugin API 2; this tramme has 1: update tramme/);
+    expect(() => new Registry().use({ meta: { name: 'future', api: 2 }, tools: [stars] }, 'sky')).toThrow(/sky \(future\) needs the plugin API 2; this Tramme has 1: update Tramme/);
     expect(new Registry().use({ meta: { name: 'now', api: 1 }, tools: [stars] }, 'sky').hasTool('demo.stars')).toBe(true);
     expect(new Registry().use({ tools: [stars] }, 'sky').hasTool('demo.stars')).toBe(true);
   });

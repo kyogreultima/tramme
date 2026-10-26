@@ -14,7 +14,7 @@ const firsts = release ? (Object.keys(SYSTEMS) as Os[]).flatMap((os) => release.
 {release && (
   <span class="download">
     {firsts.map((i) => (
-      <a class="btn btn-ghost" data-for={i.os} href={i.href} title={`tramme ${release.version}, ${i.kind.toLowerCase()} for ${i.runs}, ${Math.round(i.size / 1e6)} MB`}>
+      <a class="btn btn-ghost" data-for={i.os} href={i.href} title={`Tramme ${release.version}, ${i.kind.toLowerCase()} for ${i.runs}, ${Math.round(i.size / 1e6)} MB`}>
         <SystemIcon os={i.os} />Download for {SYSTEMS[i.os]}
       </a>
     ))}

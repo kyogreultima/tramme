@@ -2,11 +2,11 @@
 
 How the assistant has pictures made, not only sounds: a background the project holds no asset for, a texture, an illustration, a prop — and, later, moving pictures. Before this the assistant composed what the vocabulary allows and what the project holds; when the project held no fitting picture, it could only point at the lack. Now it has one made, the way [generate-sound](sound-roadmap.md) has a sound made.
 
-Status: steps 1 and 2 done. What is left is listed under each step. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
+Status: steps 1 to 4 done. What is left is listed under each step. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
 
 ## Why
 
-In tramme a picture is always a file: an `image` layer shows an asset of the project. There is no node that draws at render time, and there should not be one: rendering stays a pure function of time.
+In Tramme a picture is always a file: an `image` layer shows an asset of the project. There is no node that draws at render time, and there should not be one: rendering stays a pure function of time.
 
 So making a picture means making a file. The sound tools showed the way: records first, code for what they lack, providers for what neither can make. Pictures have no library here and no code that draws one; the providers come first. A model cannot draw either — describing a picture well and judging what comes back is what it does, the way a motion designer works with a stock library or an illustrator.
 
@@ -31,20 +31,32 @@ So making a picture means making a file. The sound tools showed the way: records
 - [x] The tool (`apps/editor/src/images.ts`, registered in the editor's vocabulary): has a provider draw, saves the file and its record, proposes the layer. The proportions follow the composition (`auto`), the layer fills the frame (`cover`, cropped to it) or shows the picture whole (`contain`), spans the composition or a time (`at`, `duration`), and `background` puts it under the other layers.
 - [x] The model and the user see the picture: the model to judge it, the user in the conversation.
 - [x] The gate before paying, the record beside the file, and the notes on when to use it: backgrounds, textures, illustrations, props — never words inside the picture (they come out crooked, and text layers can translate them).
-- [ ] A Pictures section in the settings: the provider by default, the quality, the size at most (a small picture costs less). For now the tool's input says it.
+- [x] A Pictures section in the settings: the provider by default, the quality, the size at most (a small picture costs less). For now the tool's input says it.
+
+  Settings, Pictures: the provider (automatic: the first connected), the quality (per picture, or low, medium, high), the size at most (small asks the cheapest size: OpenAI's square, CogView's smaller sizes). The tool's input still overrides them.
 
 Done when: asked for "a night-sky background", the assistant has one made, proposes it as a layer filling the frame under the others, describes what it sees, and the export shows it. Checked: the file in `assets/images/` with its record, the layer editable in the inspector, the `/` menu runs it without a model.
 
 ### Step 3. Takes and variants
 
-- [ ] `takes`: several pictures in one call (the providers take n), a contact sheet of them, the user keeps one — the others are not saved. The explore mode of the sounds applied to pictures: the assistant asks for the takes, the user picks.
-- [ ] A picture made again reads its record and changes only what the user asked to change.
+- [x] `takes`: several pictures in one call (the providers take n), a contact sheet of them, the user keeps one — the others are not saved. The explore mode of the sounds applied to pictures: the assistant asks for the takes, the user picks.
+
+  One to four takes, each one paid and counted against the turn's allowance; the server draws them side by side (one call each, whatever the provider). The user picks in the conversation or the dialog (a click on a take); a turn left alone holds them for the session and the assistant keeps one with `keep`, at no new cost — nothing is saved until one is kept. To check on a device: the picker on a phone.
+- [x] A picture made again reads its record and changes only what the user asked to change.
+
+  `again` names the picture: its record gives the prompt, the provider, the proportions and the quality; with `change`, the picture itself goes along as the reference (OpenAI and Gemini) and the words say to keep everything else. The new picture replaces the old one in place, its record keeping the one before.
 
 ### Step 4. Changing an existing picture
 
-- [ ] Image to image: a reference given (an asset, a frame of the video), the provider keeps what matters and changes the rest — the palette of the project sent along.
-- [ ] Inpainting and outpainting: a mask (the cutout tool makes some) says what changes; a picture extended past its edges to fill a wider format.
-- [ ] Upscale: a small picture brought to the size of the composition before it enters the frame.
+- [x] Image to image: a reference given (an asset, a frame of the video), the provider keeps what matters and changes the rest — the palette of the project sent along.
+
+  `reference`: an image asset, or `frame` for a still of the composition at `at`; OpenAI through its edits endpoint, Gemini with the picture before the words. Z.AI and Hydracept draw from words only and say so.
+- [x] Inpainting and outpainting: a mask (the cutout tool makes some) says what changes; a picture extended past its edges to fill a wider format.
+
+  `mask`: a picture whose white says what changes (`maskKeeps` for the other way), turned into the providers' sense (transparent where it may change); Gemini, which takes no mask, gets it as a second picture and the words. `extend`: the picture centred on the wider canvas, the border to fill.
+- [x] Upscale: a small picture brought to the size of the composition before it enters the frame.
+
+  `upscale`: the picture enlarged by a whole factor (up to four) with the upscale tool's own enlargement (Lanczos and a light sharpening, in core), before it is saved and placed. No learned super-resolution yet: the detail is the picture's own, enlarged.
 
 ### Step 5. Moving pictures
 

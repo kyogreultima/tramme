@@ -39,7 +39,7 @@ ${css ? `<link rel="stylesheet" href="/${css}">` : ''}</head>
 <body><div id="app"></div><script type="module" src="/${js}"></script></body></html>
 `;
 
-const EDITOR_TITLE = 'tramme, the open-source motion design editor';
+const EDITOR_TITLE = 'Tramme, the open-source motion design editor';
 const EDITOR_ABOUT = 'Make motion design in the browser: layers, keyframes, shaders and an AI assistant that edits the same JSON document as you. Your projects and keys stay on your device.';
 /**
  * the editor: installable on a phone's home screen, and described for a link
@@ -47,10 +47,10 @@ const EDITOR_ABOUT = 'Make motion design in the browser: layers, keyframes, shad
  * add: apps/worker/src/personal.ts)
  */
 const EDITOR_HEAD = `<meta name="theme-color" content="#0b0f12">
-<link rel="manifest" href="/manifest.webmanifest"><link rel="apple-touch-icon" href="/icons/apple-touch-icon.png"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="tramme">
+<link rel="manifest" href="/manifest.webmanifest"><link rel="apple-touch-icon" href="/icons/apple-touch-icon.png"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Tramme">
 <meta name="description" content="${EDITOR_ABOUT}">
-<meta property="og:type" content="website"><meta property="og:site_name" content="tramme"><meta property="og:title" content="${EDITOR_TITLE}"><meta property="og:description" content="${EDITOR_ABOUT}">
-<meta property="og:image:type" content="image/jpeg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="tramme: motion design, written as data. The editor, with a composition, its layers and its timeline.">
+<meta property="og:type" content="website"><meta property="og:site_name" content="Tramme"><meta property="og:title" content="${EDITOR_TITLE}"><meta property="og:description" content="${EDITOR_ABOUT}">
+<meta property="og:image:type" content="image/jpeg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="Tramme: motion design, written as data. The editor, with a composition, its layers and its timeline.">
 <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${EDITOR_TITLE}"><meta name="twitter:description" content="${EDITOR_ABOUT}">`;
 /** the key vault: the editor's address, the only one it answers, set by the Worker; never in a search engine */
 const VAULT_HEAD = '<meta name="tramme-app" content="%APP_ORIGIN%"><meta name="robots" content="noindex">';
@@ -83,7 +83,7 @@ function writePage(meta: esbuild.Metafile) {
   const outs = Object.keys(meta.outputs).map((p) => path.relative(DIST, path.resolve(ROOT, p)).split(path.sep).join('/'));
   // in dev, a new address at each rebuild, so no browser keeps an older bundle
   const v = dev ? `?v=${Date.now().toString(36)}` : '';
-  for (const [entry, file, title, head] of [['main', 'index.html', EDITOR_TITLE, EDITOR_HEAD], ['vault', 'vault.html', 'tramme', VAULT_HEAD]]) {
+  for (const [entry, file, title, head] of [['main', 'index.html', EDITOR_TITLE, EDITOR_HEAD], ['vault', 'vault.html', 'Tramme', VAULT_HEAD]]) {
     const js = outs.find((p) => new RegExp(`^assets/${entry}(-[^/]+)?\\.js$`).test(p))!;
     const css = outs.find((p) => new RegExp(`^assets/${entry}(-[^/]+)?\\.css$`).test(p));
     fs.writeFileSync(path.join(DIST, file), page(`${js}${v}`, css && `${css}${v}`, title, head));
@@ -185,7 +185,7 @@ fs.cpSync(ICONS, path.join(DIST, 'icons'), { recursive: true });
 fs.copyFileSync(OG, path.join(DIST, 'og.jpg'));
 fs.writeFileSync(path.join(DIST, 'robots.txt'), ROBOTS);
 fs.writeFileSync(path.join(DIST, 'manifest.webmanifest'), JSON.stringify({
-  id: '/', name: 'tramme', short_name: 'tramme', description: EDITOR_ABOUT, categories: ['design', 'productivity', 'video'],
+  id: '/', name: 'Tramme', short_name: 'Tramme', description: EDITOR_ABOUT, categories: ['design', 'productivity', 'video'],
   start_url: '/', scope: '/', display: 'standalone', background_color: '#0b0f12', theme_color: '#0b0f12',
   icons: [
     { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
@@ -199,8 +199,6 @@ const examples = writeExamples();
 fs.cpSync(path.join(ROOT, 'sounds'), path.join(DIST, 'sounds'), { recursive: true });
 // the plugin packs shipped with the editor (the Code section of the left panel adds them to a project)
 fs.cpSync(path.join(ROOT, 'plugins'), path.join(DIST, 'plugins'), { recursive: true });
-// the fonts a film copies into its project
-fs.cpSync(path.join(ROOT, 'fonts'), path.join(DIST, 'fonts'), { recursive: true });
 // pdf.js parses documents (the sources of a project) in a worker of its own, at a fixed address (src/pdf.ts)
 fs.copyFileSync(createRequire(import.meta.url).resolve('pdfjs-dist/build/pdf.worker.min.mjs'), path.join(DIST, 'pdf.worker.mjs'));
 

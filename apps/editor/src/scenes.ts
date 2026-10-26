@@ -1,14 +1,14 @@
 // The film as the studio shows it: its scenes, one after another, with what
 // they are called. A composition says where its scenes are by its scene
-// markers (a label each); a film the film tool built plays one composition
-// per scene; anything else is one scene, the whole composition.
+// markers (a label each); a film built as one composition per scene plays
+// them one after another; anything else is one scene, the whole composition.
 
 import { staticValue, type TrammeDoc } from '@tramme/core';
 
 export interface Scene {
   /** the marker's id, the layer's id, or the composition's */
   id: string;
-  /** what it is called, without the number the film tool puts first */
+  /** what it is called, without the number put first ("03 · Shaders") */
   name: string;
   from: number;
   to: number;

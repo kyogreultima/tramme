@@ -163,7 +163,7 @@ describe('hydracept jobs', () => {
     expect(new Uint8Array(run.bytes)).toEqual(MP3);
   });
 
-  it('requests MP3 for music with tramme duration mapped to durationMs', async () => {
+  it('requests MP3 for music with Tramme duration mapped to durationMs', async () => {
     const calls = stubHydraceptJob(MP3, 'audio/mpeg');
     const run = await hydraceptMusic(media.hydracept, { prompt: 'calm piano bed', duration: 20 }, out);
     const job = calls.find((c) => c.url.includes('/audio.music.generate.v1/jobs') && c.method === 'POST');

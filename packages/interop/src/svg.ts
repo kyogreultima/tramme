@@ -5,7 +5,7 @@
 // and reported. Finishing effects (grain, bloom) and motion blur are not part
 // of a vector frame.
 
-import { drawingAt, Evaluator, isTrimmed, localFrame, parseColor, trimRuns, type TrammeDoc, type EvaluatedLayer, type Paint, type PathValue, type Registry, type TrimProps } from '@tramme/core';
+import { drawingAt, Evaluator, isTrimmed, localFrame, parseColor, trimRuns, type TrammeDoc, type EvaluatedLayer, type Paint, type PathValue, type Registry, type SvgHost, type TrimProps } from '@tramme/core';
 import { toBase64 } from './bytes.ts';
 
 export interface SvgOptions {
@@ -165,10 +165,28 @@ class SvgWriter {
       case 'group': case 'audio': return '';
       default:
         // a plugin node may say how it looks in SVG
-        if (L.node.export?.svg) return L.node.export.svg(L.props);
+        if (L.node.export?.svg) return L.node.export.svg(L.props, this.svgHost(compId));
         this.warn(`"${L.layer.name ?? L.id}" (${L.layer.type}) is drawn by code: left out of the SVG`);
         return '';
     }
+  }
+
+  /** what a plugin node's SVG hook reads besides its props: the composition's size, the JSON assets it drew from */
+  private jsonCache = new Map<string, unknown>();
+  svgHost(compId: string): SvgHost {
+    const c = this.doc.compositions[compId];
+    return {
+      width: c?.width ?? 0, height: c?.height ?? 0,
+      json: (id: string) => {
+        if (!this.jsonCache.has(id)) {
+          const f = this.opts.readAsset?.(id);
+          let v: unknown = null;
+          try { v = f ? JSON.parse(new TextDecoder().decode(f.data)) : null; } catch { v = null; }
+          this.jsonCache.set(id, v);
+        }
+        return this.jsonCache.get(id) ?? null;
+      },
+    };
   }
 
   filter(L: EvaluatedLayer): string {

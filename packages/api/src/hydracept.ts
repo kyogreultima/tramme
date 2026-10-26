@@ -321,7 +321,7 @@ export async function fetchHydraceptVoices(media: HydraceptMedia, fetch: Fetch):
   return readJson(res);
 }
 
-/** tramme Voice list from a Hydracept catalog (search filters name and description). */
+/** Tramme Voice list from a Hydracept catalog (search filters name and description). */
 export function mapHydraceptVoices(
   catalog: HydraceptVoiceCatalog,
   search = '',

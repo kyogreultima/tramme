@@ -15,7 +15,7 @@ import reference from '../../../../docs/document.md';
 import { api, type AiEvent, type ChatItem, type KeyedProvider, type KeyStatus } from '../api.ts';
 import { S, toast } from '../state.ts';
 import { companionModels, companionTurn, NO_ENGINES, pairCompanion, probeCompanion, stopCompanion, type CompanionState, type Engines } from './companion.ts';
-import { passes, pause, ServerSession, type Message } from './server.ts';
+import { passes, pause, recallDetails, ServerSession, type Message } from './server.ts';
 import { ToolRunner } from './tools.ts';
 import { runCall, uid } from './calls.ts';
 import { clip } from '../model.ts';
@@ -325,7 +325,8 @@ export async function openChat(id: string) {
   session = { companion: c.companion, server: new ServerSession(c.server) };
   created = c.created || chats.peek().find((x) => x.id === id)?.created || new Date().toISOString();
   chatId.value = id;
-  chat.value = c.items;
+  // a conversation saved before its calls kept their line: read back from the history
+  chat.value = recallDetails(c.items, c.server);
 }
 
 /** a fresh conversation; the previous one stays in the history */
@@ -374,7 +375,7 @@ const ranAlone: string[] = [];
 
 /** a tool run straight from the / menu, without a model: its activity, pictures and proposal in the conversation */
 export async function* runTool(name: string, input: Record<string, unknown>, signal?: AbortSignal): AsyncGenerator<AiEvent> {
-  const r = yield* runCall(runner, 'use_tool', { name, input }, signal);
+  const r = yield* runCall(runner, 'use_tool', { name, input }, signal, false);
   const said = r.content.map((c) => (c.type === 'text' ? c.text : '')).filter(Boolean).join('\n');
   if (r.isError) yield { type: 'error', message: said };
   else if (runner.notice) yield { type: 'item', item: { id: uid(), role: 'assistant', text: runner.notice } };

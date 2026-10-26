@@ -1,4 +1,4 @@
-// The tramme document, version 1. The JSON file is the source of truth:
+// The Tramme document, version 1. The JSON file is the source of truth:
 // everything the editor, the AI and the renderer know lives here.
 // Collections of things that can be edited (layers, assets, tokens,
 // compositions) are maps keyed by id, so a patch path stays valid while

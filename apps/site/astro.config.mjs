@@ -24,7 +24,7 @@ export default defineConfig({
   ],
   integrations: [
     starlight({
-      title: 'tramme',
+      title: 'Tramme',
       description: SITE.docs,
       social: [{ icon: 'github', label: 'GitHub', href: REPO }],
       sidebar,

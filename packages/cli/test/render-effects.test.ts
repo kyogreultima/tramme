@@ -237,7 +237,7 @@ describe.skipIf(!CHROME)('effects, rendered', () => {
       return page.evaluate(() => (window as any).TRAMME.mix(0, 2));
     };
   }, 120_000);
-  afterAll(async () => { await close?.(); if (dir) fs.rmSync(dir, { recursive: true, force: true }); });
+  afterAll(async () => { await close?.(); if (dir) fs.rmSync(dir, { recursive: true, force: true }); }, 60_000);
 
   const near = (a: Pixel, b: Pixel) => a.every((v, i) => Math.abs(v - b[i]) <= 3);
   const RED: Pixel = [255, 0, 0], BLUE: Pixel = [0, 0, 255];

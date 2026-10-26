@@ -5,13 +5,14 @@
 
 import { useLayoutEffect, useRef, useState } from 'preact/hooks';
 import type { ChatItem } from '../api.ts';
-import { aiRoute, chat } from '../ai/index.ts';
-import { active, decide, lightbox, running, turnStart } from '../ai/conversation.ts';
-import { question } from '../confirm.ts';
+import { aiRoute, aiSettings, chat } from '../ai/index.ts';
+import { modelLabel } from '@tramme/assistant';
+import { decide, lightbox, running, stop, togglePause, turnStart } from '../ai/conversation.ts';
+import { paused } from '../ai/calls.ts';
 import { S, setTime } from '../state.ts';
 import { timecode } from '../model.ts';
-import { anotherTake, liveStage, notes, STAGE_LABEL, stagesOf, studio, takes, turns, type Stage, type Turn } from '../studio.ts';
-import { Access, FileChip, Markdown, OpLines, QuestionCard, Thinking, ToolLine, UsageLine, useElapsed, Working } from './chat.tsx';
+import { anotherTake, liveStage, notes, STAGE_LABEL, STAGES, stagesOf, studio, takes, turns, type Stage, type Turn } from '../studio.ts';
+import { Access, FileChip, Markdown, OpLines, QuestionCard, Thinking, ToolLine, UsageLine, useElapsed } from './chat.tsx';
 import type { ComponentChildren } from 'preact';
 import { memo } from 'preact/compat';
 import { Seg } from './controls.tsx';
@@ -57,11 +58,11 @@ export function TakeCard({ p }: { p: NonNullable<ChatItem['proposal']> }) {
   );
 }
 
-/** the stages of the work, in the order they came; the one under way lit */
-function Pipeline({ stages, now, open, steps, onToggle }: { stages: Stage[]; now: Stage | null; open: boolean; steps: number; onToggle: () => void }) {
+/** the stages of the work, in the order they came */
+function Pipeline({ stages, open, steps, onToggle }: { stages: Stage[]; open: boolean; steps: number; onToggle: () => void }) {
   return (
     <button class={`pipeline${open ? ' open' : ''}`} onClick={onToggle} title={open ? t('studio.hideSteps') : t('studio.showSteps')}>
-      {stages.map((s) => <span key={s} class={`tag${s === now ? ' accent' : ''}`}><i />{t(STAGE_LABEL[s])}</span>)}
+      {stages.map((s) => <span key={s} class="tag"><i />{t(STAGE_LABEL[s])}</span>)}
       <span class="steps">{steps === 1 ? t('studio.oneStep') : t('studio.nSteps', { n: steps })}<Icon name={open ? 'chevronDown' : 'chevron'} /></span>
     </button>
   );
@@ -79,25 +80,57 @@ function Said({ text }: { text: string }) {
   );
 }
 
+const Step = ({ it }: { it: ChatItem }) => (it.tool ? <ToolLine tool={it.tool} /> : <Thinking th={it.thinking!} />);
+
+/** the turn under way: what it does now and for how long, the model, how far through the stages, its last steps, and the way to pause or stop it */
+function Run({ work, steps, open, onToggle }: { work: ChatItem[]; steps: ChatItem[]; open: boolean; onToggle: () => void }) {
+  const secs = useElapsed(turnStart.value, true), hold = paused.value;
+  const now = liveStage(work), seen = stagesOf(work);
+  const doing = [...work].reverse().find((it) => it.tool && !it.tool.done)?.tool;
+  const head = hold ? t('studio.paused') : doing?.summary ?? (now ? t(STAGE_LABEL[now]) : t('studio.working'));
+  const n = now ? STAGES.indexOf(now) + 1 : 0;
+  return (
+    <div class={`run${hold ? ' paused' : ''}`} role="status">
+      <div class="run-head">
+        <span class={`mark${hold ? '' : ' working'}`}><LogoMark /></span>
+        <span class="run-now" title={head}>{head}</span>
+        <span class="mono">{Math.floor(secs / 60)}:{String(secs % 60).padStart(2, '0')}</span>
+      </div>
+      <div class="run-meta">
+        <span>{modelLabel(aiSettings.value.model)}</span>
+        {now && <span>{t(STAGE_LABEL[now])} · {t('studio.stageNofM', { n, total: STAGES.length })}</span>}
+      </div>
+      <div class="run-bar">{STAGES.map((s) => <i key={s} class={s === now ? 'now' : seen.includes(s) ? 'done' : ''} />)}</div>
+      {steps.length > 0 && <div class="run-steps">{(open ? steps : steps.slice(-3)).map((it) => <Step key={it.id} it={it} />)}</div>}
+      <div class="run-actions">
+        <button class="btn sm outline" onClick={togglePause}><Icon name={hold ? 'play' : 'pause'} />{hold ? t('assistant.resume') : t('assistant.pause')}</button>
+        <button class="btn sm outline" onClick={stop}><Icon name="stop" />{t('assistant.stop')}</button>
+        <span class="grow" />
+        {steps.length > 3 && <button class="btn sm ghost" onClick={onToggle}>{open ? t('studio.hideSteps') : t('studio.allSteps', { n: steps.length })}<Icon name={open ? 'chevronDown' : 'chevron'} /></button>}
+      </div>
+    </div>
+  );
+}
+
 /** what the assistant did after a note */
 export function Work({ work, live }: { work: ChatItem[]; live: boolean }) {
   const [open, setOpen] = useState(false);
-  const stages = stagesOf(work), now = live ? liveStage(work) : null;
+  const stages = stagesOf(work);
   const steps = work.filter((it) => it.tool || it.thinking);
-  const thought = live ? work.filter((it) => it.thinking && !it.thinking.done).at(-1)?.thinking : undefined;
   const shots = work.filter((it) => it.image);
   const usage = work.find((it) => it.usage)?.usage;
-  const secs = useElapsed(turnStart.value, live);
   return (
     <div class={`work${live ? ' live' : ''}`}>
-      <div class="work-head">
-        <span class={`mark${live ? ' working' : ''}`}><LogoMark /></span>
-        <b>tramme</b>
-        {live && <span class="faint mono">{secs} s</span>}
-      </div>
-      {stages.length > 0 && <Pipeline stages={stages} now={now} open={open} steps={steps.length} onToggle={() => setOpen(!open)} />}
-      {open && <div class="work-steps">{steps.map((it) => (it.tool ? <ToolLine key={it.id} tool={it.tool} /> : <Thinking key={it.id} th={it.thinking!} />))}</div>}
-      {!open && thought && <Thinking th={thought} />}
+      {live ? <Run work={work} steps={steps} open={open} onToggle={() => setOpen(!open)} /> : (
+        <>
+          <div class="work-head">
+            <span class="mark"><LogoMark /></span>
+            <b>Tramme</b>
+          </div>
+          {stages.length > 0 && <Pipeline stages={stages} open={open} steps={steps.length} onToggle={() => setOpen(!open)} />}
+          {open && <div class="work-steps">{steps.map((it) => <Step key={it.id} it={it} />)}</div>}
+        </>
+      )}
       {shots.length > 0 && (
         <div class="work-shots">
           {shots.slice(-6).map((it) => <button key={it.id} class="work-shot" title={it.image!.caption} onClick={() => { lightbox.value = it.image!.url; }}><img src={it.image!.url} alt={it.image!.caption} loading="lazy" /></button>)}
@@ -105,7 +138,6 @@ export function Work({ work, live }: { work: ChatItem[]; live: boolean }) {
       )}
       {work.map((it) => (it.text !== undefined && !it.tool && !it.thinking && it.text.trim() ? <Said key={it.id} text={it.text} /> : null))}
       {work.map((it) => (it.proposal ? <TakeCard key={it.id} p={it.proposal} /> : null))}
-      {live && !active(work.at(-1)) && !question.value && <Working />}
       {usage && <UsageLine u={usage} />}
     </div>
   );

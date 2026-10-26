@@ -1,4 +1,4 @@
-/* tramme editor: the themes, defined as tokens. The default (studio) sits on
+/* Tramme editor: the themes, defined as tokens. The default (studio) sits on
    :root and the others override it by their data-theme. This file is the copy
    of the reference board's TOKENS block (docs/design/board.html): the board is
    the source of these values. Interface colours stay neutral so the picture is

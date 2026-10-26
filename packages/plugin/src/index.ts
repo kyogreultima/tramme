@@ -1,4 +1,4 @@
-// Writing a tramme plugin: every type a plugin module exports, and
+// Writing a Tramme plugin: every type a plugin module exports, and
 // definePlugin() for autocompletion and checks while writing one. A plugin is
 // a JavaScript module of a project (plugins/*.js, listed in the document's
 // "plugins"); this package only brings types, nothing runs from it.

@@ -508,6 +508,14 @@ export const tools = [diagramTool];
 export const checks = [diagramCheck];
 export const messages = {
   fr: {
+    "Text": "Texte",
+    "\"flowchart\\nA[Build] --> B(Test)\\nB -->|ok| C[Ship]\", or the same as JSON { nodes, edges, groups }; leave the direction out and the format picks it (left to right in 16:9, top to bottom in 9:16), write LR, TB, RL or BT only to force one": "« flowchart\\nA[Build] --> B(Test)\\nB -->|ok| C[Ship] », ou la même chose en JSON { nodes, edges, groups } ; sans direction, le format la choisit (de gauche à droite en 16:9, de haut en bas en 9:16), écrivez LR, TB, RL ou BT seulement pour en imposer une",
+    "Highlight": "Mettre en avant",
+    "a node id: the rest dims and one route through the graph lifts in the accent": "l’id d’un nœud : le reste s’estompe et un chemin du graphe ressort à l’accent",
+    "Start (s)": "Début (s)",
+    "Fit": "Emprise",
+    "the fraction of the frame the diagram spans (0.8 by default)": "la part du cadre que le diagramme occupe (0,8 par défaut)",
+    "Type size (px)": "Corps (px)",
     'Diagram': 'Diagramme',
     'a flow, architecture, cycle or tree written as flowchart text (a Mermaid subset) or JSON, laid out layered, ring or hub, and built as editable boxes, labels and edges that draw themselves in reading order; one route can be highlighted': 'un flux, une architecture, un cycle ou un arbre écrit en texte flowchart (un sous-ensemble de Mermaid) ou JSON, disposé en couches, anneau ou étoile, et construit en boîtes, libellés et arêtes éditables qui se tracent dans l\'ordre de lecture ; une route peut être mise en avant',
     'Diagram legibility': 'Lisibilité d\'un diagramme',

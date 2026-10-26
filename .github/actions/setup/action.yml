@@ -1,9 +1,9 @@
-# Shared setup of the workflows: Node 22 with the npm cache, Rust stable with
+# Shared setup of the workflows: Node 24 with the npm cache, Rust stable with
 # its cache over the desktop crate, and on Linux the system libraries that
 # crate needs (WebKitGTK for the webview, D-Bus for the keychain).
 
-name: Set up tramme
-description: Node 22, Rust stable, and the Linux libraries of the desktop crate.
+name: Set up Tramme
+description: Node 24, Rust stable, and the Linux libraries of the desktop crate.
 
 inputs:
   rust-targets:
@@ -16,7 +16,7 @@ runs:
   steps:
     - uses: actions/setup-node@v4
       with:
-        node-version: 22
+        node-version: 24
         cache: npm
     - uses: dtolnay/rust-toolchain@stable
       with:

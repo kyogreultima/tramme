@@ -23,10 +23,12 @@ export const notificationState = (): NotificationPermission | 'unsupported' => (
 /** the user is elsewhere: another tab, another window */
 export const away = () => document.hidden || !document.hasFocus();
 
-export function notify(title: string, body: string, kind: 'info' | 'error' = 'info') {
+export function notify(title: string, body: string, kind: 'info' | 'error' = 'info', opts?: { attention?: boolean }) {
   if (away() && notificationState() === 'granted') {
     if (tauri) {
       tauri.core.invoke('plugin:notification|notify', { options: { title, body } }).catch(() => toast(body, kind, 6000));
+      // a notification alone does not bring the user back (its click is not reported): the window asks for attention too
+      if (opts?.attention) tauri.window.getCurrentWindow().requestUserAttention(2).catch(() => {});
       return;
     }
     // one at a time: a new one replaces the previous (same tag)
@@ -35,4 +37,17 @@ export function notify(title: string, body: string, kind: 'info' | 'error' = 'in
     return;
   }
   toast(body, kind, 6000);
+}
+
+/**
+ * The attention request cancelled the moment the window is focused again, or
+ * when the question is answered or withdrawn first (the returned function:
+ * the dialog calls it as it closes).
+ */
+export function attend(): () => void {
+  if (!tauri) return () => {};
+  const w = tauri.window.getCurrentWindow();
+  const stop = () => { window.removeEventListener('focus', stop); w.requestUserAttention(null).catch(() => {}); };
+  window.addEventListener('focus', stop, { once: true });
+  return stop;
 }

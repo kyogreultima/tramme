@@ -1,4 +1,4 @@
-// The tramme project format, version 1, as far as the desktop storage needs
+// The Tramme project format, version 1, as far as the desktop storage needs
 // it: a Rust port of the stable parts of packages/project/src/format.ts
 // (manifest, paths, mime, ids, a fresh project). The meaning of the document
 // stays checked by the editor, where it runs — this side only parses JSON.
@@ -86,7 +86,7 @@ const EXT: [(&str, &[&str]); 3] = [
         &[
             "png", "jpg", "jpeg", "webp", "gif", "avif", "svg", "ttf", "otf", "woff", "woff2",
             "wav", "mp3", "ogg", "m4a", "flac", "mp4", "webm", "mov", "json", "js", "mjs", "pdf",
-            "md", "markdown", "cube",
+            "md", "markdown", "cube", "glb", "gltf",
         ],
     ),
     ("plugins", &["js", "mjs"]),
@@ -119,6 +119,8 @@ pub fn mime_of(path: &str) -> &'static str {
         "webm" => "video/webm",
         "mov" => "video/quicktime",
         "zip" => "application/zip",
+        "glb" => "model/gltf-binary",
+        "gltf" => "model/gltf+json",
         _ => "application/octet-stream",
     }
 }
@@ -190,10 +192,12 @@ pub fn is_media(path: &str) -> bool {
         return false;
     };
     match rest.rsplit_once('.') {
-        Some((stem, ext)) if !stem.is_empty() => matches!(
-            ext.to_lowercase().as_str(),
-            "wav" | "mp3" | "ogg" | "m4a" | "flac" | "mp4" | "webm" | "mov"
-        ),
+        Some((stem, ext)) if !stem.is_empty() => {
+            let ext = ext.to_lowercase();
+            // a 3D model (.glb) too, under assets/ only, as the web format says
+            matches!(ext.as_str(), "wav" | "mp3" | "ogg" | "m4a" | "flac" | "mp4" | "webm" | "mov")
+                || (ext == "glb" && path.starts_with("assets/"))
+        }
         _ => false,
     }
 }

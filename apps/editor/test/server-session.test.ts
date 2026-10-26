@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ServerSession } from '../src/ai/server.ts';
+import { recallDetails, ServerSession, type Message } from '../src/ai/server.ts';
+import type { ChatItem } from '../src/api.ts';
 import type { ToolRunner } from '../src/ai/tools.ts';
 
 /** a streamed Messages API response */
@@ -264,5 +265,43 @@ describe('assistant, server path', () => {
     const s = new ServerSession();
     await go(s, fakeRunner().runner);
     expect(s.messages.at(-1)!.content).toEqual([{ type: 'text', text: 'Part.' }, { type: 'text', text: 'Done.' }]);
+  });
+});
+
+describe('a conversation saved before its calls kept their line', () => {
+  const prompt = (text: string) => `<context>\nComposition: main\n</context>\n\n${text}`;
+  const history: Message[] = [
+    { role: 'user', content: [{ type: 'text', text: prompt('A storm at sea') }] },
+    { role: 'assistant', content: [{ type: 'tool_use', id: 'a', name: 'use_tool', input: { name: 'generate-image', input: {} } }, { type: 'tool_use', id: 'b', name: 'use_tool', input: { name: 'generate-sound', input: {} } }] },
+    { role: 'user', content: [
+      { type: 'tool_result', tool_use_id: 'a', content: [{ type: 'text', text: 'Picture made by hydracept (gpt-image-2.5-flare, 16:9), saved as asset img-1 with its prompt.' }, { type: 'text', text: '[image]' }] },
+      { type: 'tool_result', tool_use_id: 'b', content: [{ type: 'text', text: 'generate-sound (plugin core) failed: hydracept: HTTP 403\nmore' }], is_error: true },
+    ] },
+    { role: 'assistant', content: [{ type: 'text', text: 'Done.' }] },
+    { role: 'user', content: [{ type: 'text', text: prompt('Again') }] },
+    { role: 'assistant', content: [{ type: 'tool_use', id: 'c', name: 'use_tool', input: { name: 'generate-sound', input: {} } }] },
+    { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'c', content: [{ type: 'text', text: 'voice made by elevenlabs (eleven_v4, voice JBF), saved as asset v-1.' }] }] },
+  ];
+  const tool = (id: string, use: string, extra: object = {}): ChatItem => ({ id, role: 'assistant', tool: { name: 'use_tool', summary: `Tool: ${use}`, use, done: true, ...extra } });
+
+  it('reads back who made what and why a call failed, turn by turn', () => {
+    const items: ChatItem[] = [
+      { id: 'u1', role: 'user', text: 'A storm at sea' }, tool('t1', 'generate-image'), tool('t2', 'generate-sound', { error: true }),
+      // run from the / menu: not in the history, left as it is
+      { id: 'u2', role: 'user', text: '/generate-sound' }, tool('t3', 'generate-sound'),
+      { id: 'u3', role: 'user', text: 'Again' }, tool('t4', 'generate-sound'),
+    ];
+    const back = recallDetails(items, history).map((it) => it.tool?.detail);
+    expect(back[1]).toMatch(/hydracept \(gpt-image-2\.5-flare, 16:9\)/);
+    expect(back[2]).toBe('generate-sound (plugin core) failed: hydracept: HTTP 403');
+    expect(back[4]).toBeUndefined();
+    expect(back[6]).toMatch(/elevenlabs \(eleven_v4, voice JBF\)/);
+  });
+
+  it('keeps the line a call already has, and a conversation without history as it is', () => {
+    const items: ChatItem[] = [{ id: 'u1', role: 'user', text: 'A storm at sea' }, tool('t1', 'generate-image', { detail: 'kept' })];
+    expect(recallDetails(items, history)).toBe(items);
+    const fresh: ChatItem[] = [{ id: 'u1', role: 'user', text: 'A storm at sea' }, tool('t1', 'generate-image')];
+    expect(recallDetails(fresh, [])).toBe(fresh);
   });
 });

@@ -35,6 +35,8 @@ export class ToolRunner {
   private signal: AbortSignal = new AbortController().signal;
   /** the last plugin tool's message for the user */
   notice = '';
+  /** the last tool's own notice (not its text), shown on its activity line */
+  told = '';
   /** stills drawn on a renderer of their own (never the preview's) */
   private stills = new Stills();
   /** events for the conversation (images, proposals, reloads), read after each tool */
@@ -185,6 +187,7 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
   async run(name: string, input: any, signal?: AbortSignal): Promise<ToolResult> {
     this.signal = signal ?? new AbortController().signal;
     this.calls++;
+    this.told = '';
     // the model reads the error and calls again rather than the tool guessing
     const issues = inputIssues(name, input);
     if (issues.length) return text(`input refused by ${name}:\n${issues.join('\n')}`, true);
@@ -304,6 +307,7 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
     if (out.reload?.length) this.events.push({ type: 'reload', assets: out.reload });
     // what the user reads after running it from the / menu: its notice, or its text when no proposal card shows the result
     this.notice = out.notice ?? (out.ops?.length ? '' : out.text ?? '');
+    this.told = out.notice ?? '';
     const lines = out.text ? [out.text] : [];
     if (out.ops?.length) {
       const r = await this.propose(out.label ?? tool.title ?? name, out.ops);

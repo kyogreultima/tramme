@@ -21,7 +21,7 @@ import { t } from './i18n/index.ts';
 // ── the library ──────────────────────────────────────────────
 let shipped: Promise<SoundEntry[]> | null = null;
 
-/** every sound at hand: recorded ones shipped with tramme, the presets written as code, the user's library */
+/** every sound at hand: recorded ones shipped with Tramme, the presets written as code, the user's library */
 export async function soundLibrary(): Promise<SoundEntry[]> {
   shipped ??= fetch(new URL('/sounds/catalog.json', location.href)).then((r) => (r.ok ? r.json() : { sounds: [] })).then((j: { sounds: SoundEntry[] }) => j.sounds).catch(() => []);
   const mine = await api.sounds().then((list) => list.flatMap((x) => (x.entry ? [{ ...(x.entry as SoundEntry), source: 'library' as const, file: x.name }] : []))).catch(() => []);
@@ -451,7 +451,7 @@ const generateSound: ToolType<{ kind: 'sfx' | 'music' | 'voice'; prompt: string;
       ops: [...kept.ops, ...placed.ops], reload: kept.reload, label: `Sound ${label}`,
       text: `${kind} made by ${made.provider} (${made.model}${made.voice ? `, voice ${made.voice}` : ''}), saved as asset ${kept.asset} with its prompt: ${figuresText(figures)}. ${placedText(placed, times)}${keep ? ' Kept in the library.' : ''}${kind === 'music' ? ' Duck it under a voice with duck.' : ''}`,
       images: [{ url: waveform(buffer, figures, label), caption: label }],
-      notice: t('sound.made', { name: label, provider: made.provider }),
+      notice: t('sound.made', { name: label, provider: made.provider, model: made.model }),
     };
   },
 };
@@ -688,7 +688,7 @@ const credits: ToolType<Record<string, never>> = {
       const e = side?.from ? all.find((x) => x.id === side.from) : all.find((x) => `sound-${x.id}`.slice(0, 64) === id);
       const name = a.name ?? id;
       if (side?.provider) lines.push(`- ${name}: made by ${side.provider}${side.model ? ` (${side.model})` : ''}`);
-      else if (side?.code || e?.code) lines.push(`- ${name}: written as code (tramme)`);
+      else if (side?.code || e?.code) lines.push(`- ${name}: written as code (Tramme)`);
       else if (e || side?.license) lines.push(`- ${name}: ${e?.title ?? side?.title ?? name}, ${side?.author ?? e?.author ?? 'unknown author'}, ${side?.license ?? e?.license ?? 'license unknown'}${side?.url ?? e?.url ? ` <${side?.url ?? e?.url}>` : ''}`);
       else lines.push(`- ${name}: brought by the user (${a.src})`);
     }

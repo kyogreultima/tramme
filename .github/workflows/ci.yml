@@ -25,6 +25,8 @@ jobs:
       - uses: ./.github/actions/setup
       - run: npm ci
       - run: npm run typecheck
+      # the packs' index (commands, French, the Packs docs page) is generated: a pack changed without it is stale
+      - run: node scripts/packs/index.ts --check
       - run: npm test
 
   site:

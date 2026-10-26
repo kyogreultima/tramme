@@ -1,4 +1,4 @@
-# Deploying tramme on Cloudflare
+# Deploying Tramme on Cloudflare
 
 The same Worker deploys in one of two modes:
 
@@ -81,7 +81,7 @@ Only connected providers show up in the model menu. A custom provider is reached
 
 Optional: the assistant's `generate-sound` tool makes sound effects, music beds and voice-overs at authoring time, saved in the project like any sound. ElevenLabs makes all three; a voice-over can also come from OpenAI or Gemini. Connect ElevenLabs in **Settings, Providers** like the others (or `npx wrangler secret put ELEVENLABS_API_KEY -c apps/worker/wrangler.jsonc`).
 
-Without any of these keys the assistant still has the sound library (recorded sounds shipped with tramme, the user's own) and the sounds it writes as code. Each provider bills its own use.
+Without any of these keys the assistant still has the sound library (recorded sounds shipped with Tramme, the user's own) and the sounds it writes as code. Each provider bills its own use.
 
 ## 7. Transcription
 

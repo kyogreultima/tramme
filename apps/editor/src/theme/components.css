@@ -210,7 +210,7 @@ button.row-item { border: 0; background: transparent; font: inherit; text-align:
 .row-item svg.i { width: 14px; height: 14px; }
 .row-item .meta { font-size: var(--fs-xs); color: var(--text-3); }
 
-/* ── the assistant's mark: tramme itself, in the theme's accent ── */
+/* ── the assistant's mark: Tramme itself, in the theme's accent ── */
 .mark { display: inline-grid; place-items: center; width: 24px; height: 24px; flex: none; border-radius: var(--r-sm); background: var(--accent-soft); color: var(--accent-text); }
 .mark svg { width: 14px; height: 14px; fill: currentColor; }
 .mark.working svg { animation: work 1.4s var(--ease) infinite; }

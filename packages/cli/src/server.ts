@@ -25,7 +25,7 @@ export const MIME: Record<string, string> = {
 };
 
 const PAGE = `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>tramme · render</title>
+<html lang="en"><head><meta charset="utf-8"><title>Tramme · render</title>
 <style>html,body{margin:0;background:#000}canvas{display:block}</style></head>
 <body><canvas id="out"></canvas><script type="module" src="/__tramme/render/page.js"></script></body></html>`;
 

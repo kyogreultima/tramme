@@ -27,7 +27,7 @@ function vault(): Promise<Window> {
   ready ??= new Promise<Window>((resolve, reject) => {
     const frame = document.createElement('iframe');
     frame.hidden = true;
-    frame.title = 'tramme vault';
+    frame.title = 'Tramme vault';
     frame.src = `${vaultOrigin}/`;
     const timer = setTimeout(() => { removeEventListener('message', heard); reject(new Error(t('personal.vaultUnreachable'))); }, 15_000);
     const heard = (e: MessageEvent) => {

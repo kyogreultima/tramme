@@ -96,7 +96,7 @@ const P: Record<string, string> = {
 export type IconName = keyof typeof P | string;
 
 export function Icon({ name, class: cls = '', size }: { name: IconName; class?: string; size?: number }) {
-  // the tramme mark, where a line icon would not do (the view switch, the assistant)
+  // the Tramme mark, where a line icon would not do (the view switch, the assistant)
   if (name === 'mark') {
     return <svg class={`i ${cls}`} viewBox="0 0 24 24" width={size} height={size} aria-hidden="true" style={{ fill: 'currentColor', stroke: 'none' }} dangerouslySetInnerHTML={{ __html: LOGO_PATHS }} />;
   }

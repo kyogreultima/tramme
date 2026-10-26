@@ -28,8 +28,8 @@ export interface ChatItem {
   pin?: [number, number];
   /** user: files joined to the message (files of the project) */
   attachments?: { path: string; name: string; kind: FileKind; asset?: string }[];
-  /** assistant activity: tool name and short description; use: the vocabulary's tool a use_tool call runs */
-  tool?: { name: string; summary: string; use?: string; done?: boolean; error?: boolean; progress?: ToolProgress };
+  /** assistant activity: tool name and short description; use: the vocabulary's tool a use_tool call runs; detail: once done, why it failed or the tool's own line for the user (who made a sound, a picture); start and duration in ms */
+  tool?: { name: string; summary: string; use?: string; done?: boolean; error?: boolean; detail?: string; progress?: ToolProgress; start?: number; ms?: number };
   /** a still the assistant rendered (data URL) */
   image?: { url: string; caption: string };
   /** what the assistant thinks before answering (summary streamed by the API); start and duration in ms */
@@ -49,7 +49,7 @@ export interface ToolProgress { done: number; total: number; step?: string }
 export type AiEvent =
   | { type: 'item'; item: ChatItem }
   | { type: 'text'; id: string; delta: string }
-  | { type: 'tool-done'; id: string; error?: boolean }
+  | { type: 'tool-done'; id: string; error?: boolean; detail?: string }
   | { type: 'tool-progress'; id: string; progress: ToolProgress }
   | { type: 'thinking'; id: string; delta: string }
   | { type: 'thinking-done'; id: string }
@@ -81,6 +81,8 @@ export interface ServerConfig {
 export interface MadeSound { blob: Blob; provider: string; model: string; voice?: string }
 /** a picture made by a provider: the file and what made it */
 export interface MadeImage { blob: Blob; provider: string; model: string }
+/** what a picture is made from: the words, the proportions, and what the settings or the ask choose */
+export interface ImageAsk { prompt: string; ratio?: string; quality?: 'low' | 'medium' | 'high'; provider?: string; size?: 'small' | 'large'; n?: number; reference?: string; mask?: string }
 
 export interface ProjectFile { path: string; size: number; etag: string; modified: string }
 
@@ -161,10 +163,17 @@ export const api = {
     const params = new URLSearchParams(Object.entries(q).filter(([, v]) => v) as [string, string][]);
     return (await call<{ voices: Voice[] }>(`/api/voices?${params}`, { signal }, reach)).voices;
   },
-  /** a picture made by a provider with the user's key */
-  async generateImage(ask: { prompt: string; ratio?: string; quality?: 'low' | 'medium' | 'high'; provider?: string }, signal?: AbortSignal): Promise<MadeImage> {
+  /**
+   * pictures made by a provider with the user's key: one, or n takes of the
+   * same ask; a reference (a data URL) to change, a mask beside it
+   * (transparent where it may change)
+   */
+  async generateImages(ask: ImageAsk, signal?: AbortSignal): Promise<MadeImage[]> {
     const r = await answered(await reach('/api/generate-image', { ...jsonInit('POST', ask), signal }));
-    return { blob: await r.blob(), provider: r.headers.get('x-tramme-provider') ?? '', model: r.headers.get('x-tramme-model') ?? '' };
+    const provider = r.headers.get('x-tramme-provider') ?? '', model = r.headers.get('x-tramme-model') ?? '';
+    if (!(r.headers.get('content-type') ?? '').startsWith('application/json')) return [{ blob: await r.blob(), provider, model }];
+    const j = await r.json() as { images: { type: string; data: string }[] };
+    return j.images.map((i) => ({ blob: new Blob([Uint8Array.from(atob(i.data), (c) => c.charCodeAt(0))], { type: i.type }), provider, model }));
   },
   remove: (id: string) => call<{ deleted: string }>(P(id), { method: 'DELETE' }),
   duplicate: (id: string, name?: string) => call<Manifest>(`${P(id)}/duplicate`, jsonInit('POST', { name })),

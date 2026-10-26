@@ -109,3 +109,54 @@ describe('generate-image', () => {
     expect(imageConfig({ get: (p) => (p === 'zai' ? 'k' : undefined), field: () => undefined, how: () => '', custom: () => undefined, status: () => ({ providers: {} as never, custom: [] }) })).toEqual(['zai']);
   });
 });
+
+describe('takes, a picture to change, the size asked', () => {
+  const ask = (body: unknown) => generateImage(new Request('http://localhost:8787/api/generate-image', { method: 'POST', body: JSON.stringify(body) }), { keys: keys(true), fetch: out });
+  const dataUrl = `data:image/png;base64,${b64(PNG)}`;
+
+  it('takes: the ask drawn n times, answered as JSON with each picture', async () => {
+    const one = () => jsonRes({ data: [{ b64_json: b64(PNG) }] });
+    const calls = stubFetch(one(), one(), one());
+    const res = await ask({ prompt: 'a lighthouse', n: 3 });
+    expect(calls).toHaveLength(3);
+    expect(res.headers.get('content-type')).toBe('application/json');
+    const j = await res.json() as { provider: string; model: string; images: { type: string; data: string }[] };
+    expect(j).toMatchObject({ provider: 'openai', model: 'gpt-image-1' });
+    expect(j.images.map((i) => i.data)).toEqual([b64(PNG), b64(PNG), b64(PNG)]);
+    // never more than four
+    stubFetch(one(), one(), one(), one());
+    expect(((await (await ask({ prompt: 'x', n: 9 })).json()) as { images: unknown[] }).images).toHaveLength(4);
+  });
+
+  it('openai changes a picture through its edits endpoint, the mask beside it', async () => {
+    const calls = stubFetch(jsonRes({ data: [{ b64_json: b64(PNG) }] }));
+    await ask({ prompt: 'the same street, at night', provider: 'openai', reference: dataUrl, mask: dataUrl, size: 'small' });
+    expect(calls[0].url).toBe('https://api.openai.com/v1/images/edits');
+    const form = calls[0].init?.body as FormData;
+    expect(form.get('prompt')).toBe('the same street, at night');
+    expect(form.get('size')).toBe('1024x1024');
+    expect(form.get('image')).toBeInstanceOf(Blob);
+    expect(form.get('mask')).toBeInstanceOf(Blob);
+  });
+
+  it('gemini takes the picture, then its mask, before the words', async () => {
+    const calls = stubFetch(jsonRes({ candidates: [{ content: { parts: [{ inlineData: { data: b64(PNG), mimeType: 'image/png' } }] } }] }));
+    await ask({ prompt: 'a red door', provider: 'gemini', reference: dataUrl, mask: dataUrl });
+    const parts = (asked(calls[0]).contents as { parts: Record<string, unknown>[] }[])[0].parts;
+    expect(parts.map((p) => Object.keys(p)[0])).toEqual(['inlineData', 'inlineData', 'text']);
+    expect(String(parts[2].text)).toMatch(/mask/);
+  });
+
+  it('a provider that draws from words only refuses a picture to change; bad pictures are refused', async () => {
+    stubFetch(jsonRes({}));
+    await expect(ask({ prompt: 'x', provider: 'zai', reference: dataUrl })).rejects.toMatchObject({ status: 400, message: /words only/ });
+    await expect(ask({ prompt: 'x', reference: 'http://example.com/a.png' })).rejects.toMatchObject({ status: 400, message: /data URL/ });
+    await expect(ask({ prompt: 'x', mask: dataUrl })).rejects.toMatchObject({ status: 400, message: /goes with the picture/ });
+  });
+
+  it('a small picture asks the cheapest size', async () => {
+    const calls = stubFetch(jsonRes({ data: [{ url: 'https://cdn.example/img' }] }), new Response(PNG, { headers: { 'content-type': 'image/png' } }));
+    await IMAGE_PROVIDERS.zai.make('k', { prompt: 'x', ratio: '16:9', size: 'small' }, out, keys());
+    expect(asked(calls[0]).size).toBe('960x544');
+  });
+});

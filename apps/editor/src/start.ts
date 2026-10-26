@@ -13,6 +13,7 @@ import { send } from './ai/conversation.ts';
 import { listCommands, parseCommand } from './ai/commands.ts';
 import { draft, pending } from './attachments.ts';
 import { startKey, type Start } from './importer.ts';
+import { packCommands, shippedPacks } from './packs.ts';
 import { S } from './state.ts';
 import { t } from './i18n/index.ts';
 
@@ -53,6 +54,9 @@ function greet(text: string) {
 async function begin(words: string, workflow?: string) {
   const commands = listCommands(S.registry.peek()), typed = parseCommand(words, commands), named = typed?.cmd;
   if (named?.kind === 'tool' && !typed!.rest) { draft.value = words; return; }
+  // a pack command the registry does not know yet: the project's packs attach once it is open, the command waits in the box until then
+  const slash = named ? null : /^\/([A-Za-z][\w.-]*)/.exec(words.trim());
+  if (slash && (await shippedPacks()).some((p) => (p.commands ?? []).some((c) => c.name === slash[1]))) { draft.value = words; return; }
   if (!aiRoute.peek()) await refreshStatus();
   const cmd = named ?? (workflow ? commands.find((c) => c.name === workflow && c.kind === 'prompt') : undefined);
   if (!aiRoute.peek()) { draft.value = cmd && !named ? `/${cmd.name} ${words}` : words; return; }
@@ -81,5 +85,5 @@ export function startProject() {
     greet(VIDEO_GREETING());
     return;
   }
-  if (words) begin(words, 'film');
+  if (words) begin(words);
 }

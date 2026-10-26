@@ -103,7 +103,7 @@ export function ModelPicker({ wide = false }: { wide?: boolean }) {
   const firstVisible = () => (anchor ? (anchor.ownerDocument.querySelector('.models-pop .model-opt') as HTMLElement | null) : null);
   return (
     <>
-      <button class={`model-pick${wide ? ' wide' : ''}`} data-tour={wide ? undefined : 'assistant-model'} title={[t('models.modelProvider', { provider: t(providerLabel(model)) }), effortTitle(model)].filter(Boolean).join(' · ')} onClick={(e) => setAnchor(anchor ? null : (e.currentTarget as HTMLElement))}>
+      <button type="button" class={`model-pick${wide ? ' wide' : ''}`} data-tour={wide ? undefined : 'assistant-model'} title={[t('models.modelProvider', { provider: t(providerLabel(model)) }), effortTitle(model)].filter(Boolean).join(' · ')} onClick={(e) => setAnchor(anchor ? null : (e.currentTarget as HTMLElement))}>
         <span>{modelLabel(model)}</span><Icon name="chevronDown" />
       </button>
       {anchor && (

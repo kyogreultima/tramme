@@ -1,5 +1,5 @@
 // The sound library: what each sound is (kind, tags, length, the moment it
-// lands on) wherever it comes from: files shipped with tramme, sounds written
+// lands on) wherever it comes from: files shipped with Tramme, sounds written
 // as code (synthesis), the user's own library shared by the projects, sounds
 // made by a provider. The assistant searches it by words, the way it would
 // ask a sound designer.

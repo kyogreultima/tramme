@@ -11,7 +11,6 @@ import { CUTOUT_TOOLS } from './cutout.ts';
 import { DEPTH_TOOLS } from './depth.ts';
 import { EVENT_TOOLS } from './events.ts';
 import { FIGURE_TOOLS } from './figures.ts';
-import { FILM_KITS, FILM_TOOLS } from './film.ts';
 import { IMAGE_TOOLS } from './images.ts';
 import { LIBRARY_TOOLS } from './library.ts';
 import { LIPSYNC_TOOLS } from './lipsync.ts';
@@ -63,10 +62,6 @@ export const EDITOR_TOOLS: ToolType[] = [
 
 export const EDITOR_PROMPTS: PromptType[] = [
   {
-    name: 'film', title: 'Make a film from a brief', description: 'a whole video (launch, announcement, ad, explainer) directed as a film description and built scene by scene',
-    prompt: 'Make the film this brief asks for, following your guide for whole films: if the format, the length or the tone are not said, take what the brief implies and say what you chose. Read the film guide (use_tool "film-guide"), read the sources of the project if there are any (use_tool "sources"), then direct the film: its concept, its structure, its art direction (from the guide\'s starting hand unless it fights the brief), its scenes counted in beats. Build it (use_tool "film"), look at it (use_tool "film-review"), fix what matters and build once more. Then tell me in a few lines the idea, the direction you took and what the film says, scene by scene.',
-  },
-  {
     name: 'analyze', title: 'Analyse the sources', description: 'reads every picture, video, sound and document of the project, then proposes what the video should be',
     prompt: 'Analyse the sources of this project before making anything, following your guide for sources: list them (use_tool "sources"), read the kit first when the list names one (a brief written from the project\'s repository: check it, do not take it on trust), read every one in full (each document to its last page, each video and sound with what is said), take the colours of the brand from its logo or its pictures (use_tool "palette"), and write what you learned in the brief (use_tool "brief" with about and sources). Then tell me in a few lines what you understood, and propose two or three directions for the video: what it is for and for whom, format and length, the story scene by scene with the sources each scene uses and what must be made for it. Recommend one, and wait for my choice before building.',
   },
@@ -76,7 +71,7 @@ export const EDITOR_PROMPTS: PromptType[] = [
   },
   {
     name: 'review', title: 'Review the composition', description: 'checks the key moments and fixes what is wrong',
-    prompt: 'Review the composition: run the check tool (use_tool "check") and read its issues and contact sheet, look closer at the entrances and transitions that matter with the motion tool, and judge what the checks cannot: contrast, hierarchy, rhythm, elements over a face. Propose fixes for what you find, then run check again.',
+    prompt: 'Review the composition: run the check tool (use_tool "check") and read its issues and contact sheet, look closer at the entrances and transitions that matter with the motion tool, and judge what the checks cannot: contrast, hierarchy, rhythm, elements over a face. When the film has music (a beats analysis), add the rhythm pack so the check tool reads its off-beat and even-shots checks too, and move the cuts they flag onto the beats they name. Propose fixes for what you find, then run check again.',
   },
   {
     name: 'polish', title: 'Polish the motion', description: 'brings the movement to standard: easings, durations, stagger, arcs, settles',
@@ -110,5 +105,5 @@ export const EDITOR_PROMPTS: PromptType[] = [
 
 /** the base vocabulary of the editor, before a document's plugins */
 export function editorRegistry() {
-  return builtinRegistry().registerTool(...EDITOR_TOOLS, ...SVG_TOOLS, ...FILM_TOOLS, ...RECIPE_TOOLS, ...FIGURE_TOOLS, ...EVENT_TOOLS, ...PERCEPTION_TOOLS, ...TRACKING_TOOLS, ...STABILIZE_TOOLS, ...PROXY_TOOLS, ...COMPONENT_TOOLS, ...DENOISE_TOOLS, ...SKIN_TOOLS, ...LONG_TOOLS, ...CUTOUT_TOOLS, ...DEPTH_TOOLS, ...MODEL_TOOLS, ...REMOVEBG_TOOLS, ...LIPSYNC_TOOLS, ...CUTS_TOOLS, ...FILLERS_TOOLS, ...REVIEW_TOOLS, ...SOUND_TOOLS, ...MIXING_TOOLS, ...IMAGE_TOOLS, ...SHORTS_TOOLS, ...SOURCE_TOOLS, ...BLOCK_TOOLS, ...BRIEF_TOOLS, ...LIBRARY_TOOLS).registerPrompt(...EDITOR_PROMPTS).registerKit(...BUILTIN_KITS, ...FILM_KITS).registerPreset(...EDITOR_PRESETS);
+  return builtinRegistry().registerTool(...EDITOR_TOOLS, ...SVG_TOOLS, ...RECIPE_TOOLS, ...FIGURE_TOOLS, ...EVENT_TOOLS, ...PERCEPTION_TOOLS, ...TRACKING_TOOLS, ...STABILIZE_TOOLS, ...PROXY_TOOLS, ...COMPONENT_TOOLS, ...DENOISE_TOOLS, ...SKIN_TOOLS, ...LONG_TOOLS, ...CUTOUT_TOOLS, ...DEPTH_TOOLS, ...MODEL_TOOLS, ...REMOVEBG_TOOLS, ...LIPSYNC_TOOLS, ...CUTS_TOOLS, ...FILLERS_TOOLS, ...REVIEW_TOOLS, ...SOUND_TOOLS, ...MIXING_TOOLS, ...IMAGE_TOOLS, ...SHORTS_TOOLS, ...SOURCE_TOOLS, ...BLOCK_TOOLS, ...BRIEF_TOOLS, ...LIBRARY_TOOLS).registerPrompt(...EDITOR_PROMPTS).registerKit(...BUILTIN_KITS).registerPreset(...EDITOR_PRESETS);
 }

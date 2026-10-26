@@ -1,8 +1,8 @@
 # Installed plugins roadmap
 
-How a user installs a plugin once and uses it everywhere: imported from the settings, kept on their own device, offered in every project to them and to the assistant — then, once tramme has its API, found in a marketplace. Today a plugin lives in a project (`plugins/*.js`), and the shared library (`library-add`, `library-use`, `apps/editor/src/library.ts`) is reached only through commands, and only where a server or the desktop app answers `/api/library`.
+How a user installs a plugin once and uses it everywhere: imported from the settings, kept on their own device, offered in every project to them and to the assistant — then, once Tramme has its API, found in a marketplace. Today a plugin lives in a project (`plugins/*.js`), and the shared library (`library-add`, `library-use`, `apps/editor/src/library.ts`) is reached only through commands, and only where a server or the desktop app answers `/api/library`.
 
-Status: steps 1 to 7 done (the share target of step 2 waits); step 8, the marketplace, waits for tramme's API. What is left is listed under each step. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
+Status: steps 1 to 7 done (the share target of step 2 waits); step 8, the marketplace, waits for Tramme's API. What is left is listed under each step. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
 
 ## Why
 
@@ -40,7 +40,7 @@ Where the installed plugins live, per platform:
 ### Step 2. The Plugins section of the settings
 
 - [x] A "Plugins" section: the installed plugins with their name, version, description, size and what they bring (nodes, effects, modifiers, tools, workflows, checks, kits, presets), each one enabled or disabled, updated or removed.
-- [x] Import by the file picker or by dropping files on the section (a `.js` module today, the package of step 7 later). On a phone the file picker reaches the Files app, the downloads and the cloud drives the system offers; a plugin shared to tramme from another app (the system's share sheet, the installed web app's share target) lands here too. Done for the picker and the drop; the share sheet and the installed web app's share target are not done yet.
+- [x] Import by the file picker or by dropping files on the section (a `.js` module today, the package of step 7 later). On a phone the file picker reaches the Files app, the downloads and the cloud drives the system offers; a plugin shared to Tramme from another app (the system's share sheet, the installed web app's share target) lands here too. Done for the picker and the drop; the share sheet and the installed web app's share target are not done yet.
 - [x] The install question before any code runs: what the plugin brings, read from the module's text as the code question already does (`apps/editor/src/importer.ts`), its declared permissions (step 5) and its API version. A plugin of a newer API is refused with the message `Registry.use` already gives.
 - [x] An update is an import of a newer version of the same plugin: the section shows what changed in what it brings and in its permissions, and asks again only when the permissions grow.
 - [x] On the desktop and on the web with a folder, "Open the folder", and the list follows what is added or removed there. Done: the list is read again when the window comes back.
@@ -79,7 +79,7 @@ Where the installed plugins live, per platform:
 
 ### Step 8. The marketplace
 
-Once tramme has its API.
+Once Tramme has its API.
 
 - [ ] A catalogue served by the API: plugins with their manifest, screenshots or a short video, versions and changelog. The settings browse it in a "Discover" tab; installing downloads the package into the device's storage of step 1, through the same install question as an import.
 - [ ] Publishing: an author account, a package signed with the author's key, the manifest checked, the permissions shown to reviewers. A review before a plugin is listed, at least for those asking for network or keys.

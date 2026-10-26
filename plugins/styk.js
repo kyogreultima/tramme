@@ -1,4 +1,4 @@
-// Stick figures: Pivot and StykAnimate-style characters, brought into tramme.
+// Stick figures: Pivot and StykAnimate-style characters, brought into Tramme.
 // A figure is a tree of segments with fixed lengths (a rig, like a .stk figure
 // type); a pose gives each segment an angle relative to its parent, so a
 // keyframed pose animates frame by frame as in Pivot, an expression can drive
@@ -392,6 +392,11 @@ export const checks = [poseCheck];
 export { presets };
 export const messages = {
   fr: {
+    "man: the blue figure; simple: black and thin; walker: the man with the walk cycle already keyed": "man : la silhouette bleue ; simple : noire et fine ; walker : la silhouette avec son cycle de marche déjà keyframé",
+    "scales the whole figure, 1 = about 270 px tall": "met à l’échelle toute la silhouette, 1 = environ 270 px de haut",
+    "one CSS colour for the whole figure, over the rig's own": "une couleur CSS pour toute la silhouette, à la place de celle du squelette",
+    "[x, y] of the hip in the composition; default: centred, at 55% of the height": "[x, y] de la hanche dans la composition ; par défaut : centrée, à 55 % de la hauteur",
+    "the layer's name": "le nom de la couche",
     'Stick figure': 'Silhouette', 'Stick figures': 'Silhouettes', 'Walking figure': 'Marcheur', 'Simple figure': 'Silhouette simple',
     'Figure': 'Corps', 'Pose': 'Pose', 'Thickness': 'Épaisseur', 'Colour': 'Couleur', 'Joints': 'Articulations',
     'the man in blue, posed by joint angles': 'l\'homme en bleu, posé par angles d\'articulations',

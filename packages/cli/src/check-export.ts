@@ -1,7 +1,7 @@
 // tramme check-export <doc> --format lottie|svg --t 0.5,1.5: how faithful an
 // export is. Lottie is played back by lottie-web (the reference player), SVG
-// is drawn by Chrome; both are compared with tramme's own frames at the same
-// instants. The tramme side drops what the format cannot carry (motion blur,
+// is drawn by Chrome; both are compared with Tramme's own frames at the same
+// instants. The Tramme side drops what the format cannot carry (motion blur,
 // finishing effects, layers drawn by code) so the comparison is like for like.
 
 import fs from 'node:fs';

@@ -34,6 +34,13 @@ export function matchCommands(list: Command[], query: string, label: (s: string)
   return list.map((c) => ({ c, r: rank(c) })).filter((x) => x.r < 9).sort((a, b) => a.r - b.r).map((x) => x.c);
 }
 
+/** the / menu's order: with nothing typed yet, the commands used last come first; with a query, the search's own order holds */
+export function ranked(matches: Command[], recent: string[], query: string): Command[] {
+  if (query.trim()) return matches;
+  const rank = (c: Command) => { const i = recent.indexOf(c.name); return i < 0 ? recent.length : i; };
+  return [...matches].sort((a, b) => rank(a) - rank(b));
+}
+
 /** a message written as a command: /name, then what the user adds */
 export function parseCommand(text: string, list: Command[]): { cmd: Command; rest: string } | null {
   const m = /^\/([A-Za-z][\w.-]*)(?:\s+([\s\S]*))?$/.exec(text.trim());

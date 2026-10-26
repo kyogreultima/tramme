@@ -10,7 +10,7 @@
 // at startup; pages of other origins than the allowed ones are refused. A page
 // of an origin named with --origin (the editor `npm run dev` serves, a deployed
 // editor) receives the token by itself (/pair); any other local page has to be
-// given it by hand. The command lines reach tramme's tools at /mcp/<key>, an
+// given it by hand. The command lines reach Tramme's tools at /mcp/<key>, an
 // address that only holds for the turn running.
 
 import crypto from 'node:crypto';
@@ -123,7 +123,7 @@ export async function startCompanion(opts: { port?: number; origins?: string[]; 
       json(200, { token: secret });
       return;
     }
-    // a command line reaching tramme's tools: only with the key of the turn running
+    // a command line reaching Tramme's tools: only with the key of the turn running
     const mcp = /^\/mcp\/([a-f0-9]{48})$/.exec(url.pathname);
     if (mcp) {
       const key = Buffer.from(mcp[1]), want = Buffer.from(turn?.key ?? '');
@@ -164,7 +164,7 @@ export async function startCompanion(opts: { port?: number; origins?: string[]; 
     }
   });
   await new Promise<void>((resolve, reject) => { server.once('error', reject); server.listen(port, '127.0.0.1', () => resolve()); });
-  console.log(`tramme companion ready on http://127.0.0.1:${port}`);
+  console.log(`Tramme companion ready on http://127.0.0.1:${port}`);
   engines().then((found) => console.log(`agents: Claude${found.codex ? `, Codex ${found.codex}` : ''}${found.antigravity ? `, Antigravity ${found.antigravity}` : ''}`)).catch(() => {});
   if (origins.size) console.log(`automatic pairing for: ${[...origins].join(', ')}`);
   console.log(`pairing token: ${secret}`);

@@ -9,9 +9,13 @@
 // in the editor: its tools read it at authoring time with ctx.packFile, and
 // only what they used is written into the project.
 
-import type { ToolContext } from '@tramme/core';
-import { manifestOf } from '@tramme/project';
+import type { ToolContext, TrammeDoc } from '@tramme/core';
+import { compareVersions, manifestOf } from '@tramme/project';
+import type { Command } from './ai/commands.ts';
+import { addMessages } from './i18n/index.ts';
 import type { Installed } from './installed.ts';
+
+export interface PackCommand { name: string; title: string; description: string }
 
 export interface PackEntry {
   file: string;
@@ -19,6 +23,12 @@ export interface PackEntry {
   description?: string;
   /** the data files beside the module (plugins/<pack>/…), read with ctx.packFile */
   data?: string[];
+  /** the version the module declares (the index carries it): a project's older copy is offered the update */
+  version?: string;
+  /** the pack's tools as the / menu lists them, generated from the modules by scripts/packs/index.ts */
+  commands?: PackCommand[];
+  /** the French of those commands' titles and descriptions */
+  fr?: Record<string, string>;
 }
 
 let cache: PackEntry[] | null = null;
@@ -47,6 +57,33 @@ export function packBySrc(packs: PackEntry[], src: string | undefined): PackEntr
   const m = src.match(/^plugins\/([\w.-]+)\.(js|mjs)$/i);
   if (!m) return null;
   return packs.find((p) => packStem(p.file) === m[1]) ?? null;
+}
+
+/** the packs' tools as commands of the / menu (the home screen, before a project holds any of them); each pack's French added as it comes */
+export function packCommands(packs: PackEntry[]): Command[] {
+  const out: Command[] = [];
+  for (const p of packs) {
+    if (p.fr) addMessages('fr', p.fr);
+    for (const c of p.commands ?? []) out.push({ kind: 'tool', name: c.name, title: c.title, description: c.description, from: p.name });
+  }
+  return out;
+}
+
+/** a project's copy of a shipped pack that is older than the editor's: the Code section offers it, never applied alone (the way an installed plugin's copy is).
+ *  `versions` reads each copy's own version by asset src, out of its code (the document does not carry it) */
+export interface PackUpdate { assetId: string; name: string; file: string; src: string; from: string; to: string }
+
+export function packUpdates(doc: TrammeDoc, packs: PackEntry[], versions: Record<string, string>): PackUpdate[] {
+  const out: PackUpdate[] = [];
+  for (const [id, a] of Object.entries(doc.assets) as [string, { type: string; src?: string; name?: string }][]) {
+    if (a.type !== 'module') continue;
+    const pack = packBySrc(packs, a.src);
+    const from = a.src ? versions[a.src] : undefined;
+    if (!pack?.version || !from) continue;
+    if (compareVersions(from, pack.version) >= 0) continue;
+    out.push({ assetId: id, name: a.name || pack.name, file: pack.file, src: a.src!, from, to: pack.version });
+  }
+  return out;
 }
 
 /** the ToolContext of a pack's tool: its data files, fetched from the editor's own origin */

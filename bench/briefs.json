@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "about": "Prompts to measure the assistant on videos it has never seen: what a turn costs (the usage line at its end) and what it makes. The dev briefs are for working on tramme; the test briefs stay unseen while doing so and are only run to measure.",
+  "about": "Prompts to measure the assistant on videos it has never seen: what a turn costs (the usage line at its end) and what it makes. The dev briefs are for working on Tramme; the test briefs stay unseen while doing so and are only run to measure.",
   "briefs": [
     {
       "id": "fintech-launch",
