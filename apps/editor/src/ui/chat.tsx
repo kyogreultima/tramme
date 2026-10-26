@@ -12,7 +12,7 @@ import { aiSettings, aiStatus, CLI_SETUP, cliUnavailable, providerLabel, refresh
 import { lightbox, running, turnStart } from '../ai/conversation.ts';
 import { openSettings } from '../settings.ts';
 import { S, toast } from '../state.ts';
-import { answer, chatShown, question } from '../confirm.ts';
+import { answer, chatShown, choose, question, type Question } from '../confirm.ts';
 import { attachmentUrl, type Attachment } from '../attachments.ts';
 import { Icon } from './icons.tsx';
 import { TranscribeButton } from './Transcribe.tsx';
@@ -62,7 +62,21 @@ export function progressOf(tool: NonNullable<ChatItem['tool']>): number | null {
   return p && p.total > 0 && Number.isFinite(p.done / p.total) ? Math.max(0, Math.min(100, Math.round((100 * p.done) / p.total))) : null;
 }
 
-/** a question asked during the turn (a generation that costs money): answered here */
+/** the pictures of a choice (the takes of a generation), one click keeps one: in the conversation's card and in the dialog */
+export function Choices({ q }: { q: Question }) {
+  return (
+    <div class="question-choices">
+      {(q.choices ?? []).map((c, i) => (
+        <button key={i} class="question-choice" title={c.label} onClick={() => choose(i)}>
+          <img src={c.url} alt={c.label} />
+          <span>{c.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** a question asked during the turn (a generation that costs money, a take to keep): answered here */
 export function QuestionCard() {
   const q = question.value;
   useEffect(() => { chatShown.value++; return () => { chatShown.value--; }; }, []);
@@ -71,10 +85,11 @@ export function QuestionCard() {
     <div class="proposal question">
       <div class="proposal-head"><Icon name="alert" /><span class="ptitle">{q.title}</span></div>
       <p class="question-text">{q.text}</p>
+      {q.choices && <Choices q={q} />}
       <div class="proposal-actions">
         <span class="grow" />
-        <button class="btn sm" onClick={() => answer(false)}>{t('common.cancel')}</button>
-        <button class="btn sm primary" onClick={() => answer(true)}><Icon name="check" />{q.yes}</button>
+        <button class="btn sm" onClick={() => answer(false)}>{q.choices ? t('image.keepNone') : t('common.cancel')}</button>
+        {!q.choices && <button class="btn sm primary" onClick={() => answer(true)}><Icon name="check" />{q.yes}</button>}
       </div>
     </div>
   );

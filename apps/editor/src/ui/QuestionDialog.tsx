@@ -7,6 +7,7 @@ import { useEffect } from 'preact/hooks';
 import { answer, chatShown, question } from '../confirm.ts';
 import { attend, away, notify } from '../notify.ts';
 import { Modal } from './controls.tsx';
+import { Choices } from './chat.tsx';
 import { t } from '../i18n/index.ts';
 
 export function QuestionDialog() {
@@ -23,9 +24,10 @@ export function QuestionDialog() {
     <Modal title={q.title} onClose={() => answer(false)}>
       <div class="modal-body">
         <p style={{ whiteSpace: 'pre-line' }}>{q.text}</p>
+        {q.choices && <Choices q={q} />}
         <div class="modal-foot">
-          <button class="btn ghost" onClick={() => answer(false)}>{t('common.cancel')}</button>
-          <button class="btn primary" onClick={() => answer(true)}>{q.yes}</button>
+          <button class="btn ghost" onClick={() => answer(false)}>{q.choices ? t('image.keepNone') : t('common.cancel')}</button>
+          {!q.choices && <button class="btn primary" onClick={() => answer(true)}>{q.yes}</button>}
         </div>
       </div>
     </Modal>
