@@ -11,7 +11,7 @@ import { Icon, kindColor, kindIcon } from './icons.tsx';
 import { preview } from '../preview.ts';
 import { manifestOf } from '@tramme/project';
 import { copiesIn } from '../installed.ts';
-import { packIdOf, packUpdates, shippedPacks, type PackEntry, type PackUpdate } from '../packs.ts';
+import { packBySrc, packIdOf, packUpdates, shippedPacks, type PackEntry, type PackUpdate } from '../packs.ts';
 import { api } from '../api.ts';
 import { fromLottie } from '@tramme/interop';
 import { mediaOf, TranscribeButton, transcribeItem } from './Transcribe.tsx';
@@ -576,19 +576,23 @@ function Assets() {
   const input = useRef<HTMLInputElement>(null);
   // a copy of a shipped pack older than the editor's: offered its update, the way an installed plugin's copy is
   const [updates, setUpdates] = useState<PackUpdate[]>([]);
+  // read again only when the modules or their recorded versions change, not on every edit; a read overtaken by a newer one is dropped
+  const modulesKey = JSON.stringify([Object.entries(doc.assets).filter(([, a]) => a.type === 'module').map(([id, a]) => [id, a.src]), doc.meta.installedCopies ?? null]);
   useEffect(() => {
+    let live = true;
     void (async () => {
       try {
         const packs = await shippedPacks();
         const versions: Record<string, string> = {};
         for (const a of Object.values(doc.assets)) {
-          if (a.type !== 'module' || !/^plugins\/[\w.-]+\.(js|mjs)$/i.test(a.src ?? '')) continue;
+          if (a.type !== 'module' || !packBySrc(packs, a.src)) continue;
           try { versions[a.src!] = manifestOf((await api.readText(S.project.peek().id, a.src!))?.text ?? '', a.src!).version; } catch { /* unread: no offer */ }
         }
-        setUpdates(packUpdates(doc, packs, versions));
+        if (live) setUpdates(packUpdates(doc, packs, versions));
       } catch { /* no packs: no offers */ }
     })();
-  }, [doc]);
+    return () => { live = false; };
+  }, [modulesKey]);
   const byType = new Map<string, [string, Asset][]>();
   for (const e of Object.entries(doc.assets)) { if (!byType.has(e[1].type)) byType.set(e[1].type, []); byType.get(e[1].type)!.push(e); }
   const url = (id: string) => { try { return preview.renderer?.assets.url(id) ?? ''; } catch { return ''; } };
@@ -664,7 +668,7 @@ async function addPack(p: PackEntry) {
 /** the shipped version put in the open project in place of its older copy (asked, never applied alone), its version recorded as an installed plugin's copy keeps its own */
 async function takeUpdate(u: PackUpdate) {
   const text = await fetch(`/plugins/${u.file}`).then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.text(); });
-  await api.write(S.project.peek().id, `plugins/${u.file}`, new Blob([text], { type: 'text/javascript; charset=utf-8' }), { type: 'text/javascript; charset=utf-8' });
+  await api.write(S.project.peek().id, u.src, new Blob([text], { type: 'text/javascript; charset=utf-8' }), { type: 'text/javascript; charset=utf-8' });
   const doc = S.doc.peek(), copies = { ...copiesIn(doc), [packIdOf(u.file)]: u.to };
   const ops: Op[] = [{ op: doc.meta.installedCopies === undefined ? 'add' : 'replace', path: '/meta/installedCopies', value: copies }];
   if (commit(t('panel.packUpdated', { name: u.name, version: u.to }), ops)) await preview.reload([u.assetId]);

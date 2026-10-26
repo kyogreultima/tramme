@@ -461,7 +461,7 @@ class Preview {
   private advance() {
     const c = comp.peek();
     const s = step(this.clock, this.now(), c.duration, S.loop.peek());
-    if (s.wrap) { this.play(s.t); return; }
+    if (s.wrap) { S.time.value = s.t; this.play(s.t); return; }
     if (s.end) { setTime(c.duration); S.playing.value = false; return; }
     S.time.value = s.t;
   }
@@ -476,16 +476,7 @@ class Preview {
     // audio layers and the sound of videos, each from its in point to its out point (the cuts)
     const solo = S.solo.peek();
     const clips = audioClips(doc, compIdOf(doc)).filter((c) => c.at + c.duration > from && (!solo.size || solo.has(c.layerId)));
-    if (clips.length && !this.audio) {
-      this.audio = new AudioContext({ sampleRate: 48000 });
-      this.master = this.audio.createGain();
-      this.master.connect(this.audio.destination);
-      this.master.gain.value = prefs.peek().previewMuted ? 0 : prefs.peek().previewVolume;
-      const limiter = this.audio.createDynamicsCompressor();
-      limiter.threshold.value = -1.5; limiter.knee.value = 0; limiter.ratio.value = 20; limiter.attack.value = 0.002; limiter.release.value = 0.08;
-      this.level = this.audio.createGain();
-      this.level.connect(limiter).connect(this.master);
-    }
+    if (clips.length) this.ensureAudio();
     if (this.audio) await this.audio.resume();
     if (!this.audio || !this.renderer || !clips.length || !this.runs.live(run)) return;
     const r = this.renderer, ctx = this.audio, compId = compIdOf(doc);
@@ -545,24 +536,44 @@ class Preview {
    *  never the videos' (their sound streams from the file) */
   private scrub(t: number) {
     const p = prefs.peek();
-    if (!p.scrubAudio || p.previewMuted || !this.audio || !this.renderer || S.playing.peek()) return;
+    if (!p.scrubAudio || p.previewMuted || !this.renderer || S.playing.peek()) return;
     const w = scrubWindow(t, this.scrubPlayedAt, performance.now());
     if (!w) return;
     this.scrubPlayedAt = performance.now();
     const doc = viewDoc.peek(), solo = S.solo.peek();
     const clips = audioClips(doc, compIdOf(doc)).filter((c) => t >= c.at && t < c.at + c.duration && doc.assets[c.asset].type !== 'video' && (!solo.size || solo.has(c.layerId)));
+    if (!clips.length) return;
+    // the drag is a gesture: the sound can start before the first playback
+    this.ensureAudio();
+    void this.audio!.resume();
     for (const c of clips) {
       void this.buffer(this.renderer.assets.url(c.asset)).then((buf) => {
         if (!buf || !this.audio || S.playing.peek()) return;
         const src = playClip(this.audio, c, buf, this.level ?? this.master!, this.audio.currentTime + 0.005, w.from);
         if (!src) return;
         this.sources.push(src);
+        // a scrub's window is short-lived: it leaves the list once it has played, so a long drag keeps none
+        src.onended = () => { this.sources = this.sources.filter((s) => s !== src); };
         src.stop(this.audio.currentTime + 0.005 + w.dur);
       });
     }
   }
 
-  /** the loudness gain of the master for this mix: measured once per mix (in the background the first time), then set on the level */  private levelOf(doc: TrammeDoc, compId: string) {
+  /** the audio graph, made on the first sound: the master volume, a limiter, the level the loudness sets */
+  private ensureAudio() {
+    if (this.audio) return;
+    this.audio = new AudioContext({ sampleRate: 48000 });
+    this.master = this.audio.createGain();
+    this.master.connect(this.audio.destination);
+    this.master.gain.value = prefs.peek().previewMuted ? 0 : prefs.peek().previewVolume;
+    const limiter = this.audio.createDynamicsCompressor();
+    limiter.threshold.value = -1.5; limiter.knee.value = 0; limiter.ratio.value = 20; limiter.attack.value = 0.002; limiter.release.value = 0.08;
+    this.level = this.audio.createGain();
+    this.level.connect(limiter).connect(this.master);
+  }
+
+  /** the loudness gain of the master for this mix: measured once per mix (in the background the first time), then set on the level */
+  private levelOf(doc: TrammeDoc, compId: string) {
     const r = this.renderer!, key = JSON.stringify([soundMix(doc.compositions[compId]), audioClips(doc, compId)]);
     let p = this.levels.get(key);
     if (!p) {

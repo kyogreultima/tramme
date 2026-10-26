@@ -71,7 +71,7 @@ export function packCommands(packs: PackEntry[]): Command[] {
 
 /** a project's copy of a shipped pack that is older than the editor's: the Code section offers it, never applied alone (the way an installed plugin's copy is).
  *  `versions` reads each copy's own version by asset src, out of its code (the document does not carry it) */
-export interface PackUpdate { assetId: string; name: string; file: string; from: string; to: string }
+export interface PackUpdate { assetId: string; name: string; file: string; src: string; from: string; to: string }
 
 export function packUpdates(doc: TrammeDoc, packs: PackEntry[], versions: Record<string, string>): PackUpdate[] {
   const out: PackUpdate[] = [];
@@ -81,7 +81,7 @@ export function packUpdates(doc: TrammeDoc, packs: PackEntry[], versions: Record
     const from = a.src ? versions[a.src] : undefined;
     if (!pack?.version || !from) continue;
     if (compareVersions(from, pack.version) >= 0) continue;
-    out.push({ assetId: id, name: a.name || pack.name, file: pack.file, from, to: pack.version });
+    out.push({ assetId: id, name: a.name || pack.name, file: pack.file, src: a.src!, from, to: pack.version });
   }
   return out;
 }

@@ -11,10 +11,11 @@ import { t } from '../i18n/index.ts';
 
 export function QuestionDialog() {
   const q = question.value;
+  // asked while the user is elsewhere, in the dialog or in the conversation: the system is told, the window asks for attention until it is focused or the question goes
   useEffect(() => {
-    if (!q || (q.inChat && chatShown.value > 0)) return;
-    if (away()) notify(q.title, q.text, 'info', { attention: true });
-    attend();
+    if (!q || !away()) return;
+    notify(q.title, q.text, 'info', { attention: true });
+    return attend();
   }, [q]);
   // asked during a turn of the assistant: in the conversation, when one is on screen
   if (!q || (q.inChat && chatShown.value > 0)) return null;

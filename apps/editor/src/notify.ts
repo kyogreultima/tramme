@@ -39,9 +39,15 @@ export function notify(title: string, body: string, kind: 'info' | 'error' = 'in
   toast(body, kind, 6000);
 }
 
-/** the attention request cancelled the moment the window is focused again (attend is called when a question opens) */
-export function attend(): void {
-  if (!tauri) return;
+/**
+ * The attention request cancelled the moment the window is focused again, or
+ * when the question is answered or withdrawn first (the returned function:
+ * the dialog calls it as it closes).
+ */
+export function attend(): () => void {
+  if (!tauri) return () => {};
   const w = tauri.window.getCurrentWindow();
-  window.addEventListener('focus', () => { w.requestUserAttention(null).catch(() => {}); }, { once: true });
+  const stop = () => { window.removeEventListener('focus', stop); w.requestUserAttention(null).catch(() => {}); };
+  window.addEventListener('focus', stop, { once: true });
+  return stop;
 }

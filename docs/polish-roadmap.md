@@ -19,13 +19,15 @@ The 0.13.0 fix (a clock started at once, and a start overtaken by another or by 
 
 ### Step 1. The playback clock as a pure, tested module
 
-- [ ] The clock that drives the preview (`Preview`'s `advance`, `play`, `stopAudio`) moves out of the component into `apps/editor/src/playclock.ts`: reading the time from a start, wrapping a loop, ending at the duration, and the runs (a start overtaken by another, or cancelled by a pause, schedules nothing) — each a pure, exported function or class with its tests. No change in behaviour.
+- [x] The clock that drives the preview (`Preview`'s `advance`, `play`, `stopAudio`) moves out of the component into `apps/editor/src/playclock.ts`: reading the time from a start, wrapping a loop, ending at the duration, and the runs (a start overtaken by another, or cancelled by a pause, schedules nothing) — each a pure, exported function or class with its tests. No change in behaviour.
 
 Done when: the wrap of a loop, the end without one, and a run killed by a restart or a pause are each pinned by a test, and `Preview` uses the module.
 
 ### Step 2. The desktop app asks for attention when it waits for an answer
 
-- [ ] When a question dialog waits for the user and the window is not focused, the desktop app also asks the window manager for attention: the taskbar flashes on Windows and Linux, the Dock icon bounces on macOS (`requestUserAttention`), and the request is cancelled when the window is focused again. In front of the window, the toast alone, as today.
+- [x] When a question dialog waits for the user and the window is not focused, the desktop app also asks the window manager for attention: the taskbar flashes on Windows and Linux, the Dock icon bounces on macOS (`requestUserAttention`), and the request is cancelled when the window is focused again. In front of the window, the toast alone, as today.
+
+  The request also goes when the question is answered or withdrawn before the window is focused. To check on a device: the taskbar's flash on Windows and Linux, the Dock's bounce on macOS (the tests drive the Tauri call, not the window manager).
 
 Done when: a question that waits while the user is elsewhere shows the window asking for attention, and stops the moment it is answered or focused.
 

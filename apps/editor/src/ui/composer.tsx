@@ -153,7 +153,7 @@ export function Composer({ placeholder, anchor, tools, context, onSent, area: gi
   const fields = cmd?.kind === 'tool' ? fieldsOf(cmd.input, S.doc.value, S.compId.value, reg, S.selection.value) : [];
   const input = inputOf(fields, values);
   const direct = cmd?.kind === 'tool' && !parsed!.rest && ready(fields, input);
-  const run = () => { if (!cmd || !direct || busy) return; setText(''); runCommand(cmd, input); onSent?.(); };
+  const run = () => { if (!cmd || !direct || busy) return; setText(''); commandUsed(cmd.name); runCommand(cmd, input); onSent?.(); };
   const submit = () => {
     const v = text.trim();
     if (!v && !pending.peek().length) return;
@@ -162,6 +162,8 @@ export function Composer({ placeholder, anchor, tools, context, onSent, area: gi
     if (/^\/[\w.-]+$/.test(v) && !cmd) { toast(t('assistant.noCommand')); return; }
     if (!available) return;
     setText('');
+    // a command typed whole and sent counts as used, as one picked from the menu
+    if (cmd) commandUsed(cmd.name);
     send(v, { command: cmd ? { cmd, input } : undefined, anchor: anchor?.() });
     onSent?.();
   };

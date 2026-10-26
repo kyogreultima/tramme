@@ -14,6 +14,7 @@ function stub(hasFocus: boolean) {
   vi.stubGlobal('window', {
     __TAURI__: { core: { invoke }, window: { getCurrentWindow: () => ({ requestUserAttention }) } },
     addEventListener: (_name: string, fn: () => void) => { focusHandlers.push(fn); },
+    removeEventListener: (_name: string, fn: () => void) => { focusHandlers = focusHandlers.filter((h) => h !== fn); },
     matchMedia: () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} }),
   });
   vi.stubGlobal('document', { hidden: false, hasFocus: () => hasFocus, documentElement: { dataset: {} }, querySelector: () => null });
@@ -46,6 +47,14 @@ describe('notify', () => {
     const m = await import('../src/notify.ts');
     m.attend();
     for (const fn of focusHandlers) fn();
+    expect(requestUserAttention).toHaveBeenCalledWith(null);
+  });
+
+  it('cancels the attention when the question goes before the window is focused', async () => {
+    stub(false);
+    const m = await import('../src/notify.ts');
+    const stop = m.attend();
+    stop();
     expect(requestUserAttention).toHaveBeenCalledWith(null);
   });
 
