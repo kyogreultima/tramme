@@ -8,7 +8,7 @@ import { Evaluator, layerMatrix, matMul, Registry, validate, type Op, type Tramm
 import { builtinRegistry } from '@tramme/nodes';
 import { newProject } from '@tramme/project';
 import { niceMax, barSlots, linePoints, donutArcs, seriesOf, parseCsv, csvNumber, ranksOver, ticks, tableOf } from '../../../plugins/charts.js';
-import { charState, bounce, lineStart } from '../../../plugins/kinetic.js';
+import { charState, bounce, lineStart, scrambleAt, flapAt, FLAPS } from '../../../plugins/kinetic.js';
 import { parseColor, lum, contrast, flashRate } from '../../../plugins/a11y.js';
 import { sentencesOf, retimed } from '../../../plugins/localize.js';
 import { searchIcons, wordsOf } from '../../../plugins/icons.js';
@@ -1087,6 +1087,47 @@ describe('charts', () => {
 });
 
 describe('kinetic type', () => {
+  it('scramble settles on the text, left to right, the same for a seed', () => {
+    const text = 'NOVA 7';
+    const at = (t: number, seed = 1) => [...text].map((ch, i) => scrambleAt(ch, i, t, 0, i * 0.07 + 0.5, seed) ?? '').join('');
+    expect(at(10)).toBe(text);
+    expect(at(0.3)).toBe(at(0.3));
+    expect(at(0.3)).not.toBe(text);
+    expect(at(0.3, 2)).not.toBe(at(0.3, 1));
+    // the first letter settles before the last one; a space never scrambles
+    expect(scrambleAt('N', 0, 0.55, 0, 0.5, 1)).toBe('N');
+    expect(scrambleAt('7', 5, 0.55, 0, 0.85, 1)).not.toBe('7');
+    expect(scrambleAt(' ', 4, 0.1, 0, 0.78, 1)).toBe(' ');
+    expect(scrambleAt('N', 0, -0.1, 0, 0.5, 1)).toBeNull();
+  });
+
+  it('flap goes through the drum in order and rests on its character', () => {
+    const seen: string[] = [];
+    for (let t = 0.001; t < 3; t += 1 / 60) { const s = flapAt('D', t, 0); if (seen.at(-1) !== s.from) seen.push(s.from); }
+    expect(seen).toEqual([' ', 'A', 'B', 'C', 'D']);
+    expect(flapAt('D', 3, 0)).toEqual({ from: 'D', to: 'D', phase: 0 });
+    // a character off the drum goes round once, then shows itself
+    const off = flapAt('é', 10, 0);
+    expect(off).toEqual({ from: 'é', to: 'é', phase: 0 });
+    expect(FLAPS.length * (1 / 15)).toBeLessThan(10);
+    // the same moment, the same flap
+    expect(flapAt('Z', 0.42, 0.1)).toEqual(flapAt('Z', 0.42, 0.1));
+  });
+
+  it('draws both modes, the flap board within its bounds', () => {
+    const node = kinetic.nodes[0];
+    const host = (t: number) => ({ layerId: 'k', t, frame: Math.round(t * 30), fps: 30, width: 1080, height: 1920, duration: 4, asset: () => null, assetInfo: () => ({}), assetUrl: () => '' }) as never;
+    for (const mode of ['scramble', 'flap']) {
+      for (const t of [0.05, 0.3, 2]) {
+        const ctx = recorder();
+        node.render.canvas2d!(ctx, { text: 'GATE 12', mode, size: 100, weight: 800, color: '#ffffff', align: 'center', tracking: 0, lineHeight: 1.15, stagger: 0.06, duration: 0.4, font: null, seed: 1, plate: '#15181d' } as never, host(t));
+        expect(ctx.calls.some((c) => c.startsWith('fillText('))).toBe(true);
+      }
+    }
+    const b = node.bounds!({ text: 'GATE 12', mode: 'flap', size: 100, lineHeight: 1.15 } as never)!;
+    expect(b.w).toBeCloseTo(7 * 100 * 0.84 - 8, 6);
+  });
+
   it('the characters land in their order and hold', () => {
     expect(charState('typewriter', 0, 0, 0).a).toBe(0);
     expect(charState('typewriter', 0.5, 0, 0).a).toBe(1);

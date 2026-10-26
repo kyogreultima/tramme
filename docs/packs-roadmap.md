@@ -2,7 +2,7 @@
 
 The general-purpose plugin packs that ship with the editor (`plugins/*.js`, listed in `plugins/index.json`, added to a project from the Code section): the ones to come, and what tramme needs first so they can exist. A pack is an ordinary plugin. It gives the assistant and the editor a new vocabulary — what they can build in one move, what they can check — for any film, never for one video.
 
-Status: steps 0 to 15 are shipped (step 5 keeps its real recordings to check on a device; step 7 keeps its set of 300 emoji to confirm on a device). Shipped packs: charts, kinetic type, physics, stick figures, icons, diagrams, UI walkthrough, accessibility checks, localization ([plugins-roadmap.md](plugins-roadmap.md), step 10). The packs after step 0 are taken in order, each one landing whole. The decisions still open are listed at the end. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
+Status: steps 0 to 16 are shipped (step 5 keeps its real recordings to check on a device; step 7 keeps its set of 300 emoji to confirm on a device). Shipped packs: charts, kinetic type, physics, stick figures, icons, diagrams, UI walkthrough, accessibility checks, localization ([plugins-roadmap.md](plugins-roadmap.md), step 10). The packs after step 0 are taken in order, each one landing whole. The decisions still open are listed at the end. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
 
 ## Why
 
@@ -204,10 +204,12 @@ Done when: the QR of an end card scans from a phone off the exported video (to c
 
 ### Step 16. Kinetic type, further (`kinetic.js` 1.1)
 
-- [ ] `scramble`: characters cycling through others before they settle, left to right, seeded.
-- [ ] `flap`: a split-flap board, each character flipping through the alphabet to its letter, both halves of each flap drawn.
-- [ ] `ai` notes: for a word, a name or a figure, never for body text (the taste guide keeps text moving as a block or word by word).
-- [ ] Tests: both settle on the text, deterministic.
+- [x] `scramble`: characters cycling through others before they settle, left to right, seeded.
+- [x] `flap`: a split-flap board, each character flipping through the alphabet to its letter, both halves of each flap drawn.
+- [x] `ai` notes: for a word, a name or a figure, never for body text (the taste guide keeps text moving as a block or word by word).
+- [x] Tests: both settle on the text, deterministic.
+
+  Both are modes of the `text.kinetic` node (`mode: 'scramble'`, `mode: 'flap'`), with a seed for the scramble and the flaps' colour, and a preset each. To check on a device: the flap's fold at 24 and 60 frames a second.
 
 ### Step 17. Logos in 3D (`extrude.js`)
 
