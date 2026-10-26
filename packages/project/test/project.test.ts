@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { zipSync } from 'fflate';
-import { checkProject, DOCUMENT, LEGACIES, MANIFEST, newProject, packProject, parseDocument, pathIssue, srcPath, unpackProject } from '../src/index.ts';
+import { checkProject, DOCUMENT, isMedia, mimeOf, LEGACIES, MANIFEST, newProject, packProject, parseDocument, pathIssue, srcPath, unpackProject } from '../src/index.ts';
 
 const enc = (s: string) => new TextEncoder().encode(s);
 const json = (v: unknown) => enc(JSON.stringify(v));
@@ -17,6 +17,11 @@ describe('project format', () => {
     expect(pathIssue('plugins/etoile.js')).toBeNull();
     expect(pathIssue('thumbnail.webp')).toBeNull();
     expect(pathIssue('.tramme/chats/mfz1k2-ab12.json')).toBeNull();
+    // a 3D model brought in with the sources (a folder holding .glb or .gltf files): allowed, a large .glb sent in parts
+    expect(pathIssue('assets/sources/robot.glb')).toBeNull();
+    expect(pathIssue('assets/sources/scene.gltf')).toBeNull();
+    expect(isMedia('assets/sources/robot.glb')).toBe(true);
+    expect(mimeOf('assets/models/logo-3d.glb')).toBe('model/gltf-binary');
     expect(pathIssue('.tramme/chats/index.json')).toBeNull();
     expect(pathIssue('.tramme/chats/Autre.txt')).not.toBeNull();
     expect(pathIssue('.tramme/notes.json')).not.toBeNull();

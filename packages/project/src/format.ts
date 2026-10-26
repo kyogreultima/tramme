@@ -94,12 +94,13 @@ export const LIMITS = {
 };
 
 /** a sound or a video of the project: may exceed one request, sent in parts */
-export const isMedia = (path: string) => /^(assets|renders)\/.+\.(wav|mp3|ogg|m4a|flac|mp4|webm|mov)$/i.test(path);
+/** a sound, a video or a 3D model (.glb): sent in parts, up to the media limit */
+export const isMedia = (path: string) => /^(assets|renders)\/.+\.(wav|mp3|ogg|m4a|flac|mp4|webm|mov)$/i.test(path) || /^assets\/.+\.glb$/i.test(path);
 /** the largest size admitted for a file at this path */
 export const maxSize = (path: string) => (isMedia(path) ? LIMITS.media : LIMITS.file);
 
 const EXT: Record<string, string[]> = {
-  assets: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'avif', 'svg', 'ttf', 'otf', 'woff', 'woff2', 'wav', 'mp3', 'ogg', 'm4a', 'flac', 'mp4', 'webm', 'mov', 'json', 'js', 'mjs', 'pdf', 'md', 'markdown', 'cube'],
+  assets: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'avif', 'svg', 'ttf', 'otf', 'woff', 'woff2', 'wav', 'mp3', 'ogg', 'm4a', 'flac', 'mp4', 'webm', 'mov', 'json', 'js', 'mjs', 'pdf', 'md', 'markdown', 'cube', 'glb', 'gltf'],
   plugins: ['js', 'mjs'],
   renders: ['mp4', 'webm', 'mov', 'gif', 'png', 'zip', 'json', 'svg', 'wav'],
 };
@@ -111,6 +112,7 @@ export const MIME: Record<string, string> = {
   md: 'text/markdown; charset=utf-8', markdown: 'text/markdown; charset=utf-8', cube: 'text/plain; charset=utf-8',
   wav: 'audio/wav', mp3: 'audio/mpeg', ogg: 'audio/ogg', m4a: 'audio/mp4', flac: 'audio/flac',
   mp4: 'video/mp4', webm: 'video/webm', mov: 'video/quicktime', zip: 'application/zip',
+  glb: 'model/gltf-binary', gltf: 'model/gltf+json',
 };
 export const mimeOf = (path: string) => MIME[path.split('.').pop()!.toLowerCase()] ?? 'application/octet-stream';
 

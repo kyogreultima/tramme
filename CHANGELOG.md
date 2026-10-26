@@ -36,6 +36,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Fixed
 
+- **A folder holding 3D models imports**: bringing in sources with a .glb or .gltf among them failed as a whole, the project format refusing those files under assets/ (in the browser, on the server and in the desktop app alike); they are now kept as model assets the 3D model layer draws, a large .glb sent in parts like a video. The extrude tool's .glb is written the same way.
 - **The packs' forms in French**: the fields of the packs' tools in the `/` menu (charts, stick figures, walkthrough, localize, icons, diagrams) carried English titles and hints in a French editor; every field is translated, and a test now keeps them so.
 
 ## [0.13.0] - 2026-10-25

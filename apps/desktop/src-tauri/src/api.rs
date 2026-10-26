@@ -177,7 +177,7 @@ fn upload(store: &Store, id: &str, parts: &[String], req: Request<Vec<u8>>) -> R
             let path = body.path.unwrap_or_default();
             store.check_path(&path)?;
             if !crate::format::is_media(&path) {
-                return Ok(json_response(400, &json!({ "error": "multipart upload: sounds and videos only" })));
+                return Ok(json_response(400, &json!({ "error": "multipart upload: sounds, videos and 3D models (.glb) only" })));
             }
             match body.size {
                 Some(size) if size > 0 && size <= crate::format::LIMITS.media => {}
