@@ -23,6 +23,7 @@ import { copiesIn, copyId, counted, installed, installedFor, installedTypes, off
 import { bindSandbox, blitSandboxFrame, declarationsModule, ensureDeclared, ensureSandboxDoc, pluginItemsOf, resetSandbox, sandboxDeclaration, sandboxVideoFrames, type SandboxContext } from './plugins/sandbox-draw.ts';
 import { t } from './i18n/index.ts';
 import { prefs } from './settings.ts';
+import { clockTime, scrubWindow, step, Runs, type Clock } from './playclock.ts';
 import { packAsInstalled, packBySrc, packContext, shippedPacks } from './packs.ts';
 import { syncPluginTours } from './tours/index.ts';
 
@@ -49,9 +50,9 @@ class Preview {
   /** sound of video layers: media elements playing their cut, and the timers that start and stop them */
   private media: HTMLAudioElement[] = [];
   private timers: ReturnType<typeof setTimeout>[] = [];
-  private clock = { at: 0, t0: 0, audio: false };
+  private clock: Clock = { at: 0, t0: 0, audio: false };
   /** the playback started last: a start still loading its sounds when another begins (or a pause) schedules nothing */
-  private playRun = 0;
+  private runs = new Runs();
   private refineTimer: ReturnType<typeof setTimeout> | null = null;
   /** last rendered frame time (ms), shown in the transport */
   lastMs = 0;
@@ -61,6 +62,8 @@ class Preview {
   private motion = { scale: 0.5, ceiling: 2, calm: 0, intervals: [] as number[], last: 0 };
   /** when the time last changed while paused (scrubbing the playhead) */
   private scrubAt = 0;
+  /** when the scrub's sound last played (the window waits its 60 ms) */
+  private scrubPlayedAt = -1e9;
   /** counter for re-loading an edited plugin in the sandbox */
   private bust = 0;
   /** one sandbox frame in flight (the flag's draw path) */
@@ -113,7 +116,7 @@ class Preview {
     let lastT = -1;
     effect(() => {
       const t = S.time.value, playing = S.playing.value;
-      if (!playing && t !== lastT) this.scrubAt = performance.now();
+      if (!playing && t !== lastT) { this.scrubAt = performance.now(); this.scrub(t); }
       if (!playing) this.playedFrame = -1;
       lastT = t;
       this.invalidate();
@@ -457,17 +460,15 @@ class Preview {
 
   private advance() {
     const c = comp.peek();
-    let t = this.clock.t0 + (this.now() - this.clock.at);
-    if (t >= c.duration) {
-      if (S.loop.peek()) { t = t % c.duration; this.play(t); }
-      else { setTime(c.duration); S.playing.value = false; return; }
-    }
-    S.time.value = t;
+    const s = step(this.clock, this.now(), c.duration, S.loop.peek());
+    if (s.wrap) { S.time.value = s.t; this.play(s.t); return; }
+    if (s.end) { setTime(c.duration); S.playing.value = false; return; }
+    S.time.value = s.t;
   }
 
   private async play(from = S.time.peek()) {
     this.stopAudio();
-    const run = this.playRun;
+    const run = this.runs.begin();
     // the clock starts at once, before the sounds load: the frames drawn meanwhile read the new start, not the last playback
     // (the audio context runs on while paused: its old clock would land past the end, wrap and start the sound again)
     this.clock = { at: performance.now() / 1000, t0: from, audio: false };
@@ -475,25 +476,16 @@ class Preview {
     // audio layers and the sound of videos, each from its in point to its out point (the cuts)
     const solo = S.solo.peek();
     const clips = audioClips(doc, compIdOf(doc)).filter((c) => c.at + c.duration > from && (!solo.size || solo.has(c.layerId)));
-    if (clips.length && !this.audio) {
-      this.audio = new AudioContext({ sampleRate: 48000 });
-      this.master = this.audio.createGain();
-      this.master.connect(this.audio.destination);
-      this.master.gain.value = prefs.peek().previewMuted ? 0 : prefs.peek().previewVolume;
-      const limiter = this.audio.createDynamicsCompressor();
-      limiter.threshold.value = -1.5; limiter.knee.value = 0; limiter.ratio.value = 20; limiter.attack.value = 0.002; limiter.release.value = 0.08;
-      this.level = this.audio.createGain();
-      this.level.connect(limiter).connect(this.master);
-    }
+    if (clips.length) this.ensureAudio();
     if (this.audio) await this.audio.resume();
-    if (!this.audio || !this.renderer || !clips.length || run !== this.playRun) return;
+    if (!this.audio || !this.renderer || !clips.length || !this.runs.live(run)) return;
     const r = this.renderer, ctx = this.audio, compId = compIdOf(doc);
     this.levelOf(doc, compId);
     const sounds = clips.filter((c) => doc.assets[c.asset].type !== 'video');
     const bufs = await Promise.all(sounds.map((c) => this.buffer(r.assets.url(c.asset))));
     // the pitch worklet, before the clock starts
     if (clips.some(needsPitch)) await loadPitch(ctx).catch(() => {});
-    if (!S.playing.peek() || run !== this.playRun) return;
+    if (!S.playing.peek() || !this.runs.live(run)) return;
     const startAt = ctx.currentTime + 0.03;
     this.clock = { at: startAt, t0: from, audio: true };
     // the mixer of the exports: filters, gain curves, fades, reverb and the shared room sound the same here
@@ -525,7 +517,7 @@ class Preview {
         const curve = c.rateCurve;
         if (!curve) return;
         const steer = setInterval(() => {
-          const now = this.clock.t0 + (this.audio!.currentTime - this.clock.at), rate = curveAt(curve, now);
+          const now = clockTime(this.clock, this.audio!.currentTime), rate = curveAt(curve, now);
           if (rate < MIN_ELEMENT_RATE) { if (!el.paused) el.pause(); return; }
           el.playbackRate = rate;
           if (el.paused && now < c.at + c.duration) el.play().catch(() => {});
@@ -540,6 +532,46 @@ class Preview {
     }
   }
 
+  /** the sound heard while the playhead is dragged: 80 ms of the decoded buffers around `t`, at most every 60 ms;
+   *  never the videos' (their sound streams from the file) */
+  private scrub(t: number) {
+    const p = prefs.peek();
+    if (!p.scrubAudio || p.previewMuted || !this.renderer || S.playing.peek()) return;
+    const w = scrubWindow(t, this.scrubPlayedAt, performance.now());
+    if (!w) return;
+    this.scrubPlayedAt = performance.now();
+    const doc = viewDoc.peek(), solo = S.solo.peek();
+    const clips = audioClips(doc, compIdOf(doc)).filter((c) => t >= c.at && t < c.at + c.duration && doc.assets[c.asset].type !== 'video' && (!solo.size || solo.has(c.layerId)));
+    if (!clips.length) return;
+    // the drag is a gesture: the sound can start before the first playback
+    this.ensureAudio();
+    void this.audio!.resume();
+    for (const c of clips) {
+      void this.buffer(this.renderer.assets.url(c.asset)).then((buf) => {
+        if (!buf || !this.audio || S.playing.peek()) return;
+        const src = playClip(this.audio, c, buf, this.level ?? this.master!, this.audio.currentTime + 0.005, w.from);
+        if (!src) return;
+        this.sources.push(src);
+        // a scrub's window is short-lived: it leaves the list once it has played, so a long drag keeps none
+        src.onended = () => { this.sources = this.sources.filter((s) => s !== src); };
+        src.stop(this.audio.currentTime + 0.005 + w.dur);
+      });
+    }
+  }
+
+  /** the audio graph, made on the first sound: the master volume, a limiter, the level the loudness sets */
+  private ensureAudio() {
+    if (this.audio) return;
+    this.audio = new AudioContext({ sampleRate: 48000 });
+    this.master = this.audio.createGain();
+    this.master.connect(this.audio.destination);
+    this.master.gain.value = prefs.peek().previewMuted ? 0 : prefs.peek().previewVolume;
+    const limiter = this.audio.createDynamicsCompressor();
+    limiter.threshold.value = -1.5; limiter.knee.value = 0; limiter.ratio.value = 20; limiter.attack.value = 0.002; limiter.release.value = 0.08;
+    this.level = this.audio.createGain();
+    this.level.connect(limiter).connect(this.master);
+  }
+
   /** the loudness gain of the master for this mix: measured once per mix (in the background the first time), then set on the level */
   private levelOf(doc: TrammeDoc, compId: string) {
     const r = this.renderer!, key = JSON.stringify([soundMix(doc.compositions[compId]), audioClips(doc, compId)]);
@@ -552,7 +584,7 @@ class Preview {
   }
 
   private stopAudio() {
-    this.playRun++;
+    this.runs.cancel();
     this.playOut?.disconnect();
     this.playOut = null;
     for (const s of this.sources) { try { s.stop(); } catch { /* not started */ } }

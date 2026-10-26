@@ -12,9 +12,9 @@
 import { z } from 'zod';
 import { ADAPTIVE, DEFAULT_EFFORT, modelName, providerOf, TOOLS, UsageMeter, type Effort, type ToolResult } from '@tramme/assistant';
 import { ChatReader, chatTools, toChat } from './compat.ts';
-import { reach, type AiEvent } from '../api.ts';
+import { reach, type AiEvent, type ChatItem } from '../api.ts';
 import type { ToolRunner } from './tools.ts';
-import { runCall, uid } from './calls.ts';
+import { detailOf, runCall, uid } from './calls.ts';
 import { t } from '../i18n/index.ts';
 
 type Block = { type: string; [k: string]: any };
@@ -150,6 +150,63 @@ const toApi = (r: ToolResult) => r.content.map((c) => (c.type === 'image'
   : { type: 'text', text: c.text || '(empty)' }));
 
 const failed = (id: string, text: string): Block => ({ type: 'tool_result', tool_use_id: id, content: text, is_error: true });
+
+/** "… made by <provider> (<model>…)": who made the sound or the picture, as the generation tools say it */
+const MADE = /\bmade by ([\w:.-]+) \(([^)]*)\)/;
+
+/** the line a saved result gives its call: why it failed, or who made what */
+function recalled(r: Block): string {
+  const content: ToolResult['content'] = typeof r.content === 'string' ? [{ type: 'text', text: r.content }]
+    : Array.isArray(r.content) ? r.content.filter((b: Block) => b.type === 'text').map((b: Block) => ({ type: 'text' as const, text: String(b.text) })) : [];
+  if (r.is_error) return detailOf({ content, isError: true }, '');
+  const made = MADE.exec(content.map((c) => (c.type === 'text' ? c.text : '')).join('\n'));
+  return made ? t('assistant.madeBy', { provider: made[1], model: made[2] }) : '';
+}
+
+/**
+ * The line under each call of a conversation saved before its calls kept one,
+ * read back from the history the model was sent. A turn is found by the
+ * prompt that ends with its message; the calls of the / menu and of the
+ * command lines are not in this history and stay as they are.
+ */
+export function recallDetails(items: ChatItem[], history: Message[] = []): ChatItem[] {
+  if (!history.length || !items.some((it) => it.tool && it.tool.detail === undefined)) return items;
+  const starts: { at: number; text: string }[] = [], calls: { at: number; id: string; name: string; use?: string }[] = [];
+  const results = new Map<string, Block>();
+  history.forEach((m, at) => m.content.forEach((b) => {
+    if (m.role === 'user' && b.type === 'text') starts.push({ at, text: String(b.text) });
+    else if (b.type === 'tool_use') calls.push({ at, id: b.id, name: b.name, use: typeof b.input?.name === 'string' ? b.input.name : undefined });
+    else if (b.type === 'tool_result') results.set(b.tool_use_id, b);
+  }));
+  // where each turn starts in the history (null: not there)
+  const from: (number | null)[] = [];
+  let s = 0;
+  for (const it of items) {
+    if (it.role !== 'user') continue;
+    const k = it.text ? starts.findIndex((x, i) => i >= s && x.text.endsWith(`\n\n${it.text}`)) : -1;
+    from.push(k < 0 ? null : starts[k].at);
+    if (k >= 0) s = k + 1;
+  }
+  // the calls of a turn: from its start to the next turn found
+  let turn = -1, hi = -1, c = calls.length;
+  return items.map((it) => {
+    if (it.role === 'user') {
+      const lo = from[++turn];
+      hi = lo === null ? -1 : from.slice(turn + 1).find((x): x is number => x !== null) ?? Infinity;
+      c = lo === null ? calls.length : calls.findIndex((x) => x.at >= lo);
+      if (c < 0) c = calls.length;
+      return it;
+    }
+    const tool = it.tool;
+    if (!tool) return it;
+    const k = calls.findIndex((x, i) => i >= c && x.at < hi && x.name === tool.name && (tool.name !== 'use_tool' || x.use === tool.use));
+    if (k < 0) return it;
+    c = k + 1;
+    const r = tool.detail === undefined ? results.get(calls[k].id) : undefined;
+    const detail = r ? recalled(r) : '';
+    return detail ? { ...it, tool: { ...tool, detail, error: tool.error ?? !!r!.is_error } } : it;
+  });
+}
 
 /**
  * An answer where another model took over after a refusal (fallbacks): what

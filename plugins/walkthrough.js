@@ -18,14 +18,33 @@ function drawBrowserBar(ctx, w, barH, url, font) {
   }
 }
 
+function drawWindowBar(ctx, w, barH, title, font) {
+  // a title bar and tabs, no address bar: the code pack's window shares the family
+  ctx.fillStyle = '#12171D';
+  ctx.beginPath(); ctx.roundRect(0, 0, w, barH, [barH * 0.35, barH * 0.35, 0, 0]); ctx.fill();
+  const tabW = Math.min(w * 0.32, barH * 4.6);
+  const tab = (x, label, active) => {
+    ctx.fillStyle = active ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.06)';
+    ctx.beginPath(); ctx.roundRect(x, barH * 0.16, tabW, barH * 0.84, [barH * 0.18, barH * 0.18, 0, 0]); ctx.fill();
+    if (label) {
+      ctx.fillStyle = active ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.4)';
+      ctx.font = `500 ${Math.round(barH * 0.32)}px ${font ? `"${font}", ` : ''}system-ui, sans-serif`;
+      ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.fillText(String(label).slice(0, 24), x + barH * 0.22, barH * 0.62, tabW - barH * 0.4);
+    }
+  };
+  tab(barH * 0.55, title, true);
+  tab(barH * 0.55 + tabW + barH * 0.08, '', false);
+}
+
 const device = {
   type: 'ui.device', title: 'Device', category: 'UI',
   ai: { when: 'showing a product: a screenshot in a phone or a browser frame, scrolled slowly while the voice speaks; one layer per screen, cut between them', avoid: 'scrolling faster than the eye can follow; a screenshot wider than the frame\'s screen (it fits by width)' },
   props: {
     screen: { type: 'asset', assetType: 'image', default: null, nullable: true, label: 'Screenshot', animatable: false },
-    device: { type: 'enum', default: 'phone', options: ['phone', 'browser'], label: 'Device', animatable: false },
+    device: { type: 'enum', default: 'phone', options: ['phone', 'browser', 'window'], label: 'Device', animatable: false },
     scroll: { type: 'number', default: 0, min: 0, max: 1, step: 0.001, label: 'Scroll', description: '0: the top of the screenshot; animate it for the pan' },
-    url: { type: 'string', default: '', label: 'Address', animatable: false, description: 'browser only: the address in the bar' },
+    url: { type: 'string', default: '', label: 'Address', animatable: false, description: 'browser: the address in the bar; window: the title in the bar' },
     bezel: { type: 'color', default: '#12171D', label: 'Frame', animatable: false },
     shadow: { type: 'bool', default: true, label: 'Shadow', animatable: false },
     size: { type: 'vec2', default: [560, 1120], label: 'Size', unit: 'px' },
@@ -51,7 +70,7 @@ const device = {
       if (p.shadow) { ctx.save(); ctx.shadowColor = 'rgba(0,0,0,0.45)'; ctx.shadowBlur = w * 0.08; ctx.shadowOffsetY = w * 0.02; ctx.fillStyle = p.bezel; ctx.beginPath(); ctx.roundRect(-w / 2, -h / 2, w, h, radius); ctx.fill(); ctx.restore(); }
       else { ctx.fillStyle = p.bezel; ctx.beginPath(); ctx.roundRect(-w / 2, -h / 2, w, h, radius); ctx.fill(); }
 
-      if (!isPhone) drawBrowserBar(ctx, w, barH, p.url, family);
+      if (!isPhone) (p.device === 'window' ? drawWindowBar : drawBrowserBar)(ctx, w, barH, p.url, family);
       // the screen: the screenshot fits the width, the scroll pans it
       const sx = -w / 2 + inset, sy = -h / 2 + inset + barH;
       ctx.save();
@@ -162,7 +181,7 @@ const walkthrough = {
   },
 };
 
-export const meta = { id: 'tramme/walkthrough', name: 'walkthrough', version: '1.0.0', description: 'A phone or browser frame for screenshots, a clicking cursor, and a tool that lays out the walkthrough', api: 1 };
+export const meta = { id: 'tramme/walkthrough', name: 'walkthrough', version: '1.1.0', description: 'A phone or browser frame for screenshots, a clicking cursor, and a tool that lays out the walkthrough', api: 1 };
 export const nodes = [device, cursor];
 export const tools = [walkthrough];
 export const presets = [
@@ -172,11 +191,19 @@ export const presets = [
 ];
 export const messages = {
   fr: {
+    "Screens": "Écrans",
+    "the screenshots, in the order they are shown": "les captures, dans l’ordre où elles sont montrées",
+    "phone by default": "téléphone par défaut",
+    "Seconds per screen": "Secondes par écran",
+    "2.5 by default": "2,5 par défaut",
+    "Captions": "Légendes",
+    "one line per screen, said under it (same order)": "une ligne par écran, dite dessous (même ordre)",
     'Device': 'Appareil', 'Cursor': 'Curseur', 'Screenshot': 'Capture', 'Scroll': 'Défilement', 'Address': 'Adresse',
     'Frame': 'Cadre', 'Shadow': 'Ombre', 'Size': 'Taille', 'Font': 'Police', 'Position': 'Position', 'Click': 'Clic',
     'Color': 'Couleur', 'Scale': 'Échelle', 'Lay out a walkthrough': 'Monter une visite guidée',
     '0: the top of the screenshot; animate it for the pan': '0 : le haut de la capture ; animez-le pour le panoramique',
     'browser only: the address in the bar': 'navigateur seulement : l\'adresse dans la barre',
+    'browser: the address in the bar; window: the title in the bar': 'navigateur : l\'adresse dans la barre ; fenêtre : le titre dans la barre',
     '0 at rest; key it up and down at each tap: it draws the ripple': '0 au repos ; keyframez-le en haut et en bas à chaque tap : il dessine l\'onde',
     'a sequence of screenshots in a phone or a browser frame, one composition, a cut per screen, each with an optional caption and a slow scroll': 'une suite de captures dans un cadre de téléphone ou de navigateur, une composition, une coupe par écran, chacune avec une légende optionnelle et un défilement lent',
     'Phone with screenshot': 'Téléphone avec capture',

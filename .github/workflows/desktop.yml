@@ -34,7 +34,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
       - id: plan
         name: Is there a version to release?
         run: |
@@ -107,7 +107,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
       - uses: actions/download-artifact@v4
         with:
           path: out
@@ -118,7 +118,7 @@ jobs:
         # the tag is made on the commit that was built
         run: |
           node scripts/version.ts --notes "${TAG#v}" > notes.md
-          gh release create "$TAG" out/* --target "$GITHUB_SHA" --title "tramme $TAG" --notes-file notes.md
+          gh release create "$TAG" out/* --target "$GITHUB_SHA" --title "Tramme $TAG" --notes-file notes.md
 
   site:
     name: Deploy the site
@@ -139,7 +139,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
       - run: npm ci
       - run: npm run site:deploy

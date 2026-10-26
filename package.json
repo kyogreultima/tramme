@@ -1,6 +1,6 @@
 {
   "name": "tramme",
-  "version": "0.13.0",
+  "version": "0.14.0",
   "private": true,
   "type": "module",
   "description": "Motion design engine and editor: JSON document, deterministic rendering, web editor",
@@ -25,21 +25,23 @@
     "typecheck": "tsc --noEmit -p . && tsc --noEmit -p apps/worker",
     "tramme": "node packages/cli/src/main.ts",
     "edit": "node packages/cli/src/main.ts edit",
-    "schema": "node packages/cli/src/main.ts schema"
+    "schema": "node packages/cli/src/main.ts schema",
+    "packs:index": "node scripts/packs/index.ts"
   },
   "engines": {
-    "node": ">=22.18"
+    "node": ">=24"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20261001.1",
     "@tauri-apps/cli": "^2.12.1",
     "@types/cross-spawn": "^6.0.6",
-    "@types/node": "^22.20.4",
+    "@types/node": "^24.19.2",
     "@types/pngjs": "^6.0.5",
     "@types/ws": "^8.18.2",
     "esbuild": "^0.28.2",
     "fake-indexeddb": "^6.2.5",
     "fflate": "^0.8.3",
+    "happy-dom": "^21.0.4",
     "lottie-web": "^5.13.0",
     "typescript": "^7.0.2",
     "vitest": "^5.0.3",
@@ -57,5 +59,10 @@
     "onnxruntime-web": "1.31.0-dev.20260914-8d85527a0",
     "pdfjs-dist": "^6.4.299",
     "preact": "^10.29.8"
+  },
+  "overrides": {
+    "miniflare": {
+      "undici": "7.30.1"
+    }
   }
 }

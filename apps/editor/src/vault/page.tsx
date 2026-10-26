@@ -66,7 +66,7 @@ const root = document.getElementById('app')!;
 document.documentElement.classList.add('vault');
 if (location.origin === APP || !APP) {
   // never on the editor's own address: its plugins would read what is kept here
-  root.textContent = 'tramme: the key vault is not configured.';
+  root.textContent = 'Tramme: the key vault is not configured.';
 } else if (location.pathname === '/settings') {
   render(<Settings />, root);
 } else {

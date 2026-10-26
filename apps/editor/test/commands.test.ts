@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { applyOps, validate, type ToolContext, type TrammeDoc } from '@tramme/core';
 import { newProject } from '@tramme/project';
-import { fieldsOf, inputOf, listCommands, matchCommands, parseCommand, ready } from '../src/ai/commands.ts';
+import { fieldsOf, inputOf, listCommands, matchCommands, parseCommand, ranked, ready, type Command } from '../src/ai/commands.ts';
 import { editorRegistry } from '../src/vocabulary.ts';
 
 const sky = {
@@ -28,8 +28,8 @@ describe('the / menu', () => {
   const list = listCommands(reg);
 
   it('lists the editor\'s tools and workflows with the plugins\' ones', () => {
-    expect(list.filter((c) => c.kind === 'tool').map((c) => c.name)).toEqual(['captions', 'title', 'keyword', 'lower-third', 'svg-paths', 'film-guide', 'film', 'film-review', 'kinetic-title', 'bar-chart', 'stat', 'transition', 'quote', 'logo-reveal', 'list', 'timeline', 'split-screen', 'map-journey', 'kit', 'pointer', 'terrain', 'keys', 'riffle', 'events', 'event-counter', 'event-tags', 'event-receipt', 'beats', 'shots', 'subjects', 'palette', 'space', 'still', 'track', 'callout', 'stabilize', 'proxy', 'define_component', 'instantiate', 'detach', 'component-keep', 'component-use', 'denoise', 'skin', 'upscale', 'interpolate', 'cutout', 'depth', 'photo-2.5d', 'model', 'remove-bg', 'lipsync', 'silences', 'fillers', 'check', 'motion', 'cues', 'sfx', 'sound-find', 'synth', 'generate-sound', 'voices', 'duck', 'sound-keep', 'credits', 'mix', 'generate-image', 'shorts', 'sources', 'block-add', 'block-use', 'brief', 'library-add', 'library-use', 'demo.stars']);
-    expect(list.filter((c) => c.kind === 'prompt').map((c) => `${c.name}:${c.from}`)).toEqual(['film:tramme', 'analyze:tramme', 'dress:tramme', 'review:tramme', 'polish:tramme', 'sound-design:tramme', 'shorts:tramme', 'transcript:tramme', 'cut-silences:tramme', 'beats:tramme', 'still:tramme', 'night:sky']);
+    expect(list.filter((c) => c.kind === 'tool').map((c) => c.name)).toEqual(['captions', 'title', 'keyword', 'lower-third', 'svg-paths', 'kinetic-title', 'bar-chart', 'stat', 'transition', 'quote', 'logo-reveal', 'list', 'timeline', 'split-screen', 'map-journey', 'kit', 'pointer', 'terrain', 'keys', 'riffle', 'events', 'event-counter', 'event-tags', 'event-receipt', 'beats', 'shots', 'subjects', 'palette', 'space', 'still', 'track', 'callout', 'stabilize', 'proxy', 'define_component', 'instantiate', 'detach', 'component-keep', 'component-use', 'denoise', 'skin', 'upscale', 'interpolate', 'cutout', 'depth', 'photo-2.5d', 'model', 'remove-bg', 'lipsync', 'silences', 'fillers', 'check', 'motion', 'cues', 'sfx', 'sound-find', 'synth', 'generate-sound', 'voices', 'duck', 'sound-keep', 'credits', 'mix', 'generate-image', 'shorts', 'sources', 'block-add', 'block-use', 'brief', 'library-add', 'library-use', 'demo.stars']);
+    expect(list.filter((c) => c.kind === 'prompt').map((c) => `${c.name}:${c.from}`)).toEqual(['analyze:tramme', 'dress:tramme', 'review:tramme', 'polish:tramme', 'sound-design:tramme', 'shorts:tramme', 'transcript:tramme', 'cut-silences:tramme', 'beats:tramme', 'still:tramme', 'night:sky']);
   });
 
   it('finds commands by name first, then by title or description', () => {
@@ -44,6 +44,15 @@ describe('the / menu', () => {
     expect(parseCommand('/demo.stars  denser at the top ', list)).toMatchObject({ cmd: { name: 'demo.stars' }, rest: 'denser at the top' });
     expect(parseCommand('/nothing here', list)).toBeNull();
     expect(parseCommand('make a title', list)).toBeNull();
+  });
+
+  it('opens on what was used last, and searches unchanged', () => {
+    const cmd = (name: string): Command => ({ kind: 'tool', name, title: name.toUpperCase(), description: `the ${name} command`, from: 'tramme' });
+    const [a, b, c] = [cmd('a'), cmd('b'), cmd('c')];
+    expect(ranked([a, b, c], ['c'], '')[0]).toBe(c);
+    expect(ranked([a, b, c], ['c', 'b'], '').map((x) => x.name)).toEqual(['c', 'b', 'a']);
+    expect(ranked([a, b, c], ['zz'], '')).toEqual([a, b, c]);
+    expect(ranked([a, b, c], ['c'], 'a')).toEqual(matchCommands([a, b, c], 'a'));
   });
 
   it('builds a form from the input schema and reads it back', () => {

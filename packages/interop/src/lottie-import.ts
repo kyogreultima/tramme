@@ -1,4 +1,4 @@
-// Import of a Lottie animation into an tramme document. Shape layers (groups,
+// Import of a Lottie animation into a Tramme document. Shape layers (groups,
 // rectangles, ellipses, paths, fills, strokes, gradients), solids, images,
 // text and precomps come in with their keyframes and eases. Lottie parenting
 // (transform only, stacking unchanged) becomes wrapper groups whose transform
@@ -52,7 +52,7 @@ class Importer {
   }
   t(frame: number) { return r4((frame - this.ip) / this.fps); }
 
-  /** a Lottie property as an tramme property */
+  /** a Lottie property as a Tramme property */
   prop(p: L | undefined, map: (v: any) => unknown): Prop | undefined {
     if (!p) return undefined;
     if (p.x) this.warn('Lottie expressions ignored');
@@ -118,7 +118,7 @@ class Importer {
     return null;
   }
 
-  /** a Lottie shape group as tramme layers (returns ids, bottom first) */
+  /** a Lottie shape group as Tramme layers (returns ids, bottom first) */
   shapes(items: L[], layers: Record<string, Layer>, inherited: { fill?: L; stroke?: L } = {}): string[] {
     const fill = items.find((i) => i.ty === 'fl' || i.ty === 'gf') ?? inherited.fill;
     const stroke = items.find((i) => i.ty === 'st' || i.ty === 'gs') ?? inherited.stroke;
@@ -287,7 +287,7 @@ class Importer {
     }
   }
 
-  /** Lottie effects with an tramme equivalent: Gaussian blur and drop shadow (lottie-web's mappings, inverted) */
+  /** Lottie effects with a Tramme equivalent: Gaussian blur and drop shadow (lottie-web's mappings, inverted) */
   effects(ly: L): NonNullable<Layer['effects']> {
     const out: NonNullable<Layer['effects']> = [];
     for (const [i, ef] of (ly.ef || []).entries()) {
@@ -323,7 +323,7 @@ class Importer {
   }
 }
 
-/** an tramme document from a Lottie animation */
+/** a Tramme document from a Lottie animation */
 export function fromLottie(json: Record<string, any>): ImportResult {
   const x = new Importer(json);
   const duration = ((json.op ?? 0) - (json.ip ?? 0)) / (json.fr || 30);

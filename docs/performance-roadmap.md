@@ -1,6 +1,6 @@
 # Performance roadmap
 
-How tramme renders faster without leaving its stack: measure where a frame's time goes, export in parallel, prepare the Evaluator for documents with hundreds of instances, and move to WebGL or to Rust compiled to WebAssembly only what a measure points at.
+How Tramme renders faster without leaving its stack: measure where a frame's time goes, export in parallel, prepare the Evaluator for documents with hundreds of instances, and move to WebGL or to Rust compiled to WebAssembly only what a measure points at.
 
 Status: steps 1 and 5 done (the breakdown per frame, the load cases and `tramme load`; a pool of readers per video file, one asset per file), step 2 done (a parallel export: `tramme render --pages n`, segments joined without encoding again, frames identical to one page's, simulations included; 1.2× here on 4 cores and a software GPU), step 3 done (the Evaluator for many instances: 400 instances under a time field evaluated in 12 ms a frame instead of 29, in Node; the `instances` load case); step 4 done (what the measures pointed at: the Canvas 2D filters run over the layer's box instead of the whole frame, the `effects` case 27.4 s → 6.8 s a frame with the same pixels; nothing called for Rust); figures taken on a laptop with a GPU (step 1's second table), those of a machine with 8 cores or more are still to take for step 2. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
 

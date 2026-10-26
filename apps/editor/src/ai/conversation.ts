@@ -9,7 +9,7 @@ import { signal } from '@preact/signals';
 import type { AiEvent, ChatItem } from '../api.ts';
 import { aiSettings, ask, chat, decided, runTool, saveChat, stop as stopAi } from './index.ts';
 import { inputLine, type Command } from './commands.ts';
-import { uid } from './calls.ts';
+import { paused, uid } from './calls.ts';
 import { opLine } from './tools.ts';
 import { attaching, pending } from '../attachments.ts';
 import { acceptProposal, comp, propose, rejectProposal, S, toast, uiTime } from '../state.ts';
@@ -130,7 +130,7 @@ async function consume(start: (signal: AbortSignal) => AsyncGenerator<AiEvent>, 
       flushWords();
       if (ev.type === 'item') { chat.value = [...chat.value, ev.item]; streaming.value = ev.item.text !== undefined ? ev.item.id : null; }
       else if (ev.type === 'thinking-done') update(ev.id, (it) => ({ ...it, thinking: it.thinking && { ...it.thinking, done: true, ms: Date.now() - (it.thinking.start ?? Date.now()) } }));
-      else if (ev.type === 'tool-done') update(ev.id, (it) => ({ ...it, tool: it.tool && { ...it.tool, done: true, error: ev.error, progress: undefined } }));
+      else if (ev.type === 'tool-done') update(ev.id, (it) => ({ ...it, tool: it.tool && { ...it.tool, done: true, error: ev.error, detail: ev.detail, progress: undefined, ms: Date.now() - (it.tool.start ?? Date.now()) } }));
       else if (ev.type === 'tool-progress') update(ev.id, (it) => ({ ...it, tool: it.tool && { ...it.tool, progress: ev.progress } }));
       else if (ev.type === 'proposal') {
         propose({ id: ev.id, label: ev.label, ops: ev.ops });
@@ -155,7 +155,8 @@ async function consume(start: (signal: AbortSignal) => AsyncGenerator<AiEvent>, 
     running.value = false;
     streaming.value = null;
     controller = null;
-    chat.value = chat.value.map((it) => (it.tool && !it.tool.done ? { ...it, tool: { ...it.tool, done: true } }
+    paused.value = false;
+    chat.value = chat.value.map((it) => (it.tool && !it.tool.done ? { ...it, tool: { ...it.tool, done: true, ms: Date.now() - (it.tool.start ?? Date.now()) } }
       : it.thinking && !it.thinking.done ? { ...it, thinking: { ...it.thinking, done: true, ms: Date.now() - (it.thinking.start ?? Date.now()) } } : it));
     // stopped by the user: nothing applied, nothing to tell
     if (!signal.aborted) finished(from, error, Date.now() - turnStart.peek());
@@ -188,8 +189,14 @@ function finished(from: number, error: string, ms: number) {
 
 /** stops the turn under way */
 export function stop() {
+  paused.value = false;
   stopAi();
   controller?.abort();
+}
+
+/** pauses the turn under way before its next tool, or lets it go on */
+export function togglePause() {
+  if (running.peek()) paused.value = !paused.peek();
 }
 
 /**
@@ -210,5 +217,3 @@ export function decide(accept: boolean): boolean {
   return true;
 }
 
-/** an item that already shows the assistant at work */
-export const active = (it: ChatItem | undefined) => !!it && ((it.tool && !it.tool.done) || (it.thinking && !it.thinking.done) || (it.text !== undefined && it.id === streaming.value));

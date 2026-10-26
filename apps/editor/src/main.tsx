@@ -60,7 +60,7 @@ async function openProject(id: string) {
   const doc = await api.readText(id, DOCUMENT);
   if (!doc) throw new Error(t('app.projectIdHasNo', { id }));
   load(upgradeDoc(JSON.parse(doc.text)) as TrammeDoc, info.manifest, api.fileUrl(id, DOCUMENT), doc.etag);
-  document.title = `${info.manifest.name} · tramme`;
+  document.title = `${info.manifest.name} · Tramme`;
   render(<App />, root);
   loadChats(info.files).catch((e) => console.warn('[tramme] conversations :', (e as Error).message)).finally(startProject);
   await preview.start();

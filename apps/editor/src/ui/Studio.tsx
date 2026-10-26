@@ -11,7 +11,8 @@ import type { RefObject } from 'preact';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import type { Vec2 } from '@tramme/core';
 import { aiRoute } from '../ai/index.ts';
-import { running, stop, turnStart } from '../ai/conversation.ts';
+import { running, stop, togglePause, turnStart } from '../ai/conversation.ts';
+import { paused } from '../ai/calls.ts';
 import { draft } from '../attachments.ts';
 import { IDEAS } from '../ideas.ts';
 import { comp, S, uiTime } from '../state.ts';
@@ -71,19 +72,20 @@ function Chips({ empty }: { empty: boolean }) {
   );
 }
 
-/** the assistant at work, over the film: the stage it is at, for how long, and the way to stop it */
+/** the assistant at work, over the film: the stage it is at, for how long, and the way to pause or stop it */
 function WorkPill() {
   const work = turns.value.at(-1)?.work ?? [];
-  const stage = liveStage(work), secs = useElapsed(turnStart.value, true);
+  const stage = liveStage(work), secs = useElapsed(turnStart.value, true), hold = paused.value;
   const tool = [...work].reverse().find((it) => it.tool && !it.tool.done)?.tool;
   const pct = tool ? progressOf(tool) : null;
   return (
     <div class="pill work-pill" role="status">
-      <span class="mark working"><LogoMark /></span>
-      <span class="stage-name">{stage ? t(STAGE_LABEL[stage]) : t('studio.working')}</span>
-      {tool && <span class="pill-detail">{tool.summary}</span>}
+      <span class={`mark${hold ? '' : ' working'}`}><LogoMark /></span>
+      <span class="stage-name">{hold ? t('studio.paused') : stage ? t(STAGE_LABEL[stage]) : t('studio.working')}</span>
+      {tool && !hold && <span class="pill-detail">{tool.summary}</span>}
       {pct !== null && <span class="progress"><i style={{ width: `${pct}%` }} /></span>}
       <span class="mono faint">{secs} s</span>
+      <button class="pill-stop pause" title={hold ? t('assistant.resume') : t('assistant.pause')} onClick={togglePause}><Icon name={hold ? 'play' : 'pause'} /></button>
       <button class="pill-stop" title={t('assistant.stop')} onClick={stop}><Icon name="stop" /></button>
     </div>
   );

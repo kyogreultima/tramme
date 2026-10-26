@@ -13,13 +13,13 @@ const TILES = [
 
 <section class="section" id="made">
   <div class="wrap">
-    <Head title="Made with tramme." more="Every example is in the repository, ready to open and take apart." />
+    <Head title="Made with Tramme." more="Every example is in the repository, ready to open and take apart." />
     <div class="grid">
       {TILES.map(({ id, wide, tint, text }) => {
         const ex = example(id);
         return (
           <figure class:list={['tile', { wide }]} data-reveal>
-            <Media id={id} width={ex.width} height={ex.height} duration={ex.duration} tint={[...tint]} label={`${ex.name}, made with tramme. ${text}`} />
+            <Media id={id} width={ex.width} height={ex.height} duration={ex.duration} tint={[...tint]} label={`${ex.name}, made with Tramme. ${text}`} />
             <figcaption class="caption"><strong>{ex.name}.</strong> {text}</figcaption>
           </figure>
         );

@@ -87,7 +87,7 @@ export const topIcons = (data, count = 12) => Object.keys(data.icons ?? {}).slic
 
 // ── the tool ─────────────────────────────────────────────────
 const JITTER = [1, 1.35, 0.8, 1.15, 0.9, 1.2, 1.05, 0.85];
-/** the draw-on's ease: the kit's enter, or tramme's out ease */
+/** the draw-on's ease: the kit's enter, or Tramme's out ease */
 const enterOf = (doc) => (doc.tokens?.enter?.type === 'ease' ? '@enter' : [0.16, 1, 0.3, 1]);
 
 /** fresh, deterministic layer ids: base, base-2, base-3… against the composition's own */
@@ -254,6 +254,22 @@ export const tools = [iconTool];
 export const checks = [iconCheck];
 export const messages = {
   fr: {
+    "the words (money, growth), a lucide name (trending-up), or several separated by commas: one per place": "les mots (money, growth), un nom lucide (trending-up), ou plusieurs séparés par des virgules : un par place",
+    "How many": "Combien",
+    "when the words name one icon: how many best matches to lay out": "quand les mots nomment une icône : combien des meilleures correspondances disposer",
+    "Layout": "Disposition",
+    "Columns": "Colonnes",
+    "a grid's columns (default: as many as keep it square)": "les colonnes d’une grille (par défaut : autant qu’il en faut pour qu’elle reste carrée)",
+    "Size (px)": "Taille (px)",
+    "one icon's box; its stroke scales with it": "la boîte d’une icône ; son trait suit sa taille",
+    "Colour": "Couleur",
+    "@ink (the default), @accent, or a CSS colour": "@ink (par défaut), @accent, ou une couleur CSS",
+    "At": "À",
+    "[x, y] of the row's or grid's centre, or of the first icon of a list": "[x, y] du centre de la rangée ou de la grille, ou de la première icône d’une liste",
+    "Gap (px)": "Écart (px)",
+    "between two icons; a list's rows sit 1.8 × the gap apart": "entre deux icônes ; les lignes d’une liste sont à 1,8 × l’écart l’une de l’autre",
+    "Draw on": "Se tracer",
+    "the contours draw themselves with the trim (yes by default)": "les contours se tracent seuls avec le trim (oui par défaut)",
     'Icons': 'Icônes',
     'finds pictograms by name, tag or a few words and lays them as editable stroke groups: a row, a grid, or one beside each line of a list; when the words are vague, the candidates come back as a contact sheet': 'trouve des pictogrammes par nom, étiquette ou quelques mots et les pose en groupes de traits éditables : en ligne, en grille, ou à côté de chaque ligne d\'une liste ; quand les mots sont vagues, les candidates reviennent en planche',
     'Icon stroke': 'Trait des icônes',

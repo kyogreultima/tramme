@@ -26,6 +26,10 @@ export interface AudioAnalysis {
   downbeats: number[];
   /** where the energy changes for good (verse, chorus, drop), with the loudness that follows */
   sections: { t: number; level: number }[];
+  /** the energy of 32 log bands (40 Hz to 16 kHz), sampled at `bandsRate` (every fourth frame of the 50 Hz rate), each band normalised on its own loudest frame — the audiogram's wave reads them; absent from analyses made before 0.14 */
+  bands?: number[][];
+  /** how many band frames a second (12.5) */
+  bandsRate?: number;
 }
 
 export const isAudioAnalysis = (x: unknown): x is AudioAnalysis =>
@@ -70,6 +74,55 @@ function peaks(nov: Float32Array, gap: number): number[] {
     for (let k = from; k < to; k++) v += (nov[k] - m) ** 2;
     const sd = Math.sqrt(v / (to - from));
     if (nov[i] > m + 1.2 * sd && nov[i] > 0.02 && i - last >= minGap) { out.push(i / RATE); last = i; }
+  }
+  return out;
+}
+
+// ── the spectrum: 32 log bands ───────────────────────────────
+/** an iterative radix-2 FFT of a real window, as magnitudes (n a power of two) */
+function magnitudes(window: Float32Array): Float32Array {
+  const n = window.length, re = Float64Array.from(window), im = new Float64Array(n);
+  for (let i = 1, j = 0; i < n; i++) {
+    let bit = n >> 1;
+    for (; j & bit; bit >>= 1) j ^= bit;
+    j ^= bit;
+    if (i < j) { [re[i], re[j]] = [re[j], re[i]]; [im[i], im[j]] = [im[j], im[i]]; }
+  }
+  for (let len = 2; len <= n; len <<= 1) {
+    const ang = (-2 * Math.PI) / len, wr = Math.cos(ang), wi = Math.sin(ang);
+    for (let i = 0; i < n; i += len) {
+      let cr = 1, ci = 0;
+      for (let k = 0; k < len / 2; k++) {
+        const ur = re[i + k], ui = im[i + k], vr = re[i + k + len / 2] * cr - im[i + k + len / 2] * ci, vi = re[i + k + len / 2] * ci + im[i + k + len / 2] * cr;
+        re[i + k] = ur + vr; im[i + k] = ui + vi;
+        re[i + k + len / 2] = ur - vr; im[i + k + len / 2] = ui - vi;
+        const ncr = cr * wr - ci * wi; ci = cr * wi + ci * wr; cr = ncr;
+      }
+    }
+  }
+  const out = new Float32Array(n / 2);
+  for (let k = 0; k < n / 2; k++) out[k] = Math.hypot(re[k], im[k]);
+  return out;
+}
+
+/** the bands are kept for every fourth frame of the analysis' rate: 12.5 a second at 50 Hz */
+const BANDS_EVERY = 4;
+
+/**
+ * A spectrum's energy in `count` bands on a log scale from 40 Hz to 16 kHz:
+ * the mean magnitude of the bins each band spans (at least one), raw (the
+ * analysis normalises them over the whole sound, so a quiet frame stays quiet).
+ */
+export function logBands(spectrum: Float32Array, sampleRate: number, count = 32): number[] {
+  const binHz = sampleRate / 2 / spectrum.length;
+  const lo = 40, hi = Math.min(16000, sampleRate / 2 - 1);
+  const out = new Array<number>(count).fill(0);
+  for (let b = 0; b < count; b++) {
+    const f0 = lo * Math.pow(hi / lo, b / count), f1 = lo * Math.pow(hi / lo, (b + 1) / count);
+    const i0 = Math.max(1, Math.floor(f0 / binHz)), i1 = Math.max(i0 + 1, Math.min(spectrum.length, Math.ceil(f1 / binHz)));
+    let s = 0;
+    for (let i = i0; i < i1; i++) s += spectrum[i];
+    out[b] = s / (i1 - i0);
   }
   return out;
 }
@@ -161,10 +214,31 @@ export function analyseAudio(samples: Float32Array, sampleRate: number): AudioAn
     if (Math.abs(after - before) > 0.25 && (!sections.length || marks[i] - sections.at(-1)!.t >= 4)) sections.push({ t: +marks[i].toFixed(3), level: +after.toFixed(2) });
   }
 
+  // the 32 log bands: an FFT of 2048 samples on every fourth frame of the 50 Hz rate (12.5 Hz, only
+  // the frames that are kept are computed), so a 30-minute analysis stays under 6 MB — the wave
+  // reads them interpolated (the audiogram's barsAt)
+  const N = 2048;
+  const spec: number[][] = Array.from({ length: 32 }, () => []);
+  const window = new Float32Array(N);
+  for (let f = 0; f < frames; f += BANDS_EVERY) {
+    const at = Math.min(samples.length - N, f * hop);
+    if (at < 0) { for (let b = 0; b < 32; b++) spec[b].push(0); continue; }
+    for (let i = 0; i < N; i++) { const v = samples[at + i]; window[i] = v * (0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (N - 1))); }
+    const frame = logBands(magnitudes(window), sampleRate);
+    for (let b = 0; b < 32; b++) spec[b].push(frame[b]);
+  }
+  // each band on its own loudest frame (a quiet frame reads low, a silence reads 0), softened by
+  // the band's share of the loudest one so a band holding only noise stays low
+  const tops = spec.map((band) => band.reduce((m, v) => (v > m ? v : m), 0)), loudest = Math.max(1e-9, ...tops);
+  const bandList = spec.map((band, b) => {
+    const k = tops[b] > 1e-9 ? Math.sqrt(tops[b] / loudest) / tops[b] : 0;
+    return band.map((v) => +(v * k).toFixed(2));
+  });
+
   return {
     version: 1, kind: 'audio-analysis', duration: +(samples.length / sampleRate).toFixed(3), rate: RATE,
     envelope: { rms: rmsN, low: normalise(bands.low), mid: normalise(bands.mid), high: normalise(bands.high) },
-    onsets: onsets.map((t) => +t.toFixed(3)), tempo, beats, downbeats, sections,
+    onsets: onsets.map((t) => +t.toFixed(3)), tempo, beats, downbeats, sections, bands: bandList, bandsRate: RATE / BANDS_EVERY,
   };
 }
 

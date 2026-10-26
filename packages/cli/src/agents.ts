@@ -4,7 +4,7 @@
 // engine, the editor sees the same events (text, thinking, tool calls, errors)
 // and runs the same tools: Claude gets them in process, the two command lines
 // reach them as an MCP server the companion serves for the turn. Each engine
-// gets tramme's tools and nothing else: no shell, no files, no web.
+// gets Tramme's tools and nothing else: no shell, no files, no web.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -39,7 +39,7 @@ export interface TurnRequest {
   effort?: string;
   sessionId?: string;
   images: { mediaType: string; data: string }[];
-  /** where the command lines reach tramme's tools this turn */
+  /** where the command lines reach Tramme's tools this turn */
   mcpUrl: string;
 }
 
@@ -66,7 +66,7 @@ const asMcp = (r: ToolResult) => ({
   isError: !!r.isError,
 });
 
-/** tramme's tools as an MCP server over HTTP, for one request of a command line (stateless: a server per request) */
+/** Tramme's tools as an MCP server over HTTP, for one request of a command line (stateless: a server per request) */
 export async function serveTools(t: Turn, req: http.IncomingMessage, res: http.ServerResponse, body: unknown) {
   const server = new McpServer({ name: 'tramme', version: '1.0.0' });
   for (const def of TOOLS) server.registerTool(def.name, { description: def.description, inputSchema: def.schema.shape }, async (input: unknown) => asMcp(await callEditor(t, def.name, input)));
@@ -157,7 +157,7 @@ async function runClaude(t: Turn, r: TurnRequest) {
     options: {
       model,
       systemPrompt: r.system,
-      // only tramme's tools, run by the editor: no files, no shell, no settings, no account connectors
+      // only Tramme's tools, run by the editor: no files, no shell, no settings, no account connectors
       tools: [],
       mcpServers: {
         tramme: createSdkMcpServer({
@@ -169,7 +169,7 @@ async function runClaude(t: Turn, r: TurnRequest) {
       settingSources: [],
       canUseTool: async (name: string, input: Record<string, unknown>) => (name.startsWith('mcp__tramme__')
         ? { behavior: 'allow' as const, updatedInput: input }
-        : { behavior: 'deny' as const, message: `Tool ${name} is not available in tramme.` }),
+        : { behavior: 'deny' as const, message: `Tool ${name} is not available in Tramme.` }),
       // thinking shown to the user as it goes (summarized)
       ...(ADAPTIVE.has(model) ? { thinking: { type: 'adaptive' as const, display: 'summarized' as const }, effort } : {}),
       includePartialMessages: true,
@@ -267,7 +267,7 @@ async function runCodex(t: Turn, r: TurnRequest) {
     const images = writeImages(dir, r.images).flatMap((f) => ['-i', f]);
     const level = EFFORTS.find((e) => e === r.effort);
     const config = [
-      // tramme's instructions instead of a coding agent's, tramme's tools instead of the shell and the web
+      // Tramme's instructions instead of a coding agent's, Tramme's tools instead of the shell and the web
       `model_instructions_file=${toml(instructions)}`,
       'features.shell_tool=false', 'web_search="disabled"', 'approval_policy="never"',
       `mcp_servers.tramme.url=${toml(r.mcpUrl)}`, 'mcp_servers.tramme.tool_timeout_sec=900', 'mcp_servers.tramme.default_tools_approval_mode="approve"',
@@ -305,7 +305,7 @@ async function runAntigravity(t: Turn, r: TurnRequest) {
   const dir = turnFolder('antigravity');
   const root = path.join(WORKDIR, 'antigravity'), workspace = path.join(root, 'workspace');
   try {
-    // its home's permissions: tramme's tools and the turn's images only; headless, any other call is refused without asking
+    // its home's permissions: Tramme's tools and the turn's images only; headless, any other call is refused without asking
     const settings = path.join(AGY_HOME, '.gemini', 'antigravity-cli');
     fs.mkdirSync(settings, { recursive: true });
     fs.writeFileSync(path.join(settings, 'settings.json'), JSON.stringify({
@@ -314,11 +314,11 @@ async function runAntigravity(t: Turn, r: TurnRequest) {
         deny: ['command(*)', 'write_file(*)', 'read_url(*)', 'execute_url(*)', 'unsandboxed(*)'],
       },
     }, null, 2));
-    // the workspace: tramme's agent (its body is the system prompt; of the built-in tools, view_file alone, for the images) and the turn's MCP address
+    // the workspace: Tramme's agent (its body is the system prompt; of the built-in tools, view_file alone, for the images) and the turn's MCP address
     const agents = path.join(workspace, '.agents');
     fs.mkdirSync(path.join(agents, 'agents'), { recursive: true });
     fs.writeFileSync(path.join(agents, 'mcp_config.json'), JSON.stringify({ mcpServers: { tramme: { serverUrl: r.mcpUrl } } }, null, 2));
-    fs.writeFileSync(path.join(agents, 'agents', 'tramme.md'), `---\nname: tramme\ndescription: The assistant of the tramme editor\ntools: [view_file]\nsubagent: false\n---\n${r.system}\n`);
+    fs.writeFileSync(path.join(agents, 'agents', 'tramme.md'), `---\nname: tramme\ndescription: The assistant of the Tramme editor\ntools: [view_file]\nsubagent: false\n---\n${r.system}\n`);
     // images: files of the turn, named in the message (its input takes text only)
     const images = writeImages(dir, r.images);
     const text = images.length ? `Images joined to this message (open them with view_file):\n${images.join('\n')}\n\n${r.prompt}` : r.prompt;

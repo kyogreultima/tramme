@@ -16,11 +16,13 @@ import { ago } from '../model.ts';
 import { createFromWords, droppedOf, importArchive, ImportError, importFile, importSources, importVideo, isSourceFile, isVideoFile, pickedOf, type Picked, type Progress } from '../importer.ts';
 import { kindOf } from '../sources.ts';
 import { S, toast } from '../state.ts';
-import { listCommands } from '../ai/commands.ts';
+import { listCommands, type Command } from '../ai/commands.ts';
+import { packCommands, shippedPacks } from '../packs.ts';
 import { useCommandMenu } from './composer.tsx';
 import { Modal, longPress, openMenu, Seg } from './controls.tsx';
 import { Icon } from './icons.tsx';
 import { LogoMark } from './Logo.tsx';
+import { ModelPicker } from './ModelPicker.tsx';
 import { Overlays } from './shell.tsx';
 import { HelpButton } from './Help.tsx';
 import { WindowControls, windowBar } from './WindowControls.tsx';
@@ -182,7 +184,7 @@ function Card({ m, onMenu }: { m: Manifest; onMenu: (e: MouseEvent | { clientX: 
   );
 }
 
-/** the direction box: the words of the film, the material it is made from, its format */
+/** the direction box: the words of the film, the material it is made from, the model that makes it, its format */
 function DirectionBox({ busy, onStart }: { busy: boolean; onStart: (words: string, material: Picked[], format: [number, number]) => void }) {
   const [words, setWords] = useState('');
   const [material, setMaterial] = useState<Picked[]>([]);
@@ -194,8 +196,11 @@ function DirectionBox({ busy, onStart }: { busy: boolean; onStart: (words: strin
   const add = (list: Picked[]) => setMaterial((had) => [...had, ...list.filter((p) => !had.some((h) => h.path === p.path))]);
   const ready = !busy && (words.trim().length > 0 || material.length > 0);
   const start = () => { if (!ready) return; const f = FILM_FORMATS.find(([id]) => id === format)!; onStart(words.trim(), material, [f[2], f[3]]); };
-  // the / menu, as in the message box: a workflow starts the project with it, a tool waits in the editor's box with its form
-  const commands = useMemo(() => listCommands(S.registry.value), [S.registry.value]);
+  // the / menu, as in the message box: a workflow starts the project with it, a tool waits in the editor's box with its form.
+  // The shipped packs' commands come from the index, so the menu offers them before a project holds any pack.
+  const [packCmds, setPackCmds] = useState<Command[]>([]);
+  useEffect(() => { void shippedPacks().then((p) => setPackCmds(packCommands(p))); }, []);
+  const commands = useMemo(() => [...listCommands(S.registry.value), ...packCmds], [S.registry.value, packCmds]);
   const commandMenu = useCommandMenu(words, commands, (c) => { setWords(`/${c.name} `); area.current?.focus(); });
   const chosen = (e: Event) => { const input = e.target as HTMLInputElement, list = pickedOf(input.files ?? []); input.value = ''; add(list); };
   return (
@@ -227,6 +232,7 @@ function DirectionBox({ busy, onStart }: { busy: boolean; onStart: (words: strin
           <input ref={files} type="file" multiple hidden accept="image/*,video/*,audio/*,.pdf,application/pdf,.md,.markdown,.json,.ttf,.otf,.woff,.woff2,.glb,.gltf" onChange={chosen} />
           <input ref={folder} type="file" multiple hidden {...{ webkitdirectory: true }} onChange={chosen} />
           <span class="grow" />
+          <ModelPicker />
           <Seg value={format} role="radiogroup" ariaLabel={t('common.format')}
             options={FILM_FORMATS.map(([id, , w, h]) => ({ value: id, label: <><i class="fmt" style={{ aspectRatio: `${w} / ${h}`, [w >= h ? 'width' : 'height']: '13px' }} />{id.replace('x', ':')}</> }))}
             onChange={setFormat} />
@@ -260,7 +266,7 @@ export function Home() {
     return () => removeEventListener('keydown', key);
   }, []);
   useEffect(() => {
-    document.title = `${t('home.projects')} · tramme`;
+    document.title = `${t('home.projects')} · Tramme`;
     refresh();
     fetch('/examples/index.json').then((r) => (r.ok ? r.json() : [])).then(setExamples).catch(() => {});
   }, []);
@@ -321,7 +327,7 @@ export function Home() {
       onDragLeave={(e) => { if (e.target === e.currentTarget) setDrag(false); }}
       onDrop={(e) => { e.preventDefault(); setDrag(false); if (e.dataTransfer) droppedOf(e.dataTransfer).then(openFiles).catch((x) => setDialog({ kind: 'failure', error: x as Error })); }}>
       <header class="home-top" {...windowBar}>
-        <div class="brand"><LogoMark /><span>tramme</span></div>
+        <div class="brand"><LogoMark /><span>Tramme</span></div>
         <span class="grow" />
         {installable.value && <button class="btn outline sm" title={t('home.installAppHint')} onClick={install}><Icon name="download" /><span class="label">{t('home.installApp')}</span></button>}
         <HelpButton page="home" />

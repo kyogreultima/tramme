@@ -14,7 +14,7 @@ const ASSETS = {
       if (req.headers.get('if-none-match') === '"v1"') return new Response(null, { status: 304, headers: { etag: '"v1"' } });
       return new Response('/* vault */', { headers: { 'content-type': 'text/javascript', etag: '"v1"' } });
     }
-    return new Response('<!doctype html><html><head><title>tramme</title></head></html>', { headers: { 'content-type': 'text/html' } });
+    return new Response('<!doctype html><html><head><title>Tramme</title></head></html>', { headers: { 'content-type': 'text/html' } });
   },
 };
 

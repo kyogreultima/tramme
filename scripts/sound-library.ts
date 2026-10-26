@@ -1,4 +1,4 @@
-// tramme's built-in sound library, made from Kenney's packs (CC0, public
+// Tramme's built-in sound library, made from Kenney's packs (CC0, public
 // domain: www.kenney.nl): downloads the packs, keeps the sounds useful for
 // motion design, measures each one in Chrome (the decoder of the editor) and
 // writes sounds/<pack>/<name>.ogg and sounds/catalog.json.

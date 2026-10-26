@@ -9,10 +9,10 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import type { ChatItem, TurnUsage } from '../api.ts';
 import { engineOf, modelLabel, providerOf } from '@tramme/assistant';
 import { aiSettings, aiStatus, CLI_SETUP, cliUnavailable, providerLabel, refreshStatus, setAiSettings } from '../ai/index.ts';
-import { lightbox, running, turnStart } from '../ai/conversation.ts';
+import { lightbox, running } from '../ai/conversation.ts';
 import { openSettings } from '../settings.ts';
 import { S, toast } from '../state.ts';
-import { answer, chatShown, question } from '../confirm.ts';
+import { answer, chatShown, choose, question, type Question } from '../confirm.ts';
 import { attachmentUrl, type Attachment } from '../attachments.ts';
 import { Icon } from './icons.tsx';
 import { TranscribeButton } from './Transcribe.tsx';
@@ -62,7 +62,21 @@ export function progressOf(tool: NonNullable<ChatItem['tool']>): number | null {
   return p && p.total > 0 && Number.isFinite(p.done / p.total) ? Math.max(0, Math.min(100, Math.round((100 * p.done) / p.total))) : null;
 }
 
-/** a question asked during the turn (a generation that costs money): answered here */
+/** the pictures of a choice (the takes of a generation), one click keeps one: in the conversation's card and in the dialog */
+export function Choices({ q }: { q: Question }) {
+  return (
+    <div class="question-choices">
+      {(q.choices ?? []).map((c, i) => (
+        <button key={i} class="question-choice" title={c.label} onClick={() => choose(i)}>
+          <img src={c.url} alt={c.label} />
+          <span>{c.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** a question asked during the turn (a generation that costs money, a take to keep): answered here */
 export function QuestionCard() {
   const q = question.value;
   useEffect(() => { chatShown.value++; return () => { chatShown.value--; }; }, []);
@@ -71,10 +85,11 @@ export function QuestionCard() {
     <div class="proposal question">
       <div class="proposal-head"><Icon name="alert" /><span class="ptitle">{q.title}</span></div>
       <p class="question-text">{q.text}</p>
+      {q.choices && <Choices q={q} />}
       <div class="proposal-actions">
         <span class="grow" />
-        <button class="btn sm" onClick={() => answer(false)}>{t('common.cancel')}</button>
-        <button class="btn sm primary" onClick={() => answer(true)}><Icon name="check" />{q.yes}</button>
+        <button class="btn sm" onClick={() => answer(false)}>{q.choices ? t('image.keepNone') : t('common.cancel')}</button>
+        {!q.choices && <button class="btn sm primary" onClick={() => answer(true)}><Icon name="check" />{q.yes}</button>}
       </div>
     </div>
   );
@@ -113,19 +128,18 @@ export function Thinking({ th }: { th: NonNullable<ChatItem['thinking']> }) {
   );
 }
 
-/** the turn goes on but nothing shows it yet (waiting for the model, between two steps) */
-export function Working() {
-  const secs = useElapsed(turnStart.value, true);
-  return <div class="activity running"><Icon name="spinner" />{t('assistant.thinking2')}<span class="faint mono">{secs} s</span></div>;
-}
+/** a duration as the activity lines show it: tenths under ten seconds */
+export const duration = (ms: number) => `${(ms < 10_000 ? (ms / 1000).toFixed(1) : String(Math.round(ms / 1000))).replace('.', locale === 'fr' ? ',' : '.')} s`;
 
-/** a tool the assistant runs: its line, and how far it is while it runs */
+/** a tool the assistant runs: its line, how far it is while it runs, how long it took once done */
 export function ToolLine({ tool }: { tool: NonNullable<ChatItem['tool']> }) {
   const run = !tool.done;
   const p = run ? tool.progress : undefined, pct = progressOf(tool);
   return (
     <div class={`activity${run ? ' running' : ''}`}>
       <Icon name={run ? 'spinner' : tool.error ? 'alert' : 'check'} />{tool.summary}
+      {!run && tool.ms !== undefined && <span class="tool-took mono">{duration(tool.ms)}</span>}
+      {tool.detail && <span class={`tool-detail${tool.error ? ' error' : ''}`} title={tool.detail}>{tool.detail}</span>}
       {p && <span class="tool-progress">{pct !== null && <span class="progress"><i style={{ width: `${pct}%` }} /></span>}<span class="mono">{[p.step, pct !== null ? `${pct} %` : ''].filter(Boolean).join(' ')}</span></span>}
     </div>
   );

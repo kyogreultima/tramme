@@ -116,6 +116,9 @@ function Preview() {
       <Row label={t('settings.playAtTheComposition')} hint={t('settings.likeTheExport24')}>
         <Toggle on={p.exactFrames} onChange={(v) => setPrefs({ exactFrames: v })} />
       </Row>
+      <Row label={t('settings.scrubAudio')} hint={t('settings.scrubAudioHint')}>
+        <Toggle on={p.scrubAudio} onChange={(v) => setPrefs({ scrubAudio: v })} />
+      </Row>
       <Row label={t('settings.playProxies')} hint={t('settings.playProxiesHint')}>
         <Toggle on={p.proxies} onChange={(v) => { setPrefs({ proxies: v }); void preview.useProxies(v); }} />
       </Row>
@@ -288,6 +291,24 @@ function Sound() {
   );
 }
 
+/** pictures made by a provider: what the generate-image tool takes when the ask names nothing */
+function Pictures() {
+  const p = prefs.value;
+  return (
+    <Section title={t('settings.pictures')} hint={t('settings.picturesHint')}>
+      <Row label={t('settings.pictureProvider')} hint={t('settings.pictureProviderHint')}>
+        <Select value={p.pictureProvider} options={[['auto', t('common.automatic')], ['openai', 'OpenAI'], ['gemini', 'Gemini'], ['zai', 'Z.AI'], ['hydracept', 'Hydracept']]} onChange={(v) => setPrefs({ pictureProvider: v as Preferences['pictureProvider'] })} />
+      </Row>
+      <Row label={t('settings.pictureQuality')} hint={t('settings.pictureQualityHint')}>
+        <Select value={p.pictureQuality} options={[['auto', t('settings.pictureQualityAuto')], ['low', t('settings.pictureQualityLow')], ['medium', t('settings.pictureQualityMedium')], ['high', t('settings.pictureQualityHigh')]]} onChange={(v) => setPrefs({ pictureQuality: v as Preferences['pictureQuality'] })} />
+      </Row>
+      <Row label={t('settings.pictureSize')} hint={t('settings.pictureSizeHint')}>
+        <Seg value={p.pictureSize} options={[['small', t('settings.pictureSizeSmall')], ['large', t('settings.pictureSizeLarge')]]} onChange={(v) => setPrefs({ pictureSize: v as Preferences['pictureSize'] })} />
+      </Row>
+    </Section>
+  );
+}
+
 function Tours() {
   const st = toursState.value;
   return (
@@ -446,6 +467,7 @@ const GROUPS: { title: () => string; panes: Pane[] }[] = [
       { id: 'appearance', icon: 'palette', title: () => t('settings.appearance'), body: Appearance },
       { id: 'preview', icon: 'eye', title: () => t('common.preview'), body: Preview },
       { id: 'sound', icon: 'audio', title: () => t('settings.sound'), body: Sound },
+      { id: 'pictures', icon: 'image', title: () => t('settings.pictures'), body: Pictures },
       { id: 'models', icon: 'download', title: () => t('localModels.title'), body: LocalModels },
       { id: 'plugins', icon: 'code', title: () => t('plugins.title'), body: Plugins },
       { id: 'tours', icon: 'help', title: () => t('common.guidedTours'), body: Tours },

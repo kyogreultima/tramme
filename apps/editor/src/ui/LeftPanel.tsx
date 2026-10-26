@@ -2,13 +2,17 @@
 
 import { signal } from '@preact/signals';
 import { Fragment } from 'preact';
-import { useRef, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { addLayer, applyOps, layerActive, moveLayer, pointer, propKind, removeLayer, staticValue, type Asset, type KeyframedProp, type Prop, type StaticProp, type Vec2, type TrammeDoc, type Layer, type NodeType, type Op, type PresetType, type TokenType } from '@tramme/core';
 import { clickSelect, comp, commit, foldAll, S, select, toggleFold, viewDoc, toast, uiTime } from '../state.ts';
 import { flatTree, freshId, layerName, shiftProp, parentOf, SOUND_GROUP, soundGroupOf, subtree, topLayers, commonStem, folderOf, imagesIn } from '../model.ts';
 import { ColorField, longPress, openMenu, Seg, Swatch, TextInput, resolveColor, type MenuItem } from './controls.tsx';
 import { Icon, kindColor, kindIcon } from './icons.tsx';
 import { preview } from '../preview.ts';
+import { manifestOf } from '@tramme/project';
+import { copiesIn } from '../installed.ts';
+import { packBySrc, packIdOf, packUpdates, shippedPacks, type PackEntry, type PackUpdate } from '../packs.ts';
+import { api } from '../api.ts';
 import { fromLottie } from '@tramme/interop';
 import { mediaOf, TranscribeButton, transcribeItem } from './Transcribe.tsx';
 import { safeName, takenPaths, upload } from '../files.ts';
@@ -570,6 +574,25 @@ function Assets() {
   const doc = viewDoc.value;
   const [over, setOver] = useState(false);
   const input = useRef<HTMLInputElement>(null);
+  // a copy of a shipped pack older than the editor's: offered its update, the way an installed plugin's copy is
+  const [updates, setUpdates] = useState<PackUpdate[]>([]);
+  // read again only when the modules or their recorded versions change, not on every edit; a read overtaken by a newer one is dropped
+  const modulesKey = JSON.stringify([Object.entries(doc.assets).filter(([, a]) => a.type === 'module').map(([id, a]) => [id, a.src]), doc.meta.installedCopies ?? null]);
+  useEffect(() => {
+    let live = true;
+    void (async () => {
+      try {
+        const packs = await shippedPacks();
+        const versions: Record<string, string> = {};
+        for (const a of Object.values(doc.assets)) {
+          if (a.type !== 'module' || !packBySrc(packs, a.src)) continue;
+          try { versions[a.src!] = manifestOf((await api.readText(S.project.peek().id, a.src!))?.text ?? '', a.src!).version; } catch { /* unread: no offer */ }
+        }
+        if (live) setUpdates(packUpdates(doc, packs, versions));
+      } catch { /* no packs: no offers */ }
+    })();
+    return () => { live = false; };
+  }, [modulesKey]);
   const byType = new Map<string, [string, Asset][]>();
   for (const e of Object.entries(doc.assets)) { if (!byType.has(e[1].type)) byType.set(e[1].type, []); byType.get(e[1].type)!.push(e); }
   const url = (id: string) => { try { return preview.renderer?.assets.url(id) ?? ''; } catch { return ''; } };
@@ -610,6 +633,12 @@ function Assets() {
                 {a.type !== 'image' && (a.type === 'font' ? <span style={{ fontFamily: `"${a.family}"`, color: 'var(--text)', fontSize: 13 }}>Aa</span> : <Icon name={ASSET_ICON[a.type]} />)}
               </span>
               <span class="name">{a.name || id}</span>
+              {updates.filter((u) => u.assetId === id).map((u) => (
+                <button key={u.to} class="btn sm" title={t('panel.packOlderHere', { from: u.from, to: u.to })}
+                  onClick={() => takeUpdate(u).catch((x) => toast(t('panel.couldNotUpdatePack', { error: (x as Error).message }), 'error', 9000))}>
+                  {t('panel.updateTo', { version: u.to })}
+                </button>
+              ))}
               {a.type === 'audio' || a.type === 'video' ? <TranscribeButton asset={id} small /> : <span class="meta mono">{id}</span>}
             </div>
           ))}
@@ -621,14 +650,8 @@ function Assets() {
   );
 }
 
-// ── the plugin packs shipped with the editor ─────────────────
-interface Pack { file: string; name: string; description?: string }
-let packsCache: Pack[] | null = null;
-const shippedPacks = async (): Promise<Pack[]> =>
-  packsCache ??= await fetch('/plugins/index.json').then((r) => (r.ok ? r.json() : [])).catch(() => []);
-
 /** the shipped packs, one click each: the file enters the project, the document loads it */
-async function addPack(p: Pack) {
+async function addPack(p: PackEntry) {
   const text = await fetch(`/plugins/${p.file}`).then((r) => {
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     return r.text();
@@ -642,7 +665,16 @@ async function addPack(p: Pack) {
   commit(t('panel.packAdded', { name: p.name }), ops);
 }
 
-async function packMenu(e: MouseEvent, add: (p: Pack) => Promise<void>) {
+/** the shipped version put in the open project in place of its older copy (asked, never applied alone), its version recorded as an installed plugin's copy keeps its own */
+async function takeUpdate(u: PackUpdate) {
+  const text = await fetch(`/plugins/${u.file}`).then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.text(); });
+  await api.write(S.project.peek().id, u.src, new Blob([text], { type: 'text/javascript; charset=utf-8' }), { type: 'text/javascript; charset=utf-8' });
+  const doc = S.doc.peek(), copies = { ...copiesIn(doc), [packIdOf(u.file)]: u.to };
+  const ops: Op[] = [{ op: doc.meta.installedCopies === undefined ? 'add' : 'replace', path: '/meta/installedCopies', value: copies }];
+  if (commit(t('panel.packUpdated', { name: u.name, version: u.to }), ops)) await preview.reload([u.assetId]);
+}
+
+async function packMenu(e: MouseEvent, add: (p: PackEntry) => Promise<void>) {
   const packs = await shippedPacks();
   openMenu(e, packs.length
     ? packs.map((p): MenuItem => ({ label: p.name, icon: 'plus', onClick: () => add(p).catch((x) => toast(t('panel.couldNotAddPack', { error: (x as Error).message }), 'error', 9000)) }))

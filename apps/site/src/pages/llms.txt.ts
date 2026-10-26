@@ -1,4 +1,4 @@
-// The site for language models (llmstxt.org): what tramme is, where to use
+// The site for language models (llmstxt.org): what Tramme is, where to use
 // it, and the docs pages in the sidebar's order, each with its description
 
 import type { APIRoute } from 'astro';

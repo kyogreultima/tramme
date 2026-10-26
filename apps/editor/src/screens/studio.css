@@ -14,7 +14,7 @@
 .studio-stage { position: relative; flex: 1; min-height: 0; overflow: hidden; background: var(--stage); border-radius: var(--r-lg); box-shadow: var(--shadow-1); }
 .studio-stage .viewport { position: absolute; inset: 0; background: transparent; }
 .studio-stage .viewport .stage { cursor: crosshair; }
-/* tramme at work: a ring of accent breathes around the picture (the picture itself does not move) */
+/* Tramme at work: a ring of accent breathes around the picture (the picture itself does not move) */
 .studio-stage.working .viewport canvas.picture { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 6px; animation: ring 1.6s var(--ease) infinite; }
 @keyframes ring { 50% { outline-color: var(--accent-soft); } }
 /* a take on screen: the picture framed by a steady accent line */
@@ -34,6 +34,7 @@
 .pill .mono { font-size: var(--fs-xs); }
 .pill-stop { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; border: 0; flex: none; background: var(--field-active); color: var(--text); }
 .pill-stop:hover { background: var(--danger); color: var(--on-danger); }
+.pill-stop.pause:hover { background: var(--field-hover); color: var(--text); }
 .pill-stop svg.i { width: 11px; height: 11px; fill: currentColor; stroke: none; }
 .take-pill { padding-left: 14px; }
 .take-pill .take-label { max-width: 260px; }
@@ -162,14 +163,7 @@ button.ctx-chip:hover { background: var(--field-hover); color: var(--text); }
 
 /* ── the direction ─────────────────────────────────────────── */
 .direction { display: flex; flex-direction: column; gap: 24px; padding: 16px 16px 28px; }
-.dir-film { padding: 16px; border-radius: var(--r-lg); background: var(--surface-2); }
-.dir-kicker { display: flex; align-items: center; gap: 6px; color: var(--accent-text); font: 600 var(--fs-xs)/1 var(--ui); letter-spacing: 0.02em; }
-.dir-kicker svg.i { width: 12px; height: 12px; }
-.dir-film h3 { margin: 8px 0 6px; font-size: var(--fs-xl); letter-spacing: -0.01em; }
-.dir-film p { margin: 0; color: var(--text-2); font-size: var(--fs-md); line-height: var(--lh-text); user-select: text; }
-.dir-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
 .dir-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
-.dir-film .dir-actions { margin-top: 14px; }
 .dir-section { display: flex; flex-direction: column; gap: 10px; }
 .dir-head { display: flex; align-items: baseline; gap: 8px; }
 .dir-head h4 { margin: 0; font-size: var(--fs-md); }

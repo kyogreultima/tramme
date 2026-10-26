@@ -8,9 +8,10 @@ import type { ComponentChildren, RefObject } from 'preact';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { aiRoute } from '../ai/index.ts';
 import { running, runCommand, send, stop, type Anchor } from '../ai/conversation.ts';
-import { fieldsOf, inputOf, listCommands, matchCommands, parseCommand, ready, type Command, type Field } from '../ai/commands.ts';
+import { fieldsOf, inputOf, listCommands, matchCommands, parseCommand, ranked, ready, type Command, type Field } from '../ai/commands.ts';
 import { refreshLibrary } from '../library.ts';
 import { attachFiles, attaching, draft, pending, removePending } from '../attachments.ts';
+import { commandUsed, prefs } from '../settings.ts';
 import { S, toast } from '../state.ts';
 import { FileChip } from './chat.tsx';
 import { Select, Toggle } from './controls.tsx';
@@ -33,10 +34,10 @@ export function useCommandMenu(text: string, commands: Command[], onPick: (c: Co
   const [hi, setHi] = useState(0);
   const [off, setOff] = useState(false);
   const typing = /^\/([\w.-]*)$/.exec(text);
-  const found = typing && !off ? matchCommands(commands, typing[1], tr).slice(0, 30) : [];
+  const found = typing && !off ? ranked(matchCommands(commands, typing[1], tr), prefs.value.recentCommands, typing[1]).slice(0, 30) : [];
   const matches = [...found.filter((c) => c.kind === 'tool'), ...found.filter((c) => c.kind === 'prompt')];
   const open = matches.length > 0, at = Math.min(hi, matches.length - 1);
-  const pick = (c: Command) => { setHi(0); onPick(c); };
+  const pick = (c: Command) => { setHi(0); commandUsed(c.name); onPick(c); };
   const keyDown = (e: KeyboardEvent) => {
     if (!open) return false;
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') setHi((i) => (i + (e.key === 'ArrowDown' ? 1 : matches.length - 1)) % matches.length);
@@ -152,7 +153,7 @@ export function Composer({ placeholder, anchor, tools, context, onSent, area: gi
   const fields = cmd?.kind === 'tool' ? fieldsOf(cmd.input, S.doc.value, S.compId.value, reg, S.selection.value) : [];
   const input = inputOf(fields, values);
   const direct = cmd?.kind === 'tool' && !parsed!.rest && ready(fields, input);
-  const run = () => { if (!cmd || !direct || busy) return; setText(''); runCommand(cmd, input); onSent?.(); };
+  const run = () => { if (!cmd || !direct || busy) return; setText(''); commandUsed(cmd.name); runCommand(cmd, input); onSent?.(); };
   const submit = () => {
     const v = text.trim();
     if (!v && !pending.peek().length) return;
@@ -161,6 +162,8 @@ export function Composer({ placeholder, anchor, tools, context, onSent, area: gi
     if (/^\/[\w.-]+$/.test(v) && !cmd) { toast(t('assistant.noCommand')); return; }
     if (!available) return;
     setText('');
+    // a command typed whole and sent counts as used, as one picked from the menu
+    if (cmd) commandUsed(cmd.name);
     send(v, { command: cmd ? { cmd, input } : undefined, anchor: anchor?.() });
     onSent?.();
   };

@@ -2,37 +2,101 @@
   {
     "file": "charts.js",
     "name": "Charts",
-    "description": "Bar, line and donut charts from a data set, animated, with a layout tool and a readability check"
+    "description": "Bar, line and donut charts from a data set, animated, with a layout tool and a readability check",
+    "commands": [
+      {
+        "name": "chart",
+        "title": "Add a chart",
+        "description": "a bar, line, donut, race, scatter or function chart from a JSON data set of the project or from a CSV (separators, quotes and decimal commas read), sized and placed in the composition, with an optional title above it"
+      }
+    ],
+    "fr": {
+      "Add a chart": "Ajouter un graphique",
+      "a bar, line, donut, race, scatter or function chart from a JSON data set of the project or from a CSV (separators, quotes and decimal commas read), sized and placed in the composition, with an optional title above it": "un histogramme, une courbe, un anneau, une course, un nuage ou une fonction depuis un jeu de données JSON du projet ou depuis un CSV (séparateurs, guillemets et virgules décimales lus), dimensionné et placé dans la composition, avec un titre optionnel au-dessus"
+    },
+    "version": "1.1.0"
   },
   {
     "file": "kinetic.js",
     "name": "Kinetic type",
-    "description": "Text that moves letter by letter: typewriter, wave, scatter, drop, mask"
+    "description": "Text that moves letter by letter: typewriter, wave, scatter, drop, mask",
+    "commands": [],
+    "fr": {},
+    "version": "1.1.0"
   },
   {
     "file": "physics.js",
     "name": "Physics",
-    "description": "Confetti, bouncing balls, a rope, and letters that drop and settle — deterministic simulations"
+    "description": "Confetti, bouncing balls, a rope, and letters that drop and settle — deterministic simulations",
+    "commands": [],
+    "fr": {},
+    "version": "1.1.0"
   },
   {
     "file": "styk.js",
     "name": "Stick figures",
-    "description": "Pivot-style stick figures: fixed-length segments posed by joint angles, two-bone IK or stretch, with a walk cycle, a figure tool and a pose check"
+    "description": "Pivot-style stick figures: fixed-length segments posed by joint angles, two-bone IK or stretch, with a walk cycle, a figure tool and a pose check",
+    "commands": [
+      {
+        "name": "styk-figure",
+        "title": "Stick figure",
+        "description": "adds a Pivot-style stick figure layer: the blue man or the plain black one, or the man already walking (a 1 s walk cycle keyframed pose by pose), at a scale and a colour"
+      }
+    ],
+    "fr": {
+      "Stick figure": "Silhouette",
+      "adds a Pivot-style stick figure layer: the blue man or the plain black one, or the man already walking (a 1 s walk cycle keyframed pose by pose), at a scale and a colour": "ajoute un calque de silhouette à la Pivot : l'homme en bleu ou le noir et fin, ou l'homme déjà en marche (un pas d'1 s, posé keyframe par keyframe), à une échelle et une couleur"
+    },
+    "version": "1.0.0"
   },
   {
     "file": "walkthrough.js",
     "name": "UI walkthrough",
-    "description": "A phone or browser frame for screenshots, a clicking cursor, and a tool that lays the walkthrough out"
+    "description": "A phone or browser frame for screenshots, a clicking cursor, and a tool that lays the walkthrough out",
+    "commands": [
+      {
+        "name": "walkthrough",
+        "title": "Lay out a walkthrough",
+        "description": "a sequence of screenshots in a phone or a browser frame, one composition, a cut per screen, each with an optional caption and a slow scroll"
+      }
+    ],
+    "fr": {
+      "Lay out a walkthrough": "Monter une visite guidée",
+      "a sequence of screenshots in a phone or a browser frame, one composition, a cut per screen, each with an optional caption and a slow scroll": "une suite de captures dans un cadre de téléphone ou de navigateur, une composition, une coupe par écran, chacune avec une légende optionnelle et un défilement lent"
+    },
+    "version": "1.1.0"
   },
   {
     "file": "a11y.js",
     "name": "Accessibility checks",
-    "description": "Text size, contrast, blinking and time-to-read, checked with the others"
+    "description": "Text size, contrast, blinking and time-to-read, checked with the others",
+    "commands": [],
+    "fr": {},
+    "version": "1.0.0"
   },
   {
     "file": "localize.js",
     "name": "Localization",
-    "description": "Captions and shorts in other languages: the assistant translates, the tools retime and duplicate"
+    "description": "Captions and shorts in other languages: the assistant translates, the tools retime and duplicate",
+    "commands": [
+      {
+        "name": "localize",
+        "title": "Prepare a translation",
+        "description": "cuts a transcript into numbered sentences for the model to translate: the answer says what to hand back to localize-apply"
+      },
+      {
+        "name": "localize-apply",
+        "title": "Apply a translation",
+        "description": "a translated array of sentences becomes a transcript asset retimed over the original, and the compositions captioning the original are duplicated for the language"
+      }
+    ],
+    "fr": {
+      "Prepare a translation": "Préparer une traduction",
+      "cuts a transcript into numbered sentences for the model to translate: the answer says what to hand back to localize-apply": "découpe une transcription en phrases numérotées pour que le modèle les traduise : la réponse dit quoi rendre à localize-apply",
+      "Apply a translation": "Appliquer une traduction",
+      "a translated array of sentences becomes a transcript asset retimed over the original, and the compositions captioning the original are duplicated for the language": "une liste de phrases traduites devient un actif de transcription recalé sur l'original, et les compositions qui sous-titrent l'original sont dupliquées pour la langue"
+    },
+    "version": "1.0.0"
   },
   {
     "file": "icons.js",
@@ -40,11 +104,235 @@
     "description": "Lucide icons as editable stroke groups, found by name, tag or words, laid in a row, a grid or a list, drawing themselves in the film's colours",
     "data": [
       "lucide.json"
-    ]
+    ],
+    "commands": [
+      {
+        "name": "icon",
+        "title": "Icons",
+        "description": "finds pictograms by name, tag or a few words and lays them as editable stroke groups: a row, a grid, or one beside each line of a list; when the words are vague, the candidates come back as a contact sheet"
+      }
+    ],
+    "fr": {
+      "Icons": "Icônes",
+      "finds pictograms by name, tag or a few words and lays them as editable stroke groups: a row, a grid, or one beside each line of a list; when the words are vague, the candidates come back as a contact sheet": "trouve des pictogrammes par nom, étiquette ou quelques mots et les pose en groupes de traits éditables : en ligne, en grille, ou à côté de chaque ligne d'une liste ; quand les mots sont vagues, les candidates reviennent en planche"
+    },
+    "version": "1.0.0"
   },
   {
     "file": "diagram.js",
     "name": "Diagrams",
-    "description": "Flows, architectures, cycles and trees from flowchart text (a Mermaid subset), laid out layered, ring or hub, drawn as editable boxes and self-drawing edges, with a legibility check"
+    "description": "Flows, architectures, cycles and trees from flowchart text (a Mermaid subset), laid out layered, ring or hub, drawn as editable boxes and self-drawing edges, with a legibility check",
+    "commands": [
+      {
+        "name": "diagram",
+        "title": "Diagram",
+        "description": "a flow, architecture, cycle or tree written as flowchart text (a Mermaid subset) or JSON, laid out layered, ring or hub, and built as editable boxes, labels and edges that draw themselves in reading order; one route can be highlighted"
+      }
+    ],
+    "fr": {
+      "Diagram": "Diagramme",
+      "a flow, architecture, cycle or tree written as flowchart text (a Mermaid subset) or JSON, laid out layered, ring or hub, and built as editable boxes, labels and edges that draw themselves in reading order; one route can be highlighted": "un flux, une architecture, un cycle ou un arbre écrit en texte flowchart (un sous-ensemble de Mermaid) ou JSON, disposé en couches, anneau ou étoile, et construit en boîtes, libellés et arêtes éditables qui se tracent dans l'ordre de lecture ; une route peut être mise en avant"
+    },
+    "version": "1.0.0"
+  },
+  {
+    "file": "codeview.js",
+    "name": "Code view",
+    "description": "Code and a terminal on screen: a lexer's colours, typing at a human rhythm, a change between two versions, a session that runs",
+    "version": "1.0.0",
+    "commands": [
+      {
+        "name": "code-screen",
+        "title": "Show code on screen",
+        "description": "code or a terminal session in a window frame, typed at a readable rhythm, the lines that matter highlighted, a long file cut to what fits"
+      }
+    ],
+    "fr": {
+      "Show code on screen": "Montrer du code à l’écran",
+      "code or a terminal session in a window frame, typed at a readable rhythm, the lines that matter highlighted, a long file cut to what fits": "du code ou une session de terminal dans un cadre de fenêtre, tapé à un rythme lisible, les lignes qui comptent soulevées, un long fichier coupé à ce qui tient"
+    }
+  },
+  {
+    "file": "rhythm.js",
+    "name": "Rhythm",
+    "description": "Rhythm and coherence checks: cuts off the beat, even shots, a palette drifting off the tokens, near-duplicate type sizes",
+    "version": "1.0.0",
+    "commands": [],
+    "fr": {}
+  },
+  {
+    "file": "screencast.js",
+    "name": "Screencast",
+    "description": "Screen recordings played as product films: the picture zooms where things happen, out before each page change, clicks marked with a ripple",
+    "version": "1.0.0",
+    "commands": [
+      {
+        "name": "screencast",
+        "title": "Play a screen recording",
+        "description": "a recording as a product film: the picture zooms where things happen and out before each page change, a click found is marked with the cursor's ripple"
+      }
+    ],
+    "fr": {
+      "Play a screen recording": "Jouer une capture d’écran",
+      "a recording as a product film: the picture zooms where things happen and out before each page change, a click found is marked with the cursor's ripple": "une capture jouée comme un film produit : l’image zoome là où ça se passe et dézoome avant chaque changement de page, un clic repéré est marqué de l’onde du curseur"
+    }
+  },
+  {
+    "file": "handmade.js",
+    "name": "Handmade",
+    "description": "Made by hand: strokes that boil, motion on twos, rough sketches and annotations drawn around what matters",
+    "data": [
+      "Caveat-Medium.woff2"
+    ],
+    "version": "1.0.0",
+    "commands": [
+      {
+        "name": "annotate",
+        "title": "Annotate a layer",
+        "description": "a rough circle, underline, box, highlight, strike or bracket around a layer, drawn on a beat after it lands, following it when it moves"
+      }
+    ],
+    "fr": {
+      "Annotate a layer": "Annoter une couche",
+      "a rough circle, underline, box, highlight, strike or bracket around a layer, drawn on a beat after it lands, following it when it moves": "un cercle, un souligné, un cadre, un surlignage, une rature ou un crochet dessinés autour d’une couche, tracés un temps après qu’elle est posée, qui la suivent quand elle bouge"
+    }
+  },
+  {
+    "file": "chat.js",
+    "name": "Chat",
+    "description": "Conversations for short videos: a script timed by reading, bubbles entering, typing indicators, the thread scrolling; notifications for the cold open",
+    "version": "1.0.0",
+    "commands": [
+      {
+        "name": "chat",
+        "title": "Play a conversation",
+        "description": "a text-message story timed by reading: bubbles entering, typing indicators, the thread scrolling — in the walkthrough pack's phone, or full frame in 9:16"
+      }
+    ],
+    "fr": {
+      "Play a conversation": "Jouer une conversation",
+      "a text-message story timed by reading: bubbles entering, typing indicators, the thread scrolling — in the walkthrough pack's phone, or full frame in 9:16": "une histoire en messages chronométrée à la lecture : des bulles qui entrent, des indicateurs de saisie, le fil qui défile — dans le téléphone du pack visite guidée, ou plein cadre en 9:16"
+    }
+  },
+  {
+    "file": "emoji.js",
+    "name": "Emoji",
+    "description": "Emoji as pictures: the 300 most used (Fluent Emoji Flat, MIT) shipped as SVG, found by name or character, drawing the same on every machine",
+    "data": [
+      "index.json"
+    ],
+    "version": "1.0.0",
+    "commands": [
+      {
+        "name": "emoji",
+        "title": "Place an emoji",
+        "description": "one or several emoji as picture layers, found by name or by the character itself, the files they use copied into the project so they draw the same everywhere"
+      }
+    ],
+    "fr": {
+      "Place an emoji": "Placer un emoji",
+      "one or several emoji as picture layers, found by name or by the character itself, the files they use copied into the project so they draw the same everywhere": "un ou plusieurs emoji comme couches d’image, trouvés par nom ou par le caractère lui-même, les fichiers utilisés copiés dans le projet pour qu’ils se dessinent pareil partout"
+    }
+  },
+  {
+    "file": "maps.js",
+    "name": "Maps",
+    "description": "Maps, offline: Natural Earth shipped beside the pack, places found by name, great circles and a smooth zoom for the flights",
+    "data": [
+      "countries-110m.json",
+      "countries-50m.json",
+      "regions-50m.json",
+      "places.json"
+    ],
+    "version": "1.0.0",
+    "commands": [
+      {
+        "name": "map",
+        "title": "Draw a map",
+        "description": "places named in words found offline among the shipped places and countries, the projection and the framing chosen from what is shown, the project holding only the shapes the map shows"
+      }
+    ],
+    "fr": {
+      "Draw a map": "Dessiner une carte",
+      "places named in words found offline among the shipped places and countries, the projection and the framing chosen from what is shown, the project holding only the shapes the map shows": "des lieux nommés en mots, trouvés hors ligne parmi les lieux et pays livrés, la projection et le cadrage choisis d’après ce qui est montré, le projet ne tenant que les formes que la carte montre"
+    }
+  },
+  {
+    "file": "audiogram.js",
+    "name": "Audiogram",
+    "description": "Audiograms: the wave of a sound moving with the voice, a cover, a name, a progress bar — a clip for the feeds",
+    "version": "1.0.0",
+    "commands": [
+      {
+        "name": "audiogram",
+        "title": "Make an audiogram",
+        "description": "an extract of a podcast or an interview as a clip: the cover, the name, the wave moving with the voice, the words said, a progress bar — laid out for the format"
+      }
+    ],
+    "fr": {
+      "Make an audiogram": "Faire un audiogramme",
+      "an extract of a podcast or an interview as a clip: the cover, the name, the wave moving with the voice, the words said, a progress bar — laid out for the format": "un extrait de podcast ou d’entretien en clip : la pochette, le nom, l’onde qui bouge avec la voix, les mots dits, une barre de progression — disposé pour le format"
+    }
+  },
+  {
+    "file": "math.js",
+    "name": "Math",
+    "description": "Formulas: a TeX subset laid out glyph by glyph in STIX Two Math, written on or changing like a proof on a board",
+    "data": [
+      "glyphs.json"
+    ],
+    "version": "1.0.0",
+    "commands": [
+      {
+        "name": "formula",
+        "title": "Show a formula",
+        "description": "a TeX formula laid out in STIX Two Math, written on or changing into a second one, the font's glyph table copied into the project so it draws the same everywhere"
+      }
+    ],
+    "fr": {
+      "Show a formula": "Montrer une formule",
+      "a TeX formula laid out in STIX Two Math, written on or changing into a second one, the font's glyph table copied into the project so it draws the same everywhere": "une formule TeX disposée en STIX Two Math, écrite ou changeant en une seconde, la table de glyphes de la police copiée dans le projet pour qu’elle se dessine pareil partout"
+    }
+  },
+  {
+    "file": "matter.js",
+    "name": "Matter",
+    "description": "Morphs, liquids and paper: one shape becoming another without twisting, seeded blobs, a torn sheet crossing the frame",
+    "version": "1.0.0",
+    "commands": [],
+    "fr": {}
+  },
+  {
+    "file": "print.js",
+    "name": "Print",
+    "description": "Print looks: halftone, riso inks, grain and duotone — as GLSL passes and stacked presets",
+    "version": "1.0.0",
+    "commands": [],
+    "fr": {}
+  },
+  {
+    "file": "qr.js",
+    "name": "QR codes",
+    "description": "QR codes written in the pack's own code: square, rounded or dotted modules, a logo in the middle, revealed module by module, a check for what a phone cannot scan",
+    "version": "1.0.0",
+    "commands": [],
+    "fr": {}
+  },
+  {
+    "file": "extrude.js",
+    "name": "Logos in 3D",
+    "description": "Logos in 3D: the path layers of a logo extruded with a bevel into a .glb, turning under the built-in 3D model layer",
+    "version": "1.0.0",
+    "commands": [
+      {
+        "name": "extrude",
+        "title": "Extrude a logo in 3D",
+        "description": "the path layers of a logo or an icon (a group from the svg-paths tool, or one path) extruded with a bevel into a .glb model, drawn by the built-in 3D model layer turning on its turntable"
+      }
+    ],
+    "fr": {
+      "Extrude a logo in 3D": "Extruder un logo en 3D",
+      "the path layers of a logo or an icon (a group from the svg-paths tool, or one path) extruded with a bevel into a .glb model, drawn by the built-in 3D model layer turning on its turntable": "les couches de tracé d’un logo ou d’une icône (un groupe de l’outil svg-paths, ou un seul tracé) extrudées avec un biseau en un modèle .glb, dessiné par la couche de modèle 3D intégrée qui tourne sur son plateau"
+    }
   }
 ]

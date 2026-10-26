@@ -44,7 +44,7 @@ class Exporter {
 
   // ── properties ─────────────────────────────────────────────
   /**
-   * A Lottie property from an tramme one: keyframes as keyframes when they
+   * A Lottie property from a Tramme one: keyframes as keyframes when they
    * are plain, a baked track otherwise, a static value when nothing moves.
    */
   prop(compId: string, address: string, raw: unknown, def: PropDef, map: (v: unknown) => number[] | number, range: [number, number], spatial = false): Json {

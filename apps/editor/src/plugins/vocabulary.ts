@@ -68,7 +68,7 @@ export async function attachIsolated(registry: Registry, host: PluginHost, doc: 
  * step 3): loaded in the project's sandbox only, never on the page, and
  * offered through the registry as the project's own are: their tools and
  * checks bridged there, their workflows, kits and presets as the plain data
- * the sandbox declares. What the registry has already (tramme's, the
+ * the sandbox declares. What the registry has already (Tramme's, the
  * project's plugins) wins: a name is never taken from them, so a project
  * opens the same on any device. Their nodes, effects and modifiers draw
  * only once copied into a project (step 4). Idempotent per registry and url,

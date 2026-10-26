@@ -226,7 +226,7 @@ const rope = {
 
 const textDrop = {
   type: 'phys.text-drop', title: 'Text drop', category: 'Physics',
-  ai: { when: 'a word that lands (a punchline, a brand): the letters fall, bounce once and settle into the line', avoid: 'more than about 20 characters (the wait gets longer than the joke), a drop taller than the frame' },
+  ai: { when: 'a word that lands (a punchline, a brand): the letters fall, knock into each other and pile up the way they land', avoid: 'more than about 12 characters (the pile gets taller than the joke), a drop taller than the frame' },
   props: {
     text: { type: 'text', default: 'BOOM', label: 'Text', animatable: false },
     size: { type: 'number', default: 220, min: 4, unit: 'px', label: 'Size' },
@@ -240,33 +240,20 @@ const textDrop = {
   bounds(p) { return { x: -p.size * 1.6, y: -p.size * (1 + p.height), w: p.size * 3.2, h: p.size * (2 + p.height) }; },
   simulate: {
     init(p, host) {
-      const chars = [...String(p.text ?? '')];
-      return {
-        chars: chars.map((_, i) => ({ y: -p.height * (1 + i * 0.06), v: 0, rot: 0, vr: 0, started: i * p.per, landed: false })),
-        t: 0,
-      };
+      // the letters are bodies now: they knock into each other and pile up
+      const widths = [...String(p.text ?? '')].map(() => p.size * 0.62);
+      return { widths, world: dropWorld(p, widths), t: 0, started: [...String(p.text ?? '')].map((_, i) => i * p.per) };
     },
     step(state, p, dt) {
       const t = state.t + dt;
-      const chars = state.chars.map((c) => ({ ...c }));
-      for (let i = 0; i < chars.length; i++) {
-        const c = chars[i];
-        if (t < c.started) continue;
-        if (!c.landed) {
-          c.v += 2600 * dt;
-          c.y += c.v * dt;
-          c.rot = clamp(c.rot + c.vr * dt, -0.35, 0.35);
-          if (c.y >= 0) {
-            c.y = 0;
-            if (Math.abs(c.v) > 140) { c.v = -c.v * p.bounciness; c.vr = (i % 2 ? 1 : -1) * Math.abs(c.v) * 0.0012; }
-            else { c.landed = true; c.v = 0; }
-          }
-        } else {
-          // settled: the little leftover rotation eases out
-          c.rot *= 1 - Math.min(1, 8 * dt);
-        }
-      }
-      return { chars, t };
+      // the letters still waiting hang where they started; the fallen ones are the engine's
+      const bodies = state.world.bodies.map((b) => {
+        if (b.id === 'floor') return b;
+        const i = Number(String(b.id).slice(2));
+        if (t < state.started[i]) return { ...b, homeX: b.homeX ?? b.x, homeY: b.homeY ?? b.y, x: b.homeX ?? b.x, y: b.homeY ?? b.y, vx: 0, vy: 0 };
+        return b;
+      });
+      return { ...state, world: stepWorld({ gravity: state.world.gravity, bodies }, Math.min(1 / 30, dt)), t };
     },
   },
   render: {
@@ -281,18 +268,19 @@ const textDrop = {
       ctx.fillStyle = p.color;
       ctx.textBaseline = 'alphabetic';
       const chars = [...text];
-      const widths = chars.map((ch) => ctx.measureText(ch).width);
+      const widths = s.widths ?? chars.map(() => p.size * 0.62);
       const total = widths.reduce((a, b) => a + b, 0);
       let x = -total / 2;
       chars.forEach((ch, i) => {
-        const c = s.chars[i];
+        const b = s.world?.bodies?.[i];
         const w = widths[i];
-        if (!c || s.t >= c.started) {
-          const y = c ? c.y : 0, rot = c ? c.rot : 0;
+        // a letter shows once its fall has started (the ones still waiting are not hung in the air)
+        if (b && s.t >= (s.started?.[i] ?? 0)) {
           ctx.save();
-          ctx.translate(x + w / 2, y);
-          ctx.rotate(rot);
-          ctx.fillText(ch, -w / 2, 0);
+          ctx.translate(b.x, b.y);
+          ctx.rotate(b.angle || 0);
+          ctx.textAlign = 'center';
+          ctx.fillText(ch, 0, p.size * 0.47);
           ctx.restore();
         }
         x += w;
@@ -301,8 +289,251 @@ const textDrop = {
   },
 };
 
-export const meta = { id: 'tramme/physics', name: 'physics', version: '1.0.0', description: 'Confetti, bouncing balls, a rope and letters that drop: four simulated nodes', api: 1 };
-export const nodes = [confetti, bounce, rope, textDrop];
+// ── 1.1: the rigid bodies ────────────────────────────────────
+const RAD = Math.PI / 180;
+
+/** a body's outline in world space, its corners turned by its angle */
+function outline(b) {
+  if (b.kind === 'circle') return null;
+  let pts = b.verts;
+  if (!pts && b.w !== undefined) pts = [[-b.w / 2, -b.h / 2], [b.w / 2, -b.h / 2], [b.w / 2, b.h / 2], [-b.w / 2, b.h / 2]];
+  if (!pts) return [];
+  const c = Math.cos(b.angle || 0), s = Math.sin(b.angle || 0);
+  return pts.map(([x, y]) => [b.x + x * c - y * s, b.y + x * s + y * c]);
+}
+
+/** the closest point of a segment ab to p, with the segment's normal facing p */
+function closestOnSeg(p, a, b) {
+  const abx = b[0] - a[0], aby = b[1] - a[1];
+  const len2 = abx * abx + aby * aby || 1e-9;
+  const u = Math.max(0, Math.min(1, ((p[0] - a[0]) * abx + (p[1] - a[1]) * aby) / len2));
+  return [a[0] + abx * u, a[1] + aby * u];
+}
+
+/** one contact between two bodies, or null: circle-circle, circle-shape, shape-shape (the deepest vertex of A in B, then of B in A) */
+function contact(a, b) {
+  if (a.kind === 'circle' && b.kind === 'circle') {
+    const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy) || 1e-9, pen = a.r + b.r - d;
+    if (pen <= 0) return null;
+    return { nx: dx / d, ny: dy / d, pen, px: a.x + (dx / d) * a.r, py: a.y + (dy / d) * a.r };
+  }
+  const circle = a.kind === 'circle' ? [a, b, 1] : b.kind === 'circle' ? [b, a, -1] : null;
+  if (circle) {
+    const [c, poly, flip] = circle;
+    const pts = outline(poly);
+    let best = null, bestD = -Infinity;
+    for (let i = 0; i < pts.length; i++) {
+      const p = closestOnSeg([c.x, c.y], pts[i], pts[(i + 1) % pts.length]);
+      const dx = c.x - p[0], dy = c.y - p[1], d = Math.hypot(dx, dy) || 1e-9;
+      const pen = c.r - d;
+      if (pen > bestD) { bestD = pen; best = { nx: dx / d, ny: dy / d, pen, px: p[0], py: p[1] }; }
+    }
+    if (!best || best.pen <= 0) return null;
+    return flip > 0 ? { nx: -best.nx, ny: -best.ny, pen: best.pen, px: best.px, py: best.py } : best;
+  }
+  // shape-shape: SAT over the faces of both — the least-overlap axis is the
+  // normal, the contact the deepest vertices of the other clipped to the face
+  const satFace = (P, Q) => {
+    const ps = outline(P), qs = outline(Q);
+    if (!ps.length || !qs.length) return null;
+    let best = null;
+    for (let i = 0; i < ps.length; i++) {
+      const a2 = ps[i], b2 = ps[(i + 1) % ps.length];
+      const ex = b2[0] - a2[0], ey = b2[1] - a2[1];
+      const nl = Math.hypot(ey, -ex) || 1e-9;
+      const nx = ey / nl, ny = -ex / nl;
+      let minQ = Infinity, maxQ = -Infinity, minP = Infinity;
+      for (const [vx, vy] of ps) { const d = (vx - a2[0]) * nx + (vy - a2[1]) * ny; if (d < minP) minP = d; }
+      for (const [vx, vy] of qs) { const d = (vx - a2[0]) * nx + (vy - a2[1]) * ny; if (d < minQ) minQ = d; if (d > maxQ) maxQ = d; }
+      // Q is behind P's face by -minQ when minQ < 0
+      if (minQ > 0) return null; // Q entirely outside this face: no contact
+      const depth = -minQ;
+      if (!best || depth < best.depth) best = { depth, nx, ny, a2 }; // SAT: the least-overlap axis
+      void maxQ;
+    }
+    return best;
+  };
+  const fa = satFace(a, b), fb = satFace(b, a);
+  if (!fa || !fb) return null;
+  // the axis of least penetration carries the contact; the normal faces from A toward B
+  const ref = fa.depth <= fb.depth ? { ...fa, flip: 1 } : { ...fb, flip: -1 };
+  const incident = ref.flip > 0 ? outline(b) : outline(a);
+  // the deepest vertices of the other shape behind the reference face, clipped to it
+  const deep = incident.map(([vx, vy]) => ({ vx, vy, d: (vx - ref.a2[0]) * ref.nx + (vy - ref.a2[1]) * ref.ny }))
+    .filter((x) => x.d < 0.5).sort((x, y) => x.d - y.d).slice(0, 2);
+  if (!deep.length) return null;
+  const nx = ref.nx * ref.flip, ny = ref.ny * ref.flip;
+  const best = { nx, ny, pen: ref.depth, px: deep[0].vx, py: deep[0].vy };
+  best.twin = deep[1] ? { px: deep[1].vx, py: deep[1].vy } : null;
+  return best;
+}
+
+/**
+ * The world one step on, a new object every time: the bodies fall, meet, and
+ * the impulses solve them — a normal push with restitution, a tangential one
+ * with friction, a body slow for a while put to sleep. Pure: the same world
+ * and dt give the same answer, so frame 90 is the same reached directly or
+ * frame by frame.
+ */
+export function stepWorld(world, dt) {
+  const g = world.gravity ?? [0, 900];
+  const bodies = world.bodies.map((b) => ({ vx: 0, vy: 0, va: 0, angle: 0, ...b, asleep: false }));
+  for (const b of bodies) {
+    if (b.static) continue;
+    b.vx += g[0] * dt;
+    b.vy += g[1] * dt;
+    const damp = 1 - Math.min(0.2, 0.6 * dt);
+    b.vx *= damp;
+    b.vy *= damp;
+    b.va = (b.va || 0) * (1 - Math.min(0.2, 1.2 * dt));
+    b.x += b.vx * dt;
+    b.y += b.vy * dt;
+    b.angle = (b.angle || 0) + (b.va || 0) * dt;
+  }
+  const iterations = 10;
+  for (let it = 0; it < iterations; it++) {
+    for (let i = 0; i < bodies.length; i++) {
+      for (let j = i + 1; j < bodies.length; j++) {
+        const A = bodies[i], B = bodies[j];
+        if (A.static && B.static) continue;
+        const one = contact(A, B);
+        const cs = one ? [one, ...(one.twin ? [{ ...one, px: one.twin.px, py: one.twin.py }] : [])] : [];
+        for (const c of cs) {
+        const rax = c.px - A.x, ray = c.py - A.y, rbx = c.px - B.x, rby = c.py - B.y;
+        const relX = B.vx - (B.va || 0) * rby - (A.vx - (A.va || 0) * ray);
+        const relY = B.vy + (B.va || 0) * rbx - (A.vy + (A.va || 0) * rax);
+        const vn = relX * c.nx + relY * c.ny;
+        const invA = A.static ? 0 : 1 / (A.mass || 1), invB = B.static ? 0 : 1 / (B.mass || 1);
+        const invIA = A.static || !A.w && !A.verts ? 0 : 1 / (A.inertia || 1), invIB = B.static || !B.w && !B.verts ? 0 : 1 / (B.inertia || 1);
+        if (vn < 0) {
+          const e = Math.min(A.restitution ?? 0.2, B.restitution ?? 0.2) * (Math.abs(vn) > 40 ? 1 : 0);
+          const jn = (-(1 + e) * vn) / (invA + invB + invIA * (rax * c.ny - ray * c.nx) ** 2 + invIB * (rbx * c.ny - rby * c.nx) ** 2 || 1e-9);
+          const ix = jn * c.nx, iy = jn * c.ny;
+          A.vx -= ix * invA; A.vy -= iy * invA; A.va = (A.va || 0) - invIA * (rax * iy - ray * ix);
+          B.vx += ix * invB; B.vy += iy * invB; B.va = (B.va || 0) + invIB * (rbx * iy - rby * ix);
+          // the friction: a tangential push clamped by the cone
+          const tx = -c.ny, ty = c.nx;
+          const vt = (B.vx - B.va * rby - (A.vx - A.va * ray)) * tx + (B.vy + B.va * rbx - (A.vy + A.va * rax)) * ty;
+          const mu = Math.min(A.friction ?? 0.4, B.friction ?? 0.4);
+          let jt = -vt / (invA + invB + 1e-9);
+          jt = Math.max(-mu * Math.abs(jn), Math.min(mu * Math.abs(jn), jt));
+          A.vx -= jt * tx * invA; A.vy -= jt * ty * invA;
+          B.vx += jt * tx * invB; B.vy += jt * ty * invB;
+          // positional correction, Baumgarte-style: the overlap eased out
+          const percent = 0.22, slop = 0.6;
+          // the pair's correction is shared by its contact points, or two points push twice
+          const corr = (Math.max(0, c.pen - slop) / (invA + invB || 1)) * percent / Math.max(1, cs.length);
+          A.x -= c.nx * corr * invA; A.y -= c.ny * corr * invA;
+          B.x += c.nx * corr * invB; B.y += c.ny * corr * invB;
+        }
+        }
+      }
+    }
+  }
+  // the sleep: a body slower than the floor for a while stops being moved
+  for (const b of bodies) {
+    if (b.static) continue;
+    const slow = Math.hypot(b.vx, b.vy) < 26 && Math.abs(b.va || 0) < 0.2;
+    b.still = slow ? (b.still ?? 0) + dt : 0;
+    // a slow body in contact stops spinning: the stacks keep their faces level
+    if (Math.hypot(b.vx, b.vy) < 60) b.va = (b.va || 0) * 0.82;
+    b.va = Math.max(-6, Math.min(6, b.va || 0));
+    b.asleep = (b.still ?? 0) > 0.5;
+    if (b.asleep) { b.vx = 0; b.vy = 0; b.va = 0; }
+  }
+  return { ...world, bodies };
+}
+
+/** a world stepped to a time, dt by dt (the node's simulate keeps checkpoints, so any frame renders in any order) */
+export function worldAt(world, dt, t) {
+  let w = world;
+  for (let k = 0; k * dt < t - 1e-9; k++) w = stepWorld(w, dt);
+  return w;
+}
+
+const bodiesNode = {
+  type: 'phys.bodies', title: 'Bodies', category: 'Physics',
+  description: 'boxes, circles and convex shapes that fall, collide, stack and come to rest — impulses, friction, restitution, sleep, the frame and floors as static segments',
+  ai: { when: 'a pile that builds itself: blocks dropped into a frame, balls settling, a stack knocked over; the bodies are what the props list, the floor the frame\'s bottom unless the walls are off', avoid: 'more than 40 bodies (the solver crawls), restitution over 0.5 in a pile (it never settles), bodies the viewer counts individually' },
+  props: {
+    bodies: { type: 'json', default: [
+      { kind: 'box', x: 0, y: -320, w: 120, h: 120 },
+      { kind: 'box', x: -40, y: -560, w: 120, h: 120 },
+      { kind: 'box', x: 60, y: -560, w: 120, h: 120 },
+      { kind: 'circle', x: 20, y: -820, r: 60 },
+    ], label: 'Bodies', animatable: false, description: '[{ kind: "box"|"circle"|"poly", x, y, w, h?, r?, verts?, angle?, static?, restitution?, friction? }]' },
+    gravity: { type: 'number', default: 900, min: 0, step: 10, label: 'Gravity', animatable: false },
+    restitution: { type: 'number', default: 0.2, min: 0, max: 0.9, step: 0.02, label: 'Bounce', animatable: false },
+    friction: { type: 'number', default: 0.4, min: 0, max: 1, step: 0.05, label: 'Friction', animatable: false },
+    walls: { type: 'bool', default: true, label: 'Walls', animatable: false, description: 'the frame\'s sides and floor as static bodies' },
+    fill: { type: 'paint', default: '@accent', label: 'Fill' },
+    ink: { type: 'paint', default: '@text', label: 'Edge' },
+    size: { type: 'vec2', default: [900, 600], label: 'Area', unit: 'px' },
+  },
+  bounds: ({ size: [w, h] }) => ({ x: -w / 2, y: -h / 2, w, h }),
+  simulate: {
+    init(p, host) {
+      const [w, h] = p.size;
+      const list = (Array.isArray(p.bodies) ? p.bodies : []).map((b, i) => ({
+        id: `b${i}`, kind: b.kind ?? 'box', x: b.x ?? 0, y: b.y ?? 0, vx: 0, vy: 0, angle: (b.angle ?? 0) * RAD, va: 0,
+        w: b.w, h: b.h, r: b.r, verts: b.verts,
+        mass: b.static ? 0 : Math.max(0.4, ((b.w ?? 0) * (b.h ?? 0) || Math.PI * (b.r ?? 10) ** 2 || 4000) / 4000),
+        inertia: b.static ? 0 : Math.max(40, ((b.w ?? b.r * 2 ?? 40) ** 2 + (b.h ?? b.r * 2 ?? 40) ** 2) / 12 * Math.max(0.4, ((b.w ?? 0) * (b.h ?? 0) || Math.PI * (b.r ?? 10) ** 2 || 4000) / 4000) * 100),
+        restitution: b.restitution ?? p.restitution ?? 0.2,
+        friction: b.friction ?? p.friction ?? 0.4,
+        static: !!b.static,
+      }));
+      if (p.walls !== false) {
+        list.push({ id: 'floor', kind: 'box', x: 0, y: h / 2 + 40, w: w * 3, h: 80, static: true, mass: 0, inertia: 0, restitution: p.restitution ?? 0.2, friction: p.friction ?? 0.4 });
+        list.push({ id: 'wallL', kind: 'box', x: -w / 2 - 40, y: 0, w: 80, h: h * 3, static: true, mass: 0, inertia: 0, restitution: p.restitution ?? 0.2, friction: p.friction ?? 0.4 });
+        list.push({ id: 'wallR', kind: 'box', x: w / 2 + 40, y: 0, w: 80, h: h * 3, static: true, mass: 0, inertia: 0, restitution: p.restitution ?? 0.2, friction: p.friction ?? 0.4 });
+      }
+      return { world: { gravity: [0, p.gravity ?? 900], bodies: list }, t: 0 };
+    },
+    step(state, p, dt) {
+      return { world: stepWorld(state.world, Math.min(1 / 30, dt)), t: state.t + dt };
+    },
+  },
+  render: {
+    canvas2d(ctx, p, host) {
+      const s = host.state();
+      if (!s) return;
+      ctx.lineWidth = 2;
+      for (const b of s.world.bodies) {
+        if (b.id === 'floor' || b.id === 'wallL' || b.id === 'wallR') continue;
+        ctx.fillStyle = p.fill;
+        ctx.strokeStyle = p.ink;
+        if (b.kind === 'circle') {
+          ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(b.x + Math.cos(b.angle || 0) * b.r * 0.8, b.y + Math.sin(b.angle || 0) * b.r * 0.8); ctx.stroke();
+        } else {
+          const pts = outline(b);
+          ctx.beginPath();
+          pts.forEach(([x, y], i) => { if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); });
+          ctx.closePath(); ctx.fill(); ctx.stroke();
+        }
+      }
+    },
+  },
+};
+
+/** the text drop, its letters made bodies: they knock into each other and pile up */
+function dropWorld(p, widths) {
+  const total = widths.reduce((a, b) => a + b, 0);
+  let x = -total / 2;
+  const bodies = [...String(p.text ?? '')].map((ch, i) => {
+    const w = widths[i], h = p.size * 0.94;
+    const body = { id: `ch${i}`, kind: 'box', x: x + w / 2, y: -p.size * (1 + p.height) - i * p.size * 0.35, w, h, vx: 0, vy: 0, angle: 0, va: 0, mass: 1, inertia: (w * w + h * h) / 12, restitution: p.bounciness ?? 0.3, friction: 0.5 };
+    x += w;
+    return body;
+  });
+  // the floor's top is the line's baseline: a letter at rest stands where the text would
+  bodies.push({ id: 'floor', kind: 'box', x: 0, y: 40, w: total * 4, h: 80, static: true, mass: 0, inertia: 0, restitution: 0.1, friction: 0.6 });
+  return { gravity: [0, 2600], bodies };
+}
+
+export const meta = { id: 'tramme/physics', name: 'physics', version: '1.1.0', description: 'Confetti, bouncing balls, a rope, letters that drop and bodies that pile up: five simulated nodes', api: 1 };
+export const nodes = [confetti, bounce, rope, textDrop, bodiesNode];
 export const presets = [
   { name: 'phys-confetti', title: 'Confetti burst', category: 'Physics', description: '120 pieces falling with wind', layer: { type: 'phys.confetti', name: 'Confetti', props: { size: [1200, 800] } } },
   { name: 'phys-bounce', title: 'Bouncing balls', category: 'Physics', description: 'ten balls loose in a box', layer: { type: 'phys.bounce', name: 'Balls', props: { size: [900, 600] } } },
@@ -311,9 +542,13 @@ export const presets = [
 ];
 export const messages = {
   fr: {
-    'Confetti': 'Confettis', 'Bouncing balls': 'Balles rebondissantes', 'Rope': 'Corde', 'Text drop': 'Texte qui tombe',
+    'Confetti': 'Confettis', 'Bouncing balls': 'Balles rebondissantes', 'Rope': 'Corde', 'Text drop': 'Texte qui tombe', 'Bodies': 'Corps',
+    'boxes, circles and convex shapes that fall, collide, stack and come to rest — impulses, friction, restitution, sleep, the frame and floors as static segments': 'des boîtes, cercles et formes convexes qui tombent, se heurtent, s\'empilent et se posent — impulsions, frottement, rebond, sommeil, le cadre et ses sols en segments statiques',
+    '[{ kind: "box"|"circle"|"poly", x, y, w, h?, r?, verts?, angle?, static?, restitution?, friction? }]': '[{ kind: "box"|"circle"|"poly", x, y, w, h ?, r ?, verts ?, angle ?, static ?, restitution ?, friction ? }]',
+    'the frame\'s sides and floor as static bodies': 'les côtés du cadre et son sol en corps statiques',
+    'Fill': 'Remplissage',
     'Pieces': 'Mordeaux', 'Emit over': 'Émis en', 'Gravity': 'Gravité', 'Wind': 'Vent', 'Air': 'Air', 'Loop': 'Boucle',
-    'Area': 'Zone', 'Colors': 'Couleurs', 'Balls': 'Balles', 'Smallest': 'Petit rayon', 'Biggest': 'Grand rayon',
+    'Area': 'Zone', 'Colors': 'Couleurs', 'Balls': 'Balles', 'Smallest': 'Petit rayon', 'Biggest': 'Grand rayon', 'Bounce': 'Rebond', 'Friction': 'Frottement', 'Walls': 'Murs', 'Edge': 'Bord',
     'Bounce': 'Rebond', 'Box': 'Boîte', 'Segments': 'Segments', 'Sag': 'Affaissement', 'Pinned': 'Attachée',
     'Thickness': 'Épaisseur', 'Color': 'Couleur', 'Text': 'Texte', 'Between letters': 'Entre les lettres',
     'Falls from': 'Tombe de', 'Size': 'Corps', 'Weight': 'Graisse', 'Font': 'Police',

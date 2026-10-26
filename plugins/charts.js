@@ -259,61 +259,193 @@ function sliceColor(i, n) {
   return set[i % set.length];
 }
 
+
+// ── 1.1: CSV, ranks, ticks ───────────────────────────────────
+/** a CSV into rows of string fields: the separator (`,` `;` or a tab) sniffed from the first line, quoted fields with doubled quotes kept whole */
+export function parseCsv(text) {
+  const src = String(text ?? '').replace(/\r\n?/g, '\n');
+  const first = src.split('\n', 1)[0] ?? '';
+  const counts = { ',': 0, ';': 0, '\t': 0 };
+  let q = false;
+  for (const ch of first) {
+    if (ch === '"') q = !q;
+    else if (!q && ch in counts) counts[ch]++;
+  }
+  const sep = Object.entries(counts).sort((a, b) => b[1] - a[1])[0][1] > 0 ? Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0] : ',';
+  const rows = [];
+  let row = [], field = '', inQ = false;
+  for (let i = 0; i < src.length; i++) {
+    const ch = src[i];
+    if (inQ) {
+      if (ch === '"') { if (src[i + 1] === '"') { field += '"'; i++; } else inQ = false; }
+      else field += ch;
+    } else if (ch === '"') inQ = true;
+    else if (ch === sep) { row.push(field); field = ''; }
+    else if (ch === '\n') { row.push(field); field = ''; rows.push(row); row = []; }
+    else field += ch;
+  }
+  if (field.length || row.length) { row.push(field); rows.push(row); }
+  return rows;
+}
+
+/** a CSV field as a number: `1,5` reads as 1.5 (a decimal comma; a `;` file always has one) */
+export function csvNumber(field) {
+  const s = String(field ?? '').trim();
+  if (/^-?\d+,\d+$/.test(s)) return parseFloat(s.replace(',', '.'));
+  const v = parseFloat(s);
+  return Number.isFinite(v) ? v : NaN;
+}
+
+/** each period's ranking: the values of the period alone, ties broken by name, entries arriving and leaving allowed */
+export function ranksOver(table) {
+  return (table ?? []).map(({ period, values }) => {
+    const names = Object.keys(values ?? {});
+    names.sort((a, b) => (values[b] ?? -Infinity) - (values[a] ?? -Infinity) || (a < b ? -1 : 1));
+    const rank = {};
+    names.forEach((n, i) => { rank[n] = i + 1; });
+    return { period, rank };
+  });
+}
+
+/** the readable ticks of an axis: 0 to a nice top, a step of 1, 2, 2.5 or 5 times a power of ten */
+export function ticks(min, max, count = 5) {
+  const top = niceMax(Math.max(1e-9, max));
+  const raw = (top - min) / Math.max(1, count);
+  const pow = Math.pow(10, Math.floor(Math.log10(Math.max(1e-9, raw))));
+  const step = [1, 2, 2.5, 5, 10].map((m) => m * pow).find((s) => s >= raw) ?? 10 * pow;
+  const out = [];
+  for (let v = min; v <= top + step * 0.001; v += step) out.push(+v.toFixed(6));
+  return out;
+}
+
+/** the labels of a scatter kept apart: right of the point when it fits, left when it does not */
+export function labelSides(points) {
+  const placed = [];
+  return points.map((p) => {
+    const near = placed.some((q) => Math.hypot(q[0] - p.x, q[1] - p.y) < 0.075);
+    const side = near && !placed.some((q) => Math.hypot(q[0] - p.x, q[1] - p.y) < 0.075 && q[2] === -1) ? -1 : 1;
+    placed.push([p.x, p.y, side]);
+    return side;
+  });
+}
+
 const chartTool = {
   name: 'chart', title: 'Add a chart',
-  description: 'a bar, line or donut chart from a JSON data set of the project (a list of { label, value }), sized and placed in the composition, with an optional title above it',
+  description: 'a bar, line, donut, race, scatter or function chart from a JSON data set of the project or from a CSV (separators, quotes and decimal commas read), sized and placed in the composition, with an optional title above it',
   input: {
     type: 'object',
     properties: {
       data: { type: 'string', format: 'asset', assetType: 'json', title: 'Data set' },
-      kind: { enum: ['bar', 'line', 'donut'], title: 'Kind', description: 'bar by default' },
+      kind: { enum: ['bar', 'line', 'donut', 'race', 'scatter', 'function'], title: 'Kind', description: 'bar by default; a race takes a table of periods by entries, a function the sampled points' },
       title: { type: 'string', title: 'Title', description: 'a line above the chart, when the chart needs one' },
       orientation: { enum: ['vertical', 'horizontal'], title: 'Bar orientation' },
+      points: { type: 'array', title: 'Points', items: { type: 'array', items: { type: 'number' } }, description: 'a function only: [[x, y], …] sampled from x = 0 to 1 — computed, never guessed' },
+      entries: { type: 'integer', title: 'Entries', description: 'a race only: how many race at once (12 at most in 9:16, 20 in 16:9)' },
     },
-    required: ['data'],
   },
-  async run({ data, kind = 'bar', title, orientation }, ctx) {
-    const a = ctx.doc.assets[data];
-    if (!a || a.type !== 'json') throw new Error(`${data}: a JSON asset of the project is expected (a list of { label, value })`);
+  async run({ data, kind = 'bar', title, orientation, points, entries }, ctx) {
+    // a function chart takes its points; every other kind reads a data set of the project
+    const a = data ? ctx.doc.assets[data] : null;
+    if (kind !== 'function' && (!a || a.type !== 'json')) throw new Error(`${data ?? 'data'}: a JSON or CSV asset of the project is expected (a list of { label, value }, a table for a race)`);
     const c = ctx.doc.compositions[ctx.compId];
     const u = Math.min(c.width, c.height);
-    const size = kind === 'donut' ? [Math.round(u * 0.52), Math.round(u * 0.52)] : [Math.round(c.width * 0.76), Math.round(c.height * (c.height > c.width ? 0.38 : 0.5))];
+    const portrait = c.height > c.width;
+    const cap = portrait ? 12 : 20;
+    let props, note = '', count = 0;
+    if (kind === 'race') {
+      // the data set: a CSV text (separators, quotes, decimal commas), or the JSON table itself
+      let text = null;
+      if (a.src) { try { text = await ctx.readText(a.src); } catch { text = null; } }
+      let table = tableOf(typeof text === 'string' ? text : []);
+      if (!table.length && typeof text === 'string') {
+        try { const j = JSON.parse(text); if (Array.isArray(j)) table = j.filter((r) => r?.values); } catch { /* neither csv nor a json table */ }
+      }
+      if (!table.length) throw new Error(`${data}: a race takes a CSV (first row of names, first cell the period) or a JSON list of { period, values }`);
+      const names = [...new Set(table.flatMap(({ values }) => Object.keys(values ?? {})))];
+      count = names.length;
+      const best = new Map(names.map((n) => [n, Math.max(0, ...table.map(({ values }) => Number(values?.[n]) || 0))]));
+      const keep = names.sort((x, y) => (best.get(y) ?? 0) - (best.get(x) ?? 0)).slice(0, Math.min(entries ?? cap, cap));
+      const cut = names.length - keep.length;
+      const filtered = table.map(({ period, values }) => ({ period, values: Object.fromEntries(keep.filter((n) => values?.[n] !== undefined).map((n) => [n, values[n]])) }));
+      props = { table: filtered, entries: keep.length };
+      if (cut) note = ` ${cut} of ${names.length} entries left out — the ${keep.length} that ever led race.`;
+    } else if (kind === 'function') {
+      const pts = (points ?? []).map(([x, y]) => [Number(x), Number(y)]).filter(([x, y]) => Number.isFinite(x) && Number.isFinite(y));
+      if (pts.length < 2) throw new Error('a function chart takes points: [[x, y], …] sampled from x = 0 to 1 (computed, never guessed)');
+      props = { points: pts };
+    } else if (kind === 'scatter') {
+      // the points of the data set: [{ name, x, y }] or { points: [...] }
+      let raw = null;
+      try { raw = JSON.parse((await ctx.readText(a.src)) ?? 'null'); } catch { raw = null; }
+      const list = (Array.isArray(raw) ? raw : raw?.points ?? []).filter((d) => d && Number.isFinite(Number(d.x)) && Number.isFinite(Number(d.y)));
+      if (!list.length) throw new Error(`${data}: a scatter takes a list of { name, x, y }`);
+      props = { values: list.map((d) => ({ name: String(d.name ?? d.label ?? ''), x: Number(d.x), y: Number(d.y), ...(Number.isFinite(Number(d.size)) ? { size: Number(d.size) } : {}) })) };
+      count = list.length;
+    } else props = { data };
+    const size = kind === 'donut' ? [Math.round(u * 0.52), Math.round(u * 0.52)] : [Math.round(c.width * 0.76), Math.round(c.height * (portrait ? 0.38 : 0.5))];
+    if (kind === 'race' || kind === 'scatter' || kind === 'function') { size[0] = Math.round(c.width * 0.8); size[1] = Math.round(c.height * (portrait ? 0.5 : 0.62)); }
     const taken = { ...c.layers };
-    const base = `chart-${kind}-${data}`.replace(/[^a-z0-9-]/g, '-').slice(0, 60);
+    const base = `chart-${kind}-${data ?? 'curve'}`.replace(/[^a-z0-9-]/g, '-').slice(0, 60);
     let cid = base, k = 2;
     while (cid in taken) cid = `${base}-${k++}`;
     const ops = [], order = [...c.order];
     const accent = ctx.doc.tokens?.accent?.type === 'color';
-    const props = { data, size };
+    props.size = size;
     if (kind === 'bar' && orientation) props.orientation = orientation;
     if (kind !== 'donut' && accent) props.fill = '@accent';
-    ops.push({ op: 'add', path: `/compositions/${ctx.compId}/layers/${cid}`, value: { type: `chart.${kind}`, name: title ?? `${kind} chart`, props } });
+    // a race runs over the composition: a period a second at least, the last one held
+    if (kind === 'race' && props.table.length > 1) {
+      const end = Math.max(1.6, Math.min(c.duration - 0.8, 0.4 + (props.table.length - 1) * Math.max(1, (c.duration - 1.2) / (props.table.length - 1))));
+      props.progress = { $k: [{ t: 0.4, v: 0 }, { t: +end.toFixed(3), v: 1 }] };
+      if ((end - 0.4) / (props.table.length - 1) < 1) note += ` The composition gives each period less than a second: lengthen it to ${Math.ceil(props.table.length + 1.2)} s.`;
+    }
+    ops.push({ op: 'add', path: `/compositions/${ctx.compId}/layers/${cid}`, value: { type: `chart.${kind}`, name: title ?? `${kind} chart`, transform: { position: [Math.round(c.width / 2), Math.round(c.height / 2)] }, props } });
     order.push(cid);
     if (title) {
       const tid = `${cid}-title`;
-      ops.push({ op: 'add', path: `/compositions/${ctx.compId}/layers/${tid}`, value: { type: 'text', name: 'Chart title', in: 0, transform: { position: [c.width / 2, Math.round(c.height * (c.height > c.width ? 0.12 : 0.16))] }, props: { text: title, size: Math.round(u * 0.05), weight: 800, align: 'center', color: '#FFFFFF' } } });
+      ops.push({ op: 'add', path: `/compositions/${ctx.compId}/layers/${tid}`, value: { type: 'text', name: 'Chart title', in: 0, transform: { position: [c.width / 2, Math.round(c.height * (portrait ? 0.12 : 0.16))] }, props: { text: title, size: Math.round(u * 0.05), weight: 800, align: 'center', color: ctx.doc.tokens?.text?.type === 'color' ? '@text' : '#FFFFFF' } } });
       order.push(tid);
     }
     ops.push({ op: 'replace', path: `/compositions/${ctx.compId}/order`, value: order });
     return {
       ops, label: title ?? `${kind} chart`,
-      text: `A ${kind} chart of ${data} (${size[0]}×${size[1]})${title ? `, titled "${title}"` : ''}. It draws itself over about a second; edit the data set or the inline values in the inspector. When the composition has no data set yet, write one with write_file (a list of { label, value }) and add it first.`,
+      text: `A ${kind} chart${count ? ` of ${count} entries` : ` of ${data}`} (${size[0]}×${size[1]})${title ? `, titled "${title}"` : ''}.${note} ${kind === 'race' ? `It runs on the layer's progress, keyed over the composition: the bars slide to their ranks, the period large behind.` : kind === 'function' ? 'The curve draws itself; the dot travels with the "at" property, a tangent on demand.' : ''} Edit the data in the inspector.`,
     };
   },
 };
 
 const chartCheck = {
   name: 'chart-readability', title: 'Chart readability',
-  description: 'a chart with too many categories, or labels too long for their bars, is a chart nobody reads',
+  description: 'a chart with too many categories, labels too long for their bars, overlapping labels on a scatter, or more than 12 entries racing in 9:16, is a chart nobody reads',
   texts: ['{name}: {n} categories is a lot — group the small ones into "other"'],
   run(ctx) {
     const out = [];
+    const portrait = ctx.comp.height > ctx.comp.width;
     const seen = new Set();
     for (const sample of ctx.samples) {
       for (const placed of sample.layers) {
         if (!placed.node.type.startsWith('chart.') || seen.has(placed.id)) continue;
         seen.add(placed.id);
         const values = Array.isArray(placed.props.values) ? placed.props.values : null;
+        if (placed.node.type === 'chart.race') {
+          const entries = Number(placed.props.entries) || 0;
+          if (portrait && entries > 12) out.push({ check: 'chart-readability', severity: 'warning', message: `${name(placed)}: ${entries} entries racing in 9:16 — 12 at most, or the bars turn to lines` });
+          const table = Array.isArray(placed.props.table) ? placed.props.table : [];
+          const periods = table.length;
+          if (periods && (placed.props.progress === undefined || placed.props.progress === 1) && periods > 1) out.push({ check: 'chart-readability', severity: 'info', t: sample.t, message: `${name(placed)}: the race shows its last period only — key the layer's progress over the composition to run it` });
+          continue;
+        }
+        if (placed.node.type === 'chart.scatter') {
+          const pts = (Array.isArray(placed.props.values) ? placed.props.values : (placed.props.values?.points ?? []));
+          if (placed.props.labels !== false && pts.length > 1) {
+            const close = [];
+            for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) {
+              if (Math.hypot((Number(pts[i].x) || 0) - (Number(pts[j].x) || 0), (Number(pts[i].y) || 0) - (Number(pts[j].y) || 0)) < Math.max(Number(placed.props.xMax) || 100, Number(placed.props.yMax) || 100) * 0.075) close.push([pts[i].name, pts[j].name]);
+            }
+            if (close.length) out.push({ check: 'chart-readability', severity: 'warning', message: `${name(placed)}: the labels of ${close.slice(0, 2).map((p) => p.join(' and ')).join(', ')} collide — label only the points the voice names` });
+          }
+          continue;
+        }
         if (placed.props.data || !values) continue; // a data set: its shape is not in the document
         if (values.length > 9) out.push({ check: 'chart-readability', severity: 'warning', message: `${name(placed)}: ${values.length} categories is a lot — group the small ones into "other"` });
         const longest = values.reduce((a, d) => Math.max(a, String(d?.label ?? '').length), 0);
@@ -327,8 +459,241 @@ const chartCheck = {
 };
 const name = (placed) => placed.layer.name ?? placed.id;
 
-export const meta = { id: 'tramme/charts', name: 'charts', version: '1.0.0', description: 'Bar, line and donut charts from a data set, with a layout tool and a readability check', api: 1 };
-export const nodes = [barNode, lineNode, donutNode];
+
+
+// ── 1.1: the race, the scatter and the function ─────────────
+const lerp = (a, b, u) => a + (b - a) * u;
+
+/** a race's table from a CSV (first row of names, first cell the period) or a JSON list of { period, values } */
+export function tableOf(raw) {
+  if (Array.isArray(raw)) return raw.filter((r) => r && typeof r === 'object' && r.values);
+  if (typeof raw !== 'string') return [];
+  const rows = parseCsv(raw).filter((r) => r.some((f) => String(f).trim()));
+  if (rows.length < 2) return [];
+  const names = rows[0].slice(1).map((n) => String(n).trim());
+  return rows.slice(1).map((r) => ({
+    period: String(r[0] ?? '').trim(),
+    values: Object.fromEntries(names.map((n, k) => [n, csvNumber(r[k + 1])]).filter(([, v]) => Number.isFinite(v))),
+  }));
+}
+
+const raceNode = {
+  type: 'chart.race', title: 'Race chart', category: 'Charts',
+  ai: { when: 'a ranking over time (market shares, medals, populations): the bars slide to their new rank while the values roll; keep the leaders in view and let the tool cut the tail', avoid: 'more than 12 entries racing in 9:16 (20 at most in 16:9), a period on screen for less than a second, values so close the ranks swap every period' },
+  props: {
+    table: { type: 'json', default: [{ period: '2000', values: { Alpha: 30, Beta: 24, Gamma: 18 } }, { period: '2001', values: { Alpha: 34, Beta: 31, Gamma: 22, Delta: 12 } }, { period: '2002', values: { Alpha: 39, Beta: 38, Gamma: 27, Delta: 20 } }], label: 'Table', animatable: false, description: '[{ period, values: { name: value } }, …] — the chart tool builds it from a CSV' },
+    progress: { type: 'number', default: 1, min: 0, max: 1, step: 0.001, label: 'Progress', description: '0: the first period; key it to run the race' },
+    entries: { type: 'integer', default: 10, min: 3, max: 20, label: 'Entries', description: 'how many race at once (12 at most in 9:16)' },
+    fill: { type: 'paint', default: '#2EC4B6', label: 'Bars' },
+    ink: { type: 'paint', default: '@text', label: 'Text colour' },
+    size: { type: 'vec2', default: [900, 560], label: 'Size', unit: 'px' },
+    font: { type: 'asset', assetType: 'font', default: null, nullable: true, label: 'Font', animatable: false },
+  },
+  bounds: ({ size: [w, h] }) => ({ x: -w / 2, y: -h / 2, w, h }),
+  path({ size: [w, h] }) { const s = new Path2D(); s.rect(-w / 2, -h / 2, w, h); return s; },
+  render: {
+    canvas2d(ctx, p, host) {
+      const table = Array.isArray(p.table) ? p.table : [];
+      if (table.length < 1) return;
+      const [w, h] = p.size;
+      if (w <= 0 || h <= 0) return;
+      const u = Math.min(w, h);
+      const ranks = ranksOver(table);
+      const names = [...new Set(table.flatMap(({ values }) => Object.keys(values ?? {})))];
+      const best = new Map(names.map((n) => [n, Math.max(0, ...table.map(({ values }) => Number(values?.[n]) || 0))]));
+      const shown = names.sort((a, b) => (best.get(b) ?? 0) - (best.get(a) ?? 0)).slice(0, Math.max(3, p.entries ?? 10));
+      const max = niceMax(Math.max(1, ...table.flatMap(({ values }) => Object.values(values ?? {}).map(Number))));
+      const fu = Math.min(1, Math.max(0, p.progress)) * (table.length - 1);
+      const k = Math.min(table.length - 2, Math.floor(fu)), blend = table.length < 2 ? 0 : fu - k;
+      const valueAt = (n, i) => Number(table[Math.max(0, Math.min(table.length - 1, i))]?.values?.[n]) || 0;
+      const rankAt = (n, i) => ranks[Math.max(0, Math.min(ranks.length - 1, i))]?.rank?.[n] ?? (shown.length + 1);
+      const rows = shown.length, rowH = (h - u * 0.14) / rows;
+      ctx.save();
+      ctx.translate(-w / 2, -h / 2);
+      // the period, large, behind the bars
+      ctx.font = FONT(p, host, Math.round(u * 0.12), 800);
+      ctx.fillStyle = p.ink; ctx.globalAlpha = 0.16;
+      ctx.textAlign = 'right'; ctx.textBaseline = 'alphabetic';
+      ctx.fillText(String(table[Math.round(fu)]?.period ?? ''), w - u * 0.02, h - u * 0.03);
+      ctx.globalAlpha = 1;
+      ctx.font = FONT(p, host, Math.round(u * 0.034));
+      ctx.textBaseline = 'alphabetic';
+      const labelW = Math.min(w * 0.26, Math.max(...shown.map((n) => n.length), 4) * u * 0.021);
+      const plotW = w - labelW - u * 0.14;
+      shown.forEach((n, i) => {
+        const v = lerp(valueAt(n, k), valueAt(n, k + 1), blend);
+        const r0 = Math.min(rankAt(n, k), rows + 0.5), r1 = Math.min(rankAt(n, k + 1), rows + 0.5);
+        const y = lerp((r0 - 1) * rowH, (r1 - 1) * rowH, blend) + rowH * 0.18;
+        const bw = (v / max) * plotW;
+        const lead = rankAt(n, blend > 0.5 ? k + 1 : k) === 1;
+        ctx.fillStyle = lead ? p.fill : sliceColor(3, rows);
+        ctx.globalAlpha = lead ? 1 : 0.78;
+        ctx.beginPath(); ctx.roundRect(labelW, y, Math.max(1, bw), rowH * 0.64, Math.min(rowH * 0.32, u * 0.01)); ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = p.ink; ctx.globalAlpha = 0.7;
+        ctx.textAlign = 'right';
+        ctx.fillText(n, labelW - u * 0.012, y + rowH * 0.58);
+        ctx.globalAlpha = 1;
+        ctx.textAlign = 'left';
+        ctx.font = FONT(p, host, Math.round(u * 0.03), 800);
+        ctx.fillText(fmt(v), labelW + bw + u * 0.012, y + rowH * 0.58);
+        ctx.font = FONT(p, host, Math.round(u * 0.034));
+      });
+      ctx.restore();
+    },
+  },
+};
+
+const scatterNode = {
+  type: 'chart.scatter', title: 'Scatter', category: 'Charts',
+  ai: { when: 'two measures together (spend against reach, years against life): the points move between the periods and their trails tell where they came from; label only the points the voice names', avoid: 'more than 30 points, labels on every point (they collide — the check says so), a story the axes do not tell' },
+  props: {
+    values: { type: 'json', default: [{ name: 'Alpha', x: 20, y: 30 }, { name: 'Beta', x: 55, y: 62 }, { name: 'Gamma', x: 80, y: 40 }], label: 'Points', animatable: false, description: '[{ name, x, y, size? }]' },
+    periods: { type: 'json', default: null, nullable: true, label: 'Over time', animatable: false, description: '[{ period, points: { name: { x, y } } }, …]: the points travel between the periods with the progress' },
+    progress: { type: 'number', default: 1, min: 0, max: 1, step: 0.001, label: 'Progress', description: '0: the first period; key it to move the points' },
+    labels: { type: 'bool', default: true, label: 'Labels', animatable: false },
+    trails: { type: 'bool', default: true, label: 'Trails', animatable: false },
+    fill: { type: 'paint', default: '#2EC4B6', label: 'Points' },
+    ink: { type: 'paint', default: '@text', label: 'Text colour' },
+    xMax: { type: 'number', default: 0, min: 0, label: 'X to', animatable: false, description: '0: the data\'s own maximum' },
+    yMax: { type: 'number', default: 0, min: 0, label: 'Y to', animatable: false },
+    size: { type: 'vec2', default: [900, 560], label: 'Size', unit: 'px' },
+    font: { type: 'asset', assetType: 'font', default: null, nullable: true, label: 'Font', animatable: false },
+  },
+  bounds: ({ size: [w, h] }) => ({ x: -w / 2, y: -h / 2, w, h }),
+  path({ size: [w, h] }) { const s = new Path2D(); s.rect(-w / 2, -h / 2, w, h); return s; },
+  render: {
+    canvas2d(ctx, p, host) {
+      const [w, h] = p.size;
+      if (w <= 0 || h <= 0) return;
+      const u = Math.min(w, h);
+      const axisW = u * 0.07, axisH = u * 0.07;
+      const plotW = w - axisW * 1.2, plotH = h - axisH * 1.2;
+      const raw = Array.isArray(p.values) ? { points: p.values } : (p.values ?? {});
+      const periods = Array.isArray(p.periods) ? p.periods : null;
+      const lastPoints = periods ? Object.values(periods[periods.length - 1]?.points ?? {}) : (raw.points ?? []);
+      const xTop = p.xMax > 0 ? p.xMax : niceMax(Math.max(1, ...lastPoints.map((d) => Number(d?.x) || 0)));
+      const yTop = p.yMax > 0 ? p.yMax : niceMax(Math.max(1, ...lastPoints.map((d) => Number(d?.y) || 0)));
+      const X = (x) => axisW + (x / xTop) * plotW, Y = (y) => plotH - (y / yTop) * plotH + axisH * 0.2;
+      ctx.save();
+      ctx.translate(-w / 2, -h / 2);
+      ctx.font = FONT(p, host, Math.round(u * 0.03));
+      ctx.strokeStyle = 'rgba(128,128,128,0.3)'; ctx.lineWidth = 1;
+      for (const t of ticks(0, xTop)) { ctx.beginPath(); ctx.moveTo(X(t), 0); ctx.lineTo(X(t), plotH + axisH * 0.2); ctx.stroke(); ctx.fillStyle = 'rgba(128,128,128,0.8)'; ctx.textAlign = 'center'; ctx.fillText(fmt(t), X(t), plotH + axisH * 0.55); }
+      for (const t of ticks(0, yTop)) { ctx.beginPath(); ctx.moveTo(axisW, Y(t)); ctx.lineTo(w, Y(t)); ctx.stroke(); ctx.fillStyle = 'rgba(128,128,128,0.8)'; ctx.textAlign = 'right'; ctx.fillText(fmt(t), axisW - u * 0.008, Y(t) + u * 0.01); }
+      const at = (frame, name) => frame?.points?.[name] ?? null;
+      const fu = periods ? Math.min(1, Math.max(0, p.progress)) * (periods.length - 1) : 0;
+      const k = Math.min(Math.max(0, (periods?.length ?? 1) - 2), Math.floor(fu)), blend = periods && periods.length > 1 ? fu - k : 0;
+      const names = periods ? [...new Set(periods.flatMap(({ points }) => Object.keys(points ?? {})))] : (raw.points ?? []).map((d) => d.name);
+      const drawn = [];
+      names.forEach((n) => {
+        let x, y, r = u * 0.014;
+        if (periods) {
+          const a = at(periods[Math.max(0, Math.min(periods.length - 1, k))], n), b = at(periods[Math.max(0, Math.min(periods.length - 1, k + 1))], n);
+          if (!a && !b) return;
+          x = lerp(Number(a?.x ?? b?.x) || 0, Number(b?.x ?? a?.x) || 0, blend);
+          y = lerp(Number(a?.y ?? b?.y) || 0, Number(b?.y ?? a?.y) || 0, blend);
+        } else {
+          const d = (raw.points ?? []).find((q) => q.name === n);
+          if (!d) return;
+          x = Number(d.x) || 0; y = Number(d.y) || 0;
+        }
+        if (periods && p.trails) {
+          for (let j = 0; j <= k; j++) {
+            const t = at(periods[j], n);
+            if (!t) continue;
+            ctx.globalAlpha = 0.12 + 0.1 * (j / Math.max(1, k));
+            ctx.fillStyle = p.fill;
+            ctx.beginPath(); ctx.arc(X(Number(t.x) || 0), Y(Number(t.y) || 0), r * 0.7, 0, Math.PI * 2); ctx.fill();
+          }
+          ctx.globalAlpha = 1;
+        }
+        ctx.fillStyle = p.fill;
+        ctx.beginPath(); ctx.arc(X(x), Y(y), r, 0, Math.PI * 2); ctx.fill();
+        drawn.push({ name: n, x: X(x), y: Y(y) });
+      });
+      if (p.labels) {
+        const sides = labelSides(drawn.map((d) => ({ x: d.x / w, y: d.y / h })));
+        drawn.forEach((d, i) => {
+          ctx.fillStyle = p.ink;
+          ctx.textAlign = sides[i] > 0 ? 'left' : 'right';
+          ctx.fillText(String(d.name), d.x + sides[i] * u * 0.018, d.y + u * 0.01);
+        });
+      }
+      ctx.restore();
+    },
+  },
+};
+
+const functionNode = {
+  type: 'chart.function', title: 'Function', category: 'Charts',
+  ai: { when: 'a curve the tool sampled (the tool takes the points; the node never computes): a formula drawn on, a dot travelling along it, the area under it filling; the pack\'s ticks keep the axes readable', avoid: 'points the model invented without computing (a wrong curve is worse than none), more than two curves on one frame, a tangent nobody asked for' },
+  props: {
+    points: { type: 'json', default: [[0, 0], [0.25, 0.5], [0.5, 0.71], [0.75, 0.87], [1, 1]], label: 'Points', animatable: false, description: '[[x, y], …], sampled by the tool from x = 0 to 1' },
+    drawFor: { type: 'number', default: 1.1, min: 0.2, unit: 's', label: 'Draw over', animatable: false },
+    at: { type: 'number', default: 1, min: 0, max: 1, step: 0.001, label: 'Dot at', description: 'where the travelling dot stands (1: at the end); key it to travel' },
+    tangent: { type: 'bool', default: false, label: 'Tangent', animatable: false },
+    area: { type: 'bool', default: false, label: 'Area under', animatable: false },
+    fill: { type: 'paint', default: '#2EC4B6', label: 'Curve' },
+    size: { type: 'vec2', default: [900, 560], label: 'Size', unit: 'px' },
+    font: { type: 'asset', assetType: 'font', default: null, nullable: true, label: 'Font', animatable: false },
+  },
+  bounds: ({ size: [w, h] }) => ({ x: -w / 2, y: -h / 2, w, h }),
+  path({ size: [w, h] }) { const s = new Path2D(); s.rect(-w / 2, -h / 2, w, h); return s; },
+  render: {
+    canvas2d(ctx, p, host) {
+      const pts = (Array.isArray(p.points) ? p.points : []).map(([x, y]) => [Number(x), Number(y)]).filter(([x, y]) => Number.isFinite(x) && Number.isFinite(y));
+      if (pts.length < 2) return;
+      const [w, h] = p.size;
+      if (w <= 0 || h <= 0) return;
+      const u = Math.min(w, h);
+      const axisW = u * 0.07, axisH = u * 0.07;
+      const plotW = w - axisW * 1.2, plotH = h - axisH * 1.2;
+      const xTop = niceMax(Math.max(1e-9, ...pts.map(([x]) => x)));
+      const yTop = niceMax(Math.max(1e-9, ...pts.map(([, y]) => y)));
+      const X = (x) => axisW + (x / xTop) * plotW, Y = (y) => plotH - (y / yTop) * plotH + axisH * 0.2;
+      const t = host.t - (host.layerIn ?? 0);
+      const revealed = Math.min(1, Math.max(0, t) / Math.max(0.001, p.drawFor));
+      ctx.save();
+      ctx.translate(-w / 2, -h / 2);
+      ctx.font = FONT(p, host, Math.round(u * 0.03));
+      for (const v of ticks(0, xTop)) { ctx.strokeStyle = 'rgba(128,128,128,0.25)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(X(v), 0); ctx.lineTo(X(v), plotH + axisH * 0.2); ctx.stroke(); ctx.fillStyle = 'rgba(128,128,128,0.8)'; ctx.textAlign = 'center'; ctx.fillText(fmt(v), X(v), plotH + axisH * 0.55); }
+      for (const v of ticks(0, yTop)) { ctx.strokeStyle = 'rgba(128,128,128,0.25)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(axisW, Y(v)); ctx.lineTo(w, Y(v)); ctx.stroke(); ctx.fillStyle = 'rgba(128,128,128,0.8)'; ctx.textAlign = 'right'; ctx.fillText(fmt(v), axisW - u * 0.008, Y(v) + u * 0.01); }
+      const xy = pts.map(([x, y]) => [X(x), Y(y)]);
+      const trace = () => {
+        ctx.beginPath();
+        ctx.moveTo(xy[0][0], xy[0][1]);
+        for (let i = 1; i < xy.length; i++) { const mx = (xy[i - 1][0] + xy[i][0]) / 2, my = (xy[i - 1][1] + xy[i][1]) / 2; ctx.quadraticCurveTo(xy[i - 1][0], xy[i - 1][1], mx, my); }
+        ctx.lineTo(xy[xy.length - 1][0], xy[xy.length - 1][1]);
+      };
+      if (p.area) {
+        trace();
+        ctx.lineTo(xy[xy.length - 1][0], plotH + axisH * 0.2); ctx.lineTo(xy[0][0], plotH + axisH * 0.2); ctx.closePath();
+        ctx.globalAlpha = 0.14; ctx.fillStyle = p.fill; ctx.fill(); ctx.globalAlpha = 1;
+      }
+      ctx.save();
+      ctx.beginPath(); ctx.rect(0, 0, axisW + plotW * revealed, h); ctx.clip();
+      trace();
+      ctx.strokeStyle = p.fill; ctx.lineWidth = Math.max(2, u * 0.008); ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.stroke();
+      ctx.restore();
+      const at = Math.min(1, Math.max(0, p.at));
+      const flat = xy.length - 1, fi = Math.min(flat - 1, Math.floor(at * flat)), fu = at * flat - fi;
+      const dx = xy[fi + 1][0] - xy[fi][0], dy = xy[fi + 1][1] - xy[fi][1];
+      const px = xy[fi][0] + dx * fu, py = xy[fi][1] + dy * fu;
+      if (p.tangent && revealed >= at) {
+        const len = Math.hypot(dx, dy) || 1, half = u * 0.09;
+        ctx.strokeStyle = p.fill; ctx.globalAlpha = 0.55; ctx.lineWidth = Math.max(1.5, u * 0.005);
+        ctx.beginPath(); ctx.moveTo(px - (dx / len) * half, py - (dy / len) * half); ctx.lineTo(px + (dx / len) * half, py + (dy / len) * half); ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+      if (revealed >= at) { ctx.fillStyle = p.fill; ctx.beginPath(); ctx.arc(px, py, Math.max(3, u * 0.013), 0, Math.PI * 2); ctx.fill(); }
+      ctx.restore();
+    },
+  },
+};
+
+export const meta = { id: 'tramme/charts', name: 'charts', version: '1.1.0', description: 'Bar, line, donut, race, scatter and function charts from a data set, with a layout tool and a readability check', api: 1 };
+export const nodes = [barNode, lineNode, donutNode, raceNode, scatterNode, functionNode];
 export const tools = [chartTool];
 export const checks = [chartCheck];
 export const presets = [
@@ -337,12 +702,38 @@ export const presets = [
 ];
 export const messages = {
   fr: {
-    'Bar chart': 'Histogramme', 'Line chart': 'Courbe', 'Donut chart': 'Anneau',
+    "Kind": "Type",
+    "Title": "Titre",
+    "a line above the chart, when the chart needs one": "une ligne au-dessus du graphique, quand il en a besoin",
+    "Bar orientation": "Orientation des barres",
+    'Bar chart': 'Histogramme', 'Line chart': 'Courbe', 'Donut chart': 'Anneau', 'Race chart': 'Course', 'Scatter': 'Nuage', 'Function': 'Fonction',
     'Bars': 'Barres', 'Values': 'Valeurs', 'Orientation': 'Orientation', 'Scale to': 'Échelle jusqu\'à',
     'Grid': 'Grille', 'Label size': 'Corps des étiquettes', 'Size': 'Taille', 'Font': 'Police',
-    'Curve': 'Courbure', 'Fill under': 'Remplir dessous', 'Dots': 'Points', 'Draw over': 'Tracé en',
+    'Curve': 'Courbure', 'Fill under': 'Remplir dessous', 'Dots': 'Points', 'Draw over': 'Tracé en', 'Text colour': 'Couleur du texte',
     'Thickness': 'Épaisseur', 'Centre text': 'Texte central', 'Percents': 'Pourcentages',
     'Data set': 'Jeu de données', 'Chart title': 'Titre du graphique', 'Add a chart': 'Ajouter un graphique',
+    'Progress': 'Progression', 'Table': 'Table', 'Entries': 'Concurrents', 'Points': 'Points', 'Over time': 'Dans le temps', 'Labels': 'Étiquettes', 'Trails': 'Traînées',
+    'X to': 'X jusqu’à', 'Y to': 'Y jusqu’à', 'Draw over': 'Tracé en', 'Text colour': 'Couleur du texte', 'Dot at': 'Point à', 'Tangent': 'Tangente', 'Area under': 'Aire dessous',
+    '0: the first period; key it to run the race': '0 : la première période ; keyframez-le pour lancer la course',
+    'how many race at once (12 at most in 9:16)': 'combien courent en même temps (12 au plus en 9:16)',
+    '[{ period, values: { name: value } }, …] — the chart tool builds it from a CSV': '[{ period, values: { name: valeur } }, …] — l’outil graphique le construit depuis un CSV',
+    '[{ name, x, y, size? }]': '[{ name, x, y, taille ? }]',
+    '[{ period, points: { name: { x, y } } }, …]: the points travel between the periods with the progress': '[{ period, points: { name: { x, y } } }, …] : les points voyagent entre les périodes avec la progression',
+    '0: the first period; key it to move the points': '0 : la première période ; keyframez-le pour faire bouger les points',
+    'where the travelling dot stands (1: at the end); key it to travel': 'où tient le point voyageur (1 : à la fin) ; keyframez-le pour le faire voyager',
+    '[[x, y], …], sampled by the tool from x = 0 to 1': '[[x, y], …], échantillonné par l’outil de x = 0 à 1',
+    '0: the data\'s own maximum': '0 : le maximum des données',
+    'a ranking over time (market shares, medals, populations): the bars slide to their new rank while the values roll; keep the leaders in view and let the tool cut the tail': 'un classement dans le temps (parts de marché, médailles, populations) : les barres glissent vers leur rang tandis que les valeurs défilent ; gardez les leaders en vue et laissez l’outil couper la queue',
+    'more than 12 entries racing in 9:16 (20 at most in 16:9), a period on screen for less than a second, values so close the ranks swap every period': 'plus de 12 concurrents en 9:16 (20 au plus en 16:9), une période à l’écran moins d’une seconde, des valeurs si proches que les rangs s’échangent à chaque période',
+    'two measures together (spend against reach, years against life): the points move between the periods and their trails tell where they came from; label only the points the voice names': 'deux mesures ensemble (dépense contre portée, années contre vie) : les points voyagent entre les périodes et leurs traînées disent d’où ils viennent ; n’étiquetez que les points que la voix nomme',
+    'more than 30 points, labels on every point (they collide — the check says so), a story the axes do not tell': 'plus de 30 points, des étiquettes sur chaque point (elles se heurtent — la vérification le dit), une histoire que les axes ne racontent pas',
+    'a curve the tool sampled (the tool takes the points; the node never computes): a formula drawn on, a dot travelling along it, the area under it filling; the pack\'s ticks keep the axes readable': 'une courbe échantillonnée par l’outil (l’outil prend les points ; le nœud ne calcule jamais) : une formule qui se trace, un point qui voyage le long, l’aire dessous qui se remplit ; les graduations du pack gardent les axes lisibles',
+    'points the model invented without computing (a wrong curve is worse than none), more than two curves on one frame, a tangent nobody asked for': 'des points inventés sans calcul (une courbe fausse est pire que pas de courbe), plus de deux courbes sur une image, une tangente que personne ne demande',
+    'a bar, line, donut, race, scatter or function chart from a JSON data set of the project or from a CSV (separators, quotes and decimal commas read), sized and placed in the composition, with an optional title above it': 'un histogramme, une courbe, un anneau, une course, un nuage ou une fonction depuis un jeu de données JSON du projet ou depuis un CSV (séparateurs, guillemets et virgules décimales lus), dimensionné et placé dans la composition, avec un titre optionnel au-dessus',
+    'bar by default; a race takes a table of periods by entries, a function the sampled points': 'histogramme par défaut ; une course prend une table de périodes par concurrents, une fonction les points échantillonnés',
+    'a function only: [[x, y], …] sampled from x = 0 to 1 — computed, never guessed': 'pour une fonction : [[x, y], …] échantillonné de x = 0 à 1 — calculé, jamais deviné',
+    'a race only: how many race at once (12 at most in 9:16, 20 in 16:9)': 'pour une course : combien courent en même temps (12 au plus en 9:16, 20 en 16:9)',
+    'a chart with too many categories, labels too long for their bars, overlapping labels on a scatter, or more than 12 entries racing in 9:16, is a chart nobody reads': 'un graphique à trop de catégories, aux libellés trop longs pour ses barres, aux étiquettes qui se chevauchent sur un nuage, ou à plus de 12 concurrents en 9:16, est un graphique que personne ne lit',
     'a value over time (a price, an audience, a temperature): a rise or a fall is the story, so crop the scale to it and let the line draw itself': 'une valeur dans le temps (un cours, une audience, une température) : la hausse ou la baisse est l\'histoire — resserrez l\'échelle sur elle et laissez la courbe se tracer',
     'a JSON file of the project: a list of { label, value } (or { series: […] }); empty: the values below': 'un fichier JSON du projet : une liste de { label, value } (ou { series: […] }); vide : les valeurs ci-dessous',
     '[{ label, value }, …] used when there is no data set': '[{ label, value }, …] utilisées quand il n\'y a pas de jeu de données',

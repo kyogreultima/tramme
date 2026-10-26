@@ -12,7 +12,7 @@ By taking part, you agree to the [code of conduct](CODE_OF_CONDUCT.md). For a se
 
 ## Setup
 
-Node 22.18 or newer. Chrome is needed for command-line renders. Rust is needed for the desktop storage test: without `cargo` on the PATH those tests are skipped, and CI (which has Rust) makes sure they still run somewhere.
+Node 24 or newer. Chrome is needed for command-line renders. Rust is needed for the desktop storage test: without `cargo` on the PATH those tests are skipped, and CI (which has Rust) makes sure they still run somewhere.
 
 ```sh
 npm install

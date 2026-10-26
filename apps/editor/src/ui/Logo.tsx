@@ -1,4 +1,4 @@
-// The tramme mark: a T whose bar is whole and whose stem is three frames, each
+// The Tramme mark: a T whose bar is whole and whose stem is three frames, each
 // a little further along and fainter, like images going by. Drawn in the
 // accent colour of the theme.
 

@@ -135,7 +135,7 @@ pub fn run() {
             }
             let url = format!("{SCHEME}://localhost/").parse().unwrap();
             let mut window = WebviewWindowBuilder::new(app, "main", WebviewUrl::CustomProtocol(url))
-                .title("tramme")
+                .title("Tramme")
                 .inner_size(1400.0, 880.0)
                 .min_inner_size(640.0, 480.0)
                 // the editor drops files itself (the home screen imports them)
@@ -162,7 +162,7 @@ pub fn run() {
             Ok(())
         })
         .run(tauri::generate_context!())
-        .expect("error while running the tramme desktop app");
+        .expect("error while running the Tramme desktop app");
 }
 
 /// any request on the app origin: /api to the storage, everything else to the
