@@ -13,7 +13,7 @@ A motion design engine and editor. The document (JSON) is the source of truth; t
 
 ## Getting started
 
-Node 22.18 or newer. Chrome for command-line renders.
+Node 24 or newer. Chrome for command-line renders.
 
 ```sh
 npm install

@@ -103,7 +103,7 @@ Three ways, the same brief:
 - **This session, with `/loop`.** The same prompt, paced by the agent; it lasts as long as the session.
 - **By hand.** The same prompt pasted into a new session, one run at a time.
 
-Before the first run, the environment must install and test the repository: Node 22.18 or newer, `npm ci`, and Chrome for the tests that render (the cloud environment has Chromium; Playwright finds it). A session start hook that runs `npm ci` saves each run that time.
+Before the first run, the environment must install and test the repository: Node 24 or newer, `npm ci`, and Chrome for the tests that render (the cloud environment has Chromium; Playwright finds it). A session start hook that runs `npm ci` saves each run that time.
 
 ## Blocked
 
