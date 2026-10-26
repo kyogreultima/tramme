@@ -43,10 +43,11 @@ import * as math from '../../../plugins/math.js';
 import { resample, bestStart, marchingSquares, tornEdge, liquidField, pairContours, aligned, sheetOf } from '../../../plugins/matter.js';
 import * as matter from '../../../plugins/matter.js';
 import * as print from '../../../plugins/print.js';
+import * as qr from '../../../plugins/qr.js';
 import { stepWorld } from '../../../plugins/physics.js';
 
 // the packs are JavaScript on purpose: their shape is checked at runtime by Registry.use, which these tests run
-const PACKS = [charts, kinetic, a11y, physics, styk, icons, diagram, walkthrough, localize, codeview, rhythm, screencast, handmade, chat, emoji, maps, audiogram, math, matter, print] as unknown as import('@tramme/core').PluginModule[];
+const PACKS = [charts, kinetic, a11y, physics, styk, icons, diagram, walkthrough, localize, codeview, rhythm, screencast, handmade, chat, emoji, maps, audiogram, math, matter, print, qr] as unknown as import('@tramme/core').PluginModule[];
 
 /** the shipped index, as the script writes it: each entry's commands and their French */
 const INDEX: { file: string; name: string; description?: string; commands?: { name: string; title: string; description: string }[]; fr?: Record<string, string> }[] =
@@ -1710,5 +1711,89 @@ describe('the fixes of the packs', () => {
   it('print: the risograph preset sets the inks the riso pass reads', () => {
     const riso = print.presets.find((p) => p.name === 'risograph')!;
     expect(Object.keys(riso.effects![0].props!)).toEqual(expect.arrayContaining(['inkA', 'inkB']));
+  });
+});
+
+describe('qr', () => {
+  // reference symbols from another encoder (segno, its byte-mode padding brought to the spec's): rows as hex, the top left module the highest bit
+  const VECTORS = [
+    { text: "tramme", level: 'L', version: 1, mask: 0, rows: ["1fc57f","104141","17545d","17415d","174b5d","104e41","1fd57f","1400","1df5c4","f1ea9","45ae3","18a3b2","f7ee3","1469","1fd11f","105043","175973","1742b6","1752fd","105382","1fd2e3"] },
+    { text: "https://example.com", level: 'M', version: 2, mask: 1, rows: ["1fd547f","104dd41","175c95d","1749c5d","174a45d","105b441","1fd557f","9700","1467d25","1b9faeb","12ee29d","99f928","3f5b61","d1d363","1dd1fcd","2b5b8","1968df2","10d11","1fd6151","1040b13","174bbf3","1749096","1759fbb","104b7f0","1fdcd49"] },
+    { text: 'x'.repeat(120), level: 'M', version: 7, mask: 2, rows: ["1fc10aeac97f","104820bf9a41","175d75153a5d","17582f40635d","17517bfac75d","105b091f9041","1fd55555557f","1d01153c00","17c0a9f06a7c","3f5eac3a3","86000bf95f6","1c8e04153c5c","184fbc406a09","706f9eac3a3","1569e3bf95f6","b636153c5c","1b6bdc406a09","1aa6e9eac3a3","e4903bf95f6","1e9646153c5c","ff9fdf06bf9","1716791ac313","b56855f9756","b14df153d1c","1ffa37f069f9","623bf4ac103","b7580ef96a6","b08d4b53efc","1edc13106959","41bbb4ac103","1640cef96a6","171944b53efc","bdc07106959","c1f8b4ac103","1647cef96a6","f19b4b53efc","137cc7f069f9","1c2b1ac113","1fc2675f9556","105a13153d1c","175649f06bf9","1752241ac253","1751614f9706","104f13e53dac","1fd54ab068fa"] },
+  ];
+  const rowsOf = (m: boolean[][]) => m.map((row) => BigInt('0b' + row.map((v) => (v ? '1' : '0')).join('')).toString(16));
+
+  it('encodes the reference symbols module for module, the mask chosen by its penalty', () => {
+    for (const v of VECTORS) {
+      const code = qr.encodeQr(v.text, v.level);
+      expect([code.version, code.mask], v.text.slice(0, 20)).toEqual([v.version, v.mask]);
+      expect(rowsOf(code.matrix!)).toEqual(v.rows);
+    }
+  });
+
+  it('computes the Reed-Solomon codewords, the format and version bits of the standard', () => {
+    // HELLO WORLD at 1-M: its 16 data codewords and their 10 of correction
+    expect(qr.rsRemainder([32, 91, 11, 120, 209, 114, 220, 77, 67, 64, 236, 17, 236, 17, 236, 17], 10)).toEqual([196, 35, 39, 119, 235, 215, 231, 226, 93, 23]);
+    expect(qr.formatBits('L', 0).toString(2).padStart(15, '0')).toBe('111011111000100');
+    expect(qr.formatBits('M', 5).toString(2).padStart(15, '0')).toBe('100000011001110');
+    expect(qr.versionBits(7)).toBe(0x07c94);
+    expect(qr.versionBits(8)).toBe(0x085bc);
+    expect(qr.alignmentPositions(7)).toEqual([6, 22, 38]);
+    expect(qr.alignmentPositions(20)).toEqual([6, 34, 62, 90]);
+    // the byte capacities of the standard's table
+    expect(['L', 'M', 'Q', 'H'].map((l) => qr.byteCapacity(1, l))).toEqual([17, 14, 11, 7]);
+    expect(['L', 'M', 'Q', 'H'].map((l) => qr.byteCapacity(10, l))).toEqual([271, 213, 151, 119]);
+    expect(['L', 'M', 'Q', 'H'].map((l) => qr.byteCapacity(20, l))).toEqual([858, 666, 482, 382]);
+  });
+
+  it('scores the masks as the standard does', () => {
+    const blank = Array.from({ length: 21 }, () => new Array(21).fill(false));
+    // 21 runs of 21 each way (3 + 16 each), 400 blocks, no finder-like pattern, all light (10 x 10)
+    expect(qr.penalty(blank)).toBe(21 * 2 * 19 + 400 * 3 + 100);
+    const checker = Array.from({ length: 21 }, (_, y) => Array.from({ length: 21 }, (_, x) => (x + y) % 2 === 0));
+    expect(qr.penalty(checker)).toBe(0);
+  });
+
+  it('grows the version with the text, the level, and refuses past version 20', () => {
+    expect(qr.encodeQr('a', 'L').version).toBe(1);
+    expect(qr.encodeQr('a'.repeat(18), 'L').version).toBe(2);
+    expect(qr.encodeQr('a'.repeat(858), 'L').version).toBe(20);
+    expect(() => qr.encodeQr('a'.repeat(859), 'L')).toThrow(/too long/);
+    // UTF-8: an accent or an emoji takes its bytes
+    expect(qr.encodeQr('é'.repeat(9), 'L').version).toBe(2);
+  });
+
+  it("leaves the picture's hole at level H, the reveal deterministic, any frame alone", () => {
+    const hole = qr.pictureHole(41);
+    expect(hole.to - hole.from).toBeLessThanOrEqual(Math.ceil(41 * 0.25));
+    const draw = (progress: number) => {
+      const ctx = recorder();
+      qr.nodes[0].render.canvas2d!(ctx, { text: 'https://example.com', level: 'M', style: 'square', size: 400, quiet: 4, picture: null, progress, reveal: 'random', ink: '#111111', plate: '#ffffff' } as never, { layerId: 'q', t: 0, frame: 0, fps: 30, width: 1920, height: 1080, duration: 4, asset: () => null, assetInfo: () => ({}), assetUrl: () => '' } as never);
+      return ctx.calls.filter((c) => c.startsWith('fillRect(')).length;
+    };
+    expect(draw(0.5)).toBe(draw(0.5));
+    expect(draw(0.2)).toBeLessThan(draw(0.8));
+    expect(draw(0)).toBe(1); // the plate alone
+  });
+
+  it('exports a still code to SVG and Lottie', () => {
+    const p = { text: 'tramme', level: 'L', style: 'square', size: 210, quiet: 4, picture: null, progress: 1, reveal: 'scan', ink: '#111111', plate: '#ffffff' };
+    const svg = qr.nodes[0].export!.svg!(p as never);
+    expect(svg).toMatch(/^<rect/);
+    expect(svg).toMatch(/<path d="M/);
+    const lottie = qr.nodes[0].export!.lottie!(p as never) as { ty: string; it: { ty: string }[] }[];
+    expect(lottie.map((g) => g.ty)).toEqual(['gr', 'gr']);
+    expect(lottie[0].it.filter((i) => i.ty === 'rc').length).toBeGreaterThan(20);
+  });
+
+  it('the check flags small modules, a thin quiet zone, an inverted or faint code, and a short stay', () => {
+    const placed = (props: Record<string, unknown>, layer: Record<string, unknown> = {}) => ({ id: 'q', layer: { name: 'Code', type: 'qr.code', in: 0, out: 6, ...layer }, node: { type: 'qr.code' }, props: { text: 'https://example.com', level: 'M', style: 'square', size: 520, quiet: 4, picture: null, progress: 1, reveal: 'scan', ink: '#111111', plate: '#ffffff', ...props }, opacity: 1, box: null });
+    const run = (pl: ReturnType<typeof placed>) => (qr.checks[0].run({ doc: {}, compId: 'main', comp: { width: 1080, height: 1920, fps: 30, duration: 10 }, samples: [{ t: 1, layers: [pl] }], data: () => null } as never) as { message: string }[]).map((i) => i.message);
+    expect(run(placed({}))).toEqual([]);
+    expect(run(placed({ size: 90 })).join()).toMatch(/under 5/);
+    expect(run(placed({ quiet: 1 })).join()).toMatch(/quiet zone/);
+    expect(run(placed({ ink: '#ffffff', plate: '#111111' })).join()).toMatch(/light modules on a dark plate/);
+    expect(run(placed({ ink: '#9a9a9a' })).join()).toMatch(/under 4:1/);
+    expect(run(placed({}, { out: 2 })).join()).toMatch(/3 s/);
   });
 });

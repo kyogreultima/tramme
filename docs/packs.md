@@ -162,3 +162,11 @@ Print looks: halftone, riso inks, grain and duotone — as GLSL passes and stack
 - Nodes: none
 - Checks: none
 
+## QR codes
+
+QR codes written in the pack's own code: square, rounded or dotted modules, a logo in the middle, revealed module by module, a check for what a phone cannot scan
+
+- Tools: none
+- Nodes: `qr.code` — QR code
+- Checks: `qr-scannable` — QR scannable
+

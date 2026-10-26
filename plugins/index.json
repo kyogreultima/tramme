@@ -309,5 +309,13 @@
     "version": "1.0.0",
     "commands": [],
     "fr": {}
+  },
+  {
+    "file": "qr.js",
+    "name": "QR codes",
+    "description": "QR codes written in the pack's own code: square, rounded or dotted modules, a logo in the middle, revealed module by module, a check for what a phone cannot scan",
+    "version": "1.0.0",
+    "commands": [],
+    "fr": {}
   }
 ]

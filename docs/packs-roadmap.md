@@ -2,7 +2,7 @@
 
 The general-purpose plugin packs that ship with the editor (`plugins/*.js`, listed in `plugins/index.json`, added to a project from the Code section): the ones to come, and what tramme needs first so they can exist. A pack is an ordinary plugin. It gives the assistant and the editor a new vocabulary — what they can build in one move, what they can check — for any film, never for one video.
 
-Status: steps 0 to 14 are shipped (step 5 keeps its real recordings to check on a device; step 7 keeps its set of 300 emoji to confirm on a device). Shipped packs: charts, kinetic type, physics, stick figures, icons, diagrams, UI walkthrough, accessibility checks, localization ([plugins-roadmap.md](plugins-roadmap.md), step 10). The packs after step 0 are taken in order, each one landing whole. The decisions still open are listed at the end. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
+Status: steps 0 to 15 are shipped (step 5 keeps its real recordings to check on a device; step 7 keeps its set of 300 emoji to confirm on a device). Shipped packs: charts, kinetic type, physics, stick figures, icons, diagrams, UI walkthrough, accessibility checks, localization ([plugins-roadmap.md](plugins-roadmap.md), step 10). The packs after step 0 are taken in order, each one landing whole. The decisions still open are listed at the end. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
 
 ## Why
 
@@ -193,10 +193,12 @@ Done when: a whole film prints as a risograph in its own two colours, the same i
 
 ### Step 15. QR codes (`qr.js`)
 
-- [ ] A QR encoder in the pack's own code (ISO/IEC 18004: byte mode, versions 1 to 20, the four correction levels, the mask chosen by its penalty).
-- [ ] The `qr` node: square, rounded or dotted modules in ink on plate, a picture in the centre at level H, revealed module by module; `export.svg` and `export.lottie`, since it is static.
-- [ ] The `qr-scannable` check: modules under 5 px at the export's size, a quiet zone under four modules, a contrast under 4:1 or inverted, less than 3 s on screen.
-- [ ] Tests: the encoding against reference vectors, the mask penalties.
+- [x] A QR encoder in the pack's own code (ISO/IEC 18004: byte mode, versions 1 to 20, the four correction levels, the mask chosen by its penalty).
+- [x] The `qr` node: square, rounded or dotted modules in ink on plate, a picture in the centre at level H, revealed module by module; `export.svg` and `export.lottie`, since it is static.
+- [x] The `qr-scannable` check: modules under 5 px at the export's size, a quiet zone under four modules, a contrast under 4:1 or inverted, less than 3 s on screen.
+- [x] Tests: the encoding against reference vectors, the mask penalties.
+
+  The node is `qr.code`. The reference symbols (versions 1, 2 and 7) come from another encoder, segno, whose byte-mode padding adds a zero codeword the standard does not ask for once the stream ends on a byte (its output was compared with that padding brought to the standard's: 26 symbols of versions 1 to 19, every level, the same module for module, the same mask chosen). To check on a device: the codes scanned by two or three phones, a logo in the middle at level H included.
 
 Done when: the QR of an end card scans from a phone off the exported video (to check on a device).
 
