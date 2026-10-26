@@ -28,8 +28,8 @@ export interface ChatItem {
   pin?: [number, number];
   /** user: files joined to the message (files of the project) */
   attachments?: { path: string; name: string; kind: FileKind; asset?: string }[];
-  /** assistant activity: tool name and short description; use: the vocabulary's tool a use_tool call runs */
-  tool?: { name: string; summary: string; use?: string; done?: boolean; error?: boolean; progress?: ToolProgress };
+  /** assistant activity: tool name and short description; use: the vocabulary's tool a use_tool call runs; detail: once done, why it failed or the tool's own line for the user (who made a sound, a picture); start and duration in ms */
+  tool?: { name: string; summary: string; use?: string; done?: boolean; error?: boolean; detail?: string; progress?: ToolProgress; start?: number; ms?: number };
   /** a still the assistant rendered (data URL) */
   image?: { url: string; caption: string };
   /** what the assistant thinks before answering (summary streamed by the API); start and duration in ms */
@@ -49,7 +49,7 @@ export interface ToolProgress { done: number; total: number; step?: string }
 export type AiEvent =
   | { type: 'item'; item: ChatItem }
   | { type: 'text'; id: string; delta: string }
-  | { type: 'tool-done'; id: string; error?: boolean }
+  | { type: 'tool-done'; id: string; error?: boolean; detail?: string }
   | { type: 'tool-progress'; id: string; progress: ToolProgress }
   | { type: 'thinking'; id: string; delta: string }
   | { type: 'thinking-done'; id: string }

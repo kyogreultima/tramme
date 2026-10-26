@@ -9,7 +9,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import type { ChatItem, TurnUsage } from '../api.ts';
 import { engineOf, modelLabel, providerOf } from '@tramme/assistant';
 import { aiSettings, aiStatus, CLI_SETUP, cliUnavailable, providerLabel, refreshStatus, setAiSettings } from '../ai/index.ts';
-import { lightbox, running, turnStart } from '../ai/conversation.ts';
+import { lightbox, running } from '../ai/conversation.ts';
 import { openSettings } from '../settings.ts';
 import { S, toast } from '../state.ts';
 import { answer, chatShown, choose, question, type Question } from '../confirm.ts';
@@ -128,19 +128,18 @@ export function Thinking({ th }: { th: NonNullable<ChatItem['thinking']> }) {
   );
 }
 
-/** the turn goes on but nothing shows it yet (waiting for the model, between two steps) */
-export function Working() {
-  const secs = useElapsed(turnStart.value, true);
-  return <div class="activity running"><Icon name="spinner" />{t('assistant.thinking2')}<span class="faint mono">{secs} s</span></div>;
-}
+/** a duration as the activity lines show it: tenths under ten seconds */
+export const duration = (ms: number) => `${(ms < 10_000 ? (ms / 1000).toFixed(1) : String(Math.round(ms / 1000))).replace('.', locale === 'fr' ? ',' : '.')} s`;
 
-/** a tool the assistant runs: its line, and how far it is while it runs */
+/** a tool the assistant runs: its line, how far it is while it runs, how long it took once done */
 export function ToolLine({ tool }: { tool: NonNullable<ChatItem['tool']> }) {
   const run = !tool.done;
   const p = run ? tool.progress : undefined, pct = progressOf(tool);
   return (
     <div class={`activity${run ? ' running' : ''}`}>
       <Icon name={run ? 'spinner' : tool.error ? 'alert' : 'check'} />{tool.summary}
+      {!run && tool.ms !== undefined && <span class="tool-took mono">{duration(tool.ms)}</span>}
+      {tool.detail && <span class={`tool-detail${tool.error ? ' error' : ''}`} title={tool.detail}>{tool.detail}</span>}
       {p && <span class="tool-progress">{pct !== null && <span class="progress"><i style={{ width: `${pct}%` }} /></span>}<span class="mono">{[p.step, pct !== null ? `${pct} %` : ''].filter(Boolean).join(' ')}</span></span>}
     </div>
   );

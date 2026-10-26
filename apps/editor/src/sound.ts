@@ -451,7 +451,7 @@ const generateSound: ToolType<{ kind: 'sfx' | 'music' | 'voice'; prompt: string;
       ops: [...kept.ops, ...placed.ops], reload: kept.reload, label: `Sound ${label}`,
       text: `${kind} made by ${made.provider} (${made.model}${made.voice ? `, voice ${made.voice}` : ''}), saved as asset ${kept.asset} with its prompt: ${figuresText(figures)}. ${placedText(placed, times)}${keep ? ' Kept in the library.' : ''}${kind === 'music' ? ' Duck it under a voice with duck.' : ''}`,
       images: [{ url: waveform(buffer, figures, label), caption: label }],
-      notice: t('sound.made', { name: label, provider: made.provider }),
+      notice: t('sound.made', { name: label, provider: made.provider, model: made.model }),
     };
   },
 };

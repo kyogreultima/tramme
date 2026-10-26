@@ -22,6 +22,7 @@ import { useCommandMenu } from './composer.tsx';
 import { Modal, longPress, openMenu, Seg } from './controls.tsx';
 import { Icon } from './icons.tsx';
 import { LogoMark } from './Logo.tsx';
+import { ModelPicker } from './ModelPicker.tsx';
 import { Overlays } from './shell.tsx';
 import { HelpButton } from './Help.tsx';
 import { WindowControls, windowBar } from './WindowControls.tsx';
@@ -183,7 +184,7 @@ function Card({ m, onMenu }: { m: Manifest; onMenu: (e: MouseEvent | { clientX: 
   );
 }
 
-/** the direction box: the words of the film, the material it is made from, its format */
+/** the direction box: the words of the film, the material it is made from, the model that makes it, its format */
 function DirectionBox({ busy, onStart }: { busy: boolean; onStart: (words: string, material: Picked[], format: [number, number]) => void }) {
   const [words, setWords] = useState('');
   const [material, setMaterial] = useState<Picked[]>([]);
@@ -231,6 +232,7 @@ function DirectionBox({ busy, onStart }: { busy: boolean; onStart: (words: strin
           <input ref={files} type="file" multiple hidden accept="image/*,video/*,audio/*,.pdf,application/pdf,.md,.markdown,.json,.ttf,.otf,.woff,.woff2,.glb,.gltf" onChange={chosen} />
           <input ref={folder} type="file" multiple hidden {...{ webkitdirectory: true }} onChange={chosen} />
           <span class="grow" />
+          <ModelPicker />
           <Seg value={format} role="radiogroup" ariaLabel={t('common.format')}
             options={FILM_FORMATS.map(([id, , w, h]) => ({ value: id, label: <><i class="fmt" style={{ aspectRatio: `${w} / ${h}`, [w >= h ? 'width' : 'height']: '13px' }} />{id.replace('x', ':')}</> }))}
             onChange={setFormat} />

@@ -291,7 +291,7 @@ async function keepAndPlace(ctx: ToolContext, made: MadeImage, label: string, re
     ops, reload: o.again ? [o.again] : kept.reload, label: `Picture ${label}`,
     text: `Picture made by ${made.provider} (${made.model}, ${String(record.ratio)}), saved as asset ${o.again ?? kept.asset} with its record${o.again ? ' — made again in place: every layer showing it shows the new one' : `; layer ${placed!.layer}${o.background ? ' in the background' : ''} from ${o.at.toFixed(2)} s`}.${grown} You see it: judge it (a background stays quiet under the titles) and have it made again with a sharper prompt, or again + change, when it is off.`,
     images: [{ url: await preview(blob), caption: `${label} · ${made.provider}` }],
-    notice: t('image.made', { name: label, provider: made.provider }),
+    notice: t('image.made', { name: label, provider: made.provider, model: made.model }),
   };
 }
 

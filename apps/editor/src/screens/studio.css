@@ -34,6 +34,7 @@
 .pill .mono { font-size: var(--fs-xs); }
 .pill-stop { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; border: 0; flex: none; background: var(--field-active); color: var(--text); }
 .pill-stop:hover { background: var(--danger); color: var(--on-danger); }
+.pill-stop.pause:hover { background: var(--field-hover); color: var(--text); }
 .pill-stop svg.i { width: 11px; height: 11px; fill: currentColor; stroke: none; }
 .take-pill { padding-left: 14px; }
 .take-pill .take-label { max-width: 260px; }
