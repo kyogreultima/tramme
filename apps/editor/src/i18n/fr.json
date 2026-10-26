@@ -141,6 +141,12 @@
     "paidTakes": "Un fournisseur va en dessiner {n} prises, ce qui coûte de l’argent (chacune compte) : « {prompt} »",
     "take": "Prise {n}"
   },
+  "video": {
+    "made": "Clip « {name} » créé par {provider} ({model}).",
+    "paidTitle": "Faire créer ce clip ?",
+    "paidText": "Un fournisseur va créer un court clip, ce qui coûte de l’argent : « {prompt} »",
+    "paidYes": "Créer le clip"
+  },
   "shorts": {
     "candidates": "{n} passage(s) qui se tiennent seuls.",
     "built": "{n} short(s) construit(s) en compositions.",
@@ -880,6 +886,12 @@
     "pictureSizeHint": "Petite demande la taille la moins chère du fournisseur ; l’outil d’agrandissement amène ensuite l’image à la taille du cadre.",
     "pictureSizeSmall": "Petite",
     "pictureSizeLarge": "Grande",
+    "videos": "Vidéos",
+    "videosHint": "Ce que l’assistant et le menu / utilisent quand ils font faire un clip et que la demande ne dit rien. Un clip fait par un fournisseur coûte de l’argent : on vous le demande d’abord, et chaque seconde est facturée.",
+    "videoProvider": "Fournisseur",
+    "videoProviderHint": "Automatique : le premier connecté qui fait des clips. Hydracept fait tourner Veo 3.1 Fast.",
+    "videoSeconds": "Durée",
+    "videoSecondsHint": "Veo fait des clips de 4, 6 ou 8 secondes ; l’outil peut demander une autre durée par clip.",
     "toursHint": "De courtes visites de l'éditeur, proposées la première fois qu'un écran s'ouvre.",
     "storageHint": "Les projets de cette appli, gardés en dossiers sur cet ordinateur.",
     "modelHint": "L'IA avec laquelle l'assistant réfléchit, et l'effort qu'il met dans chaque message.",

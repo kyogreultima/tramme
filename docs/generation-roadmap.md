@@ -2,7 +2,7 @@
 
 How the assistant has pictures made, not only sounds: a background the project holds no asset for, a texture, an illustration, a prop — and, later, moving pictures. Before this the assistant composed what the vocabulary allows and what the project holds; when the project held no fitting picture, it could only point at the lack. Now it has one made, the way [generate-sound](sound-roadmap.md) has a sound made.
 
-Status: steps 1 to 4 done. What is left is listed under each step. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
+Status: steps 1 to 5 done (video through Hydracept/Veo for now). What is left is listed under each step. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
 
 ## Why
 
@@ -60,7 +60,9 @@ Done when: asked for "a night-sky background", the assistant has one made, propo
 
 ### Step 5. Moving pictures
 
-- [ ] Video providers (Veo, Kling, Runway…) as footage layers: the same record (`.video.json`), the same gate, seconds billed, the shots tool finding the cuts of what comes back. The providers are young and slow: this step waits for prices and latency worth building on.
+- [x] Video providers as footage layers: the same record (`.video.json`), the same gate, seconds billed, the shots tool finding the cuts of what comes back.
+
+  `generate-video` through Hydracept runs Veo 3.1 Fast: 4, 6 or 8 seconds from words, or a still picture (an image asset, or a frame of the composition) animated as the opening frame. The clip is saved under `assets/videos/` with its record, proposed as a video layer at the playhead, and answered with a frame so the assistant judges it. The Videos settings set the provider and the length. Kling and Runway wait for a provider of their own: Hydracept is the one wired for now.
 
 ### Step 6. What was made, checked
 

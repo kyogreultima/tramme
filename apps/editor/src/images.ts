@@ -39,7 +39,7 @@ export function ratioOf(w: number, h: number): Ratio {
 /** a ratio's width over its height */
 const valueOf = (r: string) => { const [a, b] = r.split(':').map(Number); return a / b; };
 
-export const slugOf = (name: string) => name.toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 56) || 'picture';
+export const slugOf = (name: string, fallback = 'picture') => name.toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 56) || fallback;
 
 /** a picture kept under assets/images/ and declared as an image asset (replaced when made again) */
 async function keepImage(ctx: ToolContext, name: string, blob: Blob, made: unknown): Promise<{ asset: string; ops: Op[]; reload: string[] }> {

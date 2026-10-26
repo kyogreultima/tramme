@@ -8,6 +8,10 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+### Added
+
+- **Clips, made by a provider** ([generation-roadmap.md](docs/generation-roadmap.md), step 5): `generate-video` has Veo 3.1 Fast, through Hydracept, make a 4, 6 or 8 second shot from words, or animate a still picture of the project as its opening frame. The clip is saved under `assets/videos/` with its record (`.video.json`), proposed as a video layer at the playhead, and answered with a frame so the assistant judges it; `again` and `change` make it again from its record. A new Videos section in the settings sets the provider and the length. Each second is billed, so the user says yes first, as for the pictures and the sounds.
+
 ## [0.14.0] - 2026-10-26
 
 ### Added
