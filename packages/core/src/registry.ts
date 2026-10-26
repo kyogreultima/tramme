@@ -417,7 +417,7 @@ export class Registry {
   /** register what a plugin module exports (`nodes`, `effects`, `modifiers`, `tools`, `prompts`, `checks`, `kits`, `presets`); a plugin may replace its own earlier version */
   use(mod: PluginModule, from: string): this {
     const api = mod.meta?.api ?? 1;
-    if (typeof api !== 'number' || api > PLUGIN_API) throw new Error(`plugin ${from}${mod.meta?.name ? ` (${mod.meta.name})` : ''} needs the plugin API ${api}; this tramme has ${PLUGIN_API}: update tramme`);
+    if (typeof api !== 'number' || api > PLUGIN_API) throw new Error(`plugin ${from}${mod.meta?.name ? ` (${mod.meta.name})` : ''} needs the plugin API ${api}; this Tramme has ${PLUGIN_API}: update Tramme`);
     for (const n of mod.nodes || []) {
       if (!n || typeof n.type !== 'string' || !n.props || !n.render) throw new Error(`plugin ${from}: malformed node`);
       this.nodes.set(n.type, n);

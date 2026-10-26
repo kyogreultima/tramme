@@ -1,4 +1,4 @@
-// The tramme project format, version 1. A project is a set of files:
+// The Tramme project format, version 1. A project is a set of files:
 //
 //   tramme.json            manifest (this file's schema)
 //   document.tramme.json   the document (schema tramme/1)
@@ -169,7 +169,7 @@ export function checkProject(files: Map<string, Uint8Array>): { issues: Issue[];
     if (data.byteLength > maxSize(p)) issues.push({ path: p, message: 'file too large' });
   }
   let manifest: Manifest | undefined;
-  if (!files.has(MANIFEST)) issues.push({ path: MANIFEST, message: 'manifest missing: this is not a tramme project' });
+  if (!files.has(MANIFEST)) issues.push({ path: MANIFEST, message: 'manifest missing: this is not a Tramme project' });
   else {
     try {
       const r = ManifestSchema.safeParse(JSON.parse(text(MANIFEST)));

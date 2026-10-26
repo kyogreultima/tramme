@@ -1,4 +1,4 @@
-// The picture a link to tramme shows (Open Graph, X, chats): a 1200×630 card
+// The picture a link to Tramme shows (Open Graph, X, chats): a 1200×630 card
 // in the site's colours, its title in Geist and the editor's screenshot,
 // rendered by a headless Edge or Chrome, written to apps/editor/og.jpg. The
 // site (apps/site) and the editor's page (apps/editor/build.ts) share it.
@@ -47,7 +47,7 @@ p { margin-top: 28px; font-size: 25px; line-height: 1.4; color: #9eabb3; letter-
 .shot img { display: block; width: 100%; }
 </style></head><body>
 <div class="text">
-  <div class="brand">${icon}<span>tramme</span></div>
+  <div class="brand">${icon}<span>Tramme</span></div>
   <h1><span>Motion design,</span> <span class="quiet">written as data.</span></h1>
   <p>An open-source engine and editor. You and the AI edit the same document.</p>
   <div class="foot"><b>tramme.dev</b><span>Apache-2.0</span></div>

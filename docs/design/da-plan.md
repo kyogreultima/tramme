@@ -35,8 +35,8 @@ L'organisation du Studio est validée. Trois problèmes restent :
    - l'action principale ;
    - la sélection ;
    - le focus ;
-   - « tramme au travail ».
-4. **Pas de clichés IA.** Ni violet, ni dégradé décoratif, ni halo, ni étincelle. L'assistant, c'est tramme : sa marque (`LogoMark`) et l'accent du thème. Une prise se signale par une claquette (nouvelle icône `clap`).
+   - « Tramme au travail ».
+4. **Pas de clichés IA.** Ni violet, ni dégradé décoratif, ni halo, ni étincelle. L'assistant, c'est Tramme : sa marque (`LogoMark`) et l'accent du thème. Une prise se signale par une claquette (nouvelle icône `clap`).
 5. **Des formes cohérentes.** Une seule échelle de rayons :
    - boutons texte en pilule ;
    - boutons icône en carré arrondi à 8 px ;
@@ -196,7 +196,7 @@ La partie `2. COMPOSANTS` de la planche donne la forme exacte de chacun : classe
 | Panneau | `.col`, `.panel-head`, `.assistant`, `.inspector-wrap`, bord à bord | `.panel` : `--surface`, rayon 14, `--shadow-1`, posé dans une gouttière ; `.panel-head` de 44 px sans filet |
 | Carte | onze classes (détail sous le tableau) | `.card` (+ `interactive`) et `.well` (zone interne `--surface-2`, rayon 12) |
 | Ligne de liste | neuf classes (détail sous le tableau) | `.row-item` : 28 px, rayon 8, en retrait de 6 px dans son panneau, sélection `--accent-soft` ; plus de barre pleine largeur ni de liseré gauche |
-| Marque de l'assistant | `Icon name="spark"` partout | `LogoMark` dans un carré `--accent-soft` (`.mark`), qui respire quand tramme travaille |
+| Marque de l'assistant | `Icon name="spark"` partout | `LogoMark` dans un carré `--accent-soft` (`.mark`), qui respire quand Tramme travaille |
 
 **Contrôle segmenté.**
 - Les six variantes à remplacer :

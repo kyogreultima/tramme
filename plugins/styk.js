@@ -1,4 +1,4 @@
-// Stick figures: Pivot and StykAnimate-style characters, brought into tramme.
+// Stick figures: Pivot and StykAnimate-style characters, brought into Tramme.
 // A figure is a tree of segments with fixed lengths (a rig, like a .stk figure
 // type); a pose gives each segment an angle relative to its parent, so a
 // keyframed pose animates frame by frame as in Pivot, an expression can drive

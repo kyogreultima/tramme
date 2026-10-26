@@ -118,7 +118,7 @@ jobs:
         # the tag is made on the commit that was built
         run: |
           node scripts/version.ts --notes "${TAG#v}" > notes.md
-          gh release create "$TAG" out/* --target "$GITHUB_SHA" --title "tramme $TAG" --notes-file notes.md
+          gh release create "$TAG" out/* --target "$GITHUB_SHA" --title "Tramme $TAG" --notes-file notes.md
 
   site:
     name: Deploy the site

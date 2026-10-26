@@ -1,4 +1,4 @@
-// The tramme project format, version 1, as far as the desktop storage needs
+// The Tramme project format, version 1, as far as the desktop storage needs
 // it: a Rust port of the stable parts of packages/project/src/format.ts
 // (manifest, paths, mime, ids, a fresh project). The meaning of the document
 // stays checked by the editor, where it runs — this side only parses JSON.

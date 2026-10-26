@@ -1,4 +1,4 @@
-# The tramme document (`tramme/1`)
+# The Tramme document (`tramme/1`)
 
 A project is a JSON file `*.tramme.json`. It is the source of truth: the editor, the AI and the renderer read and change this file, nothing else. The JSON schema is in `schema/tramme-1.schema.json`.
 
@@ -256,7 +256,7 @@ Property types: `number`, `vec2`, `bool`, `color`, `paint`, `enum` (`options`), 
 
 A node may also simulate: `simulate: { init(props, host), step(state, props, dt, host) }` carries a state from frame to frame (springs, ropes, flocks, trails). The engine steps it in order from the layer's in point at the composition's frame rate and keeps checkpoints, so any frame renders in any order and always gives the same picture; `step` returns a new state and never changes the one it is given. Rendering reads it with `host.state()`. `host.layer(id)` gives another layer's evaluated props and transform at the same instant (connectors, followers). The built-in `follow` node is an example: a dot following another layer on a spring.
 
-A plugin should say who it is: `export const meta = { name, version, description, api: 1 }`. `api` is the plugin API it was written for; a tramme with an older API refuses the plugin with a message rather than failing halfway. In TypeScript or with JSDoc, `@tramme/plugin` gives every type and `definePlugin()` for autocompletion.
+A plugin should say who it is: `export const meta = { name, version, description, api: 1 }`. `api` is the plugin API it was written for; a Tramme with an older API refuses the plugin with a message rather than failing halfway. In TypeScript or with JSDoc, `@tramme/plugin` gives every type and `definePlugin()` for autocompletion.
 
 A plugin can be installed on the user's device (Settings, Plugins: a `.js` module, or a `.trammeplugin` package, a zip of `plugin.js` and its own files such as fonts, LUTs and pictures), or kept there from a project with `library-add`. It is then offered in every project. Its tools, checks, workflows, kits and presets run in each project's sandbox. Its nodes, effects and modifiers are copied into the project's `plugins/` (with its own files) when a layer first uses one, so the project and its archive stay self-contained. `library-use` copies one by hand. An installed plugin says more about itself in `meta`: a stable `id` (`author/name`), a `version` (semver), a `licence`, an `author`, a `homepage`, and its `permissions`. Without them, an id is made from its name and its version is `0.0.0`.
 

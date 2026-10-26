@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "tramme",
-  "version": "0.13.0",
+  "productName": "Tramme",
+  "version": "0.14.0",
   "identifier": "app.tramme.desktop",
   "build": {
     "frontendDist": "../../editor/dist"
@@ -18,8 +18,8 @@
     "fileAssociations": [
       {
         "ext": ["tramme"],
-        "name": "tramme project",
-        "description": "A tramme project"
+        "name": "Tramme project",
+        "description": "A Tramme project"
       }
     ],
     "macOS": {

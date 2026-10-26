@@ -266,7 +266,7 @@ export function Home() {
     return () => removeEventListener('keydown', key);
   }, []);
   useEffect(() => {
-    document.title = `${t('home.projects')} · tramme`;
+    document.title = `${t('home.projects')} · Tramme`;
     refresh();
     fetch('/examples/index.json').then((r) => (r.ok ? r.json() : [])).then(setExamples).catch(() => {});
   }, []);
@@ -327,7 +327,7 @@ export function Home() {
       onDragLeave={(e) => { if (e.target === e.currentTarget) setDrag(false); }}
       onDrop={(e) => { e.preventDefault(); setDrag(false); if (e.dataTransfer) droppedOf(e.dataTransfer).then(openFiles).catch((x) => setDialog({ kind: 'failure', error: x as Error })); }}>
       <header class="home-top" {...windowBar}>
-        <div class="brand"><LogoMark /><span>tramme</span></div>
+        <div class="brand"><LogoMark /><span>Tramme</span></div>
         <span class="grow" />
         {installable.value && <button class="btn outline sm" title={t('home.installAppHint')} onClick={install}><Icon name="download" /><span class="label">{t('home.installApp')}</span></button>}
         <HelpButton page="home" />

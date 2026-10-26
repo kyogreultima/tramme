@@ -35,7 +35,7 @@ The order the items are taken in. It follows what each one needs from the others
 9. Installed plugins, steps 1 to 7.
 10. Performance, step 4 — only what the measures point at.
 11. Components, step 6 — the cut per pixel, said in its roadmap to come later.
-12. Installed plugins, step 8 — the marketplace: blocked until tramme has its API. The loop does not start it; it lists it as blocked and stops there.
+12. Installed plugins, step 8 — the marketplace: blocked until Tramme has its API. The loop does not start it; it lists it as blocked and stops there.
 13. Polish, all steps.
 14. Packs, steps 3 to 17, in order.
 15. Generation, steps 2 to 4.
@@ -61,7 +61,7 @@ One iteration lands one box, or a few boxes of the same step when they only make
 5. **Check.** `npm run typecheck` and `npm test` pass; `npm run site:build` too when a page of the docs changed. A failure is fixed, not skipped. After three honest attempts at the same failure, the work in progress is reverted from the branch (kept as a patch under `docs/roadmap-loop/` only if it is worth resuming), the box goes under "Blocked" with the reason, and the loop takes the next box. The branch's checks always pass.
 6. **Write it down.**
    - Tick the box in its roadmap, update the roadmap's "Status" line, and add under the box what was left out, if anything.
-   - A line in `CHANGELOG.md`, under `Unreleased`, for every box, always: under `Added`, `Changed` or `Fixed`, written for the people who use tramme (what they can now do, or what got faster and by how much), the way the existing entries are written. No box is ticked without its changelog line.
+   - A line in `CHANGELOG.md`, under `Unreleased`, for every box, always: under `Added`, `Changed` or `Fixed`, written for the people who use Tramme (what they can now do, or what got faster and by how much), the way the existing entries are written. No box is ticked without its changelog line.
    - The README when a visible feature changes what it says.
    - What could not be checked here (a phone, a Mac, iOS's Files app, a real GPU, HDR on a screen) said under the box: "to check on a device", and gathered in the final pull request. It does not block the box.
 7. **Commit and push.** The code, its tests, the ticked box and the changelog line in the same commit (or a few, for a large box), its message in Conventional Commits (`feat(editor): speed curves on video and sound layers`), then push `feat/roadmap-loop`. The commits are the user's: before the first one, `git config user.name KYOGRE` and `git config user.email aziz@kyogre.dev`, never Claude as author or committer. No `Co-Authored-By` line, no mention of Claude in commits or in the pull request. Nothing is left unpushed at the end of an iteration.
@@ -98,7 +98,7 @@ Three ways, the same brief:
 
 - **A scheduled task (recommended).** A fresh session every few hours, each doing as many iterations as fit, then stopping cleanly. Each run starts from what is pushed, so nothing is lost when a session ends, and each starts with a clean context. The prompt of the task:
 
-  > Work on the tramme repository (kyogreultima/tramme). Read `docs/roadmap-loop.md` on `develop` and follow it: work on the branch `feat/roadmap-loop` (create it from the latest `develop` if it does not exist yet), run iterations one after the other, each landing one box of the queue with its changelog line, until the run's time is nearly spent or the loop says to stop. Leave nothing unpushed. Do not open the pull request before every box is ticked or blocked.
+  > Work on the Tramme repository (kyogreultima/tramme). Read `docs/roadmap-loop.md` on `develop` and follow it: work on the branch `feat/roadmap-loop` (create it from the latest `develop` if it does not exist yet), run iterations one after the other, each landing one box of the queue with its changelog line, until the run's time is nearly spent or the loop says to stop. Leave nothing unpushed. Do not open the pull request before every box is ticked or blocked.
 
 - **This session, with `/loop`.** The same prompt, paced by the agent; it lasts as long as the session.
 - **By hand.** The same prompt pasted into a new session, one run at a time.
@@ -109,7 +109,7 @@ Before the first run, the environment must install and test the repository: Node
 
 Boxes the loop could not land, with why. The loop adds to this list; the user clears it.
 
-- Installed plugins, step 8 (the marketplace): waits for tramme's API.
+- Installed plugins, step 8 (the marketplace): waits for Tramme's API.
 - Editing, step 12, voice and music apart (Demucs in ONNX): no ONNX export of Demucs whose inputs are known could be fetched or checked from the loop's container; it needs one, then runs through the long-job runner of step 13.
 - Editing, step 14, HDR (PQ, HLG): waits by design for Canvas 2D above 8 bits; exports stay SDR, at 10 bits where possible.
 - Components, step 5, the volume view: written in its roadmap as "later"; nothing in the queue asks for it yet.

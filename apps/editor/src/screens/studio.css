@@ -14,7 +14,7 @@
 .studio-stage { position: relative; flex: 1; min-height: 0; overflow: hidden; background: var(--stage); border-radius: var(--r-lg); box-shadow: var(--shadow-1); }
 .studio-stage .viewport { position: absolute; inset: 0; background: transparent; }
 .studio-stage .viewport .stage { cursor: crosshair; }
-/* tramme at work: a ring of accent breathes around the picture (the picture itself does not move) */
+/* Tramme at work: a ring of accent breathes around the picture (the picture itself does not move) */
 .studio-stage.working .viewport canvas.picture { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 6px; animation: ring 1.6s var(--ease) infinite; }
 @keyframes ring { 50% { outline-color: var(--accent-soft); } }
 /* a take on screen: the picture framed by a steady accent line */

@@ -1,6 +1,6 @@
 # Taste roadmap
 
-How tramme gains the taste of a motion designer: the rules of the craft, distilled from the public references of the field and encoded where the engine can act on them. The goal: a simple request produces a result that already moves well, without the user asking for it.
+How Tramme gains the taste of a motion designer: the rules of the craft, distilled from the public references of the field and encoded where the engine can act on them. The goal: a simple request produces a result that already moves well, without the user asking for it.
 
 Status: steps 1 to 7 done. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
 

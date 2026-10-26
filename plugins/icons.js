@@ -87,7 +87,7 @@ export const topIcons = (data, count = 12) => Object.keys(data.icons ?? {}).slic
 
 // ── the tool ─────────────────────────────────────────────────
 const JITTER = [1, 1.35, 0.8, 1.15, 0.9, 1.2, 1.05, 0.85];
-/** the draw-on's ease: the kit's enter, or tramme's out ease */
+/** the draw-on's ease: the kit's enter, or Tramme's out ease */
 const enterOf = (doc) => (doc.tokens?.enter?.type === 'ease' ? '@enter' : [0.16, 1, 0.3, 1]);
 
 /** fresh, deterministic layer ids: base, base-2, base-3… against the composition's own */

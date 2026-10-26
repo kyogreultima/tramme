@@ -3,13 +3,13 @@
 //   tramme still    <doc> --t 0.5,1.2 [--out dir] [--samples n] [--comp id]
 //   tramme render   <doc> [--format mp4|mov|webm|gif|png] [--out file] [--samples n] [--from s] [--to s] [--crf 16] [--mute] [--comp id] [--pages n] [--depth 8|10]
 //   tramme export   <doc> --format lottie|svg|wav [--t s] [--comp id] [--out file]
-//   tramme import   <animation.json> [--out folder]                     Lottie to a tramme project folder
+//   tramme import   <animation.json> [--out folder]                     Lottie to a Tramme project folder
 //   tramme pack     <folder> [--out project.tramme]                    a project folder as a .tramme archive (checked)
 //   tramme unpack   <project.tramme> [--out folder]                    a .tramme archive as a project folder (checked)
 //   tramme nodes    [<doc>]                                            the node and effect vocabulary (plugins included)
 //   tramme bench    <editor url> [--layer id] [--t s]                  how the editor holds up: playback, drag, hover
 //   tramme load     [case...] [--frames n] [--out folder] [--json file] [--before file]   the load cases of bench/load: where a frame's time goes
-//   tramme check-export <doc> --format lottie|svg --t 0.5,1.5 [--out dir]   an export played back (lottie-web, Chrome) vs tramme
+//   tramme check-export <doc> --format lottie|svg --t 0.5,1.5 [--out dir]   an export played back (lottie-web, Chrome) vs Tramme
 //   tramme compare  <ref> <test> [--diff dir] [--threshold 16]     files, or folders paired by time
 //   tramme schema   [--out schema/tramme-1.schema.json]
 //   tramme agent    [--origin https://app.example] [--port 4317] [--renew]   the local companion of the editor's assistant (Claude Code, Codex or the Antigravity CLI of this computer)
@@ -220,7 +220,7 @@ async function reportProject(files: Map<string, Uint8Array>, label: string) {
 }
 
 async function cmdPack(dir: string) {
-  if (!dir || !fs.existsSync(path.join(dir, MANIFEST))) throw new Error(`no tramme project in ${dir ?? '(none)'} (${MANIFEST} missing)`);
+  if (!dir || !fs.existsSync(path.join(dir, MANIFEST))) throw new Error(`no Tramme project in ${dir ?? '(none)'} (${MANIFEST} missing)`);
   const files = readFolder(dir);
   for (const k of [...files.keys()]) if (k.startsWith('.tramme/') && !isChatPath(k)) files.delete(k);
   await reportProject(files, dir);

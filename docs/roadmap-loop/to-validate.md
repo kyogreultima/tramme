@@ -453,7 +453,7 @@ its network policy) and has no GPU: no model was downloaded or run there.
   that is not copied yet runs from a blob URL, where that relative URL does
   not resolve.
 - **Not done:** a hanging tool is not timed out (tools may run long);
-  step 8, the marketplace, is blocked until tramme has its API.
+  step 8, the marketplace, is blocked until Tramme has its API.
 
 ## Performance, step 4
 

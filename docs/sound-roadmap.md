@@ -6,7 +6,7 @@ Status: steps 1 to 9 done. What is left is listed under each step. Tick the boxe
 
 ## Why
 
-In tramme a sound is always a file: an `audio` layer plays an asset from `start`, between its in and out points (`packages/core/src/audio.ts`). There is no node that synthesises sound at render time, and there should not be one: rendering stays a pure function of time.
+In Tramme a sound is always a file: an `audio` layer plays an asset from `start`, between its in and out points (`packages/core/src/audio.ts`). There is no node that synthesises sound at render time, and there should not be one: rendering stays a pure function of time.
 
 So making a sound means making a file. From a terminal, Claude writes a script; the editor's assistant had no terminal, `write_file` writes text only, and its audio tools only analysed (`beats`, `get_transcript`, `cut_media`).
 

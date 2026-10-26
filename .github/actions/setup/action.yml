@@ -2,7 +2,7 @@
 # its cache over the desktop crate, and on Linux the system libraries that
 # crate needs (WebKitGTK for the webview, D-Bus for the keychain).
 
-name: Set up tramme
+name: Set up Tramme
 description: Node 22, Rust stable, and the Linux libraries of the desktop crate.
 
 inputs:

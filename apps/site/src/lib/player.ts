@@ -1,4 +1,4 @@
-// The site's players: the editor's engine (packages/render) playing a tramme
+// The site's players: the editor's engine (packages/render) playing a Tramme
 // document on a canvas, in a loop. Loaded once a player comes near the
 // screen; the poster stays until the first frame is drawn.
 //

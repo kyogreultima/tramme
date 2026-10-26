@@ -26,7 +26,7 @@ export const DOCS: { label: string; collapsed?: boolean; pages: DocPage[] }[] = 
     ],
   },
   {
-    label: 'Using tramme',
+    label: 'Using Tramme',
     pages: [
       { slug: 'editor', label: 'The editor', file: 'README.md', sections: ['The editor'] },
       { slug: 'assistant', label: 'The assistant', file: 'README.md', sections: ['The assistant'] },

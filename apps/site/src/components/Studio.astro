@@ -15,19 +15,19 @@ import composerDark from '../assets/part-composer-dark.png';
 
 const ITEMS = [
   { Icon: PushPin, title: 'Notes, pinned', text: 'Say what should change, as you would to an editor. Pin a note to a moment or a place of the frame, or to a scene of the storyboard.' },
-  { Icon: FilmSlate, title: 'Takes, not surprises', text: 'tramme answers with a take shown on the picture. Keep it, or set it aside: nothing lands in the film without you.' },
+  { Icon: FilmSlate, title: 'Takes, not surprises', text: 'Tramme answers with a take shown on the picture. Keep it, or set it aside: nothing lands in the film without you.' },
   { Icon: Compass, title: 'A direction it follows', text: 'The brief (subject, tone, rules), the palette and the material of the film, read before anything is staged.' },
 ];
 const PARTS = [
   { light: briefLight, dark: briefDark, alt: 'The brief of the film: its subject, its tone and its rules.', class: 'brief' },
   { light: composerLight, dark: composerDark, alt: 'The note box, with suggestions above it: review the film, more rhythm, another palette.', class: 'composer' },
 ];
-const alt = 'The tramme studio: the Showreel example in front, its storyboard below, and the Direction panel with the brief, the palette and the material.';
+const alt = 'The Tramme studio: the Showreel example in front, its storyboard below, and the Direction panel with the brief, the palette and the material.';
 ---
 
 <section class="section" id="studio">
   <div class="wrap">
-    <Head title="Direct the film in words." more="The studio puts the film in front: you leave notes, tramme answers with takes." />
+    <Head title="Direct the film in words." more="The studio puts the film in front: you leave notes, Tramme answers with takes." />
   </div>
   <div class="wrap-wide body">
     <Shot light={light} dark={dark} alt={alt} parts={PARTS} />

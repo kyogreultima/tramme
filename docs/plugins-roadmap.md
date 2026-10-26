@@ -26,7 +26,7 @@ The renderer gains what those need (GPU effects, layer inputs, simulations, 3D).
 - **One mechanism for the assistant and the editor.** A plugin tool is callable by the assistant and, later, from the editor's menus. Document changes always go through operations, so they are validated, previewed and undoable.
 - **Plugins describe themselves to the model.** Every node, effect, modifier and tool can carry notes for the assistant: when to use it, what to avoid, values that look good.
 - **The assistant's tool list stays fixed.** Plugin tools are reached through one generic tool (`use_tool`) and listed by `list_nodes`. The tool definitions sent to the model do not change with the project, which keeps prompt caching working on every path (companion, server, other providers).
-- **Built-in features dogfood the system.** Templates, analyses and checks that ship with tramme are written as built-in plugins, with the same API as project plugins.
+- **Built-in features dogfood the system.** Templates, analyses and checks that ship with Tramme are written as built-in plugins, with the same API as project plugins.
 
 ## The plugin module, once complete
 

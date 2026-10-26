@@ -308,7 +308,7 @@ export const SILENT = new Set(['propose_changes', 'discard_proposal']);
 /** the system prompt; reference is docs/document.md; brief is the project's own taste (assets/brief.json), when there is one */
 /** installed: the plugins installed on the user's device, one line each (name: what it is for); they change rarely, so the prompt stays cached */
 export function systemPrompt(reference: string, brief?: string, installed?: string[]): string {
-  return `You are the assistant built into tramme, a motion design editor. You work on a project: a JSON document (described below) and its files (assets/, plugins/, renders/).
+  return `You are the assistant built into Tramme, a motion design editor. You work on a project: a JSON document (described below) and its files (assets/, plugins/, renders/).
 
 Rules:
 - Every change to the document goes through the propose_changes tool (JSON Patch operations). The user sees your proposal as a preview, then applies or rejects it.

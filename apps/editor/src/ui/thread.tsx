@@ -125,7 +125,7 @@ export function Work({ work, live }: { work: ChatItem[]; live: boolean }) {
         <>
           <div class="work-head">
             <span class="mark"><LogoMark /></span>
-            <b>tramme</b>
+            <b>Tramme</b>
           </div>
           {stages.length > 0 && <Pipeline stages={stages} open={open} steps={steps.length} onToggle={() => setOpen(!open)} />}
           {open && <div class="work-steps">{steps.map((it) => <Step key={it.id} it={it} />)}</div>}

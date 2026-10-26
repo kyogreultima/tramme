@@ -19,7 +19,7 @@
 
 - House rules of the loop, verbatim in force: rendering is a pure function of `t`; a model or an analysis runs at authoring time and its result is saved as an asset; every new property comes from a schema (`npm run schema` when the document format changes); every new tool is in the editor's vocabulary (`use_tool` and the `/` menu) with its `ai` notes; every interface string in English and French; no model packed in the bundle.
 - Packs, from the roadmap's principles: **any film, never one video** (each pack tried on at least three inputs and in 16:9 and 9:16 before its box is ticked); colours only as token references (`@plate`, `@ink`, `@accent`, `@accent2`), curves and pace from the kit (`enter`, `exit`, `pace`, `stagger`); draw-ons of 0.4 to 0.8 s eased out; no gradients, glows or violets; seeded layouts (same input and seed give the same result).
-- **One file, no imports** per pack. A need shared by two packs goes into tramme itself or into the pack that already owns it (the walkthrough's `device` frame, the charts' `niceMax`).
+- **One file, no imports** per pack. A need shared by two packs goes into Tramme itself or into the pack that already owns it (the walkthrough's `device` frame, the charts' `niceMax`).
 - **Licences:** MIT, ISC, BSD, Apache-2.0, OFL or public domain only, each listed in `THIRD_PARTY_NOTICES.md`. Nothing CC-BY.
 - **No network** for a pack, at authoring or render time. Data ships beside the pack; only what a tool used is written into the project.
 - **Complete when it lands** (each pack task's last step, never skipped):

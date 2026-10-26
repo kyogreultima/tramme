@@ -6,7 +6,7 @@ Status: steps 1 to 4 done. What is left is listed under each step. Tick the boxe
 
 ## Why
 
-In tramme a picture is always a file: an `image` layer shows an asset of the project. There is no node that draws at render time, and there should not be one: rendering stays a pure function of time.
+In Tramme a picture is always a file: an `image` layer shows an asset of the project. There is no node that draws at render time, and there should not be one: rendering stays a pure function of time.
 
 So making a picture means making a file. The sound tools showed the way: records first, code for what they lack, providers for what neither can make. Pictures have no library here and no code that draws one; the providers come first. A model cannot draw either — describing a picture well and judging what comes back is what it does, the way a motion designer works with a stock library or an illustrator.
 

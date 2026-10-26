@@ -1,4 +1,4 @@
-/** what tramme writes: `tramme render` (video, frames) and `tramme export`
+/** what Tramme writes: `tramme render` (video, frames) and `tramme export`
  *  (vectors, sound); the editor writes them all in the browser but MOV */
 export const FORMATS = [
   { name: 'MP4', what: 'H.264, or H.265 in 10 bits' },

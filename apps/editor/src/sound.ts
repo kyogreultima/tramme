@@ -21,7 +21,7 @@ import { t } from './i18n/index.ts';
 // ── the library ──────────────────────────────────────────────
 let shipped: Promise<SoundEntry[]> | null = null;
 
-/** every sound at hand: recorded ones shipped with tramme, the presets written as code, the user's library */
+/** every sound at hand: recorded ones shipped with Tramme, the presets written as code, the user's library */
 export async function soundLibrary(): Promise<SoundEntry[]> {
   shipped ??= fetch(new URL('/sounds/catalog.json', location.href)).then((r) => (r.ok ? r.json() : { sounds: [] })).then((j: { sounds: SoundEntry[] }) => j.sounds).catch(() => []);
   const mine = await api.sounds().then((list) => list.flatMap((x) => (x.entry ? [{ ...(x.entry as SoundEntry), source: 'library' as const, file: x.name }] : []))).catch(() => []);
@@ -688,7 +688,7 @@ const credits: ToolType<Record<string, never>> = {
       const e = side?.from ? all.find((x) => x.id === side.from) : all.find((x) => `sound-${x.id}`.slice(0, 64) === id);
       const name = a.name ?? id;
       if (side?.provider) lines.push(`- ${name}: made by ${side.provider}${side.model ? ` (${side.model})` : ''}`);
-      else if (side?.code || e?.code) lines.push(`- ${name}: written as code (tramme)`);
+      else if (side?.code || e?.code) lines.push(`- ${name}: written as code (Tramme)`);
       else if (e || side?.license) lines.push(`- ${name}: ${e?.title ?? side?.title ?? name}, ${side?.author ?? e?.author ?? 'unknown author'}, ${side?.license ?? e?.license ?? 'license unknown'}${side?.url ?? e?.url ? ` <${side?.url ?? e?.url}>` : ''}`);
       else lines.push(`- ${name}: brought by the user (${a.src})`);
     }

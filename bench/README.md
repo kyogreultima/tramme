@@ -1,13 +1,13 @@
 # Bench
 
 Two benches: what the assistant costs and makes (below), and where a frame's
-time goes when tramme renders ([load cases](#load-cases-where-a-frames-time-goes)).
+time goes when Tramme renders ([load cases](#load-cases-where-a-frames-time-goes)).
 
 ## What the assistant costs and makes, on briefs it has never seen
 
 `briefs.json` holds prompts of the kind users write: launches, announcements,
 teasers, data stories, testimonials, in four formats and two languages. The
-**dev** briefs are for working on tramme; the **test** briefs stay unseen while
+**dev** briefs are for working on Tramme; the **test** briefs stay unseen while
 doing so (no preset, element or prompt is tuned on them) and are only run to
 measure. A change that helps the dev briefs and not the test ones is fitted to
 those videos, not general.
