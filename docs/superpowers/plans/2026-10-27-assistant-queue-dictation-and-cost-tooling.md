@@ -67,7 +67,7 @@
 
 **Interfaces:** none new, unless the cause calls for one.
 
-- [ ] **Step 1: Find the cause** with superpowers:systematic-debugging before changing anything.
+- [x] **Step 1: Find the cause** with superpowers:systematic-debugging before changing anything.
   - Render `DirectionBox` (it is not exported: export it for the test) with happy-dom, type `/` into its textarea, and look for `.command-menu` rows.
   - The code is supposed to offer `listCommands(S.registry.value)` (the editor registry has tools and prompts) plus the packs' commands.
   - Candidates to rule out:
@@ -76,11 +76,11 @@
     - `S.registry` is empty at that moment in the desktop app;
     - `shippedPacks()` fails under the desktop app's protocol.
   - If the cause shows only in the running app, say so in the report, with what you found, rather than guessing.
-- [ ] **Step 2: Write the failing test** `offers the commands on the home page`: render the box, input `/`, expect at least one `.command-row` and the row of a built-in prompt (for example `/analyze`) present.
-- [ ] **Step 3: Run** `npx vitest run apps/editor/test/home-commands.test.ts`. Expected: FAIL for the reason found in step 1.
-- [ ] **Step 4: Fix the cause.**
-- [ ] **Step 5: Run the test.** Expected: PASS.
-- [ ] **Step 6: Commit** `fix(home): offer the / commands in the home box`.
+- [x] **Step 2: Write the failing test** `offers the commands on the home page`: render the box, input `/`, expect at least one `.command-row` and the row of a built-in prompt (for example `/analyze`) present.
+- [x] **Step 3: Run** `npx vitest run apps/editor/test/home-commands.test.ts`. Expected: FAIL for the reason found in step 1.
+- [x] **Step 4: Fix the cause.**
+- [x] **Step 5: Run the test.** Expected: PASS.
+- [x] **Step 6: Commit** `fix(home): offer the / commands in the home box`.
 
 ### Task 3: A prompt for messages sent together
 
