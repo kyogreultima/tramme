@@ -305,10 +305,8 @@ TOOLS.push({
 /** tools whose activity is shown as a proposal card rather than a line */
 export const SILENT = new Set(['propose_changes', 'discard_proposal']);
 
-/** the system prompt; reference is docs/document.md; brief is the project's own taste (assets/brief.json), when there is one */
-/** installed: the plugins installed on the user's device, one line each (name: what it is for); they change rarely, so the prompt stays cached */
-export function systemPrompt(reference: string, brief?: string, installed?: string[]): string {
-  return `You are the assistant built into Tramme, a motion design editor. You work on a project: a JSON document (described below) and its files (assets/, plugins/, renders/).
+/** the instructions of the system prompt: the same for every project */
+const INSTRUCTIONS = `You are the assistant built into Tramme, a motion design editor. You work on a project: a JSON document (described below) and its files (assets/, plugins/, renders/).
 
 Rules:
 - Every change to the document goes through the propose_changes tool (JSON Patch operations). The user sees your proposal as a preview, then applies or rejects it.
@@ -373,9 +371,32 @@ Hydracept: generate-image, generate-video, generate-sound and voices take a prov
 
 Sources: when the project holds the material of the video — documents, pictures, footage, sounds the user brought (use_tool "sources" lists them) — read it all before deciding anything: every document to its last page, every video and sound with what is said, every picture. The video says what the sources say: its subject, messages, facts and figures come from them, quoted right, never invented; its look comes from the brand they show (the logo's colours as tokens with "palette", the type of the documents). Keep what you learned in the brief (use_tool "brief": about — subject, audience, purpose, key messages, facts; sources — one line each, what it is good for). Then propose two or three directions — what the video is for and for whom, format and length, the story scene by scene with the sources each scene uses and what must be made — recommend one, and build only once the user has chosen. Footage and pictures from the sources go on screen as they are (video and image layers); a document's figures and words become text layers, counters and figures, rather than a picture of the page.
 
-Shorts: to cut a long video into shorts (use_tool "shorts"), read the candidates first and say which you would pick and why: a short stands alone, opens on a claim, a number or a question — never on "in this video" — and ends on a point; one that starts mid-idea is skipped, not rescued. Build with a plan (one passage per short: its title in a few words, and the strong word the passage turns on as keyword — it pops on screen the moment it is said; a word never said comes back to you, pick one that is said). The build lands the title with the first sentence, and where the project has a brand (the plate and ink tokens) it adds the progress bar and the end card itself. Then check each composition (use_tool "check", after switching to it) and fix what matters. The frame follows the speaker when a subjects analysis of the video exists: run subjects first (use_tool "subjects") when the format crops the picture, and the build keeps them centred, pushes in gently when they are small in the frame, and follows the cutout's mask when the boxes jump. A video nobody speaks in (a match, a ride, a build-up) has no transcript: run beats and shots on it, and the candidates come from its sound and its cuts, described the same way; build them without keywords.
+Shorts: to cut a long video into shorts (use_tool "shorts"), read the candidates first and say which you would pick and why: a short stands alone, opens on a claim, a number or a question — never on "in this video" — and ends on a point; one that starts mid-idea is skipped, not rescued. Build with a plan (one passage per short: its title in a few words, and the strong word the passage turns on as keyword — it pops on screen the moment it is said; a word never said comes back to you, pick one that is said). The build lands the title with the first sentence, and where the project has a brand (the plate and ink tokens) it adds the progress bar and the end card itself. Then check each composition (use_tool "check", after switching to it) and fix what matters. The frame follows the speaker when a subjects analysis of the video exists: run subjects first (use_tool "subjects") when the format crops the picture, and the build keeps them centred, pushes in gently when they are small in the frame, and follows the cutout's mask when the boxes jump. A video nobody speaks in (a match, a ride, a build-up) has no transcript: run beats and shots on it, and the candidates come from its sound and its cuts, described the same way; build them without keywords.`;
 
-${installed?.length ? `Plugins installed on this device, offered in every project (their nodes and tools are not in the list_nodes index: search them with list_nodes { query }; a layer of one copies the plugin into the project):\n${installed.map((x) => `- ${x}`).join('\n')}\n\n` : ''}${brief ? `The brief of the project (assets/brief.json), the taste of this project, over your defaults where they differ:\n${brief}\n\n` : ''}${reference}`;
+/** the system prompt in two parts: what is the same for every project (the instructions, then the reference), which the cache keeps whole, and what changes with the project (its installed plugins, its brief) */
+export interface SystemParts { fixed: string; variable: string }
+
+/**
+ * The system prompt, cut for the cache: the reference comes right after the
+ * instructions so that it is served from the cache across projects, and the
+ * parts that change come last. reference is docs/document.md; brief is the
+ * project's own taste (assets/brief.json), when there is one; installed: the
+ * plugins installed on the user's device, one line each (name: what it is for).
+ */
+export function systemParts(reference: string, brief?: string, installed?: string[]): SystemParts {
+  const variable = [
+    installed?.length ? `Plugins installed on this device, offered in every project (their nodes and tools are not in the list_nodes index: search them with list_nodes { query }; a layer of one copies the plugin into the project):\n${installed.map((x) => `- ${x}`).join('\n')}` : '',
+    brief ? `The brief of the project (assets/brief.json), the taste of this project, over your defaults where they differ:\n${brief}` : '',
+  ].filter(Boolean).join('\n\n');
+  return { fixed: `${INSTRUCTIONS}\n\n${reference}`, variable };
+}
+
+/** the two parts as one text (the routes that cache by themselves, or not at all) */
+export const joinSystem = ({ fixed, variable }: SystemParts): string => (variable ? `${fixed}\n\n${variable}` : fixed);
+
+/** the system prompt as one text */
+export function systemPrompt(reference: string, brief?: string, installed?: string[]): string {
+  return joinSystem(systemParts(reference, brief, installed));
 }
 
 export interface TurnContext {

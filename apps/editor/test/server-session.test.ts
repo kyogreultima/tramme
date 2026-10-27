@@ -110,6 +110,26 @@ describe('assistant, server path', () => {
     expect(repaired.content[1]).toMatchObject({ type: 'text', text: 'go on' });
   });
 
+  it('sends the system prompt as two blocks, the fixed one cached an hour', async () => {
+    const sent = serve(second, second, second);
+    const turn = (system: string | { fixed: string; variable: string }) => drain(new ServerSession().turn('Hi', 'claude-opus-5-5', system, fakeRunner().runner, new AbortController().signal));
+    await turn({ fixed: 'FIXED', variable: 'VARIABLE' });
+    expect(sent[0].body.system).toEqual([{ type: 'text', text: 'FIXED', cache_control: { type: 'ephemeral', ttl: '1h' } }, { type: 'text', text: 'VARIABLE' }]);
+    // nothing that changes: one block
+    await turn({ fixed: 'FIXED', variable: '' });
+    expect(sent[1].body.system).toEqual([{ type: 'text', text: 'FIXED', cache_control: { type: 'ephemeral', ttl: '1h' } }]);
+    // a string, as before
+    await turn('whole');
+    expect(sent[2].body.system).toEqual([{ type: 'text', text: 'whole', cache_control: { type: 'ephemeral', ttl: '1h' } }]);
+  });
+
+  it('gives a chat-format model the two parts joined', async () => {
+    const said = () => new Response('data: {"choices":[{"delta":{"content":"ok"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n', { headers: { 'content-type': 'text/event-stream' } });
+    const sent = serve(said);
+    await drain(new ServerSession().turn('Hi', 'openai:gpt-5', { fixed: 'FIXED', variable: 'VARIABLE' }, fakeRunner().runner, new AbortController().signal, { target: { url: '/api/llm/x' } }));
+    expect(sent[0].body.messages[0]).toEqual({ role: 'system', content: 'FIXED\n\nVARIABLE' });
+  });
+
   it('never changes what it sent: the next message carries the same history, pictures included', async () => {
     const frame = () => answer([{ thinking: 'Let me see it.' }, { tool: 'render_still', id: 'r1', json: '{"t":1}' }], 'tool_use');
     const sent = serve(frame, second, second);

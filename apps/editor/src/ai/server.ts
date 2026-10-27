@@ -10,7 +10,7 @@
 // results are cleared by the API itself (context editing), not here.
 
 import { z } from 'zod';
-import { ADAPTIVE, DEFAULT_EFFORT, modelName, providerOf, TOOLS, UsageMeter, type Effort, type ToolResult } from '@tramme/assistant';
+import { ADAPTIVE, DEFAULT_EFFORT, joinSystem, modelName, providerOf, TOOLS, UsageMeter, type Effort, type SystemParts, type ToolResult } from '@tramme/assistant';
 import { ChatReader, chatTools, toChat } from './compat.ts';
 import { reach, type AiEvent, type ChatItem } from '../api.ts';
 import type { ToolRunner } from './tools.ts';
@@ -320,7 +320,7 @@ export class ServerSession {
     }
   }
 
-  async *turn(prompt: string, model: string, system: string, runner: ToolRunner, signal: AbortSignal, opts: TurnOptions = {}): AsyncGenerator<AiEvent> {
+  async *turn(prompt: string, model: string, system: string | SystemParts, runner: ToolRunner, signal: AbortSignal, opts: TurnOptions = {}): AsyncGenerator<AiEvent> {
     this.repair();
     this.pushUser([...(opts.images ?? []).map((i) => ({ type: 'image', source: { type: 'base64', media_type: i.mediaType, data: i.data } })), { type: 'text', text: prompt }]);
     // chat models: the pictures of earlier turns are not sent again (they have no context editing)
@@ -328,7 +328,7 @@ export class ServerSession {
     for (let step = 0; step < MAX_STEPS; step++) {
       const { content, stop, invalid, declined } = yield* this.streamed(signal, () => (providerOf(model) === 'anthropic'
         ? this.request(model, system, opts.effort ?? DEFAULT_EFFORT, signal)
-        : this.chat(model, system, signal, opts.target!, turnStart, opts.effort)));
+        : this.chat(model, typeof system === 'string' ? system : joinSystem(system), signal, opts.target!, turnStart, opts.effort)));
       // empty text blocks are refused when sent back
       const kept = content.filter((b) => !(b.type === 'text' && !b.text));
       this.messages.push({ role: 'assistant', content: kept.length ? kept : [{ type: 'text', text: '…' }] });
@@ -395,8 +395,9 @@ export class ServerSession {
   }
 
   /** a Messages API request: the conversation as it was sent before, plus the parts the model still takes */
-  private attempt(model: string, system: string, effort: Effort): Attempt {
+  private attempt(model: string, system: string | SystemParts, effort: Effort): Attempt {
     const parts: Part[] = [];
+    const { fixed, variable } = typeof system === 'string' ? { fixed: system, variable: '' } : system;
     // a part is sent while the model takes it, and noted as sent
     const on = (part: Part) => this.takes(model, part) && !!parts.push(part);
     const adaptive = ADAPTIVE.has(model);
@@ -423,8 +424,11 @@ export class ServerSession {
       headers: { 'anthropic-version': '2023-06-01', ...(betas.length ? { 'anthropic-beta': betas.join(',') } : {}) },
       body: {
         model, max_tokens: MAX_TOKENS, stream: true,
-        // the system prompt is cached an hour: the user often takes longer than 5 minutes between two messages
-        system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral', ...(on('hour') ? { ttl: '1h' } : {}) } }],
+        // the fixed part of the system prompt is cached an hour (the user often takes longer than 5 minutes between two messages), the part that changes with the project comes after it
+        system: [
+          { type: 'text', text: fixed, cache_control: { type: 'ephemeral', ...(on('hour') ? { ttl: '1h' } : {}) } },
+          ...(variable ? [{ type: 'text', text: variable }] : []),
+        ],
         tools: TOOL_SPECS, messages,
         ...(thinking ? { thinking } : {}),
         ...(adaptive && on('effort') ? { output_config: { effort } } : {}),
@@ -435,7 +439,7 @@ export class ServerSession {
   }
 
   /** one streamed request; yields the text as it comes, returns the content blocks */
-  private async *request(model: string, system: string, effort: Effort, signal: AbortSignal): AsyncGenerator<AiEvent, Answer> {
+  private async *request(model: string, system: string | SystemParts, effort: Effort, signal: AbortSignal): AsyncGenerator<AiEvent, Answer> {
     let stripped = false;
     // thinking that no longer matches its history (the conversation was changed elsewhere): sent without it, once
     const recover = (message: string) => !stripped && /signature/i.test(message) && (stripped = true, this.stripThinking(), true);
