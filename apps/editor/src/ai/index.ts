@@ -8,7 +8,7 @@
 
 import { installed, offIn } from '../installed.ts';
 import { computed, signal } from '@preact/signals';
-import { addUsage, CLI_DEFAULT, COMPANION_PORT, DEFAULT_MODEL, EFFORTS, effortFor, effortLevels, ENGINE_MODELS, ENGINES, engineOf, LOCAL_URL, modelLabel, modelName, MODELS, NO_USAGE, pickModel, PROVIDER_LABEL, providerOf, REMOTE, queuedPrompt, setTranslator, slotOf, systemPrompt, userPrompt, type Effort, type Engine, type TurnContext } from '@tramme/assistant';
+import { addUsage, CLI_DEFAULT, COMPANION_PORT, DEFAULT_MODEL, EFFORTS, effortFor, effortLevels, ENGINE_MODELS, ENGINES, engineOf, LOCAL_URL, modelLabel, modelName, MODELS, NO_USAGE, pickModel, PROVIDER_LABEL, providerOf, REMOTE, joinSystem, queuedPrompt, setTranslator, slotOf, systemParts, userPrompt, type Effort, type Engine, type TurnContext } from '@tramme/assistant';
 import { CHAT, CHAT_INDEX, chatPath } from '@tramme/project';
 import type { TrammeDoc } from '@tramme/core';
 import reference from '../../../../docs/document.md';
@@ -451,7 +451,8 @@ export async function* ask(p: AskPayload, signal: AbortSignal): AsyncGenerator<A
   // the packs that ship with the editor, named in one line: reachable without being in the project
   const packs = await shippedPacks();
   if (packs.length) mine.push(`Packs of the editor: ${packs.map((x) => x.name).join(', ')} — usable even when the project holds none; the first use adds the pack to the project.`);
-  const system = systemPrompt(reference, brief ?? undefined, mine);
+  // the part that is the same for every project first: the Messages API caches it apart; the other routes get the same text in one piece
+  const system = systemParts(reference, brief ?? undefined, mine);
   const target = route === 'local' ? { url: localBase() } : route === 'remote' ? { url: `/api/llm/${encodeURIComponent(slotOf(model))}` } : undefined;
   // Claude by its model id; a command line by its own model name, none for its default
   const asked = engine === 'claude' ? model : modelName(model) === CLI_DEFAULT ? '' : modelName(model);
@@ -461,7 +462,7 @@ export async function* ask(p: AskPayload, signal: AbortSignal): AsyncGenerator<A
       const sessionId = again === null ? resumed : session.companion?.startsWith(`${engine}:`) ? session.companion.slice(engine.length + 1) : undefined;
       // no session opened yet: the message is sent again whole
       const text = again === null || !sessionId ? prompt : again;
-      return companionTurn(link(), { engine, prompt: text, system, model: asked, effort, sessionId, images: again === null ? images : [] }, runner, signal, (id) => { session.companion = `${engine}:${id}`; });
+      return companionTurn(link(), { engine, prompt: text, system: joinSystem(system), model: asked, effort, sessionId, images: again === null ? images : [] }, runner, signal, (id) => { session.companion = `${engine}:${id}`; });
     }
     return session.server.turn(again ?? prompt, model, system, runner, signal, again === null ? { images, target, effort } : { target, effort });
   };

@@ -312,15 +312,15 @@
 - `fixed` is today's instructions followed by `reference`. `variable` is today's installed-plugins paragraph and brief paragraph. Not one word changes: only `reference` moves before them.
 - `ServerSession.turn(prompt, model, system: string | SystemParts, ...)`. The packs line is added by `ask` to the installed list as today, so it stays in `variable`.
 
-- [ ] **Step 1: Write the failing tests.**
+- [x] **Step 1: Write the failing tests.**
   - `the fixed part holds no project`: `systemParts(REF, 'BRIEF', ['plug: x'])`. `fixed` contains `REF` and contains neither `BRIEF` nor `plug: x`.
   - `same words, reference first`: the multiset of paragraphs of `systemPrompt(REF, 'BRIEF', ['plug: x'])` equals that of the previous implementation. Keep a copy of today's function in the test as the oracle. `indexOf(REF) < indexOf('BRIEF')`.
   - `the server sends two system blocks, the fixed one cached`: given `SystemParts`, the request's `system` is `[{ text: fixed, cache_control: { type: 'ephemeral', ttl: '1h' } }, { text: variable }]`. With an empty `variable`, one block.
   - `a string system still works`: the existing server-session tests pass unchanged.
-- [ ] **Step 2: Run** `npx vitest run packages/assistant/test/system.test.ts apps/editor/test/server-session.test.ts`. Expected: FAIL.
-- [ ] **Step 3: Implement.** The chat-format route and the companion receive the joined string.
-- [ ] **Step 4: Run the tests.** Expected: PASS.
-- [ ] **Step 5: Commit** `perf(assistant): system prompt in cache order, its fixed part cached apart`.
+- [x] **Step 2: Run** `npx vitest run packages/assistant/test/system.test.ts apps/editor/test/server-session.test.ts`. Expected: FAIL.
+- [x] **Step 3: Implement.** The chat-format route and the companion receive the joined string.
+- [x] **Step 4: Run the tests.** Expected: PASS.
+- [x] **Step 5: Commit** `perf(assistant): system prompt in cache order, its fixed part cached apart`.
 
 ### Task 11: The conversation's cache lifetime as a setting
 
