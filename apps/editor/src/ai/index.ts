@@ -8,7 +8,7 @@
 
 import { installed, offIn } from '../installed.ts';
 import { computed, signal } from '@preact/signals';
-import { addUsage, CLI_DEFAULT, COMPANION_PORT, DEFAULT_MODEL, EFFORTS, effortFor, effortLevels, ENGINE_MODELS, ENGINES, engineOf, LOCAL_URL, modelLabel, modelName, MODELS, NO_USAGE, pickModel, PROVIDER_LABEL, providerOf, REMOTE, setTranslator, slotOf, systemPrompt, userPrompt, type Effort, type Engine, type TurnContext } from '@tramme/assistant';
+import { addUsage, CLI_DEFAULT, COMPANION_PORT, DEFAULT_MODEL, EFFORTS, effortFor, effortLevels, ENGINE_MODELS, ENGINES, engineOf, LOCAL_URL, modelLabel, modelName, MODELS, NO_USAGE, pickModel, PROVIDER_LABEL, providerOf, REMOTE, queuedPrompt, setTranslator, slotOf, systemPrompt, userPrompt, type Effort, type Engine, type TurnContext } from '@tramme/assistant';
 import { CHAT, CHAT_INDEX, chatPath } from '@tramme/project';
 import type { TrammeDoc } from '@tramme/core';
 import reference from '../../../../docs/document.md';
@@ -24,6 +24,7 @@ import { describe, imageBlocks, type Attachment } from '../attachments.ts';
 import { locale, t } from '../i18n/index.ts';
 import { personal } from '../mode.ts';
 import { shippedPacks } from '../packs.ts';
+import { held, queue, type Queued } from './queue.ts';
 
 export interface AiSettings {
   model: string;
@@ -287,12 +288,13 @@ const sorted = (list: ChatMeta[]) => [...list].sort((a, b) => b.modified.localeC
 /** a conversation file: its items and how to continue it */
 function parse(text: string) {
   const j = JSON.parse(text);
-  if (Array.isArray(j)) return { items: j as ChatItem[], companion: undefined, server: undefined, created: '' };
+  if (Array.isArray(j)) return { items: j as ChatItem[], companion: undefined, server: undefined, created: '', queue: [] as Queued[] };
   return {
     items: (Array.isArray(j.items) ? j.items : []) as ChatItem[],
     companion: typeof j.companion === 'string' ? j.companion : undefined,
     server: Array.isArray(j.server) ? (j.server as Message[]) : undefined,
     created: typeof j.created === 'string' ? j.created : '',
+    queue: (Array.isArray(j.queue) ? j.queue.filter((q: Queued) => q && typeof q.id === 'string' && typeof q.text === 'string') : []) as Queued[],
   };
 }
 
@@ -341,6 +343,9 @@ export async function openChat(id: string) {
   session = { companion: c.companion, server: new ServerSession(c.server) };
   created = c.created || chats.peek().find((x) => x.id === id)?.created || new Date().toISOString();
   chatId.value = id;
+  // messages waiting when the page was left do not leave by themselves: the user sends them
+  queue.value = c.queue;
+  held.value = c.queue.length > 0;
   // a conversation saved before its calls kept their line: read back from the history
   chat.value = recallDetails(c.items, c.server);
 }
@@ -352,6 +357,8 @@ export function newChat() {
   created = '';
   chatId.value = null;
   chat.value = [];
+  queue.value = [];
+  held.value = false;
 }
 
 export async function deleteChat(id: string) {
@@ -377,14 +384,18 @@ export async function saveChat(items: ChatItem[] = chat.peek()) {
   const now = new Date().toISOString();
   let id = chatId.peek();
   if (!id) { id = newChatId(); chatId.value = id; created = now; }
-  const data = { version: 1, created, items: lighter(items), companion: session.companion, server: session.server.toJSON() };
+  const data = { version: 1, created, items: lighter(items), companion: session.companion, server: session.server.toJSON(), ...(queue.peek().length ? { queue: queue.peek() } : {}) };
   await api.write(pid(), chatPath(id), JSON.stringify(data), { type: 'application/json' });
   const meta: ChatMeta = { id, title: titleOf(items), created, modified: now, count: items.filter((it) => it.role === 'user').length };
   chats.value = sorted([meta, ...chats.peek().filter((c) => c.id !== id)]);
   await api.write(pid(), CHAT_INDEX, JSON.stringify(chats.peek()), { type: 'application/json' });
 }
 
-export interface AskPayload { text: string; context: TurnContext; doc: TrammeDoc; decisions: { id: string; status: string }[]; attachments?: Attachment[]; command?: Command; commandInput?: Record<string, unknown> }
+export interface AskPayload {
+  text: string; context: TurnContext; doc: TrammeDoc; decisions: { id: string; status: string }[]; attachments?: Attachment[]; command?: Command; commandInput?: Record<string, unknown>;
+  /** messages written during the previous turn, answered together, each with its own context (text and context are the last one's) */
+  queued?: { text: string; context: TurnContext }[];
+}
 
 /** what the user did without the assistant (tools run from the / menu), told at the next message */
 const ranAlone: string[] = [];
@@ -430,7 +441,7 @@ export async function* ask(p: AskPayload, signal: AbortSignal): AsyncGenerator<A
   const kept = session.companion && !session.companion.includes(':') ? `claude:${session.companion}` : session.companion;
   const resumed = route === 'companion' && engine && kept?.startsWith(`${engine}:`) ? kept.slice(engine.length + 1) : undefined;
   if (route === 'companion' ? !resumed : !session.server.messages.length) notes.unshift(...earlier());
-  const prompt = userPrompt(p.text, p.context, notes);
+  const prompt = p.queued ? queuedPrompt(p.queued.map((m) => ({ text: m.text, ctx: m.context })), notes) : userPrompt(p.text, p.context, notes);
   // the project's brief, when there is one, rides in the system prompt: the assistant follows it from the first word
   let brief: string | null = null;
   try { brief = (await api.readText(S.project.peek().id, 'assets/brief.json'))?.text ?? null; } catch { brief = null; }

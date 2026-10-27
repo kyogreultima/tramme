@@ -126,7 +126,7 @@
   - `export function flushQueue(extra?: { text: string; anchor?: Anchor }): Promise<void>`
 - `AskPayload` gains `queued?: { text: string; context: TurnContext }[]`. When set, `ask` builds the prompt with `queuedPrompt` and joins every message's attachments.
 
-- [ ] **Step 1: Write the failing tests.** Stub `ask` (or `consume`'s source) to record the payload.
+- [x] **Step 1: Write the failing tests.** Stub `ask` (or `consume`'s source) to record the payload.
   - `a message sent during a turn waits`: with `running.value = true`, `send('b')` adds one item to `queue` and calls no `ask`.
   - `the queue leaves when the turn ends, as one turn, in order`: two queued; the turn ends without error and without a pending proposal. Expect:
     - one `ask` whose `queued` texts are `['b', 'c']`;
@@ -139,8 +139,8 @@
   - `a deleted message never leaves`: `dequeue(id)` before the end of the turn, and it is absent from `queued`.
   - `the queue is kept with the conversation`: `saveChat` writes `queue`, and `parse` reads it back.
   - `a command is not queued`: `send` with `opts.command` while running adds nothing.
-- [ ] **Step 2: Run** `npx vitest run apps/editor/test/queue.test.ts`. Expected: FAIL.
-- [ ] **Step 3: Implement.**
+- [x] **Step 2: Run** `npx vitest run apps/editor/test/queue.test.ts`. Expected: FAIL.
+- [x] **Step 3: Implement.**
   - `send`:
     - while `running`, it enqueues (commands excepted, which return as today);
     - when not running and the queue is not empty, it calls `flushQueue({ text, anchor })`.
@@ -148,8 +148,8 @@
   - `decide`: after a decision, it calls `flushQueue()` when the queue is not empty and no turn runs.
   - The conversation file carries `queue`.
   - `autonomous` is computed when the queue leaves.
-- [ ] **Step 4: Run the test**, then `npx vitest run apps/editor/test`. Expected: PASS.
-- [ ] **Step 5: Commit** `feat(assistant): queue the messages written during a turn`.
+- [x] **Step 4: Run the test**, then `npx vitest run apps/editor/test`. Expected: PASS.
+- [x] **Step 5: Commit** `feat(assistant): queue the messages written during a turn`.
 
 ### Task 5: The queue in the message boxes
 

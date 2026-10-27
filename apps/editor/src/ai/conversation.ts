@@ -12,6 +12,7 @@ import { inputLine, type Command } from './commands.ts';
 import { paused, uid } from './calls.ts';
 import { opLine } from './tools.ts';
 import { attaching, pending } from '../attachments.ts';
+import { enqueue, flushQueue, held, queue, written, type Queued } from './queue.ts';
 import { acceptProposal, comp, propose, rejectProposal, S, toast, uiTime } from '../state.ts';
 import { clip, layerName, timecode } from '../model.ts';
 import { away, notify } from '../notify.ts';
@@ -28,6 +29,8 @@ export const turnStart = signal(0);
 /** a picture of the conversation shown large */
 export const lightbox = signal<string | null>(null);
 let controller: AbortController | null = null;
+/** the end of a turn is being settled: a decision made by it does not send the queue yet */
+let ending = false;
 /** decisions on proposals not yet reported to the agent */
 const decisions = new Map<string, string>();
 
@@ -85,24 +88,34 @@ function gather(id: string, kind: 'text' | 'thinking', delta: string) {
 
 /** a message for the assistant; command: the tool or workflow it was written with (/name); anchor: the scene and point of a studio note */
 export async function send(text: string, opts: { command?: { cmd: Command; input?: Record<string, unknown> }; anchor?: Anchor } = {}) {
-  const atts = pending.peek();
-  if ((!text.trim() && !atts.length) || running.peek() || attaching.peek()) return;
-  if (!text.trim()) text = atts.length > 1 ? t('assistant.hereAreSomeFiles') : t('assistant.hereIsAFile');
-  pending.value = [];
-  const ctx = contextLine(), { command, anchor } = opts;
-  const at = ctx.data.time as number;
-  chat.value = [...chat.value, {
-    id: uid(), role: 'user', text, context: ctx.text, at,
-    ...(anchor?.scene ? { scene: anchor.scene.name } : {}),
-    ...(anchor?.pin ? { pin: anchor.pin } : {}),
-    ...(atts.length ? { attachments: atts.map(({ path, name, kind, asset }) => ({ path, name, kind, asset })) } : {}),
-  }];
+  const atts = pending.peek(), { command, anchor } = opts;
+  if ((!text.trim() && !atts.length) || attaching.peek()) return;
+  // a turn runs: the message waits for its end (a command stays unavailable meanwhile)
+  if (running.peek()) { if (!command) enqueue(text, anchor); return; }
+  // messages kept by a stop leave first, the new one with them
+  if (queue.peek().length && !command) { await flushQueue({ text, anchor }); return; }
+  await startTurn([written(text, anchor)], command);
+}
+
+/** one turn of the agent for these messages (one, or the queue's), each shown as written and sent with its own context */
+export async function startTurn(messages: Queued[], command?: { cmd: Command; input?: Record<string, unknown> }) {
+  held.value = false;
+  chat.value = [...chat.value, ...messages.map((m): ChatItem => ({
+    id: uid(), role: 'user', text: m.text, context: m.context, at: m.at,
+    ...(m.anchor?.scene ? { scene: m.anchor.scene.name } : {}),
+    ...(m.anchor?.pin ? { pin: m.anchor.pin } : {}),
+    ...(m.attachments.length ? { attachments: m.attachments.map(({ path, name, kind, asset }) => ({ path, name, kind, asset })) } : {}),
+  }))];
   const ds = [...decisions].map(([id, status]) => ({ id, status }));
   decisions.clear();
   // changes applied without the user: the turn works on its own, nothing is asked
   const auto = aiSettings.peek().apply !== 'off';
-  const context = { ...ctx.data, autonomous: auto, ...(anchor?.scene ? { scene: anchor.scene } : {}), ...(anchor?.pin ? { point: anchor.pin, ...(anchor.under ? { under: anchor.under } : {}) } : {}) };
-  await consume((signal) => ask({ text, context, doc: S.doc.peek(), decisions: ds, attachments: atts, command: command?.cmd, commandInput: command?.input }, signal), auto);
+  const contexts = messages.map(({ data, anchor }) => ({ ...data, autonomous: auto, ...(anchor?.scene ? { scene: anchor.scene } : {}), ...(anchor?.pin ? { point: anchor.pin, ...(anchor.under ? { under: anchor.under } : {}) } : {}) }));
+  const last = messages.length - 1, attachments = messages.flatMap((m) => m.attachments);
+  await consume((signal) => ask({
+    text: messages[last].text, context: contexts[last], doc: S.doc.peek(), decisions: ds, attachments, command: command?.cmd, commandInput: command?.input,
+    ...(messages.length > 1 ? { queued: messages.map((m, i) => ({ text: m.text, context: contexts[i] })) } : {}),
+  }, signal), auto);
 }
 
 /** a tool of the / menu run at once, without the assistant */
@@ -159,8 +172,12 @@ async function consume(start: (signal: AbortSignal) => AsyncGenerator<AiEvent>, 
     chat.value = chat.value.map((it) => (it.tool && !it.tool.done ? { ...it, tool: { ...it.tool, done: true, ms: Date.now() - (it.tool.start ?? Date.now()) } }
       : it.thinking && !it.thinking.done ? { ...it, thinking: { ...it.thinking, done: true, ms: Date.now() - (it.thinking.start ?? Date.now()) } } : it));
     // stopped by the user: nothing applied, nothing to tell
-    if (!signal.aborted) finished(from, error, Date.now() - turnStart.peek());
+    ending = true;
+    try { if (!signal.aborted) finished(from, error, Date.now() - turnStart.peek()); } finally { ending = false; }
+    // a stop or a failure keeps the queue; otherwise it leaves unless a proposal waits for its decision
+    held.value = signal.aborted || !!error;
     saveChat(chat.value).catch(() => {});
+    if (!held.peek() && S.proposal.peek()?.status !== 'pending') flushQueue().catch(() => {});
   }
 }
 
@@ -214,6 +231,8 @@ export function decide(accept: boolean): boolean {
   decided(p.id);
   chat.value = chat.value.map((it) => (it.proposal?.id === p.id ? { ...it, proposal: { ...it.proposal, status } } : it));
   saveChat(chat.value).catch(() => {});
+  // the queue was waiting for this decision
+  if (!ending && !running.peek() && !held.peek() && queue.peek().length) flushQueue().catch(() => {});
   return true;
 }
 
