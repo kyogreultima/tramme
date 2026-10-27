@@ -185,7 +185,7 @@ function Card({ m, onMenu }: { m: Manifest; onMenu: (e: MouseEvent | { clientX: 
 }
 
 /** the direction box: the words of the film, the material it is made from, the model that makes it, its format */
-function DirectionBox({ busy, onStart }: { busy: boolean; onStart: (words: string, material: Picked[], format: [number, number]) => void }) {
+export function DirectionBox({ busy, onStart }: { busy: boolean; onStart: (words: string, material: Picked[], format: [number, number]) => void }) {
   const [words, setWords] = useState('');
   const [material, setMaterial] = useState<Picked[]>([]);
   const [format, setFormat] = useState('16x9');
