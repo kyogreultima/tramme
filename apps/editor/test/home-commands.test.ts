@@ -3,13 +3,15 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { h, render } from 'preact';
 import { act } from 'preact/test-utils';
 
+// loaded once, before the tests: the page pulls in most of the editor
+const { DirectionBox } = await import('../src/ui/Home.tsx');
+
 afterEach(() => { vi.unstubAllGlobals(); document.body.innerHTML = ''; });
 
 describe('the home page box', () => {
   it('offers the commands', async () => {
     // the shipped packs' index, as the page fetches it
     vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 404 })));
-    const { DirectionBox } = await import('../src/ui/Home.tsx');
     const host = document.body.appendChild(document.createElement('div'));
     await act(() => { render(h(DirectionBox, { busy: false, onStart: () => {} }), host); });
     const area = host.querySelector('textarea')!;
