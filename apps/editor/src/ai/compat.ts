@@ -6,6 +6,7 @@
 // (extra_content.google.thought_signature) and wants each signature back with
 // its call: it is kept on the tool_use block and sent to Gemini only.
 
+import type { Usage } from '@tramme/assistant';
 import type { Message } from './server.ts';
 
 type Block = { type: string; [k: string]: any };
@@ -76,10 +77,13 @@ export const chatTools = (specs: { name: string; description: string; input_sche
 export class ChatReader {
   private text = '';
   private finish = '';
+  private counted: Record<string, any> | null = null;
   private calls: { id: string; name: string; args: string; extra?: Record<string, any> }[] = [];
 
   push(ev: any): { text: string; reasoning: string } {
     if (ev.error) throw new Error(ev.error.message ?? String(ev.error));
+    // the usage comes in the last event, which has no choice, or in the last one that has
+    if (ev.usage && typeof ev.usage === 'object') this.counted = ev.usage;
     const choice = ev.choices?.[0];
     if (!choice) return { text: '', reasoning: '' };
     const d = choice.delta ?? {};
@@ -100,6 +104,15 @@ export class ChatReader {
     }
     if (choice.finish_reason) this.finish = choice.finish_reason;
     return { text, reasoning };
+  }
+
+  /** what the request cost, when the provider said (the stream_options asked for it); the cached share is where the provider puts it */
+  usage(): Usage | null {
+    const u = this.counted;
+    if (!u) return null;
+    const prompt = Number(u.prompt_tokens) || 0;
+    const cached = Number(u.prompt_tokens_details?.cached_tokens ?? u.cached_tokens ?? u.prompt_cache_hit_tokens ?? u.cache_read_input_tokens) || 0;
+    return { requests: 1, input: Math.max(0, prompt - cached), cacheRead: cached, cacheWrite: 0, cacheWrite1h: 0, output: Number(u.completion_tokens) || 0 };
   }
 
   /** the model said why it stopped (a stream cut short says nothing) */

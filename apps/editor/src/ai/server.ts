@@ -47,9 +47,10 @@ const CLEAR_OLD_RESULTS = {
  * naming one the request carried drops it for that model for the rest of the
  * session, and the request goes again; the most specific patterns come first.
  */
-type Part = 'context' | 'hour' | 'binding' | 'fallbacks' | 'effort' | 'vision' | 'display' | 'thinking';
+type Part = 'context' | 'usage' | 'hour' | 'binding' | 'fallbacks' | 'effort' | 'vision' | 'display' | 'thinking';
 const REFUSED: [Part, RegExp][] = [
   ['context', /context_management|context-management|clear_tool_uses/i],
+  ['usage', /stream_options|include_usage/i],
   ['hour', /\bttl\b/i],
   ['binding', /block_binding|thinking-binding/i],
   ['fallbacks', /fallback/i],
@@ -358,12 +359,13 @@ export class ServerSession {
   /** one streamed request to a model of the chat format; yields the text as it comes, returns the content blocks */
   private async *chat(model: string, system: string, signal: AbortSignal, target: ChatTarget, turnStart: number, effort?: Effort): AsyncGenerator<AiEvent, Answer> {
     const res = await this.post(model, `${target.url}/chat/completions`, () => {
-      const vision = this.takes(model, 'vision'), level = effort && this.takes(model, 'effort') ? effort : undefined;
+      const vision = this.takes(model, 'vision'), level = effort && this.takes(model, 'effort') ? effort : undefined, counted = this.takes(model, 'usage');
       return {
-        // a model without vision gets a note instead of the images; one without levels runs at its own
-        parts: ['vision', ...(level ? ['effort' as const] : [])],
+        // a model without vision gets a note instead of the images; one without levels runs at its own; a server that does not count tokens is not asked to
+        parts: ['vision', ...(level ? ['effort' as const] : []), ...(counted ? ['usage' as const] : [])],
         body: {
           model: modelName(model), stream: true, tools: CHAT_TOOLS,
+          ...(counted ? { stream_options: { include_usage: true } } : {}),
           messages: toChat(this.messages, system, { vision, gemini: providerOf(model) === 'gemini', imagesFrom: turnStart }),
           // the effort level: reasoning_effort, or OpenRouter's own field
           ...(level ? (providerOf(model) === 'openrouter' ? { reasoning: { effort: level } } : { reasoning_effort: level }) : {}),
@@ -385,6 +387,8 @@ export class ServerSession {
       }
     }
     if (thinkId) yield { type: 'thinking-done', id: thinkId };
+    const usage = reader.usage();
+    if (usage) yield { type: 'usage', usage };
     // every complete answer says why it stopped: a stream cut before is not an answer (the turn would end with no word)
     if (!reader.finished) throw new ApiFailure(0, t('ai.streamCut'));
     return reader.result();
