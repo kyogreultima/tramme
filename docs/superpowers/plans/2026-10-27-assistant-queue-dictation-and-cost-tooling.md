@@ -333,11 +333,11 @@
 **Interfaces:**
 - Produces: `AiSettings.cacheTtl: '5m' | '1h'`, defaulting to `'5m'`, and `TurnOptions.cacheTtl?: '5m' | '1h'`. `ask` passes it.
 
-- [ ] **Step 1: Write the failing test** `the conversation's cache lasts as set`. With `cacheTtl: '1h'`, the last message block's `cache_control` is `{ type: 'ephemeral', ttl: '1h' }`. With `'5m'` or unset, it is `{ type: 'ephemeral' }`. When the `hour` part was refused, there is never a `ttl`.
-- [ ] **Step 2: Run** `npx vitest run apps/editor/test/server-session.test.ts`. Expected: FAIL.
-- [ ] **Step 3: Implement**, with the setting in the assistant settings, in both locales. Say in its description that an hour costs more to write and less when the user comes back after more than five minutes.
-- [ ] **Step 4: Run the test.** Expected: PASS.
-- [ ] **Step 5: Commit** `feat(assistant): the conversation's cache lifetime as a setting`.
+- [x] **Step 1: Write the failing test** `the conversation's cache lasts as set`. With `cacheTtl: '1h'`, the last message block's `cache_control` is `{ type: 'ephemeral', ttl: '1h' }`. With `'5m'` or unset, it is `{ type: 'ephemeral' }`. When the `hour` part was refused, there is never a `ttl`.
+- [x] **Step 2: Run** `npx vitest run apps/editor/test/server-session.test.ts`. Expected: FAIL.
+- [x] **Step 3: Implement**, with the setting in the assistant settings, in both locales. Say in its description that an hour costs more to write and less when the user comes back after more than five minutes.
+- [x] **Step 4: Run the test.** Expected: PASS.
+- [x] **Step 5: Commit** `feat(assistant): the conversation's cache lifetime as a setting`.
 
 ### Task 12: Haiku 5.5
 

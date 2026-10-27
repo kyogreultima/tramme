@@ -14,7 +14,7 @@ import type { SoundEntry } from '@tramme/core';
 import { ELEVEN_VOICE_MODELS, HYDRACEPT_VOICE_MODELS } from '@tramme/api';
 import { api, type Voice } from '../api.ts';
 import { EffortPicker, ModelPicker } from './ModelPicker.tsx';
-import { aiSettings, aiStatus, connectProvider, disconnectProvider, ensureStatus, providersChanged, refreshStatus, removeCustomProvider, saveCustomProvider, serverName, setAiSettings, statusLabels } from '../ai/index.ts';
+import { aiSettings, type AiSettings, aiStatus, connectProvider, disconnectProvider, ensureStatus, providersChanged, refreshStatus, removeCustomProvider, saveCustomProvider, serverName, setAiSettings, statusLabels } from '../ai/index.ts';
 import { allowNotifications, notificationState } from '../notify.ts';
 import { preview, previewInfo } from '../preview.ts';
 import { DEFAULT_PREFERENCES, prefs, resetPrefs, setLanguage, setPrefs, settingsOpen, settingsSection, THEMES, type Preferences, type SettingsSection, type ThemeInfo } from '../settings.ts';
@@ -410,6 +410,9 @@ function Behavior() {
       </Row>
       <Row label={t('settings.resume')} hint={t('settings.resumeHint')}>
         <Toggle on={a.resume} onChange={(on) => setAiSettings({ resume: on })} />
+      </Row>
+      <Row label={t('settings.cacheTtl')} hint={t('settings.cacheTtlHint')}>
+        <Seg value={a.cacheTtl} options={[['5m', t('settings.cacheTtl5m')], ['1h', t('settings.cacheTtl1h')]]} onChange={(v) => setAiSettings({ cacheTtl: v as AiSettings['cacheTtl'] })} />
       </Row>
       <Row label={t('settings.autoApply')} hint={t('settings.autoApplyHint')}>
         <Seg value={confirming ?? a.apply}

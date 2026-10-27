@@ -230,6 +230,8 @@ export interface TurnOptions {
   images?: { mediaType: string; data: string }[];
   target?: ChatTarget;
   effort?: Effort;
+  /** how long the cache keeps the conversation: 5 minutes, or an hour (written for more, read back later at the same price) */
+  cacheTtl?: '5m' | '1h';
 }
 
 export class ServerSession {
@@ -327,7 +329,7 @@ export class ServerSession {
     const turnStart = this.messages.length - 1;
     for (let step = 0; step < MAX_STEPS; step++) {
       const { content, stop, invalid, declined } = yield* this.streamed(signal, () => (providerOf(model) === 'anthropic'
-        ? this.request(model, system, opts.effort ?? DEFAULT_EFFORT, signal)
+        ? this.request(model, system, opts.effort ?? DEFAULT_EFFORT, signal, opts.cacheTtl)
         : this.chat(model, typeof system === 'string' ? system : joinSystem(system), signal, opts.target!, turnStart, opts.effort)));
       // empty text blocks are refused when sent back
       const kept = content.filter((b) => !(b.type === 'text' && !b.text));
@@ -395,7 +397,7 @@ export class ServerSession {
   }
 
   /** a Messages API request: the conversation as it was sent before, plus the parts the model still takes */
-  private attempt(model: string, system: string | SystemParts, effort: Effort): Attempt {
+  private attempt(model: string, system: string | SystemParts, effort: Effort, cacheTtl?: '5m' | '1h'): Attempt {
     const parts: Part[] = [];
     const { fixed, variable } = typeof system === 'string' ? { fixed: system, variable: '' } : system;
     // a part is sent while the model takes it, and noted as sent
@@ -405,7 +407,7 @@ export class ServerSession {
     const clean = (b: Block) => (b.type === 'tool_use' && 'extra_content' in b ? { type: b.type, id: b.id, name: b.name, input: b.input } : b);
     // the cache covers the tools, the system prompt and the conversation so far
     const messages = this.messages.map((m) => ({ ...m, content: m.content.map(clean) })).map((m, i) => (i === this.messages.length - 1
-      ? { ...m, content: m.content.map((b, j) => (j === m.content.length - 1 ? { ...b, cache_control: { type: 'ephemeral' } } : b)) }
+      ? { ...m, content: m.content.map((b, j) => (j === m.content.length - 1 ? { ...b, cache_control: { type: 'ephemeral', ...(cacheTtl === '1h' && on('hour') ? { ttl: '1h' } : {}) } } : b)) }
       : m));
     const betas: string[] = [];
     let thinking: Record<string, unknown> | undefined;
@@ -439,11 +441,11 @@ export class ServerSession {
   }
 
   /** one streamed request; yields the text as it comes, returns the content blocks */
-  private async *request(model: string, system: string | SystemParts, effort: Effort, signal: AbortSignal): AsyncGenerator<AiEvent, Answer> {
+  private async *request(model: string, system: string | SystemParts, effort: Effort, signal: AbortSignal, cacheTtl?: '5m' | '1h'): AsyncGenerator<AiEvent, Answer> {
     let stripped = false;
     // thinking that no longer matches its history (the conversation was changed elsewhere): sent without it, once
     const recover = (message: string) => !stripped && /signature/i.test(message) && (stripped = true, this.stripThinking(), true);
-    const res = await this.post(model, '/api/claude/v1/messages', () => this.attempt(model, system, effort), signal, recover);
+    const res = await this.post(model, '/api/claude/v1/messages', () => this.attempt(model, system, effort, cacheTtl), signal, recover);
     const blocks: Block[] = [];
     const json: string[] = [];
     const items: string[] = [];
