@@ -309,6 +309,21 @@ function Pictures() {
   );
 }
 
+/** clips made by a provider: what the generate-video tool takes when the ask names nothing */
+function Videos() {
+  const p = prefs.value;
+  return (
+    <Section title={t('settings.videos')} hint={t('settings.videosHint')}>
+      <Row label={t('settings.videoProvider')} hint={t('settings.videoProviderHint')}>
+        <Select value={p.videoProvider} options={[['auto', t('common.automatic')], ['hydracept', 'Hydracept (Veo)']]} onChange={(v) => setPrefs({ videoProvider: v as Preferences['videoProvider'] })} />
+      </Row>
+      <Row label={t('settings.videoSeconds')} hint={t('settings.videoSecondsHint')}>
+        <Seg value={String(p.videoSeconds)} options={[['4', '4 s'], ['6', '6 s'], ['8', '8 s']]} onChange={(v) => setPrefs({ videoSeconds: Number(v) as Preferences['videoSeconds'] })} />
+      </Row>
+    </Section>
+  );
+}
+
 function Tours() {
   const st = toursState.value;
   return (
@@ -468,6 +483,7 @@ const GROUPS: { title: () => string; panes: Pane[] }[] = [
       { id: 'preview', icon: 'eye', title: () => t('common.preview'), body: Preview },
       { id: 'sound', icon: 'audio', title: () => t('settings.sound'), body: Sound },
       { id: 'pictures', icon: 'image', title: () => t('settings.pictures'), body: Pictures },
+      { id: 'videos', icon: 'film', title: () => t('settings.videos'), body: Videos },
       { id: 'models', icon: 'download', title: () => t('localModels.title'), body: LocalModels },
       { id: 'plugins', icon: 'code', title: () => t('plugins.title'), body: Plugins },
       { id: 'tours', icon: 'help', title: () => t('common.guidedTours'), body: Tours },

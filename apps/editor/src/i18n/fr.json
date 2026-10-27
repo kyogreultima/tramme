@@ -141,6 +141,12 @@
     "paidTakes": "Un fournisseur va en dessiner {n} prises, ce qui coûte de l’argent (chacune compte) : « {prompt} »",
     "take": "Prise {n}"
   },
+  "video": {
+    "made": "Clip « {name} » créé par {provider} ({model}).",
+    "paidTitle": "Faire créer ce clip ?",
+    "paidText": "Un fournisseur va créer un clip de {seconds} secondes, ce qui coûte de l’argent : « {prompt} »",
+    "paidYes": "Créer le clip"
+  },
   "shorts": {
     "candidates": "{n} passage(s) qui se tiennent seuls.",
     "built": "{n} short(s) construit(s) en compositions.",
@@ -880,6 +886,12 @@
     "pictureSizeHint": "Petite demande la taille la moins chère du fournisseur ; l’outil d’agrandissement amène ensuite l’image à la taille du cadre.",
     "pictureSizeSmall": "Petite",
     "pictureSizeLarge": "Grande",
+    "videos": "Vidéos",
+    "videosHint": "Ce que l’assistant et le menu / utilisent quand ils font faire un clip et que la demande ne dit rien. Un clip fait par un fournisseur coûte de l’argent : on vous le demande d’abord, et chaque seconde est facturée.",
+    "videoProvider": "Fournisseur",
+    "videoProviderHint": "Automatique : le premier connecté qui fait des clips. Hydracept fait tourner Veo 3.1 Fast.",
+    "videoSeconds": "Durée",
+    "videoSecondsHint": "Veo fait des clips de 4, 6 ou 8 secondes ; l’outil peut demander une autre durée par clip.",
     "toursHint": "De courtes visites de l'éditeur, proposées la première fois qu'un écran s'ouvre.",
     "storageHint": "Les projets de cette appli, gardés en dossiers sur cet ordinateur.",
     "modelHint": "L'IA avec laquelle l'assistant réfléchit, et l'effort qu'il met dans chaque message.",
@@ -922,7 +934,7 @@
     "confirmPaid": "Demander avant un son payant",
     "confirmPaidHint": "Un effet, une musique, une voix off ou une image créés par un fournisseur coûtent de l'argent : vous dites oui d'abord. Quand l'assistant applique ses modifications tout seul, c'est le plafond ci-dessous qui compte.",
     "paidPerTurn": "Générations payantes par tour en automatique",
-    "paidPerTurnHint": "Quand l'assistant applique ses modifications tout seul, rien n’est demandé : un tour crée au plus ce nombre de sons ou d’images payants, puis se rabat sur la bibliothèque.",
+    "paidPerTurnHint": "Quand l'assistant applique ses modifications tout seul, rien n’est demandé : un tour crée au plus ce nombre de générations payantes (sons, images ou secondes de clips), puis se rabat sur la bibliothèque.",
     "voiceOver": "Voix off",
     "voiceOverHint": "Le fournisseur et la voix utilisés sauf si la demande en nomme d'autres (Gemini : Kore, Puck… ; OpenAI : alloy, coral… ; ElevenLabs : un identifiant de voix, ou choisissez-en une ci-dessous).",
     "voicePlaceholder": "sa voix par défaut",

@@ -301,6 +301,32 @@ describe('sounds made by a provider', () => {
     expect(((await none.json()) as { error: string }).error).toContain('ELEVENLABS_API_KEY');
   });
 
+  it('makes a Veo clip through Hydracept with the server key and lists video in the config', async () => {
+    const { call } = setup({ HYDRACEPT_API_KEY: 'hk-test', HYDRACEPT_PROJECT: 'cpr_test' });
+    const real = globalThis.fetch;
+    const seen: string[] = [];
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = String(input);
+      seen.push(url);
+      if (url.includes('/video.generate.v1/quote')) return Response.json({ quoteId: 'quo_1' });
+      if (url.includes('/video.generate.v1/jobs')) return Response.json({ jobId: 'job_1', status: 'queued' });
+      if (url.endsWith('/jobs/job_1')) return Response.json({ jobId: 'job_1', status: 'succeeded', receiptId: 'rcpt_1', artifacts: [{ artifactId: 'art_1', mediaType: 'video/mp4' }] });
+      if (url.includes('/artifacts/art_1')) return new Response(new Uint8Array([0, 0, 0, 24, 102, 116, 121, 112]), { headers: { 'content-type': 'video/mp4' } });
+      return new Response('unexpected', { status: 500 });
+    }) as typeof fetch;
+    try {
+      const res = await call('/api/generate-video', ask({ prompt: 'a paper boat', ratio: '9:16', duration: 4 }));
+      expect(res.status).toBe(200);
+      expect(res.headers.get('content-type')).toBe('video/mp4');
+      expect(res.headers.get('x-tramme-provider')).toBe('hydracept');
+      expect(res.headers.get('x-tramme-model')).toBe('veo-3.1-fast-generate-001');
+      expect(res.headers.get('x-tramme-hydracept-receipt')).toBe('rcpt_1');
+      expect(seen.some((u) => u.includes('/video.generate.v1/quote'))).toBe(true);
+      const config = await (await call('/api/config')).json() as { videos: string[] };
+      expect(config.videos).toEqual(['hydracept']);
+    } finally { globalThis.fetch = real; }
+  });
+
   it('makes a sound effect and music with ElevenLabs, a voice with Gemini, the key added by the server', async () => {
     const { call } = setup({ GEMINI_API_KEY: 'g-key', ELEVENLABS_API_KEY: 'el-key' });
     const p = providers();

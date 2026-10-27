@@ -8,15 +8,14 @@
 // record, changed from a reference (an asset, a frame of the video) with a
 // mask, extended past its edges, and brought to the frame's size.
 
-import { enlarge, pointer, type Op, type ToolContext, type ToolType } from '@tramme/core';
+import { enlarge, type ToolContext, type ToolType } from '@tramme/core';
 import { api, type ImageAsk, type MadeImage } from './api.ts';
 import { alone, chooseAmong, payFor } from './confirm.ts';
-import { clip, freshId } from './model.ts';
+import { clip } from './model.ts';
 import { jpegOf } from './perception.ts';
 import { prefs } from './settings.ts';
+import { againOps, canvasOf, dataUrl, fitSide, keepMedia, placeMedia, recordOf } from './media.ts';
 import { t } from './i18n/index.ts';
-
-const EXT: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/gif': 'gif' };
 
 /** the proportions the providers take, named as Gemini does */
 const RATIOS = ['21:9', '16:9', '9:16', '5:4', '4:5', '3:2', '2:3', '4:3', '3:4', '1:1'] as const;
@@ -39,49 +38,13 @@ export function ratioOf(w: number, h: number): Ratio {
 /** a ratio's width over its height */
 const valueOf = (r: string) => { const [a, b] = r.split(':').map(Number); return a / b; };
 
-export const slugOf = (name: string) => name.toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 56) || 'picture';
-
-/** a picture kept under assets/images/ and declared as an image asset (replaced when made again) */
-async function keepImage(ctx: ToolContext, name: string, blob: Blob, made: unknown): Promise<{ asset: string; ops: Op[]; reload: string[] }> {
-  const slug = slugOf(name);
-  const asset = `image-${slug}`;
-  const path = await ctx.writeFile(`assets/images/${slug}.${EXT[blob.type] ?? 'png'}`, blob);
-  await ctx.writeFile(`assets/images/${slug}.image.json`, JSON.stringify(made, null, 1));
-  const had = !!ctx.doc.assets[asset];
-  return { asset, reload: had ? [asset] : [], ops: [{ op: had ? 'replace' : 'add', path: pointer('assets', asset), value: { type: 'image', src: path, name } }] };
-}
-
 /** what the model and the user see of the picture: a small JPEG, the size of a still */
 async function preview(blob: Blob, side = 768): Promise<string> {
   const img = await createImageBitmap(blob);
   try { return jpegOf(img, img.width, img.height, Math.min(1, side / img.width)); } finally { img.close(); }
 }
 
-/**
- * An image layer showing the picture: filling the frame (cover, cropped to
- * it) or showing it whole (contain, bands around it), over the whole
- * composition or from a time; a background goes under the other layers.
- */
-function place(ctx: ToolContext, asset: string, name: string, o: { fit: 'cover' | 'contain'; at: number; duration?: number; background: boolean }): { ops: Op[]; layer: string } {
-  const c = ctx.doc.compositions[ctx.compId];
-  const id = freshId({ ...c.layers }, asset.replace(/^image-/, 'pic-'));
-  const at = Math.max(0, o.at), out = Math.min(c.duration, at + (o.duration ?? c.duration));
-  const ops: Op[] = [
-    { op: 'add', path: pointer('compositions', ctx.compId, 'layers', id), value: { type: 'image', name, in: +at.toFixed(3), out: +out.toFixed(3), transform: { position: [c.width / 2, c.height / 2] }, props: { image: asset, size: [c.width, c.height], fit: o.fit } } },
-    { op: 'add', path: pointer('compositions', ctx.compId, 'order', o.background ? '0' : '-'), value: id },
-  ];
-  return { ops, layer: id };
-}
-
 // ── what a picture is made from ──────────────────────────────
-/** the record of a picture made before (assets/images/<name>.image.json, beside its file), or null */
-async function recordOf(ctx: ToolContext, asset: string): Promise<Record<string, unknown> | null> {
-  const src = ctx.doc.assets[asset]?.src;
-  if (!src) return null;
-  const text = await ctx.readText(src.replace(/\.[a-z0-9]+$/i, '.image.json')).catch(() => null);
-  try { return text ? JSON.parse(text) : null; } catch { return null; }
-}
-
 /**
  * The words of a picture made again: what made it, and only the change asked
  * — the rest said to stay as it is, so the provider changes only that.
@@ -98,7 +61,7 @@ export function paletteWords(tokens: Record<string, { type: string; value: unkno
 }
 
 /** a bitmap of an image file, a project asset or a still of the composition */
-async function bitmapOf(ctx: ToolContext, source: string, at: number): Promise<ImageBitmap> {
+export async function bitmapOf(ctx: ToolContext, source: string, at: number): Promise<ImageBitmap> {
   if (source === 'frame') {
     const url = await ctx.renderStill(at);
     return createImageBitmap(await (await fetch(url)).blob());
@@ -109,20 +72,6 @@ async function bitmapOf(ctx: ToolContext, source: string, at: number): Promise<I
   if (!res.ok) throw new Error(`${source}: the picture could not be read (HTTP ${res.status})`);
   return createImageBitmap(await res.blob());
 }
-
-/** a canvas of a size, its 2D context */
-function canvasOf(w: number, h: number): { c: OffscreenCanvas; g: OffscreenCanvasRenderingContext2D } {
-  const c = new OffscreenCanvas(Math.max(1, Math.round(w)), Math.max(1, Math.round(h)));
-  return { c, g: c.getContext('2d')! };
-}
-
-const dataUrl = async (c: OffscreenCanvas) => {
-  const blob = await c.convertToBlob({ type: 'image/png' });
-  const bytes = new Uint8Array(await blob.arrayBuffer());
-  let s = '';
-  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  return `data:image/png;base64,${btoa(s)}`;
-};
 
 /**
  * Where a picture sits when extended to a wider (or taller) ratio: its size
@@ -135,9 +84,6 @@ export function extension(w: number, h: number, ratio: string): { width: number;
   const width = Math.round(Math.max(w, h * r)), height = Math.round(Math.max(h, w / r));
   return { width, height, x: Math.round((width - w) / 2), y: Math.round((height - h) / 2) };
 }
-
-/** a reference at most 1536 px on its longest side: a provider does not draw bigger, and the request stays small */
-const fitSide = (w: number, h: number, side = 1536) => Math.min(1, side / Math.max(w, h));
 
 /**
  * The reference and mask of a change, as data URLs: the picture (fitted), a
@@ -231,7 +177,7 @@ const generateImage: ToolType<Input> = {
       return keepAndPlace(ctx, pick, h.label, { ...h.record, take: Number(n) }, { again: h.again, fit: h.fit, at: h.at, duration: h.duration, background: h.background, upscale: a.upscale });
     }
     // what it is made from: a record made before, a reference, or words alone
-    const before = a.again ? await recordOf(ctx, a.again) : null;
+    const before = a.again ? await recordOf(ctx, 'image', a.again) : null;
     if (a.again && !ctx.doc.assets[a.again]) throw new Error(`${a.again}: no such picture in the project`);
     const words = a.prompt?.trim() || (before?.prompt ? String(before.prompt) : '');
     if (!words) throw new Error('say what to draw (prompt), or name a picture made before to make again (again)');
@@ -283,10 +229,10 @@ async function keepAndPlace(ctx: ToolContext, made: MadeImage, label: string, re
     if (up) { blob = up.blob; grown = ` Brought to ${up.width}×${up.height} for the frame.`; record = { ...record, upscaled: [up.width, up.height] }; }
   }
   // made again: the same asset, its layers showing the new picture; else a new asset and its layer
-  const kept = await keepImage(ctx, o.again ? String(ctx.doc.assets[o.again].src).split('/').pop()!.replace(/\.[a-z0-9]+$/i, '') : label, blob, record);
-  const again = o.again && kept.asset !== o.again ? [{ op: 'replace' as const, path: pointer('assets', o.again), value: { ...ctx.doc.assets[o.again], src: (kept.ops[0] as { value: { src: string } }).value.src } }] : [];
-  const placed = o.again ? null : place(ctx, kept.asset, label, { fit: o.fit, at: o.at, duration: o.duration, background: o.background });
-  const ops = o.again ? (again.length ? again : kept.ops) : [...kept.ops, ...placed!.ops];
+  const kept = await keepMedia(ctx, 'image', o.again ? String(ctx.doc.assets[o.again].src).split('/').pop()!.replace(/\.[a-z0-9]+$/i, '') : label, blob, record);
+  const again = o.again ? againOps(ctx, o.again, kept) : null;
+  const placed = o.again ? null : placeMedia(ctx, 'image', kept.asset, label, { fit: o.fit, at: o.at, out: Math.min(c.duration, o.at + (o.duration ?? c.duration)), background: o.background });
+  const ops = o.again ? again! : [...kept.ops, ...placed!.ops];
   return {
     ops, reload: o.again ? [o.again] : kept.reload, label: `Picture ${label}`,
     text: `Picture made by ${made.provider} (${made.model}, ${String(record.ratio)}), saved as asset ${o.again ?? kept.asset} with its record${o.again ? ' — made again in place: every layer showing it shows the new one' : `; layer ${placed!.layer}${o.background ? ' in the background' : ''} from ${o.at.toFixed(2)} s`}.${grown} You see it: judge it (a background stays quiet under the titles) and have it made again with a sharper prompt, or again + change, when it is off.`,

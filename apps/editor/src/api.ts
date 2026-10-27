@@ -75,6 +75,8 @@ export interface ServerConfig {
   sound?: Record<'sfx' | 'music' | 'voice', string[]>;
   /** providers that make pictures */
   images?: string[];
+  /** providers that make video clips */
+  videos?: string[];
 }
 
 /** a sound made by a provider: the file and what made it */
@@ -83,6 +85,10 @@ export interface MadeSound { blob: Blob; provider: string; model: string; voice?
 export interface MadeImage { blob: Blob; provider: string; model: string }
 /** what a picture is made from: the words, the proportions, and what the settings or the ask choose */
 export interface ImageAsk { prompt: string; ratio?: string; quality?: 'low' | 'medium' | 'high'; provider?: string; size?: 'small' | 'large'; n?: number; reference?: string; mask?: string }
+/** a clip made by a provider: the file and what made it */
+export interface MadeVideo { blob: Blob; provider: string; model: string }
+/** what a clip is made from: the words, the proportions, the length, and a still to animate */
+export interface VideoAsk { prompt: string; ratio?: string; duration?: number; source?: string; provider?: string }
 
 export interface ProjectFile { path: string; size: number; etag: string; modified: string }
 
@@ -174,6 +180,11 @@ export const api = {
     if (!(r.headers.get('content-type') ?? '').startsWith('application/json')) return [{ blob: await r.blob(), provider, model }];
     const j = await r.json() as { images: { type: string; data: string }[] };
     return j.images.map((i) => ({ blob: new Blob([Uint8Array.from(atob(i.data), (c) => c.charCodeAt(0))], { type: i.type }), provider, model }));
+  },
+  /** a video clip made by a provider with the user's key */
+  async generateVideo(ask: VideoAsk, signal?: AbortSignal): Promise<MadeVideo> {
+    const r = await answered(await reach('/api/generate-video', { ...jsonInit('POST', ask), signal }));
+    return { blob: await r.blob(), provider: r.headers.get('x-tramme-provider') ?? '', model: r.headers.get('x-tramme-model') ?? '' };
   },
   remove: (id: string) => call<{ deleted: string }>(P(id), { method: 'DELETE' }),
   duplicate: (id: string, name?: string) => call<Manifest>(`${P(id)}/duplicate`, jsonInit('POST', { name })),
