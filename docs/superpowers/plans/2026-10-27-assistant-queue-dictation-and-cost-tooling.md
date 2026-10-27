@@ -43,21 +43,21 @@
 **Interfaces:**
 - Produces: `watchCompanion(): () => void` in `apps/editor/src/ai/index.ts`, returning a function that stops it. `useStatusWatch` keeps its signature but no longer polls (it only runs the first `refreshStatus()`).
 
-- [ ] **Step 1: Write the failing tests.** Stub `fetch` so `/health` fails, then answers as the companion does (read `probeCompanion` in `apps/editor/src/ai/companion.ts` for the shape). Use `vi.useFakeTimers()`.
+- [x] **Step 1: Write the failing tests.** Stub `fetch` so `/health` fails, then answers as the companion does (read `probeCompanion` in `apps/editor/src/ai/companion.ts` for the shape). Use `vi.useFakeTimers()`.
   - `finds a companion started after the app, even when another route works`: `aiStatus.value.server = true` first; start `watchCompanion()`; `/health` fails, advance 4 s, then `/health` answers; advance 4 s; expect `aiStatus.value.companion === 'ok'`.
   - `notices a companion that stops`: from `ok`, `/health` fails; advance 15 s; expect `companion !== 'ok'`.
   - `never looks twice at once`: `/health` never settles; advance 60 s; expect the `/health` fetch called once.
   - `looks again when the window regains focus`: dispatch `focus` on `window`; expect one more `/health` call.
-- [ ] **Step 2: Run** `npx vitest run apps/editor/test/companion-watch.test.ts`. Expected: FAIL (`watchCompanion` is not exported).
-- [ ] **Step 3: Implement `watchCompanion()`.**
+- [x] **Step 2: Run** `npx vitest run apps/editor/test/companion-watch.test.ts`. Expected: FAIL (`watchCompanion` is not exported).
+- [x] **Step 3: Implement `watchCompanion()`.**
   - It calls `refreshStatus(true)` every 4 s while `aiStatus.companion !== 'ok'`, and every 15 s once it is `ok`.
   - It also looks again on the window's `focus` event.
   - It skips a tick while a look is in flight.
   - It runs whatever `aiRoute` is.
   - Start it once in `main.tsx`, which covers the home page and the editor.
   - Remove the interval from `useStatusWatch`.
-- [ ] **Step 4: Run the test**, then `npx vitest run apps/editor/test`. Expected: PASS.
-- [ ] **Step 5: Commit** `fix(assistant): find the local companion whenever it starts`.
+- [x] **Step 4: Run the test**, then `npx vitest run apps/editor/test`. Expected: PASS.
+- [x] **Step 5: Commit** `fix(assistant): find the local companion whenever it starts`.
 
 ### Task 2: `/` on the home page
 

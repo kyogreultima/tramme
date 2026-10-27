@@ -248,6 +248,22 @@ export async function refreshStatus(quiet = false) {
   if (providerOf(aiSettings.peek().model) === 'openrouter' && next.remote.openrouter && !aiModels.peek().remote.openrouter) loadModels().catch(() => {});
 }
 
+/** the companion looked for whenever it may have started or stopped, on every screen and whatever route works: often while it is missing, rarely once it answers */
+export function watchCompanion(): () => void {
+  let timer: ReturnType<typeof setTimeout> | undefined, busy = false, stopped = false;
+  const wait = () => { if (!stopped) timer = setTimeout(look, aiStatus.peek().companion === 'ok' ? 15_000 : 4000); };
+  // never a second look while one is in flight: a companion that hangs would pile up requests
+  const look = async () => {
+    clearTimeout(timer);
+    if (busy) return;
+    busy = true;
+    try { await refreshStatus(true); } catch { /* the next look tries again */ } finally { busy = false; wait(); }
+  };
+  addEventListener('focus', look);
+  wait();
+  return () => { stopped = true; clearTimeout(timer); removeEventListener('focus', look); };
+}
+
 // ── conversations ────────────────────────────────────────────
 // Each conversation is a file of the project (.tramme/chats/<id>.json); an
 // index lists them for the history. "New conversation" keeps the others.

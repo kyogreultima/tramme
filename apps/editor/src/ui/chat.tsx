@@ -257,12 +257,7 @@ export function Access() {
   );
 }
 
-/** while no model answers: look again now and then, the companion may have just started */
-export function useStatusWatch(available: boolean) {
+/** the first look at the routes when a panel opens; the companion is then watched by the app (watchCompanion) */
+export function useStatusWatch() {
   useEffect(() => { refreshStatus(); }, []);
-  useEffect(() => {
-    if (available) return;
-    const id = setInterval(() => refreshStatus(true), 4000);
-    return () => clearInterval(id);
-  }, [available]);
 }
