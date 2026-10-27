@@ -260,16 +260,16 @@
   - `Usage` gains `cacheWrite1h: number`, the share of `cacheWrite` kept an hour. It is `0` in `NO_USAGE`, and `addUsage` sums it.
   - `TurnUsage` gains `route: 'server' | 'chat' | 'companion' | 'local'` and `unknown?: true`. `unknown` is set when the turn received no `usage` event.
 
-- [ ] **Step 1: Write the failing tests.**
+- [x] **Step 1: Write the failing tests.**
   - `UsageMeter reads the 1-hour cache writes`: `message_start` with `usage: { input_tokens: 10, cache_creation_input_tokens: 300, cache_creation: { ephemeral_5m_input_tokens: 100, ephemeral_1h_input_tokens: 200 }, output_tokens: 1 }` gives `cacheWrite: 300, cacheWrite1h: 200`.
   - `addUsage sums cacheWrite1h`.
   - In the server-session test, the usage of a turn carries `route: 'server'`.
-- [ ] **Step 2: Run** `npx vitest run packages/assistant/test/usage.test.ts apps/editor/test/server-session.test.ts`. Expected: FAIL.
-- [ ] **Step 3: Implement.**
+- [x] **Step 2: Run** `npx vitest run packages/assistant/test/usage.test.ts apps/editor/test/server-session.test.ts`. Expected: FAIL.
+- [x] **Step 3: Implement.**
   - `ask` sets `route` from the route it took. It sets `unknown: true` when no `usage` event arrived.
   - The Codex usage in `packages/cli/src/agents.ts:296` sends `cacheWrite1h: 0`.
-- [ ] **Step 4: Run the tests.** Expected: PASS.
-- [ ] **Step 5: Commit** `feat(assistant): record cache writes by lifetime and the route of each turn`.
+- [x] **Step 4: Run the tests.** Expected: PASS.
+- [x] **Step 5: Commit** `feat(assistant): record cache writes by lifetime and the route of each turn`.
 
 ### Task 9: Usage of the chat-format routes
 

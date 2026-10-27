@@ -433,13 +433,13 @@ export interface ToolResult {
 }
 
 // ── what a turn costs ────────────────────────────────────────
-/** the tokens of a turn's requests: fresh input, input read from the cache, input written to it, output */
-export interface Usage { requests: number; input: number; cacheRead: number; cacheWrite: number; output: number }
+/** the tokens of a turn's requests: fresh input, input read from the cache, input written to it (cacheWrite1h: the share kept an hour, priced apart), output */
+export interface Usage { requests: number; input: number; cacheRead: number; cacheWrite: number; cacheWrite1h: number; output: number }
 
-export const NO_USAGE: Usage = { requests: 0, input: 0, cacheRead: 0, cacheWrite: 0, output: 0 };
+export const NO_USAGE: Usage = { requests: 0, input: 0, cacheRead: 0, cacheWrite: 0, cacheWrite1h: 0, output: 0 };
 
 export const addUsage = (a: Usage, b: Usage): Usage => ({
-  requests: a.requests + b.requests, input: a.input + b.input, cacheRead: a.cacheRead + b.cacheRead, cacheWrite: a.cacheWrite + b.cacheWrite, output: a.output + b.output,
+  requests: a.requests + b.requests, input: a.input + b.input, cacheRead: a.cacheRead + b.cacheRead, cacheWrite: a.cacheWrite + b.cacheWrite, cacheWrite1h: a.cacheWrite1h + b.cacheWrite1h, output: a.output + b.output,
 });
 
 /**
@@ -451,11 +451,11 @@ export const addUsage = (a: Usage, b: Usage): Usage => ({
 export class UsageMeter {
   usage: Usage = { ...NO_USAGE };
   private out = 0;
-  event(ev: { type?: string; message?: { usage?: Record<string, number> }; usage?: Record<string, number> }) {
+  event(ev: { type?: string; message?: { usage?: Record<string, number | Record<string, number>> & { cache_creation?: Record<string, number> } }; usage?: Record<string, number> }) {
     if (ev.type === 'message_start') {
-      const u = ev.message?.usage ?? {};
+      const u = (ev.message?.usage ?? {}) as Record<string, number> & { cache_creation?: Record<string, number> };
       this.out = u.output_tokens ?? 0;
-      this.usage = addUsage(this.usage, { requests: 1, input: u.input_tokens ?? 0, cacheRead: u.cache_read_input_tokens ?? 0, cacheWrite: u.cache_creation_input_tokens ?? 0, output: this.out });
+      this.usage = addUsage(this.usage, { requests: 1, input: u.input_tokens ?? 0, cacheRead: u.cache_read_input_tokens ?? 0, cacheWrite: u.cache_creation_input_tokens ?? 0, cacheWrite1h: u.cache_creation?.ephemeral_1h_input_tokens ?? 0, output: this.out });
     } else if (ev.type === 'message_delta' && typeof ev.usage?.output_tokens === 'number') {
       this.usage = { ...this.usage, output: this.usage.output + ev.usage.output_tokens - this.out };
       this.out = ev.usage.output_tokens;
