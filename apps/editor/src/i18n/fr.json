@@ -934,7 +934,7 @@
     "confirmPaid": "Demander avant un son payant",
     "confirmPaidHint": "Un effet, une musique, une voix off ou une image créés par un fournisseur coûtent de l'argent : vous dites oui d'abord. Quand l'assistant applique ses modifications tout seul, c'est le plafond ci-dessous qui compte.",
     "paidPerTurn": "Générations payantes par tour en automatique",
-    "paidPerTurnHint": "Quand l'assistant applique ses modifications tout seul, rien n’est demandé : un tour crée au plus ce nombre de sons ou d’images payants, puis se rabat sur la bibliothèque.",
+    "paidPerTurnHint": "Quand l'assistant applique ses modifications tout seul, rien n’est demandé : un tour crée au plus ce nombre de générations payantes (sons, images ou secondes de clips), puis se rabat sur la bibliothèque.",
     "voiceOver": "Voix off",
     "voiceOverHint": "Le fournisseur et la voix utilisés sauf si la demande en nomme d'autres (Gemini : Kore, Puck… ; OpenAI : alloy, coral… ; ElevenLabs : un identifiant de voix, ou choisissez-en une ci-dessous).",
     "voicePlaceholder": "sa voix par défaut",

@@ -10,24 +10,22 @@
 // as its opening frame, and `again` makes the same clip again from its record.
 // The user says yes before it costs money, as for the pictures and the sounds.
 
-import { pointer, type Op, type ToolContext, type ToolType } from '@tramme/core';
+import { pointer, type Layer, type Op, type ToolContext, type ToolType } from '@tramme/core';
+import { HYDRACEPT_VIDEO_SECONDS, videoSecondsOf, type HydraceptVideoSeconds } from '@tramme/api';
 import { VideoFrames } from '@tramme/render';
 import { api, type MadeVideo, type VideoAsk } from './api.ts';
 import { payFor } from './confirm.ts';
-import { clip, freshId } from './model.ts';
+import { clip } from './model.ts';
 import { jpegOf } from './perception.ts';
 import { prefs } from './settings.ts';
-import { againPrompt, bitmapOf, slugOf } from './images.ts';
+import { againPrompt, bitmapOf } from './images.ts';
+import { againOps, canvasOf, dataUrl, fitSide, keepMedia, placeMedia, recordOf } from './media.ts';
 import { t } from './i18n/index.ts';
 
 const RATIOS = ['16:9', '9:16'] as const;
-const SECONDS = [4, 6, 8] as const;
+const SECONDS = HYDRACEPT_VIDEO_SECONDS;
 type Ratio = (typeof RATIOS)[number];
-type Seconds = (typeof SECONDS)[number];
-
-/** the video format the provider answers; Hydracept names the artifact's own type */
-const EXT: Record<string, string> = { 'video/mp4': 'mp4', 'video/webm': 'webm', 'video/quicktime': 'mov' };
-const SIDE = 1536;
+type Seconds = HydraceptVideoSeconds;
 
 /** the ratio the composition calls for: wide or tall (Veo takes these two) */
 export function clipRatio(w: number, h: number): Ratio {
@@ -50,49 +48,42 @@ export function clipPlacement(duration: number, compDuration: number, at: number
   return { at: start, out: Math.min(compDuration, start + length) };
 }
 
-/** a clip kept under assets/videos/ with its record, replaced when made again */
-async function keepClip(ctx: ToolContext, name: string, blob: Blob, made: unknown): Promise<{ asset: string; ops: Op[]; reload: string[] }> {
-  const slug = slugOf(name, 'clip');
-  const asset = `video-${slug}`.slice(0, 64);
-  const path = await ctx.writeFile(`assets/videos/${slug}.${EXT[blob.type] ?? 'mp4'}`, blob);
-  await ctx.writeFile(`assets/videos/${slug}.video.json`, JSON.stringify(made, null, 1));
-  const had = !!ctx.doc.assets[asset];
-  return { asset, reload: had ? [asset] : [], ops: [{ op: had ? 'replace' : 'add', path: pointer('assets', asset), value: { type: 'video', src: path, name } }] };
-}
-
 /** a video layer showing the clip: fills the frame (cover) or shows it whole (contain), from `at` */
-function place(ctx: ToolContext, asset: string, name: string, o: { fit: 'cover' | 'contain'; at: number; duration: number; background: boolean }): { ops: Op[]; layer: string } {
-  const c = ctx.doc.compositions[ctx.compId];
-  const id = freshId({ ...c.layers }, asset.replace(/^video-/, 'clip-'));
-  const at = Math.max(0, o.at), out = Math.min(c.duration, at + o.duration);
-  const ops: Op[] = [
-    { op: 'add', path: pointer('compositions', ctx.compId, 'layers', id), value: { type: 'video', name, in: +at.toFixed(3), out: +out.toFixed(3), transform: { position: [c.width / 2, c.height / 2] }, props: { video: asset, size: [c.width, c.height], fit: o.fit } } },
-    { op: 'add', path: pointer('compositions', ctx.compId, 'order', o.background ? '0' : '-'), value: id },
-  ];
-  return { ops, layer: id };
+function layersOf(ctx: ToolContext, asset: string): { compId: string; id: string; layer: Layer }[] {
+  const found: { compId: string; id: string; layer: Layer }[] = [];
+  for (const [compId, c] of Object.entries(ctx.doc.compositions)) {
+    for (const [id, layer] of Object.entries(c.layers)) {
+      if ((layer.props as { video?: string } | undefined)?.video === asset) found.push({ compId, id, layer });
+    }
+  }
+  return found;
 }
 
-/** the record of a clip made before (assets/videos/<name>.video.json, beside its file), or null */
-async function recordOf(ctx: ToolContext, asset: string): Promise<Record<string, unknown> | null> {
-  const src = ctx.doc.assets[asset]?.src;
-  if (!src) return null;
-  const text = await ctx.readText(src.replace(/\.[a-z0-9]+$/i, '.video.json')).catch(() => null);
-  try { return text ? JSON.parse(text) : null; } catch { return null; }
+/**
+ * A clip made again at another length: the layers showing it that were not
+ * trimmed follow the new length, clamped to each composition's end. A layer
+ * whose span differs from the old length is a deliberate trim and stays.
+ */
+function resizeLayers(ctx: ToolContext, asset: string, oldDuration: number, duration: number): Op[] {
+  const ops: Op[] = [];
+  for (const { compId, id, layer } of layersOf(ctx, asset)) {
+    const comp = ctx.doc.compositions[compId];
+    const from = layer.in ?? 0, to = layer.out ?? comp.duration;
+    if (Math.abs(to - from - oldDuration) > 0.001) continue;
+    const out = Math.min(comp.duration, from + duration);
+    if (Math.abs(out - to) > 0.001) ops.push({ op: 'replace', path: pointer('compositions', compId, 'layers', id, 'out'), value: +out.toFixed(3) });
+  }
+  return ops;
 }
 
 /** a still picture sent to the provider as the clip's opening frame (an image asset, or a frame of the composition) */
 async function sourceOf(ctx: ToolContext, source: string, at: number): Promise<string> {
   const img = await bitmapOf(ctx, source, at);
   try {
-    const k = Math.min(1, SIDE / Math.max(img.width, img.height));
-    const c = new OffscreenCanvas(Math.max(1, Math.round(img.width * k)), Math.max(1, Math.round(img.height * k)));
-    const g = c.getContext('2d')!;
+    const k = fitSide(img.width, img.height);
+    const { c, g } = canvasOf(img.width * k, img.height * k);
     g.drawImage(img, 0, 0, c.width, c.height);
-    const png = await c.convertToBlob({ type: 'image/png' });
-    const bytes = new Uint8Array(await png.arrayBuffer());
-    let s = '';
-    for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-    return `data:image/png;base64,${btoa(s)}`;
+    return await dataUrl(c);
   } finally { img.close(); }
 }
 
@@ -117,7 +108,7 @@ async function poster(blob: Blob): Promise<string | null> {
 }
 
 type Input = {
-  prompt?: string; name?: string; ratio?: Ratio | 'auto'; duration?: Seconds; provider?: string;
+  prompt?: string; name?: string; ratio?: Ratio | 'auto'; duration?: Seconds | null; provider?: string;
   fit?: 'cover' | 'contain'; at?: number; background?: boolean; source?: string; again?: string; change?: string;
 };
 
@@ -134,7 +125,7 @@ const generateVideo: ToolType<Input> = {
       fit: { enum: ['cover', 'contain'], title: 'Fit', description: 'cover: fills the frame, cropped to it; contain: shown whole, bands around it' },
       at: { type: 'number', minimum: 0, title: 'Start (s)', description: 'the playhead by default' },
       background: { type: 'boolean', title: 'In the background', description: 'under the other layers' },
-      source: { type: 'string', title: 'First frame', description: 'an image asset of the project, or "frame" for a still of the composition at the start: the clip animates it (image-to-video)' },
+      source: { type: 'string', title: 'First frame', description: 'an image asset of the project, or "frame" for a still of the composition at the clip\'s start: the clip animates it (image-to-video)' },
       again: { type: 'string', format: 'asset', assetType: 'video', title: 'Make again', description: 'a clip made before: its record gives the prompt, the provider, the proportions and the length' },
       change: { type: 'string', title: 'Change', description: 'with again: what changes ("night instead of dusk", "slower push-in"); the rest stays' },
     },
@@ -146,7 +137,7 @@ const generateVideo: ToolType<Input> = {
   },
   async run(a, ctx) {
     const p = prefs.peek(), c = ctx.doc.compositions[ctx.compId];
-    const before = a.again ? await recordOf(ctx, a.again) : null;
+    const before = a.again ? await recordOf(ctx, 'video', a.again) : null;
     if (a.again && !ctx.doc.assets[a.again]) throw new Error(`${a.again}: no such clip in the project`);
     const words = a.prompt?.trim() || (before?.prompt ? String(before.prompt) : '');
     if (!words) throw new Error('say what the shot shows (prompt), or name a clip made before to make again (again)');
@@ -154,41 +145,54 @@ const generateVideo: ToolType<Input> = {
     const ratio: Ratio = a.ratio && a.ratio !== 'auto' ? a.ratio
       : RATIOS.includes(String(before?.ratio) as Ratio) ? String(before?.ratio) as Ratio
         : clipRatio(c.width, c.height);
-    const earlier = Number(before?.duration);
-    const asked = Number(a.duration);
-    const duration: Seconds = Number.isFinite(asked) ? Math.min(8, Math.max(4, Math.round(asked / 2) * 2)) as Seconds
-      : (SECONDS as readonly number[]).includes(earlier) ? earlier as Seconds : p.videoSeconds;
+    // null, undefined and an empty form field all mean "not asked": the record or the setting decides
+    const asked = a.duration == null || String(a.duration).trim() === '' ? undefined : Number(a.duration);
+    const recorded = before?.duration == null ? undefined : Number(before.duration);
+    const duration: Seconds = asked !== undefined && Number.isFinite(asked) ? videoSecondsOf(asked)
+      : recorded !== undefined && Number.isFinite(recorded) ? videoSecondsOf(recorded) : p.videoSeconds;
     const source = a.source ?? (typeof before?.source === 'string' ? before.source : undefined);
     if (source && source !== 'frame' && ctx.doc.assets[source]?.type !== 'image') throw new Error(`${source}: an image asset of the project, or "frame" for a still of the composition, is expected`);
     const prompt = a.again ? againPrompt(words, a.change) : words;
     const placement = clipPlacement(duration, c.duration, a.at === undefined ? undefined : Number(a.at), ctx.time);
-    // a clip made again animates the same opening frame unless another is asked for
-    const recordedFrame = Number(before?.sourceAt);
-    const frameAt = a.again && a.source === undefined && Number.isFinite(recordedFrame)
-      ? Math.max(0, Math.min(recordedFrame, c.duration))
-      : Math.max(0, Math.min(ctx.time, c.duration));
+    const showing = a.again ? layersOf(ctx, a.again) : [];
+    // a still is read where the clip starts; made again, it keeps the record's frame unless another is asked
+    const recordedFrame = before?.sourceAt == null ? undefined : Number(before.sourceAt);
+    const frameAt = source === 'frame'
+      ? (a.again && a.source === undefined && recordedFrame !== undefined && Number.isFinite(recordedFrame)
+          ? Math.max(0, Math.min(recordedFrame, c.duration))
+          : a.again && a.source === 'frame' && showing[0]
+            ? Math.max(0, Math.min(showing[0].layer.in ?? 0, c.duration))
+            : placement.at)
+      : placement.at;
     const at = placement.at;
     const fit = a.fit ?? 'cover', background = a.background ?? false;
-    // it costs money: the user says yes first, or the turn's allowance does (as for the sounds and the pictures)
-    await payFor(t('video.paidTitle'), t('video.paidText', { prompt: clip(prompt, 140), seconds: duration }), t('video.paidYes'), 'use footage already in the project');
+    // it costs money: the user says yes first, or the turn's allowance does; each second of the clip counts
+    await payFor(t('video.paidTitle'), t('video.paidText', { prompt: clip(prompt, 140), seconds: duration }), t('video.paidYes'), 'use footage already in the project', duration);
     const still = source ? await sourceOf(ctx, source, frameAt) : undefined;
     const ask: VideoAsk = { prompt, ratio, duration, provider, ...(still ? { source: still } : {}) };
     const made: MadeVideo = await api.generateVideo(ask, ctx.signal);
     const label = a.again ? String(ctx.doc.assets[a.again].name ?? a.again.replace(/^video-/, '')) : a.name ?? words.toLowerCase().split(/\s+/).slice(0, 4).join('-');
     const record: Record<string, unknown> = {
       prompt: words, provider: made.provider, model: made.model, ratio, duration, fit,
+      at: +placement.at.toFixed(3),
       ...(source ? { source, ...(source === 'frame' ? { sourceAt: +frameAt.toFixed(3) } : {}) } : {}),
       ...(a.again ? { again: a.again, ...(a.change ? { change: a.change } : {}) } : {}),
       ...(before ? { before: { ...before, before: undefined } } : {}),
     };
-    const kept = await keepClip(ctx, a.again ? String(ctx.doc.assets[a.again].src).split('/').pop()!.replace(/\.[a-z0-9]+$/i, '') : label, made.blob, record);
-    const again = a.again && kept.asset !== a.again ? [{ op: 'replace' as const, path: pointer('assets', a.again), value: { ...ctx.doc.assets[a.again], src: (kept.ops[0] as { value: { src: string } }).value.src } }] : [];
-    const placed = a.again ? null : place(ctx, kept.asset, label, { fit, at, duration, background });
-    const ops = a.again ? (again.length ? again : kept.ops) : [...kept.ops, ...placed!.ops];
+    const kept = await keepMedia(ctx, 'video', a.again ? String(ctx.doc.assets[a.again].src).split('/').pop()!.replace(/\.[a-z0-9]+$/i, '') : label, made.blob, record);
+    const replaced = a.again ? againOps(ctx, a.again, kept) : [];
+    const resized = a.again && recorded !== undefined && Number.isFinite(recorded) && Math.abs(recorded - duration) > 0.001
+      ? resizeLayers(ctx, a.again, recorded, duration)
+      : [];
+    const placed = a.again ? null : placeMedia(ctx, 'video', kept.asset, label, { fit, at, out: placement.out, background });
+    const ops = a.again ? [...replaced, ...resized] : [...kept.ops, ...placed!.ops];
     const frame = await poster(made.blob);
+    const againNote = !showing.length ? ' — made again in place; no layer in this project shows it'
+      : resized.length ? ` — made again in place: the layers showing it follow the new ${duration} s length (trimmed ones keep their trim)`
+        : ' — made again in place: the layers showing it keep their trim';
     return {
       ops, reload: a.again ? [a.again] : kept.reload, label: `Clip ${label}`,
-      text: `Clip made by ${made.provider} (${made.model}, ${ratio}, ${duration} s${source ? `, animated from ${source === 'frame' ? `the frame at ${frameAt.toFixed(2)} s` : source}` : ''}), saved as asset ${a.again ?? kept.asset} with its record${placed ? `; layer ${placed.layer}${background ? ' in the background' : ''} from ${at.toFixed(2)} s to ${placement.out.toFixed(2)} s` : ' — made again in place: every layer showing it plays the new one'}. Look at it with media_frame at a time, and find its cuts with shots.`,
+      text: `Clip made by ${made.provider} (${made.model}, ${ratio}, ${duration} s${source ? `, animated from ${source === 'frame' ? `the frame at ${frameAt.toFixed(2)} s` : source}` : ''}), saved as asset ${a.again ?? kept.asset} with its record${placed ? `; layer ${placed.layer}${background ? ' in the background' : ''} from ${at.toFixed(2)} s to ${placement.out.toFixed(2)} s` : againNote}. Look at it with media_frame at a time, and find its cuts with shots.`,
       ...(frame ? { images: [{ url: frame, caption: `${label} · ${made.provider}` }] } : {}),
       notice: t('video.made', { name: label, provider: made.provider, model: made.model }),
     };

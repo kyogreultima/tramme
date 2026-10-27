@@ -934,7 +934,7 @@
     "confirmPaid": "Ask before a paid sound",
     "confirmPaidHint": "A sound effect, a music, a voice-over or a picture made by a provider costs money: you say yes first. When the assistant applies its changes by itself, the allowance below counts instead.",
     "paidPerTurn": "Paid generations per turn on its own",
-    "paidPerTurnHint": "When the assistant applies its changes by itself, nothing is asked: a turn makes at most this many sounds or pictures that cost money, then falls back on the library.",
+    "paidPerTurnHint": "When the assistant applies its changes by itself, nothing is asked: a turn makes at most this many paid generations (sounds, pictures, or seconds of clips), then falls back on the library.",
     "voiceOver": "Voice-overs",
     "voiceOverHint": "The provider and the voice used unless the request names others (Gemini: Kore, Puck…; OpenAI: alloy, coral…; ElevenLabs: a voice id, or choose one below).",
     "voicePlaceholder": "its own voice",

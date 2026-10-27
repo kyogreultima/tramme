@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { generate, voices } from '../src/generate.ts';
 import { HYDRACEPT_AUDIO_MP3, HYDRACEPT_VIDEO_MODEL, hydraceptImage, hydraceptMusic, hydraceptSfx, hydraceptVideo, hydraceptVoice, mapHydraceptVoices, videoSecondsOf } from '../src/hydracept.ts';
 import { generateImage, imageConfig } from '../src/images.ts';
-import { generateVideo, videoConfig } from '../src/videos.ts';
+import { generateVideo, videoConfig, videoSourceOf } from '../src/videos.ts';
 import { keysRoute, loadKeys, storedKeys, type KeyStore, type Secrets, type StoredKeys } from '../src/keys.ts';
 import { soundConfig } from '../src/generate.ts';
 
@@ -288,6 +288,13 @@ describe('routes with Hydracept', () => {
     const job = calls.find((c) => c.url.includes('/video.generate.v1/jobs') && c.method === 'POST');
     expect((job?.body?.input as Record<string, unknown>)?.sourceImage).toEqual({ dataUrl, mimeType: 'image/png', filename: 'source.png' });
     expect((job?.body?.input as Record<string, unknown>)?.durationSeconds).toBe(8);
+  });
+
+  it('reads a clip source through the pictures parser, including its 12 MB limit', () => {
+    const picture = `data:image/png;base64,${btoa(String.fromCharCode(...PNG))}`;
+    expect(videoSourceOf(picture)).toEqual({ dataUrl: picture, mimeType: 'image/png', filename: 'source.png' });
+    expect(videoSourceOf(undefined)).toBeUndefined();
+    expect(() => videoSourceOf(`data:image/png;base64,${'A'.repeat(16_000_001)}`)).toThrow(/about 12 MB/);
   });
 
   it('generate-video refuses a source that is not a picture data URL', async () => {

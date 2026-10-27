@@ -18,6 +18,7 @@ import {
   type HydraceptVideoSource,
 } from './hydracept.ts';
 import { HttpError, readJson } from './http.ts';
+import { pictureOf } from './images.ts';
 import type { Keys } from './keys.ts';
 import type { Reach } from './providers.ts';
 
@@ -53,15 +54,11 @@ export function videoConfig(keys: Keys): VideoProvider[] {
   return (Object.keys(VIDEO_PROVIDERS) as VideoProvider[]).filter((p) => keys.get(p));
 }
 
-const SOURCE = /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/;
-
-/** a still sent as a data URL ('data:image/png;base64,…'), or nothing; anything else is refused */
+/** a still sent as a data URL ('data:image/png;base64,…'), or nothing; the picture parser is the pictures' own */
 export function videoSourceOf(v: unknown): HydraceptVideoSource | undefined {
-  if (v === undefined || v === null || v === '') return undefined;
-  const m = typeof v === 'string' ? SOURCE.exec(v) : null;
-  if (!m) throw new HttpError(400, 'source: a PNG, JPEG or WebP picture as a data URL is expected');
-  if (m[2].length > 16_000_000) throw new HttpError(413, 'source: the picture is too large (about 12 MB at most)');
-  return { dataUrl: String(v), mimeType: m[1], filename: `source.${m[1].split('/')[1]}` };
+  const picture = pictureOf(v, 'source');
+  if (!picture) return undefined;
+  return { dataUrl: picture.url, mimeType: picture.type, filename: `source.${picture.type.split('/')[1]}` };
 }
 
 export async function generateVideo(req: Request, { keys, fetch }: Reach) {
