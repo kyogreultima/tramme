@@ -399,7 +399,7 @@
 **Files:**
 - Modify: `CHANGELOG.md` (`Unreleased`)
 
-- [ ] **Step 1:** Add the user-visible lines:
+- [x] **Step 1:** Add the user-visible lines:
   - the companion found without a reload;
   - `/` on the home page;
   - the message queue;
@@ -407,9 +407,9 @@
   - Haiku 5.5;
   - the cache lifetime setting;
   - the bench's prices and comparison.
-- [ ] **Step 2: Run** `npm run typecheck` then `npm test`. Expected: both pass. Fix any failure before going on.
-- [ ] **Step 3: Commit** `docs: changelog for the queue, dictation and cost tooling`.
-- [ ] **Step 4:** Do not push. Report:
+- [x] **Step 2: Run** `npm run typecheck` then `npm test`. Expected: both pass. Fix any failure before going on.
+- [x] **Step 3: Commit** `docs: changelog for the queue, dictation and cost tooling`.
+- [x] **Step 4:** Do not push. Report:
   - the branch;
   - the commits;
   - what Task 2 found;
