@@ -383,16 +383,16 @@
 
   No other provider's prices: their models give `null` until someone adds them.
 
-- [ ] **Step 1: Write the failing tests.**
+- [x] **Step 1: Write the failing tests.**
   - `costOf prices each part`: Opus 5.5 with `input 1e6, cacheRead 1e6, cacheWrite 1e6, cacheWrite1h 4e5, output 1e5` gives `4 + 0.2 + 0.6 × 5 + 0.4 × 8 + 2 = 12.4`.
   - `unknown model or usage gives null`.
   - `Haiku 5.5 is a lower bound`.
   - `cacheShare`.
   - `compare sums and subtracts`. A `null` dollars on either side stays `null`.
-- [ ] **Step 2: Run** `npx vitest run bench/cost.test.ts`. Expected: FAIL.
-- [ ] **Step 3: Implement.** `node bench/usage.ts <project>` adds per turn the dollars (or "unknown"), the cache share and the route, then totals per conversation and overall. `node bench/usage.ts --compare <before> <after>` prints both totals and the change. Document both in `bench/README.md`.
-- [ ] **Step 4: Run the test**, then `node bench/usage.ts` with no argument. Expected: PASS, and the usage message lists the `--compare` form.
-- [ ] **Step 5: Commit** `feat(bench): price and compare the assistant's turns`.
+- [x] **Step 2: Run** `npx vitest run bench/cost.test.ts`. Expected: FAIL.
+- [x] **Step 3: Implement.** `node bench/usage.ts <project>` adds per turn the dollars (or "unknown"), the cache share and the route, then totals per conversation and overall. `node bench/usage.ts --compare <before> <after>` prints both totals and the change. Document both in `bench/README.md`.
+- [x] **Step 4: Run the test**, then `node bench/usage.ts` with no argument. Expected: PASS, and the usage message lists the `--compare` form.
+- [x] **Step 5: Commit** `feat(bench): price and compare the assistant's turns`.
 
 ### Task 14: Close
 
