@@ -12,7 +12,7 @@ import { addUsage, CLI_DEFAULT, COMPANION_PORT, DEFAULT_MODEL, EFFORTS, effortFo
 import { CHAT, CHAT_INDEX, chatPath } from '@tramme/project';
 import type { TrammeDoc } from '@tramme/core';
 import reference from '../../../../docs/document.md';
-import { api, type AiEvent, type ChatItem, type KeyedProvider, type KeyStatus } from '../api.ts';
+import { api, type AiEvent, type ChatItem, type KeyedProvider, type KeyStatus, type TurnUsage } from '../api.ts';
 import { S, toast } from '../state.ts';
 import { companionModels, companionTurn, NO_ENGINES, pairCompanion, probeCompanion, stopCompanion, type CompanionState, type Engines } from './companion.ts';
 import { passes, pause, recallDetails, ServerSession, type Message } from './server.ts';
@@ -467,13 +467,13 @@ export async function* ask(p: AskPayload, signal: AbortSignal): AsyncGenerator<A
   };
   // what the turn costs, told at its end
   const started = Date.now(), calls = runner.calls;
-  let usage = NO_USAGE, seen = 0;
+  let usage = NO_USAGE, seen = 0, reported = false;
   for (let n = 0, failure = ''; ; n++) {
     const again = n ? resumeNote(failure) : null;
     failure = '';
     try {
       for await (const ev of attempt(again)) {
-        if (ev.type === 'usage') { usage = addUsage(usage, ev.usage); continue; }
+        if (ev.type === 'usage') { usage = addUsage(usage, ev.usage); reported = true; continue; }
         if (ev.type === 'item' && ev.item.image) seen++;
         // an error the turn will get over is held back, told below with the wait
         if (ev.type === 'error' && resumable(ev.message, n)) failure = ev.message;
@@ -488,9 +488,12 @@ export async function* ask(p: AskPayload, signal: AbortSignal): AsyncGenerator<A
     yield { type: 'item', item: { id: uid(), role: 'assistant', text: t('ai.resumeIn', { error: failure, s: wait, n: n + 1, max: RESUME_DELAYS.length }) } };
     await pause(wait * 1000, signal);
   }
-  yield { type: 'item', item: { id: uid(), role: 'assistant', usage: { ...usage, tools: runner.calls - calls, images: seen, ms: Date.now() - started, model } } };
+  yield { type: 'item', item: { id: uid(), role: 'assistant', usage: { ...usage, tools: runner.calls - calls, images: seen, ms: Date.now() - started, model, route: USAGE_ROUTE[route], ...(reported ? {} : { unknown: true as const }) } } };
   yield { type: 'done' };
 }
+
+/** the route of a turn as the usage line names it, so the bench can price it: the Messages API (server), the chat-format providers (chat), the companion, a local model */
+const USAGE_ROUTE: Record<Route, TurnUsage['route']> = { server: 'server', remote: 'chat', companion: 'companion', local: 'local' };
 
 /** the waits before each new attempt, in seconds: twice as long each time */
 const RESUME_DELAYS = [2, 4, 8, 16, 32, 60];

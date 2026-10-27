@@ -40,8 +40,8 @@ export interface ChatItem {
   usage?: TurnUsage;
 }
 
-/** a turn's cost: its tokens (when the path reports them), the tools it ran, the pictures it looked at, its length */
-export interface TurnUsage extends Usage { tools: number; images: number; ms: number; model: string }
+/** a turn's cost: its tokens (when the path reports them: `unknown` when the route told nothing, which is not zero), the tools it ran, the pictures it looked at, its length, the route it took */
+export interface TurnUsage extends Usage { tools: number; images: number; ms: number; model: string; route: 'server' | 'chat' | 'companion' | 'local'; unknown?: true }
 
 /** how far a running tool is */
 export interface ToolProgress { done: number; total: number; step?: string }
