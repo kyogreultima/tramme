@@ -91,7 +91,7 @@
 **Interfaces:**
 - Produces: `export function queuedPrompt(messages: { text: string; ctx: TurnContext }[], notes: string[]): string`. With one message it returns exactly `userPrompt(messages[0].text, messages[0].ctx, notes)`.
 
-- [ ] **Step 1: Write the failing tests.**
+- [x] **Step 1: Write the failing tests.**
   - `one message is the usual prompt`: `queuedPrompt([m], notes) === userPrompt(m.text, m.ctx, notes)`.
   - `several messages keep their order and their own context`:
     - two messages with different `selection` and `time`;
@@ -100,12 +100,12 @@
     - the notes appear once, before the first message;
     - the result says the messages were written while the agent worked and are answered together.
   - `the autonomous line appears once`, when any `ctx.autonomous` is set.
-- [ ] **Step 2: Run** `npx vitest run packages/assistant/test/prompt.test.ts`. Expected: FAIL.
-- [ ] **Step 3: Implement `queuedPrompt`.**
+- [x] **Step 2: Run** `npx vitest run packages/assistant/test/prompt.test.ts`. Expected: FAIL.
+- [x] **Step 3: Implement `queuedPrompt`.**
   - Start with one opening `<context>` holding the notes (and `AUTONOMOUS` when set).
   - Then each message as `<message n="i">` holding its own `<context>` lines (composition, selection, scene, point; the same lines `userPrompt` builds, factored out rather than copied) and its text.
-- [ ] **Step 4: Run the test.** Expected: PASS.
-- [ ] **Step 5: Commit** `feat(assistant): one prompt for messages written during a turn`.
+- [x] **Step 4: Run the test.** Expected: PASS.
+- [x] **Step 5: Commit** `feat(assistant): one prompt for messages written during a turn`.
 
 ### Task 4: The queue
 
