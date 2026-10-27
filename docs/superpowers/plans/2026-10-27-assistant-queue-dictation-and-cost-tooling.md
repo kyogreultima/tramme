@@ -349,13 +349,13 @@
 **Interfaces:**
 - Produces: `['claude-haiku-5-5', 'Haiku 5.5']` in `MODELS`, placed after Sonnet 5.5 and before Haiku 4.5. `ADAPTIVE` includes it. `export const NO_FALLBACK = new Set(['claude-haiku-5-5'])`. `DEFAULT_MODEL` is unchanged.
 
-- [ ] **Step 1: Write the failing tests.**
+- [x] **Step 1: Write the failing tests.**
   - `Haiku 5.5 is offered, the default unchanged`: it is in `MODELS`, `DEFAULT_MODEL === 'claude-opus-5-5'`, and `effortLevels('claude-haiku-5-5')` has five levels.
   - `no fallback is asked for Haiku 5.5`: a request with that model has neither the `server-side-fallback` beta nor `fallbacks`, and has `thinking: { type: 'adaptive', ... }`.
-- [ ] **Step 2: Run** `npx vitest run packages/assistant/test/models.test.ts apps/editor/test/server-session.test.ts`. Expected: FAIL.
-- [ ] **Step 3: Implement.**
-- [ ] **Step 4: Run the tests.** Expected: PASS.
-- [ ] **Step 5: Commit** `feat(assistant): Haiku 5.5 in the model list`.
+- [x] **Step 2: Run** `npx vitest run packages/assistant/test/models.test.ts apps/editor/test/server-session.test.ts`. Expected: FAIL.
+- [x] **Step 3: Implement.**
+- [x] **Step 4: Run the tests.** Expected: PASS.
+- [x] **Step 5: Commit** `feat(assistant): Haiku 5.5 in the model list`.
 
 ### Task 13: The bench prices and compares
 

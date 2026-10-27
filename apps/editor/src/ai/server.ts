@@ -10,7 +10,7 @@
 // results are cleared by the API itself (context editing), not here.
 
 import { z } from 'zod';
-import { ADAPTIVE, DEFAULT_EFFORT, joinSystem, modelName, providerOf, TOOLS, UsageMeter, type Effort, type SystemParts, type ToolResult } from '@tramme/assistant';
+import { ADAPTIVE, DEFAULT_EFFORT, joinSystem, modelName, NO_FALLBACK, providerOf, TOOLS, UsageMeter, type Effort, type SystemParts, type ToolResult } from '@tramme/assistant';
 import { ChatReader, chatTools, toChat } from './compat.ts';
 import { reach, type AiEvent, type ChatItem } from '../api.ts';
 import type { ToolRunner } from './tools.ts';
@@ -419,7 +419,7 @@ export class ServerSession {
     const context = on('context');
     if (context) betas.push('context-management-2025-06-27');
     // a request Claude declines is run again by another model, on the server
-    const fallbacks = adaptive && on('fallbacks');
+    const fallbacks = adaptive && !NO_FALLBACK.has(model) && on('fallbacks');
     if (fallbacks) betas.push('server-side-fallback-2026-07-01');
     return {
       parts,

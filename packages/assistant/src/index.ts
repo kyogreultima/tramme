@@ -8,11 +8,14 @@ import { z } from 'zod';
 export const MODELS: [id: string, label: string][] = [
   ['claude-opus-5-5', 'Opus 5.5'],
   ['claude-sonnet-5-5', 'Sonnet 5.5'],
+  ['claude-haiku-5-5', 'Haiku 5.5'],
   ['claude-haiku-4-5-20251001', 'Haiku 4.5'],
 ];
 export const DEFAULT_MODEL = 'claude-opus-5-5';
 /** models that think when they need to (adaptive thinking) */
-export const ADAPTIVE = new Set(['claude-opus-5-5', 'claude-sonnet-5-5']);
+export const ADAPTIVE = new Set(['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5']);
+/** models a request cannot ask the server to run another model for when Claude declines (no server-side fallback exists for them) */
+export const NO_FALLBACK = new Set(['claude-haiku-5-5']);
 
 /** how hard a model works on a turn: thinking depth, care, checks (Opus 5.5 alone would run at medium) */
 export const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'] as const;
@@ -111,10 +114,10 @@ const CHAT_EFFORTS: Effort[] = ['low', 'medium', 'high'];
 
 /**
  * The effort levels a model offers, none when it has no such setting. Claude
- * Opus and Sonnet: all five. In the chat format, the reasoning models: OpenAI's
+ * Opus, Sonnet and Haiku 5.5: all five. In the chat format, the reasoning models: OpenAI's
  * o-series and GPT-5 (not their chat variants), Gemini 2.5 and later, the
  * OpenRouter models whose listing says they reason (`reasons`), gpt-oss on a
- * local server, Codex, Antigravity's default. Haiku, Z.AI and the other models: none.
+ * local server, Codex, Antigravity's default. Haiku 4.5, Z.AI and the other models: none.
  */
 export function effortLevels(model: string, reasons = false): Effort[] {
   const name = modelName(model).toLowerCase().replace(/^models\//, '');
