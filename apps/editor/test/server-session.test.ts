@@ -198,6 +198,28 @@ describe('assistant, server path', () => {
     expect(sent.map((x) => x.body.reasoning_effort)).toEqual(['low', undefined, undefined]);
   });
 
+  it('asks the chat-format providers for their usage, and goes on without when a server refuses it', async () => {
+    const withUsage = () => new Response('data: {"choices":[{"delta":{"content":"ok"},"finish_reason":"stop"}]}\n\ndata: {"choices":[],"usage":{"prompt_tokens":1000,"completion_tokens":50,"prompt_tokens_details":{"cached_tokens":800}}}\n\ndata: [DONE]\n\n', { headers: { 'content-type': 'text/event-stream' } });
+    const plain = () => new Response('data: {"choices":[{"delta":{"content":"ok"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n', { headers: { 'content-type': 'text/event-stream' } });
+    const chatTurn = (s: ServerSession) => drain(s.turn('Hi', 'openai:gpt-5', 'system prompt', fakeRunner().runner, new AbortController().signal, { target: { url: '/api/llm/x' } }));
+
+    let sent = serve(withUsage);
+    const events = await chatTurn(new ServerSession());
+    expect(sent[0].body.stream_options).toEqual({ include_usage: true });
+    expect(events.find((e) => e.type === 'usage')).toMatchObject({ usage: { requests: 1, input: 200, cacheRead: 800, output: 50 } });
+
+    // a server that refuses the option: the request goes again without it, the turn ends, its usage is unknown
+    const s = new ServerSession();
+    sent = serve(() => refusedWith("Unknown parameter: 'stream_options'."), plain, plain);
+    const again = await chatTurn(s);
+    expect(sent.map((x) => x.body.stream_options)).toEqual([{ include_usage: true }, undefined]);
+    expect(again.find((e) => e.type === 'text')).toMatchObject({ delta: 'ok' });
+    expect(again.some((e) => e.type === 'usage')).toBe(false);
+    // and not asked again for that model in the session
+    await chatTurn(s);
+    expect(sent[2].body.stream_options).toBeUndefined();
+  });
+
   describe('tries again by itself', () => {
     // the waits between tries, at once; the watch on a stalled stream (minutes) never fires
     const instant = () => vi.stubGlobal('setTimeout', ((fn: () => void, ms = 0) => { if (ms < 60_000) fn(); return 0; }) as unknown as typeof setTimeout);

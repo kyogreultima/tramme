@@ -287,14 +287,14 @@
   - It returns `null` when no event carried a usage.
 - A new refusable `Part` named `'usage'`, matched by `/stream_options|include_usage/i`.
 
-- [ ] **Step 1: Write the failing tests.**
+- [x] **Step 1: Write the failing tests.**
   - `ChatReader reads the usage of the last chunk`: a stream whose last event is `{ choices: [], usage: { prompt_tokens: 1000, completion_tokens: 50, prompt_tokens_details: { cached_tokens: 800 } } }` gives `{ requests: 1, input: 200, cacheRead: 800, cacheWrite: 0, cacheWrite1h: 0, output: 50 }`. Note that `push` must not skip an event without `choices` before reading its usage.
   - `the chat route asks for the usage`: the request body has `stream_options: { include_usage: true }`, and the turn yields a `usage` event.
   - `a server refusing stream_options` (Review Focus 4): the first answer is a 400 naming `stream_options`. The request is sent again without it, the turn ends normally, and no `usage` event is yielded.
-- [ ] **Step 2: Run** `npx vitest run apps/editor/test/compat.test.ts apps/editor/test/server-session.test.ts`. Expected: FAIL.
-- [ ] **Step 3: Implement.**
-- [ ] **Step 4: Run the tests.** Expected: PASS.
-- [ ] **Step 5: Commit** `feat(assistant): read the usage of the chat-format providers`.
+- [x] **Step 2: Run** `npx vitest run apps/editor/test/compat.test.ts apps/editor/test/server-session.test.ts`. Expected: FAIL.
+- [x] **Step 3: Implement.**
+- [x] **Step 4: Run the tests.** Expected: PASS.
+- [x] **Step 5: Commit** `feat(assistant): read the usage of the chat-format providers`.
 
 ### Task 10: The system prompt in cache order
 
