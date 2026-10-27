@@ -14,7 +14,7 @@ import { upgradeDoc, type TrammeDoc } from '@tramme/core';
 import { api } from './api.ts';
 import { preview } from './preview.ts';
 import { commit, hooks, load, S, select, setTime, undo } from './state.ts';
-import { loadChats, runTool } from './ai/index.ts';
+import { loadChats, runTool, watchCompanion } from './ai/index.ts';
 import { App } from './ui/App.tsx';
 import { Home } from './ui/Home.tsx';
 import './theme/tokens.css';
@@ -79,6 +79,8 @@ boot().then(() => {
   initDesktop();
   // the plugins installed on this device, read once from where they are kept
   startInstalled();
+  // the local companion, found whenever it starts, on the home page and in the editor
+  watchCompanion();
   if (m) {
     openProject(m[1]).catch((e) => {
       S.loadError.value = (e as Error).message;

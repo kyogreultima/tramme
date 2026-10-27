@@ -41,7 +41,7 @@ function Empty() {
 
 export function SidePanel() {
   const panel = studio.panel.value, count = notes.value.length;
-  useStatusWatch(aiRoute.value !== null);
+  useStatusWatch();
   return (
     <aside class="studio-side" data-tour="notes">
       <div class="side-head">
