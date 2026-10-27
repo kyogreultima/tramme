@@ -110,6 +110,26 @@ describe('assistant, server path', () => {
     expect(repaired.content[1]).toMatchObject({ type: 'text', text: 'go on' });
   });
 
+  it('the conversation\'s cache lasts as set', async () => {
+    const lastMark = (body: any) => { const m = body.messages.at(-1); return m.content.at(-1).cache_control; };
+    const run = (cacheTtl?: '5m' | '1h') => drain(new ServerSession().turn('Hi', 'claude-opus-5-5', 'system prompt', fakeRunner().runner, new AbortController().signal, { cacheTtl }));
+    let sent = serve(second);
+    await run('1h');
+    expect(lastMark(sent[0].body)).toEqual({ type: 'ephemeral', ttl: '1h' });
+    sent = serve(second);
+    await run('5m');
+    expect(lastMark(sent[0].body)).toEqual({ type: 'ephemeral' });
+    sent = serve(second);
+    await run();
+    expect(lastMark(sent[0].body)).toEqual({ type: 'ephemeral' });
+    // a provider that refused the hour never gets it, for the system prompt or the conversation
+    const s = new ServerSession();
+    sent = serve(() => refusedWith('cache_control.ttl: Extra inputs are not permitted'), second);
+    await drain(s.turn('Hi', 'claude-opus-5-5', 'system prompt', fakeRunner().runner, new AbortController().signal, { cacheTtl: '1h' }));
+    expect(JSON.stringify(sent[0].body)).toContain('"ttl":"1h"');
+    expect(JSON.stringify(sent[1].body)).not.toContain('ttl');
+  });
+
   it('sends the system prompt as two blocks, the fixed one cached an hour', async () => {
     const sent = serve(second, second, second);
     const turn = (system: string | { fixed: string; variable: string }) => drain(new ServerSession().turn('Hi', 'claude-opus-5-5', system, fakeRunner().runner, new AbortController().signal));

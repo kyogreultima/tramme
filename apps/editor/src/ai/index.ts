@@ -42,11 +42,13 @@ export interface AiSettings {
   apply: 'off' | 'turn' | 'all';
   /** a turn cut by a failure that passes (network, busy server) goes on by itself, later each time; never after a quota or a key refused */
   resume: boolean;
+  /** how long the conversation stays in the cache of the Messages API: 5 minutes, or an hour (costs more to write, less when the user comes back later) */
+  cacheTtl: '5m' | '1h';
 }
 
 const KEY = 'tramme.assistant';
 function loadSettings(): AiSettings {
-  const d: AiSettings = { model: DEFAULT_MODEL, prefer: 'auto', companionUrl: `http://127.0.0.1:${COMPANION_PORT}`, token: '', localUrl: LOCAL_URL, efforts: {}, notify: true, apply: 'off', resume: true };
+  const d: AiSettings = { model: DEFAULT_MODEL, prefer: 'auto', companionUrl: `http://127.0.0.1:${COMPANION_PORT}`, token: '', localUrl: LOCAL_URL, efforts: {}, notify: true, apply: 'off', resume: true, cacheTtl: '5m' };
   try {
     // the settings kept under the tool's former name (model, companion token) are taken over
     const s = { ...d, ...JSON.parse(localStorage.getItem(KEY) ?? localStorage.getItem('emotion.assistant') ?? '{}') } as AiSettings;
@@ -57,6 +59,7 @@ function loadSettings(): AiSettings {
     s.efforts = Object.fromEntries(Object.entries(efforts).filter(([, e]) => EFFORTS.includes(e)));
     s.notify = s.notify !== false;
     s.resume = s.resume !== false;
+    s.cacheTtl = s.cacheTtl === '1h' ? '1h' : '5m';
     // the former boolean becomes 'turn' (applied at the end of the turn, as before)
     const old = s as AiSettings & { autoApply?: boolean };
     s.apply = s.apply === 'turn' || s.apply === 'all' ? s.apply : old.autoApply === true ? 'turn' : 'off';
@@ -436,7 +439,7 @@ export async function* ask(p: AskPayload, signal: AbortSignal): AsyncGenerator<A
   notes.push(`The user's interface is in ${locale === 'fr' ? 'French' : 'English'}: reply in that language, including the titles of your proposals and the names of the layers you create.`);
   const images = await imageBlocks(p.attachments ?? []);
   // each agent of the companion keeps its own history (the session is the engine's): another one taking over the conversation reads what was said
-  const model = aiSettings.peek().model, effort = currentEffort(model), engine = engineOf(model);
+  const model = aiSettings.peek().model, cacheTtl = aiSettings.peek().cacheTtl, effort = currentEffort(model), engine = engineOf(model);
   // a conversation saved before the engines holds Claude's session alone
   const kept = session.companion && !session.companion.includes(':') ? `claude:${session.companion}` : session.companion;
   const resumed = route === 'companion' && engine && kept?.startsWith(`${engine}:`) ? kept.slice(engine.length + 1) : undefined;
@@ -464,7 +467,7 @@ export async function* ask(p: AskPayload, signal: AbortSignal): AsyncGenerator<A
       const text = again === null || !sessionId ? prompt : again;
       return companionTurn(link(), { engine, prompt: text, system: joinSystem(system), model: asked, effort, sessionId, images: again === null ? images : [] }, runner, signal, (id) => { session.companion = `${engine}:${id}`; });
     }
-    return session.server.turn(again ?? prompt, model, system, runner, signal, again === null ? { images, target, effort } : { target, effort });
+    return session.server.turn(again ?? prompt, model, system, runner, signal, again === null ? { images, target, effort, cacheTtl } : { target, effort, cacheTtl });
   };
   // what the turn costs, told at its end
   const started = Date.now(), calls = runner.calls;
