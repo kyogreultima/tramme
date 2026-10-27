@@ -7,8 +7,8 @@ const REF = '# Reference\n\nThe document format.\n\nMore of the reference.';
 /** the paragraphs of a prompt, order aside */
 const paragraphs = (s: string) => s.replace(/\r\n/g, '\n').split('\n\n').filter(Boolean).sort();
 
-/** what systemPrompt(REF, 'BRIEF', ['plug: x']) returned before the reference moved ahead of the project's parts */
-const BEFORE = fs.readFileSync(new URL('./fixtures/system-before.txt', import.meta.url), 'utf8');
+/** what systemPrompt(REF, 'BRIEF', ['plug: x']) returned before the reference moved ahead of the project's parts (LF, whatever the checkout wrote) */
+const BEFORE = fs.readFileSync(new URL('./fixtures/system-before.txt', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
 
 describe('the system prompt in cache order', () => {
   it('the fixed part holds no project', () => {
