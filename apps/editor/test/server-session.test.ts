@@ -110,6 +110,19 @@ describe('assistant, server path', () => {
     expect(repaired.content[1]).toMatchObject({ type: 'text', text: 'go on' });
   });
 
+  it('asks for no fallback for Haiku 5.5, which has none, and still thinks adaptively', async () => {
+    let sent = serve(second);
+    await drain(new ServerSession().turn('Hi', 'claude-haiku-5-5', 'system prompt', fakeRunner().runner, new AbortController().signal));
+    expect(sent[0].body.fallbacks).toBeUndefined();
+    expect(sent[0].headers['anthropic-beta']).not.toContain('server-side-fallback');
+    expect(sent[0].body.thinking).toMatchObject({ type: 'adaptive' });
+    expect(sent[0].body.output_config).toEqual({ effort: 'high' });
+    // the others keep theirs
+    sent = serve(second);
+    await drain(new ServerSession().turn('Hi', 'claude-opus-5-5', 'system prompt', fakeRunner().runner, new AbortController().signal));
+    expect(sent[0].body.fallbacks).toBe('default');
+  });
+
   it('the conversation\'s cache lasts as set', async () => {
     const lastMark = (body: any) => { const m = body.messages.at(-1); return m.content.at(-1).cache_control; };
     const run = (cacheTtl?: '5m' | '1h') => drain(new ServerSession().turn('Hi', 'claude-opus-5-5', 'system prompt', fakeRunner().runner, new AbortController().signal, { cacheTtl }));
