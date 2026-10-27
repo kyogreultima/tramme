@@ -299,3 +299,9 @@ code.cmd { display: block; margin-top: 4px; padding: 6px 8px; border-radius: var
 .queue-text { flex: 1; min-width: 0; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
 .queue-files { display: flex; gap: 4px; flex: none; }
 .queue-note { display: flex; align-items: center; gap: 8px; padding: 0 4px; color: var(--text-3); font-size: var(--fs-sm); }
+
+/* the microphone of a message box: the level of the voice rises behind the icon while it records */
+.mic { position: relative; overflow: hidden; }
+.mic svg.i { position: relative; }
+.mic-level { position: absolute; inset: 0; background: var(--accent-soft); transform-origin: bottom; transition: transform 80ms linear; }
+.mic-time { color: var(--accent-text); font-size: var(--fs-sm); }

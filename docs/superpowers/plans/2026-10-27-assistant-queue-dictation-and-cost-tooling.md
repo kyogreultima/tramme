@@ -222,7 +222,7 @@
   - `export function cancelDictation(): void`;
   - `export function MicButton(props: { onText: (text: string) => void; disabled?: boolean }): JSX.Element`.
 
-- [ ] **Step 1: Write the failing tests.**
+- [x] **Step 1: Write the failing tests.**
   - `insertAtCursor`:
     - `('hello', 5, 5, 'world')` gives `{ value: 'hello world', caret: 11 }`;
     - `('', 0, 0, 'hi')` gives `{ value: 'hi', caret: 2 }`;
@@ -231,8 +231,8 @@
   - `a tap writes nothing` (Review Focus 3): a recording shorter than 0.5 s resolves `''` without calling `transcribeSamples`. An empty transcription also resolves `''`.
   - `the downloaded model is offered before its first download`: source `'local'`, model not in the cache. Expect `askUser` called with the model's size. Declined: nothing transcribed.
   - `the setting picks the source`: with `prefs.dictation` set to `'server'`, `transcribeSamples` receives `'server'`.
-- [ ] **Step 2: Run** `npx vitest run apps/editor/test/dictation.test.ts`. Expected: FAIL.
-- [ ] **Step 3: Implement.**
+- [x] **Step 2: Run** `npx vitest run apps/editor/test/dictation.test.ts`. Expected: FAIL.
+- [x] **Step 3: Implement.**
   - Record with `getUserMedia({ audio: true })` and `MediaRecorder`.
   - Show the level from an `AnalyserNode`.
   - At stop, decode the blob and render it to 16 kHz mono with an `OfflineAudioContext`, like `chunkAudio`.
@@ -244,8 +244,8 @@
   - Put it in the `Composer` bar (inserting at the textarea's cursor) and in the home brief bar.
   - A dictated message sent during a turn goes to the queue through the normal send.
   - The setting goes in the settings next to the transcription model, with three choices: downloaded model, companion, server.
-- [ ] **Step 4: Run the test**, then `npx vitest run apps/editor/test`. Expected: PASS.
-- [ ] **Step 5: Commit** `feat(assistant): dictate a message, on the downloaded model first`.
+- [x] **Step 4: Run the test**, then `npx vitest run apps/editor/test`. Expected: PASS.
+- [x] **Step 5: Commit** `feat(assistant): dictate a message, on the downloaded model first`.
 
 ### Task 8: Usage: cache writes by lifetime, and a turn's unknown usage
 
