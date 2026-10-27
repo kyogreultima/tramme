@@ -398,17 +398,32 @@ const pct = (x: number) => `${Math.round(x * 100)} %`;
 /** what a turn left alone is told: it never waits on the user */
 const AUTONOMOUS = 'Mode: on your own. Your changes apply without the user, who may be away for a long while: do not stop on a question a sensible choice answers (a format, a voice, a wording, a direction). Where the rules say to ask or to propose directions first, take the one you would recommend and go on; say in your summary what you chose and assumed. Stop only when truly blocked (a missing key or source). Paid generations are not asked for: each turn has an allowance, and the library or synth take over once it is used.';
 
-/** the user's message with what it is about */
-export function userPrompt(text: string, ctx: TurnContext, notes: string[]): string {
-  const lines = [
+/** what a message is about: where the user was, what was selected, the scene, the pin */
+function contextLines(ctx: TurnContext): string[] {
+  return [
     `Composition: ${ctx.compId} · time ${ctx.time} s (frame ${ctx.frame})`,
     `Selection: ${ctx.selection?.length ? ctx.selection.map((s) => `${s.name} (${s.id}, ${s.type})`).join(', ') : 'none'}`,
     ...(ctx.scene ? [`Scene: "${ctx.scene.name}", from ${ctx.scene.from} s to ${ctx.scene.to} s: the message is about this scene; leave the others as they are unless it asks otherwise.`] : []),
     ...(ctx.point ? [`Note pinned on the picture at ${pct(ctx.point[0])} across and ${pct(ctx.point[1])} down the frame, at ${ctx.time} s: it is about what shows there${ctx.under ? `, on the layer ${ctx.under.name} (${ctx.under.id}, ${ctx.under.type}) of this composition` : ''} (render that frame to see it).`] : []),
-    ...(ctx.autonomous ? [AUTONOMOUS] : []),
-    ...notes,
   ];
+}
+
+/** the user's message with what it is about */
+export function userPrompt(text: string, ctx: TurnContext, notes: string[]): string {
+  const lines = [...contextLines(ctx), ...(ctx.autonomous ? [AUTONOMOUS] : []), ...notes];
   return `<context>\n${lines.join('\n')}\n</context>\n\n${text}`;
+}
+
+/**
+ * Messages written while the agent worked, answered together: the notes and the
+ * mode once, then each message with the context of the moment it was written
+ * (so "this layer" is the layer selected then). One message is the usual prompt.
+ */
+export function queuedPrompt(messages: { text: string; ctx: TurnContext }[], notes: string[]): string {
+  if (messages.length === 1) return userPrompt(messages[0].text, messages[0].ctx, notes);
+  const head = [...(messages.some((m) => m.ctx.autonomous) ? [AUTONOMOUS] : []), ...notes];
+  const each = messages.map((m, i) => `<message n="${i + 1}">\n<context>\n${contextLines(m.ctx).join('\n')}\n</context>\n\n${m.text}\n</message>`);
+  return `<context>\n${head.join('\n')}\n</context>\n\nThe user wrote these ${messages.length} messages while you were working. Answer them together, in this one turn; each is about the context given with it.\n\n${each.join('\n\n')}`;
 }
 
 /** a tool's result, the same shape on both paths */
