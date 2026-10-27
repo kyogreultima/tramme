@@ -127,6 +127,7 @@ describe('clips', () => {
     expect(out.text).not.toMatch(/every layer/);
     const saved = JSON.parse(files.get('assets/videos/boat.video.json') as string);
     expect(saved.duration).toBe(8);
+    expect(saved.at).toBe(2);
     expect(validate(next, reg)).toEqual([]);
   });
 

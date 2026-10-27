@@ -155,6 +155,11 @@ const generateVideo: ToolType<Input> = {
     const prompt = a.again ? againPrompt(words, a.change) : words;
     const placement = clipPlacement(duration, c.duration, a.at === undefined ? undefined : Number(a.at), ctx.time);
     const showing = a.again ? layersOf(ctx, a.again) : [];
+    // made again, the record keeps where the clip already starts, not where a new one would go
+    const recordedAt = before?.at == null ? undefined : Number(before.at);
+    const recordAt = a.again
+      ? showing[0]?.layer.in ?? (recordedAt !== undefined && Number.isFinite(recordedAt) ? recordedAt : placement.at)
+      : placement.at;
     // a still is read where the clip starts; made again, it keeps the record's frame unless another is asked
     const recordedFrame = before?.sourceAt == null ? undefined : Number(before.sourceAt);
     const frameAt = source === 'frame'
@@ -162,9 +167,9 @@ const generateVideo: ToolType<Input> = {
           ? Math.max(0, Math.min(recordedFrame, c.duration))
           : a.again && a.source === 'frame' && showing[0]
             ? Math.max(0, Math.min(showing[0].layer.in ?? 0, c.duration))
-            : placement.at)
-      : placement.at;
-    const at = placement.at;
+            : recordAt)
+      : recordAt;
+    const at = recordAt;
     const fit = a.fit ?? 'cover', background = a.background ?? false;
     // it costs money: the user says yes first, or the turn's allowance does; each second of the clip counts
     await payFor(t('video.paidTitle'), t('video.paidText', { prompt: clip(prompt, 140), seconds: duration }), t('video.paidYes'), 'use footage already in the project', duration);
@@ -174,7 +179,7 @@ const generateVideo: ToolType<Input> = {
     const label = a.again ? String(ctx.doc.assets[a.again].name ?? a.again.replace(/^video-/, '')) : a.name ?? words.toLowerCase().split(/\s+/).slice(0, 4).join('-');
     const record: Record<string, unknown> = {
       prompt: words, provider: made.provider, model: made.model, ratio, duration, fit,
-      at: +placement.at.toFixed(3),
+      at: +recordAt.toFixed(3),
       ...(source ? { source, ...(source === 'frame' ? { sourceAt: +frameAt.toFixed(3) } : {}) } : {}),
       ...(a.again ? { again: a.again, ...(a.change ? { change: a.change } : {}) } : {}),
       ...(before ? { before: { ...before, before: undefined } } : {}),
