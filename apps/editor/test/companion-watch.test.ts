@@ -1,6 +1,8 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+const { aiStatus, watchCompanion } = await import('../src/ai/index.ts');
+
 // the companion's /health, answering or not as the test decides
 let healthy = false;
 let hang = false;
@@ -21,7 +23,6 @@ afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 const healthCalls = () => health.mock.calls.filter(([u]) => String(u).endsWith('/health')).length;
 
 async function start() {
-  const { aiStatus, watchCompanion } = await import('../src/ai/index.ts');
   aiStatus.value = { ...aiStatus.value, server: true, companion: 'absent' };
   return { aiStatus, stop: watchCompanion() };
 }

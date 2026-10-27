@@ -164,18 +164,18 @@
 - Consumes: `queue`, `dequeue`, `queueWaits`, `flushQueue` (Task 4).
 - Produces: `export function QueueList(): JSX.Element | null`. It renders nothing when the queue is empty.
 
-- [ ] **Step 1: Write the failing tests** (happy-dom).
+- [x] **Step 1: Write the failing tests** (happy-dom).
   - `shows the queued messages above the box, each with a delete button`: two queued, so two rows. Clicking the first row's delete leaves one.
   - `says why it waits`: with `queueWaits` `'decision'`, the waiting-for-decision string. With `'stopped'`, a "send now" button that calls `flushQueue`.
   - `the box accepts a message during a turn`: with `running` true, the send button is enabled when text is typed, and the stop button is present too.
-- [ ] **Step 2: Run** `npx vitest run apps/editor/test/queue-ui.test.ts`. Expected: FAIL.
-- [ ] **Step 3: Implement.**
+- [x] **Step 2: Run** `npx vitest run apps/editor/test/queue-ui.test.ts`. Expected: FAIL.
+- [x] **Step 3: Implement.**
   - `Composer` renders `QueueList` above `.composer`.
   - While busy, it shows both the stop and the send buttons. Send stays disabled while a command is typed, as today.
   - Rows reuse the `file-chip` look for attachments. Message text is clipped to two lines.
   - New strings go in both locales: queue title, waiting for the turn, waiting for a decision, send now, delete.
-- [ ] **Step 4: Run the test**, then `npx vitest run apps/editor/test/i18n.test.ts`. Expected: PASS.
-- [ ] **Step 5: Commit** `feat(assistant): show the queue in every message box`.
+- [x] **Step 4: Run the test**, then `npx vitest run apps/editor/test/i18n.test.ts`. Expected: PASS.
+- [x] **Step 5: Commit** `feat(assistant): show the queue in every message box`.
 
 ### Task 6: Transcribing samples
 
