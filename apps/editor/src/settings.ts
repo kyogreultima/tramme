@@ -5,6 +5,7 @@
 
 import { effect, signal } from '@preact/signals';
 import { MODEL_TASKS, resolveModel, type ModelEntry, type ModelTask } from './models.ts';
+import type { DictationSource } from './speech.ts';
 
 export interface Preferences {
   /** interface language: the browser's (French or English), or chosen */
@@ -58,13 +59,15 @@ export interface Preferences {
   /** clips made by a provider: the one by default (auto: the first connected), and their length in seconds */
   videoProvider: 'auto' | 'hydracept';
   videoSeconds: 4 | 6 | 8;
+  /** where a dictation is transcribed: the downloaded model (this browser, the default), the companion, or the server */
+  dictation: DictationSource;
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
   language: 'auto', theme: 'studio', view: 'studio', motion: 'auto', still: 'display', blur: 'document', exactFrames: true, scrubAudio: true, sandboxPreview: false,
   effectsDb: -8, musicDb: -14, duckDb: -12, varySounds: true, confirmPaid: true, paidPerTurn: 10, voiceProvider: 'auto', voice: '', voiceModel: '', previewVolume: 1, previewMuted: false, proxies: true, models: {}, pluginsOff: [], recentCommands: [],
   pictureProvider: 'auto', pictureQuality: 'auto', pictureSize: 'large',
-  videoProvider: 'auto', videoSeconds: 8,
+  videoProvider: 'auto', videoSeconds: 8, dictation: 'local',
 };
 
 // ── themes and views ─────────────────────────────────────────
@@ -154,6 +157,7 @@ function load(): Preferences {
     p.videoSeconds = ([4, 6, 8] as number[]).includes(seconds)
       ? seconds as Preferences['videoSeconds']
       : DEFAULT_PREFERENCES.videoSeconds;
+    if (!['local', 'companion', 'server'].includes(p.dictation)) p.dictation = DEFAULT_PREFERENCES.dictation;
     return p;
   } catch { return { ...DEFAULT_PREFERENCES }; }
 }

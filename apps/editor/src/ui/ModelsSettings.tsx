@@ -11,6 +11,7 @@ import { cachedFiles, cachedOf, deleteCached, downloadModel, groupCache, type Ca
 import { HUB_PREFIX, isHubId, MODEL_TASKS, modelsFor, PIPELINE_OF, resolveModel, type ModelEntry, type ModelTask } from '../models.ts';
 import { tryPipeline } from '../perception.ts';
 import { prefs, setPrefs } from '../settings.ts';
+import type { DictationSource } from '../speech.ts';
 import { toast } from '../state.ts';
 import { m, t } from '../i18n/index.ts';
 import { Select } from './controls.tsx';
@@ -154,6 +155,10 @@ export function LocalModels() {
       </Section>
       <Section title={t('localModels.sound')} hint={t('localModels.soundHint')}>
         {SOUND.map((task) => <ModelRow key={task} task={task} files={files} changed={changed} />)}
+        <Row label={t('localModels.dictation')} hint={t('localModels.dictationHint')}>
+          <Select value={prefs.value.dictation} options={[['local', t('localModels.dictationLocal')], ['companion', t('localModels.dictationCompanion')], ['server', t('localModels.dictationServer')]]}
+            onChange={(v) => setPrefs({ dictation: v as DictationSource })} />
+        </Row>
       </Section>
       <Section title={t('localModels.advanced')} hint={t('localModels.advancedHint')}>
         <HubRow />

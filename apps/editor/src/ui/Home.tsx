@@ -19,6 +19,7 @@ import { S, toast } from '../state.ts';
 import { listCommands, type Command } from '../ai/commands.ts';
 import { packCommands, shippedPacks } from '../packs.ts';
 import { useCommandMenu } from './composer.tsx';
+import { MicButton, writeInto } from './MicButton.tsx';
 import { Modal, longPress, openMenu, Seg } from './controls.tsx';
 import { Icon } from './icons.tsx';
 import { LogoMark } from './Logo.tsx';
@@ -229,6 +230,7 @@ export function DirectionBox({ busy, onStart }: { busy: boolean; onStart: (words
         <div class="brief-bar">
           <button type="button" class="btn sm ghost" title={t('home.addMaterialHint')} onClick={() => files.current?.click()}><Icon name="attach" />{t('home.addMaterial')}</button>
           <button type="button" class="icon-btn sm" title={t('home.fromSourcesFolder')} onClick={() => folder.current?.click()}><Icon name="folder" /></button>
+          <MicButton onText={(add) => writeInto(area.current, setWords, add)} />
           <input ref={files} type="file" multiple hidden accept="image/*,video/*,audio/*,.pdf,application/pdf,.md,.markdown,.json,.ttf,.otf,.woff,.woff2,.glb,.gltf" onChange={chosen} />
           <input ref={folder} type="file" multiple hidden {...{ webkitdirectory: true }} onChange={chosen} />
           <span class="grow" />

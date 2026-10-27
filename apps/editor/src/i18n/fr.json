@@ -2465,6 +2465,18 @@
   "cuts": {
     "done": "« {name} » resserré : {saved} gagnées."
   },
+  "dictation": {
+    "start": "Dicter : parlez, puis cliquez à nouveau pour écrire ce que vous avez dit",
+    "stop": "Arrêter et écrire ce que vous avez dit",
+    "writing": "Écriture de ce que vous avez dit…",
+    "recordingHint": "Enregistrement en cours. Échap l'annule.",
+    "micRefused": "Le microphone est bloqué. Autorisez-le pour Tramme dans les réglages du système ou du navigateur.",
+    "noMic": "Aucun microphone trouvé.",
+    "failed": "Impossible d'écrire ce que vous avez dit : {error}",
+    "downloadTitle": "Télécharger le modèle de parole ?",
+    "downloadText": "Pour écrire ce que vous dites, Tramme exécute {model} sur cet ordinateur ({size}, téléchargé une fois). Votre voix reste sur cet ordinateur.",
+    "download": "Télécharger"
+  },
   "localModels": {
     "face": "Visages",
     "vad": "Où quelqu'un parle",
@@ -2506,7 +2518,12 @@
     "nothingElse": "Rien d'autre : chaque modèle gardé ici sert.",
     "picture": "Image",
     "sound": "Son",
-    "soundHint": "Le serveur transcrit avec son propre modèle quand il en a un (Workers AI, ou une clé OpenAI). Sinon le compagnon local fait tourner le modèle choisi ici (TRAMME_WHISPER_MODEL sur sa machine l'emporte), et sans compagnon, ce navigateur s'en charge."
+    "soundHint": "Le serveur transcrit avec son propre modèle quand il en a un (Workers AI, ou une clé OpenAI). Sinon le compagnon local fait tourner le modèle choisi ici (TRAMME_WHISPER_MODEL sur sa machine l'emporte), et sans compagnon, ce navigateur s'en charge.",
+    "dictation": "Dictée",
+    "dictationHint": "Où est transcrit le microphone d'une boîte de message. Le modèle téléchargé garde votre voix sur cet ordinateur ; le compagnon l'exécute aussi sur cet ordinateur ; le serveur l'envoie ailleurs.",
+    "dictationLocal": "Modèle téléchargé",
+    "dictationCompanion": "Compagnon",
+    "dictationServer": "Serveur"
   },
   "components": {
     "kept": "{name} gardé dans la bibliothèque",

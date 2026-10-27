@@ -1405,6 +1405,18 @@
   "cuts": {
     "done": "\"{name}\" tightened: {saved} saved."
   },
+  "dictation": {
+    "start": "Dictate: speak, then click again to write what you said",
+    "stop": "Stop and write what you said",
+    "writing": "Writing what you said…",
+    "recordingHint": "Recording. Escape cancels.",
+    "micRefused": "The microphone is blocked. Allow it for Tramme in the system or browser settings.",
+    "noMic": "No microphone found.",
+    "failed": "Could not write what you said: {error}",
+    "downloadTitle": "Download the speech model?",
+    "downloadText": "To write what you say, Tramme runs {model} on this computer ({size}, downloaded once). Your voice stays on this computer.",
+    "download": "Download"
+  },
   "localModels": {
     "face": "Faces",
     "vad": "Where someone speaks",
@@ -1446,7 +1458,12 @@
     "nothingElse": "Nothing else: every model kept here is in use.",
     "picture": "Picture",
     "sound": "Sound",
-    "soundHint": "The server transcribes with its own model when it has one (Workers AI, or an OpenAI key). Otherwise the local companion runs the model chosen here (TRAMME_WHISPER_MODEL on its machine overrides it), and without a companion, this browser does."
+    "soundHint": "The server transcribes with its own model when it has one (Workers AI, or an OpenAI key). Otherwise the local companion runs the model chosen here (TRAMME_WHISPER_MODEL on its machine overrides it), and without a companion, this browser does.",
+    "dictation": "Dictation",
+    "dictationHint": "Where the microphone of a message box is transcribed. The downloaded model keeps your voice on this computer; the companion runs it on this computer too; the server sends it away.",
+    "dictationLocal": "Downloaded model",
+    "dictationCompanion": "Companion",
+    "dictationServer": "Server"
   },
   "components": {
     "kept": "{name} kept in the library",
