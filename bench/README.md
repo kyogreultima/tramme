@@ -19,12 +19,30 @@ those videos, not general.
 3. Leave the assistant alone until the turn ends: apply the changes at the end
    of the turn (settings), no answer to its questions.
 4. The turn ends with its cost: tool calls, pictures seen, tokens read (and the
-   share from the cache), tokens written, time. It is kept in the conversation
+   share from the cache), tokens written, time, the route it took (server,
+   chat, companion, local). It is kept in the conversation
    (`.tramme/chats/*.json`, the items with `usage`); `node bench/usage.ts
-   <project folder or .tramme>` adds them up.
+   <project folder or .tramme>` adds them up and prices them (see below).
 5. Export the film (MP4) and score it.
 6. Run the same brief a second time in a new project: the two films are scored
    apart, then side by side for variety.
+
+### What a run costs, and what a change did to it
+
+`node bench/usage.ts <project>` prints, for each turn, its tokens, the share
+read from the cache, the route and the cost in dollars, then the same per
+conversation and in all. The prices are in `prices.ts` (dollars per million
+tokens: input, cache read, cache writes kept 5 minutes or an hour, output).
+Only Claude is priced: a turn of any other model, or of a route that reported no
+usage (Antigravity), says "cost unknown" rather than zero, and so does a total
+holding one. Usage is kept per turn, not per request, so Haiku 5.5's higher rate
+past 100 K tokens of prompt cannot be applied: its costs read "at least".
+
+`node bench/usage.ts --compare <before> <after>` compares two series of runs of
+the same briefs, each a project or a folder with one project per run (folders or
+`.tramme` files): the cost, the cache share, the tokens written and the time of
+each, and the change. Run the briefs before a change, run them again after, and
+compare; a change that lowers the cost and moves the scores is not a saving.
 
 ### Scoring (1 to 5 each)
 
