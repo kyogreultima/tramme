@@ -192,13 +192,13 @@
     - `'companion'` runs `'companion'`;
     - `'server'` runs the existing `'server'` chain.
 
-- [ ] **Step 1: Write the failing tests.**
+- [x] **Step 1: Write the failing tests.**
   - `chunkStarts`: `chunkStarts(10)` is `[0]`, `chunkStarts(28)` is `[0]`, `chunkStarts(30)` is `[0, 26]`, `chunkStarts(60)` is `[0, 26, 52]`.
   - `transcribeSamples` with `wordsOf` mocked (export it for the test, or inject it): 40 s of samples make two calls with the source's backend. The text is the merged words in order, with the overlap counted once.
-- [ ] **Step 2: Run** `npx vitest run apps/editor/test/speech-chunks.test.ts`. Expected: FAIL.
-- [ ] **Step 3: Implement.** `transcribeUrl` keeps its behaviour and uses `chunkStarts`.
-- [ ] **Step 4: Run the test**, then `npx vitest run apps/editor/test/perception.test.ts packages/cli/test/speech.test.ts`. Expected: PASS.
-- [ ] **Step 5: Commit** `refactor(speech): transcribe samples, chunk starts shared`.
+- [x] **Step 2: Run** `npx vitest run apps/editor/test/speech-chunks.test.ts`. Expected: FAIL.
+- [x] **Step 3: Implement.** `transcribeUrl` keeps its behaviour and uses `chunkStarts`.
+- [x] **Step 4: Run the test**, then `npx vitest run apps/editor/test/perception.test.ts packages/cli/test/speech.test.ts`. Expected: PASS.
+- [x] **Step 5: Commit** `refactor(speech): transcribe samples, chunk starts shared`.
 
 ### Task 7: Dictation
 
