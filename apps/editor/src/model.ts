@@ -53,6 +53,32 @@ export function contentEnd(comp: Composition): number {
   return Math.min(end, comp.duration);
 }
 
+/** the composition lengthened to `end` when it is shorter: what is added or stretched past its end is seen and played whole */
+export function fitCompOps(doc: TrammeDoc, compId: string, end: number): Op[] {
+  if (!(Number.isFinite(end) && end > doc.compositions[compId].duration)) return [];
+  return [{ op: 'replace', path: pointer('compositions', compId, 'duration'), value: +end.toFixed(4) }];
+}
+
+/** a media layer as long as its file from where it starts, and the composition lengthened to hold it; a file of unknown length leaves both as they are */
+export function wholeFile(doc: TrammeDoc, compId: string, layer: Layer, fileDuration: number): { layer: Layer; ops: Op[] } {
+  if (!(fileDuration > 0)) return { layer, ops: [] };
+  const at = layer.in ?? 0, out = +(at + fileDuration).toFixed(4);
+  return { layer: { ...layer, in: at, out }, ops: fitCompOps(doc, compId, out) };
+}
+
+/**
+ * A media layer's end moved to `at` seconds of its file (the right handle of
+ * its cut): at least a frame, at most the file's end; stretched past the
+ * composition's end, the composition lengthens with it.
+ */
+export function cutEndOps(doc: TrammeDoc, compId: string, id: string, at: number, fileDuration: number, fps: number): Op[] {
+  const c = doc.compositions[compId], l = c.layers[id];
+  const li = l.in ?? 0, lo = l.out ?? c.duration;
+  const start = Math.max(0, Number(staticValue(l.props?.start) ?? 0) || 0);
+  const out = +(li + Math.max(start + 1 / fps, Math.min(fileDuration, at)) - start).toFixed(4);
+  return out === lo ? [] : [{ op: 'add', path: `${pointer('compositions', compId, 'layers', id)}/out`, value: out }, ...fitCompOps(doc, compId, out)];
+}
+
 /** the name of the group the sounds are kept in */
 export const SOUND_GROUP = 'Sound';
 

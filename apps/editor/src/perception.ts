@@ -19,6 +19,13 @@ export const canvas = (width: number, height: number) => {
   return { c, g: c.getContext('2d', { willReadFrequently: true })! };
 };
 
+/** a media file's length in seconds, read from its container (a few kB of it); 0 when it cannot be read */
+export async function mediaDuration(url: string): Promise<number> {
+  // two more tries, then 0: mediabunny's own default tries again for ever, and the layer would wait with it
+  const input = new Input({ source: new UrlSource(url, { getRetryDelay: (tries) => (tries < 3 ? 0.5 : null) }), formats: ALL_FORMATS });
+  try { return await input.computeDuration(); } catch { return 0; } finally { input.dispose(); }
+}
+
 /** a picture, decoded */
 export async function loadImage(url: string): Promise<HTMLImageElement> {
   const img = new Image();

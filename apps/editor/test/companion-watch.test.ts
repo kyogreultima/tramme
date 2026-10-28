@@ -67,3 +67,23 @@ describe('watchCompanion', () => {
     stop();
   });
 });
+
+describe('the model chosen', () => {
+  it('stays chosen when the companion misses one look after it answered', async () => {
+    const { aiModels, aiSettings, setAiSettings } = await import('../src/ai/index.ts');
+    setAiSettings({ model: 'claude-opus-5-5', prefer: 'auto' });
+    // another AI connected (OpenAI), with its models listed: what the assistant would turn to
+    aiModels.value = { ...aiModels.value, remote: { openai: [{ id: 'gpt-5', label: 'gpt-5' }] } };
+    aiStatus.value = { ...aiStatus.value, server: false, remote: { openai: true }, companion: 'absent' };
+    healthy = true;
+    const stop = watchCompanion();
+    await vi.advanceTimersByTimeAsync(4000);
+    expect(aiStatus.value.companion).toBe('ok');
+    // busy for a moment (a transcription, a turn): one look fails
+    healthy = false;
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(aiStatus.value.companion).not.toBe('ok');
+    expect(aiSettings.value.model).toBe('claude-opus-5-5');
+    stop();
+  });
+});

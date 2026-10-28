@@ -8,6 +8,16 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+## [0.15.1] - 2026-10-28
+
+### Fixed
+
+- **The local companion transcribes in the language spoken too**: it ran Whisper without a language, so transformers.js took English. It now reads the language from Whisper's first step, as the browser does, and tells it back so the next chunks of a long sound keep it.
+- **A video added from the assets plays whole**: its layer is as long as its file, and a composition shorter than it lengthens to hold it (one undo takes both back). A 12-minute video added to a new 5-second project was cut to 5 seconds and looped there.
+- **The cut in the file reaches past the composition**: stretching a video's end past the composition's end lengthens the composition with it, so what was taken is seen and played instead of falling after the end.
+- **The model chosen stays chosen**: the companion missing one of the editor's checks (busy with a turn or a transcription) no longer replaces the model picked with another connected AI's; that takeover now only happens at startup, while the chosen model has never answered.
+- **A media file's length that cannot be read no longer hangs**: reading it gives up after two retries, where the media library's default tried again for ever.
+
 ## [0.15.0] - 2026-10-28
 
 ### Added
@@ -506,7 +516,8 @@ First public release.
 
 - Cloudflare Worker serving the editor and the API, projects stored in R2, access protected by Cloudflare Access.
 
-[Unreleased]: ../../compare/v0.15.0...HEAD
+[Unreleased]: ../../compare/v0.15.1...HEAD
+[0.15.1]: ../../compare/v0.15.0...v0.15.1
 [0.15.0]: ../../compare/v0.14.0...v0.15.0
 [0.14.0]: ../../compare/v0.13.0...v0.14.0
 [0.13.0]: ../../compare/v0.12.0...v0.13.0
