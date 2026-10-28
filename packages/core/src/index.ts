@@ -37,3 +37,4 @@ export * from './interpolate.ts';
 export * from './timing.ts';
 export * from './montage.ts';
 export * from './chapters.ts';
+export * from './syncoffset.ts';

@@ -11,7 +11,7 @@ import { progressCallback, type DownloadProgress } from './model-cache.ts';
 import { madeBy, type ModelEntry } from './models.ts';
 import { chosenModel } from './settings.ts';
 
-const RATE = 16000;
+export const RATE = 16000;
 
 /** a canvas and its 2D context, set up for reading its pixels often */
 export const canvas = (width: number, height: number) => {
@@ -48,14 +48,14 @@ export function jpegOf(image: CanvasImageSource, w: number, h: number, k: number
   return c.toDataURL('image/jpeg', 0.86);
 }
 
-/** the sound of a media file, mono, decoded a minute at a time */
-async function decodeMono(url: string, signal: AbortSignal): Promise<Float32Array> {
+/** the sound of a media file, mono at RATE, decoded a minute at a time; `seconds` stops at that point of the file */
+export async function decodeMono(url: string, signal: AbortSignal, seconds = Infinity): Promise<Float32Array> {
   const input = new Input({ source: new UrlSource(url), formats: ALL_FORMATS });
   try {
     const track = await input.getPrimaryAudioTrack();
     if (!track) throw new Error('this file has no sound');
     if (!(await track.canDecode())) throw new Error(`sound codec not supported by this browser (${track.codec ?? 'unknown'})`);
-    const duration = await input.computeDuration(), sink = new AudioBufferSink(track);
+    const duration = Math.min(await input.computeDuration(), seconds), sink = new AudioBufferSink(track);
     const out = new Float32Array(Math.ceil(duration * RATE));
     for (let from = 0; from < duration; from += 60) {
       if (signal.aborted) throw new Error('stopped');

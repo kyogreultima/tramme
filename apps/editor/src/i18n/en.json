@@ -1150,7 +1150,12 @@
     "makeAChapter": "Make it a chapter",
     "notAChapter": "Not a chapter any more",
     "copyChapters": "Copy the chapters as a list",
-    "chaptersCopied": "{n} chapter(s) copied"
+    "chaptersCopied": "{n} chapter(s) copied",
+    "syncBySound": "Line the clips up by their sound",
+    "syncing": "Comparing the sounds…",
+    "syncNeedsTwo": "Select two clips with a sound, at normal speed",
+    "syncNoSound": "{name} has no sound to compare",
+    "syncNoMatch": "{a} and {b} do not share a sound that can be lined up"
   },
   "topbar": {
     "tenBit": "10 bits",

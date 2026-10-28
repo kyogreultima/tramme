@@ -1150,7 +1150,12 @@
     "makeAChapter": "En faire un chapitre",
     "notAChapter": "Ne plus être un chapitre",
     "copyChapters": "Copier les chapitres en liste",
-    "chaptersCopied": "{n} chapitre(s) copié(s)"
+    "chaptersCopied": "{n} chapitre(s) copié(s)",
+    "syncBySound": "Caler les plans sur leur son",
+    "syncing": "Comparaison des sons…",
+    "syncNeedsTwo": "Sélectionnez deux plans avec du son, à vitesse normale",
+    "syncNoSound": "{name} n'a pas de son à comparer",
+    "syncNoMatch": "{a} et {b} n'ont pas de son commun à caler"
   },
   "topbar": {
     "tenBit": "10 bits",
