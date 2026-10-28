@@ -8,6 +8,22 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+### Added
+
+- **A timeline by tracks** ([montage.md](docs/montage.md)): a composition can be a *sequence*, its clips on picture and sound tracks with lock, hide, mute, solo, a magnetic mode that closes gaps, a height, and an adjustment clip for a range of tracks. The format gains optional fields only (`kind: "sequence"`, `tracks`, a clip's `track` and `link`, a track's `volume`, `pan`, `bus`, `to`); a document without them is read as before.
+- **The edits of a video editor**, one function each in `@tramme/core` and the same for the keys, the mouse, the assistant: ripple delete, ripple trim, roll, slip, slide, insert, overwrite, reorder on a magnetic track, linked clips, a video's sound detached on its own track, copy and paste with the look, cut at the playhead (Ctrl+B, Q, W, Shift+Delete, L, `,` and `.`).
+- **Media**: bins, tags and a search that also finds a word said in a clip; a source monitor with in and out marks and **sub-clips**; media gone missing listed offline (the preview goes on, an export names them, "Find the files…" brings them back); clips lined up **by their sound**; **multicam** (one camera per track, a panel that cuts between them); drag a media or a composition onto a lane; several compositions open in tabs.
+- **Sound**: a mixer with a strip per sound track and bus (volume, pan, mute, solo, automation written by moving a fader while the film plays), a loudness target and a measure, and a **voice-over recorded** on the timeline.
+- **Picture**: **match the look** of a shot to another's with editable colour wheels; **Real-ESRGAN** as a choice for enlarging pictures (the built-in Lanczos stays the default).
+- **Publishing**: presets for a vertical short, a square, a landscape film, a 4K master and a GIF, with what stands in the way listed and fixed; **export the marked part** (I and O); **exports in line**, each on the film as it was asked for; **chapters** (markers of kind `chapter`) written into the files the command line renders, and copied as a list from the browser.
+- **The assistant** has the editing operations as tools: `ripple_delete`, `insert_clip`, `overwrite_clip`, `ripple_trim`, `roll`, `slip`, `slide`, `detach_audio`, `link`, `sync_clips`, `add_adjustment`, `match_look`, `publish`. A guided tour of the lot.
+- **The hesitations cut by the fillers tool can be reviewed and put back one by one** from the media panel.
+
+### Fixed
+
+- **The voice detector loaded the wrong onnxruntime build** (the one whose wasm files transformers.js does not configure), so it fell back on the energy of the sound; it now loads the build the other models use.
+- **The editor's `time` helpers moved to `@tramme/core`** (`packages/core/src/timing.ts`), the editor re-exporting them: the montage operations and the assistant need them without the interface.
+
 ## [0.15.1] - 2026-10-28
 
 ### Fixed

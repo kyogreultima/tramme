@@ -444,7 +444,23 @@
       "filesBody": "Un son ou une vidéo joint à un message porte le même bouton. Quand l'assistant a besoin des mots d'un média pas encore transcrit, il vous le demande d'abord.",
       "words": "Ensuite",
       "wordsBody": "Demandez des sous-titres, la coupe des silences et des hésitations, ou un mot clé au moment où il est dit : l'assistant travaille sur la transcription."
-    }
+    },
+    "montage.title": "Monter un film sur des pistes",
+    "montage.summary": "Les pistes, les touches qui coupent, déplacer une coupe, les médias, le mixeur, la publication.",
+    "montage.welcomeTitle": "Un film sur des pistes",
+    "montage.welcomeBody": "Une séquence range ses plans sur des pistes, les uns après les autres, comme un logiciel de montage. Le film reste le même document : rien ici ne change son rendu. Le clic droit sur un endroit vide de la timeline range les calques sur des pistes.",
+    "montage.lanesTitle": "Les pistes",
+    "montage.lanesBody": "Chaque piste a son en-tête : son nom (double clic), l'aimant qui fait refermer les trous aux plans, l'œil, le son, le solo, et le cadenas qui empêche de toucher à une piste. Un plan lâché sur une autre piste change de piste.",
+    "montage.keysTitle": "Les touches qui coupent",
+    "montage.keysBody": "**Ctrl+B** coupe à la tête de lecture. **Q** et **W** rognent le début et la fin des plans sélectionnés jusqu'à elle. **Maj+Suppr** supprime et referme le trou (Suppr en fait autant sur une piste magnétique). **Ctrl+C**, **Ctrl+V** et **Ctrl+Alt+V** copient, collent et collent l'apparence. **L** lie des plans, **Ctrl+Maj+L** les libère. **,** insère à la tête de lecture le média choisi dans le panneau, **.** le pose par-dessus.",
+    "montage.gesturesTitle": "Déplacer une coupe",
+    "montage.gesturesBody": "Tirez le bord d'un plan avec **Maj** pour déplacer la coupe entre deux plans. **Alt** et tirer un plan décale ce qu'il montre dans son fichier ; **Ctrl+Alt** le glisse entre ses voisins. Clic droit sur un plan pour détacher son son, le caler sur un autre par le son, monter entre caméras ou caler son étalonnage.",
+    "montage.mediaTitle": "Les médias",
+    "montage.mediaBody": "Glissez un média sur une piste : il s'insère sur une piste magnétique, se pose par-dessus ailleurs (**Alt** fait l'inverse). Les dossiers et les étiquettes rangent les médias, la recherche trouve un nom ou un mot dit dans un plan. Le moniteur source pose un début et une fin (**I**, **O**) et garde la partie comme sous-plan. Un média dont le fichier a disparu le dit et peut être retrouvé.",
+    "montage.mixerTitle": "Le mixeur",
+    "montage.mixerBody": "Une tranche par piste de son et par bus : le potentiomètre, le panoramique, muet, solo, le bus alimenté. Armez **W** et bougez un potentiomètre pendant la lecture : les mouvements s'écrivent en automation du volume. Le master montre le volume visé et mesure le mix.",
+    "montage.publishTitle": "Publier",
+    "montage.publishBody": "Choisissez où va le film : ce qui le sépare de cette destination est listé, avec sa correction. **I** et **O** marquent la partie à exporter ; plusieurs exports peuvent attendre en file pendant que vous continuez à monter."
   },
   "assistant": {
     "hereAreSomeFiles": "Voici des fichiers.",

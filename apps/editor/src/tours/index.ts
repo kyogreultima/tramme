@@ -8,6 +8,7 @@ import './editor.ts';
 import './tips.ts';
 import './drawn.ts';
 import './sound.ts';
+import './montage.ts';
 import './speech.ts';
 import './assistant.ts';
 

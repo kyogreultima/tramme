@@ -29,6 +29,7 @@ export const DOCS: { label: string; collapsed?: boolean; pages: DocPage[] }[] = 
     label: 'Using Tramme',
     pages: [
       { slug: 'editor', label: 'The editor', file: 'README.md', sections: ['The editor'] },
+      { slug: 'montage', label: 'Cutting on tracks', file: 'docs/montage.md' },
       { slug: 'assistant', label: 'The assistant', file: 'README.md', sections: ['The assistant'] },
       { slug: 'cli', label: 'Command line', file: 'README.md', sections: ['Commands'], title: 'Command line' },
       { slug: 'limits', label: 'Known limits', file: 'README.md', sections: ['Known limits'] },
