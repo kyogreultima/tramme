@@ -5,7 +5,7 @@
 
 import { applyOps, pointer, type Op } from './ops.ts';
 import { staticValue } from './props.ts';
-import { round6, shiftLayerOps, splitLayerOps, subtree, trimInOps } from './timing.ts';
+import { carriedStart, round6, shiftLayerOps, splitLayerOps, subtree, trimInOps } from './timing.ts';
 import type { Composition, Layer, TrammeDoc } from './types.ts';
 
 /** where a clip sits on its track: its id, its in point and its out point (the composition's end when it has none) */
@@ -246,4 +246,78 @@ export function overwriteOps(doc: TrammeDoc, compId: string, id: string, layer: 
   }
   steps.push(() => addClipOps(compId, id, clip), (d) => syncOrderOps(d, compId), (d) => fitDurationOps(d, compId));
   return chain(doc, steps);
+}
+
+/** the rate a clip plays its file at, and where in its file it starts (null when that is not a plain number) */
+function sourceOf(l: Layer): { rate: number; start: number | null; asset: string | null } {
+  const rate = Number(staticValue(l.props?.rate));
+  const raw = staticValue(l.props?.start);
+  const asset = staticValue(l.props?.[l.type === 'audio' ? 'audio' : 'video']);
+  return { rate: rate > 0 ? rate : 1, start: l.props?.start === undefined ? 0 : typeof raw === 'number' ? raw : null, asset: typeof asset === 'string' ? asset : null };
+}
+
+/** a clip's head and tail may only move as far as its file goes: [the most its in point can move earlier (≤ 0), the most its out point can move later] */
+function handles(l: Layer, length: number, fileLength?: (asset: string) => number | undefined): [number, number] {
+  if (l.type !== 'video' && l.type !== 'audio') return [-Infinity, Infinity];
+  const { rate, start, asset } = sourceOf(l);
+  if (start === null) return [-Infinity, Infinity];
+  const total = asset ? fileLength?.(asset) : undefined;
+  return [-start / rate, total === undefined ? Infinity : Math.max(0, (total - start) / rate - length)];
+}
+
+/**
+ * An edge of a clip moved to `to`, the track following it. The out edge: what
+ * follows moves by the change. The in edge: the clip stays where it starts, its
+ * file carried (the head cut off or brought back, as far as the file goes) and
+ * it gets shorter or longer, what follows moving by that. Clips linked to it
+ * follow by the same amount. `fileLength` gives a file's length when known.
+ */
+export function rippleTrimOps(doc: TrammeDoc, compId: string, id: string, edge: 'in' | 'out', to: number, fileLength?: (asset: string) => number | undefined): Op[] {
+  const c = doc.compositions[compId], l = c.layers[id], fr = 1 / c.fps;
+  if (!l || !l.track || isLocked(c, id)) return [];
+  const tin = l.in ?? 0, tout = l.out ?? c.duration, length = tout - tin;
+  const [headMax, tailMax] = handles(l, length, fileLength);
+  // the change of length wanted, limited by the file and by one frame left
+  const grow = edge === 'out' ? Math.min(tailMax, Math.max(fr - length, to - tout)) : Math.min(-headMax, Math.max(fr - length, tin - to));
+  const dt = edge === 'out' ? grow : -grow;
+  if (Math.abs(grow) < 1e-9) return [];
+  const shifts = new Map<string, number>(), ops: Op[] = [];
+  for (const m of linkedIds(c, id)) {
+    const ml = c.layers[m];
+    if (!ml.track || isLocked(c, m)) return [];
+    const mp = pointer('compositions', compId, 'layers', m), mout = ml.out ?? c.duration;
+    if (edge === 'out') ops.push({ op: 'add', path: `${mp}/out`, value: round6(mout + grow) });
+    else {
+      ops.push({ op: 'add', path: `${mp}/out`, value: round6(mout + grow) });
+      const s = carriedStart(ml, dt);
+      if (s !== null) ops.push({ op: 'add', path: `${mp}/props/start`, value: round6(s) });
+    }
+    const track = trackClips(c, ml.track), at = track.findIndex((k) => k.id === m);
+    for (const k of track.slice(at + 1)) shifts.set(k.id, (shifts.get(k.id) ?? 0) + grow);
+  }
+  const moved = shiftAll(doc, compId, new Map([...shifts].filter(([k]) => !linkedIds(c, id).includes(k))));
+  if (!moved) return [];
+  return chain(doc, [() => [...ops, ...moved], (d) => fitDurationOps(d, compId)]);
+}
+
+/**
+ * The cut between two neighbouring clips moved to `to`: the left clip ends
+ * there and the right one starts there (its file carried), nothing else
+ * moves. Limited by the files, and by one frame left on each side. Where a
+ * transition overlaps them, their middle is the cut and both edges move
+ * together.
+ */
+export function rollOps(doc: TrammeDoc, compId: string, left: string, right: string, to: number, fileLength?: (asset: string) => number | undefined): Op[] {
+  const c = doc.compositions[compId], a = c.layers[left], b = c.layers[right], fr = 1 / c.fps;
+  if (!a || !b || !a.track || a.track !== b.track || isLocked(c, left) || isLocked(c, right)) return [];
+  const aout = a.out ?? c.duration, bin = b.in ?? 0, ain = a.in ?? 0, bout = b.out ?? c.duration;
+  const cut = (bin + aout) / 2;
+  const [, aTail] = handles(a, aout - ain, fileLength);
+  const [bHead] = handles(b, bout - bin);
+  const dt = Math.min(aTail, bout - fr - bin, Math.max(ain + fr - aout, bHead, to - cut));
+  if (Math.abs(dt) < 1e-9) return [];
+  return [
+    { op: 'add', path: pointer('compositions', compId, 'layers', left, 'out'), value: round6(aout + dt) },
+    ...trimInOps(doc, compId, right, bin + dt),
+  ];
 }

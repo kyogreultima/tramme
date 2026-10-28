@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyOps, closeGapOps, cutsOf, insertOps, isLocked, linkedIds, overwriteOps, rippleDeleteOps, syncOrderOps, trackClips, type Composition, type Op, type TrammeDoc } from '../src/index.ts';
+import { applyOps, closeGapOps, cutsOf, insertOps, isLocked, linkedIds, overwriteOps, rippleDeleteOps, rippleTrimOps, rollOps, syncOrderOps, trackClips, type Composition, type Op, type TrammeDoc } from '../src/index.ts';
 
 /** a sequence of 10 s: V1 holds a (0-5) and b (4-9, a transition of 1 s over a), A1 holds the sound of a, linked to it */
 export function sequence(): Composition {
@@ -237,5 +237,83 @@ describe('draw order', () => {
   it('returns no operation when the order is already right', () => {
     const d = docOf(three());
     expect(syncOrderOps(d, 'main')).toEqual([]);
+  });
+});
+
+describe('ripple trim', () => {
+  it('of the out edge by -1 s shifts the following clips left 1 s', () => {
+    const d = docOf(three()), c = after(d, rippleTrimOps(d, 'main', 'a', 'out', 2));
+    expect([range(c, 'a'), range(c, 'b'), range(c, 'c')]).toEqual([[0, 2], [2, 5], [5, 8]]);
+  });
+
+  it('of the out edge past the end lengthens the track and the composition', () => {
+    const d = docOf(three()), c = after(d, rippleTrimOps(d, 'main', 'c', 'out', 13));
+    expect(range(c, 'c')).toEqual([6, 13]);
+    expect(c.duration).toBe(13);
+  });
+
+  it('of the in edge keeps the clip where it starts and carries the source', () => {
+    const d = docOf(three()), c = after(d, rippleTrimOps(d, 'main', 'b', 'in', 4));
+    expect(range(c, 'a')).toEqual([0, 3]);
+    expect(range(c, 'b')).toEqual([3, 5]);
+    expect(c.layers.b.props!.start).toBe(1);
+    expect(range(c, 'c')).toEqual([5, 8]);
+  });
+
+  it('stays at the start of its file when asked for more head than the file has', () => {
+    const d = docOf(three()), c = after(d, rippleTrimOps(d, 'main', 'b', 'in', 2));
+    expect(range(c, 'b')).toEqual([3, 6]);
+    expect(range(c, 'c')).toEqual([6, 9]);
+  });
+
+  it('still trims the edges of a clip whose start is an expression, without carrying the source', () => {
+    const c0 = three(); c0.layers.b.props!.start = { $expr: '1' } as never;
+    const d = docOf(c0), c = after(d, rippleTrimOps(d, 'main', 'b', 'in', 4));
+    expect(range(c, 'b')).toEqual([3, 5]);
+    expect(c.layers.b.props!.start).toEqual({ $expr: '1' });
+    expect(range(c, 'c')).toEqual([5, 8]);
+  });
+
+  it('next to a transition keeps the overlap length', () => {
+    const d = docOf(sequence()), c = after(d, rippleTrimOps(d, 'main', 'a', 'out', 4.5));
+    expect(range(c, 'a')).toEqual([0, 4.5]);
+    expect(range(c, 'b')).toEqual([3.5, 8.5]);
+    expect(c.layers.a.out! - c.layers.b.in!).toBe(1);
+  });
+
+  it('does nothing on a locked track', () => {
+    const c0 = three(); c0.tracks![0].locked = true;
+    expect(rippleTrimOps(docOf(c0), 'main', 'a', 'out', 2)).toEqual([]);
+  });
+});
+
+describe('roll', () => {
+  it('moves the cut and changes the two clips by equal and opposite amounts', () => {
+    const d = docOf(three()), c = after(d, rollOps(d, 'main', 'a', 'b', 4));
+    expect(range(c, 'a')).toEqual([0, 4]);
+    expect(range(c, 'b')).toEqual([4, 6]);
+    expect(c.layers.b.props!.start).toBe(1);
+    expect(range(c, 'c')).toEqual([6, 9]);
+  });
+
+  it('is clamped when the right file has no head left', () => {
+    const c0 = three(); c0.layers.b.props!.start = 0.5;
+    const d = docOf(c0), c = after(d, rollOps(d, 'main', 'a', 'b', 2));
+    expect(range(c, 'a')).toEqual([0, 2.5]);
+    expect(range(c, 'b')).toEqual([2.5, 6]);
+    expect(c.layers.b.props!.start).toBe(0);
+  });
+
+  it('is clamped by the end of the left file when its length is known', () => {
+    const d = docOf(three()), c = after(d, rollOps(d, 'main', 'a', 'b', 5, () => 3.5));
+    expect(range(c, 'a')).toEqual([0, 3.5]);
+    expect(range(c, 'b')).toEqual([3.5, 6]);
+  });
+
+  it('keeps one frame at least on the shorter side, and does nothing on a locked track', () => {
+    const d = docOf(three()), c = after(d, rollOps(d, 'main', 'a', 'b', 8));
+    expect(c.layers.b.in).toBeCloseTo(6 - 1 / 30, 3);
+    const c0 = three(); c0.tracks![0].locked = true;
+    expect(rollOps(docOf(c0), 'main', 'a', 'b', 4)).toEqual([]);
   });
 });
