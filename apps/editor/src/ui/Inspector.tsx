@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { Evaluator, getAt, pointer, propKind, staticValue, sheetIssues, TRANSFORM_SCHEMA, MOTION_BLUR_SCHEMA, CAMERA_SCHEMA, SOUND_MIX_SCHEMA, type TrammeDoc, type Op, type Paint, type Prop, type PropDef, type PropSchema, type Token, MASK_SCHEMA, curveTable, type PathValue } from '@tramme/core';
 import { comp, commit, draft, cancelDraft, S, viewDoc, select, toast, uiTime } from '../state.ts';
 import { assetData } from '../preview.ts';
-import { addModifierOps, editAtOps, fixedOps, folderOf, imagesIn, keyAtOps, keyIndexAt, keysOf, removeKeyOps, removeModifierOps, setAtOps, snap, freshId, fmtSeconds } from '../model.ts';
+import { addModifierOps, editAtOps, fixedOps, folderOf, imagesIn, keyAtOps, keyIndexAt, keysOf, removeKeyOps, removeModifierOps, setAtOps, snap, freshId, cutEndOps, fmtSeconds } from '../model.ts';
 import { addressDef, componentOf, detachPlan, modsOf, modifierParams, paramDef } from '@tramme/core';
 import { followTrackOps, tracksOf } from '../masks.ts';
 import { pickColor } from '../dropper.ts';
@@ -719,10 +719,7 @@ function VideoTrim({ ctx, id }: { ctx: Ctx; id: string }) {
       if (which === 'start') {
         const s = Math.max(0, Math.min(end - 1 / ctx.fps, v));
         ops = s === start ? [] : [{ op: 'add', path: `${lp}/props/start`, value: +s.toFixed(4) }];
-      } else {
-        const out = +(li + Math.max(start + 1 / ctx.fps, Math.min(dur, v)) - start).toFixed(4);
-        ops = out === lo ? [] : [{ op: 'add', path: `${lp}/out`, value: out }];
-      }
+      } else ops = cutEndOps(ctx.doc, ctx.compId, id, v, dur, ctx.fps);
       if (ops.length) draft(ops); else cancelDraft();
     };
     const up = () => {

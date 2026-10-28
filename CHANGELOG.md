@@ -8,6 +8,13 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+### Fixed
+
+- **A video added from the assets plays whole**: its layer is as long as its file, and a composition shorter than it lengthens to hold it (one undo takes both back). A 12-minute video added to a new 5-second project was cut to 5 seconds and looped there.
+- **The cut in the file reaches past the composition**: stretching a video's end past the composition's end lengthens the composition with it, so what was taken is seen and played instead of falling after the end.
+- **The model chosen stays chosen**: the companion missing one of the editor's checks (busy with a turn or a transcription) no longer replaces the model picked with another connected AI's; that takeover now only happens at startup, while the chosen model has never answered.
+- **A media file's length that cannot be read no longer hangs**: reading it gives up after two retries, where the media library's default tried again for ever.
+
 ## [0.15.0] - 2026-10-28
 
 ### Added
