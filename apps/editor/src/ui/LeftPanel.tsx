@@ -5,10 +5,11 @@ import { Fragment } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { addLayer, applyOps, layerActive, moveLayer, pointer, propKind, removeLayer, staticValue, type Asset, type KeyframedProp, type Prop, type StaticProp, type Vec2, type TrammeDoc, type Layer, type NodeType, type Op, type PresetType, type TokenType } from '@tramme/core';
 import { clickSelect, comp, commit, foldAll, S, select, toggleFold, viewDoc, toast, uiTime } from '../state.ts';
-import { flatTree, freshId, layerName, shiftProp, parentOf, SOUND_GROUP, soundGroupOf, subtree, topLayers, commonStem, folderOf, imagesIn } from '../model.ts';
+import { flatTree, freshId, layerName, shiftProp, parentOf, SOUND_GROUP, soundGroupOf, subtree, topLayers, commonStem, folderOf, imagesIn, wholeFile } from '../model.ts';
 import { ColorField, longPress, openMenu, Seg, Swatch, TextInput, resolveColor, type MenuItem } from './controls.tsx';
 import { Icon, kindColor, kindIcon } from './icons.tsx';
 import { preview } from '../preview.ts';
+import { mediaDuration } from '../perception.ts';
 import { manifestOf } from '@tramme/project';
 import { copiesIn } from '../installed.ts';
 import { packBySrc, packIdOf, packUpdates, shippedPacks, type PackEntry, type PackUpdate } from '../packs.ts';
@@ -87,8 +88,8 @@ function applyStack(p: PresetType) {
   commit(t('panel.stackApplied', { name: tr(p.title ?? p.name) }), ops);
 }
 
-/** add a layer above the selection (same parent), or at the top of the root */
-export function insertLayer(layer: Layer, base?: string) {
+/** add a layer above the selection (same parent), or at the top of the root; extra: what changes with it, in the same undo step */
+export function insertLayer(layer: Layer, base?: string, extra: Op[] = []) {
   const doc = S.doc.peek(), compId = S.compId.peek(), c = doc.compositions[compId];
   const id = freshId(c.layers, base ?? layer.type.split('.').pop()!);
   const sel = S.selection.peek()[0];
@@ -101,7 +102,23 @@ export function insertLayer(layer: Layer, base?: string) {
       place = { parent, index: arr.indexOf(sel) + 1 };
     }
   }
-  if (commit(t('panel.newLayerName', { name: layer.name ?? id }), addLayer(doc, compId, id, layer, place))) select([id]);
+  if (commit(t('panel.newLayerName', { name: layer.name ?? id }), [...addLayer(doc, compId, id, layer, place), ...extra])) select([id]);
+}
+
+/**
+ * A layer of an asset of the project. A video plays whole: its layer is as
+ * long as its file, and the composition lengthens to hold it (one undo step).
+ */
+export async function layerFromAsset(id: string, a: Asset) {
+  const doc = S.doc.peek(), compId = S.compId.peek(), reg = S.registry.peek();
+  if (a.type === 'image') insertLayer(newLayer(doc, compId, reg.node('image'), { name: a.name || id, props: { image: id, size: [600, 600], fit: 'contain' } }), id);
+  else if (a.type === 'audio') insertLayer(newLayer(doc, compId, reg.node('audio'), { name: a.name || id, props: { audio: id } }), id);
+  else if (a.type === 'video') {
+    const length = await mediaDuration(new URL(a.src, new URL(S.docUrl.peek(), location.href)).href);
+    const l = newLayer(S.doc.peek(), compId, reg.node('video'), { name: a.name || id });
+    const { layer, ops } = wholeFile(S.doc.peek(), compId, { ...l, props: { ...l.props, video: id } }, length);
+    insertLayer(layer, id, ops);
+  } else if (a.type === 'model' && reg.hasNode('model.3d')) { const l = newLayer(doc, compId, reg.node('model.3d'), { name: a.name || id }); insertLayer({ ...l, props: { ...l.props, source: id } }, id); }
 }
 
 export function addLayerMenu(e: MouseEvent | DOMRect) {
@@ -605,13 +622,7 @@ function Assets() {
       { label: t('panel.removeFromProject'), icon: 'trash', onClick: () => commit(t('common.removeName', { name: a.name || id }), [{ op: 'remove', path: pointer('assets', id) }]) },
     ]);
   };
-  const use = (id: string, a: Asset) => {
-    const reg = S.registry.peek();
-    if (a.type === 'image') insertLayer(newLayer(doc, S.compId.peek(), reg.node('image'), { name: a.name || id, props: { image: id, size: [600, 600], fit: 'contain' } }), id);
-    else if (a.type === 'audio') insertLayer(newLayer(doc, S.compId.peek(), reg.node('audio'), { name: a.name || id, props: { audio: id } }), id);
-    else if (a.type === 'video') { const l = newLayer(doc, S.compId.peek(), reg.node('video'), { name: a.name || id }); insertLayer({ ...l, props: { ...l.props, video: id } }, id); }
-    else if (a.type === 'model' && reg.hasNode('model.3d')) { const l = newLayer(doc, S.compId.peek(), reg.node('model.3d'), { name: a.name || id }); insertLayer({ ...l, props: { ...l.props, source: id } }, id); }
-  };
+  const use = (id: string, a: Asset) => { void layerFromAsset(id, a); };
   return (
     <div class={`panel-body${over ? ' drop' : ''}`} style={over ? { boxShadow: 'inset 0 0 0 2px var(--accent-line)' } : undefined}
       onDragOver={(e) => { e.preventDefault(); setOver(true); }} onDragLeave={() => setOver(false)}
