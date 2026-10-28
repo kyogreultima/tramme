@@ -15,6 +15,7 @@ import { transcriptions } from '../speech.ts';
 import { SettingsDialog } from './Settings.tsx';
 import { settingsOpen } from '../settings.ts';
 import { QuestionDialog } from './QuestionDialog.tsx';
+import { SourceMonitor } from './Source.tsx';
 import { t } from '../i18n/index.ts';
 
 /** the shortcuts of a project open, the same in the studio and the atelier */
@@ -85,5 +86,5 @@ export function Toasts() {
 
 /** the settings, the questions asked, the menus and the toasts, over any page (the question last: it waits on top) */
 export function Overlays() {
-  return <><SettingsDialog /><MenuHost /><Toasts /><QuestionDialog /></>;
+  return <><SettingsDialog /><MenuHost /><Toasts /><QuestionDialog /><SourceMonitor /></>;
 }

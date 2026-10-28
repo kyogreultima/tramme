@@ -5,13 +5,14 @@ import { Fragment } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { addLayer, applyOps, layerActive, moveLayer, pointer, propKind, removeLayer, staticValue, type Asset, type KeyframedProp, type Prop, type StaticProp, type Vec2, type TrammeDoc, type Layer, type NodeType, type Op, type PresetType, type TokenType } from '@tramme/core';
 import { clickSelect, comp, commit, foldAll, S, select, toggleFold, viewDoc, toast, uiTime } from '../state.ts';
-import { flatTree, freshId, layerName, shiftProp, parentOf, SOUND_GROUP, soundGroupOf, subtree, topLayers, commonStem, folderOf, imagesIn, wholeFile } from '../model.ts';
+import { fitCompOps, flatTree, freshId, layerName, shiftProp, parentOf, SOUND_GROUP, soundGroupOf, subtree, topLayers, commonStem, folderOf, imagesIn, wholeFile } from '../model.ts';
 import { ColorField, longPress, openMenu, Seg, Swatch, TextInput, resolveColor, type MenuItem } from './controls.tsx';
 import { Icon, kindColor, kindIcon } from './icons.tsx';
-import { ASSET_MIME, chosenAsset, COMP_MIME } from './timeline/assets-drag.ts';
+import { ASSET_MIME, chosenAsset, COMP_MIME, sourceOpen } from './timeline/assets-drag.ts';
 import { newSequenceFromAsset } from './timeline/place.ts';
 import { MediaBar, naming, useSpoken } from './MediaBar.tsx';
 import { relinkFiles } from '../relink-run.ts';
+import { clipFromRange } from '../subclips.ts';
 import { binsOf, filterAssets, removeTagOps, setBinOps, type AssetFilter } from '../bins.ts';
 import { preview } from '../preview.ts';
 import { mediaDuration } from '../perception.ts';
@@ -122,6 +123,12 @@ export async function layerFromAsset(id: string, a: Asset) {
 /** the layer an asset becomes, and what must change with it (a video's composition lengthened to hold it); null for an asset that is no layer */
 export async function assetLayer(id: string, a: Asset): Promise<{ layer: Layer; ops: Op[] } | null> {
   const doc = S.doc.peek(), compId = S.compId.peek(), reg = S.registry.peek();
+  // a sub-clip plays its media from the start of its range, as long as the range: nothing to read in the file
+  if (a.of !== undefined && a.range && (a.type === 'video' || a.type === 'audio')) {
+    const l = newLayer(doc, compId, reg.node(a.type), { name: a.name || id });
+    const layer = clipFromRange({ ...l, props: { ...l.props, [a.type]: a.of } }, a.range[0], a.range[1]);
+    return { layer, ops: fitCompOps(doc, compId, layer.out!) };
+  }
   if (a.type === 'image') return { layer: newLayer(doc, compId, reg.node('image'), { name: a.name || id, props: { image: id, size: [600, 600], fit: 'contain' } }), ops: [] };
   if (a.type === 'audio') return { layer: newLayer(doc, compId, reg.node('audio'), { name: a.name || id, props: { audio: id } }), ops: [] };
   if (a.type === 'video') {
@@ -649,6 +656,7 @@ function Assets() {
       ]) },
       { label: t('panel.addTag'), icon: 'marker' as const, onClick: () => { naming.value = { kind: 'tag', ids: [id] }; } },
       ...(a.tags ?? []).map((tag): MenuItem => ({ label: `#${tag} ×`, onClick: () => commit(t('panel.addTag'), removeTagOps(S.doc.peek(), [id], tag)) })),
+      ...(a.type === 'audio' || a.type === 'video' ? [{ label: t('source.openInSource'), icon: 'film' as const, onClick: () => { sourceOpen.value = id; } }] : []),
       ...(S.offline.peek().includes(id) ? [{ label: t('panel.relinkFile'), icon: 'search' as const, onClick: () => relink.current?.click() }] : []),
       ...(a.type === 'audio' || a.type === 'video' || a.type === 'image' ? [{ label: t('panel.newSequenceFromMedia'), icon: 'film' as const, onClick: () => { void newSequenceFromAsset(id); } }] : []),
       ...(a.type === 'audio' || a.type === 'video' ? [transcribeItem(id)] : []),

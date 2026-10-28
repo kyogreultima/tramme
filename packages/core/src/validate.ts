@@ -61,6 +61,14 @@ class Checker {
       if (a.type !== 'audio' && a.type !== 'video') this.err(pointer('assets', id, 'clean'), 'only a sound or a video has a cleaned voice');
       else if (doc.assets[a.clean]?.type !== 'audio' || a.clean === id) this.err(pointer('assets', id, 'clean'), `the cleaned voice "${a.clean}" must be another sound asset`);
     }
+    for (const [id, a] of Object.entries(doc.assets)) {
+      if (a.of === undefined && a.range === undefined) continue;
+      const of = a.of === undefined ? undefined : doc.assets[a.of];
+      if (a.of !== undefined && !of) this.err(pointer('assets', id, 'of'), `unknown asset "${a.of}"`);
+      else if (of && (of.type !== a.type || (a.type !== 'video' && a.type !== 'audio'))) this.err(pointer('assets', id, 'of'), `a sub-clip is a range of an asset of the same kind (a video or a sound), "${a.of}" is ${of.type}`);
+      else if (of?.of !== undefined) this.err(pointer('assets', id, 'of'), `"${a.of}" is itself a sub-clip: a sub-clip is a range of a media file`);
+      if (a.of === undefined || a.range === undefined || !(a.range[0] >= 0 && a.range[1] > a.range[0])) this.err(pointer('assets', id, 'range'), 'a sub-clip needs the media it is a range of and a range that starts at 0 or later and ends after it starts');
+    }
     for (const [name, tk] of Object.entries(doc.tokens)) this.token(name, tk.type, tk.value);
     for (const [cid, comp] of Object.entries(doc.compositions)) this.comp(cid, comp);
     this.nestingCycles();

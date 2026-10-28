@@ -1625,5 +1625,22 @@
   },
   "proxy": {
     "encoding": "encoding the proxy"
+  },
+  "source": {
+    "title": "Source monitor",
+    "close": "Close the source monitor",
+    "setIn": "Set the in point (I)",
+    "setOut": "Set the out point (O)",
+    "markIn": "In {time}",
+    "markOut": "Out {time}",
+    "range": "{length} selected",
+    "insert": "Insert",
+    "overwrite": "Overwrite",
+    "addToTimeline": "Add to the timeline",
+    "saveSubclip": "Save as a sub-clip",
+    "subclipName": "Name of the sub-clip, then Enter",
+    "openInSource": "Open in the source monitor",
+    "subclipSaved": "Sub-clip {name} saved",
+    "needRange": "Set an in point and an out point first"
   }
 }

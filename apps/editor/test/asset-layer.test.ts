@@ -24,6 +24,17 @@ const layerOf = (asset: string) => Object.values(main().layers).find((l: Layer) 
 beforeEach(open);
 afterEach(() => { vi.restoreAllMocks(); });
 
+describe('a layer of a sub-clip', () => {
+  it('plays its media from the start of the range, as long as the range, without reading the file', async () => {
+    const duration = vi.spyOn(perception, 'mediaDuration');
+    S.doc.peek().assets.part = { type: 'video', src: talk.src, name: 'Opening', of: 'talk', range: [2, 7.5] };
+    await layerFromAsset('part', S.doc.peek().assets.part);
+    expect(layerOf('talk')).toMatchObject({ type: 'video', in: 0, out: 5.5, props: { video: 'talk', start: 2 } });
+    expect(main().duration).toBe(5.5);
+    expect(duration).not.toHaveBeenCalled();
+  });
+});
+
 describe('a layer of a video asset', () => {
   it('plays a 12-minute video whole in a 5-second project', async () => {
     vi.spyOn(perception, 'mediaDuration').mockResolvedValue(753.17);
