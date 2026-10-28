@@ -3,8 +3,8 @@
 // magnetism; the menu adds and removes tracks and sets the lane's height.
 
 import { useState } from 'preact/hooks';
-import type { Composition, SequenceTrack } from '@tramme/core';
-import { commit, S } from '../../state.ts';
+import { addAdjustmentOps, type Composition, type SequenceTrack } from '@tramme/core';
+import { commit, S, select } from '../../state.ts';
 import { m, t } from '../../i18n/index.ts';
 import { Icon, kindColor, kindIcon } from '../icons.tsx';
 import { openMenu, type MenuItem } from '../controls.tsx';
@@ -20,6 +20,12 @@ const label = (track: SequenceTrack) => track.name || track.id;
 export const changeTrack = (compId: string, track: SequenceTrack, change: TrackChange, what: string) =>
   commit(what, trackChangeOps(S.doc.peek().compositions[compId], compId, track.id, change));
 
+/** an adjustment clip at the playhead, on this track when it is free there, else on a new track above the others */
+export function addAdjustment(compId: string, trackId: string | null) {
+  const r = addAdjustmentOps(S.doc.peek(), compId, trackId, S.time.peek(), Math.min(5, Math.max(0.5, S.doc.peek().compositions[compId].duration - S.time.peek())));
+  if (r && commit(t('timeline.addAdjustment'), r.ops)) select([r.id]);
+}
+
 /** the menu of a lane (right click on its header or the add button) */
 export function trackMenu(e: { clientX: number; clientY: number } | DOMRect, compId: string, c: Composition, track?: SequenceTrack) {
   const add = (kind: 'video' | 'audio') => commit(kind === 'video' ? t('timeline.addVideoTrack') : t('timeline.addSoundTrack'), addTrackOps(S.doc.peek().compositions[compId], compId, kind).ops);
@@ -32,6 +38,8 @@ export function trackMenu(e: { clientX: number; clientY: number } | DOMRect, com
     );
   }
   items.push(
+    { label: t('timeline.addAdjustment'), icon: 'effects', detail: t('timeline.adjustmentHint'), disabled: track?.kind === 'audio', onClick: () => addAdjustment(compId, track?.kind === 'video' ? track.id : null) },
+    'sep',
     { label: t('timeline.addVideoTrack'), icon: 'plus', onClick: () => add('video') },
     { label: t('timeline.addSoundTrack'), icon: 'plus', onClick: () => add('audio') },
   );

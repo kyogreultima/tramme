@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { registry } from './fixtures.ts';
-import { applyOps, audioClips, closeGapOps, multicamOps, switchAngleOps, Evaluator, cutsOf, detachAudioOps, insertOps, isLocked, linkOps, linkedIds, overwriteOps, pasteAttributesOps, pasteOps, unlinkOps, rippleDeleteOps, rippleTrimOps, rollOps, slideOps, slipOps, splitAtOps, syncOrderOps, toSequenceOps, trackClips, type Composition, type Op, type TrammeDoc } from '../src/index.ts';
+import { addAdjustmentOps, applyOps, audioClips, closeGapOps, multicamOps, switchAngleOps, Evaluator, cutsOf, detachAudioOps, insertOps, isLocked, linkOps, linkedIds, overwriteOps, pasteAttributesOps, pasteOps, unlinkOps, rippleDeleteOps, rippleTrimOps, rollOps, slideOps, slipOps, splitAtOps, syncOrderOps, toSequenceOps, trackClips, type Composition, type Op, type TrammeDoc } from '../src/index.ts';
 
 /** a sequence of 10 s: V1 holds a (0-5) and b (4-9, a transition of 1 s over a), A1 holds the sound of a, linked to it */
 export function sequence(): Composition {
@@ -624,5 +624,41 @@ describe('a multicam', () => {
     const d = rigged();
     expect(switchAngleOps(d, 'main', ['V1', 'V2'], 'V1', 4)).toEqual([]);
     expect(switchAngleOps(d, 'main', ['V1', 'V2'], 'V2', 12)).toEqual([]);
+  });
+});
+
+describe('an adjustment clip on a track', () => {
+  const adjustable = () => registry().register({ type: 'adjust', title: 'Adjustment', category: 'test', composes: 'adjust', props: {}, render: {} }, { type: 'video', title: 'Video', category: 'test', props: { video: { type: 'asset', default: null, nullable: true, assetType: 'video' } }, render: {} });
+
+  it('goes on a track of its own above the others, for the range given, without moving anything', () => {
+    const d = docOf(three()), r = addAdjustmentOps(d, 'main', null, 2, 4)!, c = after(d, r.ops);
+    expect(c.tracks!.map((t) => t.id)).toEqual(['V1', 'V2', 'A1']);
+    expect([c.layers[r.id].type, c.layers[r.id].track, c.layers[r.id].in, c.layers[r.id].out]).toEqual(['adjust', 'V2', 2, 6]);
+    expect(c.order.indexOf(r.id)).toBeGreaterThan(c.order.indexOf('c'));
+    expect([range(c, 'a'), range(c, 'b'), range(c, 'c')]).toEqual([[0, 3], [3, 6], [6, 9]]);
+  });
+
+  it('goes on the track given when nothing is there in that range', () => {
+    const c0 = three(); c0.tracks!.splice(1, 0, { id: 'V2', kind: 'video' });
+    const d = docOf(c0), r = addAdjustmentOps(d, 'main', 'V2', 1, 3)!;
+    expect(after(d, r.ops).layers[r.id].track).toBe('V2');
+    expect(after(d, r.ops).tracks!.map((t) => t.id)).toEqual(['V1', 'V2', 'A1']);
+    // V1 is taken in that range: a new track above
+    expect(after(d, addAdjustmentOps(d, 'main', 'V1', 1, 3)!.ops).tracks!.map((t) => t.id)).toEqual(['V1', 'V2', 'V3', 'A1']);
+  });
+
+  it('applies to the picture only while it plays: out of its range it is not in the frame', () => {
+    const d = docOf(three()), r = addAdjustmentOps(d, 'main', null, 2, 2)!, doc = applyOps(d, r.ops).doc;
+    const inFrame = (t: number) => new Evaluator(doc, adjustable()).frame(t).layers.map((l) => l.id);
+    expect(inFrame(1)).not.toContain(r.id);
+    expect(inFrame(3)).toContain(r.id);
+    expect(inFrame(4.5)).not.toContain(r.id);
+  });
+
+  it('is refused on a sound track, or a locked one', () => {
+    const c0 = three(), d = docOf(c0);
+    expect(addAdjustmentOps(d, 'main', 'A1', 0, 1)).toBeNull();
+    c0.tracks![0].locked = true;
+    expect(addAdjustmentOps(docOf(c0), 'main', 'V1', 20, 1)).toBeNull();
   });
 });

@@ -1161,7 +1161,9 @@
     "multicamNeedsTwo": "Select two videos of the same scene",
     "switchCamera": "Switch camera",
     "cameraN": "Camera {n}",
-    "closeMulticam": "Close the multicam"
+    "closeMulticam": "Close the multicam",
+    "addAdjustment": "Add an adjustment clip at the playhead",
+    "adjustmentHint": "Its effects reach every track under it, for its length only"
   },
   "topbar": {
     "tenBit": "10 bits",

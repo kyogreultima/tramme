@@ -1161,7 +1161,9 @@
     "multicamNeedsTwo": "Sélectionnez deux vidéos de la même scène",
     "switchCamera": "Changer de caméra",
     "cameraN": "Caméra {n}",
-    "closeMulticam": "Fermer le multicam"
+    "closeMulticam": "Fermer le multicam",
+    "addAdjustment": "Ajouter un calque d'effets à la tête de lecture",
+    "adjustmentHint": "Ses effets touchent toutes les pistes dessous, sur sa durée seulement"
   },
   "topbar": {
     "tenBit": "10 bits",

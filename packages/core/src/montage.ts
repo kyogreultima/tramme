@@ -699,3 +699,29 @@ export function switchAngleOps(doc: TrammeDoc, compId: string, angles: string[],
   }));
   return chain(doc, steps);
 }
+
+/**
+ * An adjustment clip on a picture track: what is on the tracks under it, over
+ * its range only, goes through its effects. It goes on `trackId` when nothing
+ * plays there in that range, else on a new track above the others (given no
+ * track, always there); it moves nothing. Null on a sound track or a locked
+ * one.
+ */
+export function addAdjustmentOps(doc: TrammeDoc, compId: string, trackId: string | null, at: number, len: number): { ops: Op[]; id: string } | null {
+  const c = doc.compositions[compId], half = 0.5 / c.fps, track = trackId ? c.tracks?.find((x) => x.id === trackId) : undefined;
+  if (trackId && (!track || track.kind !== 'video' || track.locked) || !(len > 0)) return null;
+  const free = !!track && !trackClips(c, track.id).some((k) => k.in < at + len - half && k.out > at + half);
+  const id = freshId(c, 'adjustment'), made: { id?: string } = {};
+  const ops = chain(doc, [
+    (d) => {
+      if (free) { made.id = track!.id; return []; }
+      const add = addTrackOps(d.compositions[compId], compId, 'video');
+      made.id = add.id;
+      return add.ops;
+    },
+    () => addClipOps(compId, id, { type: 'adjust', name: 'Adjustment', track: made.id, in: round6(at), out: round6(at + len) }),
+    (d) => syncOrderOps(d, compId),
+    (d) => fitDurationOps(d, compId),
+  ]);
+  return { ops, id };
+}
