@@ -4,6 +4,7 @@
 // storage is this browser's, served by the service worker (mode.ts): it is
 // started first.
 
+import { exportQueue } from './export-queue.ts';
 import { render } from 'preact';
 // first: the browser's offer to install the app comes early
 import './install.ts';
@@ -70,7 +71,7 @@ async function openProject(id: string) {
   hooks.copies = copiesFor;
   if (!info.manifest.thumbnail) setTimeout(() => thumbnail(true), 1500);
   // a handle for measurements and automated checks (tramme bench); runTool runs a tool of the / menu, its events returned
-  (window as any).__tramme = { S, preview, select, setTime, undo, commit, runTool };
+  (window as any).__tramme = { S, preview, select, setTime, undo, commit, runTool, exportQueue };
 }
 
 const m = location.pathname.match(/^\/p\/([a-z0-9][a-z0-9-]{2,63})\/?$/);

@@ -18,6 +18,7 @@ import { QuestionDialog } from './QuestionDialog.tsx';
 import { SourceMonitor } from './Source.tsx';
 import { MulticamPanel } from './Multicam.tsx';
 import { cancelVoiceover } from '../voiceover-run.ts';
+import { setRangeOps } from '../exportspan.ts';
 import { t } from '../i18n/index.ts';
 
 /** the shortcuts of a project open, the same in the studio and the atelier */
@@ -35,6 +36,13 @@ export function useShortcuts() {
       if (mod && e.key.toLowerCase() === 'd') { e.preventDefault(); duplicateSelection(); return; }
       if (mod && e.key.toLowerCase() === 'a') { e.preventDefault(); selectAll(); return; }
       if (runEditKey(e)) return;
+      // I and O: the start and the end of what an export renders (two marks on the ruler)
+      if (!mod && !e.shiftKey && !e.altKey && (e.key.toLowerCase() === 'i' || e.key.toLowerCase() === 'o')) {
+        e.preventDefault();
+        const which = e.key.toLowerCase() === 'i' ? 'in' : 'out', c = comp.peek();
+        commit(which === 'in' ? t('timeline.exportStartHere') : t('timeline.exportEndHere'), setRangeOps(c, S.compId.peek(), which, S.time.peek()));
+        return;
+      }
       // Shift+Z: the whole timeline in view
       if (!mod && e.shiftKey && !e.altKey && e.key.toLowerCase() === 'z') { e.preventDefault(); pps.value = 0; return; }
       if (e.code === 'Space') { e.preventDefault(); S.playing.value = !S.playing.value; return; }
