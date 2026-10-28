@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyOps, closeGapOps, cutsOf, isLocked, linkedIds, rippleDeleteOps, trackClips, type Composition, type Op, type TrammeDoc } from '../src/index.ts';
+import { applyOps, closeGapOps, cutsOf, insertOps, isLocked, linkedIds, overwriteOps, rippleDeleteOps, syncOrderOps, trackClips, type Composition, type Op, type TrammeDoc } from '../src/index.ts';
 
 /** a sequence of 10 s: V1 holds a (0-5) and b (4-9, a transition of 1 s over a), A1 holds the sound of a, linked to it */
 export function sequence(): Composition {
@@ -145,5 +145,97 @@ describe('closing a gap', () => {
     expect(closeGapOps(d, 'main', 'V1', 1)).toEqual([]);
     const c0 = three(); c0.layers.b.in = 4; c0.tracks![0].locked = true;
     expect(closeGapOps(docOf(c0), 'main', 'V1', 3.5)).toEqual([]);
+  });
+});
+
+const clipLayer = (len: number) => ({ type: 'video', in: 0, out: len, props: { video: 'new' } });
+const range = (c: Composition, id: string) => [c.layers[id].in, c.layers[id].out];
+
+describe('insert', () => {
+  it('in the middle of a clip splits it and shifts the tail', () => {
+    const d = docOf(three()), c = after(d, insertOps(d, 'main', 'n', clipLayer(2), 'V1', 4.5));
+    expect(range(c, 'b')).toEqual([3, 4.5]);
+    expect(range(c, 'n')).toEqual([4.5, 6.5]);
+    expect(range(c, 'b-2')).toEqual([6.5, 8]);
+    expect(c.layers['b-2'].props!.start).toBe(1.5);
+    expect(range(c, 'c')).toEqual([8, 11]);
+    expect(c.layers.n.track).toBe('V1');
+  });
+
+  it('at a cut shifts the later clips only', () => {
+    const d = docOf(three()), c = after(d, insertOps(d, 'main', 'n', clipLayer(2), 'V1', 3));
+    expect(range(c, 'a')).toEqual([0, 3]);
+    expect(range(c, 'n')).toEqual([3, 5]);
+    expect(range(c, 'b')).toEqual([5, 8]);
+    expect(range(c, 'c')).toEqual([8, 11]);
+  });
+
+  it('lengthens the composition to hold what was pushed past its end', () => {
+    const d = docOf(three()), c = after(d, insertOps(d, 'main', 'n', clipLayer(5), 'V1', 0));
+    expect(c.duration).toBe(14);
+  });
+
+  it('does nothing on a locked track', () => {
+    const c0 = three(); c0.tracks![0].locked = true;
+    expect(insertOps(docOf(c0), 'main', 'n', clipLayer(2), 'V1', 3)).toEqual([]);
+  });
+
+  it('syncs the draw order so a clip on a higher track is above the lower ones', () => {
+    const c0 = three(); c0.tracks!.push({ id: 'V2', kind: 'video' });
+    const d = docOf(c0);
+    const c = after(d, insertOps(d, 'main', 'n', clipLayer(2), 'V2', 0));
+    expect(c.order).toEqual(['a', 'b', 'c', 'n']);
+    const d2 = docOf(c), c2 = after(d2, insertOps(d2, 'main', 'z', clipLayer(1), 'V1', 9));
+    expect(c2.order).toEqual(['a', 'b', 'c', 'z', 'n']);
+  });
+});
+
+describe('overwrite', () => {
+  it('a clip fully covered is removed', () => {
+    const d = docOf(three()), c = after(d, overwriteOps(d, 'main', 'n', clipLayer(3), 'V1', 3));
+    expect(c.layers.b).toBeUndefined();
+    expect(range(c, 'n')).toEqual([3, 6]);
+    expect([range(c, 'a'), range(c, 'c')]).toEqual([[0, 3], [6, 9]]);
+  });
+
+  it('over the tail of a clip trims its out, and over the head of the next trims its in', () => {
+    const d = docOf(three()), c = after(d, overwriteOps(d, 'main', 'n', clipLayer(2), 'V1', 2));
+    expect(range(c, 'a')).toEqual([0, 2]);
+    expect(range(c, 'n')).toEqual([2, 4]);
+    expect(range(c, 'b')).toEqual([4, 6]);
+  });
+
+  it('over the head of a video trims its in and carries the start of its file', () => {
+    const d = docOf(three()), c = after(d, overwriteOps(d, 'main', 'n', clipLayer(1), 'V1', 3));
+    expect(range(c, 'b')).toEqual([4, 6]);
+    expect(c.layers.b.props!.start).toBe(1);
+  });
+
+  it('inside one clip splits it in three', () => {
+    const d = docOf(three()), c = after(d, overwriteOps(d, 'main', 'n', clipLayer(1), 'V1', 7));
+    expect(range(c, 'c')).toEqual([6, 7]);
+    expect(range(c, 'n')).toEqual([7, 8]);
+    expect(range(c, 'c-2')).toEqual([8, 9]);
+    expect(c.layers['c-2'].props!.start).toBe(2);
+  });
+
+  it('does nothing on a locked track', () => {
+    const c0 = three(); c0.tracks![0].locked = true;
+    expect(overwriteOps(docOf(c0), 'main', 'n', clipLayer(1), 'V1', 7)).toEqual([]);
+  });
+});
+
+describe('draw order', () => {
+  it('keeps free layers where they were and puts the clips of the tracks in track order', () => {
+    const c0 = three();
+    c0.layers.bg = { type: 'shape.rect' }; c0.layers.title = { type: 'text' };
+    c0.order = ['bg', 'b', 'a', 'c', 'title'];
+    const d = docOf(c0);
+    expect(after(d, syncOrderOps(d, 'main')).order).toEqual(['bg', 'a', 'b', 'c', 'title']);
+  });
+
+  it('returns no operation when the order is already right', () => {
+    const d = docOf(three());
+    expect(syncOrderOps(d, 'main')).toEqual([]);
   });
 });
