@@ -10,6 +10,8 @@ import { ColorField, longPress, openMenu, Seg, Swatch, TextInput, resolveColor, 
 import { Icon, kindColor, kindIcon } from './icons.tsx';
 import { ASSET_MIME, chosenAsset, COMP_MIME } from './timeline/assets-drag.ts';
 import { newSequenceFromAsset } from './timeline/place.ts';
+import { MediaBar, naming, useSpoken } from './MediaBar.tsx';
+import { binsOf, filterAssets, removeTagOps, setBinOps, type AssetFilter } from '../bins.ts';
 import { preview } from '../preview.ts';
 import { mediaDuration } from '../perception.ts';
 import { manifestOf } from '@tramme/project';
@@ -607,6 +609,8 @@ function animateFolder(folder: string) {
 function Assets() {
   const doc = viewDoc.value;
   const [over, setOver] = useState(false);
+  const [filter, setFilter] = useState<AssetFilter>({});
+  const spoken = useSpoken(doc, !!filter.text);
   const input = useRef<HTMLInputElement>(null);
   // a copy of a shipped pack older than the editor's: offered its update, the way an installed plugin's copy is
   const [updates, setUpdates] = useState<PackUpdate[]>([]);
@@ -628,12 +632,20 @@ function Assets() {
     return () => { live = false; };
   }, [modulesKey]);
   const byType = new Map<string, [string, Asset][]>();
-  for (const e of Object.entries(doc.assets)) { if (!byType.has(e[1].type)) byType.set(e[1].type, []); byType.get(e[1].type)!.push(e); }
+  const shown = filterAssets(doc, filter, spoken);
+  for (const e of shown) { if (!byType.has(e[1].type)) byType.set(e[1].type, []); byType.get(e[1].type)!.push(e); }
   const url = (id: string) => { try { return preview.renderer?.assets.url(id) ?? ''; } catch { return ''; } };
   const assetMenu = (e: MouseEvent | { clientX: number; clientY: number }, id: string, a: Asset) => {
     if ('preventDefault' in e) e.preventDefault();
     openMenu(e, [
       ...(a.type === 'image' || a.type === 'audio' || a.type === 'video' || a.type === 'model' ? [{ label: t('panel.createALayer'), icon: 'plus' as const, onClick: () => use(id, a) }] : []),
+      { label: t('panel.moveToBin'), icon: 'folder' as const, onClick: () => openMenu(e, [
+        ...binsOf(doc).filter((b) => b !== a.bin).map((b): MenuItem => ({ label: b, icon: 'folder', onClick: () => commit(t('panel.moveToBin'), setBinOps(S.doc.peek(), [id], b)) })),
+        { label: t('panel.newBin'), icon: 'plus', onClick: () => { naming.value = { kind: 'bin', ids: [id] }; } },
+        ...(a.bin ? [{ label: t('panel.takeOutOfBin'), icon: 'x' as const, onClick: () => commit(t('panel.takeOutOfBin'), setBinOps(S.doc.peek(), [id], '')) }] : []),
+      ]) },
+      { label: t('panel.addTag'), icon: 'marker' as const, onClick: () => { naming.value = { kind: 'tag', ids: [id] }; } },
+      ...(a.tags ?? []).map((tag): MenuItem => ({ label: `#${tag} ×`, onClick: () => commit(t('panel.addTag'), removeTagOps(S.doc.peek(), [id], tag)) })),
       ...(a.type === 'audio' || a.type === 'video' || a.type === 'image' ? [{ label: t('panel.newSequenceFromMedia'), icon: 'film' as const, onClick: () => { void newSequenceFromAsset(id); } }] : []),
       ...(a.type === 'audio' || a.type === 'video' ? [transcribeItem(id)] : []),
       ...(a.type === 'image' ? [{ label: t('panel.animateTheFolderN', { n: imagesIn(doc, folderOf(a.src)).length }), icon: 'film' as const, onClick: () => animateFolder(folderOf(a.src)) }] : []),
@@ -646,6 +658,8 @@ function Assets() {
       onDragOver={(e) => { e.preventDefault(); setOver(true); }} onDragLeave={() => setOver(false)}
       onDrop={(e) => { e.preventDefault(); setOver(false); if (e.dataTransfer?.files.length) importFiles(e.dataTransfer.files); }}>
       <Compositions />
+      {Object.keys(doc.assets).length > 0 && <MediaBar doc={doc} filter={filter} onChange={setFilter} />}
+      {Object.keys(doc.assets).length > 0 && shown.length === 0 && <div class="faint tree-none">{t('panel.noMediaMatches')}</div>}
       <input ref={input} type="file" multiple hidden onChange={(e) => { const f = (e.target as HTMLInputElement).files; if (f) importFiles(f); (e.target as HTMLInputElement).value = ''; }} />
       {byType.size === 0 && <div class="empty"><Icon name="folder" />{t('panel.noAssetsDropFiles')}<button class="btn sm" onClick={() => input.current?.click()}><Icon name="plus" />{t('panel.import')}</button></div>}
       {[...byType].map(([type, list]) => (

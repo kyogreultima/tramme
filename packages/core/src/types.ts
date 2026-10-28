@@ -79,6 +79,10 @@ export interface Asset {
   clean?: string;
   /** video: a copy with frames made up between its frames (the interpolate tool), timed like it; a layer slowed under 1× plays it */
   interpolated?: string;
+  /** the media panel's bin this asset is kept in (a name); the engine ignores it */
+  bin?: string;
+  /** tags to find it by (lower case, no spaces); the engine ignores them */
+  tags?: string[];
 }
 
 export interface Transform {

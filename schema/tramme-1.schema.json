@@ -130,6 +130,17 @@
           },
           "interpolated": {
             "type": "string"
+          },
+          "bin": {
+            "type": "string",
+            "minLength": 1
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
           }
         },
         "required": [

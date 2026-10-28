@@ -304,6 +304,9 @@
 .tl-tab .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tl-tab .tbtn { flex: none; width: 16px; height: 16px; padding: 0; display: grid; place-items: center; border: 0; border-radius: var(--r-xs); background: none; color: inherit; }
 .tl-tab .tbtn:hover { background: var(--hover); }
+/* the bins and tags of the media panel */
+.media-chips { display: flex; flex-wrap: wrap; gap: 4px; padding: 2px 10px 6px; }
+.media-chips .chip { height: 22px; padding: 0 8px; font-size: var(--fs-xs); }
 /* where a moved edge snaps, and the band drawn to select */
 .tl-snap { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--key); pointer-events: none; z-index: 3; }
 .tl-band { position: absolute; border: 1px solid var(--accent); background: var(--accent-soft); pointer-events: none; z-index: 3; }
