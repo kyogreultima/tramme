@@ -254,7 +254,7 @@ export function Timeline() {
       if (!tool && mode === 'move' && magnetic && !lane) ops = dropOps(d0, compId, moving, lastDt);
       else if (lane && lane !== l.track) ops = [...ops, ...moveToTrackOps(ops.length ? applyOps(d0, ops).doc : d0, compId, id, lane)];
       if (!ops.length) { cancelDraft(); return; }
-      const label = tool ? t(`timeline.${tool}`) : mode === 'in'
+      const label = tool ? t(TOOL_LABEL[tool]) : mode === 'in'
         ? (ops.length > 1 && l.type === 'video' ? t('timeline.trimVideoInFile') : t('common.inPoint'))
         : mode === 'out' ? t('common.outPoint') : moving.length > 1 ? t('timeline.moveNClips', { n: moving.length }) : t('timeline.moveInTime');
       commit(label, ops);
@@ -594,6 +594,9 @@ function ClipFilm({ layer, from, seconds, width }: { layer: Layer; from: number;
   if (!ok) return null;
   return <canvas ref={canvas} class="film" width={slots * FILM_W} height={FILM_H} aria-hidden="true" />;
 }
+
+/** what a modified drag is called in the history */
+const TOOL_LABEL = { roll: m('timeline.roll'), slip: m('timeline.slip'), slide: m('timeline.slide') };
 
 const KIND_LABEL: Record<TransitionKind, string> = {
   crossfade: m('timeline.kindCrossfade'), dip: m('timeline.kindDip'), push: m('timeline.kindPush'), slide: m('timeline.kindSlide'),
