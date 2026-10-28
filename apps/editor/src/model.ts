@@ -1,8 +1,11 @@
 // Pure helpers over the document for the editor: tree order, parents,
 // keyframes, time formatting, and the ops of common edits.
 
-import { getAt, pointer, propKind, setKeyframe, setProp, staticValue, type Composition, type TrammeDoc, type Keyframe, type KeyframedProp, type Layer, type Op, type Prop } from '@tramme/core';
+import { animatedProps, carriedStart, getAt, keysOf, parentOf, pointer, propPath, rawProp, setKeyframe, setProp, shiftLayerOps, snap, splitLayerOps, staticValue, subtree, trimInOps, type Composition, type TrammeDoc, type Keyframe, type Layer, type Op, type Prop } from '@tramme/core';
 import { locale, t } from './i18n/index.ts';
+
+// the time helpers live in core (packages/core/src/timing.ts); the editor keeps importing them from here
+export { animatedProps, carriedStart, keysOf, parentOf, propPath, rawProp, shiftLayerOps, shiftProp, snap, splitLayerOps, subtree, trimInOps } from '@tramme/core';
 
 export interface TreeItem { id: string; layer: Layer; depth: number; parent: string | null }
 
@@ -21,24 +24,12 @@ export function flatTree(comp: Composition, collapsed: Set<string> = new Set()):
   return out;
 }
 
-export function parentOf(comp: Composition, id: string): string | null {
-  for (const [pid, l] of Object.entries(comp.layers)) if (l.children?.includes(id)) return pid;
-  return null;
-}
-
 /** the list that holds a layer (the composition's order or a group's children) and its path in the composition */
 export function siblingsOf(comp: Composition, id: string): { path: string[]; list: string[] } {
   if (comp.order.includes(id)) return { path: ['order'], list: comp.order };
   const p = parentOf(comp, id);
   if (!p) throw new Error(`${id} is not in the composition's tree`);
   return { path: ['layers', p, 'children'], list: comp.layers[p].children! };
-}
-
-/** ids of a layer and all its descendants */
-export function subtree(comp: Composition, id: string): string[] {
-  const out = [id];
-  for (const c of comp.layers[id]?.children || []) out.push(...subtree(comp, c));
-  return out;
 }
 
 /** where the last layer of the composition ends: its duration when a layer runs to the end (no out point) */
@@ -100,8 +91,6 @@ export const clip = (text: string, max: number) => (text.length > max ? `${text.
 export const slug = (text: string) => text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '');
 
 // ── time ─────────────────────────────────────────────────────
-export const snap = (t: number, fps: number) => Math.round(t * fps) / fps;
-
 const p2 = (n: number) => String(n).padStart(2, '0');
 /** MM:SS:FF, minutes, seconds and frames */
 export function timecode(t: number, fps: number): string {
@@ -128,30 +117,6 @@ export function parseTime(text: string, fps: number): number | null {
 
 export const fmtSeconds = (s: number) => `${locale === 'fr' ? s.toFixed(2).replace('.', ',') : s.toFixed(2)} s`;
 
-// ── properties ───────────────────────────────────────────────
-/** 'size' -> props.size, 'transform.position' -> transform.position */
-export function propPath(compId: string, id: string, name: string): string {
-  return name.startsWith('transform.')
-    ? pointer('compositions', compId, 'layers', id, 'transform', name.slice(10))
-    : pointer('compositions', compId, 'layers', id, 'props', name);
-}
-
-export function rawProp(doc: TrammeDoc, compId: string, id: string, name: string): Prop | undefined {
-  return getAt(doc, propPath(compId, id, name));
-}
-
-export function keysOf(p: Prop | undefined): Keyframe[] | null {
-  return p !== undefined && propKind(p) === 'keyframes' ? (p as KeyframedProp).$k : null;
-}
-
-/** every animated property of a layer: [name, keys] (transform first) */
-export function animatedProps(layer: Layer): [string, Keyframe[]][] {
-  const out: [string, Keyframe[]][] = [];
-  for (const [k, v] of Object.entries(layer.transform || {})) { const ks = keysOf(v as Prop); if (ks) out.push([`transform.${k}`, ks]); }
-  for (const [k, v] of Object.entries(layer.props || {})) { const ks = keysOf(v as Prop); if (ks) out.push([k, ks]); }
-  return out;
-}
-
 /** edit a property at time t: a key at t when it is animated, the static value otherwise */
 export function editPropOps(doc: TrammeDoc, compId: string, id: string, name: string, value: unknown, t: number): Op[] {
   const fps = doc.compositions[compId].fps;
@@ -160,80 +125,7 @@ export function editPropOps(doc: TrammeDoc, compId: string, id: string, name: st
   return setProp(doc, compId, id, name, value as Prop);
 }
 
-/** a property dt later: its keys moved, any other form kept */
-export const shiftProp = (p: Prop, dt: number): Prop => (propKind(p) === 'keyframes'
-  ? { ...(p as KeyframedProp), $k: (p as KeyframedProp).$k.map((k) => ({ ...k, t: Math.round((k.t + dt) * 1e6) / 1e6 })) }
-  : p);
-
-/** move a layer and its descendants in time: in/out and every keyframe */
-export function shiftLayerOps(doc: TrammeDoc, compId: string, id: string, dt: number): Op[] {
-  const comp = doc.compositions[compId];
-  const ops: Op[] = [];
-  const r = (x: number) => Math.round(x * 1e6) / 1e6;
-  for (const lid of subtree(comp, id)) {
-    const l = comp.layers[lid];
-    if (l.in !== undefined || lid === id) ops.push({ op: 'add', path: pointer('compositions', compId, 'layers', lid, 'in'), value: r(Math.max(0, (l.in ?? 0) + dt)) });
-    if (l.out !== undefined || lid === id) ops.push({ op: 'add', path: pointer('compositions', compId, 'layers', lid, 'out'), value: r((l.out ?? comp.duration) + dt) });
-    for (const [name] of animatedProps(l)) ops.push({ op: 'replace', path: propPath(compId, lid, name), value: shiftProp(rawProp(doc, compId, lid, name)!, dt) });
-  }
-  return ops;
-}
-
 const r4 = (x: number) => +x.toFixed(4);
-
-/**
- * Where a layer's source starts once its in point moves by `din`, so what
- * plays stays where it was in time: a video goes further in its file, a sound
- * too at its rate, a composition further in its time at its speed. Null when
- * nothing carries (no source, a start animated or written as an expression, a
- * composition remapped).
- */
-export function carriedStart(l: Layer, din: number): number | null {
-  if (!din || !l.props) return null;
-  const p = l.props, raw = staticValue(p.start);
-  if (p.start !== undefined && typeof raw !== 'number') return null;
-  const s0 = (raw as number | undefined) ?? 0;
-  const factor = (v: unknown) => Number(staticValue(v) ?? 1) || 1;
-  if (l.type === 'video') return Math.max(0, s0 + din * factor(p.rate));
-  if (l.type === 'audio') return Math.max(0, s0 + din * factor(p.rate));
-  if (l.type === 'comp' && (p.remap ?? null) === null) return s0 + din * factor(p.speed);
-  return null;
-}
-
-/** the in point of a layer moved to `at`, what it plays staying in place (the head cut off, or brought back) */
-export function trimInOps(doc: TrammeDoc, compId: string, id: string, at: number): Op[] {
-  const l = doc.compositions[compId].layers[id], lp = pointer('compositions', compId, 'layers', id);
-  const ops: Op[] = [{ op: 'add', path: `${lp}/in`, value: r4(at) }];
-  const s = carriedStart(l, at - (l.in ?? 0));
-  if (s !== null) ops.push({ op: 'add', path: `${lp}/props/start`, value: r4(s) });
-  return ops;
-}
-
-/**
- * A layer cut in two at `at`: it ends there, and a copy of it plays on from
- * there to its old end (its source carried, its keyframes the same, just
- * above it in the stack). Null when `at` is not inside it, or for a group.
- */
-export function splitLayerOps(doc: TrammeDoc, compId: string, id: string, at: number): { ops: Op[]; id: string } | null {
-  const c = doc.compositions[compId], l = c.layers[id];
-  if (!l || l.children) return null;
-  const tin = l.in ?? 0, tout = l.out ?? c.duration;
-  if (at <= tin || at >= tout) return null;
-  const stem = id.replace(/-\d+$/, '');
-  let n = 2;
-  while (c.layers[`${stem}-${n}`]) n++;
-  const nid = `${stem}-${n}`;
-  const rest: Layer = { ...structuredClone(l), in: r4(at) };
-  const s = carriedStart(l, at - tin);
-  if (s !== null) rest.props = { ...rest.props, start: r4(s) };
-  const parent = parentOf(c, id), list = parent ? c.layers[parent].children! : c.order, i = list.indexOf(id);
-  const ops: Op[] = [
-    { op: 'add', path: pointer('compositions', compId, 'layers', id, 'out'), value: r4(at) },
-    { op: 'add', path: pointer('compositions', compId, 'layers', nid), value: rest },
-    { op: 'replace', path: parent ? pointer('compositions', compId, 'layers', parent, 'children') : pointer('compositions', compId, 'order'), value: [...list.slice(0, i + 1), nid, ...list.slice(i + 1)] },
-  ];
-  return { ops, id: nid };
-}
 
 /**
  * A cross-fade between a layer and the closest one under it: opacity keys on
