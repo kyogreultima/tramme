@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyOps, closeGapOps, cutsOf, insertOps, isLocked, linkedIds, overwriteOps, rippleDeleteOps, rippleTrimOps, rollOps, slideOps, slipOps, syncOrderOps, trackClips, type Composition, type Op, type TrammeDoc } from '../src/index.ts';
+import { applyOps, closeGapOps, cutsOf, detachAudioOps, insertOps, isLocked, linkOps, linkedIds, overwriteOps, pasteAttributesOps, pasteOps, unlinkOps, rippleDeleteOps, rippleTrimOps, rollOps, slideOps, slipOps, syncOrderOps, trackClips, type Composition, type Op, type TrammeDoc } from '../src/index.ts';
 
 /** a sequence of 10 s: V1 holds a (0-5) and b (4-9, a transition of 1 s over a), A1 holds the sound of a, linked to it */
 export function sequence(): Composition {
@@ -371,5 +371,84 @@ describe('slide', () => {
   it('does nothing on a locked track', () => {
     const c0 = three(); c0.tracks![0].locked = true;
     expect(slideOps(docOf(c0), 'main', 'b', 1)).toEqual([]);
+  });
+});
+
+describe('links', () => {
+  it('linkOps gives one fresh link to the clips and to the groups they belong to', () => {
+    const d = docOf(sequence()), c = after(d, linkOps(d, 'main', ['b', 'sa']));
+    expect(c.layers.b.link).toBeDefined();
+    expect(c.layers.b.link).toBe(c.layers.sa.link);
+    expect(c.layers.a.link).toBe(c.layers.b.link); // a was linked to sa
+    expect(new Set([c.layers.a.link]).has('k1')).toBe(false);
+  });
+
+  it('unlinkOps takes the clips out of their group and clears a link left with one clip', () => {
+    const d = docOf(sequence()), c = after(d, unlinkOps(d, 'main', ['sa']));
+    expect(c.layers.sa.link).toBeUndefined();
+    expect(c.layers.a.link).toBeUndefined();
+  });
+});
+
+describe('detach audio', () => {
+  it('creates a linked audio layer with the same start, rate and range, and mutes the video', () => {
+    const c0 = three(); c0.layers.b.props = { video: 'two', start: 1.5, rate: 2, gain: -3 };
+    c0.tracks!.push({ id: 'A2', kind: 'audio' });
+    const d = docOf(c0), r = detachAudioOps(d, 'main', 'b', 'A2')!;
+    expect(r).not.toBeNull();
+    const c = after(d, r.ops), s = c.layers[r.id];
+    expect(s.type).toBe('audio');
+    expect(s.track).toBe('A2');
+    expect([s.in, s.out]).toEqual([3, 6]);
+    expect(s.props).toMatchObject({ audio: 'two', start: 1.5, rate: 2, gain: -3 });
+    expect(c.layers.b.props!.muted).toBe(true);
+    expect(c.layers.b.link).toBeDefined();
+    expect(c.layers.b.link).toBe(s.link);
+    expect(c.order).toContain(r.id);
+  });
+
+  it('returns null for a video already muted, for a layer that is not a video, and on a locked track', () => {
+    const c0 = three(); c0.layers.a.props!.muted = true; c0.layers.t = { type: 'text', in: 0, out: 1 };
+    const d = docOf(c0);
+    expect(detachAudioOps(d, 'main', 'a', 'A1')).toBeNull();
+    expect(detachAudioOps(d, 'main', 't', 'A1')).toBeNull();
+    c0.tracks![1].locked = true;
+    expect(detachAudioOps(docOf(c0), 'main', 'b', 'A1')).toBeNull();
+  });
+});
+
+describe('paste', () => {
+  const two = (): import('../src/index.ts').Layer[] => [
+    { type: 'video', in: 10, out: 12, props: { video: 'p' } },
+    { type: 'video', in: 12, out: 14, props: { video: 'q' }, transform: { position: { $k: [{ t: 12, v: [0, 0] }, { t: 13, v: [5, 0] }] } } },
+  ];
+
+  it('in insert mode puts the clips end to end at the point and shifts the rest once', () => {
+    const d = docOf(three()), c = after(d, pasteOps(d, 'main', two(), 'V1', 3, 'insert'));
+    const pasted = Object.keys(c.layers).filter((k) => !['a', 'b', 'c'].includes(k));
+    expect(pasted.map((k) => range(c, k)).sort()).toEqual([[3, 5], [5, 7]]);
+    expect([range(c, 'a'), range(c, 'b'), range(c, 'c')]).toEqual([[0, 3], [7, 10], [10, 13]]);
+    const q = pasted.find((k) => c.layers[k].props!.video === 'q')!;
+    expect((c.layers[q].transform!.position as { $k: { t: number }[] }).$k.map((k) => k.t)).toEqual([5, 6]);
+  });
+
+  it('in overwrite mode lays them over what is there', () => {
+    const d = docOf(three()), c = after(d, pasteOps(d, 'main', two(), 'V1', 3, 'overwrite'));
+    expect(c.layers.b).toBeUndefined();
+    expect(range(c, 'a')).toEqual([0, 3]);
+    expect(range(c, 'c')).toEqual([7, 9]);
+    expect(c.layers.c.props!.start).toBe(1);
+  });
+
+  it('attributes: copies effects and transform onto other clips, their keyframes moved, not the range', () => {
+    const c0 = three();
+    c0.layers.a.effects = [{ id: 'blur', type: 'fx.blur', props: { radius: 4 } }];
+    c0.layers.a.blend = 'multiply';
+    c0.layers.a.transform = { opacity: { $k: [{ t: 0, v: 0 }, { t: 1, v: 1 }] } };
+    const d = docOf(c0), c = after(d, pasteAttributesOps(d, 'main', 'a', ['b'], ['effects', 'transform']));
+    expect(c.layers.b.effects).toEqual(c0.layers.a.effects);
+    expect((c.layers.b.transform!.opacity as { $k: { t: number }[] }).$k.map((k) => k.t)).toEqual([3, 4]);
+    expect(c.layers.b.blend).toBeUndefined();
+    expect(range(c, 'b')).toEqual([3, 6]);
   });
 });

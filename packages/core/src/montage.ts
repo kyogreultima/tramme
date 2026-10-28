@@ -5,7 +5,7 @@
 
 import { applyOps, pointer, type Op } from './ops.ts';
 import { staticValue } from './props.ts';
-import { carriedStart, round6, shiftLayerOps, splitLayerOps, subtree, trimInOps } from './timing.ts';
+import { carriedStart, round6, shiftLayerOps, shiftLayerValues, splitLayerOps, subtree, trimInOps } from './timing.ts';
 import type { Composition, Layer, TrammeDoc } from './types.ts';
 
 /** where a clip sits on its track: its id, its in point and its out point (the composition's end when it has none) */
@@ -187,10 +187,10 @@ function fitDurationOps(doc: TrammeDoc, compId: string): Op[] {
   return end > c.duration + 1e-9 ? [{ op: 'replace', path: pointer('compositions', compId, 'duration'), value: +end.toFixed(4) }] : [];
 }
 
-/** the clip as it goes on the track: `layer` placed at `at`, as long as it is */
+/** the clip as it goes on the track: `layer` placed at `at`, as long as it is, its keyframes moved with it */
 function placed(c: Composition, layer: Layer, trackId: string, at: number): { clip: Layer; len: number } {
   const len = round6((layer.out ?? c.duration) - (layer.in ?? 0));
-  return { clip: { ...structuredClone(layer), track: trackId, in: round6(at), out: round6(at + len) }, len };
+  return { clip: { ...shiftLayerValues(layer, at - (layer.in ?? 0)), track: trackId, in: round6(at), out: round6(at + len) }, len };
 }
 
 const addClipOps = (compId: string, id: string, clip: Layer): Op[] => [
@@ -205,17 +205,20 @@ const addClipOps = (compId: string, id: string, clip: Layer): Op[] => [
  * locked.
  */
 export function insertOps(doc: TrammeDoc, compId: string, id: string, layer: Layer, trackId: string, at: number): Op[] {
-  const c = doc.compositions[compId], half = 0.5 / c.fps;
-  const { clip, len } = placed(c, layer, trackId, at);
-  if (!(len > 0) || trackLocked(c, trackId)) return [];
-  const clips = trackClips(c, trackId);
-  if (clips.some((k) => k.out > at && isLocked(c, k.id))) return [];
+  const { clip, len } = placed(doc.compositions[compId], layer, trackId, at);
+  if (!(len > 0)) return [];
+  const room = makeRoomOps(doc, compId, trackId, at, len);
+  if (!room) return [];
+  return chain(doc, [() => room, () => addClipOps(compId, id, clip), (d) => syncOrderOps(d, compId), (d) => fitDurationOps(d, compId)]);
+}
+
+/** a gap of `len` opened on a track at `at`: a clip it falls in is cut there and everything from `at` moves later. Null when the track, or a clip that would move, is locked */
+function makeRoomOps(doc: TrammeDoc, compId: string, trackId: string, at: number, len: number): Op[] | null {
+  const c = doc.compositions[compId], half = 0.5 / c.fps, clips = trackClips(c, trackId);
+  if (trackLocked(c, trackId) || clips.some((k) => k.out > at && isLocked(c, k.id))) return null;
   return chain(doc, [
     (d) => chain(d, clips.filter((k) => k.in < at - half && k.out > at + half).map((k) => (x: TrammeDoc) => splitLayerOps(x, compId, k.id, at)?.ops ?? [])),
     (d) => chain(d, trackClips(d.compositions[compId], trackId).filter((k) => k.in >= at - half).map((k) => (x: TrammeDoc) => shiftLayerOps(x, compId, k.id, len))),
-    () => addClipOps(compId, id, clip),
-    (d) => syncOrderOps(d, compId),
-    (d) => fitDurationOps(d, compId),
   ]);
 }
 
@@ -369,4 +372,119 @@ export function slideOps(doc: TrammeDoc, compId: string, id: string, d: number):
     ...(before ? [{ op: 'add', path: pointer('compositions', compId, 'layers', before.id, 'out'), value: round6(before.out + dt) } as Op] : []),
     ...(after ? trimInOps(doc, compId, after.id, after.in + dt) : []),
   ];
+}
+
+/** a layer id not yet used in the composition, nor in `taken`: `stem`, `stem-2`, `stem-3`… */
+function freshId(c: Composition, stem: string, taken: Set<string> = new Set()): string {
+  let id = stem, n = 1;
+  while (c.layers[id] || taken.has(id)) id = `${stem}-${++n}`;
+  taken.add(id);
+  return id;
+}
+
+/** a link id no clip uses yet: `k1`, `k2`… */
+function freshLink(c: Composition): string {
+  const used = new Set(Object.values(c.layers).map((l) => l.link));
+  let n = 1;
+  while (used.has(`k${n}`)) n++;
+  return `k${n}`;
+}
+
+/** one link id for these clips and for every group they already belong to */
+export function linkOps(doc: TrammeDoc, compId: string, ids: string[]): Op[] {
+  const c = doc.compositions[compId], members = new Set(ids.filter((id) => c.layers[id]).flatMap((id) => linkedIds(c, id)));
+  if (members.size < 2) return [];
+  const link = freshLink(c);
+  return [...members].map((id) => ({ op: 'add', path: pointer('compositions', compId, 'layers', id, 'link'), value: link }));
+}
+
+/** these clips taken out of their groups; a clip left alone in its group is freed too */
+export function unlinkOps(doc: TrammeDoc, compId: string, ids: string[]): Op[] {
+  const c = doc.compositions[compId], out = new Set(ids.filter((id) => c.layers[id]?.link));
+  const free = new Set(out);
+  for (const link of new Set([...out].map((id) => c.layers[id].link))) {
+    const rest = Object.keys(c.layers).filter((k) => c.layers[k].link === link && !out.has(k));
+    if (rest.length === 1) free.add(rest[0]);
+  }
+  return [...free].map((id) => ({ op: 'remove', path: pointer('compositions', compId, 'layers', id, 'link') }));
+}
+
+/** what makes a video layer's sound, which its audio layer takes over when the sound is detached */
+const SOUND_KEYS = ['start', 'rate', 'loop', 'loopEnd', 'gain', 'fadeIn', 'fadeOut', 'lowCut', 'highCut', 'eqLow', 'eqMid', 'eqMidFreq', 'eqHigh', 'compress', 'reverb', 'voice', 'semitones', 'keepPitch', 'clean'];
+
+/**
+ * The sound of a video put on its own audio layer of `audioTrack` (same range,
+ * same place in the file, same mix settings), linked to the video, which is
+ * muted. Null for a layer that is not a video, one already muted, or when a
+ * track involved is locked.
+ */
+export function detachAudioOps(doc: TrammeDoc, compId: string, id: string, audioTrack: string): { ops: Op[]; id: string } | null {
+  const c = doc.compositions[compId], l = c.layers[id], asset = staticValue(l?.props?.video);
+  if (!l || l.type !== 'video' || staticValue(l.props?.muted) === true || typeof asset !== 'string') return null;
+  if (trackLocked(c, audioTrack) || isLocked(c, id)) return null;
+  const props: Record<string, unknown> = { audio: asset };
+  for (const k of SOUND_KEYS) if (l.props?.[k] !== undefined) props[k] = structuredClone(l.props[k]);
+  const link = l.link ?? freshLink(c), nid = freshId(c, `${id}-sound`);
+  const sound: Layer = { type: 'audio', ...(l.name ? { name: `${l.name} (sound)` } : {}), track: audioTrack, link, ...(l.in !== undefined ? { in: l.in } : {}), ...(l.out !== undefined ? { out: l.out } : {}), props: props as Layer['props'] };
+  const lp = pointer('compositions', compId, 'layers', id);
+  const ops = chain(doc, [
+    () => [...addClipOps(compId, nid, sound), { op: 'add', path: `${lp}/props/muted`, value: true } as Op, ...(l.link ? [] : [{ op: 'add', path: `${lp}/link`, value: link } as Op])],
+    (d) => syncOrderOps(d, compId),
+  ]);
+  return { ops, id: nid };
+}
+
+/**
+ * Clips pasted on a track at `at`, keeping their distances from one another
+ * and their keyframes: in `insert` mode room is made for all of them at once,
+ * in `overwrite` mode they lie over what is there. Only clips (no groups). The
+ * copies are not linked to anything.
+ */
+export function pasteOps(doc: TrammeDoc, compId: string, clips: Layer[], trackId: string, at: number, mode: 'insert' | 'overwrite'): Op[] {
+  const c = doc.compositions[compId], leaves = clips.filter((l) => !l.children).map((l) => { const { link: _link, ...rest } = l; return rest as Layer; });
+  if (!leaves.length) return [];
+  const base = Math.min(...leaves.map((l) => l.in ?? 0)), total = Math.max(...leaves.map((l) => l.out ?? c.duration)) - base;
+  const taken = new Set<string>(), ids = leaves.map(() => freshId(c, 'paste', taken));
+  if (mode === 'overwrite') return chain(doc, leaves.map((l, i) => (d: TrammeDoc) => overwriteOps(d, compId, ids[i], l, trackId, at + (l.in ?? 0) - base)));
+  const room = makeRoomOps(doc, compId, trackId, at, round6(total));
+  if (!room) return [];
+  return chain(doc, [
+    () => room,
+    ...leaves.map((l, i) => () => addClipOps(compId, ids[i], placed(c, l, trackId, at + (l.in ?? 0) - base).clip)),
+    (d) => syncOrderOps(d, compId),
+    (d) => fitDurationOps(d, compId),
+  ]);
+}
+
+export type Attribute = 'transform' | 'effects' | 'masks' | 'blend' | 'speed';
+
+/**
+ * What a clip looks like, copied onto others: its transform, effects, masks,
+ * blend mode, speed. Keyframes move to the target's own time; the range and the
+ * file are left alone. An attribute the source does not have is taken off the
+ * target. Locked clips are skipped.
+ */
+export function pasteAttributesOps(doc: TrammeDoc, compId: string, from: string, to: string[], only: Attribute[]): Op[] {
+  const c = doc.compositions[compId], src = c.layers[from], ops: Op[] = [];
+  if (!src) return ops;
+  for (const id of to) {
+    const target = c.layers[id];
+    if (!target || id === from || isLocked(c, id)) continue;
+    const moved = shiftLayerValues(src, (target.in ?? 0) - (src.in ?? 0)), lp = pointer('compositions', compId, 'layers', id);
+    const set = (key: string, value: unknown, had: unknown) => {
+      if (value !== undefined) ops.push({ op: 'add', path: `${lp}/${key}`, value });
+      else if (had !== undefined) ops.push({ op: 'remove', path: `${lp}/${key}` });
+    };
+    for (const a of only) {
+      if (a === 'transform') set('transform', moved.transform, target.transform);
+      else if (a === 'effects') set('effects', moved.effects, target.effects);
+      else if (a === 'masks') set('masks', moved.masks, target.masks);
+      else if (a === 'blend') set('blend', moved.blend, target.blend);
+      else {
+        const key = src.type === 'comp' ? 'speed' : 'rate';
+        if (moved.props?.[key] !== undefined && target.props) ops.push({ op: 'add', path: `${lp}/props/${key}`, value: moved.props[key] });
+      }
+    }
+  }
+  return ops;
 }
