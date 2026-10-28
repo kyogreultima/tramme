@@ -5,13 +5,13 @@
 import { useState } from 'preact/hooks';
 import type { Composition, SequenceTrack } from '@tramme/core';
 import { commit, S } from '../../state.ts';
-import { t } from '../../i18n/index.ts';
+import { m, t } from '../../i18n/index.ts';
 import { Icon, kindColor, kindIcon } from '../icons.tsx';
 import { openMenu, type MenuItem } from '../controls.tsx';
 import { addTrackOps, clipsOn, removeTrackOps, soloOf, trackChangeOps, type TrackChange } from './tracks.ts';
 
 /** lane heights the menu offers, px */
-export const LANE_HEIGHTS: [string, number][] = [['timeline.laneSmall', 28], ['timeline.laneMedium', 44], ['timeline.laneLarge', 72]];
+export const LANE_HEIGHTS: [string, number][] = [[m('timeline.laneSmall'), 28], [m('timeline.laneMedium'), 44], [m('timeline.laneLarge'), 72]];
 export const laneHeight = (track: SequenceTrack) => track.height ?? (track.kind === 'audio' ? 36 : 44);
 
 const label = (track: SequenceTrack) => track.name || track.id;
