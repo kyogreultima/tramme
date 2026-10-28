@@ -10,6 +10,7 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import ffmpegPath from 'ffmpeg-static';
+import { ffmetadata, type Chapter } from '@tramme/core';
 
 export const FFMPEG = ffmpegPath as unknown as string;
 export type VideoFormat = 'mp4' | 'mov' | 'webm' | 'gif' | 'png';
@@ -83,6 +84,21 @@ export function encoder({ format, W, H, fps, frames, out, audio, crf = 16, start
     write: (buf: Buffer) => new Promise<void>((res) => { if (!ff.stdin.write(buf)) ff.stdin.once('drain', () => res()); else res(); }),
     end: async () => { ff.stdin.end(); await done; },
   };
+}
+
+/** a film's chapters written into its file, without encoding it again (mp4, mov and webm carry them); nothing to do without chapters or for other formats */
+export async function addChapters(format: VideoFormat, file: string, chapters: Chapter[], seconds: number): Promise<void> {
+  if (!chapters.length || !(format === 'mp4' || format === 'mov' || format === 'webm')) return;
+  const meta = `${file}.chapters.txt`, tmp = `${file}.chapters.${format}`;
+  fs.writeFileSync(meta, ffmetadata(chapters, seconds));
+  try {
+    await new Promise<void>((res, rej) => {
+      const ff = spawn(FFMPEG, ['-y', '-hide_banner', '-loglevel', 'error', '-i', file, '-i', meta, '-map', '0', '-map_metadata', '1', '-map_chapters', '1', '-c', 'copy', ...(format === 'mp4' ? ['-movflags', '+faststart'] : []), tmp], { stdio: ['ignore', 'inherit', 'inherit'] });
+      ff.on('error', rej);
+      ff.on('close', (c) => (c === 0 ? res() : rej(new Error(`ffmpeg failed to write the chapters (code ${c})`))));
+    });
+    fs.renameSync(tmp, file);
+  } finally { fs.rmSync(meta, { force: true }); fs.rmSync(tmp, { force: true }); }
 }
 
 /**

@@ -8,7 +8,7 @@ import { S, undo, redo, frameStep, setTime, commit, comp, saveNow, toast, select
 import { freshId, snap } from '../model.ts';
 import { MenuHost } from './controls.tsx';
 import { deleteSelection, duplicateSelection } from './LeftPanel.tsx';
-import { deleteKeys } from './Timeline.tsx';
+import { deleteKeys, pps } from './Timeline.tsx';
 import { rippleOnMagnetic, runEditKey } from './timeline/edit-keys.ts';
 import { uploads } from '../files.ts';
 import { transcriptions } from '../speech.ts';
@@ -32,6 +32,8 @@ export function useShortcuts() {
       if (mod && e.key.toLowerCase() === 'd') { e.preventDefault(); duplicateSelection(); return; }
       if (mod && e.key.toLowerCase() === 'a') { e.preventDefault(); selectAll(); return; }
       if (runEditKey(e)) return;
+      // Shift+Z: the whole timeline in view
+      if (!mod && e.shiftKey && !e.altKey && e.key.toLowerCase() === 'z') { e.preventDefault(); pps.value = 0; return; }
       if (e.code === 'Space') { e.preventDefault(); S.playing.value = !S.playing.value; return; }
       if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
         e.preventDefault();

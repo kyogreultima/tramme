@@ -1130,7 +1130,11 @@
     "placeName": "Place {name}",
     "cannotNest": "A composition cannot hold itself",
     "newSequenceName": "New sequence from {name}",
-    "closeTab": "Close the tab"
+    "closeTab": "Close the tab",
+    "makeAChapter": "Make it a chapter",
+    "notAChapter": "Not a chapter any more",
+    "copyChapters": "Copy the chapters as a list",
+    "chaptersCopied": "{n} chapter(s) copied"
   },
   "topbar": {
     "tenBit": "10 bits",

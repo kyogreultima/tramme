@@ -6,7 +6,7 @@
 
 import { signal } from '@preact/signals';
 import { useLayoutEffect, useRef, useState } from 'preact/hooks';
-import { applyOps, cutsOf, isLocked, layerActive, pointer, rippleTrimOps, rollOps, slideOps, slipOps, staticValue, toSequenceOps, type Composition, type Keyframe, type Layer, type Op, type SequenceTrack } from '@tramme/core';
+import { applyOps, chapterList, chaptersOf, cutsOf, isLocked, layerActive, pointer, rippleTrimOps, rollOps, slideOps, slipOps, staticValue, toSequenceOps, type Composition, type Keyframe, type Layer, type Op, type SequenceTrack } from '@tramme/core';
 import { clickSelect, comp, commit, draft, cancelDraft, S, select, selectAll, setTime, frameStep, toast, toggleFold, uiTime, viewDoc } from '../state.ts';
 import { animatedProps, contentEnd, crossfadeOps, flatTree, freshId, keysOf, layerName, parentOf, parseTime, propPath, rawProp, rulerLabel, shiftLayerOps, snap, splitLayerOps, subtree, timecode, topLayers, trimInOps, type TreeItem } from '../model.ts';
 import { bandOf, longPress, noBrowserMenu, openMenu, Seg, useSize } from './controls.tsx';
@@ -365,8 +365,10 @@ export function Timeline() {
   const markerMenu = (e: MouseEvent, mid: string) => {
     const list = c.markers ?? [], m = list.find((x) => x.id === mid);
     if (!m) return;
+    const at = list.indexOf(m), chapter = m.kind === 'chapter';
     openMenu(e, [
       { label: t('timeline.goToMarker'), icon: 'target', onClick: () => setTime(m.t) },
+      { label: chapter ? t('timeline.notAChapter') : t('timeline.makeAChapter'), icon: 'marker', onClick: () => commit(chapter ? t('timeline.notAChapter') : t('timeline.makeAChapter'), [chapter ? { op: 'remove', path: pointer('compositions', compId, 'markers', at, 'kind') } : { op: 'add', path: pointer('compositions', compId, 'markers', at, 'kind'), value: 'chapter' }]) },
       'sep',
       { label: t('timeline.deleteMarker'), icon: 'trash', danger: true, onClick: () => commit(t('timeline.deleteMarker'), [{ op: 'replace', path: pointer('compositions', compId, 'markers'), value: list.filter((x) => x.id !== mid) }]) },
     ]);
@@ -380,6 +382,7 @@ export function Timeline() {
     openMenu(e, [
       { section: timecode(at, fps) },
       { label: t('timeline.setTimeHere'), icon: 'target', onClick: () => { S.playing.value = false; setTime(at); } },
+      ...(chaptersOf(c.markers).length ? [{ label: t('timeline.copyChapters'), icon: 'copy' as const, onClick: () => { const list = chaptersOf(c.markers); void navigator.clipboard?.writeText(chapterList(list)); toast(t('timeline.chaptersCopied', { n: list.length }), 'info', 1500); } }] : []),
       { label: t('timeline.addMarkerHere'), icon: 'marker', onClick: () => commit(t('timeline.addMarkerHere'), [{ op: 'add', path: pointer('compositions', compId, 'markers'), value: [...list, { id: mid, t: at, label: t('timeline.markerN', { n: list.length + 1 }) }].sort((a, b) => a.t - b.t) }]) },
       { label: t('timeline.endHere'), icon: 'end', disabled: at <= 0 || at === c.duration, onClick: () => setDuration(t('timeline.endHere'), at) },
       { label: t('topbar.trimToContent'), icon: 'collapse', disabled: !(end > 0 && end < c.duration - 0.5 / fps), onClick: () => setDuration(t('topbar.trimToContent'), end) },
@@ -449,7 +452,7 @@ export function Timeline() {
             <div key={tk.t} class={`tick${tk.major ? '' : ' minor'}`} style={{ left: X(tk.t) }}>{tk.major && <span>{rulerLabel(tk.t, fps)}</span>}</div>
           ))}
           {(c.markers || []).map((m) => (
-            <div key={m.id} data-marker={m.id} class={`tl-marker${m.kind === 'scene' ? ' scene' : ''}`} style={{ left: X(m.t) }} title={`${m.label ?? m.id} · ${timecode(m.t, fps)}`}
+            <div key={m.id} data-marker={m.id} class={`tl-marker${m.kind === 'scene' ? ' scene' : m.kind === 'chapter' ? ' chapter' : ''}`} style={{ left: X(m.t) }} title={`${m.label ?? m.id} · ${timecode(m.t, fps)}`}
               onDblClick={(e) => { e.stopPropagation(); setTime(m.t); }}>
               {k * 0.4 > 30 && <span>{m.label ?? m.id}</span>}
             </div>

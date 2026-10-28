@@ -238,6 +238,8 @@
 .tl-marker span { position: absolute; top: 14px; left: 8px; font-size: 9.5px; color: var(--link); white-space: nowrap; }
 .tl-marker.scene::before { background: var(--text-3); }
 .tl-marker.scene span { color: var(--text-3); }
+.tl-marker.chapter::before { background: var(--accent); border-radius: 50%; transform: none; }
+.tl-marker.chapter span { color: var(--accent); }
 .tl-names { overflow: hidden; }
 .tl-tracks { position: relative; overflow: auto; }
 .tl-row { position: relative; height: var(--row); border-bottom: 1px solid var(--line-soft); }
