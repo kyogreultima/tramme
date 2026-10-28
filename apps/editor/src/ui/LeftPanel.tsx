@@ -10,6 +10,7 @@ import { ColorField, longPress, openMenu, Seg, Swatch, TextInput, resolveColor, 
 import { Icon, kindColor, kindIcon } from './icons.tsx';
 import { ASSET_MIME, chosenAsset, COMP_MIME, sourceOpen } from './timeline/assets-drag.ts';
 import { newSequenceFromAsset } from './timeline/place.ts';
+import { fillerCuts } from './FillerCuts.tsx';
 import { MediaBar, naming, useSpoken } from './MediaBar.tsx';
 import { relinkFiles } from '../relink-run.ts';
 import { clipFromRange } from '../subclips.ts';
@@ -656,6 +657,7 @@ function Assets() {
       ]) },
       { label: t('panel.addTag'), icon: 'marker' as const, onClick: () => { naming.value = { kind: 'tag', ids: [id] }; } },
       ...(a.tags ?? []).map((tag): MenuItem => ({ label: `#${tag} ×`, onClick: () => commit(t('panel.addTag'), removeTagOps(S.doc.peek(), [id], tag)) })),
+      ...(a.type === 'json' && id.startsWith('fillers-') ? [{ label: t('fillers.review'), icon: 'cutTail' as const, onClick: () => { fillerCuts.value = id; } }] : []),
       ...(a.type === 'audio' || a.type === 'video' ? [{ label: t('source.openInSource'), icon: 'film' as const, onClick: () => { sourceOpen.value = id; } }] : []),
       ...(S.offline.peek().includes(id) ? [{ label: t('panel.relinkFile'), icon: 'search' as const, onClick: () => relink.current?.click() }] : []),
       ...(a.type === 'audio' || a.type === 'video' || a.type === 'image' ? [{ label: t('panel.newSequenceFromMedia'), icon: 'film' as const, onClick: () => { void newSequenceFromAsset(id); } }] : []),

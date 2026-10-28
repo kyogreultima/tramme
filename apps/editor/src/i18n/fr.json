@@ -2704,7 +2704,13 @@
     "restored": "{n} coupe(s) remise(s)",
     "none": "Aucune hésitation trouvée",
     "done": "{n} hésitation(s) coupée(s)",
-    "listName": "Hésitations coupées"
+    "listName": "Hésitations coupées",
+    "reviewTitle": "Hésitations coupées",
+    "noCuts": "Plus rien à remettre",
+    "putBack": "Remettre",
+    "heard": "entendue, non écrite",
+    "noTool": "L'outil des hésitations n'est pas disponible",
+    "review": "Revoir les coupes…"
   },
   "skin": {
     "finding": "Recherche des visages",

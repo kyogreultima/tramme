@@ -17,6 +17,7 @@ import { settingsOpen } from '../settings.ts';
 import { QuestionDialog } from './QuestionDialog.tsx';
 import { SourceMonitor } from './Source.tsx';
 import { MulticamPanel } from './Multicam.tsx';
+import { FillerCutsPanel } from './FillerCuts.tsx';
 import { cancelVoiceover } from '../voiceover-run.ts';
 import { setRangeOps } from '../exportspan.ts';
 import { t } from '../i18n/index.ts';
@@ -97,5 +98,5 @@ export function Toasts() {
 
 /** the settings, the questions asked, the menus and the toasts, over any page (the question last: it waits on top) */
 export function Overlays() {
-  return <><SettingsDialog /><MenuHost /><Toasts /><QuestionDialog /><SourceMonitor /><MulticamPanel /></>;
+  return <><SettingsDialog /><MenuHost /><Toasts /><QuestionDialog /><SourceMonitor /><MulticamPanel /><FillerCutsPanel /></>;
 }

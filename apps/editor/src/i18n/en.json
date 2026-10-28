@@ -1602,7 +1602,13 @@
     "restored": "{n} cut(s) put back",
     "none": "No hesitation found",
     "done": "{n} hesitation(s) cut",
-    "listName": "Hesitations cut"
+    "listName": "Hesitations cut",
+    "reviewTitle": "Hesitations cut",
+    "noCuts": "Nothing left to put back",
+    "putBack": "Put back",
+    "heard": "heard, not written",
+    "noTool": "The fillers tool is not available",
+    "review": "Review the cuts…"
   },
   "skin": {
     "finding": "Finding the faces",
