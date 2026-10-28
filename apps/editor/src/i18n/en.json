@@ -141,6 +141,12 @@
     "paidTakes": "A provider will draw {n} takes of it, which costs money (each one counts): \"{prompt}\"",
     "take": "Take {n}"
   },
+  "video": {
+    "made": "Clip \"{name}\" made by {provider} ({model}).",
+    "paidTitle": "Have this clip made?",
+    "paidText": "A provider will make a {seconds} second clip, which costs money: \"{prompt}\"",
+    "paidYes": "Make the clip"
+  },
   "shorts": {
     "candidates": "{n} passage(s) that stand alone.",
     "built": "{n} short(s) built as compositions.",
@@ -502,6 +508,11 @@
     "resume": "Resume",
     "madeBy": "Made by {provider} ({model})",
     "sendEnter": "Send (Enter)",
+    "queueTitle": "Messages waiting",
+    "queueWaitsTurn": "They leave together when the turn ends.",
+    "queueWaitsDecision": "They leave once you apply or reject the proposal.",
+    "queueStopped": "The turn stopped: they are still waiting.",
+    "sendNow": "Send now",
     "run": "Run",
     "auto": "auto",
     "commandHint": "Runs right away. Or write what you want after the command, and the assistant does it.",
@@ -880,6 +891,12 @@
     "pictureSizeHint": "Small asks the provider's cheapest size; the upscale tool brings a picture to the frame's size afterwards.",
     "pictureSizeSmall": "Small",
     "pictureSizeLarge": "Large",
+    "videos": "Videos",
+    "videosHint": "What the assistant and the / menu use when they have a clip made and the ask names nothing. A clip made by a provider costs money: it is asked first, and each second is billed.",
+    "videoProvider": "Provider",
+    "videoProviderHint": "Automatic: the first one connected that makes clips. Hydracept runs Veo 3.1 Fast.",
+    "videoSeconds": "Length",
+    "videoSecondsHint": "Veo makes 4, 6 or 8 second clips; the tool can ask for another length per clip.",
     "toursHint": "Short walks through the editor, offered the first time a screen opens.",
     "storageHint": "The projects of this app, kept as folders on this computer.",
     "modelHint": "The AI the assistant thinks with, and how hard it works on each message.",
@@ -922,7 +939,7 @@
     "confirmPaid": "Ask before a paid sound",
     "confirmPaidHint": "A sound effect, a music, a voice-over or a picture made by a provider costs money: you say yes first. When the assistant applies its changes by itself, the allowance below counts instead.",
     "paidPerTurn": "Paid generations per turn on its own",
-    "paidPerTurnHint": "When the assistant applies its changes by itself, nothing is asked: a turn makes at most this many sounds or pictures that cost money, then falls back on the library.",
+    "paidPerTurnHint": "When the assistant applies its changes by itself, nothing is asked: a turn makes at most this many paid generations (sounds, pictures, or seconds of clips), then falls back on the library.",
     "voiceOver": "Voice-overs",
     "voiceOverHint": "The provider and the voice used unless the request names others (Gemini: Kore, Puck…; OpenAI: alloy, coral…; ElevenLabs: a voice id, or choose one below).",
     "voicePlaceholder": "its own voice",
@@ -957,6 +974,10 @@
     "notifyDone": "Tell me when the assistant is done",
     "resume": "Go on after a network failure",
     "resumeHint": "A task cut by the network or a busy server starts again by itself, waiting longer each time (2 s to 1 min, 6 attempts). Never after a used-up quota or a refused key.",
+    "cacheTtl": "Conversation cache",
+    "cacheTtlHint": "How long Claude keeps the conversation ready, through the server's key. 5 minutes is the cheapest to write; an hour costs more to write and less when you come back after more than five minutes.",
+    "cacheTtl5m": "5 minutes",
+    "cacheTtl1h": "1 hour",
     "notifyHint": "A notification from the system when the editor is in the background (the browser asks once), a message in the editor after a long task.",
     "notifyBlocked": "The browser blocks the notifications: a message in the editor after a long task only.",
     "autoApply": "Apply the changes automatically",
@@ -1388,6 +1409,19 @@
   "cuts": {
     "done": "\"{name}\" tightened: {saved} saved."
   },
+  "dictation": {
+    "start": "Dictate: speak, then click again to write what you said",
+    "stop": "Stop and write what you said",
+    "writing": "Writing what you said…",
+    "downloading": "Downloading the speech model (once)",
+    "recordingHint": "Recording. Escape cancels.",
+    "micRefused": "The microphone is blocked. Allow it for Tramme in the system or browser settings.",
+    "noMic": "No microphone found.",
+    "failed": "Could not write what you said: {error}",
+    "downloadTitle": "Download the speech model?",
+    "downloadText": "To write what you say, Tramme runs {model} on this computer ({size}, downloaded once). Your voice stays on this computer.",
+    "download": "Download"
+  },
   "localModels": {
     "face": "Faces",
     "vad": "Where someone speaks",
@@ -1429,7 +1463,12 @@
     "nothingElse": "Nothing else: every model kept here is in use.",
     "picture": "Picture",
     "sound": "Sound",
-    "soundHint": "The server transcribes with its own model when it has one (Workers AI, or an OpenAI key). Otherwise the local companion runs the model chosen here (TRAMME_WHISPER_MODEL on its machine overrides it), and without a companion, this browser does."
+    "soundHint": "The server transcribes with its own model when it has one (Workers AI, or an OpenAI key). Otherwise the local companion runs the model chosen here (TRAMME_WHISPER_MODEL on its machine overrides it), and without a companion, this browser does.",
+    "dictation": "Dictation",
+    "dictationHint": "Where the microphone of a message box is transcribed. The downloaded model keeps your voice on this computer; the companion runs it on this computer too; the server sends it away.",
+    "dictationLocal": "Downloaded model",
+    "dictationCompanion": "Companion",
+    "dictationServer": "Server"
   },
   "components": {
     "kept": "{name} kept in the library",

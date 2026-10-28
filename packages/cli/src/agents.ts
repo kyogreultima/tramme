@@ -293,7 +293,7 @@ async function runCodex(t: Turn, r: TurnRequest) {
         } else if (ev.type === 'turn.completed' && ev.usage) {
           // its input counts the cached part
           const u = ev.usage, cached = Number(u.cached_input_tokens) || 0;
-          t.send({ type: 'usage', usage: { requests: 0, input: Math.max(0, (Number(u.input_tokens) || 0) - cached), cacheRead: cached, cacheWrite: 0, output: Number(u.output_tokens) || 0 } });
+          t.send({ type: 'usage', usage: { requests: 0, input: Math.max(0, (Number(u.input_tokens) || 0) - cached), cacheRead: cached, cacheWrite: 0, cacheWrite1h: 0, output: Number(u.output_tokens) || 0 } });
         } else if (ev.type === 'turn.failed') t.send({ type: 'error', message: String(ev.error?.message ?? 'Codex stopped') });
         else if (ev.type === 'error' && ev.message) t.send({ type: 'error', message: String(ev.message) });
       },

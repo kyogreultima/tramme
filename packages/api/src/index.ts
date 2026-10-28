@@ -6,6 +6,7 @@
 
 export * from './bucket.ts';
 export * from './conditions.ts';
+export { HYDRACEPT_VIDEO_SECONDS, videoSecondsOf, type HydraceptVideoSeconds } from './hydracept.ts';
 export * from './direct.ts';
 export * from './http.ts';
 export * from './keys.ts';

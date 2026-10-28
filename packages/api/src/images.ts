@@ -21,7 +21,7 @@ import type { Reach } from './providers.ts';
 
 export type ImageProvider = 'openai' | 'gemini' | 'zai' | 'hydracept';
 
-export interface Picture { data: ArrayBuffer; type: string }
+export interface Picture { data: ArrayBuffer; type: string; url: string }
 interface Ask { prompt: string; ratio: string; quality?: 'low' | 'medium' | 'high'; size?: 'small' | 'large'; reference?: Picture; mask?: Picture }
 interface Made { image: ArrayBuffer; type: string; model: string; headers?: Record<string, string> }
 
@@ -139,7 +139,7 @@ export function pictureOf(v: unknown, what: string): Picture | undefined {
   const m = typeof v === 'string' ? /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/.exec(v) : null;
   if (!m) throw new HttpError(400, `${what}: a PNG, JPEG or WebP picture as a data URL is expected`);
   if (m[2].length > 16_000_000) throw new HttpError(413, `${what}: the picture is too large (about 12 MB at most)`);
-  return { data: b64(m[2]), type: m[1] };
+  return { data: b64(m[2]), type: m[1], url: String(v) };
 }
 
 export async function generateImage(req: Request, { keys, fetch }: Reach) {

@@ -10,7 +10,7 @@
 // results are cleared by the API itself (context editing), not here.
 
 import { z } from 'zod';
-import { ADAPTIVE, DEFAULT_EFFORT, modelName, providerOf, TOOLS, UsageMeter, type Effort, type ToolResult } from '@tramme/assistant';
+import { ADAPTIVE, DEFAULT_EFFORT, joinSystem, modelName, NO_FALLBACK, providerOf, TOOLS, UsageMeter, type Effort, type SystemParts, type ToolResult } from '@tramme/assistant';
 import { ChatReader, chatTools, toChat } from './compat.ts';
 import { reach, type AiEvent, type ChatItem } from '../api.ts';
 import type { ToolRunner } from './tools.ts';
@@ -47,9 +47,10 @@ const CLEAR_OLD_RESULTS = {
  * naming one the request carried drops it for that model for the rest of the
  * session, and the request goes again; the most specific patterns come first.
  */
-type Part = 'context' | 'hour' | 'binding' | 'fallbacks' | 'effort' | 'vision' | 'display' | 'thinking';
+type Part = 'context' | 'usage' | 'hour' | 'binding' | 'fallbacks' | 'effort' | 'vision' | 'display' | 'thinking';
 const REFUSED: [Part, RegExp][] = [
   ['context', /context_management|context-management|clear_tool_uses/i],
+  ['usage', /stream_options|include_usage/i],
   ['hour', /\bttl\b/i],
   ['binding', /block_binding|thinking-binding/i],
   ['fallbacks', /fallback/i],
@@ -229,6 +230,8 @@ export interface TurnOptions {
   images?: { mediaType: string; data: string }[];
   target?: ChatTarget;
   effort?: Effort;
+  /** how long the cache keeps the conversation: 5 minutes, or an hour (written for more, read back later at the same price) */
+  cacheTtl?: '5m' | '1h';
 }
 
 export class ServerSession {
@@ -319,15 +322,15 @@ export class ServerSession {
     }
   }
 
-  async *turn(prompt: string, model: string, system: string, runner: ToolRunner, signal: AbortSignal, opts: TurnOptions = {}): AsyncGenerator<AiEvent> {
+  async *turn(prompt: string, model: string, system: string | SystemParts, runner: ToolRunner, signal: AbortSignal, opts: TurnOptions = {}): AsyncGenerator<AiEvent> {
     this.repair();
     this.pushUser([...(opts.images ?? []).map((i) => ({ type: 'image', source: { type: 'base64', media_type: i.mediaType, data: i.data } })), { type: 'text', text: prompt }]);
     // chat models: the pictures of earlier turns are not sent again (they have no context editing)
     const turnStart = this.messages.length - 1;
     for (let step = 0; step < MAX_STEPS; step++) {
       const { content, stop, invalid, declined } = yield* this.streamed(signal, () => (providerOf(model) === 'anthropic'
-        ? this.request(model, system, opts.effort ?? DEFAULT_EFFORT, signal)
-        : this.chat(model, system, signal, opts.target!, turnStart, opts.effort)));
+        ? this.request(model, system, opts.effort ?? DEFAULT_EFFORT, signal, opts.cacheTtl)
+        : this.chat(model, typeof system === 'string' ? system : joinSystem(system), signal, opts.target!, turnStart, opts.effort)));
       // empty text blocks are refused when sent back
       const kept = content.filter((b) => !(b.type === 'text' && !b.text));
       this.messages.push({ role: 'assistant', content: kept.length ? kept : [{ type: 'text', text: '…' }] });
@@ -358,12 +361,13 @@ export class ServerSession {
   /** one streamed request to a model of the chat format; yields the text as it comes, returns the content blocks */
   private async *chat(model: string, system: string, signal: AbortSignal, target: ChatTarget, turnStart: number, effort?: Effort): AsyncGenerator<AiEvent, Answer> {
     const res = await this.post(model, `${target.url}/chat/completions`, () => {
-      const vision = this.takes(model, 'vision'), level = effort && this.takes(model, 'effort') ? effort : undefined;
+      const vision = this.takes(model, 'vision'), level = effort && this.takes(model, 'effort') ? effort : undefined, counted = this.takes(model, 'usage');
       return {
-        // a model without vision gets a note instead of the images; one without levels runs at its own
-        parts: ['vision', ...(level ? ['effort' as const] : [])],
+        // a model without vision gets a note instead of the images; one without levels runs at its own; a server that does not count tokens is not asked to
+        parts: ['vision', ...(level ? ['effort' as const] : []), ...(counted ? ['usage' as const] : [])],
         body: {
           model: modelName(model), stream: true, tools: CHAT_TOOLS,
+          ...(counted ? { stream_options: { include_usage: true } } : {}),
           messages: toChat(this.messages, system, { vision, gemini: providerOf(model) === 'gemini', imagesFrom: turnStart }),
           // the effort level: reasoning_effort, or OpenRouter's own field
           ...(level ? (providerOf(model) === 'openrouter' ? { reasoning: { effort: level } } : { reasoning_effort: level }) : {}),
@@ -385,14 +389,17 @@ export class ServerSession {
       }
     }
     if (thinkId) yield { type: 'thinking-done', id: thinkId };
+    const usage = reader.usage();
+    if (usage) yield { type: 'usage', usage };
     // every complete answer says why it stopped: a stream cut before is not an answer (the turn would end with no word)
     if (!reader.finished) throw new ApiFailure(0, t('ai.streamCut'));
     return reader.result();
   }
 
   /** a Messages API request: the conversation as it was sent before, plus the parts the model still takes */
-  private attempt(model: string, system: string, effort: Effort): Attempt {
+  private attempt(model: string, system: string | SystemParts, effort: Effort, cacheTtl?: '5m' | '1h'): Attempt {
     const parts: Part[] = [];
+    const { fixed, variable } = typeof system === 'string' ? { fixed: system, variable: '' } : system;
     // a part is sent while the model takes it, and noted as sent
     const on = (part: Part) => this.takes(model, part) && !!parts.push(part);
     const adaptive = ADAPTIVE.has(model);
@@ -400,7 +407,7 @@ export class ServerSession {
     const clean = (b: Block) => (b.type === 'tool_use' && 'extra_content' in b ? { type: b.type, id: b.id, name: b.name, input: b.input } : b);
     // the cache covers the tools, the system prompt and the conversation so far
     const messages = this.messages.map((m) => ({ ...m, content: m.content.map(clean) })).map((m, i) => (i === this.messages.length - 1
-      ? { ...m, content: m.content.map((b, j) => (j === m.content.length - 1 ? { ...b, cache_control: { type: 'ephemeral' } } : b)) }
+      ? { ...m, content: m.content.map((b, j) => (j === m.content.length - 1 ? { ...b, cache_control: { type: 'ephemeral', ...(cacheTtl === '1h' && on('hour') ? { ttl: '1h' } : {}) } } : b)) }
       : m));
     const betas: string[] = [];
     let thinking: Record<string, unknown> | undefined;
@@ -412,15 +419,18 @@ export class ServerSession {
     const context = on('context');
     if (context) betas.push('context-management-2025-06-27');
     // a request Claude declines is run again by another model, on the server
-    const fallbacks = adaptive && on('fallbacks');
+    const fallbacks = adaptive && !NO_FALLBACK.has(model) && on('fallbacks');
     if (fallbacks) betas.push('server-side-fallback-2026-07-01');
     return {
       parts,
       headers: { 'anthropic-version': '2023-06-01', ...(betas.length ? { 'anthropic-beta': betas.join(',') } : {}) },
       body: {
         model, max_tokens: MAX_TOKENS, stream: true,
-        // the system prompt is cached an hour: the user often takes longer than 5 minutes between two messages
-        system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral', ...(on('hour') ? { ttl: '1h' } : {}) } }],
+        // the fixed part of the system prompt is cached an hour (the user often takes longer than 5 minutes between two messages), the part that changes with the project comes after it
+        system: [
+          { type: 'text', text: fixed, cache_control: { type: 'ephemeral', ...(on('hour') ? { ttl: '1h' } : {}) } },
+          ...(variable ? [{ type: 'text', text: variable }] : []),
+        ],
         tools: TOOL_SPECS, messages,
         ...(thinking ? { thinking } : {}),
         ...(adaptive && on('effort') ? { output_config: { effort } } : {}),
@@ -431,11 +441,11 @@ export class ServerSession {
   }
 
   /** one streamed request; yields the text as it comes, returns the content blocks */
-  private async *request(model: string, system: string, effort: Effort, signal: AbortSignal): AsyncGenerator<AiEvent, Answer> {
+  private async *request(model: string, system: string | SystemParts, effort: Effort, signal: AbortSignal, cacheTtl?: '5m' | '1h'): AsyncGenerator<AiEvent, Answer> {
     let stripped = false;
     // thinking that no longer matches its history (the conversation was changed elsewhere): sent without it, once
     const recover = (message: string) => !stripped && /signature/i.test(message) && (stripped = true, this.stripThinking(), true);
-    const res = await this.post(model, '/api/claude/v1/messages', () => this.attempt(model, system, effort), signal, recover);
+    const res = await this.post(model, '/api/claude/v1/messages', () => this.attempt(model, system, effort, cacheTtl), signal, recover);
     const blocks: Block[] = [];
     const json: string[] = [];
     const items: string[] = [];

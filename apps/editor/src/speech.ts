@@ -15,7 +15,7 @@ import { aiStatus, companionLink, refreshStatus } from './ai/index.ts';
 import { reach } from './api.ts';
 import { safeName, takenPaths, upload } from './files.ts';
 import { askUser } from './confirm.ts';
-import { pipelineOf } from './perception.ts';
+import { pipelineOf, type PipelineRun } from './perception.ts';
 import { chosenModel } from './settings.ts';
 import { madeBy } from './models.ts';
 import { commit, S, toast } from './state.ts';
@@ -59,16 +59,38 @@ async function chunkAudio(sink: AudioBufferSink, from: number, to: number): Prom
 
 type Backend = 'server' | 'companion' | 'browser';
 
-type Asr = (audio: Float32Array, opts: Record<string, unknown>) => Promise<{ text: string; chunks?: { text: string; timestamp: [number, number | null] }[] }>;
+/** what of a Whisper pipeline the language detection reads: its model (called for one step) and its processor */
+interface WhisperParts {
+  model: ((inputs: { input_features: unknown; decoder_input_ids: unknown }) => Promise<{ logits: { data: ArrayLike<number> } }>)
+    & { generation_config: { decoder_start_token_id: number; lang_to_id: Record<string, number> } };
+  processor: (audio: Float32Array) => Promise<{ input_features: unknown }>;
+}
+type Asr = ((audio: Float32Array, opts: Record<string, unknown>) => Promise<{ text: string; chunks?: { text: string; timestamp: [number, number | null] }[] }>) & WhisperParts;
 
-/** one chunk to words, by the server, or by the companion when the server cannot, or else in this browser */
-async function wordsOf(samples: Float32Array, language: string | undefined, prefer: Backend): Promise<{ words: TranscriptWord[]; language?: string; backend: Backend; model?: string }> {
+/**
+ * The language spoken, as Whisper hears it: one step of its decoder after
+ * the start of the transcript, the most likely language token. transformers.js
+ * does not detect it, and transcribes as English when it is not told.
+ */
+export async function spokenLanguage(run: WhisperParts, samples: Float32Array): Promise<string> {
+  const { Tensor } = await import('@huggingface/transformers');
+  const { decoder_start_token_id: start, lang_to_id: languages } = run.model.generation_config;
+  const { input_features } = await run.processor(samples);
+  const { logits } = await run.model({ input_features, decoder_input_ids: new Tensor('int64', BigInt64Array.from([BigInt(start)]), [1, 1]) });
+  let best = 'en', score = -Infinity;
+  for (const [token, id] of Object.entries(languages)) if (logits.data[id] > score) { score = logits.data[id]; best = token.slice(2, -2); }
+  return best;
+}
+
+/** one chunk to words, by the server, or by the companion when the server cannot, or else in this browser (local: how the model runs there) */
+async function wordsOf(samples: Float32Array, language: string | undefined, prefer: Backend, local?: PipelineRun): Promise<{ words: TranscriptWord[]; language?: string; backend: Backend; model?: string }> {
   const audio = prefer === 'browser' ? '' : base64(wav(samples, RATE));
   const viaBrowser = async () => {
     const model = chosenModel('transcription');
-    const run = await pipelineOf<Asr>(model, 'the transcription model');
-    const out = await run(samples, { return_timestamps: 'word', chunk_length_s: 30, ...(language ? { language } : {}), task: 'transcribe' });
-    return { words: asrWords(out), language, backend: 'browser' as const, model: madeBy(model) };
+    const run = await pipelineOf<Asr>(model, 'the transcription model', local);
+    const spoken = language ?? await spokenLanguage(run, samples);
+    const out = await run(samples, { return_timestamps: 'word', chunk_length_s: 30, language: spoken, task: 'transcribe' });
+    return { words: asrWords(out), language: spoken, backend: 'browser' as const, model: madeBy(model) };
   };
   const viaServer = async () => {
     const r = await reach('/api/transcribe', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ audio, language }) });
@@ -95,6 +117,34 @@ async function wordsOf(samples: Float32Array, language: string | undefined, pref
   }
 }
 
+/** where each chunk of a sound starts: 28 s chunks, one every 26 s, the last reaching the end */
+export function chunkStarts(duration: number): number[] {
+  const starts: number[] = [];
+  for (let s = 0; s < duration; s += STEP) { starts.push(s); if (s + CHUNK >= duration) break; }
+  return starts;
+}
+
+/** the chunks of a sound to words, joined: audioOf gives the 16 kHz mono samples of [from, to); a backend that fails over stays the one that answered */
+async function transcribeChunks(
+  duration: number, audioOf: (from: number, to: number) => Promise<Float32Array>,
+  opts: { language?: string; backend: Backend; onProgress?: (done: number, total: number, stage: string) => void; wordsOf?: typeof wordsOf; local?: PipelineRun },
+) {
+  const starts = chunkStarts(duration), words = opts.wordsOf ?? wordsOf;
+  const chunks: { start: number; end: number; words: TranscriptWord[] }[] = [], models = new Set<string>();
+  let language = opts.language, backend = opts.backend;
+  for (const [i, start] of starts.entries()) {
+    const end = Math.min(duration, start + CHUNK);
+    opts.onProgress?.(i, starts.length, backend === 'companion' ? m('speech.localCompanion') : backend === 'browser' ? m('speech.inThisBrowser') : m('speech.server'));
+    const r = await words(await audioOf(start, end), language, backend, opts.local);
+    backend = r.backend;
+    language ??= r.language;
+    if (r.model) models.add(r.model);
+    chunks.push({ start, end, words: r.words.map((w) => ({ w: w.w, s: +(start + w.s).toFixed(3), e: +(start + w.e).toFixed(3) })) });
+  }
+  opts.onProgress?.(starts.length, starts.length, m('speech.done'));
+  return { words: mergeChunks(chunks), language, models };
+}
+
 /** the words of a media file at url, with their timing in the file */
 export async function transcribeUrl(url: string, opts: { language?: string; onProgress?: (done: number, total: number, stage: string) => void } = {}): Promise<Transcript> {
   const input = new Input({ source: new UrlSource(url), formats: ALL_FORMATS });
@@ -104,24 +154,21 @@ export async function transcribeUrl(url: string, opts: { language?: string; onPr
     if (!(await track.canDecode())) throw new Error(t('speech.soundCannotBeDecoded', { codec: track.codec ?? t('common.unknown') }));
     const duration = await input.computeDuration();
     const sink = new AudioBufferSink(track);
-    const starts: number[] = [];
-    for (let s = 0; s < duration; s += STEP) { starts.push(s); if (s + CHUNK >= duration) break; }
-    const chunks: { start: number; end: number; words: TranscriptWord[] }[] = [], models = new Set<string>();
-    let language = opts.language, backend: Backend = 'server';
-    for (const [i, start] of starts.entries()) {
-      const end = Math.min(duration, start + CHUNK);
-      opts.onProgress?.(i, starts.length, backend === 'companion' ? m('speech.localCompanion') : backend === 'browser' ? m('speech.inThisBrowser') : m('speech.server'));
-      const r = await wordsOf(await chunkAudio(sink, start, end), language, backend);
-      backend = r.backend;
-      language ??= r.language;
-      if (r.model) models.add(r.model);
-      chunks.push({ start, end, words: r.words.map((w) => ({ w: w.w, s: +(start + w.s).toFixed(3), e: +(start + w.e).toFixed(3) })) });
-    }
-    opts.onProgress?.(starts.length, starts.length, m('speech.done'));
-    return { version: 1, language, duration: +duration.toFixed(3), words: mergeChunks(chunks), ...(models.size ? { madeBy: [...models] } : {}) };
+    const { words, language, models } = await transcribeChunks(duration, (from, to) => chunkAudio(sink, from, to), { language: opts.language, backend: 'server', onProgress: opts.onProgress });
+    return { version: 1, language, duration: +duration.toFixed(3), words, ...(models.size ? { madeBy: [...models] } : {}) };
   } finally {
     input.dispose();
   }
+}
+
+/** where a dictation is transcribed: the downloaded model (in this browser), the local companion, or the server (the fallbacks of a sound's transcription) */
+export type DictationSource = 'local' | 'companion' | 'server';
+
+/** what was said in 16 kHz mono samples (a dictation), as text; the language is detected */
+export async function transcribeSamples(samples: Float32Array, source: DictationSource, opts: { local?: PipelineRun; words?: typeof wordsOf } = {}): Promise<string> {
+  const backend: Backend = source === 'local' ? 'browser' : source;
+  const { words: said } = await transcribeChunks(samples.length / RATE, async (from, to) => samples.subarray(Math.round(from * RATE), Math.round(to * RATE)), { backend, wordsOf: opts.words, local: opts.local });
+  return said.map((w) => w.w).join(' ').trim();
 }
 
 /** id of the transcript asset of a media asset (defined in the core, with the rest of the transcript domain) */

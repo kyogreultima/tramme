@@ -14,6 +14,8 @@ import { attachFiles, attaching, draft, pending, removePending } from '../attach
 import { commandUsed, prefs } from '../settings.ts';
 import { S, toast } from '../state.ts';
 import { FileChip } from './chat.tsx';
+import { MicButton, writeInto } from './MicButton.tsx';
+import { QueueList } from './QueueList.tsx';
 import { Select, Toggle } from './controls.tsx';
 import { Icon } from './icons.tsx';
 import { t, tr } from '../i18n/index.ts';
@@ -157,6 +159,8 @@ export function Composer({ placeholder, anchor, tools, context, onSent, area: gi
   const submit = () => {
     const v = text.trim();
     if (!v && !pending.peek().length) return;
+    // a command is not queued: it waits for the end of the turn, in the box
+    if (busy && cmd) return;
     if (direct) { run(); return; }
     if (cmd?.kind === 'tool' && !parsed!.rest) { toast(t('assistant.fillRequired')); return; }
     if (/^\/[\w.-]+$/.test(v) && !cmd) { toast(t('assistant.noCommand')); return; }
@@ -174,6 +178,7 @@ export function Composer({ placeholder, anchor, tools, context, onSent, area: gi
   return (
     <div class="composer-wrap">
       {commandMenu.view}
+      <QueueList />
       <div class="composer" data-tour={tour}>
         {cmd && <CommandCard cmd={cmd} fields={fields} values={values} busy={busy} canRun={direct} onRun={run}
           onChange={(k, v) => setForm({ name: cmd.name, values: { ...values, [k]: v } })} />}
@@ -192,11 +197,11 @@ export function Composer({ placeholder, anchor, tools, context, onSent, area: gi
         <div class="bar">
           <button class="icon-btn sm" title={t('assistant.attachImagesSoundsOr')} disabled={!available} onClick={() => files.current?.click()}><Icon name="attach" /></button>
           <input ref={files} type="file" multiple hidden accept={ATTACHABLE} onChange={(e) => { join((e.target as HTMLInputElement).files); (e.target as HTMLInputElement).value = ''; }} />
+          <MicButton onText={(add) => writeInto(area.current, setText, add)} />
           {tools}
           <div class="grow">{context}</div>
-          {busy
-            ? <button class="send stop" title={t('assistant.stop')} onClick={stop}><Icon name="stop" /></button>
-            : <button class="send" title={t('assistant.sendEnter')} disabled={(!text.trim() && !pending.value.length) || attaching.value > 0 || (!available && !direct)} onClick={submit}><Icon name="send" /></button>}
+          {busy && <button class="send stop" title={t('assistant.stop')} onClick={stop}><Icon name="stop" /></button>}
+          <button class="send" title={t('assistant.sendEnter')} disabled={(!text.trim() && !pending.value.length) || attaching.value > 0 || (!available && !direct) || (busy && !!cmd)} onClick={submit}><Icon name="send" /></button>
         </div>
       </div>
     </div>

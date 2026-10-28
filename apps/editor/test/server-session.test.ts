@@ -110,6 +110,59 @@ describe('assistant, server path', () => {
     expect(repaired.content[1]).toMatchObject({ type: 'text', text: 'go on' });
   });
 
+  it('asks for no fallback for Haiku 5.5, which has none, and still thinks adaptively', async () => {
+    let sent = serve(second);
+    await drain(new ServerSession().turn('Hi', 'claude-haiku-5-5', 'system prompt', fakeRunner().runner, new AbortController().signal));
+    expect(sent[0].body.fallbacks).toBeUndefined();
+    expect(sent[0].headers['anthropic-beta']).not.toContain('server-side-fallback');
+    expect(sent[0].body.thinking).toMatchObject({ type: 'adaptive' });
+    expect(sent[0].body.output_config).toEqual({ effort: 'high' });
+    // the others keep theirs
+    sent = serve(second);
+    await drain(new ServerSession().turn('Hi', 'claude-opus-5-5', 'system prompt', fakeRunner().runner, new AbortController().signal));
+    expect(sent[0].body.fallbacks).toBe('default');
+  });
+
+  it('the conversation\'s cache lasts as set', async () => {
+    const lastMark = (body: any) => { const m = body.messages.at(-1); return m.content.at(-1).cache_control; };
+    const run = (cacheTtl?: '5m' | '1h') => drain(new ServerSession().turn('Hi', 'claude-opus-5-5', 'system prompt', fakeRunner().runner, new AbortController().signal, { cacheTtl }));
+    let sent = serve(second);
+    await run('1h');
+    expect(lastMark(sent[0].body)).toEqual({ type: 'ephemeral', ttl: '1h' });
+    sent = serve(second);
+    await run('5m');
+    expect(lastMark(sent[0].body)).toEqual({ type: 'ephemeral' });
+    sent = serve(second);
+    await run();
+    expect(lastMark(sent[0].body)).toEqual({ type: 'ephemeral' });
+    // a provider that refused the hour never gets it, for the system prompt or the conversation
+    const s = new ServerSession();
+    sent = serve(() => refusedWith('cache_control.ttl: Extra inputs are not permitted'), second);
+    await drain(s.turn('Hi', 'claude-opus-5-5', 'system prompt', fakeRunner().runner, new AbortController().signal, { cacheTtl: '1h' }));
+    expect(JSON.stringify(sent[0].body)).toContain('"ttl":"1h"');
+    expect(JSON.stringify(sent[1].body)).not.toContain('ttl');
+  });
+
+  it('sends the system prompt as two blocks, the fixed one cached an hour', async () => {
+    const sent = serve(second, second, second);
+    const turn = (system: string | { fixed: string; variable: string }) => drain(new ServerSession().turn('Hi', 'claude-opus-5-5', system, fakeRunner().runner, new AbortController().signal));
+    await turn({ fixed: 'FIXED', variable: 'VARIABLE' });
+    expect(sent[0].body.system).toEqual([{ type: 'text', text: 'FIXED', cache_control: { type: 'ephemeral', ttl: '1h' } }, { type: 'text', text: 'VARIABLE' }]);
+    // nothing that changes: one block
+    await turn({ fixed: 'FIXED', variable: '' });
+    expect(sent[1].body.system).toEqual([{ type: 'text', text: 'FIXED', cache_control: { type: 'ephemeral', ttl: '1h' } }]);
+    // a string, as before
+    await turn('whole');
+    expect(sent[2].body.system).toEqual([{ type: 'text', text: 'whole', cache_control: { type: 'ephemeral', ttl: '1h' } }]);
+  });
+
+  it('gives a chat-format model the two parts joined', async () => {
+    const said = () => new Response('data: {"choices":[{"delta":{"content":"ok"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n', { headers: { 'content-type': 'text/event-stream' } });
+    const sent = serve(said);
+    await drain(new ServerSession().turn('Hi', 'openai:gpt-5', { fixed: 'FIXED', variable: 'VARIABLE' }, fakeRunner().runner, new AbortController().signal, { target: { url: '/api/llm/x' } }));
+    expect(sent[0].body.messages[0]).toEqual({ role: 'system', content: 'FIXED\n\nVARIABLE' });
+  });
+
   it('never changes what it sent: the next message carries the same history, pictures included', async () => {
     const frame = () => answer([{ thinking: 'Let me see it.' }, { tool: 'render_still', id: 'r1', json: '{"t":1}' }], 'tool_use');
     const sent = serve(frame, second, second);
@@ -196,6 +249,28 @@ describe('assistant, server path', () => {
     await chatTurn(s, 'local:gpt-oss:20b', 'low');
     await chatTurn(s, 'local:gpt-oss:20b', 'low');
     expect(sent.map((x) => x.body.reasoning_effort)).toEqual(['low', undefined, undefined]);
+  });
+
+  it('asks the chat-format providers for their usage, and goes on without when a server refuses it', async () => {
+    const withUsage = () => new Response('data: {"choices":[{"delta":{"content":"ok"},"finish_reason":"stop"}]}\n\ndata: {"choices":[],"usage":{"prompt_tokens":1000,"completion_tokens":50,"prompt_tokens_details":{"cached_tokens":800}}}\n\ndata: [DONE]\n\n', { headers: { 'content-type': 'text/event-stream' } });
+    const plain = () => new Response('data: {"choices":[{"delta":{"content":"ok"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n', { headers: { 'content-type': 'text/event-stream' } });
+    const chatTurn = (s: ServerSession) => drain(s.turn('Hi', 'openai:gpt-5', 'system prompt', fakeRunner().runner, new AbortController().signal, { target: { url: '/api/llm/x' } }));
+
+    let sent = serve(withUsage);
+    const events = await chatTurn(new ServerSession());
+    expect(sent[0].body.stream_options).toEqual({ include_usage: true });
+    expect(events.find((e) => e.type === 'usage')).toMatchObject({ usage: { requests: 1, input: 200, cacheRead: 800, output: 50 } });
+
+    // a server that refuses the option: the request goes again without it, the turn ends, its usage is unknown
+    const s = new ServerSession();
+    sent = serve(() => refusedWith("Unknown parameter: 'stream_options'."), plain, plain);
+    const again = await chatTurn(s);
+    expect(sent.map((x) => x.body.stream_options)).toEqual([{ include_usage: true }, undefined]);
+    expect(again.find((e) => e.type === 'text')).toMatchObject({ delta: 'ok' });
+    expect(again.some((e) => e.type === 'usage')).toBe(false);
+    // and not asked again for that model in the session
+    await chatTurn(s);
+    expect(sent[2].body.stream_options).toBeUndefined();
   });
 
   describe('tries again by itself', () => {

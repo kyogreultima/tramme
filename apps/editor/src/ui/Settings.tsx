@@ -14,7 +14,7 @@ import type { SoundEntry } from '@tramme/core';
 import { ELEVEN_VOICE_MODELS, HYDRACEPT_VOICE_MODELS } from '@tramme/api';
 import { api, type Voice } from '../api.ts';
 import { EffortPicker, ModelPicker } from './ModelPicker.tsx';
-import { aiSettings, aiStatus, connectProvider, disconnectProvider, ensureStatus, providersChanged, refreshStatus, removeCustomProvider, saveCustomProvider, serverName, setAiSettings, statusLabels } from '../ai/index.ts';
+import { aiSettings, type AiSettings, aiStatus, connectProvider, disconnectProvider, ensureStatus, providersChanged, refreshStatus, removeCustomProvider, saveCustomProvider, serverName, setAiSettings, statusLabels } from '../ai/index.ts';
 import { allowNotifications, notificationState } from '../notify.ts';
 import { preview, previewInfo } from '../preview.ts';
 import { DEFAULT_PREFERENCES, prefs, resetPrefs, setLanguage, setPrefs, settingsOpen, settingsSection, THEMES, type Preferences, type SettingsSection, type ThemeInfo } from '../settings.ts';
@@ -309,6 +309,21 @@ function Pictures() {
   );
 }
 
+/** clips made by a provider: what the generate-video tool takes when the ask names nothing */
+function Videos() {
+  const p = prefs.value;
+  return (
+    <Section title={t('settings.videos')} hint={t('settings.videosHint')}>
+      <Row label={t('settings.videoProvider')} hint={t('settings.videoProviderHint')}>
+        <Select value={p.videoProvider} options={[['auto', t('common.automatic')], ['hydracept', 'Hydracept (Veo)']]} onChange={(v) => setPrefs({ videoProvider: v as Preferences['videoProvider'] })} />
+      </Row>
+      <Row label={t('settings.videoSeconds')} hint={t('settings.videoSecondsHint')}>
+        <Seg value={String(p.videoSeconds)} options={[['4', '4 s'], ['6', '6 s'], ['8', '8 s']]} onChange={(v) => setPrefs({ videoSeconds: Number(v) as Preferences['videoSeconds'] })} />
+      </Row>
+    </Section>
+  );
+}
+
 function Tours() {
   const st = toursState.value;
   return (
@@ -396,6 +411,9 @@ function Behavior() {
       <Row label={t('settings.resume')} hint={t('settings.resumeHint')}>
         <Toggle on={a.resume} onChange={(on) => setAiSettings({ resume: on })} />
       </Row>
+      <Row label={t('settings.cacheTtl')} hint={t('settings.cacheTtlHint')}>
+        <Seg value={a.cacheTtl} options={[['5m', t('settings.cacheTtl5m')], ['1h', t('settings.cacheTtl1h')]]} onChange={(v) => setAiSettings({ cacheTtl: v as AiSettings['cacheTtl'] })} />
+      </Row>
       <Row label={t('settings.autoApply')} hint={t('settings.autoApplyHint')}>
         <Seg value={confirming ?? a.apply}
           options={[['off', t('settings.autoApplyOff')], ['turn', t('settings.autoApplyTurn')], ['all', t('settings.autoApplyAll')]]}
@@ -468,6 +486,7 @@ const GROUPS: { title: () => string; panes: Pane[] }[] = [
       { id: 'preview', icon: 'eye', title: () => t('common.preview'), body: Preview },
       { id: 'sound', icon: 'audio', title: () => t('settings.sound'), body: Sound },
       { id: 'pictures', icon: 'image', title: () => t('settings.pictures'), body: Pictures },
+      { id: 'videos', icon: 'film', title: () => t('settings.videos'), body: Videos },
       { id: 'models', icon: 'download', title: () => t('localModels.title'), body: LocalModels },
       { id: 'plugins', icon: 'code', title: () => t('plugins.title'), body: Plugins },
       { id: 'tours', icon: 'help', title: () => t('common.guidedTours'), body: Tours },

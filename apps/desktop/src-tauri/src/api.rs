@@ -102,7 +102,7 @@ fn route_inner(parts: &[String], req: Request<Vec<u8>>) -> Result<Body, store::H
         ("sounds", _) => shelf(&store, "sounds", parts, req),
         ("keys", _) => Ok(ok_json(KeyStore::system()?.route(method, &decode_segments(&parts[1..]), req.body())?)),
         // the provider routes are the page's (api.reach), never asked here
-        ("claude" | "llm" | "models" | "generate" | "generate-image" | "transcribe", _) => Ok(json_response(
+        ("claude" | "llm" | "models" | "generate" | "generate-image" | "generate-video" | "transcribe", _) => Ok(json_response(
             404,
             &json!({ "error": "the provider routes are answered by the page in the desktop app (api.reach)" }),
         )),

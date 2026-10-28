@@ -8,11 +8,14 @@ import { z } from 'zod';
 export const MODELS: [id: string, label: string][] = [
   ['claude-opus-5-5', 'Opus 5.5'],
   ['claude-sonnet-5-5', 'Sonnet 5.5'],
+  ['claude-haiku-5-5', 'Haiku 5.5'],
   ['claude-haiku-4-5-20251001', 'Haiku 4.5'],
 ];
 export const DEFAULT_MODEL = 'claude-opus-5-5';
 /** models that think when they need to (adaptive thinking) */
-export const ADAPTIVE = new Set(['claude-opus-5-5', 'claude-sonnet-5-5']);
+export const ADAPTIVE = new Set(['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5']);
+/** models a request cannot ask the server to run another model for when Claude declines (no server-side fallback exists for them) */
+export const NO_FALLBACK = new Set(['claude-haiku-5-5']);
 
 /** how hard a model works on a turn: thinking depth, care, checks (Opus 5.5 alone would run at medium) */
 export const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'] as const;
@@ -111,10 +114,10 @@ const CHAT_EFFORTS: Effort[] = ['low', 'medium', 'high'];
 
 /**
  * The effort levels a model offers, none when it has no such setting. Claude
- * Opus and Sonnet: all five. In the chat format, the reasoning models: OpenAI's
+ * Opus, Sonnet and Haiku 5.5: all five. In the chat format, the reasoning models: OpenAI's
  * o-series and GPT-5 (not their chat variants), Gemini 2.5 and later, the
  * OpenRouter models whose listing says they reason (`reasons`), gpt-oss on a
- * local server, Codex, Antigravity's default. Haiku, Z.AI and the other models: none.
+ * local server, Codex, Antigravity's default. Haiku 4.5, Z.AI and the other models: none.
  */
 export function effortLevels(model: string, reasons = false): Effort[] {
   const name = modelName(model).toLowerCase().replace(/^models\//, '');
@@ -305,10 +308,8 @@ TOOLS.push({
 /** tools whose activity is shown as a proposal card rather than a line */
 export const SILENT = new Set(['propose_changes', 'discard_proposal']);
 
-/** the system prompt; reference is docs/document.md; brief is the project's own taste (assets/brief.json), when there is one */
-/** installed: the plugins installed on the user's device, one line each (name: what it is for); they change rarely, so the prompt stays cached */
-export function systemPrompt(reference: string, brief?: string, installed?: string[]): string {
-  return `You are the assistant built into Tramme, a motion design editor. You work on a project: a JSON document (described below) and its files (assets/, plugins/, renders/).
+/** the instructions of the system prompt: the same for every project */
+const INSTRUCTIONS = `You are the assistant built into Tramme, a motion design editor. You work on a project: a JSON document (described below) and its files (assets/, plugins/, renders/).
 
 Rules:
 - Every change to the document goes through the propose_changes tool (JSON Patch operations). The user sees your proposal as a preview, then applies or rejects it.
@@ -367,13 +368,38 @@ Sound: a video without sound feels unfinished, one with a sound on everything fe
 
 Pictures: when the project has no picture for what a shot needs (a background a title reads over, a texture, an illustration, a prop), have one made (use_tool "generate-image"): describe what it shows and how it is drawn — technique, palette of the tokens, mood — in the proportions of the composition. You see what comes back: judge it (a background stays quiet under the titles), and have it made again once with a sharper prompt when it is off — it costs money, not drafts. When the look is the user's choice, ask for takes (2 to 4): they pick one, the others are never saved. To fix one thing, make it again from its record (again, change) rather than from scratch; to restyle a frame of the video or a picture of the project, give it as a reference (a mask says where it changes; extend widens it to another format). Words are never drawn in the picture: text layers say them, so they stay editable and translatable. A still photo that should move on its own: turn it to 2.5D (use_tool "photo-2.5d", or "depth" alone when the composition has a camera already); footage can take a depth of field the same way (use_tool "depth").
 
-Hydracept: generate-image, generate-sound and voices take a provider. Name "hydracept" to have a picture (OpenAI images), a sound effect, a music bed or a voice-over (ElevenLabs, with Hydracept's list of voices) made through Hydracept: one key for all of them, a quote before each job and a receipt after it. Name it when the user asks for Hydracept, or when the project's media should all go through it; otherwise leave provider out, and the providers of the user's own keys come first.
+Clips: when a shot needs footage the project does not hold, have a short one made (use_tool "generate-video"): 4, 6 or 8 seconds from words, or a still picture of the project animated as its opening frame (source). Describe the shot as filmed — subject, movement, camera, light, mood — and fit it to the shot's length: each second is billed, so one clip per shot, not drafts. You see a frame of what came back: judge it, look closer with media_frame, and find its cuts with shots. A clip made again keeps its record (again, change) rather than starting over. Use it for what the composition cannot move itself, never for words or logos (text layers say them).
+
+Hydracept: generate-image, generate-video, generate-sound and voices take a provider. Name "hydracept" to have a picture (OpenAI images), a clip (Veo 3.1 Fast), a sound effect, a music bed or a voice-over (ElevenLabs, with Hydracept's list of voices) made through Hydracept: one key for all of them, a quote before each job and a receipt after it. Name it when the user asks for Hydracept, or when the project's media should all go through it; otherwise leave provider out, and the providers of the user's own keys come first.
 
 Sources: when the project holds the material of the video — documents, pictures, footage, sounds the user brought (use_tool "sources" lists them) — read it all before deciding anything: every document to its last page, every video and sound with what is said, every picture. The video says what the sources say: its subject, messages, facts and figures come from them, quoted right, never invented; its look comes from the brand they show (the logo's colours as tokens with "palette", the type of the documents). Keep what you learned in the brief (use_tool "brief": about — subject, audience, purpose, key messages, facts; sources — one line each, what it is good for). Then propose two or three directions — what the video is for and for whom, format and length, the story scene by scene with the sources each scene uses and what must be made — recommend one, and build only once the user has chosen. Footage and pictures from the sources go on screen as they are (video and image layers); a document's figures and words become text layers, counters and figures, rather than a picture of the page.
 
-Shorts: to cut a long video into shorts (use_tool "shorts"), read the candidates first and say which you would pick and why: a short stands alone, opens on a claim, a number or a question — never on "in this video" — and ends on a point; one that starts mid-idea is skipped, not rescued. Build with a plan (one passage per short: its title in a few words, and the strong word the passage turns on as keyword — it pops on screen the moment it is said; a word never said comes back to you, pick one that is said). The build lands the title with the first sentence, and where the project has a brand (the plate and ink tokens) it adds the progress bar and the end card itself. Then check each composition (use_tool "check", after switching to it) and fix what matters. The frame follows the speaker when a subjects analysis of the video exists: run subjects first (use_tool "subjects") when the format crops the picture, and the build keeps them centred, pushes in gently when they are small in the frame, and follows the cutout's mask when the boxes jump. A video nobody speaks in (a match, a ride, a build-up) has no transcript: run beats and shots on it, and the candidates come from its sound and its cuts, described the same way; build them without keywords.
+Shorts: to cut a long video into shorts (use_tool "shorts"), read the candidates first and say which you would pick and why: a short stands alone, opens on a claim, a number or a question — never on "in this video" — and ends on a point; one that starts mid-idea is skipped, not rescued. Build with a plan (one passage per short: its title in a few words, and the strong word the passage turns on as keyword — it pops on screen the moment it is said; a word never said comes back to you, pick one that is said). The build lands the title with the first sentence, and where the project has a brand (the plate and ink tokens) it adds the progress bar and the end card itself. Then check each composition (use_tool "check", after switching to it) and fix what matters. The frame follows the speaker when a subjects analysis of the video exists: run subjects first (use_tool "subjects") when the format crops the picture, and the build keeps them centred, pushes in gently when they are small in the frame, and follows the cutout's mask when the boxes jump. A video nobody speaks in (a match, a ride, a build-up) has no transcript: run beats and shots on it, and the candidates come from its sound and its cuts, described the same way; build them without keywords.`;
 
-${installed?.length ? `Plugins installed on this device, offered in every project (their nodes and tools are not in the list_nodes index: search them with list_nodes { query }; a layer of one copies the plugin into the project):\n${installed.map((x) => `- ${x}`).join('\n')}\n\n` : ''}${brief ? `The brief of the project (assets/brief.json), the taste of this project, over your defaults where they differ:\n${brief}\n\n` : ''}${reference}`;
+/** the system prompt in two parts: what is the same for every project (the instructions, then the reference), which the cache keeps whole, and what changes with the project (its installed plugins, its brief) */
+export interface SystemParts { fixed: string; variable: string }
+
+/**
+ * The system prompt, cut for the cache: the reference comes right after the
+ * instructions so that it is served from the cache across projects, and the
+ * parts that change come last. reference is docs/document.md; brief is the
+ * project's own taste (assets/brief.json), when there is one; installed: the
+ * plugins installed on the user's device, one line each (name: what it is for).
+ */
+export function systemParts(reference: string, brief?: string, installed?: string[]): SystemParts {
+  const variable = [
+    installed?.length ? `Plugins installed on this device, offered in every project (their nodes and tools are not in the list_nodes index: search them with list_nodes { query }; a layer of one copies the plugin into the project):\n${installed.map((x) => `- ${x}`).join('\n')}` : '',
+    brief ? `The brief of the project (assets/brief.json), the taste of this project, over your defaults where they differ:\n${brief}` : '',
+  ].filter(Boolean).join('\n\n');
+  return { fixed: `${INSTRUCTIONS}\n\n${reference}`, variable };
+}
+
+/** the two parts as one text (the routes that cache by themselves, or not at all) */
+export const joinSystem = ({ fixed, variable }: SystemParts): string => (variable ? `${fixed}\n\n${variable}` : fixed);
+
+/** the system prompt as one text */
+export function systemPrompt(reference: string, brief?: string, installed?: string[]): string {
+  return joinSystem(systemParts(reference, brief, installed));
 }
 
 export interface TurnContext {
@@ -396,17 +422,32 @@ const pct = (x: number) => `${Math.round(x * 100)} %`;
 /** what a turn left alone is told: it never waits on the user */
 const AUTONOMOUS = 'Mode: on your own. Your changes apply without the user, who may be away for a long while: do not stop on a question a sensible choice answers (a format, a voice, a wording, a direction). Where the rules say to ask or to propose directions first, take the one you would recommend and go on; say in your summary what you chose and assumed. Stop only when truly blocked (a missing key or source). Paid generations are not asked for: each turn has an allowance, and the library or synth take over once it is used.';
 
-/** the user's message with what it is about */
-export function userPrompt(text: string, ctx: TurnContext, notes: string[]): string {
-  const lines = [
+/** what a message is about: where the user was, what was selected, the scene, the pin */
+function contextLines(ctx: TurnContext): string[] {
+  return [
     `Composition: ${ctx.compId} · time ${ctx.time} s (frame ${ctx.frame})`,
     `Selection: ${ctx.selection?.length ? ctx.selection.map((s) => `${s.name} (${s.id}, ${s.type})`).join(', ') : 'none'}`,
     ...(ctx.scene ? [`Scene: "${ctx.scene.name}", from ${ctx.scene.from} s to ${ctx.scene.to} s: the message is about this scene; leave the others as they are unless it asks otherwise.`] : []),
     ...(ctx.point ? [`Note pinned on the picture at ${pct(ctx.point[0])} across and ${pct(ctx.point[1])} down the frame, at ${ctx.time} s: it is about what shows there${ctx.under ? `, on the layer ${ctx.under.name} (${ctx.under.id}, ${ctx.under.type}) of this composition` : ''} (render that frame to see it).`] : []),
-    ...(ctx.autonomous ? [AUTONOMOUS] : []),
-    ...notes,
   ];
+}
+
+/** the user's message with what it is about */
+export function userPrompt(text: string, ctx: TurnContext, notes: string[]): string {
+  const lines = [...contextLines(ctx), ...(ctx.autonomous ? [AUTONOMOUS] : []), ...notes];
   return `<context>\n${lines.join('\n')}\n</context>\n\n${text}`;
+}
+
+/**
+ * Messages written while the agent worked, answered together: the notes and the
+ * mode once, then each message with the context of the moment it was written
+ * (so "this layer" is the layer selected then). One message is the usual prompt.
+ */
+export function queuedPrompt(messages: { text: string; ctx: TurnContext }[], notes: string[]): string {
+  if (messages.length === 1) return userPrompt(messages[0].text, messages[0].ctx, notes);
+  const head = [...(messages.some((m) => m.ctx.autonomous) ? [AUTONOMOUS] : []), ...notes];
+  const each = messages.map((m, i) => `<message n="${i + 1}">\n<context>\n${contextLines(m.ctx).join('\n')}\n</context>\n\n${m.text}\n</message>`);
+  return `<context>\n${head.join('\n')}\n</context>\n\nThe user wrote these ${messages.length} messages while you were working. Answer them together, in this one turn; each is about the context given with it.\n\n${each.join('\n\n')}`;
 }
 
 /** a tool's result, the same shape on both paths */
@@ -416,13 +457,13 @@ export interface ToolResult {
 }
 
 // ── what a turn costs ────────────────────────────────────────
-/** the tokens of a turn's requests: fresh input, input read from the cache, input written to it, output */
-export interface Usage { requests: number; input: number; cacheRead: number; cacheWrite: number; output: number }
+/** the tokens of a turn's requests: fresh input, input read from the cache, input written to it (cacheWrite1h: the share kept an hour, priced apart), output */
+export interface Usage { requests: number; input: number; cacheRead: number; cacheWrite: number; cacheWrite1h: number; output: number }
 
-export const NO_USAGE: Usage = { requests: 0, input: 0, cacheRead: 0, cacheWrite: 0, output: 0 };
+export const NO_USAGE: Usage = { requests: 0, input: 0, cacheRead: 0, cacheWrite: 0, cacheWrite1h: 0, output: 0 };
 
 export const addUsage = (a: Usage, b: Usage): Usage => ({
-  requests: a.requests + b.requests, input: a.input + b.input, cacheRead: a.cacheRead + b.cacheRead, cacheWrite: a.cacheWrite + b.cacheWrite, output: a.output + b.output,
+  requests: a.requests + b.requests, input: a.input + b.input, cacheRead: a.cacheRead + b.cacheRead, cacheWrite: a.cacheWrite + b.cacheWrite, cacheWrite1h: a.cacheWrite1h + b.cacheWrite1h, output: a.output + b.output,
 });
 
 /**
@@ -434,11 +475,11 @@ export const addUsage = (a: Usage, b: Usage): Usage => ({
 export class UsageMeter {
   usage: Usage = { ...NO_USAGE };
   private out = 0;
-  event(ev: { type?: string; message?: { usage?: Record<string, number> }; usage?: Record<string, number> }) {
+  event(ev: { type?: string; message?: { usage?: Record<string, number | Record<string, number>> & { cache_creation?: Record<string, number> } }; usage?: Record<string, number> }) {
     if (ev.type === 'message_start') {
-      const u = ev.message?.usage ?? {};
+      const u = (ev.message?.usage ?? {}) as Record<string, number> & { cache_creation?: Record<string, number> };
       this.out = u.output_tokens ?? 0;
-      this.usage = addUsage(this.usage, { requests: 1, input: u.input_tokens ?? 0, cacheRead: u.cache_read_input_tokens ?? 0, cacheWrite: u.cache_creation_input_tokens ?? 0, output: this.out });
+      this.usage = addUsage(this.usage, { requests: 1, input: u.input_tokens ?? 0, cacheRead: u.cache_read_input_tokens ?? 0, cacheWrite: u.cache_creation_input_tokens ?? 0, cacheWrite1h: u.cache_creation?.ephemeral_1h_input_tokens ?? 0, output: this.out });
     } else if (ev.type === 'message_delta' && typeof ev.usage?.output_tokens === 'number') {
       this.usage = { ...this.usage, output: this.usage.output + ev.usage.output_tokens - this.out };
       this.out = ev.usage.output_tokens;

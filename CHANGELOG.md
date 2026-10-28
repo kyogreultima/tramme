@@ -8,6 +8,27 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-10-28
+
+### Added
+
+- **A queue for the messages written while the assistant works**: every message box (the conversation, the Studio's direction bar, the notes) keeps accepting messages during a turn. They wait above the box, each with a button to take it back, and leave together when the turn ends, as one turn of the assistant, each with the context of the moment it was written (the time, the selection, the scene, the pin), so "this layer" is the layer that was selected then. After a stop or a failed turn the queue stays, with a "Send now" button, and leaves with the next message; a turn that ends with a proposal waiting for a decision holds it until the proposal is applied or rejected. The queue survives a reload of the page.
+- **Dictation**: a microphone in every message box (the home page, the conversation, the Studio's direction bar, the notes). Click to speak, click to stop, and what you said is written where the cursor is, for you to read and send; Escape drops the recording. It runs on the downloaded Whisper model first (Whisper base, 80 MB, is offered when none is downloaded), and a setting in Models, Sound chooses the downloaded model, the companion or the server. The desktop app asks for the microphone (`NSMicrophoneUsageDescription` on macOS).
+- **Haiku 5.5** in the model list, next to Haiku 4.5, with adaptive thinking and the five effort levels (no server-side fallback is asked for it). The default model does not change.
+- **The conversation's cache lifetime, as a setting**: 5 minutes (as before) or an hour, in Settings, Behavior. An hour costs more to write and less when you come back after more than five minutes.
+- **The bench prices and compares the assistant's turns**: every route now reports its usage (the chat-format providers through `stream_options`, with the cached share where each gives it; cache writes split by lifetime; each turn names its route, and says when it has no usage rather than counting zero). `node bench/usage.ts` adds the dollars (a price table for Claude, "unknown" for a model without one, "at least" for Haiku 5.5), the cache share and the route per turn, per conversation and in all; `node bench/usage.ts --compare <before> <after>` compares two series of runs. Costs stay in the bench, never in the chat.
+- **Clips, made by a provider** ([generation-roadmap.md](docs/generation-roadmap.md), step 5): `generate-video` has Veo 3.1 Fast, through Hydracept, make a 4, 6 or 8 second shot from words, or animate a still picture of the project as its opening frame. The clip is saved under `assets/videos/` with its record (`.video.json`), proposed as a video layer at the playhead, and answered with a frame so the assistant judges it; `again` and `change` make it again from its record. A new Videos section in the settings sets the provider and the length. Each second is billed, so the user says yes first, as for the pictures and the sounds.
+
+### Changed
+
+- **The system prompt is in cache order**: the same text, reordered, so that the reference (`docs/document.md`) follows the instructions and comes before what changes with the project (the installed plugins, the packs, the brief). The Messages API caches the fixed part apart for an hour, so it is served from the cache across projects; the other routes get the same order in one piece.
+
+### Fixed
+
+- **The local companion is found whenever it starts**: the app looks for it again every few seconds while it is missing and every fifteen once it answers, on every screen and whichever route works, and when the window regains focus. A companion started after the app, or one that stops, is noticed without a reload.
+- **Speech in any language, transcribed in it**: transformers.js transcribes as English when it is not told the language, so a French dictation came back as English words. Whisper's own first step now tells the language spoken, for dictations and for the sounds transcribed in the browser.
+- **Dictation, quicker the first time**: it runs Whisper on the processor in the compact weights the download offer names (77 MB), where a GPU fetched the full ones (291 MB), and shows the download as a percentage beside the microphone. A second click while the microphone opens no longer opens it twice, and the recording time never shows below zero.
+
 ## [0.14.0] - 2026-10-26
 
 ### Added
@@ -485,7 +506,8 @@ First public release.
 
 - Cloudflare Worker serving the editor and the API, projects stored in R2, access protected by Cloudflare Access.
 
-[Unreleased]: ../../compare/v0.14.0...HEAD
+[Unreleased]: ../../compare/v0.15.0...HEAD
+[0.15.0]: ../../compare/v0.14.0...v0.15.0
 [0.14.0]: ../../compare/v0.13.0...v0.14.0
 [0.13.0]: ../../compare/v0.12.0...v0.13.0
 [0.12.0]: ../../compare/v0.11.1...v0.12.0
