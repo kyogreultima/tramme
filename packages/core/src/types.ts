@@ -253,7 +253,7 @@ export interface MotionBlur {
 }
 
 /** a lane of a sequence: its clips follow one another, a video track draws, an audio track plays */
-export interface Track {
+export interface SequenceTrack {
   id: string;
   name?: string;
   kind: 'video' | 'audio';
@@ -277,7 +277,7 @@ export interface Composition {
   /** 'sequence': a film put together on `tracks`; the engine reads it like any composition */
   kind?: 'sequence';
   /** the lanes of a sequence, bottom to top */
-  tracks?: Track[];
+  tracks?: SequenceTrack[];
   /** plate under the layers; null for a transparent render */
   background?: Prop<string> | null;
   motionBlur?: MotionBlur;
