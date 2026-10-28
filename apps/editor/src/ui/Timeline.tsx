@@ -21,6 +21,8 @@ import { outgoingOf, TRANSITION_KINDS, transitionOf, transitionPlan, type Transi
 import { laneHeight, TrackHeader } from './timeline/Tracks.tsx';
 import { addTrackOps, clipsOn, laneOrder, moveToTrackOps } from './timeline/tracks.ts';
 import { dropOps } from './timeline/clipDrag.ts';
+import { ASSET_MIME } from './timeline/assets-drag.ts';
+import { placeAsset } from './timeline/place.ts';
 
 export const pps = signal(0);              // pixels per second (0: fit)
 const expanded = signal<Set<string>>(new Set());
@@ -145,6 +147,8 @@ export function Timeline() {
   const fps = c.fps;
   const order = rows.flatMap((r) => (r.kind === 'layer' ? [r.item.id] : r.kind === 'track' ? r.ids : []));
   const [snapAt, setSnapAt] = useState<number | null>(null);
+  /** the lane an asset of the media panel is being dragged over */
+  const [dropLane, setDropLane] = useState<string | null>(null);
   const [band, setBand] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
 
   // ── interactions ───────────────────────────────────────────
@@ -481,7 +485,16 @@ export function Timeline() {
             if (r.kind === 'track') {
               const { track } = r;
               return (
-                <div key={`track.${track.id}`} data-track={track.id} class={`tl-row track${track.locked ? ' locked' : ''}${track.hidden || track.muted ? ' off' : ''}`} style={{ height: laneHeight(track) }}>
+                <div key={`track.${track.id}`} data-track={track.id} class={`tl-row track${track.locked ? ' locked' : ''}${track.hidden || track.muted ? ' off' : ''}${dropLane === track.id ? ' drop' : ''}`} style={{ height: laneHeight(track) }}
+                  onDragOver={(e) => { if (!e.dataTransfer?.types.includes(ASSET_MIME)) return; e.preventDefault(); setDropLane(track.id); }}
+                  onDragLeave={() => setDropLane(null)}
+                  onDrop={(e) => {
+                    const asset = e.dataTransfer?.getData(ASSET_MIME);
+                    if (!asset) return;
+                    e.preventDefault(); setDropLane(null);
+                    // the track makes room when it is magnetic, the clip lies over what is there otherwise; Alt does the other
+                    void placeAsset(asset, timeAt(e.clientX), track.id, (track.magnetic ? !e.altKey : e.altKey) ? 'insert' : 'overwrite');
+                  }}>
                   {r.ids.map((id) => { const l = c.layers[id], a = l.in ?? 0; return clipView(id, l, a, Math.max(a, l.out ?? c.duration)); })}
                 </div>
               );

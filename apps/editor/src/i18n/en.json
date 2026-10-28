@@ -1122,7 +1122,9 @@
     "copied": "{n} clip(s) copied",
     "roll": "Roll the cut",
     "slip": "Slip the shot",
-    "slide": "Slide the shot"
+    "slide": "Slide the shot",
+    "cannotPlaceHere": "This clip cannot go on that track",
+    "placeName": "Place {name}"
   },
   "topbar": {
     "tenBit": "10 bits",

@@ -5,13 +5,15 @@
 import { applyOps, isLocked, linkOps, pasteAttributesOps, pasteOps, pointer, rippleDeleteOps, rippleTrimOps, splitAtOps, trimInOps, unlinkOps, type Layer, type Op, type TrammeDoc } from '@tramme/core';
 import { t } from '../../i18n/index.ts';
 
-export type EditCommand = 'split' | 'trimIn' | 'trimOut' | 'rippleDelete' | 'copy' | 'paste' | 'pasteAttributes' | 'link' | 'unlink';
+export type EditCommand = 'insertSource' | 'overwriteSource' | 'split' | 'trimIn' | 'trimOut' | 'rippleDelete' | 'copy' | 'paste' | 'pasteAttributes' | 'link' | 'unlink';
 
 /** a key and the modifiers it needs, no others (mod is Ctrl, or Cmd on a Mac) */
 interface Chord { key: string; mod?: boolean; shift?: boolean; alt?: boolean }
 
 /** every editing key, in one place */
 export const KEYMAP: Record<EditCommand, Chord> = {
+  insertSource: { key: ',' },
+  overwriteSource: { key: '.' },
   split: { key: 'b', mod: true },
   trimIn: { key: 'q' },
   trimOut: { key: 'w' },
@@ -62,6 +64,8 @@ export function editPlan(cmd: EditCommand, env: EditEnv): EditPlan | null {
   const magnetic = (id: string) => !!c.tracks?.find((x) => x.id === c.layers[id].track)?.magnetic;
   const plan = (label: string, ops: Op[], extra: Partial<EditPlan> = {}): EditPlan | null => (ops.length ? { label, ops, ...extra } : null);
 
+  // the asset chosen in the media panel is read from its file: placed by edit-keys.ts, not planned here
+  if (cmd === 'insertSource' || cmd === 'overwriteSource') return null;
   if (cmd === 'split') {
     const r = splitAtOps(doc, compId, clips.length || env.selection.length ? clips : [], time);
     return plan(t('timeline.split'), r.ops, { select: r.ids });

@@ -22,6 +22,12 @@ describe('the editing keys', () => {
     expect(commandFor(key('v', { ctrlKey: true, altKey: true }))).toBe('pasteAttributes');
   });
 
+  it('a comma inserts the asset chosen in the media panel at the playhead, a full stop lays it over', () => {
+    expect(commandFor(key(','))).toBe('insertSource');
+    expect(commandFor(key('.'))).toBe('overwriteSource');
+    expect(commandFor(key('.', { ctrlKey: true }))).toBeNull();
+  });
+
   it('a key with other modifiers than its own is nothing', () => {
     expect(commandFor(key('b'))).toBeNull();
     expect(commandFor(key('b', { ctrlKey: true, shiftKey: true }))).toBeNull();

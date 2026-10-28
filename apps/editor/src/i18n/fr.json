@@ -1122,7 +1122,9 @@
     "copied": "{n} plan(s) copié(s)",
     "roll": "Déplacer la coupe",
     "slip": "Décaler le plan dans son fichier",
-    "slide": "Glisser le plan entre ses voisins"
+    "slide": "Glisser le plan entre ses voisins",
+    "cannotPlaceHere": "Ce plan ne peut pas aller sur cette piste",
+    "placeName": "Placer {name}"
   },
   "topbar": {
     "tenBit": "10 bits",

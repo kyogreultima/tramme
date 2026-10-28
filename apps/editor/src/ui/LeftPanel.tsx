@@ -8,6 +8,7 @@ import { clickSelect, comp, commit, foldAll, S, select, toggleFold, viewDoc, toa
 import { flatTree, freshId, layerName, shiftProp, parentOf, SOUND_GROUP, soundGroupOf, subtree, topLayers, commonStem, folderOf, imagesIn, wholeFile } from '../model.ts';
 import { ColorField, longPress, openMenu, Seg, Swatch, TextInput, resolveColor, type MenuItem } from './controls.tsx';
 import { Icon, kindColor, kindIcon } from './icons.tsx';
+import { ASSET_MIME, chosenAsset } from './timeline/assets-drag.ts';
 import { preview } from '../preview.ts';
 import { mediaDuration } from '../perception.ts';
 import { manifestOf } from '@tramme/project';
@@ -110,15 +111,22 @@ export function insertLayer(layer: Layer, base?: string, extra: Op[] = []) {
  * long as its file, and the composition lengthens to hold it (one undo step).
  */
 export async function layerFromAsset(id: string, a: Asset) {
+  const built = await assetLayer(id, a);
+  if (built) insertLayer(built.layer, id, built.ops);
+}
+
+/** the layer an asset becomes, and what must change with it (a video's composition lengthened to hold it); null for an asset that is no layer */
+export async function assetLayer(id: string, a: Asset): Promise<{ layer: Layer; ops: Op[] } | null> {
   const doc = S.doc.peek(), compId = S.compId.peek(), reg = S.registry.peek();
-  if (a.type === 'image') insertLayer(newLayer(doc, compId, reg.node('image'), { name: a.name || id, props: { image: id, size: [600, 600], fit: 'contain' } }), id);
-  else if (a.type === 'audio') insertLayer(newLayer(doc, compId, reg.node('audio'), { name: a.name || id, props: { audio: id } }), id);
-  else if (a.type === 'video') {
+  if (a.type === 'image') return { layer: newLayer(doc, compId, reg.node('image'), { name: a.name || id, props: { image: id, size: [600, 600], fit: 'contain' } }), ops: [] };
+  if (a.type === 'audio') return { layer: newLayer(doc, compId, reg.node('audio'), { name: a.name || id, props: { audio: id } }), ops: [] };
+  if (a.type === 'video') {
     const length = await mediaDuration(new URL(a.src, new URL(S.docUrl.peek(), location.href)).href);
     const l = newLayer(S.doc.peek(), compId, reg.node('video'), { name: a.name || id });
-    const { layer, ops } = wholeFile(S.doc.peek(), compId, { ...l, props: { ...l.props, video: id } }, length);
-    insertLayer(layer, id, ops);
-  } else if (a.type === 'model' && reg.hasNode('model.3d')) { const l = newLayer(doc, compId, reg.node('model.3d'), { name: a.name || id }); insertLayer({ ...l, props: { ...l.props, source: id } }, id); }
+    return wholeFile(S.doc.peek(), compId, { ...l, props: { ...l.props, video: id } }, length);
+  }
+  if (a.type === 'model' && reg.hasNode('model.3d')) { const l = newLayer(doc, compId, reg.node('model.3d'), { name: a.name || id }); return { layer: { ...l, props: { ...l.props, source: id } }, ops: [] }; }
+  return null;
 }
 
 export function addLayerMenu(e: MouseEvent | DOMRect) {
@@ -638,7 +646,7 @@ function Assets() {
             {type === 'module' && <button class="icon-btn xs" title={t('panel.addPack')} onClick={(e) => packMenu(e, addPack)}><Icon name="plus" /></button>}
           </div>
           {list.map(([id, a]) => (
-            <div key={id} class="list-row" title={a.src} onDblClick={() => use(id, a)}
+            <div key={id} class={`list-row${chosenAsset.value === id ? ' on' : ''}`} title={a.src} draggable onDragStart={(e) => { e.dataTransfer?.setData(ASSET_MIME, id); if (e.dataTransfer) e.dataTransfer.effectAllowed = 'copy'; }} onClick={() => { chosenAsset.value = id; }} onDblClick={() => use(id, a)}
               onPointerDown={(e) => longPress(e, (pos) => assetMenu(pos, id, a))} onContextMenu={(e) => assetMenu(e, id, a)}>
               <span class="thumb" style={a.type === 'image' ? { backgroundImage: `url("${url(id)}")`, backgroundSize: 'contain', backgroundColor: 'var(--media)' } : undefined}>
                 {a.type !== 'image' && (a.type === 'font' ? <span style={{ fontFamily: `"${a.family}"`, color: 'var(--text)', fontSize: 13 }}>Aa</span> : <Icon name={ASSET_ICON[a.type]} />)}
