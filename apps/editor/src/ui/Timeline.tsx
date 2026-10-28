@@ -6,12 +6,12 @@
 
 import { signal } from '@preact/signals';
 import { useLayoutEffect, useRef, useState } from 'preact/hooks';
-import { applyOps, isLocked, layerActive, pointer, rippleTrimOps, staticValue, toSequenceOps, type Composition, type Keyframe, type Layer, type Op, type SequenceTrack } from '@tramme/core';
+import { applyOps, cutsOf, isLocked, layerActive, pointer, rippleTrimOps, rollOps, slideOps, slipOps, staticValue, toSequenceOps, type Composition, type Keyframe, type Layer, type Op, type SequenceTrack } from '@tramme/core';
 import { clickSelect, comp, commit, draft, cancelDraft, S, select, selectAll, setTime, frameStep, toast, toggleFold, uiTime, viewDoc } from '../state.ts';
 import { animatedProps, contentEnd, crossfadeOps, flatTree, freshId, keysOf, layerName, parentOf, parseTime, propPath, rawProp, rulerLabel, shiftLayerOps, snap, splitLayerOps, subtree, timecode, topLayers, trimInOps, type TreeItem } from '../model.ts';
 import { bandOf, longPress, noBrowserMenu, openMenu, Seg, useSize } from './controls.tsx';
 import { Icon, kindColor, kindIcon } from './icons.tsx';
-import { preview } from '../preview.ts';
+import { fileLength, preview } from '../preview.ts';
 import { FILM_H, FILM_W, filmThumb, filmVersion } from '../filmstrip.ts';
 import { GraphEditor } from './GraphEditor.tsx';
 import { addLayerMenu, FoldButtons, openLayerMenu } from './LeftPanel.tsx';
@@ -197,7 +197,10 @@ export function Timeline() {
   const dragClip = (e: PointerEvent, id: string, mode: 'move' | 'in' | 'out') => {
     e.stopPropagation();
     if (e.button !== 0) return;
-    if (e.shiftKey || e.ctrlKey || e.metaKey) { clickSelect(e, id, order); return; }
+    // Shift on an edge rolls the cut; Alt on a clip slips its file, Ctrl+Alt slides it between its neighbours (clips on a track only)
+    const onTrack = !!c.layers[id]?.track, ctrlAlt = (e.ctrlKey || e.metaKey) && e.altKey;
+    const tool: 'roll' | 'slip' | 'slide' | null = !onTrack ? null : mode !== 'move' ? (e.shiftKey ? 'roll' : null) : e.altKey ? (ctrlAlt ? 'slide' : 'slip') : null;
+    if (!tool && (e.shiftKey || e.ctrlKey || e.metaKey)) { clickSelect(e, id, order); return; }
     if (!sel.includes(id)) select([id]);
     const x0 = e.clientX, d0 = S.doc.peek(), c0 = d0.compositions[compId], l = c0.layers[id];
     if (isLocked(c0, id)) { toast(t('timeline.trackLocked'), 'error'); return; }
@@ -216,7 +219,11 @@ export function Timeline() {
       dt = s.at === null ? snap(dt, fps) : dt + s.d;
       setSnapAt(s.at);
       lastDt = dt;
-      if (mode === 'move') {
+      const cut = tool === 'roll' ? cutsOf(c0, l.track!).find((x) => (mode === 'in' ? x.right : x.left) === id) : undefined;
+      if (tool) {
+        const by = snap(dt, fps);
+        ops = tool === 'slip' ? slipOps(d0, compId, id, -by, fileLength) : tool === 'slide' ? slideOps(d0, compId, id, by) : cut ? rollOps(d0, compId, cut.left, cut.right, cut.at + by, fileLength) : [];
+      } else if (mode === 'move') {
         dt = Math.max(dt, -earliest);
         ops = dt ? moving.flatMap((x) => shiftLayerOps(d0, compId, x, dt)) : [];
       } else if (magnetic) {
@@ -237,11 +244,11 @@ export function Timeline() {
       removeEventListener('pointermove', move); removeEventListener('pointerup', up);
       setSnapAt(null);
       // dropped on another lane of a sequence: the clip changes track, where it is in time
-      const lane = mode === 'move' && moving.length === 1 ? document.elementsFromPoint(ev.clientX, ev.clientY).find((el) => (el as HTMLElement).dataset?.track)?.getAttribute('data-track') : null;
-      if (mode === 'move' && magnetic && !lane) ops = dropOps(d0, compId, moving, lastDt);
+      const lane = !tool && mode === 'move' && moving.length === 1 ? document.elementsFromPoint(ev.clientX, ev.clientY).find((el) => (el as HTMLElement).dataset?.track)?.getAttribute('data-track') : null;
+      if (!tool && mode === 'move' && magnetic && !lane) ops = dropOps(d0, compId, moving, lastDt);
       else if (lane && lane !== l.track) ops = [...ops, ...moveToTrackOps(ops.length ? applyOps(d0, ops).doc : d0, compId, id, lane)];
       if (!ops.length) { cancelDraft(); return; }
-      const label = mode === 'in'
+      const label = tool ? t(`timeline.${tool}`) : mode === 'in'
         ? (ops.length > 1 && l.type === 'video' ? t('timeline.trimVideoInFile') : t('common.inPoint'))
         : mode === 'out' ? t('common.outPoint') : moving.length > 1 ? t('timeline.moveNClips', { n: moving.length }) : t('timeline.moveInTime');
       commit(label, ops);
@@ -573,9 +580,6 @@ const KIND_LABEL: Record<TransitionKind, string> = {
   crossfade: m('timeline.kindCrossfade'), dip: m('timeline.kindDip'), push: m('timeline.kindPush'), slide: m('timeline.kindSlide'),
   zoom: m('timeline.kindZoom'), whip: m('timeline.kindWhip'), luma: m('timeline.kindLuma'), glitch: m('timeline.kindGlitch'),
 };
-
-/** a video's length when the preview has it open: the handle after a shot's end */
-const fileLength = (asset: string) => { try { return (preview.renderer?.assets.get(asset) as { duration?: number } | undefined)?.duration; } catch { return undefined; } };
 
 /** a transition on the cut into this clip, its length: the operations, or a toast saying why not */
 function putTransition(compId: string, id: string, kind: TransitionKind, duration: number, quiet = false): Op[] | null {
