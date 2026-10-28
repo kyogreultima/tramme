@@ -161,6 +161,13 @@ export class AssetStore {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return parseCube(await r.text());
       }
+      case 'audio': {
+        // a sound is decoded by the mixer when it plays: here only its presence is checked, a byte asked for
+        const r = await fetch(url, { headers: { range: 'bytes=0-0' } });
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        void r.body?.cancel?.();
+        return url;
+      }
       default:
         return url;
     }

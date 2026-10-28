@@ -8,6 +8,8 @@ const doc = (): TrammeDoc => ({
     ok: { type: 'json', src: 'data/ok.json' },
     gone: { type: 'json', src: 'data/gone.json' },
     lost: { type: 'json', src: 'data/lost.json' },
+    voice: { type: 'audio', src: 'data/voice.wav' },
+    here: { type: 'audio', src: 'data/here.wav' },
   },
   compositions: { main: { name: 'Main', width: 64, height: 36, fps: 30, duration: 1, layers: {}, order: [] } },
 });
@@ -15,12 +17,12 @@ const doc = (): TrammeDoc => ({
 let present: Set<string>;
 const fetched: string[] = [];
 beforeEach(() => {
-  present = new Set(['ok']);
+  present = new Set(['ok', 'here']);
   fetched.length = 0;
   vi.stubGlobal('document', { fonts: { ready: Promise.resolve() } });
   vi.stubGlobal('fetch', async (url: string) => {
     fetched.push(url);
-    const name = /data\/(\w+)\.json/.exec(url)![1];
+    const name = /data\/(\w+)\.\w+/.exec(url)![1];
     return present.has(name) ? { ok: true, status: 200, json: async () => ({ name }) } : { ok: false, status: 404 };
   });
 });
@@ -31,7 +33,7 @@ describe('media whose file is missing', () => {
     const store = new AssetStore(doc(), 'http://host/doc.json');
     await store.sync(doc(), [], true);
     expect(store.has('ok')).toBe(true);
-    expect([...store.offline.keys()]).toEqual(['gone', 'lost']);
+    expect([...store.offline.keys()]).toEqual(['gone', 'lost', 'voice']);
     expect(store.offline.get('gone')).toMatch(/HTTP 404/);
   });
 
@@ -49,7 +51,7 @@ describe('media whose file is missing', () => {
     present.add('gone');
     await store.sync(doc(), ['gone'], true);
     expect(store.has('gone')).toBe(true);
-    expect([...store.offline.keys()]).toEqual(['lost']);
+    expect([...store.offline.keys()]).toEqual(['lost', 'voice']);
   });
 
   it('leave the list when their asset is removed from the project', async () => {
@@ -57,6 +59,14 @@ describe('media whose file is missing', () => {
     await store.sync(d, [], true);
     delete d.assets.lost;
     await store.sync(d, [], true);
-    expect([...store.offline.keys()]).toEqual(['gone']);
+    expect([...store.offline.keys()]).toEqual(['gone', 'voice']);
+  });
+
+  it('a sound is checked too: its file is asked for in a word, not downloaded', async () => {
+    const store = new AssetStore(doc(), 'http://host/doc.json');
+    await store.sync(doc(), [], true);
+    expect(store.has('here')).toBe(true);
+    expect(store.offline.has('voice')).toBe(true);
+    expect(store.offline.get('voice')).toMatch(/HTTP 404/);
   });
 });
