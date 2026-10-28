@@ -18,6 +18,7 @@ import { LIPSYNC_TOOLS } from './lipsync.ts';
 import { MODEL_TOOLS } from './model3d.ts';
 import { REMOVEBG_TOOLS } from './removebg.ts';
 import { CUTS_TOOLS } from './cuts.ts';
+import { MONTAGE_TOOLS } from './montage-tools.ts';
 import { PERCEPTION_TOOLS } from './perception.ts';
 import { EDITOR_PRESETS } from './presets.ts';
 import { BUILTIN_KITS, RECIPE_TOOLS } from './recipes.ts';
@@ -106,5 +107,5 @@ export const EDITOR_PROMPTS: PromptType[] = [
 
 /** the base vocabulary of the editor, before a document's plugins */
 export function editorRegistry() {
-  return builtinRegistry().registerTool(...EDITOR_TOOLS, ...SVG_TOOLS, ...RECIPE_TOOLS, ...FIGURE_TOOLS, ...EVENT_TOOLS, ...PERCEPTION_TOOLS, ...TRACKING_TOOLS, ...STABILIZE_TOOLS, ...PROXY_TOOLS, ...COMPONENT_TOOLS, ...DENOISE_TOOLS, ...SKIN_TOOLS, ...LONG_TOOLS, ...CUTOUT_TOOLS, ...DEPTH_TOOLS, ...MODEL_TOOLS, ...REMOVEBG_TOOLS, ...LIPSYNC_TOOLS, ...CUTS_TOOLS, ...FILLERS_TOOLS, ...REVIEW_TOOLS, ...SOUND_TOOLS, ...MIXING_TOOLS, ...IMAGE_TOOLS, ...VIDEO_TOOLS, ...SHORTS_TOOLS, ...SOURCE_TOOLS, ...BLOCK_TOOLS, ...BRIEF_TOOLS, ...LIBRARY_TOOLS).registerPrompt(...EDITOR_PROMPTS).registerKit(...BUILTIN_KITS).registerPreset(...EDITOR_PRESETS);
+  return builtinRegistry().registerTool(...EDITOR_TOOLS, ...SVG_TOOLS, ...RECIPE_TOOLS, ...FIGURE_TOOLS, ...EVENT_TOOLS, ...PERCEPTION_TOOLS, ...TRACKING_TOOLS, ...STABILIZE_TOOLS, ...PROXY_TOOLS, ...COMPONENT_TOOLS, ...DENOISE_TOOLS, ...SKIN_TOOLS, ...LONG_TOOLS, ...CUTOUT_TOOLS, ...DEPTH_TOOLS, ...MODEL_TOOLS, ...REMOVEBG_TOOLS, ...LIPSYNC_TOOLS, ...CUTS_TOOLS, ...MONTAGE_TOOLS, ...FILLERS_TOOLS, ...REVIEW_TOOLS, ...SOUND_TOOLS, ...MIXING_TOOLS, ...IMAGE_TOOLS, ...VIDEO_TOOLS, ...SHORTS_TOOLS, ...SOURCE_TOOLS, ...BLOCK_TOOLS, ...BRIEF_TOOLS, ...LIBRARY_TOOLS).registerPrompt(...EDITOR_PROMPTS).registerKit(...BUILTIN_KITS).registerPreset(...EDITOR_PRESETS);
 }
