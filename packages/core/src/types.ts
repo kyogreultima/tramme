@@ -132,6 +132,10 @@ export interface Layer {
   locked?: boolean;
   /** id of a layer whose path clips this one (in the same parent space) */
   clip?: string;
+  /** sequences: the track this clip sits on */
+  track?: string;
+  /** sequences: clips sharing a link id move, split and are deleted together (a video and its detached sound) */
+  link?: string;
   blend?: BlendMode;
   transform?: Transform;
   props?: Record<string, Prop>;
@@ -248,6 +252,21 @@ export interface MotionBlur {
   shutter: Prop<number>;
 }
 
+/** a lane of a sequence: its clips follow one another, a video track draws, an audio track plays */
+export interface Track {
+  id: string;
+  name?: string;
+  kind: 'video' | 'audio';
+  locked?: boolean;
+  hidden?: boolean;
+  muted?: boolean;
+  solo?: boolean;
+  /** clips of this track close their gaps by themselves and ripple when one is removed or trimmed */
+  magnetic?: boolean;
+  /** lane height in the timeline, px */
+  height?: number;
+}
+
 export interface Composition {
   name: string;
   width: number;
@@ -255,6 +274,10 @@ export interface Composition {
   fps: number;
   /** seconds */
   duration: number;
+  /** 'sequence': a film put together on `tracks`; the engine reads it like any composition */
+  kind?: 'sequence';
+  /** the lanes of a sequence, bottom to top */
+  tracks?: Track[];
   /** plate under the layers; null for a transparent render */
   background?: Prop<string> | null;
   motionBlur?: MotionBlur;
