@@ -1247,7 +1247,8 @@
     "queueFailed": "échec",
     "addToQueue": "Mettre en file",
     "onlyMarked": "Seulement la partie marquée, de {from} à {to}",
-    "queuedName": "{name} · {format}"
+    "queuedName": "{name} · {format}",
+    "hdrUnavailable": "HDR : le canevas de ce navigateur ne peut pas encore le tenir, l'export reste en SDR"
   },
   "viewport": {
     "waveform": "Forme d'onde",
