@@ -1685,5 +1685,24 @@
     "openInSource": "Open in the source monitor",
     "subclipSaved": "Sub-clip {name} saved",
     "needRange": "Set an in point and an out point first"
+  },
+  "publish": {
+    "title": "Publish for",
+    "short": "Vertical short · 1080×1920, 60 s",
+    "square": "Square · 1080×1080, 60 s",
+    "landscape": "Landscape · 1920×1080",
+    "master": "4K master · 3840×2160",
+    "gif": "Animated GIF · 640 px, 15 s",
+    "ready": "The film is ready for this format",
+    "fix": "Fix",
+    "fixAll": "Fix all",
+    "askVertical": "Ask the assistant",
+    "copyChapters": "Copy the chapters as a list for the description",
+    "chaptersNote": "The file does not carry the chapters of this export: paste them in the description",
+    "issue.long": "The film lasts {seconds} s, this format takes {max} s at most: cut it to {max} s",
+    "issue.aspect": "The film is {from}, this format is {to}",
+    "issue.size": "The film is {from}, this format is {to}",
+    "issue.fps": "The film runs at {from} fps, this format wants {to}",
+    "issue.loudness": "The loudness aimed at is {from}, this format wants {to} LUFS"
   }
 }

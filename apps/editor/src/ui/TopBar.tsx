@@ -12,6 +12,7 @@ import { canRedo, canUndo, comp, commit, redo, redoLabel, S, saveNow, toast, und
 import { ago, contentEnd, fmtSeconds, snap } from '../model.ts';
 import { shortsOf } from '../shorts.ts';
 import { openMenu, Popover, Select, Toggle, type MenuItem } from './controls.tsx';
+import { PublishPanel } from './PublishPanel.tsx';
 import { VIDEO, WEB_FORMATS, type WebFormat } from '../formats.ts';
 import { Icon } from './icons.tsx';
 import { LogoMark } from './Logo.tsx';
@@ -197,6 +198,7 @@ function ExportPop({ anchor, onClose }: { anchor: HTMLElement; onClose: () => vo
   return (
     <Popover anchor={anchor} onClose={running() ? () => {} : onClose} class="export-pop" align="right">
       <div style={{ fontWeight: 600 }}>{t('common.export')}</div>
+      <PublishPanel c={c} compId={S.compId.value} disabled={running()} onFormat={setFormat} />
       <div class="export-formats">
         {WEB_FORMATS.map(([id, label, hint]) => (
           <button key={id} class={format === id ? 'on' : ''} disabled={running()} onClick={() => setFormat(id)}>

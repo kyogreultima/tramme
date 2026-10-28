@@ -1363,6 +1363,25 @@
     "subclipSaved": "Sous-plan {name} gardé",
     "needRange": "Posez d'abord un point d'entrée et un point de sortie"
   },
+  "publish": {
+    "title": "Publier pour",
+    "short": "Court vertical · 1080×1920, 60 s",
+    "square": "Carré · 1080×1080, 60 s",
+    "landscape": "Paysage · 1920×1080",
+    "master": "Master 4K · 3840×2160",
+    "gif": "GIF animé · 640 px, 15 s",
+    "ready": "Le film est prêt pour ce format",
+    "fix": "Corriger",
+    "fixAll": "Tout corriger",
+    "askVertical": "Demander à l'assistant",
+    "copyChapters": "Copier les chapitres en liste pour la description",
+    "chaptersNote": "Le fichier de cet export ne porte pas les chapitres : collez-les dans la description",
+    "issue.long": "Le film dure {seconds} s, ce format en accepte {max} au plus : le couper à {max} s",
+    "issue.aspect": "Le film est en {from}, ce format est en {to}",
+    "issue.size": "Le film fait {from}, ce format fait {to}",
+    "issue.fps": "Le film tourne à {from} i/s, ce format en veut {to}",
+    "issue.loudness": "Le volume visé est {from}, ce format veut {to} LUFS"
+  },
   "content": {
     "Keep the pitch": "Garder la hauteur",
     "Semitones": "Demi-tons",
