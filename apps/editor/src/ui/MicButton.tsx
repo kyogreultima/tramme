@@ -16,8 +16,8 @@ export function writeInto(area: HTMLTextAreaElement | null, set: (value: string)
   requestAnimationFrame(() => { area?.focus(); area?.setSelectionRange(caret, caret); });
 }
 
-/** m:ss of a recording's length */
-const clock = (ms: number) => `${Math.floor(ms / 60000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}`;
+/** m:ss of a recording's length (never below zero: the clock's last tick may predate the recording's start) */
+const clock = (ms: number) => { const s = Math.max(0, Math.floor(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 
 export function MicButton({ onText, disabled }: { onText: (text: string) => void; disabled?: boolean }) {
   const [writing, setWriting] = useState(false);
@@ -25,6 +25,7 @@ export function MicButton({ onText, disabled }: { onText: (text: string) => void
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     if (!rec) return;
+    setNow(Date.now());
     const tick = setInterval(() => setNow(Date.now()), 250);
     const key = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); cancelDictation(); } };
     addEventListener('keydown', key, true);
