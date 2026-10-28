@@ -545,3 +545,28 @@ export function toSequenceOps(doc: TrammeDoc, compId: string): Op[] {
     ...ops,
   ];
 }
+
+/**
+ * A clip lifted out of its place on a track and put where `centre` (the time
+ * of its middle) falls among the others, the track closing up behind it and
+ * opening for it: the third clip dropped between the first two. The clips
+ * linked to it move by the same amount. Nothing when it falls in its own
+ * place, or when a clip involved is locked.
+ */
+export function reorderOps(doc: TrammeDoc, compId: string, id: string, centre: number): Op[] {
+  const c = doc.compositions[compId], me = c.layers[id];
+  if (!me?.track || isLocked(c, id)) return [];
+  const all = trackClips(c, me.track), rest = all.filter((k) => k.id !== id), mine = all.find((k) => k.id === id)!;
+  const len = round6(mine.out - mine.in), was = all.indexOf(mine);
+  const slot = rest.filter((k) => (k.in + k.out) / 2 < centre).length;
+  if (slot === was) return [];
+  // closing up behind the clip, then opening where it goes: each clip's net shift
+  const after1 = (j: number) => (j >= was ? -len : 0);
+  const net = rest.map((_, j) => after1(j) + (j >= slot ? len : 0));
+  const landing = slot < rest.length ? rest[slot].in + after1(slot) : rest.length ? rest[rest.length - 1].out + after1(rest.length - 1) : 0;
+  const shifts = new Map(rest.flatMap((k, j) => (Math.abs(net[j]) > 1e-9 ? [[k.id, net[j]] as [string, number]] : [])));
+  const moved = shiftAll(doc, compId, shifts);
+  if (!moved) return [];
+  const delta = round6(landing - mine.in);
+  return [...moved, ...linkedIds(c, id).flatMap((m) => shiftLayerOps(doc, compId, m, delta))];
+}

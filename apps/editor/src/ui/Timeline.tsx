@@ -6,7 +6,7 @@
 
 import { signal } from '@preact/signals';
 import { useLayoutEffect, useRef, useState } from 'preact/hooks';
-import { applyOps, isLocked, layerActive, pointer, staticValue, toSequenceOps, type Composition, type Keyframe, type Layer, type Op, type SequenceTrack } from '@tramme/core';
+import { applyOps, isLocked, layerActive, pointer, rippleTrimOps, staticValue, toSequenceOps, type Composition, type Keyframe, type Layer, type Op, type SequenceTrack } from '@tramme/core';
 import { clickSelect, comp, commit, draft, cancelDraft, S, select, selectAll, setTime, frameStep, toast, toggleFold, uiTime, viewDoc } from '../state.ts';
 import { animatedProps, contentEnd, crossfadeOps, flatTree, freshId, keysOf, layerName, parentOf, parseTime, propPath, rawProp, rulerLabel, shiftLayerOps, snap, splitLayerOps, subtree, timecode, topLayers, trimInOps, type TreeItem } from '../model.ts';
 import { bandOf, longPress, noBrowserMenu, openMenu, Seg, useSize } from './controls.tsx';
@@ -20,6 +20,7 @@ import { m, t, tr } from '../i18n/index.ts';
 import { outgoingOf, TRANSITION_KINDS, transitionOf, transitionPlan, type TransitionKind } from '../transitions.ts';
 import { laneHeight, TrackHeader } from './timeline/Tracks.tsx';
 import { addTrackOps, clipsOn, laneOrder, moveToTrackOps } from './timeline/tracks.ts';
+import { dropOps } from './timeline/clipDrag.ts';
 
 export const pps = signal(0);              // pixels per second (0: fit)
 const expanded = signal<Set<string>>(new Set());
@@ -206,15 +207,20 @@ export function Timeline() {
     const tin = l.in ?? 0, tout = l.out ?? c0.duration;
     const edges = mode === 'move' ? moving.flatMap((x) => [c0.layers[x].in ?? 0, c0.layers[x].out ?? c0.duration]) : [mode === 'in' ? tin : tout];
     const earliest = Math.min(...moving.map((x) => c0.layers[x].in ?? 0));
-    let ops: Op[] = [];
+    // on a magnetic track a drag lets the clip fall among the others and a trim ripples the track
+    const magnetic = !!l.track && !!c0.tracks?.find((x) => x.id === l.track)?.magnetic;
+    let ops: Op[] = [], lastDt = 0;
     const move = (ev: PointerEvent) => {
       let dt = (ev.clientX - x0) / k;
       const s = ev.shiftKey ? { d: 0, at: null } : snapShift(edges.map((x) => x + dt), targets, SNAP_PX / k);
       dt = s.at === null ? snap(dt, fps) : dt + s.d;
       setSnapAt(s.at);
+      lastDt = dt;
       if (mode === 'move') {
         dt = Math.max(dt, -earliest);
         ops = dt ? moving.flatMap((x) => shiftLayerOps(d0, compId, x, dt)) : [];
+      } else if (magnetic) {
+        ops = rippleTrimOps(d0, compId, id, mode, mode === 'in' ? tin + dt : tout + dt, fileLength);
       } else {
         const lp = pointer('compositions', compId, 'layers', id);
         if (mode === 'in') {
@@ -232,7 +238,8 @@ export function Timeline() {
       setSnapAt(null);
       // dropped on another lane of a sequence: the clip changes track, where it is in time
       const lane = mode === 'move' && moving.length === 1 ? document.elementsFromPoint(ev.clientX, ev.clientY).find((el) => (el as HTMLElement).dataset?.track)?.getAttribute('data-track') : null;
-      if (lane && lane !== l.track) ops = [...ops, ...moveToTrackOps(ops.length ? applyOps(d0, ops).doc : d0, compId, id, lane)];
+      if (mode === 'move' && magnetic && !lane) ops = dropOps(d0, compId, moving, lastDt);
+      else if (lane && lane !== l.track) ops = [...ops, ...moveToTrackOps(ops.length ? applyOps(d0, ops).doc : d0, compId, id, lane)];
       if (!ops.length) { cancelDraft(); return; }
       const label = mode === 'in'
         ? (ops.length > 1 && l.type === 'video' ? t('timeline.trimVideoInFile') : t('common.inPoint'))
