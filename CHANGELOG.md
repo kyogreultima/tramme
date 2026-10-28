@@ -8,8 +8,11 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+## [0.15.1] - 2026-10-28
+
 ### Fixed
 
+- **The local companion transcribes in the language spoken too**: it ran Whisper without a language, so transformers.js took English. It now reads the language from Whisper's first step, as the browser does, and tells it back so the next chunks of a long sound keep it.
 - **A video added from the assets plays whole**: its layer is as long as its file, and a composition shorter than it lengthens to hold it (one undo takes both back). A 12-minute video added to a new 5-second project was cut to 5 seconds and looped there.
 - **The cut in the file reaches past the composition**: stretching a video's end past the composition's end lengthens the composition with it, so what was taken is seen and played instead of falling after the end.
 - **The model chosen stays chosen**: the companion missing one of the editor's checks (busy with a turn or a transcription) no longer replaces the model picked with another connected AI's; that takeover now only happens at startup, while the chosen model has never answered.
@@ -33,7 +36,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 ### Fixed
 
 - **The local companion is found whenever it starts**: the app looks for it again every few seconds while it is missing and every fifteen once it answers, on every screen and whichever route works, and when the window regains focus. A companion started after the app, or one that stops, is noticed without a reload.
-- **Speech in any language, transcribed in it**: transformers.js transcribes as English when it is not told the language, so a French dictation came back as English words. Whisper's own first step now tells the language spoken, for dictations and for the sounds transcribed in the browser or by the local companion (which tells it back, so the next chunks keep it).
+- **Speech in any language, transcribed in it**: transformers.js transcribes as English when it is not told the language, so a French dictation came back as English words. Whisper's own first step now tells the language spoken, for dictations and for the sounds transcribed in the browser.
 - **Dictation, quicker the first time**: it runs Whisper on the processor in the compact weights the download offer names (77 MB), where a GPU fetched the full ones (291 MB), and shows the download as a percentage beside the microphone. A second click while the microphone opens no longer opens it twice, and the recording time never shows below zero.
 
 ## [0.14.0] - 2026-10-26
@@ -513,7 +516,8 @@ First public release.
 
 - Cloudflare Worker serving the editor and the API, projects stored in R2, access protected by Cloudflare Access.
 
-[Unreleased]: ../../compare/v0.15.0...HEAD
+[Unreleased]: ../../compare/v0.15.1...HEAD
+[0.15.1]: ../../compare/v0.15.0...v0.15.1
 [0.15.0]: ../../compare/v0.14.0...v0.15.0
 [0.14.0]: ../../compare/v0.13.0...v0.14.0
 [0.13.0]: ../../compare/v0.12.0...v0.13.0
