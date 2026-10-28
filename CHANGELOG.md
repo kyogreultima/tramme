@@ -8,6 +8,8 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-10-28
+
 ### Added
 
 - **A queue for the messages written while the assistant works**: every message box (the conversation, the Studio's direction bar, the notes) keeps accepting messages during a turn. They wait above the box, each with a button to take it back, and leave together when the turn ends, as one turn of the assistant, each with the context of the moment it was written (the time, the selection, the scene, the pin), so "this layer" is the layer that was selected then. After a stop or a failed turn the queue stays, with a "Send now" button, and leaves with the next message; a turn that ends with a proposal waiting for a decision holds it until the proposal is applied or rejected. The queue survives a reload of the page.
@@ -24,6 +26,8 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 ### Fixed
 
 - **The local companion is found whenever it starts**: the app looks for it again every few seconds while it is missing and every fifteen once it answers, on every screen and whichever route works, and when the window regains focus. A companion started after the app, or one that stops, is noticed without a reload.
+- **Speech in any language, transcribed in it**: transformers.js transcribes as English when it is not told the language, so a French dictation came back as English words. Whisper's own first step now tells the language spoken, for dictations and for the sounds transcribed in the browser.
+- **Dictation, quicker the first time**: it runs Whisper on the processor in the compact weights the download offer names (77 MB), where a GPU fetched the full ones (291 MB), and shows the download as a percentage beside the microphone. A second click while the microphone opens no longer opens it twice, and the recording time never shows below zero.
 
 ## [0.14.0] - 2026-10-26
 
@@ -502,7 +506,8 @@ First public release.
 
 - Cloudflare Worker serving the editor and the API, projects stored in R2, access protected by Cloudflare Access.
 
-[Unreleased]: ../../compare/v0.14.0...HEAD
+[Unreleased]: ../../compare/v0.15.0...HEAD
+[0.15.0]: ../../compare/v0.14.0...v0.15.0
 [0.14.0]: ../../compare/v0.13.0...v0.14.0
 [0.13.0]: ../../compare/v0.12.0...v0.13.0
 [0.12.0]: ../../compare/v0.11.1...v0.12.0
