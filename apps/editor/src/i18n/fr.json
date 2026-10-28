@@ -1163,7 +1163,10 @@
     "cameraN": "Caméra {n}",
     "closeMulticam": "Fermer le multicam",
     "addAdjustment": "Ajouter un calque d'effets à la tête de lecture",
-    "adjustmentHint": "Ses effets touchent toutes les pistes dessous, sur sa durée seulement"
+    "adjustmentHint": "Ses effets touchent toutes les pistes dessous, sur sa durée seulement",
+    "matchLook": "Caler l'étalonnage sur le premier plan sélectionné",
+    "matchNeedsTwo": "Sélectionnez deux plans avec une image",
+    "matchNoPicture": "{name} : son image n'est pas encore lisible"
   },
   "topbar": {
     "tenBit": "10 bits",

@@ -15,6 +15,7 @@ import { fileLength, preview } from '../preview.ts';
 import { Tabs } from './timeline/Tabs.tsx';
 import { syncClips } from '../sync.ts';
 import { makeMulticam } from './Multicam.tsx';
+import { matchLooks } from '../looks-run.ts';
 import { FILM_H, FILM_W, filmThumb, filmVersion } from '../filmstrip.ts';
 import { GraphEditor } from './GraphEditor.tsx';
 import { addLayerMenu, FoldButtons, openLayerMenu } from './LeftPanel.tsx';
@@ -341,6 +342,7 @@ export function Timeline() {
         { label: t('timeline.moveToPlayhead'), icon: 'arrow', disabled: at === tin, onClick: () => commit(t('timeline.moveToPlayhead'), shiftLayerOps(S.doc.peek(), compId, id, at - tin)) },
         { label: t('timeline.syncBySound'), icon: 'audio', disabled: S.selection.peek().length < 2 || !S.selection.peek().includes(id), onClick: () => { void syncClips(S.selection.peek()); } },
         { label: t('timeline.makeMulticam'), icon: 'film', disabled: S.selection.peek().filter((x) => c.layers[x]?.type === 'video').length < 2 || !S.selection.peek().includes(id), onClick: () => { void makeMulticam(S.selection.peek()); } },
+        { label: t('timeline.matchLook'), icon: 'palette', disabled: S.selection.peek().filter((x) => c.layers[x]?.type === 'video' || c.layers[x]?.type === 'image').length < 2 || !S.selection.peek().includes(id), onClick: () => { void matchLooks(S.selection.peek()); } },
         { label: t('timeline.crossfade'), icon: 'compare', hint: t('timeline.crossfadeHint'), disabled: !fade, onClick: () => fade && commit(t('timeline.crossfade'), fade.ops) },
         {
           label: transitionOf(l) ? t('timeline.changeTransition') : t('timeline.addTransition'), icon: 'effects', hint: t('timeline.transitionHint'),

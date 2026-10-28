@@ -1163,7 +1163,10 @@
     "cameraN": "Camera {n}",
     "closeMulticam": "Close the multicam",
     "addAdjustment": "Add an adjustment clip at the playhead",
-    "adjustmentHint": "Its effects reach every track under it, for its length only"
+    "adjustmentHint": "Its effects reach every track under it, for its length only",
+    "matchLook": "Match the look of the first selected clip",
+    "matchNeedsTwo": "Select two clips with a picture",
+    "matchNoPicture": "{name}: its picture cannot be read yet"
   },
   "topbar": {
     "tenBit": "10 bits",
