@@ -835,7 +835,10 @@
     "packOlderHere": "Ce projet tient {name} en {from} ; l’éditeur livre {to}.",
     "packUpdated": "{name} mis à jour vers {version}",
     "couldNotUpdatePack": "Impossible de mettre à jour le pack : {error}",
-    "couldNotAddPack": "Impossible d'ajouter le pack : {error}"
+    "couldNotAddPack": "Impossible d'ajouter le pack : {error}",
+    "newSequence": "Nouvelle séquence",
+    "sequenceN": "Séquence {n}",
+    "newSequenceFromMedia": "Nouvelle séquence depuis ce média"
   },
   "models": {
     "loading": "Chargement…",
@@ -1124,7 +1127,10 @@
     "slip": "Décaler le plan dans son fichier",
     "slide": "Glisser le plan entre ses voisins",
     "cannotPlaceHere": "Ce plan ne peut pas aller sur cette piste",
-    "placeName": "Placer {name}"
+    "placeName": "Placer {name}",
+    "cannotNest": "Une composition ne peut pas se contenir elle-même",
+    "newSequenceName": "Nouvelle séquence depuis {name}",
+    "closeTab": "Fermer l'onglet"
   },
   "topbar": {
     "tenBit": "10 bits",

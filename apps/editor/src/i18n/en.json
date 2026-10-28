@@ -835,7 +835,10 @@
     "packOlderHere": "This project holds {name} at {from}; the editor ships {to}.",
     "packUpdated": "{name} updated to {version}",
     "couldNotUpdatePack": "Could not update the pack: {error}",
-    "couldNotAddPack": "Could not add the pack: {error}"
+    "couldNotAddPack": "Could not add the pack: {error}",
+    "newSequence": "New sequence",
+    "sequenceN": "Sequence {n}",
+    "newSequenceFromMedia": "New sequence from this media"
   },
   "models": {
     "loading": "Loading…",
@@ -1124,7 +1127,10 @@
     "slip": "Slip the shot",
     "slide": "Slide the shot",
     "cannotPlaceHere": "This clip cannot go on that track",
-    "placeName": "Place {name}"
+    "placeName": "Place {name}",
+    "cannotNest": "A composition cannot hold itself",
+    "newSequenceName": "New sequence from {name}",
+    "closeTab": "Close the tab"
   },
   "topbar": {
     "tenBit": "10 bits",
