@@ -76,6 +76,9 @@ export function removeLayersOps(doc: TrammeDoc, compId: string, ids: Iterable<st
   return ops;
 }
 
+/** a change of time cut to the ten-thousandth toward zero, the precision the trims write: the two edges of a cut then stay equal, and a clamp stays inside its limit */
+const cutTo4 = (x: number) => Math.trunc(x * 1e4) / 1e4;
+
 const trackLocked = (c: Composition, trackId: string) => !!c.tracks?.find((t) => t.id === trackId)?.locked;
 
 /** the operations moving each of these clips by its own shift, or none when one of them cannot move (locked) */
@@ -278,7 +281,7 @@ export function rippleTrimOps(doc: TrammeDoc, compId: string, id: string, edge: 
   const tin = l.in ?? 0, tout = l.out ?? c.duration, length = tout - tin;
   const [headMax, tailMax] = handles(l, length, fileLength);
   // the change of length wanted, limited by the file and by one frame left
-  const grow = edge === 'out' ? Math.min(tailMax, Math.max(fr - length, to - tout)) : Math.min(-headMax, Math.max(fr - length, tin - to));
+  const grow = cutTo4(edge === 'out' ? Math.min(tailMax, Math.max(fr - length, to - tout)) : Math.min(-headMax, Math.max(fr - length, tin - to)));
   const dt = edge === 'out' ? grow : -grow;
   if (Math.abs(grow) < 1e-9) return [];
   const shifts = new Map<string, number>(), ops: Op[] = [];
@@ -314,10 +317,56 @@ export function rollOps(doc: TrammeDoc, compId: string, left: string, right: str
   const cut = (bin + aout) / 2;
   const [, aTail] = handles(a, aout - ain, fileLength);
   const [bHead] = handles(b, bout - bin);
-  const dt = Math.min(aTail, bout - fr - bin, Math.max(ain + fr - aout, bHead, to - cut));
+  const dt = cutTo4(Math.min(aTail, bout - fr - bin, Math.max(ain + fr - aout, bHead, to - cut)));
   if (Math.abs(dt) < 1e-9) return [];
   return [
     { op: 'add', path: pointer('compositions', compId, 'layers', left, 'out'), value: round6(aout + dt) },
     ...trimInOps(doc, compId, right, bin + dt),
+  ];
+}
+
+/**
+ * The window a clip shows in its file moved by `d` seconds of the timeline
+ * (later in the file for a positive `d`), the clip staying where it is. The
+ * clips linked to it slip with it. Limited by the start of the file and, when
+ * its length is known, its end. Nothing for a clip with no file or whose start
+ * is not a plain number.
+ */
+export function slipOps(doc: TrammeDoc, compId: string, id: string, d: number, fileLength?: (asset: string) => number | undefined): Op[] {
+  const c = doc.compositions[compId], l = c.layers[id];
+  if (!l || isLocked(c, id) || carriedStart(l, 1) === null) return [];
+  const ops: Op[] = [];
+  for (const m of linkedIds(c, id)) {
+    const ml = c.layers[m], { rate, asset } = sourceOf(ml), total = asset ? fileLength?.(asset) : undefined;
+    const to = carriedStart(ml, d);
+    if (to === null) continue;
+    const last = total === undefined ? Infinity : Math.max(0, total - ((ml.out ?? c.duration) - (ml.in ?? 0)) * rate);
+    ops.push({ op: 'add', path: pointer('compositions', compId, 'layers', m, 'props', 'start'), value: round6(Math.min(to, last)) });
+  }
+  return ops;
+}
+
+/**
+ * A clip moved by `d` between its neighbours, the track keeping its length:
+ * the clip before it ends later (or earlier) by `d`, the one after starts
+ * later (or earlier) by `d`, its file carried. Limited so each neighbour keeps
+ * a frame. Nothing when the track, or a clip it touches, is locked.
+ */
+export function slideOps(doc: TrammeDoc, compId: string, id: string, d: number): Op[] {
+  const c = doc.compositions[compId], l = c.layers[id], fr = 1 / c.fps;
+  if (!l || !l.track) return [];
+  const track = trackClips(c, l.track), at = track.findIndex((k) => k.id === id);
+  const before = track[at - 1], after = track[at + 1];
+  if ([id, before?.id, after?.id].some((x) => x && isLocked(c, x))) return [];
+  let dt = d;
+  if (before) dt = Math.max(dt, fr - (before.out - before.in));
+  if (after) dt = Math.min(dt, after.out - after.in - fr);
+  if (!before) dt = Math.max(dt, -(l.in ?? 0));
+  dt = cutTo4(dt);
+  if (Math.abs(dt) < 1e-9) return [];
+  return [
+    ...shiftLayerOps(doc, compId, id, dt),
+    ...(before ? [{ op: 'add', path: pointer('compositions', compId, 'layers', before.id, 'out'), value: round6(before.out + dt) } as Op] : []),
+    ...(after ? trimInOps(doc, compId, after.id, after.in + dt) : []),
   ];
 }

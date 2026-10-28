@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyOps, closeGapOps, cutsOf, insertOps, isLocked, linkedIds, overwriteOps, rippleDeleteOps, rippleTrimOps, rollOps, syncOrderOps, trackClips, type Composition, type Op, type TrammeDoc } from '../src/index.ts';
+import { applyOps, closeGapOps, cutsOf, insertOps, isLocked, linkedIds, overwriteOps, rippleDeleteOps, rippleTrimOps, rollOps, slideOps, slipOps, syncOrderOps, trackClips, type Composition, type Op, type TrammeDoc } from '../src/index.ts';
 
 /** a sequence of 10 s: V1 holds a (0-5) and b (4-9, a transition of 1 s over a), A1 holds the sound of a, linked to it */
 export function sequence(): Composition {
@@ -315,5 +315,61 @@ describe('roll', () => {
     expect(c.layers.b.in).toBeCloseTo(6 - 1 / 30, 3);
     const c0 = three(); c0.tracks![0].locked = true;
     expect(rollOps(docOf(c0), 'main', 'a', 'b', 4)).toEqual([]);
+  });
+});
+
+describe('slip', () => {
+  it('moves the start of the file by the slip times the rate and leaves in and out', () => {
+    const c0 = three(); c0.layers.b.props = { video: 'two', start: 2, rate: 2 };
+    const d = docOf(c0), c = after(d, slipOps(d, 'main', 'b', 1));
+    expect(c.layers.b.props!.start).toBe(4);
+    expect(range(c, 'b')).toEqual([3, 6]);
+  });
+
+  it('cannot go before the start of the file, nor past its end when its length is known', () => {
+    const c0 = three(); c0.layers.b.props = { video: 'two', start: 2 };
+    const d = docOf(c0);
+    expect(after(d, slipOps(d, 'main', 'b', -5)).layers.b.props!.start).toBe(0);
+    expect(after(d, slipOps(d, 'main', 'b', 5, () => 6)).layers.b.props!.start).toBe(3);
+  });
+
+  it('returns [] for a clip whose start is an expression, or that has no file', () => {
+    const c0 = three(); c0.layers.b.props!.start = { $expr: '1' } as never; c0.layers.t = { type: 'text', track: 'V1', in: 9, out: 10 };
+    const d = docOf(c0);
+    expect(slipOps(d, 'main', 'b', 1)).toEqual([]);
+    expect(slipOps(d, 'main', 't', 1)).toEqual([]);
+  });
+
+  it('slips the clips linked to it by the same amount', () => {
+    const c0 = three();
+    c0.layers.b.link = 'k'; c0.layers.sb = { type: 'audio', track: 'A1', link: 'k', in: 3, out: 6, props: { audio: 'two', start: 1 } };
+    c0.layers.b.props!.start = 1;
+    const d = docOf(c0), c = after(d, slipOps(d, 'main', 'b', 0.5));
+    expect([c.layers.b.props!.start, c.layers.sb.props!.start]).toEqual([1.5, 1.5]);
+  });
+});
+
+describe('slide', () => {
+  it('moves a clip and trims the out of the left one and the in of the right one by the same amount', () => {
+    const d = docOf(three()), c = after(d, slideOps(d, 'main', 'b', 1));
+    expect([range(c, 'a'), range(c, 'b'), range(c, 'c')]).toEqual([[0, 4], [4, 7], [7, 9]]);
+    expect(c.layers.c.props!.start).toBe(1);
+  });
+
+  it('carries the keyframes of the moved clip', () => {
+    const c0 = three(); c0.layers.b.transform = { position: { $k: [{ t: 3, v: [0, 0] }, { t: 5, v: [10, 0] }] } };
+    const d = docOf(c0), c = after(d, slideOps(d, 'main', 'b', -1));
+    expect((c.layers.b.transform!.position as { $k: { t: number }[] }).$k.map((k) => k.t)).toEqual([2, 4]);
+  });
+
+  it('is clamped when a neighbour would be left with less than a frame', () => {
+    const d = docOf(three()), c = after(d, slideOps(d, 'main', 'b', 10));
+    expect(c.layers.c.out! - c.layers.c.in!).toBeCloseTo(1 / 30, 3);
+    expect(c.layers.b.out).toBe(c.layers.c.in);
+  });
+
+  it('does nothing on a locked track', () => {
+    const c0 = three(); c0.tracks![0].locked = true;
+    expect(slideOps(docOf(c0), 'main', 'b', 1)).toEqual([]);
   });
 });
