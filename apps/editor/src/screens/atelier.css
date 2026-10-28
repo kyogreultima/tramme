@@ -282,6 +282,18 @@
 .tl-name .solo { flex: none; width: 18px; height: 16px; margin-left: auto; padding: 0; border: 1px solid var(--line); border-radius: var(--r-xs); background: none; color: var(--text-3); font: 600 9.5px var(--mono); }
 .tl-name .solo:hover { color: var(--text); border-color: var(--line-strong); }
 .tl-name .solo.on { background: var(--key); border-color: var(--key); color: var(--on-accent); }
+/* the header of a lane of a sequence */
+.tl-name.track { gap: 3px; padding: 0 4px 0 6px; align-items: center; }
+.tl-name.track.locked { opacity: .7; }
+.tl-name.track .kind { display: grid; flex: none; }
+.tl-name.track .name-input { flex: 1; min-width: 0; height: 18px; padding: 0 4px; font: inherit; color: var(--text); background: var(--surface-2); border: 1px solid var(--line-strong); border-radius: var(--r-xs); }
+.tl-name .tbtn { flex: none; width: 18px; height: 18px; padding: 0; display: grid; place-items: center; border: 1px solid transparent; border-radius: var(--r-xs); background: none; color: var(--text-3); }
+.tl-name .tbtn:hover { color: var(--text); background: var(--hover); }
+.tl-name .tbtn.on { color: var(--on-accent); background: var(--key); }
+.tl-row.track { background: color-mix(in srgb, var(--surface-2) 40%, transparent); }
+.tl-row.track.locked .clip { cursor: not-allowed; opacity: .75; }
+.tl-row.track.off { opacity: .55; }
+.tl-row.track.drop { box-shadow: inset 0 0 0 1.5px var(--accent); }
 /* where a moved edge snaps, and the band drawn to select */
 .tl-snap { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--key); pointer-events: none; z-index: 3; }
 .tl-band { position: absolute; border: 1px solid var(--accent); background: var(--accent-soft); pointer-events: none; z-index: 3; }
