@@ -26,7 +26,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 ### Fixed
 
 - **The local companion is found whenever it starts**: the app looks for it again every few seconds while it is missing and every fifteen once it answers, on every screen and whichever route works, and when the window regains focus. A companion started after the app, or one that stops, is noticed without a reload.
-- **Speech in any language, transcribed in it**: transformers.js transcribes as English when it is not told the language, so a French dictation came back as English words. Whisper's own first step now tells the language spoken, for dictations and for the sounds transcribed in the browser.
+- **Speech in any language, transcribed in it**: transformers.js transcribes as English when it is not told the language, so a French dictation came back as English words. Whisper's own first step now tells the language spoken, for dictations and for the sounds transcribed in the browser or by the local companion (which tells it back, so the next chunks keep it).
 - **Dictation, quicker the first time**: it runs Whisper on the processor in the compact weights the download offer names (77 MB), where a GPU fetched the full ones (291 MB), and shows the download as a percentage beside the microphone. A second click while the microphone opens no longer opens it twice, and the recording time never shows below zero.
 
 ## [0.14.0] - 2026-10-26

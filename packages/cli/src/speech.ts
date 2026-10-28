@@ -5,11 +5,11 @@
 // the one chosen in the editor's settings (Models, Transcription), unless
 // TRAMME_WHISPER_MODEL names another for this machine.
 
-import { asrWords } from '@tramme/core';
+import { asrWords, spokenLanguage, type WhisperParts } from '@tramme/core';
 
 const DEFAULT_MODEL = 'Xenova/whisper-small';
 
-type Asr = (audio: Float32Array, opts: Record<string, unknown>) => Promise<{ text: string; chunks?: { text: string; timestamp: [number, number | null] }[] }>;
+type Asr = ((audio: Float32Array, opts: Record<string, unknown>) => Promise<{ text: string; chunks?: { text: string; timestamp: [number, number | null] }[] }>) & WhisperParts;
 const loaded = new Map<string, Promise<Asr>>();
 
 /** the model a request runs: the machine's override, else the one the editor asks for (a model hub id), else the default */
@@ -50,7 +50,10 @@ export async function transcribeLocal(audioBase64: string, language?: string, as
   if (rate !== 16000) throw new Error(`16 kHz expected (got ${rate} Hz)`);
   const id = whisperModel(asked);
   const run = await model(id);
-  const out = await run(samples, { return_timestamps: 'word', chunk_length_s: 30, ...(language ? { language } : {}), task: 'transcribe' });
+  // the language heard when the editor names none (transformers.js would take English), told back so the next chunks keep it
+  const { Tensor } = await import('@huggingface/transformers');
+  const spoken = language ?? await spokenLanguage(run, samples, (ids) => new Tensor('int64', BigInt64Array.from(ids.map(BigInt)), [1, ids.length]));
+  const out = await run(samples, { return_timestamps: 'word', chunk_length_s: 30, language: spoken, task: 'transcribe' });
   const words = asrWords(out);
-  return { words, text: out.text.trim(), language, duration: samples.length / rate, model: id };
+  return { words, text: out.text.trim(), language: spoken, duration: samples.length / rate, model: id };
 }

@@ -10,7 +10,7 @@
 
 import { signal } from '@preact/signals';
 import { ALL_FORMATS, AudioBufferSink, Input, UrlSource } from 'mediabunny';
-import { asrWords, mergeChunks, pointer, transcriptIdOf, type Transcript, type TranscriptWord } from '@tramme/core';
+import { asrWords, mergeChunks, pointer, spokenLanguage, transcriptIdOf, type Transcript, type TranscriptWord, type WhisperParts } from '@tramme/core';
 import { aiStatus, companionLink, refreshStatus } from './ai/index.ts';
 import { reach } from './api.ts';
 import { safeName, takenPaths, upload } from './files.ts';
@@ -59,28 +59,7 @@ async function chunkAudio(sink: AudioBufferSink, from: number, to: number): Prom
 
 type Backend = 'server' | 'companion' | 'browser';
 
-/** what of a Whisper pipeline the language detection reads: its model (called for one step) and its processor */
-interface WhisperParts {
-  model: ((inputs: { input_features: unknown; decoder_input_ids: unknown }) => Promise<{ logits: { data: ArrayLike<number> } }>)
-    & { generation_config: { decoder_start_token_id: number; lang_to_id: Record<string, number> } };
-  processor: (audio: Float32Array) => Promise<{ input_features: unknown }>;
-}
 type Asr = ((audio: Float32Array, opts: Record<string, unknown>) => Promise<{ text: string; chunks?: { text: string; timestamp: [number, number | null] }[] }>) & WhisperParts;
-
-/**
- * The language spoken, as Whisper hears it: one step of its decoder after
- * the start of the transcript, the most likely language token. transformers.js
- * does not detect it, and transcribes as English when it is not told.
- */
-export async function spokenLanguage(run: WhisperParts, samples: Float32Array): Promise<string> {
-  const { Tensor } = await import('@huggingface/transformers');
-  const { decoder_start_token_id: start, lang_to_id: languages } = run.model.generation_config;
-  const { input_features } = await run.processor(samples);
-  const { logits } = await run.model({ input_features, decoder_input_ids: new Tensor('int64', BigInt64Array.from([BigInt(start)]), [1, 1]) });
-  let best = 'en', score = -Infinity;
-  for (const [token, id] of Object.entries(languages)) if (logits.data[id] > score) { score = logits.data[id]; best = token.slice(2, -2); }
-  return best;
-}
 
 /** one chunk to words, by the server, or by the companion when the server cannot, or else in this browser (local: how the model runs there) */
 async function wordsOf(samples: Float32Array, language: string | undefined, prefer: Backend, local?: PipelineRun): Promise<{ words: TranscriptWord[]; language?: string; backend: Backend; model?: string }> {
@@ -88,7 +67,8 @@ async function wordsOf(samples: Float32Array, language: string | undefined, pref
   const viaBrowser = async () => {
     const model = chosenModel('transcription');
     const run = await pipelineOf<Asr>(model, 'the transcription model', local);
-    const spoken = language ?? await spokenLanguage(run, samples);
+    const { Tensor } = await import('@huggingface/transformers');
+    const spoken = language ?? await spokenLanguage(run, samples, (ids) => new Tensor('int64', BigInt64Array.from(ids.map(BigInt)), [1, ids.length]));
     const out = await run(samples, { return_timestamps: 'word', chunk_length_s: 30, language: spoken, task: 'transcribe' });
     return { words: asrWords(out), language: spoken, backend: 'browser' as const, model: madeBy(model) };
   };

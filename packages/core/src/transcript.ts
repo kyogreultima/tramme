@@ -102,6 +102,28 @@ export function mergeChunks(chunks: { start: number; end: number; words: Transcr
   return out.sort((a, b) => a.s - b.s);
 }
 
+/** what of a transformers.js Whisper pipeline the language detection reads: its model (called for one step) and its processor */
+export interface WhisperParts {
+  model: ((inputs: { input_features: unknown; decoder_input_ids: unknown }) => Promise<{ logits: { data: ArrayLike<number> } }>)
+    & { generation_config: { decoder_start_token_id: number; lang_to_id: Record<string, number> } };
+  processor: (audio: Float32Array) => Promise<{ input_features: unknown }>;
+}
+
+/**
+ * The language spoken, as Whisper hears it: one step of its decoder after
+ * the start of the transcript, the most likely language token. transformers.js
+ * does not detect it, and transcribes as English when it is not told. tokens
+ * makes the decoder's input from ids (the caller's Tensor: int64, [1, n]).
+ */
+export async function spokenLanguage(run: WhisperParts, samples: Float32Array, tokens: (ids: number[]) => unknown): Promise<string> {
+  const { decoder_start_token_id: start, lang_to_id: languages } = run.model.generation_config;
+  const { input_features } = await run.processor(samples);
+  const { logits } = await run.model({ input_features, decoder_input_ids: tokens([start]) });
+  let best = 'en', score = -Infinity;
+  for (const [token, id] of Object.entries(languages)) if (logits.data[id] > score) { score = logits.data[id]; best = token.slice(2, -2); }
+  return best;
+}
+
 /** Whisper's word chunks (transformers.js, return_timestamps: 'word') as words with their timing; empty ones dropped */
 export function asrWords(out: { chunks?: { text: string; timestamp: [number, number | null] }[] }): TranscriptWord[] {
   return (out.chunks ?? []).map((c) => ({ w: c.text.trim(), s: c.timestamp[0], e: c.timestamp[1] ?? c.timestamp[0] })).filter((w) => w.w);

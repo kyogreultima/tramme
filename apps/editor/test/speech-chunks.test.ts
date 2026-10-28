@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from 'vitest';
 
-const { chunkStarts, spokenLanguage, transcribeSamples } = await import('../src/speech.ts');
+const { chunkStarts, transcribeSamples } = await import('../src/speech.ts');
 
 describe('chunkStarts', () => {
   it('cuts a sound in 28 s chunks, one every 26 s', () => {
@@ -43,19 +43,5 @@ describe('transcribeSamples', () => {
     const local = { cpu: true, progress: () => {} };
     await transcribeSamples(new Float32Array(16000), 'local', { words, local });
     expect(seen).toEqual([local]);
-  });
-});
-
-describe('spokenLanguage', () => {
-  it('takes the language Whisper finds most likely after the start of the transcript', async () => {
-    const logits = new Float32Array(10);
-    logits[3] = 2; logits[4] = 5; logits[5] = 1;
-    const asked: unknown[] = [];
-    const model = Object.assign(async (inputs: { input_features: unknown; decoder_input_ids: unknown }) => {
-      const ids = inputs.decoder_input_ids as { data: BigInt64Array }; asked.push(ids.data[0]); return { logits: { data: logits } }; },
-      { generation_config: { decoder_start_token_id: 7, lang_to_id: { '<|en|>': 3, '<|fr|>': 4, '<|de|>': 5 } } });
-    const run = { model, processor: async () => ({ input_features: {} }) };
-    expect(await spokenLanguage(run, new Float32Array(16000))).toBe('fr');
-    expect(asked).toEqual([7n]);
   });
 });
