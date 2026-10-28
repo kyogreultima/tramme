@@ -177,10 +177,14 @@ async function localModels(): Promise<ModelOption[] | null> {
  * Gemini key, say): its strongest model takes over, and the user is told. A
  * local model chosen on purpose stays chosen.
  */
+/** the chosen model answered once this session: its route lost for a moment (a companion busy, a look missed) is no reason to replace it */
+let reached = false;
+
 async function adoptConnected() {
   const { model } = aiSettings.peek(), st = aiStatus.peek();
+  if (aiRoute.peek()) { reached = true; return; }
   // a local model or a command line of this computer chosen on purpose stays chosen (it may just not be started yet)
-  if (aiRoute.peek() || providerOf(model) === 'local' || (engineOf(model) && engineOf(model) !== 'claude') || st.companion === 'checking') return;
+  if (reached || providerOf(model) === 'local' || (engineOf(model) && engineOf(model) !== 'claude') || st.companion === 'checking') return;
   let next: string | undefined = st.server || st.companion === 'ok' ? DEFAULT_MODEL : undefined;
   const slots = remoteProviders.peek().map((p) => p.slot).filter((s) => st.remote[s]);
   if (!next && slots.length) {
