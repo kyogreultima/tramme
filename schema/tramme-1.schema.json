@@ -209,9 +209,6 @@
                 "muted": {
                   "type": "boolean"
                 },
-                "solo": {
-                  "type": "boolean"
-                },
                 "magnetic": {
                   "type": "boolean"
                 },

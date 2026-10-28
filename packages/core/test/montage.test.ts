@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { applyOps, closeGapOps, cutsOf, detachAudioOps, insertOps, isLocked, linkOps, linkedIds, overwriteOps, pasteAttributesOps, pasteOps, unlinkOps, rippleDeleteOps, rippleTrimOps, rollOps, slideOps, slipOps, syncOrderOps, toSequenceOps, trackClips, type Composition, type Op, type TrammeDoc } from '../src/index.ts';
+import { registry } from './fixtures.ts';
+import { applyOps, audioClips, closeGapOps, Evaluator, cutsOf, detachAudioOps, insertOps, isLocked, linkOps, linkedIds, overwriteOps, pasteAttributesOps, pasteOps, unlinkOps, rippleDeleteOps, rippleTrimOps, rollOps, slideOps, slipOps, syncOrderOps, toSequenceOps, trackClips, type Composition, type Op, type TrammeDoc } from '../src/index.ts';
 
 /** a sequence of 10 s: V1 holds a (0-5) and b (4-9, a transition of 1 s over a), A1 holds the sound of a, linked to it */
 export function sequence(): Composition {
@@ -494,5 +495,34 @@ describe('turning a composition into a sequence', () => {
   it('gives the same document when applied twice', () => {
     const d = docOf(plain()), once = after(d, toSequenceOps(d, 'main'));
     expect(toSequenceOps(docOf(once), 'main')).toEqual([]);
+  });
+});
+
+describe('hidden and muted tracks', () => {
+  const media = () => registry().register(
+    { type: 'video', title: 'Video', category: 'test', props: { video: { type: 'asset', default: null, nullable: true, assetType: 'video' } }, render: {} },
+    { type: 'audio', title: 'Sound', category: 'test', props: { audio: { type: 'asset', default: null, nullable: true, assetType: 'audio' } }, render: {} },
+  );
+  const withSounds = (): TrammeDoc => {
+    const c = sequence();
+    c.layers.sa.props = { audio: 'one' };
+    return { ...docOf(c), assets: { one: { type: 'video', src: 'one.mp4' }, two: { type: 'video', src: 'two.mp4' } } } as TrammeDoc;
+  };
+
+  it('a layer on a hidden track is not drawn, and is silent', () => {
+    const d = withSounds(), c = d.compositions.main;
+    const shown = (doc: TrammeDoc) => new Evaluator(doc, media()).frame(4.2).layers.map((l) => l.id);
+    expect(shown(d)).toContain('a');
+    c.tracks![0].hidden = true;
+    expect(shown(d)).toEqual([]);
+    expect(audioClips(d, 'main').map((x) => x.layerId)).toEqual(['sa']);
+  });
+
+  it('a layer on a muted track is drawn but silent', () => {
+    const d = withSounds(), c = d.compositions.main;
+    expect(audioClips(d, 'main').map((x) => x.layerId).sort()).toEqual(['a', 'b', 'sa']);
+    c.tracks![1].muted = true;
+    expect(audioClips(d, 'main').map((x) => x.layerId).sort()).toEqual(['a', 'b']);
+    expect(new Evaluator(d, media()).frame(1).layers.map((l) => l.id)).toEqual(['a']);
   });
 });

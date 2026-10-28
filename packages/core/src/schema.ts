@@ -133,7 +133,6 @@ const sequenceTrack = z.strictObject({
   locked: z.boolean().optional(),
   hidden: z.boolean().optional(),
   muted: z.boolean().optional(),
-  solo: z.boolean().optional(),
   magnetic: z.boolean().optional(),
   height: finite.optional(),
 });

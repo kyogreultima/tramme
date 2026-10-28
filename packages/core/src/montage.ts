@@ -32,6 +32,11 @@ export function cutsOf(c: Composition, trackId: string): { left: string; right: 
   return out;
 }
 
+/** a layer sitting on a track that is switched off for `flag`: hidden (not drawn, not heard) or muted (not heard) */
+export function trackOff(c: Composition, l: Layer, flag: 'hidden' | 'muted'): boolean {
+  return !!l.track && !!c.tracks?.find((t) => t.id === l.track)?.[flag];
+}
+
 /** the clips that share a link with `id`, itself included (just itself when it is not linked) */
 export function linkedIds(c: Composition, id: string): string[] {
   const link = c.layers[id]?.link;

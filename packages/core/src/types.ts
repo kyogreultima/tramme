@@ -260,7 +260,6 @@ export interface SequenceTrack {
   locked?: boolean;
   hidden?: boolean;
   muted?: boolean;
-  solo?: boolean;
   /** clips of this track close their gaps by themselves and ripple when one is removed or trimmed */
   magnetic?: boolean;
   /** lane height in the timeline, px */
