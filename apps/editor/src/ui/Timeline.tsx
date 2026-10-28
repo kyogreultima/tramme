@@ -13,6 +13,7 @@ import { bandOf, longPress, noBrowserMenu, openMenu, Seg, useSize } from './cont
 import { Icon, kindColor, kindIcon } from './icons.tsx';
 import { fileLength, preview } from '../preview.ts';
 import { Tabs } from './timeline/Tabs.tsx';
+import { syncClips } from '../sync.ts';
 import { FILM_H, FILM_W, filmThumb, filmVersion } from '../filmstrip.ts';
 import { GraphEditor } from './GraphEditor.tsx';
 import { addLayerMenu, FoldButtons, openLayerMenu } from './LeftPanel.tsx';
@@ -337,6 +338,7 @@ export function Timeline() {
         { label: t('timeline.trimStartToPlayhead'), icon: 'cutHead', disabled: !inside, onClick: () => commit(t('timeline.trimStartToPlayhead'), trimInOps(S.doc.peek(), compId, id, at)) },
         { label: t('timeline.trimEndToPlayhead'), icon: 'cutTail', disabled: !inside, onClick: () => commit(t('timeline.trimEndToPlayhead'), [{ op: 'add', path: `${lp}/out`, value: at }]) },
         { label: t('timeline.moveToPlayhead'), icon: 'arrow', disabled: at === tin, onClick: () => commit(t('timeline.moveToPlayhead'), shiftLayerOps(S.doc.peek(), compId, id, at - tin)) },
+        { label: t('timeline.syncBySound'), icon: 'audio', disabled: S.selection.peek().length < 2 || !S.selection.peek().includes(id), onClick: () => { void syncClips(S.selection.peek()); } },
         { label: t('timeline.crossfade'), icon: 'compare', hint: t('timeline.crossfadeHint'), disabled: !fade, onClick: () => fade && commit(t('timeline.crossfade'), fade.ops) },
         {
           label: transitionOf(l) ? t('timeline.changeTransition') : t('timeline.addTransition'), icon: 'effects', hint: t('timeline.transitionHint'),
