@@ -445,11 +445,22 @@ export function detachAudioOps(doc: TrammeDoc, compId: string, id: string, audio
  * in `overwrite` mode they lie over what is there. Only clips (no groups). The
  * copies are not linked to anything.
  */
-export function pasteOps(doc: TrammeDoc, compId: string, clips: Layer[], trackId: string, at: number, mode: 'insert' | 'overwrite'): Op[] {
+export function pasteOps(doc: TrammeDoc, compId: string, clips: Layer[], trackId: string | null, at: number, mode: 'insert' | 'overwrite'): Op[] {
   const c = doc.compositions[compId], leaves = clips.filter((l) => !l.children).map((l) => { const { link: _link, ...rest } = l; return rest as Layer; });
   if (!leaves.length) return [];
   const base = Math.min(...leaves.map((l) => l.in ?? 0)), total = Math.max(...leaves.map((l) => l.out ?? c.duration)) - base;
   const taken = new Set<string>(), ids = leaves.map(() => freshId(c, 'paste', taken));
+  if (trackId === null) {
+    // no tracks: the clips join the stack as free layers, their times and keyframes moved to the point
+    return chain(doc, [
+      ...leaves.map((l, i) => () => {
+        const from = l.in ?? 0, len = (l.out ?? c.duration) - from, to = at + from - base;
+        const { track: _track, ...rest } = shiftLayerValues(l, to - from);
+        return addClipOps(compId, ids[i], { ...rest, in: round6(to), out: round6(to + len) });
+      }),
+      (d) => fitDurationOps(d, compId),
+    ]);
+  }
   if (mode === 'overwrite') return chain(doc, leaves.map((l, i) => (d: TrammeDoc) => overwriteOps(d, compId, ids[i], l, trackId, at + (l.in ?? 0) - base)));
   const room = makeRoomOps(doc, compId, trackId, at, round6(total));
   if (!room) return [];
@@ -569,4 +580,40 @@ export function reorderOps(doc: TrammeDoc, compId: string, id: string, centre: n
   if (!moved) return [];
   const delta = round6(landing - mine.in);
   return [...moved, ...linkedIds(c, id).flatMap((m) => shiftLayerOps(doc, compId, m, delta))];
+}
+
+/**
+ * The clips given cut in two at `at` (every clip of the tracks it falls in
+ * when none is given), and the clips linked to them with them. A clip that is
+ * locked, or linked to one that is, stays whole. The halves that come after
+ * the cut get a link of their own, so the first halves and the second halves
+ * each stay together. Returns the operations and the ids of the new halves.
+ */
+export function splitAtOps(doc: TrammeDoc, compId: string, ids: string[], at: number): { ops: Op[]; ids: string[] } {
+  const c = doc.compositions[compId], half = 0.5 / c.fps;
+  const given = ids.length ? ids : Object.keys(c.layers).filter((id) => c.layers[id].track && !c.layers[id].children);
+  const clips = [...new Set(given.filter((id) => c.layers[id]).flatMap((id) => linkedIds(c, id)))].filter((id) => {
+    const l = c.layers[id], tin = l.in ?? 0, tout = l.out ?? c.duration;
+    return !l.children && tin + half < at && at < tout - half && !isLocked(c, id);
+  });
+  const made: { from: string; id: string }[] = [];
+  let d = doc;
+  const ops: Op[] = [];
+  for (const id of clips) {
+    const cut = splitLayerOps(d, compId, id, at);
+    if (!cut) continue;
+    ops.push(...cut.ops);
+    d = applyOps(d, cut.ops).doc;
+    made.push({ from: id, id: cut.id });
+  }
+  const byLink = new Map<string, string[]>();
+  for (const m of made) { const link = c.layers[m.from].link; if (link) byLink.set(link, [...(byLink.get(link) ?? []), m.id]); }
+  for (const news of byLink.values()) {
+    if (news.length > 1) {
+      const link = freshLink(d.compositions[compId]);
+      for (const id of news) ops.push({ op: 'add', path: pointer('compositions', compId, 'layers', id, 'link'), value: link });
+      d = applyOps(d, news.map((id) => ({ op: 'add', path: pointer('compositions', compId, 'layers', id, 'link'), value: link }) as Op)).doc;
+    } else ops.push({ op: 'remove', path: pointer('compositions', compId, 'layers', news[0], 'link') });
+  }
+  return { ops, ids: made.map((m) => m.id) };
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { registry } from './fixtures.ts';
-import { applyOps, audioClips, closeGapOps, Evaluator, cutsOf, detachAudioOps, insertOps, isLocked, linkOps, linkedIds, overwriteOps, pasteAttributesOps, pasteOps, unlinkOps, rippleDeleteOps, rippleTrimOps, rollOps, slideOps, slipOps, syncOrderOps, toSequenceOps, trackClips, type Composition, type Op, type TrammeDoc } from '../src/index.ts';
+import { applyOps, audioClips, closeGapOps, Evaluator, cutsOf, detachAudioOps, insertOps, isLocked, linkOps, linkedIds, overwriteOps, pasteAttributesOps, pasteOps, unlinkOps, rippleDeleteOps, rippleTrimOps, rollOps, slideOps, slipOps, splitAtOps, syncOrderOps, toSequenceOps, trackClips, type Composition, type Op, type TrammeDoc } from '../src/index.ts';
 
 /** a sequence of 10 s: V1 holds a (0-5) and b (4-9, a transition of 1 s over a), A1 holds the sound of a, linked to it */
 export function sequence(): Composition {
@@ -433,6 +433,18 @@ describe('paste', () => {
     expect((c.layers[q].transform!.position as { $k: { t: number }[] }).$k.map((k) => k.t)).toEqual([5, 6]);
   });
 
+  it('on a composition without tracks adds them as free layers at the point, their keyframes moved', () => {
+    const c0 = three(); delete c0.tracks; delete c0.kind;
+    for (const l of Object.values(c0.layers)) delete l.track;
+    const d = docOf(c0), c = after(d, pasteOps(d, 'main', two(), null, 3, 'insert'));
+    const added = Object.keys(c.layers).filter((k) => !['a', 'b', 'c'].includes(k)).sort();
+    expect(added.map((k) => [range(c, k), c.layers[k].track])).toEqual([[[3, 5], undefined], [[5, 7], undefined]]);
+    expect(c.order.slice(-2)).toEqual(added);
+    expect(range(c, 'b')).toEqual([3, 6]);
+    const q = added.find((k) => c.layers[k].props!.video === 'q')!;
+    expect((c.layers[q].transform!.position as { $k: { t: number }[] }).$k.map((k) => k.t)).toEqual([5, 6]);
+  });
+
   it('in overwrite mode lays them over what is there', () => {
     const d = docOf(three()), c = after(d, pasteOps(d, 'main', two(), 'V1', 3, 'overwrite'));
     expect(c.layers.b).toBeUndefined();
@@ -524,5 +536,35 @@ describe('hidden and muted tracks', () => {
     c.tracks![1].muted = true;
     expect(audioClips(d, 'main').map((x) => x.layerId).sort()).toEqual(['a', 'b']);
     expect(new Evaluator(d, media()).frame(1).layers.map((l) => l.id)).toEqual(['a']);
+  });
+});
+
+describe('splitting at a time', () => {
+  it('cuts the clips given and gives the halves of a linked pair a link of their own', () => {
+    const c0 = three();
+    c0.layers.b.link = 'k'; c0.layers.sb = { type: 'audio', track: 'A1', link: 'k', in: 3, out: 6, props: { audio: 'two' } }; c0.order.push('sb');
+    const d = docOf(c0), r = splitAtOps(d, 'main', ['b'], 4);
+    const c = after(d, r.ops);
+    expect(r.ids.sort()).toEqual(['b-2', 'sb-2']);
+    expect([range(c, 'b'), range(c, 'b-2'), range(c, 'sb'), range(c, 'sb-2')]).toEqual([[3, 4], [4, 6], [3, 4], [4, 6]]);
+    expect(c.layers.b.link).toBe('k');
+    expect(c.layers.sb.link).toBe('k');
+    expect(c.layers['b-2'].link).toBeDefined();
+    expect(c.layers['b-2'].link).toBe(c.layers['sb-2'].link);
+    expect(c.layers['b-2'].link).not.toBe('k');
+  });
+
+  it('leaves a clip that is locked, or that the time does not fall in, and says what it cut', () => {
+    const c0 = three(); c0.tracks![0].locked = true;
+    expect(splitAtOps(docOf(c0), 'main', ['b'], 4)).toEqual({ ops: [], ids: [] });
+    expect(splitAtOps(docOf(three()), 'main', ['b'], 8)).toEqual({ ops: [], ids: [] });
+  });
+
+  it('cuts every clip of the unlocked tracks the time falls in when none is given', () => {
+    const c0 = three();
+    c0.layers.t = { type: 'video', track: 'V2', in: 3.5, out: 5, props: { video: 'q' } }; c0.tracks!.push({ id: 'V2', kind: 'video', locked: true }); c0.order.push('t');
+    c0.layers.u = { type: 'video', track: 'V3', in: 3.5, out: 5, props: { video: 'q' } }; c0.tracks!.push({ id: 'V3', kind: 'video' }); c0.order.push('u');
+    const d = docOf(c0), r = splitAtOps(d, 'main', [], 4);
+    expect(r.ids.sort()).toEqual(['b-2', 'u-2']);
   });
 });

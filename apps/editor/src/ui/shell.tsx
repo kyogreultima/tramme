@@ -9,6 +9,7 @@ import { freshId, snap } from '../model.ts';
 import { MenuHost } from './controls.tsx';
 import { deleteSelection, duplicateSelection } from './LeftPanel.tsx';
 import { deleteKeys } from './Timeline.tsx';
+import { rippleOnMagnetic, runEditKey } from './timeline/edit-keys.ts';
 import { uploads } from '../files.ts';
 import { transcriptions } from '../speech.ts';
 import { SettingsDialog } from './Settings.tsx';
@@ -30,6 +31,7 @@ export function useShortcuts() {
       if (mod && e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); return; }
       if (mod && e.key.toLowerCase() === 'd') { e.preventDefault(); duplicateSelection(); return; }
       if (mod && e.key.toLowerCase() === 'a') { e.preventDefault(); selectAll(); return; }
+      if (runEditKey(e)) return;
       if (e.code === 'Space') { e.preventDefault(); S.playing.value = !S.playing.value; return; }
       if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
         e.preventDefault();
@@ -51,7 +53,7 @@ export function useShortcuts() {
         if (m) { S.playing.value = false; setTime(m.t); }
         return;
       }
-      if (e.key === 'Delete' || e.key === 'Backspace') { if (!deleteKeys()) deleteSelection(); return; }
+      if (e.key === 'Delete' || e.key === 'Backspace') { if (!deleteKeys() && !rippleOnMagnetic()) deleteSelection(); return; }
       if (e.key === 'Escape') { select([]); S.keys.value = []; S.assistantFull.value = false; }
     };
     addEventListener('keydown', key);

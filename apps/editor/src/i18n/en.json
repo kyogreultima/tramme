@@ -1112,7 +1112,17 @@
     "lockTrack": "Lock the track",
     "unlockTrack": "Unlock the track",
     "trackLocked": "This track is locked",
-    "makeSequence": "Lay the layers out on tracks"
+    "makeSequence": "Lay the layers out on tracks",
+    "rippleDelete": "Delete and close the gap",
+    "copyClips": "Copy the clips",
+    "pasteClips": "Paste the clips",
+    "pasteAttributes": "Paste the look",
+    "linkClips": "Link the clips",
+    "unlinkClips": "Unlink the clips",
+    "copied": "{n} clip(s) copied",
+    "roll": "Roll the cut",
+    "slip": "Slip the shot",
+    "slide": "Slide the shot"
   },
   "topbar": {
     "tenBit": "10 bits",

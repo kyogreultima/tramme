@@ -607,5 +607,8 @@ class Preview {
 
 export const preview = new Preview();
 
+/** a video's length when the preview has it open: the handle after a shot's end */
+export const fileLength = (asset: string): number | undefined => { try { return (preview.renderer?.assets.get(asset) as { duration?: number } | undefined)?.duration; } catch { return undefined; } };
+
 /** a JSON asset as the preview loaded it (analyses, event lists), for the editor's own evaluators: the expressions that read them get their values */
 export const assetData = (id: string) => (preview.renderer?.assets.has(id) ? preview.renderer.assets.get(id) : undefined);
