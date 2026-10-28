@@ -20,8 +20,13 @@ const MIN_SECONDS = 0.5;
 /** while recording: when it started and the level of the voice (0 to 1) */
 export const recording = signal<{ since: number; level: number } | null>(null);
 
+/** while the downloaded model's files come down: their bytes so far and in all */
+export const modelLoad = signal<{ loaded: number; total: number } | null>(null);
+
 interface Session { stream: MediaStream; recorder: MediaRecorder; context: AudioContext; chunks: Blob[]; meter: ReturnType<typeof setInterval>; since: number }
 let session: Session | null = null;
+/** the microphone being opened (it can take seconds): a second click meanwhile opens nothing more */
+let opening: Promise<void> | null = null;
 
 /** words written at the cursor of a box: replacing the selection, one space between the words around it */
 export function insertAtCursor(value: string, start: number, end: number, add: string): { value: string; caret: number } {
@@ -32,8 +37,13 @@ export function insertAtCursor(value: string, start: number, end: number, add: s
 }
 
 /** the microphone opens and recording starts; a refusal or a missing device is told, nothing is left open */
-export async function startDictation(): Promise<void> {
-  if (session) return;
+export function startDictation(): Promise<void> {
+  if (session) return Promise.resolve();
+  opening ??= open().finally(() => { opening = null; });
+  return opening;
+}
+
+async function open(): Promise<void> {
   let stream: MediaStream;
   try {
     stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -109,8 +119,12 @@ async function samplesOf(blob: Blob): Promise<Float32Array> {
 /** the words of the samples, from the source the setting names; '' when the user declines the download of the model */
 export async function transcribeDictation(samples: Float32Array): Promise<string> {
   const source = prefs.peek().dictation;
-  if (source === 'local' && !(await modelReady())) return '';
-  return (await transcribeSamples(samples, source)).trim();
+  if (source !== 'local') return (await transcribeSamples(samples, source)).trim();
+  if (!(await modelReady())) return '';
+  // on the processor: the compact weights the offer names (a GPU would take the full ones, several times larger), quick on a short message
+  try {
+    return (await transcribeSamples(samples, 'local', { local: { cpu: true, progress: (loaded, total) => { modelLoad.value = { loaded, total }; } } })).trim();
+  } finally { modelLoad.value = null; }
 }
 
 /**

@@ -94,15 +94,19 @@ export async function downloadModel(m: ModelEntry, progress?: DownloadProgress):
   // a pipeline model: transformers.js fetches its files into the same cache, in the precision its tool would take here
   const a = m.adapter;
   const { pipeline } = await import('@huggingface/transformers');
+  const gpu = typeof navigator !== 'undefined' && 'gpu' in navigator;
+  const p = await pipeline(a.pipeline, m.source, { revision: m.revision, dtype: gpu ? a.gpu[0] : a.cpu, ...(progress ? { progress_callback: progressCallback(progress) } : {}) } as never);
+  await (p as unknown as { dispose?: () => Promise<void> }).dispose?.();
+}
+
+/** transformers.js's progress_callback, its files' bytes added up into one progress */
+export function progressCallback(progress: DownloadProgress) {
   const files = new Map<string, { loaded: number; total: number }>();
-  const onProgress = (e: { status: string; file?: string; loaded?: number; total?: number }) => {
+  return (e: { status: string; file?: string; loaded?: number; total?: number }) => {
     if (e.status !== 'progress' || !e.file) return;
     files.set(e.file, { loaded: e.loaded ?? 0, total: e.total ?? 0 });
     let loaded = 0, total = 0;
     for (const f of files.values()) { loaded += f.loaded; total += f.total; }
-    progress?.(loaded, total);
+    progress(loaded, total);
   };
-  const gpu = typeof navigator !== 'undefined' && 'gpu' in navigator;
-  const p = await pipeline(a.pipeline, m.source, { revision: m.revision, dtype: gpu ? a.gpu[0] : a.cpu, progress_callback: onProgress } as never);
-  await (p as unknown as { dispose?: () => Promise<void> }).dispose?.();
 }

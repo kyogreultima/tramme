@@ -3,7 +3,7 @@
 // the text to `onText`; the user reads it and sends it.
 
 import { useEffect, useState } from 'preact/hooks';
-import { cancelDictation, insertAtCursor, recording, startDictation, stopDictation } from '../dictation.ts';
+import { cancelDictation, insertAtCursor, modelLoad, recording, startDictation, stopDictation } from '../dictation.ts';
 import { toast } from '../state.ts';
 import { t } from '../i18n/index.ts';
 import { Icon } from './icons.tsx';
@@ -44,9 +44,11 @@ export function MicButton({ onText, disabled }: { onText: (text: string) => void
       toast(t('dictation.failed', { error: (e as Error).message }), 'error');
     } finally { setWriting(false); }
   };
+  const load = writing ? modelLoad.value : null;
   return (
     <>
       {rec && <span class="mic-time mono" title={t('dictation.recordingHint')}>{clock(now - rec.since)}</span>}
+      {load && load.total > 0 && <span class="mic-time mono" title={t('dictation.downloading')}>{Math.floor((100 * load.loaded) / load.total)} %</span>}
       <button type="button" class={`icon-btn sm mic${rec ? ' on' : ''}`} disabled={disabled || writing}
         title={writing ? t('dictation.writing') : rec ? t('dictation.stop') : t('dictation.start')} aria-pressed={!!rec} onClick={click}>
         {writing ? <Icon name="spinner" /> : <Icon name="mic" />}

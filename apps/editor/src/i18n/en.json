@@ -1413,6 +1413,7 @@
     "start": "Dictate: speak, then click again to write what you said",
     "stop": "Stop and write what you said",
     "writing": "Writing what you said…",
+    "downloading": "Downloading the speech model (once)",
     "recordingHint": "Recording. Escape cancels.",
     "micRefused": "The microphone is blocked. Allow it for Tramme in the system or browser settings.",
     "noMic": "No microphone found.",
