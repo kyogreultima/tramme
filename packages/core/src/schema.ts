@@ -98,6 +98,8 @@ const distribution = z.strictObject({
 
 const layer = z.strictObject({
   type: z.string().min(1),
+  track: id.optional(),
+  link: id.optional(),
   name: z.string().optional(),
   in: finite.optional(),
   out: finite.optional(),
@@ -124,8 +126,22 @@ const marker = z.strictObject({
   duration: finite.optional(),
 });
 
+const sequenceTrack = z.strictObject({
+  id,
+  name: z.string().optional(),
+  kind: z.enum(['video', 'audio']),
+  locked: z.boolean().optional(),
+  hidden: z.boolean().optional(),
+  muted: z.boolean().optional(),
+  solo: z.boolean().optional(),
+  magnetic: z.boolean().optional(),
+  height: finite.optional(),
+});
+
 const composition = z.strictObject({
   name: z.string(),
+  kind: z.literal('sequence').optional(),
+  tracks: z.array(sequenceTrack).optional(),
   width: z.number().int().positive(),
   height: z.number().int().positive(),
   fps: z.number().positive(),
