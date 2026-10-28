@@ -838,7 +838,17 @@
     "couldNotAddPack": "Could not add the pack: {error}",
     "newSequence": "New sequence",
     "sequenceN": "Sequence {n}",
-    "newSequenceFromMedia": "New sequence from this media"
+    "newSequenceFromMedia": "New sequence from this media",
+    "findMedia": "Find media, #tag or a spoken word",
+    "allMedia": "All",
+    "noBin": "No bin",
+    "moveToBin": "Move to a bin",
+    "newBin": "New bin…",
+    "takeOutOfBin": "Take out of its bin",
+    "addTag": "Add a tag…",
+    "binName": "Name of the bin, then Enter",
+    "tagName": "Name of the tag, then Enter",
+    "noMediaMatches": "No media matches"
   },
   "models": {
     "loading": "Loading…",

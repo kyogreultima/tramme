@@ -838,7 +838,17 @@
     "couldNotAddPack": "Impossible d'ajouter le pack : {error}",
     "newSequence": "Nouvelle séquence",
     "sequenceN": "Séquence {n}",
-    "newSequenceFromMedia": "Nouvelle séquence depuis ce média"
+    "newSequenceFromMedia": "Nouvelle séquence depuis ce média",
+    "findMedia": "Chercher un média, un #tag ou un mot dit",
+    "allMedia": "Tout",
+    "noBin": "Sans dossier",
+    "moveToBin": "Ranger dans un dossier",
+    "newBin": "Nouveau dossier…",
+    "takeOutOfBin": "Sortir de son dossier",
+    "addTag": "Ajouter une étiquette…",
+    "binName": "Nom du dossier, puis Entrée",
+    "tagName": "Nom de l'étiquette, puis Entrée",
+    "noMediaMatches": "Aucun média ne correspond"
   },
   "models": {
     "loading": "Chargement…",
