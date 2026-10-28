@@ -60,6 +60,7 @@ No model is packed with the editor, the desktop app or the command line: each is
 | [Depth Anything v2](https://github.com/DepthAnything/Depth-Anything-V2) small (`onnx-community/depth-anything-v2-small`) | Apache-2.0 | Depth (parallax, depth blur). The base and large sizes are CC-BY-NC-4.0: offered in the settings, marked not for commercial work |
 | [Whisper](https://github.com/openai/whisper) small (`Xenova/whisper-small`) | Apache-2.0 (the model card; OpenAI's release is MIT) | Transcription in the companion and in the browser |
 | [Silero VAD](https://github.com/snakers4/silero-vad) (`onnx-community/silero-vad`) | MIT | Where someone speaks (the fillers tool) |
+| [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN) general x4 v3, in ONNX (`TheGuy444/Real-ESRGAN-ONNX`) | BSD-3-Clause | Enlarging a picture with fine texture (the upscale tool, a choice in the settings; the default is the built-in Lanczos) |
 | [MediaPipe Face Landmarker](https://ai.google.dev/edge/mediapipe/solutions/vision/face_landmarker) | Apache-2.0 | The faces' skin (the skin tool) |
 
 ## Fonts and media

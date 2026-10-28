@@ -1579,7 +1579,10 @@
     "dictationHint": "Where the microphone of a message box is transcribed. The downloaded model keeps your voice on this computer; the companion runs it on this computer too; the server sends it away.",
     "dictationLocal": "Downloaded model",
     "dictationCompanion": "Companion",
-    "dictationServer": "Server"
+    "dictationServer": "Server",
+    "upscale": "Enlarging a picture",
+    "noteEsrgan": "Rebuilds fine texture in pictures; slow (a few seconds per 128 px tile on this computer); videos always use the built-in engine",
+    "builtIn": "built in"
   },
   "components": {
     "kept": "{name} kept in the library",

@@ -26,6 +26,7 @@ const TASK: Record<ModelTask, string> = {
   transcription: m('localModels.transcription'),
   vad: m('localModels.vad'),
   face: m('localModels.face'),
+  upscale: m('localModels.upscale'),
 };
 
 /** what to know before choosing a model, by its id */
@@ -38,10 +39,11 @@ const NOTE: Record<string, string> = {
   'whisper-base': m('localModels.noteWhisperBase'),
   'whisper-tiny': m('localModels.noteWhisperTiny'),
   'whisper-large-v3-turbo': m('localModels.noteWhisperLarge'),
+  'realesr-general-x4v3': m('localModels.noteEsrgan'),
 };
 
 /** the tasks on the picture, then those on the sound */
-const PICTURE: ModelTask[] = ['cutout-person', 'cutout-any', 'detection', 'depth', 'face'];
+const PICTURE: ModelTask[] = ['cutout-person', 'cutout-any', 'detection', 'depth', 'face', 'upscale'];
 const SOUND: ModelTask[] = ['transcription', 'vad'];
 
 const bytes = (n: number) => size(n / 1e6);
@@ -68,7 +70,7 @@ function ModelRow({ task, files, changed }: { task: ModelTask; files: CachedFile
   const list = modelsFor(task);
   const options: [string, string][] = list.map((e, i) => [e.id, i === 0 ? t('localModels.byDefault', { name: e.name }) : e.name]);
   if (!list.includes(chosen)) options.push([chosen.id, chosen.name]);
-  const here = cachedOf(chosen, files);
+  const here = cachedOf(chosen, files), builtIn = chosen.adapter.kind === 'engine';
   const download = async () => {
     setProgress(0);
     try { await downloadModel(chosen, (loaded, total) => setProgress(total ? loaded / total : 0)); }
@@ -79,7 +81,7 @@ function ModelRow({ task, files, changed }: { task: ModelTask; files: CachedFile
   const hint = [
     here.bytes ? bytes(here.bytes) : chosen.mb ? t('localModels.aboutSize', { size: size(chosen.mb) }) : '',
     chosen.licence,
-    here.bytes ? t('localModels.inThisBrowser') : progress !== null ? t('localModels.downloading', { percent: Math.round(progress * 100) }) : t('localModels.notDownloaded'),
+    builtIn ? t('localModels.builtIn') : here.bytes ? t('localModels.inThisBrowser') : progress !== null ? t('localModels.downloading', { percent: Math.round(progress * 100) }) : t('localModels.notDownloaded'),
   ].filter(Boolean).join(' · ');
   const warnings = chosen === list[0] ? [] : [
     chosen.commercial === false ? t('localModels.notCommercial') : chosen.commercial === null ? t('localModels.ownLicence') : '',
@@ -92,7 +94,7 @@ function ModelRow({ task, files, changed }: { task: ModelTask; files: CachedFile
     </p>}>
       <div class="set-actions models-actions">
         <Select value={chosen.id} options={options} onChange={(id) => setModel(task, id)} />
-        {here.bytes
+        {builtIn ? null : here.bytes
           ? <button class="icon-btn sm" title={t('common.delete')} aria-label={t('common.delete')} onClick={remove}><Icon name="trash" /></button>
           : <button class="icon-btn sm" title={t('localModels.download')} aria-label={t('localModels.download')} disabled={progress !== null} onClick={download}><Icon name={progress !== null ? 'spinner' : 'download'} /></button>}
       </div>

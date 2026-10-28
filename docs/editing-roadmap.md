@@ -148,3 +148,12 @@ Each of these runs on the machine, at authoring time, and saves a new asset; eac
 - [x] The command line first: ffmpeg writes 10-bit H.265 and ProRes (ProRes 4444 is already written at 10 bits, `packages/cli/src/media.ts`); the frames reach it at more than 8 bits from the compositor's half-float target (`RGBA16F`) instead of an 8-bit canvas.
 - [x] The browser where the encoder allows it (HEVC Main 10, VP9 profile 2 or AV1 10-bit, asked to WebCodecs before it is offered), with the export menu saying when the machine cannot.
 - [ ] HDR (PQ or HLG) only after the whole pipeline is at more than 8 bits, Canvas2D included; until then exports stay SDR, at 10 bits where possible.
+
+## Notes of the montage work (2026-10-29)
+
+What the work on a track-based timeline (`docs/superpowers/plans/2026-10-28-nle-editing.md`) did about this file's open boxes:
+
+- **Real-ESRGAN: done for pictures.** `realesr-general-x4v3` (BSD-3-Clause, 4.9 MB, `TheGuy444/Real-ESRGAN-ONNX` pinned to its revision) is a choice in the settings under "Enlarging a picture"; the tool cuts the picture in 128 px tiles, enlarges them four times and brings the result down to twice (`apps/editor/src/esrgan.ts`, geometry tested exactly; `esrgan-run.ts`, the session). Tried here: the model loads in onnxruntime-node and in headless Chrome, a 96×64 picture came back 192×128. A video keeps the Lanczos engine: a network over every frame would take hours.
+- **RIFE, DeepFilterNet, Demucs: not integrated.** Candidates exist today (`FuryTMP/RIFE_fp32` MIT; `soniqo/DeepFilterNet3-ONNX` MIT; for stems `nsosu/demucs-onnx` MIT, whose tags say open-unmix, and `MansfieldPlumbing/Demucs_v4_TRT` CC-BY-NC-4.0, not for commercial work), but none was checked end to end where this work ran: their inputs (an STFT done outside the graph for DeepFilterNet and the stem models, a timestep and padding for RIFE) need an adapter each, tried against a reference, and a licence read from the model card. The core's own engines (RNNoise, block matching) stay the defaults, and the stems stay "blocked: no export checked".
+- **HDR: still waiting** for Canvas 2D above 8 bits (`HTMLCanvasElement` has no float context in the browsers of this machine).
+- **The cut-by-number button** exists: the media panel lists the cuts of `fillers-<media>` and puts each back (the tool applies its cuts at once, so there is no proposal to cut from).

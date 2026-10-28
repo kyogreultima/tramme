@@ -2681,7 +2681,10 @@
     "dictationHint": "Où est transcrit le microphone d'une boîte de message. Le modèle téléchargé garde votre voix sur cet ordinateur ; le compagnon l'exécute aussi sur cet ordinateur ; le serveur l'envoie ailleurs.",
     "dictationLocal": "Modèle téléchargé",
     "dictationCompanion": "Compagnon",
-    "dictationServer": "Serveur"
+    "dictationServer": "Serveur",
+    "upscale": "Agrandir une image",
+    "noteEsrgan": "Recrée la texture fine des images ; lent (quelques secondes par carreau de 128 px) ; les vidéos gardent toujours le moteur intégré",
+    "builtIn": "intégré"
   },
   "components": {
     "kept": "{name} gardé dans la bibliothèque",

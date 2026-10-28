@@ -4,7 +4,7 @@
 // transformers.js uses ('transformers-cache'), where the cut-out keeps its
 // matte networks too.
 
-import { cachePrefix, MODELS, type ModelEntry } from './models.ts';
+import { cachePrefix, filesOf, MODELS, type ModelEntry } from './models.ts';
 
 export const CACHE = 'transformers-cache';
 
@@ -32,7 +32,7 @@ export function groupCache(files: CachedFile[], models: ModelEntry[] = MODELS): 
     out.set(id, g);
   };
   for (const f of files) {
-    const known = models.find((m) => (m.adapter.kind !== 'pipeline' ? f.url === m.source : f.url.startsWith(cachePrefix(m))));
+    const known = models.find((m) => (m.adapter.kind !== 'pipeline' ? filesOf(m).includes(f.url) : f.url.startsWith(cachePrefix(m))));
     if (known) { add(known.id, known.name, f); continue; }
     const repo = repoOf(f.url);
     add(repo ? `hub:${repo}` : 'other', repo ?? 'other', f);
@@ -42,7 +42,7 @@ export function groupCache(files: CachedFile[], models: ModelEntry[] = MODELS): 
 
 /** the files of a model in the cache and their weight (a file two rows share, the small U²-Net, counts for both) */
 export function cachedOf(m: ModelEntry, files: CachedFile[]): { bytes: number; urls: string[] } {
-  const mine = files.filter((f) => (m.adapter.kind !== 'pipeline' ? f.url === m.source : f.url.startsWith(cachePrefix(m))));
+  const mine = files.filter((f) => (m.adapter.kind !== 'pipeline' ? filesOf(m).includes(f.url) : f.url.startsWith(cachePrefix(m))));
   return { bytes: mine.reduce((n, f) => n + f.bytes, 0), urls: mine.map((f) => f.url) };
 }
 
@@ -72,23 +72,10 @@ export type DownloadProgress = (loaded: number, total: number) => void;
 
 /** a model's files fetched into the cache ahead of its tool, with their progress (bytes of all its files) */
 export async function downloadModel(m: ModelEntry, progress?: DownloadProgress): Promise<void> {
-  // one file read with onnxruntime (a matte, a voice detector): fetched into the cache as it is
+  // files read with onnxruntime (a matte, a voice detector, a super-resolution network and its weights): each fetched into the cache as it is
   if (m.adapter.kind !== 'pipeline') {
-    const cache = await caches.open(CACHE);
-    if (await cache.match(m.source)) return;
-    const res = await fetch(m.source);
-    if (!res.ok || !res.body) throw new Error(`${m.source}: ${res.status} ${res.statusText}`);
-    const total = Number(res.headers.get('content-length')) || 0, parts: Uint8Array[] = [];
-    let loaded = 0;
-    const reader = res.body.getReader();
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      parts.push(value);
-      loaded += value.length;
-      progress?.(loaded, total || loaded);
-    }
-    await cache.put(m.source, new Response(new Blob(parts as BlobPart[]), { headers: { 'content-type': 'application/octet-stream', 'content-length': String(loaded) } }));
+    const files = filesOf(m);
+    for (const [i, source] of files.entries()) await fetchOne(source, progress && ((loaded, total) => progress(i + loaded / (total || loaded || 1), files.length)));
     return;
   }
   // a pipeline model: transformers.js fetches its files into the same cache, in the precision its tool would take here
@@ -97,6 +84,25 @@ export async function downloadModel(m: ModelEntry, progress?: DownloadProgress):
   const gpu = typeof navigator !== 'undefined' && 'gpu' in navigator;
   const p = await pipeline(a.pipeline, m.source, { revision: m.revision, dtype: gpu ? a.gpu[0] : a.cpu, ...(progress ? { progress_callback: progressCallback(progress) } : {}) } as never);
   await (p as unknown as { dispose?: () => Promise<void> }).dispose?.();
+}
+
+/** one file fetched into the cache, its progress reported */
+async function fetchOne(source: string, progress?: DownloadProgress): Promise<void> {
+  const cache = await caches.open(CACHE);
+  if (await cache.match(source)) return;
+  const res = await fetch(source);
+  if (!res.ok || !res.body) throw new Error(`${source}: ${res.status} ${res.statusText}`);
+  const total = Number(res.headers.get('content-length')) || 0, parts: Uint8Array[] = [];
+  let loaded = 0;
+  const reader = res.body.getReader();
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    parts.push(value);
+    loaded += value.length;
+    progress?.(loaded, total || loaded);
+  }
+  await cache.put(source, new Response(new Blob(parts as BlobPart[]), { headers: { 'content-type': 'application/octet-stream', 'content-length': String(loaded) } }));
 }
 
 /** transformers.js's progress_callback, its files' bytes added up into one progress */
