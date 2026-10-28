@@ -35,3 +35,4 @@ export * from './hesitations.ts';
 export * from './faces.ts';
 export * from './interpolate.ts';
 export * from './timing.ts';
+export * from './montage.ts';
