@@ -79,6 +79,9 @@ export interface Asset {
   clean?: string;
   /** video: a copy with frames made up between its frames (the interpolate tool), timed like it; a layer slowed under 1× plays it */
   interpolated?: string;
+  /** video or audio: this asset is a sub-clip, the range `range` (s) of the media `of`; it is no file of its own and is never loaded, a layer made from it plays the media from its start */
+  of?: string;
+  range?: [number, number];
   /** the media panel's bin this asset is kept in (a name); the engine ignores it */
   bin?: string;
   /** tags to find it by (lower case, no spaces); the engine ignores them */

@@ -1303,6 +1303,23 @@
     "kept": "Plugin gardé dans la bibliothèque : {name}. Les autres projets peuvent l'utiliser.",
     "used": "Plugin {name} ajouté à ce projet."
   },
+  "source": {
+    "title": "Moniteur source",
+    "close": "Fermer le moniteur source",
+    "setIn": "Poser le point d'entrée (I)",
+    "setOut": "Poser le point de sortie (O)",
+    "markIn": "Entrée {time}",
+    "markOut": "Sortie {time}",
+    "range": "{length} retenues",
+    "insert": "Insérer",
+    "overwrite": "Écraser",
+    "addToTimeline": "Ajouter à la timeline",
+    "saveSubclip": "Garder comme sous-plan",
+    "subclipName": "Nom du sous-plan, puis Entrée",
+    "openInSource": "Ouvrir dans le moniteur source",
+    "subclipSaved": "Sous-plan {name} gardé",
+    "needRange": "Posez d'abord un point d'entrée et un point de sortie"
+  },
   "content": {
     "Keep the pitch": "Garder la hauteur",
     "Semitones": "Demi-tons",

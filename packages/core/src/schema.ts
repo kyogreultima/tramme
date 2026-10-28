@@ -29,6 +29,8 @@ const asset = z.strictObject({
   proxy: z.string().optional(),
   clean: z.string().optional(),
   interpolated: z.string().optional(),
+  of: z.string().optional(),
+  range: z.tuple([finite, finite]).optional(),
   bin: z.string().min(1).optional(),
   tags: z.array(z.string().min(1)).optional(),
 });

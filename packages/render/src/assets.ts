@@ -93,6 +93,8 @@ export class AssetStore {
     const refused: string[] = [];
     if (reload.length) this.version++;
     await Promise.all(Object.entries(doc.assets).map(async ([id, a]) => {
+      // a sub-clip is a range of another asset, no file of its own
+      if (a.of !== undefined) { this.loaded.delete(id); return; }
       // the sandbox owns the project's plugin modules: their code never loads here
       if (this.sandboxModules && a.type === 'module' && (doc.plugins || []).includes(id)) { this.loaded.delete(id); return; }
       const have = this.loaded.get(id);

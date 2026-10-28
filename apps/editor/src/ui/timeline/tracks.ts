@@ -10,6 +10,12 @@ export function laneOrder(c: Composition): SequenceTrack[] {
   return [...tracks.filter((t) => t.kind === 'video').reverse(), ...tracks.filter((t) => t.kind === 'audio')];
 }
 
+/** the track a clip of this kind goes on by default: that of the clip selected, else the first one of its kind that is not locked */
+export function defaultTrackOf(c: Composition, audio: boolean, selected?: string): string | undefined {
+  const fits = (x: SequenceTrack) => (x.kind === 'audio') === audio && !x.locked;
+  return (c.tracks?.find((x) => x.id === (selected ? c.layers[selected]?.track : undefined) && fits(x)) ?? c.tracks?.find(fits))?.id;
+}
+
 /** the clips of a track, by their in point */
 export const clipsOn = (c: Composition, trackId: string): string[] => trackClips(c, trackId).map((k) => k.id);
 

@@ -10,3 +10,6 @@ export const ASSET_MIME = 'application/x-tramme-asset';
 export const COMP_MIME = 'application/x-tramme-comp';
 
 export const chosenAsset = signal<string | null>(null);
+
+/** the asset open in the source monitor, if any */
+export const sourceOpen = signal<string | null>(null);

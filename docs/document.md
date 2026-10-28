@@ -27,6 +27,7 @@ A project is a JSON file `*.tramme.json`. It is the source of truth: the editor,
 ```
 
 - Editable collections (`tokens`, `assets`, `compositions`, `layers`) are maps keyed by id (letters, digits, `_`, `-`). A patch path therefore stays valid when other items are added or removed.
+- A video or sound asset may be a sub-clip: `of` names the media (another asset of the same kind, that is not a sub-clip itself) and `range` is `[in, out]` in seconds of its file. It is a name for a range, not a file: it is never loaded, and a layer made from it plays the media from `in`, as long as the range.
 - An asset may be kept in a `bin` (a name) and carry `tags` (lower case, no spaces) to find it by in the media panel; the engine ignores both.
 - An asset may keep `hash`, the hash of its file's content written by the editor at import: importing the same file again (from the assets panel, as an attachment of the assistant, among the sources of a new project) gives back the asset that has it, and nothing is written twice.
 - An asset a model made (a cut-out's mask, a depth map, a transcript, a track, an analysis) keeps `madeBy`, the models and versions that made it (`["u2net-human-seg@e6d4c49…", "yolos-tiny@main"]`). Choosing another model in the settings never changes it; its tool, run again, writes it anew.

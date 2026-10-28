@@ -113,6 +113,31 @@ describe('sequences: tracks, links, the sound of a video', () => {
   });
 });
 
+describe('sub-clips: a range of a media file', () => {
+  const sub = (mut: (d: any) => void) => issuesOf((d) => {
+    d.assets.clip = { type: 'video', src: 'c.mp4' };
+    d.assets.part = { type: 'video', src: 'c.mp4', name: 'Opening', of: 'clip', range: [2, 7.5] };
+    mut(d);
+  });
+
+  it('a sub-clip names the media it is a range of, and the range it keeps', () => {
+    expect(sub(() => {})).toEqual([]);
+  });
+
+  it('is refused when its media is unknown, is not of its kind, or is itself a sub-clip', () => {
+    expect(sub((d) => { d.assets.part.of = 'gone'; })[0].path).toBe('/assets/part/of');
+    expect(sub((d) => { d.assets.part.of = 'photo'; })[0].message).toMatch(/same kind/);
+    expect(sub((d) => { d.assets.more = { type: 'video', src: 'c.mp4', of: 'part', range: [0, 1] }; })[0].path).toBe('/assets/more/of');
+  });
+
+  it('needs a range that starts before it ends, and no range without a media', () => {
+    expect(sub((d) => { d.assets.part.range = [5, 5]; })[0].path).toBe('/assets/part/range');
+    expect(sub((d) => { d.assets.part.range = [-1, 5]; })[0].path).toBe('/assets/part/range');
+    expect(sub((d) => { delete d.assets.part.of; })[0].path).toBe('/assets/part/range');
+    expect(sub((d) => { delete d.assets.part.range; })[0].path).toBe('/assets/part/range');
+  });
+});
+
 describe('the example films', () => {
   it('still pass the structure check, with the sequence fields added', async () => {
     const { readFileSync, readdirSync } = await import('node:fs');
