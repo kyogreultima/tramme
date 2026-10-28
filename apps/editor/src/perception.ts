@@ -7,6 +7,7 @@ import { ALL_FORMATS, AudioBufferSink, CanvasSink, Input, UrlSource } from 'medi
 import { analyseAudio, clearMargins, freeSides, largestFree, pointer, type Op, type ToolContext, type ToolType } from '@tramme/core';
 import { t } from './i18n/index.ts';
 import { freshId } from './model.ts';
+import { progressCallback, type DownloadProgress } from './model-cache.ts';
 import { madeBy, type ModelEntry } from './models.ts';
 import { chosenModel } from './settings.ts';
 
@@ -203,23 +204,28 @@ export function onDemand<T>(what: string, load: () => Promise<T>): () => Promise
 
 const PIPELINES = new Map<string, () => Promise<unknown>>();
 
+/** how a pipeline runs: cpu on the processor whatever the device (its smaller weights download faster); progress told while its files download */
+export interface PipelineRun { cpu?: boolean; progress?: DownloadProgress }
+
 /**
  * A model's transformers.js pipeline, loaded on first use and kept (per
  * model): on the GPU (WebGPU) in the precisions its adapter lists, in turn,
  * on the processor without one or when the GPU refuses them all (slower).
  */
-export function pipelineOf<T>(entry: ModelEntry, what: string): Promise<T> {
+export function pipelineOf<T>(entry: ModelEntry, what: string, run: PipelineRun = {}): Promise<T> {
   const a = entry.adapter;
   if (a.kind !== 'pipeline') return Promise.reject(new Error(`${entry.name} does not run as a pipeline`));
-  if (!PIPELINES.has(entry.id)) PIPELINES.set(entry.id, onDemand(what, () => import('@huggingface/transformers').then(async ({ pipeline }) => {
-    const make = (opts: object) => pipeline(a.pipeline, entry.source, { revision: entry.revision, ...opts } as never);
+  const key = run.cpu ? `${entry.id}:cpu` : entry.id;
+  if (!PIPELINES.has(key)) PIPELINES.set(key, onDemand(what, () => import('@huggingface/transformers').then(async ({ pipeline }) => {
+    const told = run.progress ? { progress_callback: progressCallback(run.progress) } : {};
+    const make = (opts: object) => pipeline(a.pipeline, entry.source, { revision: entry.revision, ...told, ...opts } as never);
     const cpu = () => make({ dtype: a.cpu });
-    if (!('gpu' in navigator)) return cpu();
+    if (run.cpu || !('gpu' in navigator)) return cpu();
     let p = make({ device: 'webgpu', dtype: a.gpu[0] });
     for (const dtype of a.gpu.slice(1)) p = p.catch(() => make({ device: 'webgpu', dtype }));
     return p.catch(cpu);
   })));
-  return PIPELINES.get(entry.id)!() as Promise<T>;
+  return PIPELINES.get(key)!() as Promise<T>;
 }
 
 /** the object detector chosen in the settings (by default YOLOS tiny, a few MB), downloaded once and run in the browser */

@@ -1,12 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { generate, voices } from '../src/generate.ts';
-import { HYDRACEPT_AUDIO_MP3, hydraceptImage, hydraceptMusic, hydraceptSfx, hydraceptVoice, mapHydraceptVoices } from '../src/hydracept.ts';
+import { HYDRACEPT_AUDIO_MP3, HYDRACEPT_VIDEO_MODEL, hydraceptImage, hydraceptMusic, hydraceptSfx, hydraceptVideo, hydraceptVoice, mapHydraceptVoices, videoSecondsOf } from '../src/hydracept.ts';
 import { generateImage, imageConfig } from '../src/images.ts';
+import { generateVideo, videoConfig, videoSourceOf } from '../src/videos.ts';
 import { keysRoute, loadKeys, storedKeys, type KeyStore, type Secrets, type StoredKeys } from '../src/keys.ts';
 import { soundConfig } from '../src/generate.ts';
 
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 13, 10, 26, 10]);
 const MP3 = new Uint8Array([0xff, 0xfb, 0x90, 0x00]);
+const MP4 = new Uint8Array([0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70]);
 
 const media = {
   hydracept: {
@@ -92,9 +94,11 @@ describe('Hydracept as a provider', () => {
     const both = await loadKeys(memory({ keys: { elevenlabs: 'el', openai: 'oa', hydracept: 'hk' }, fields: { hydracept: { project: 'cpr_1' } } }));
     expect(soundConfig(both)).toEqual({ sfx: ['elevenlabs', 'hydracept'], music: ['elevenlabs', 'hydracept'], voice: ['elevenlabs', 'openai', 'hydracept'] });
     expect(imageConfig(both)).toEqual(['openai', 'hydracept']);
+    expect(videoConfig(both)).toEqual(['hydracept']);
     const only = await keys();
     expect(soundConfig(only).sfx).toEqual(['hydracept']);
     expect(imageConfig(only)).toEqual(['hydracept']);
+    expect(videoConfig(only)).toEqual(['hydracept']);
   });
 });
 
@@ -111,6 +115,8 @@ describe('the routes, without Hydracept', () => {
       .rejects.toMatchObject({ message: /ELEVENLABS_API_KEY or OPENAI_API_KEY or GEMINI_API_KEY or HYDRACEPT_API_KEY/ });
     await expect(generateImage(new Request('http://x/api/generate-image', { method: 'POST', body: JSON.stringify({ prompt: 'x' }) }), { keys: k, fetch: out }))
       .rejects.toMatchObject({ message: /OPENAI_API_KEY or GEMINI_API_KEY or ZAI_API_KEY or HYDRACEPT_API_KEY/ });
+    await expect(generateVideo(new Request('http://x/api/generate-video', { method: 'POST', body: JSON.stringify({ prompt: 'x' }) }), { keys: k, fetch: out }))
+      .rejects.toMatchObject({ message: /HYDRACEPT_API_KEY/ });
   });
 });
 
@@ -218,6 +224,36 @@ describe('hydracept jobs', () => {
     input = job?.body?.input as Record<string, unknown>;
     expect(input?.modelId).toBe('eleven_v4');
   });
+
+  it('quotes and submits a Veo clip with the model in executionConstraints', async () => {
+    const calls = stubHydraceptJob(MP4, 'video/mp4');
+    const run = await hydraceptVideo(media.hydracept, { prompt: 'a paper boat', ratio: '9:16', duration: 6 }, out);
+    const job = calls.find((c) => c.url.includes('/video.generate.v1/jobs') && c.method === 'POST');
+    const input = job?.body?.input as Record<string, unknown>;
+    const execution = job?.body?.execution as Record<string, unknown>;
+    expect(input).toMatchObject({ prompt: 'a paper boat', aspectRatio: '9:16', durationSeconds: 6 });
+    expect(input?.sourceImage).toBeUndefined();
+    expect(execution?.executionConstraints).toEqual({ preferredModel: HYDRACEPT_VIDEO_MODEL });
+    // the quote priced the same model the job runs
+    const quote = calls.find((c) => c.url.includes('/video.generate.v1/quote'));
+    expect((quote?.body?.execution as Record<string, unknown>)?.executionConstraints).toEqual({ preferredModel: HYDRACEPT_VIDEO_MODEL });
+    expect(run.model).toBe(HYDRACEPT_VIDEO_MODEL);
+    expect(run.type).toBe('video/mp4');
+    expect(new Uint8Array(run.bytes)).toEqual(MP4);
+  });
+
+  it('sends a still as the opening frame, and keeps to the lengths Veo takes', async () => {
+    const calls = stubHydraceptJob(MP4, 'video/mp4');
+    const source = { dataUrl: `data:image/png;base64,${btoa(String.fromCharCode(...PNG))}`, mimeType: 'image/png' };
+    await hydraceptVideo(media.hydracept, { prompt: 'animate it', duration: 5, source }, out);
+    const job = calls.find((c) => c.url.includes('/video.generate.v1/jobs') && c.method === 'POST');
+    expect((job?.body?.input as Record<string, unknown>)?.sourceImage).toEqual(source);
+    expect((job?.body?.input as Record<string, unknown>)?.durationSeconds).toBe(6);
+    expect(videoSecondsOf(3)).toBe(4);
+    expect(videoSecondsOf(5)).toBe(6);
+    expect(videoSecondsOf(7)).toBe(8);
+    expect(videoSecondsOf(undefined)).toBe(8);
+  });
 });
 
 describe('routes with Hydracept', () => {
@@ -230,6 +266,41 @@ describe('routes with Hydracept', () => {
     expect(res.headers.get('x-tramme-provider')).toBe('hydracept');
     expect(res.headers.get('x-tramme-hydracept-receipt')).toBe('rcpt_1');
     expect(res.headers.get('x-tramme-hydracept-quote')).toBe('quo_1');
+  });
+
+  it('generate-video names Hydracept, returns the clip and records receipt ids', async () => {
+    stubHydraceptJob(MP4, 'video/mp4');
+    const res = await generateVideo(new Request('http://localhost/api/generate-video', { method: 'POST', body: JSON.stringify({ prompt: 'a paper boat', ratio: '9:16', duration: '4' }) }), await reach());
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toBe('video/mp4');
+    expect(res.headers.get('x-tramme-provider')).toBe('hydracept');
+    expect(res.headers.get('x-tramme-model')).toBe(HYDRACEPT_VIDEO_MODEL);
+    expect(res.headers.get('x-tramme-hydracept-receipt')).toBe('rcpt_1');
+    expect(res.headers.get('x-tramme-hydracept-quote')).toBe('quo_1');
+    expect(new Uint8Array(await res.arrayBuffer())).toEqual(MP4);
+  });
+
+  it('generate-video sends a still as the opening frame', async () => {
+    const calls = stubHydraceptJob(MP4, 'video/mp4');
+    const dataUrl = `data:image/png;base64,${btoa(String.fromCharCode(...PNG))}`;
+    const res = await generateVideo(new Request('http://localhost/api/generate-video', { method: 'POST', body: JSON.stringify({ prompt: 'animate it', source: dataUrl }) }), await reach());
+    expect(res.status).toBe(200);
+    const job = calls.find((c) => c.url.includes('/video.generate.v1/jobs') && c.method === 'POST');
+    expect((job?.body?.input as Record<string, unknown>)?.sourceImage).toEqual({ dataUrl, mimeType: 'image/png', filename: 'source.png' });
+    expect((job?.body?.input as Record<string, unknown>)?.durationSeconds).toBe(8);
+  });
+
+  it('reads a clip source through the pictures parser, including its 12 MB limit', () => {
+    const picture = `data:image/png;base64,${btoa(String.fromCharCode(...PNG))}`;
+    expect(videoSourceOf(picture)).toEqual({ dataUrl: picture, mimeType: 'image/png', filename: 'source.png' });
+    expect(videoSourceOf(undefined)).toBeUndefined();
+    expect(() => videoSourceOf(`data:image/png;base64,${'A'.repeat(16_000_001)}`)).toThrow(/about 12 MB/);
+  });
+
+  it('generate-video refuses a source that is not a picture data URL', async () => {
+    stubHydraceptJob(MP4, 'video/mp4');
+    await expect(generateVideo(new Request('http://localhost/api/generate-video', { method: 'POST', body: JSON.stringify({ prompt: 'x', source: 'https://example.com/a.png' }) }), await reach()))
+      .rejects.toMatchObject({ status: 400, message: /data URL/ });
   });
 
   it('generate sfx through Hydracept by default as audio/mpeg', async () => {

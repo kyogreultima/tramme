@@ -33,6 +33,7 @@ const IMAGE_POLL_MS = 180_000;
 const SFX_POLL_MS = 120_000;
 const MUSIC_POLL_MS = 360_000;
 const VOICE_POLL_MS = 300_000;
+const VIDEO_POLL_MS = 600_000;
 /** Hydracept rejects SFX prompts over 450 characters (overflow: reject). */
 const SFX_PROMPT_MAX = 450;
 /** Hydracept clamps music to 300 seconds. */
@@ -90,8 +91,10 @@ function context(media: HydraceptMedia) {
   return { productId: media.productId, projectId: media.projectId, environment: media.environment };
 }
 
-function execution() {
-  return { executionPreference: 'automatic' };
+type Constraints = Record<string, unknown>;
+
+function execution(constraints?: Constraints) {
+  return { executionPreference: 'automatic', ...(constraints ? { executionConstraints: constraints } : {}) };
 }
 
 function quoteIdOf(q: Record<string, unknown>): string {
@@ -103,8 +106,8 @@ function quoteIdOf(q: Record<string, unknown>): string {
   throw new HttpError(502, 'hydracept: no quote id in the quote answer');
 }
 
-async function quote(media: HydraceptMedia, capability: string, input: Record<string, unknown>, fetch: Fetch): Promise<string> {
-  const body = { context: context(media), input, execution: execution() };
+async function quote(media: HydraceptMedia, capability: string, input: Record<string, unknown>, fetch: Fetch, constraints?: Constraints): Promise<string> {
+  const body = { context: context(media), input, execution: execution(constraints) };
   const res = await fetch(url(media.apiUrl, `/capabilities/${encodeURIComponent(capability)}/quote`), {
     method: 'POST', headers: authHeaders(media.apiKey), body: JSON.stringify(body),
   });
@@ -122,11 +125,12 @@ async function submitJob(
   input: Record<string, unknown>,
   quoteId: string,
   fetch: Fetch,
+  constraints?: Constraints,
 ): Promise<string> {
   const body = {
     context: context(media),
     input,
-    execution: { ...execution(), quoteId },
+    execution: { ...execution(constraints), quoteId },
     idempotencyKey: idempotencyKey(),
   };
   const send = () => fetch(url(media.apiUrl, `/capabilities/${encodeURIComponent(capability)}/jobs`), {
@@ -203,9 +207,10 @@ async function runJob(
   model: string,
   pollCapMs: number,
   voice?: string,
+  constraints?: Constraints,
 ): Promise<HydraceptRun> {
-  const quoteId = await quote(media, capability, input, fetch);
-  const jobId = await submitJob(media, capability, input, quoteId, fetch);
+  const quoteId = await quote(media, capability, input, fetch, constraints);
+  const jobId = await submitJob(media, capability, input, quoteId, fetch, constraints);
   const job = await pollJob(media, jobId, fetch, pollCapMs);
   const receiptId = await receiptIdFor(media, jobId, job, fetch);
   const { artifactId, type } = firstArtifact(job);
@@ -237,6 +242,45 @@ export async function hydraceptImage(
     ...(ask.quality ? { quality: ask.quality } : {}),
   };
   return runJob(media, 'image.generate.v1', input, fetch, IMAGE_MODEL, IMAGE_POLL_MS);
+}
+
+/** Hydracept video: Veo 3.1 Fast, the GA text-to-video (and image-to-video) target. */
+export const HYDRACEPT_VIDEO_MODEL = 'veo-3.1-fast-generate-001';
+
+/** the clip lengths Veo 3.1 takes, in seconds */
+export const HYDRACEPT_VIDEO_SECONDS = [4, 6, 8] as const;
+export type HydraceptVideoSeconds = (typeof HYDRACEPT_VIDEO_SECONDS)[number];
+
+/** a length Veo takes: its nearest (half up), 8 when none is asked */
+export function videoSecondsOf(value: number | undefined): HydraceptVideoSeconds {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 8;
+  return Math.min(8, Math.max(4, Math.round(n / 2) * 2)) as HydraceptVideoSeconds;
+}
+
+export interface HydraceptVideoSource {
+  dataUrl: string;
+  mimeType: string;
+  filename?: string;
+}
+
+export async function hydraceptVideo(
+  media: HydraceptMedia,
+  ask: { prompt: string; ratio?: '16:9' | '9:16'; duration?: number; source?: HydraceptVideoSource },
+  fetch: Fetch,
+): Promise<HydraceptRun> {
+  const input: Record<string, unknown> = {
+    prompt: ask.prompt,
+    aspectRatio: ask.ratio ?? '16:9',
+    durationSeconds: videoSecondsOf(ask.duration),
+    ...(ask.source ? { sourceImage: ask.source } : {}),
+  };
+  // The model is chosen through executionConstraints (the video contract has
+  // no input.model); both the quote and the job must name it, or the quote
+  // prices the route default while the job runs Veo.
+  return runJob(media, 'video.generate.v1', input, fetch, HYDRACEPT_VIDEO_MODEL, VIDEO_POLL_MS, undefined, {
+    preferredModel: HYDRACEPT_VIDEO_MODEL,
+  });
 }
 
 export async function hydraceptSfx(

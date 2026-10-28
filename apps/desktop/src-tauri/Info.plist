@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- merged into the app's Info.plist by Tauri: macOS asks for the microphone with this sentence (dictation in the message boxes) -->
+  <key>NSMicrophoneUsageDescription</key>
+  <string>Tramme uses the microphone when you dictate a message. Nothing is recorded unless you start it.</string>
+</dict>
+</plist>

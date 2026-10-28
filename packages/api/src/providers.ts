@@ -10,6 +10,7 @@
 //   POST   /api/generate                        {kind: sfx|music|voice, prompt, duration?, voice?, style?, model?, provider?} -> audio
 //   GET    /api/voices                          ?provider=&search=&language=&accent=&gender= -> the voices of a voice-over
 //   POST   /api/generate-image                  {prompt, ratio?, quality?, provider?} -> the picture file
+//   POST   /api/generate-video                  {prompt, ratio?, duration?, source?, provider?} -> the clip file
 //   POST   /api/transcribe                      {audio: WAV base64, language?} -> words with their timing (OpenAI)
 
 import { claude, claudeConfig } from './claude.ts';
@@ -21,6 +22,7 @@ import { generateImage, imageConfig } from './images.ts';
 import type { Keys } from './keys.ts';
 import { llm, llmConfig, models } from './llm.ts';
 import { transcribe, transcribeConfig } from './transcribe.ts';
+import { generateVideo, videoConfig } from './videos.ts';
 
 /** what the routes reach a provider with: the keys of this request, and the way out to the provider */
 export interface Reach {
@@ -29,10 +31,10 @@ export interface Reach {
 }
 
 /** the routes of providers, under /api/ */
-export const PROVIDER_ROUTES = ['claude', 'llm', 'models', 'generate', 'voices', 'generate-image', 'transcribe'];
+export const PROVIDER_ROUTES = ['claude', 'llm', 'models', 'generate', 'voices', 'generate-image', 'generate-video', 'transcribe'];
 
 /** what is connected, as /api/config tells it */
-export const providersConfig = (keys: Keys) => ({ claude: claudeConfig(keys), llm: llmConfig(keys), keys: keys.status(), sound: soundConfig(keys), images: imageConfig(keys), transcribe: transcribeConfig(keys) });
+export const providersConfig = (keys: Keys) => ({ claude: claudeConfig(keys), llm: llmConfig(keys), keys: keys.status(), sound: soundConfig(keys), images: imageConfig(keys), videos: videoConfig(keys), transcribe: transcribeConfig(keys) });
 
 /** the answer of a provider route (parts: the path after /api/), or null when the request is not one */
 export async function providerRoute(req: Request, reach: Reach, parts: string[]): Promise<Response | null> {
@@ -43,6 +45,7 @@ export async function providerRoute(req: Request, reach: Reach, parts: string[])
   if (parts[0] === 'generate' && m === 'POST') return generate(req, reach);
   if (parts[0] === 'voices' && m === 'GET') return voices(req, reach);
   if (parts[0] === 'generate-image' && m === 'POST') return generateImage(req, reach);
+  if (parts[0] === 'generate-video' && m === 'POST') return generateVideo(req, reach);
   if (parts[0] === 'transcribe' && m === 'POST') return transcribe(req, reach);
   return null;
 }

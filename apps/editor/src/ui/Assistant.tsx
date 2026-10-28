@@ -130,7 +130,7 @@ export function ConversationTools() {
 export function Assistant({ style }: { style?: Record<string, string | number> }) {
   const busy = running.value, full = S.assistantFull.value;
   const available = aiRoute.value !== null;
-  useStatusWatch(available);
+  useStatusWatch();
   const ctx = contextLine(true);
   const [dropping, setDropping] = useState(false);
   const empty = (

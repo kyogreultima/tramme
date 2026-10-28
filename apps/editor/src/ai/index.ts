@@ -8,11 +8,11 @@
 
 import { installed, offIn } from '../installed.ts';
 import { computed, signal } from '@preact/signals';
-import { addUsage, CLI_DEFAULT, COMPANION_PORT, DEFAULT_MODEL, EFFORTS, effortFor, effortLevels, ENGINE_MODELS, ENGINES, engineOf, LOCAL_URL, modelLabel, modelName, MODELS, NO_USAGE, pickModel, PROVIDER_LABEL, providerOf, REMOTE, setTranslator, slotOf, systemPrompt, userPrompt, type Effort, type Engine, type TurnContext } from '@tramme/assistant';
+import { addUsage, CLI_DEFAULT, COMPANION_PORT, DEFAULT_MODEL, EFFORTS, effortFor, effortLevels, ENGINE_MODELS, ENGINES, engineOf, LOCAL_URL, modelLabel, modelName, MODELS, NO_USAGE, pickModel, PROVIDER_LABEL, providerOf, REMOTE, joinSystem, queuedPrompt, setTranslator, slotOf, systemParts, userPrompt, type Effort, type Engine, type TurnContext } from '@tramme/assistant';
 import { CHAT, CHAT_INDEX, chatPath } from '@tramme/project';
 import type { TrammeDoc } from '@tramme/core';
 import reference from '../../../../docs/document.md';
-import { api, type AiEvent, type ChatItem, type KeyedProvider, type KeyStatus } from '../api.ts';
+import { api, type AiEvent, type ChatItem, type KeyedProvider, type KeyStatus, type TurnUsage } from '../api.ts';
 import { S, toast } from '../state.ts';
 import { companionModels, companionTurn, NO_ENGINES, pairCompanion, probeCompanion, stopCompanion, type CompanionState, type Engines } from './companion.ts';
 import { passes, pause, recallDetails, ServerSession, type Message } from './server.ts';
@@ -24,6 +24,7 @@ import { describe, imageBlocks, type Attachment } from '../attachments.ts';
 import { locale, t } from '../i18n/index.ts';
 import { personal } from '../mode.ts';
 import { shippedPacks } from '../packs.ts';
+import { held, queue, type Queued } from './queue.ts';
 
 export interface AiSettings {
   model: string;
@@ -41,11 +42,13 @@ export interface AiSettings {
   apply: 'off' | 'turn' | 'all';
   /** a turn cut by a failure that passes (network, busy server) goes on by itself, later each time; never after a quota or a key refused */
   resume: boolean;
+  /** how long the conversation stays in the cache of the Messages API: 5 minutes, or an hour (costs more to write, less when the user comes back later) */
+  cacheTtl: '5m' | '1h';
 }
 
 const KEY = 'tramme.assistant';
 function loadSettings(): AiSettings {
-  const d: AiSettings = { model: DEFAULT_MODEL, prefer: 'auto', companionUrl: `http://127.0.0.1:${COMPANION_PORT}`, token: '', localUrl: LOCAL_URL, efforts: {}, notify: true, apply: 'off', resume: true };
+  const d: AiSettings = { model: DEFAULT_MODEL, prefer: 'auto', companionUrl: `http://127.0.0.1:${COMPANION_PORT}`, token: '', localUrl: LOCAL_URL, efforts: {}, notify: true, apply: 'off', resume: true, cacheTtl: '5m' };
   try {
     // the settings kept under the tool's former name (model, companion token) are taken over
     const s = { ...d, ...JSON.parse(localStorage.getItem(KEY) ?? localStorage.getItem('emotion.assistant') ?? '{}') } as AiSettings;
@@ -56,6 +59,7 @@ function loadSettings(): AiSettings {
     s.efforts = Object.fromEntries(Object.entries(efforts).filter(([, e]) => EFFORTS.includes(e)));
     s.notify = s.notify !== false;
     s.resume = s.resume !== false;
+    s.cacheTtl = s.cacheTtl === '1h' ? '1h' : '5m';
     // the former boolean becomes 'turn' (applied at the end of the turn, as before)
     const old = s as AiSettings & { autoApply?: boolean };
     s.apply = s.apply === 'turn' || s.apply === 'all' ? s.apply : old.autoApply === true ? 'turn' : 'off';
@@ -248,6 +252,22 @@ export async function refreshStatus(quiet = false) {
   if (providerOf(aiSettings.peek().model) === 'openrouter' && next.remote.openrouter && !aiModels.peek().remote.openrouter) loadModels().catch(() => {});
 }
 
+/** the companion looked for whenever it may have started or stopped, on every screen and whatever route works: often while it is missing, rarely once it answers */
+export function watchCompanion(): () => void {
+  let timer: ReturnType<typeof setTimeout> | undefined, busy = false, stopped = false;
+  const wait = () => { if (!stopped) timer = setTimeout(look, aiStatus.peek().companion === 'ok' ? 15_000 : 4000); };
+  // never a second look while one is in flight: a companion that hangs would pile up requests
+  const look = async () => {
+    clearTimeout(timer);
+    if (busy) return;
+    busy = true;
+    try { await refreshStatus(true); } catch { /* the next look tries again */ } finally { busy = false; wait(); }
+  };
+  addEventListener('focus', look);
+  wait();
+  return () => { stopped = true; clearTimeout(timer); removeEventListener('focus', look); };
+}
+
 // ── conversations ────────────────────────────────────────────
 // Each conversation is a file of the project (.tramme/chats/<id>.json); an
 // index lists them for the history. "New conversation" keeps the others.
@@ -271,12 +291,13 @@ const sorted = (list: ChatMeta[]) => [...list].sort((a, b) => b.modified.localeC
 /** a conversation file: its items and how to continue it */
 function parse(text: string) {
   const j = JSON.parse(text);
-  if (Array.isArray(j)) return { items: j as ChatItem[], companion: undefined, server: undefined, created: '' };
+  if (Array.isArray(j)) return { items: j as ChatItem[], companion: undefined, server: undefined, created: '', queue: [] as Queued[] };
   return {
     items: (Array.isArray(j.items) ? j.items : []) as ChatItem[],
     companion: typeof j.companion === 'string' ? j.companion : undefined,
     server: Array.isArray(j.server) ? (j.server as Message[]) : undefined,
     created: typeof j.created === 'string' ? j.created : '',
+    queue: (Array.isArray(j.queue) ? j.queue.filter((q: Queued) => q && typeof q.id === 'string' && typeof q.text === 'string') : []) as Queued[],
   };
 }
 
@@ -325,6 +346,9 @@ export async function openChat(id: string) {
   session = { companion: c.companion, server: new ServerSession(c.server) };
   created = c.created || chats.peek().find((x) => x.id === id)?.created || new Date().toISOString();
   chatId.value = id;
+  // messages waiting when the page was left do not leave by themselves: the user sends them
+  queue.value = c.queue;
+  held.value = c.queue.length > 0;
   // a conversation saved before its calls kept their line: read back from the history
   chat.value = recallDetails(c.items, c.server);
 }
@@ -336,6 +360,8 @@ export function newChat() {
   created = '';
   chatId.value = null;
   chat.value = [];
+  queue.value = [];
+  held.value = false;
 }
 
 export async function deleteChat(id: string) {
@@ -361,14 +387,18 @@ export async function saveChat(items: ChatItem[] = chat.peek()) {
   const now = new Date().toISOString();
   let id = chatId.peek();
   if (!id) { id = newChatId(); chatId.value = id; created = now; }
-  const data = { version: 1, created, items: lighter(items), companion: session.companion, server: session.server.toJSON() };
+  const data = { version: 1, created, items: lighter(items), companion: session.companion, server: session.server.toJSON(), ...(queue.peek().length ? { queue: queue.peek() } : {}) };
   await api.write(pid(), chatPath(id), JSON.stringify(data), { type: 'application/json' });
   const meta: ChatMeta = { id, title: titleOf(items), created, modified: now, count: items.filter((it) => it.role === 'user').length };
   chats.value = sorted([meta, ...chats.peek().filter((c) => c.id !== id)]);
   await api.write(pid(), CHAT_INDEX, JSON.stringify(chats.peek()), { type: 'application/json' });
 }
 
-export interface AskPayload { text: string; context: TurnContext; doc: TrammeDoc; decisions: { id: string; status: string }[]; attachments?: Attachment[]; command?: Command; commandInput?: Record<string, unknown> }
+export interface AskPayload {
+  text: string; context: TurnContext; doc: TrammeDoc; decisions: { id: string; status: string }[]; attachments?: Attachment[]; command?: Command; commandInput?: Record<string, unknown>;
+  /** messages written during the previous turn, answered together, each with its own context (text and context are the last one's) */
+  queued?: { text: string; context: TurnContext }[];
+}
 
 /** what the user did without the assistant (tools run from the / menu), told at the next message */
 const ranAlone: string[] = [];
@@ -409,12 +439,12 @@ export async function* ask(p: AskPayload, signal: AbortSignal): AsyncGenerator<A
   notes.push(`The user's interface is in ${locale === 'fr' ? 'French' : 'English'}: reply in that language, including the titles of your proposals and the names of the layers you create.`);
   const images = await imageBlocks(p.attachments ?? []);
   // each agent of the companion keeps its own history (the session is the engine's): another one taking over the conversation reads what was said
-  const model = aiSettings.peek().model, effort = currentEffort(model), engine = engineOf(model);
+  const model = aiSettings.peek().model, cacheTtl = aiSettings.peek().cacheTtl, effort = currentEffort(model), engine = engineOf(model);
   // a conversation saved before the engines holds Claude's session alone
   const kept = session.companion && !session.companion.includes(':') ? `claude:${session.companion}` : session.companion;
   const resumed = route === 'companion' && engine && kept?.startsWith(`${engine}:`) ? kept.slice(engine.length + 1) : undefined;
   if (route === 'companion' ? !resumed : !session.server.messages.length) notes.unshift(...earlier());
-  const prompt = userPrompt(p.text, p.context, notes);
+  const prompt = p.queued ? queuedPrompt(p.queued.map((m) => ({ text: m.text, ctx: m.context })), notes) : userPrompt(p.text, p.context, notes);
   // the project's brief, when there is one, rides in the system prompt: the assistant follows it from the first word
   let brief: string | null = null;
   try { brief = (await api.readText(S.project.peek().id, 'assets/brief.json'))?.text ?? null; } catch { brief = null; }
@@ -424,7 +454,8 @@ export async function* ask(p: AskPayload, signal: AbortSignal): AsyncGenerator<A
   // the packs that ship with the editor, named in one line: reachable without being in the project
   const packs = await shippedPacks();
   if (packs.length) mine.push(`Packs of the editor: ${packs.map((x) => x.name).join(', ')} — usable even when the project holds none; the first use adds the pack to the project.`);
-  const system = systemPrompt(reference, brief ?? undefined, mine);
+  // the part that is the same for every project first: the Messages API caches it apart; the other routes get the same text in one piece
+  const system = systemParts(reference, brief ?? undefined, mine);
   const target = route === 'local' ? { url: localBase() } : route === 'remote' ? { url: `/api/llm/${encodeURIComponent(slotOf(model))}` } : undefined;
   // Claude by its model id; a command line by its own model name, none for its default
   const asked = engine === 'claude' ? model : modelName(model) === CLI_DEFAULT ? '' : modelName(model);
@@ -434,19 +465,19 @@ export async function* ask(p: AskPayload, signal: AbortSignal): AsyncGenerator<A
       const sessionId = again === null ? resumed : session.companion?.startsWith(`${engine}:`) ? session.companion.slice(engine.length + 1) : undefined;
       // no session opened yet: the message is sent again whole
       const text = again === null || !sessionId ? prompt : again;
-      return companionTurn(link(), { engine, prompt: text, system, model: asked, effort, sessionId, images: again === null ? images : [] }, runner, signal, (id) => { session.companion = `${engine}:${id}`; });
+      return companionTurn(link(), { engine, prompt: text, system: joinSystem(system), model: asked, effort, sessionId, images: again === null ? images : [] }, runner, signal, (id) => { session.companion = `${engine}:${id}`; });
     }
-    return session.server.turn(again ?? prompt, model, system, runner, signal, again === null ? { images, target, effort } : { target, effort });
+    return session.server.turn(again ?? prompt, model, system, runner, signal, again === null ? { images, target, effort, cacheTtl } : { target, effort, cacheTtl });
   };
   // what the turn costs, told at its end
   const started = Date.now(), calls = runner.calls;
-  let usage = NO_USAGE, seen = 0;
+  let usage = NO_USAGE, seen = 0, reported = false;
   for (let n = 0, failure = ''; ; n++) {
     const again = n ? resumeNote(failure) : null;
     failure = '';
     try {
       for await (const ev of attempt(again)) {
-        if (ev.type === 'usage') { usage = addUsage(usage, ev.usage); continue; }
+        if (ev.type === 'usage') { usage = addUsage(usage, ev.usage); reported = true; continue; }
         if (ev.type === 'item' && ev.item.image) seen++;
         // an error the turn will get over is held back, told below with the wait
         if (ev.type === 'error' && resumable(ev.message, n)) failure = ev.message;
@@ -461,9 +492,12 @@ export async function* ask(p: AskPayload, signal: AbortSignal): AsyncGenerator<A
     yield { type: 'item', item: { id: uid(), role: 'assistant', text: t('ai.resumeIn', { error: failure, s: wait, n: n + 1, max: RESUME_DELAYS.length }) } };
     await pause(wait * 1000, signal);
   }
-  yield { type: 'item', item: { id: uid(), role: 'assistant', usage: { ...usage, tools: runner.calls - calls, images: seen, ms: Date.now() - started, model } } };
+  yield { type: 'item', item: { id: uid(), role: 'assistant', usage: { ...usage, tools: runner.calls - calls, images: seen, ms: Date.now() - started, model, route: USAGE_ROUTE[route], ...(reported ? {} : { unknown: true as const }) } } };
   yield { type: 'done' };
 }
+
+/** the route of a turn as the usage line names it, so the bench can price it: the Messages API (server), the chat-format providers (chat), the companion, a local model */
+const USAGE_ROUTE: Record<Route, TurnUsage['route']> = { server: 'server', remote: 'chat', companion: 'companion', local: 'local' };
 
 /** the waits before each new attempt, in seconds: twice as long each time */
 const RESUME_DELAYS = [2, 4, 8, 16, 32, 60];

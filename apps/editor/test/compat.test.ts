@@ -68,6 +68,23 @@ describe('chat format', () => {
     expect(() => new ChatReader().push({ error: { message: 'quota' } })).toThrow('quota');
   });
 
+  it('reads the usage of the last chunk', () => {
+    const r = new ChatReader();
+    r.push({ choices: [{ delta: { content: 'ok' }, finish_reason: 'stop' }] });
+    // the last event carries no choice, only the usage
+    r.push({ choices: [], usage: { prompt_tokens: 1000, completion_tokens: 50, prompt_tokens_details: { cached_tokens: 800 } } });
+    expect(r.usage()).toEqual({ requests: 1, input: 200, cacheRead: 800, cacheWrite: 0, cacheWrite1h: 0, output: 50 });
+    expect(r.result().stop).toBe('end_turn');
+  });
+
+  it('reads the cached share where each provider puts it, and none when nothing was said', () => {
+    const read = (usage: object) => { const r = new ChatReader(); r.push({ choices: [], usage }); return r.usage(); };
+    expect(read({ prompt_tokens: 100, completion_tokens: 5, cached_tokens: 60 })).toMatchObject({ input: 40, cacheRead: 60 });
+    expect(read({ prompt_tokens: 100, completion_tokens: 5, prompt_cache_hit_tokens: 30 })).toMatchObject({ input: 70, cacheRead: 30 });
+    expect(read({ prompt_tokens: 100, completion_tokens: 5 })).toMatchObject({ input: 100, cacheRead: 0 });
+    expect(new ChatReader().usage()).toBeNull();
+  });
+
   it('tells a call cut off by the length limit from a complete one', () => {
     const r = new ChatReader();
     r.push({ choices: [{ delta: { tool_calls: [{ index: 0, id: 'c1', function: { name: 'propose_changes', arguments: '{"label":"Ti' } }] }, finish_reason: 'length' }] });
