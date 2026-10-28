@@ -2473,6 +2473,7 @@
     "start": "Dicter : parlez, puis cliquez à nouveau pour écrire ce que vous avez dit",
     "stop": "Arrêter et écrire ce que vous avez dit",
     "writing": "Écriture de ce que vous avez dit…",
+    "downloading": "Téléchargement du modèle de parole (une seule fois)",
     "recordingHint": "Enregistrement en cours. Échap l'annule.",
     "micRefused": "Le microphone est bloqué. Autorisez-le pour Tramme dans les réglages du système ou du navigateur.",
     "noMic": "Aucun microphone trouvé.",

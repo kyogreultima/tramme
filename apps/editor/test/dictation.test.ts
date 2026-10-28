@@ -113,7 +113,31 @@ describe('dictation', () => {
     ask.mockResolvedValue(true);
     expect(await dictation.transcribeDictation(samples)).toBe('hello');
     expect(prefs.value.models.transcription).toBe('whisper-base');
-    expect(transcribe).toHaveBeenCalledWith(samples, 'local');
+    // on the processor (the size offered is the one downloaded), its download told as it goes
+    const opts = transcribe.mock.calls.at(-1)![2]!;
+    expect(transcribe.mock.calls.at(-1)!.slice(0, 2)).toEqual([samples, 'local']);
+    expect(opts.local?.cpu).toBe(true);
+  });
+
+  it('tells the download of the model as it goes, and forgets it after', async () => {
+    vi.spyOn(cache, 'cachedFiles').mockResolvedValue([{ url: 'https://huggingface.co/Xenova/whisper-small/resolve/main/config.json', bytes: 10 }]);
+    let seen: unknown = null;
+    vi.spyOn(speech, 'transcribeSamples').mockImplementation(async (_s, _src, opts) => { opts?.local?.progress?.(25, 100); seen = dictation.modelLoad.value; return 'hello'; });
+    expect(await dictation.transcribeDictation(samples)).toBe('hello');
+    expect(seen).toEqual({ loaded: 25, total: 100 });
+    expect(dictation.modelLoad.value).toBeNull();
+  });
+
+  it('a second click while the microphone opens does not open it twice', async () => {
+    fakeMicrophone();
+    let open!: () => void;
+    const gum = vi.fn(() => new Promise((resolve) => { open = () => resolve({ getTracks: () => [{ stop() {} }] }); }));
+    vi.stubGlobal('navigator', { ...navigator, mediaDevices: { getUserMedia: gum } });
+    const first = dictation.startDictation(), second = dictation.startDictation();
+    open();
+    await Promise.all([first, second]);
+    expect(gum).toHaveBeenCalledOnce();
+    dictation.cancelDictation();
   });
 
   it('a model already here is not offered again', async () => {
