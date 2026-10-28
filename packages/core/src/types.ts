@@ -269,6 +269,14 @@ export interface SequenceTrack {
   muted?: boolean;
   /** clips of this track close their gaps by themselves and ripple when one is removed or trimmed */
   magnetic?: boolean;
+  /** sound tracks: the fader, in dB over the gain of each sound on the track (animatable: its keys are the automation) */
+  volume?: Prop<number>;
+  /** sound tracks: where the track sits between left (-1) and right (1) */
+  pan?: number;
+  /** this track is a bus: it holds no sound, its volume, pan and mute apply to the tracks that feed it */
+  bus?: boolean;
+  /** the bus (a track with `bus`) this track feeds */
+  to?: string;
   /** lane height in the timeline, px */
   height?: number;
 }

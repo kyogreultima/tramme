@@ -55,7 +55,7 @@ export const S = {
   version: signal(0),
   renderError: signal<string | null>(null),
   toasts: signal<Toast[]>([]),
-  bottomTab: signal<'timeline' | 'graph'>('timeline'),
+  bottomTab: signal<'timeline' | 'graph' | 'mixer'>('timeline'),
   mobileTab: signal<'viewport' | 'layers' | 'timeline' | 'inspector' | 'ai'>('viewport'),
   assistantFull: signal(false),
 };

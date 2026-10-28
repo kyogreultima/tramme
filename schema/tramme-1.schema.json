@@ -240,6 +240,19 @@
                 "magnetic": {
                   "type": "boolean"
                 },
+                "volume": {},
+                "pan": {
+                  "type": "number",
+                  "minimum": -1,
+                  "maximum": 1
+                },
+                "bus": {
+                  "type": "boolean"
+                },
+                "to": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
                 "height": {
                   "type": "number"
                 }

@@ -142,6 +142,11 @@ class Checker {
       if (tracks.has(t.id)) this.err(pointer(...base, 'tracks', i, 'id'), `duplicate track id "${t.id}"`);
       tracks.add(t.id);
     });
+    (comp.tracks || []).forEach((t, i) => {
+      if (t.to === undefined) return;
+      const bus = comp.tracks!.find((x) => x.id === t.to);
+      if (!bus || !bus.bus || t.bus || t.kind !== 'audio') this.err(pointer(...base, 'tracks', i, 'to'), t.kind !== 'audio' ? 'only a sound track feeds a bus' : t.bus ? 'a bus does not feed another bus' : `"${t.to}" is not a bus (a sound track with bus: true)`);
+    });
     for (const [lid, l] of Object.entries(comp.layers)) {
       if (l.track !== undefined && !tracks.has(l.track)) this.err(pointer(...base, 'layers', lid, 'track'), `unknown track "${l.track}"`);
     }

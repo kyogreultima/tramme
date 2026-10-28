@@ -107,7 +107,10 @@ export function clipChain(ctx: BaseAudioContext, clip: AudioClip, out: AudioNode
   const gain = ctx.createGain();
   stages.push(gain);
   stages.reduce((a, b) => (outOf.get(a) ?? a).connect(b));
-  gain.connect(out);
+  // the pan of the clip's track in the mixer (a centred clip builds no panner)
+  let dry: AudioNode = out;
+  if (clip.pan) { const p = ctx.createStereoPanner(); p.pan.value = clip.pan; p.connect(out); dry = p; }
+  gain.connect(dry);
   if (clip.reverb > 0) {
     const send = ctx.createGain(), conv = ctx.createConvolver();
     send.gain.value = clip.reverb;

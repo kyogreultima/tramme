@@ -31,6 +31,7 @@ describe('audioClips', () => {
 // a mock context: it only counts and records the nodes the chain builds
 const param = () => ({ value: 0, setValueCurveAtTime: () => {}, setValueAtTime: () => {} });
 const mockCtx = () => {
+  const panners: { pan: { value: number } }[] = [];
   const filters: { type: string; frequency: { value: number }; Q: { value: number }; gain: { value: number } }[] = [];
   const compressors: { threshold: { value: number }; knee: { value: number }; ratio: { value: number }; attack: { value: number }; release: { value: number } }[] = [];
   const node = () => {
@@ -49,9 +50,10 @@ const mockCtx = () => {
       return f as never;
     },
     createGain: () => ({ gain: param(), connect: (o: unknown) => o }) as never,
+    createStereoPanner: () => { const p = { pan: param(), connect: (o: unknown) => o }; panners.push(p); return p as never; },
     createConvolver: () => ({ buffer: null, connect: (o: unknown) => o }) as never,
   };
-  return { ctx: ctx as unknown as BaseAudioContext, filters, compressors };
+  return { ctx: ctx as unknown as BaseAudioContext, filters, compressors, panners };
 };
 
 const clip = (sound: Partial<AudioClip>): AudioClip => ({
@@ -61,6 +63,15 @@ const clip = (sound: Partial<AudioClip>): AudioClip => ({
 });
 
 describe('clipChain', () => {
+  it('pans a clip that has a pan, and builds no panner for a centred one', () => {
+    const centred = mockCtx();
+    clipChain(centred.ctx, clip({}), { connect: () => {} } as never, 0, 0);
+    expect(centred.panners).toHaveLength(0);
+    const { ctx, panners } = mockCtx();
+    clipChain(ctx, clip({ pan: -0.4 }), { connect: () => {} } as never, 0, 0);
+    expect(panners.map((p) => p.pan.value)).toEqual([-0.4]);
+  });
+
   it('adds no node when the equaliser is flat', () => {
     const { ctx, filters } = mockCtx();
     clipChain(ctx, clip({}), { connect: () => {} } as never, 0, 0);
