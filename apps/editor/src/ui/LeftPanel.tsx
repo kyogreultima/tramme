@@ -11,6 +11,7 @@ import { Icon, kindColor, kindIcon } from './icons.tsx';
 import { ASSET_MIME, chosenAsset, COMP_MIME } from './timeline/assets-drag.ts';
 import { newSequenceFromAsset } from './timeline/place.ts';
 import { MediaBar, naming, useSpoken } from './MediaBar.tsx';
+import { relinkFiles } from '../relink-run.ts';
 import { binsOf, filterAssets, removeTagOps, setBinOps, type AssetFilter } from '../bins.ts';
 import { preview } from '../preview.ts';
 import { mediaDuration } from '../perception.ts';
@@ -612,6 +613,8 @@ function Assets() {
   const [filter, setFilter] = useState<AssetFilter>({});
   const spoken = useSpoken(doc, !!filter.text);
   const input = useRef<HTMLInputElement>(null);
+  const relink = useRef<HTMLInputElement>(null);
+  const offline = S.offline.value;
   // a copy of a shipped pack older than the editor's: offered its update, the way an installed plugin's copy is
   const [updates, setUpdates] = useState<PackUpdate[]>([]);
   // read again only when the modules or their recorded versions change, not on every edit; a read overtaken by a newer one is dropped
@@ -646,6 +649,7 @@ function Assets() {
       ]) },
       { label: t('panel.addTag'), icon: 'marker' as const, onClick: () => { naming.value = { kind: 'tag', ids: [id] }; } },
       ...(a.tags ?? []).map((tag): MenuItem => ({ label: `#${tag} ×`, onClick: () => commit(t('panel.addTag'), removeTagOps(S.doc.peek(), [id], tag)) })),
+      ...(S.offline.peek().includes(id) ? [{ label: t('panel.relinkFile'), icon: 'search' as const, onClick: () => relink.current?.click() }] : []),
       ...(a.type === 'audio' || a.type === 'video' || a.type === 'image' ? [{ label: t('panel.newSequenceFromMedia'), icon: 'film' as const, onClick: () => { void newSequenceFromAsset(id); } }] : []),
       ...(a.type === 'audio' || a.type === 'video' ? [transcribeItem(id)] : []),
       ...(a.type === 'image' ? [{ label: t('panel.animateTheFolderN', { n: imagesIn(doc, folderOf(a.src)).length }), icon: 'film' as const, onClick: () => animateFolder(folderOf(a.src)) }] : []),
@@ -658,6 +662,8 @@ function Assets() {
       onDragOver={(e) => { e.preventDefault(); setOver(true); }} onDragLeave={() => setOver(false)}
       onDrop={(e) => { e.preventDefault(); setOver(false); if (e.dataTransfer?.files.length) importFiles(e.dataTransfer.files); }}>
       <Compositions />
+      <input ref={relink} type="file" multiple hidden onChange={(e) => { const f = (e.target as HTMLInputElement).files; if (f) void relinkFiles([...f]); (e.target as HTMLInputElement).value = ''; }} />
+      {offline.length > 0 && <div class="missing-note"><Icon name="alert" size={13} /><span>{t('panel.mediaMissing', { n: offline.length })}</span><button class="btn sm" onClick={() => relink.current?.click()}>{t('panel.relinkMissing')}</button></div>}
       {Object.keys(doc.assets).length > 0 && <MediaBar doc={doc} filter={filter} onChange={setFilter} />}
       {Object.keys(doc.assets).length > 0 && shown.length === 0 && <div class="faint tree-none">{t('panel.noMediaMatches')}</div>}
       <input ref={input} type="file" multiple hidden onChange={(e) => { const f = (e.target as HTMLInputElement).files; if (f) importFiles(f); (e.target as HTMLInputElement).value = ''; }} />
@@ -675,7 +681,8 @@ function Assets() {
               <span class="thumb" style={a.type === 'image' ? { backgroundImage: `url("${url(id)}")`, backgroundSize: 'contain', backgroundColor: 'var(--media)' } : undefined}>
                 {a.type !== 'image' && (a.type === 'font' ? <span style={{ fontFamily: `"${a.family}"`, color: 'var(--text)', fontSize: 13 }}>Aa</span> : <Icon name={ASSET_ICON[a.type]} />)}
               </span>
-              <span class="name">{a.name || id}</span>
+              <span class="name" style={offline.includes(id) ? { color: 'var(--danger, var(--text-3))' } : undefined}>{a.name || id}</span>
+              {offline.includes(id) && <span class="offline-badge" title={t('panel.fileMissing')}><Icon name="alert" size={12} /></span>}
               {updates.filter((u) => u.assetId === id).map((u) => (
                 <button key={u.to} class="btn sm" title={t('panel.packOlderHere', { from: u.from, to: u.to })}
                   onClick={() => takeUpdate(u).catch((x) => toast(t('panel.couldNotUpdatePack', { error: (x as Error).message }), 'error', 9000))}>

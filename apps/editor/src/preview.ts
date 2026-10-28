@@ -236,6 +236,7 @@ class Preview {
       await this.attachPlugins();
       setRegistry(this.renderer.registry);
       this.pluginTours();
+      this.noteOffline();
       S.renderError.value = null;
     } catch (e) {
       S.renderError.value = (e as Error).message;
@@ -254,7 +255,14 @@ class Preview {
     await this.attachPlugins(assetIds);
     setRegistry(this.renderer.registry);
     this.pluginTours();
+    this.noteOffline();
     this.invalidate();
+  }
+
+  /** the media whose file is missing, for the panels: written only when the list changes */
+  private noteOffline() {
+    const ids = [...(this.renderer?.assets.offline.keys() ?? [])];
+    if (ids.join('|') !== S.offline.peek().join('|')) S.offline.value = ids;
   }
 
   /** the proxies setting changed: the videos that have one open again, the proxy or the original */
