@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Composition, TrammeDoc } from '@tramme/core';
 import { applyOps as apply } from '@tramme/core';
-import { carriedStart, contentEnd, crossfadeOps, describeOp, isToolAsset, mediaAssetsOf, splitLayerOps, trimInOps } from '../src/model.ts';
+import { carriedStart, contentEnd, crossfadeOps, cutEndOps, describeOp, fitCompOps, isToolAsset, mediaAssetsOf, splitLayerOps, trimInOps, wholeFile } from '../src/model.ts';
 import { passes } from '../src/ai/server.ts';
 import EN from '../src/i18n/en.json' with { type: 'json' };
 import FR from '../src/i18n/fr.json' with { type: 'json' };
@@ -14,6 +14,103 @@ describe('where the content of a composition ends', () => {
   });
   it('is the whole composition when a layer runs to its end', () => {
     expect(contentEnd(comp({ a: { type: 'text', out: 12 }, bg: { type: 'shape.rect' } }))).toBe(60);
+  });
+});
+
+/** a document with one composition, short (5 s) as a new project's, and a second one inside */
+const short = (): TrammeDoc => ({ version: 1, root: 'main', assets: {}, tokens: {}, compositions: {
+  main: { name: 'Main', width: 1920, height: 1080, fps: 30, duration: 5, layers: {}, order: [] },
+  inner: { name: 'Inner', width: 1920, height: 1080, fps: 30, duration: 8, layers: {}, order: [] },
+} } as unknown as TrammeDoc);
+
+describe('a composition lengthened to hold what is added', () => {
+  it('reaches the end asked when it is shorter', () => {
+    const doc = short();
+    expect(fitCompOps(doc, 'main', 753.17)).toEqual([{ op: 'replace', path: '/compositions/main/duration', value: 753.17 }]);
+    expect(apply(doc, fitCompOps(doc, 'main', 753.17)).doc.compositions.main.duration).toBe(753.17);
+  });
+  it('is left as it is when it holds the end already, or exactly', () => {
+    expect(fitCompOps(short(), 'main', 3)).toEqual([]);
+    expect(fitCompOps(short(), 'main', 5)).toEqual([]);
+  });
+  it('touches only the composition named', () => {
+    const doc = apply(short(), fitCompOps(short(), 'inner', 20)).doc;
+    expect(doc.compositions.inner.duration).toBe(20);
+    expect(doc.compositions.main.duration).toBe(5);
+  });
+  it('rounds the end to the thousandth of a frame (no float noise in the document)', () => {
+    expect(fitCompOps(short(), 'main', 0.1 + 0.2 + 10)).toEqual([{ op: 'replace', path: '/compositions/main/duration', value: 10.3 }]);
+  });
+  it('asks nothing for an end that is not a length', () => {
+    for (const end of [Number.NaN, Number.POSITIVE_INFINITY, -1, 0]) expect(fitCompOps(short(), 'main', end), String(end)).toEqual([]);
+  });
+});
+
+describe('a media layer as long as its file', () => {
+  const video = { type: 'video', name: 'Talk', transform: { position: [960, 540] }, props: { video: 'talk', size: [1920, 1080], fit: 'cover' } } as never;
+  it('plays a 12-minute video whole in a 5-second composition', () => {
+    const doc = short();
+    const { layer, ops } = wholeFile(doc, 'main', video, 753.17);
+    expect(layer).toMatchObject({ in: 0, out: 753.17, props: { video: 'talk' } });
+    expect(ops).toEqual([{ op: 'replace', path: '/compositions/main/duration', value: 753.17 }]);
+  });
+  it('ends with a short file, the composition kept', () => {
+    const { layer, ops } = wholeFile(short(), 'main', video, 2.5);
+    expect(layer).toMatchObject({ in: 0, out: 2.5 });
+    expect(ops).toEqual([]);
+  });
+  it('starts where the layer starts', () => {
+    const { layer, ops } = wholeFile(short(), 'main', { ...(video as object), in: 4 } as never, 10);
+    expect(layer).toMatchObject({ in: 4, out: 14 });
+    expect(ops).toEqual([{ op: 'replace', path: '/compositions/main/duration', value: 14 }]);
+  });
+  it('keeps the layer as it was when the file length is unknown', () => {
+    const { layer, ops } = wholeFile(short(), 'main', video, 0);
+    expect(layer).toBe(video);
+    expect(ops).toEqual([]);
+  });
+  it('never changes the layer given', () => {
+    const given = structuredClone(video);
+    wholeFile(short(), 'main', given, 60);
+    expect(given).toEqual(video);
+  });
+});
+
+describe('the end of a video cut in its file', () => {
+  /** a 5 s project with a video of 753.17 s, its layer 0 to 5 s, played from the file's start (or from start) */
+  const withClip = (start?: number) => {
+    const doc = short();
+    doc.compositions.main.layers.clip = { type: 'video', in: 0, out: 5, props: { video: 'talk', ...(start !== undefined ? { start } : {}) } } as never;
+    doc.compositions.main.order = ['clip'];
+    return doc;
+  };
+  const end = (ops: ReturnType<typeof cutEndOps>) => apply(withClip(), ops).doc.compositions.main;
+
+  it('stretched past the project, takes it along: what was taken is seen', () => {
+    const ops = cutEndOps(withClip(), 'main', 'clip', 253, 753.17, 30);
+    expect(ops).toEqual([
+      { op: 'add', path: '/compositions/main/layers/clip/out', value: 253 },
+      { op: 'replace', path: '/compositions/main/duration', value: 253 },
+    ]);
+    expect(end(ops)).toMatchObject({ duration: 253, layers: { clip: { out: 253 } } });
+  });
+  it('shortened inside the project, leaves its length', () => {
+    expect(cutEndOps(withClip(), 'main', 'clip', 3, 753.17, 30)).toEqual([{ op: 'add', path: '/compositions/main/layers/clip/out', value: 3 }]);
+  });
+  it('stops at the end of the file', () => {
+    const ops = cutEndOps(withClip(), 'main', 'clip', 900, 753.17, 30);
+    expect(end(ops)).toMatchObject({ duration: 753.17, layers: { clip: { out: 753.17 } } });
+  });
+  it('keeps at least one frame', () => {
+    expect(cutEndOps(withClip(), 'main', 'clip', 0, 753.17, 30)).toEqual([{ op: 'add', path: '/compositions/main/layers/clip/out', value: 0.0333 }]);
+  });
+  it('counts from where the layer plays in its file', () => {
+    // the file played from 100 s: its end at 160 s in the file is 60 s of layer
+    const doc = withClip(100);
+    expect(apply(doc, cutEndOps(doc, 'main', 'clip', 160, 753.17, 30)).doc.compositions.main).toMatchObject({ duration: 60, layers: { clip: { out: 60 } } });
+  });
+  it('asks nothing when the end does not move', () => {
+    expect(cutEndOps(withClip(), 'main', 'clip', 5, 753.17, 30)).toEqual([]);
   });
 });
 

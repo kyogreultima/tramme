@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { captionGroups, mergeChunks, remapTranscript, silences, transcriptText, type Transcript } from '../src/index.ts';
+import { captionGroups, mergeChunks, remapTranscript, silences, spokenLanguage, transcriptText, type Transcript } from '../src/index.ts';
 
 const words = [
   { w: 'Hello', s: 0.2, e: 0.6 }, { w: 'to', s: 0.65, e: 0.7 }, { w: 'everyone.', s: 0.72, e: 1.0 },
@@ -32,5 +32,19 @@ describe('transcription', () => {
       { start: 2.5, end: 5, words: words.filter((w) => w.e > 2.5) },
     ]);
     expect(merged.map((w) => w.w)).toEqual(words.map((w) => w.w));
+  });
+});
+
+describe('spokenLanguage', () => {
+  it('takes the language Whisper finds most likely after the start of the transcript', async () => {
+    const logits = new Float32Array(10);
+    logits[3] = 2; logits[4] = 5; logits[5] = 1;
+    const asked: unknown[] = [];
+    const model = Object.assign(async (inputs: { input_features: unknown; decoder_input_ids: unknown }) => { asked.push(inputs.decoder_input_ids); return { logits: { data: logits } }; },
+      { generation_config: { decoder_start_token_id: 7, lang_to_id: { '<|en|>': 3, '<|fr|>': 4, '<|de|>': 5 } } });
+    const run = { model, processor: async () => ({ input_features: {} }) };
+    // the decoder's input is made by the caller's tensor library: here, the ids as they are
+    expect(await spokenLanguage(run, new Float32Array(16000), (ids) => ids)).toBe('fr');
+    expect(asked).toEqual([[7]]);
   });
 });
