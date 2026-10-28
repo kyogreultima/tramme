@@ -1198,7 +1198,8 @@
     "exportEndHere": "End the export here",
     "clearExportRange": "Export the whole film again",
     "exportIn": "In",
-    "exportOut": "Out"
+    "exportOut": "Out",
+    "detachAudio": "Detach the sound"
   },
   "topbar": {
     "tenBit": "10 bits",
