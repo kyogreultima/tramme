@@ -1247,7 +1247,8 @@
     "queueFailed": "failed",
     "addToQueue": "Add to the queue",
     "onlyMarked": "Only the marked part, {from} to {to}",
-    "queuedName": "{name} · {format}"
+    "queuedName": "{name} · {format}",
+    "hdrUnavailable": "HDR: this browser's canvas cannot hold it yet, the export stays SDR"
   },
   "viewport": {
     "waveform": "Waveform",

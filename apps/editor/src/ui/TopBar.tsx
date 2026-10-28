@@ -13,6 +13,7 @@ import { ago, contentEnd, fmtSeconds, snap } from '../model.ts';
 import { shortsOf } from '../shorts.ts';
 import { openMenu, Popover, Select, Toggle, type MenuItem } from './controls.tsx';
 import { PublishPanel } from './PublishPanel.tsx';
+import { hdrCapability } from '../hdr.ts';
 import { ExportQueueList } from './ExportQueueList.tsx';
 import { exportQueue } from '../export-queue.ts';
 import { exportRangeOf, frameSpan } from '../exportspan.ts';
@@ -239,6 +240,7 @@ function ExportPop({ anchor, onClose }: { anchor: HTMLElement; onClose: () => vo
           ? <span title={deepLabel} style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Toggle on={expDeep.value} onChange={(v) => { expDeep.value = v; }} /><span class="faint" style={{ fontSize: 11 }}>{deepLabel}</span></span>
           : <span class="faint" style={{ fontSize: 11 }}>{deepLabel === null ? t('topbar.tenBitUnavailable') : t('common.searching')}</span>}
       </div>}
+      {deepable && !hdrCapability() && <div class="faint" style={{ fontSize: 11 }}>{t('topbar.hdrUnavailable')}</div>}
       {state && 'total' in state && video && <>
         <div class="progress"><i style={{ width: `${(100 * state.done) / Math.max(1, state.total)}%` }} /></div>
         <div class="faint mono" style={{ fontSize: 11 }}>{t('common.frameDoneTotal', { done: state.done, total: state.total })}</div>
