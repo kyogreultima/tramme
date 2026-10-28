@@ -12,6 +12,7 @@ import { animatedSlots, motionFigures, motionStretches, pathDeviation, sampleAdd
 import { layerMatrix, matMul, type Mat2D } from './math.ts';
 import { mediaTime, pictureRect } from './track.ts';
 import type { Host, NodeType, Rect, Registry } from './registry.ts';
+import { sequenceCheck } from './montage-checks.ts';
 import type { Composition, Layer, TrammeDoc, Vec2 } from './types.ts';
 
 export interface QualityIssue {
@@ -759,7 +760,7 @@ const repeated: CheckType = {
   },
 };
 
-export const BUILTIN_CHECKS: CheckType[] = [textSize, textTime, safeZone, overlap, crossing, overSubject, overDetail, textContrast, crowd, stillness, linearTravel, springSettle, twinMotion, abruptEntrance, straightTravel, uniformStagger, repeated];
+export const BUILTIN_CHECKS: CheckType[] = [textSize, textTime, safeZone, overlap, crossing, overSubject, overDetail, textContrast, crowd, stillness, linearTravel, springSettle, twinMotion, abruptEntrance, straightTravel, uniformStagger, repeated, sequenceCheck];
 
 /** every check of the registry on one composition, the failures of a check reported as issues */
 export async function runChecks(doc: TrammeDoc, registry: Registry, compId = doc.root, { step = 0.25, only, data = () => undefined }: { step?: number; only?: string[]; data?: (assetId: string) => unknown } = {}): Promise<QualityIssue[]> {

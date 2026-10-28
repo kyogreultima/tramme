@@ -115,3 +115,38 @@ describe('quality checks', () => {
     expect(issues.find((i) => i.check === 'broken')?.message).toMatch(/boom/);
   });
 });
+
+describe('the sequence check', () => {
+  /** two clips on V1 and a sound on A1, as given */
+  const seq = (mut: (c: any) => void = () => {}): TrammeDoc => {
+    const d = doc({
+      a: { type: 'shape.rect', track: 'V1', in: 0, out: 3, props: { size: [100, 100] } } as Partial<Layer>,
+      b: { type: 'shape.rect', track: 'V1', in: 3, out: 6, props: { size: [100, 100] } } as Partial<Layer>,
+      s: { type: 'audio', track: 'A1', in: 0, out: 6 } as Partial<Layer>,
+    });
+    Object.assign(d.compositions.main, { kind: 'sequence', tracks: [{ id: 'V1', kind: 'video' }, { id: 'A1', kind: 'audio' }] });
+    mut(d.compositions.main);
+    return d;
+  };
+  const found = async (d: TrammeDoc) => (await runChecks(d, builtinRegistry(), 'main', { only: ['sequence'] })).map((i) => `${i.severity}:${i.layers?.join('+')}`);
+
+  it('has nothing to say about clips that follow one another', async () => {
+    expect(await found(seq())).toEqual([]);
+  });
+
+  it('warns of two clips overlapping on one track without a transition, not within one', async () => {
+    expect(await found(seq((c) => { c.layers.b.in = 2; }))).toEqual(['warning:a+b']);
+    expect(await found(seq((c) => { c.layers.b.in = 2; c.layers.b.effects = [{ id: 'tr', type: 'fx.transition', props: { from: 'a', duration: 1 } }]; }))).toEqual([]);
+    expect(await found(seq((c) => { c.layers.b.in = 1.5; c.layers.b.effects = [{ id: 'tr', type: 'fx.transition', props: { from: 'a', duration: 1 } }]; }))).toEqual(['warning:a+b']);
+  });
+
+  it('warns of a sound on a video track and a picture on an audio track', async () => {
+    expect(await found(seq((c) => { c.layers.s.track = 'V1'; c.layers.s.in = 6; c.layers.s.out = 6.5; }))).toEqual(['warning:s']);
+    expect(await found(seq((c) => { c.layers.b.track = 'A1'; c.layers.s.out = 3; }))).toEqual(['warning:b']);
+  });
+
+  it('notes a link that joins only one clip', async () => {
+    expect(await found(seq((c) => { c.layers.a.link = 'k1'; }))).toEqual(['info:a']);
+    expect(await found(seq((c) => { c.layers.a.link = 'k1'; c.layers.s.link = 'k1'; }))).toEqual([]);
+  });
+});

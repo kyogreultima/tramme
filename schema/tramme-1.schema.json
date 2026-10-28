@@ -177,6 +177,55 @@
           "name": {
             "type": "string"
           },
+          "kind": {
+            "type": "string",
+            "const": "sequence"
+          },
+          "tracks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "video",
+                    "audio"
+                  ]
+                },
+                "locked": {
+                  "type": "boolean"
+                },
+                "hidden": {
+                  "type": "boolean"
+                },
+                "muted": {
+                  "type": "boolean"
+                },
+                "solo": {
+                  "type": "boolean"
+                },
+                "magnetic": {
+                  "type": "boolean"
+                },
+                "height": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "id",
+                "kind"
+              ],
+              "additionalProperties": false
+            }
+          },
           "width": {
             "type": "integer",
             "exclusiveMinimum": 0,
@@ -299,6 +348,14 @@
                 "type": {
                   "type": "string",
                   "minLength": 1
+                },
+                "track": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "link": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
                 },
                 "name": {
                   "type": "string"

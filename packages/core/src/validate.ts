@@ -129,6 +129,15 @@ class Checker {
       if (!seen.has(lid)) this.err(pointer(...base, 'layers', lid), `layer "${lid}" missing from the tree (neither in order nor in a group)`);
     }
 
+    const tracks = new Set<string>();
+    (comp.tracks || []).forEach((t, i) => {
+      if (tracks.has(t.id)) this.err(pointer(...base, 'tracks', i, 'id'), `duplicate track id "${t.id}"`);
+      tracks.add(t.id);
+    });
+    for (const [lid, l] of Object.entries(comp.layers)) {
+      if (l.track !== undefined && !tracks.has(l.track)) this.err(pointer(...base, 'layers', lid, 'track'), `unknown track "${l.track}"`);
+    }
+
     const markers = new Set<string>();
     (comp.markers || []).forEach((m, i) => {
       if (markers.has(m.id)) this.err(pointer(...base, 'markers', i, 'id'), `duplicate marker id "${m.id}"`);
@@ -389,7 +398,8 @@ class Checker {
         if (typeof v !== 'string') return 'asset id expected';
         const a = this.doc.assets[v];
         if (!a) return `unknown asset "${v}"`;
-        return !def.assetType || a.type === def.assetType ? null : `asset of type ${def.assetType} expected ("${v}" is ${a.type})`;
+        // a sound layer plays the sound of a video file as well (a video's sound detached onto its own layer)
+        return !def.assetType || a.type === def.assetType || (def.assetType === 'audio' && a.type === 'video') ? null : `asset of type ${def.assetType} expected ("${v}" is ${a.type})`;
       }
       case 'assets': {
         if (!Array.isArray(v)) return 'list of asset ids expected';

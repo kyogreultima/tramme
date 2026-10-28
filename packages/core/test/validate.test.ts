@@ -78,3 +78,48 @@ describe('validation', () => {
     expect(s.required).toContain('compositions');
   });
 });
+
+describe('sequences: tracks, links, the sound of a video', () => {
+  const lane = (mut: (c: any) => void) => issuesOf((d) => {
+    const c = d.compositions.main;
+    c.kind = 'sequence';
+    c.tracks = [{ id: 'V1', kind: 'video' }, { id: 'A1', kind: 'audio', locked: true, magnetic: false }];
+    c.layers.bg.track = 'V1'; c.layers.bg.link = 'k1';
+    mut(c);
+  });
+
+  it('a sequence with its tracks and clips on them is valid', () => {
+    expect(lane(() => {})).toEqual([]);
+  });
+
+  it('a clip on an unknown track is an error', () => {
+    expect(lane((c) => { c.layers.bg.track = 'V9'; })[0]).toMatchObject({ path: '/compositions/main/layers/bg/track', message: expect.stringMatching(/unknown track/) });
+  });
+
+  it('two tracks with one id is an error, an unknown kind is refused', () => {
+    expect(lane((c) => { c.tracks.push({ id: 'V1', kind: 'video' }); })[0]).toMatchObject({ path: '/compositions/main/tracks/2/id' });
+    expect(lane((c) => { c.tracks[0].kind = 'text'; }).length).toBeGreaterThan(0);
+  });
+
+  it('a document without tracks validates as before', () => {
+    expect(issuesOf(() => {})).toEqual([]);
+  });
+
+  it('a sound layer may play the sound of a video file, not a picture', () => {
+    const reg = () => registry().register({ type: 'sound', title: 'Sound', category: 'test', props: { audio: { type: 'asset', default: null, nullable: true, assetType: 'audio' } }, render: {} });
+    const doc = (asset: string): any => { const d: any = makeDoc(); d.assets.clip = { type: 'video', src: 'c.mp4' }; d.compositions.main.layers.s = { type: 'sound', props: { audio: asset } }; d.compositions.main.order.push('s'); return d; };
+    expect(validate(doc('clip'), reg())).toEqual([]);
+    expect(validate(doc('photo'), reg())[0].message).toMatch(/asset of type audio expected/);
+  });
+});
+
+describe('the example films', () => {
+  it('still pass the structure check, with the sequence fields added', async () => {
+    const { readFileSync, readdirSync } = await import('node:fs');
+    const { DocSchema } = await import('../src/index.ts');
+    const root = new URL('../../../examples/', import.meta.url);
+    const names = readdirSync(root).filter((n) => !n.startsWith('.'));
+    expect(names.length).toBeGreaterThanOrEqual(3);
+    for (const n of names) expect(DocSchema.safeParse(JSON.parse(readFileSync(new URL(`${n}/document.tramme.json`, root), 'utf8'))).success, n).toBe(true);
+  });
+});

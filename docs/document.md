@@ -174,6 +174,28 @@ Expressions read it with `events(source)`, the asset id or the list's name: `.to
 
 Three tools show a list, each with layers that read it as they render: `event-counter` (the running totals in a corner: `text.counter` layers whose `from`, `to`, `progress` and `direction` are `events()` expressions), `event-tags` (an `events.tag` layer: a tag at each event, above the counters) and `event-receipt` (an `events.receipt` layer: every event, line by line, then the totals).
 
+### Sequences
+
+A film put together from clips is a composition with `"kind": "sequence"` and a list of `tracks`, bottom to top. The engine reads it like any composition (it can be nested, animated, exported); the track fields only say how the timeline lays it out and how the edit operations (`packages/core/src/montage.ts`) keep it whole. Not to be confused with the object tracks below, which follow something filmed.
+
+```jsonc
+"main": {
+  "kind": "sequence",
+  "tracks": [{ "id": "V1", "kind": "video", "magnetic": true }, { "id": "A1", "kind": "audio", "muted": false }],
+  "layers": {
+    "shot1": { "type": "video", "track": "V1", "link": "k1", "in": 0, "out": 4, "props": { "video": "take1" } },
+    "shot1-sound": { "type": "audio", "track": "A1", "link": "k1", "in": 0, "out": 4, "props": { "audio": "take1" } }
+  },
+  "order": ["shot1-sound", "shot1"]
+}
+```
+
+- A track is `{ id, kind: "video" | "audio", name?, locked?, hidden?, muted?, solo?, magnetic?, height? }`. A locked track cannot be edited by the operations; a magnetic one closes its gaps by itself; `hidden` and `muted` are in the document (the exported film follows them), `solo` is a view of the preview only.
+- A layer's `track` puts it on a track of its composition (an unknown track is an error). Clips of one track follow one another; where a transition makes two overlap, the cut is the middle of the overlap.
+- Clips sharing a `link` move, split and are deleted together (a video and its sound detached onto an audio layer). A link joining a single clip is noted by the `sequence` check.
+- The draw order of `order` follows the tracks (a higher track above a lower one, a later clip above an earlier one); layers with no track keep their place.
+- An audio layer may point at a video asset: it plays that file's sound, which is how a video's sound is detached.
+
 ### Tracks
 
 Where something filmed is over time. The `track` tool follows an object through a video once, framed by a rectangle drawn over it at the current time, a region of the picture, or its name for what the detector knows (person, car, dog, bicycle…), and saves a JSON asset `track-<video asset>-<name>` (`assets/tracks/…`):
