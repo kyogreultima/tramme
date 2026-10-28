@@ -6,7 +6,7 @@
 
 import { signal } from '@preact/signals';
 import { useLayoutEffect, useRef, useState } from 'preact/hooks';
-import { layerActive, pointer, staticValue, type Composition, type Keyframe, type Layer, type Op } from '@tramme/core';
+import { applyOps, isLocked, layerActive, pointer, staticValue, toSequenceOps, type Composition, type Keyframe, type Layer, type Op, type SequenceTrack } from '@tramme/core';
 import { clickSelect, comp, commit, draft, cancelDraft, S, select, selectAll, setTime, frameStep, toast, toggleFold, uiTime, viewDoc } from '../state.ts';
 import { animatedProps, contentEnd, crossfadeOps, flatTree, freshId, keysOf, layerName, parentOf, parseTime, propPath, rawProp, rulerLabel, shiftLayerOps, snap, splitLayerOps, subtree, timecode, topLayers, trimInOps, type TreeItem } from '../model.ts';
 import { bandOf, longPress, noBrowserMenu, openMenu, Seg, useSize } from './controls.tsx';
@@ -18,6 +18,8 @@ import { addLayerMenu, FoldButtons, openLayerMenu } from './LeftPanel.tsx';
 import { peaksOf, wavePath, wavesReady } from '../waveforms.ts';
 import { m, t, tr } from '../i18n/index.ts';
 import { outgoingOf, TRANSITION_KINDS, transitionOf, transitionPlan, type TransitionKind } from '../transitions.ts';
+import { laneHeight, TrackHeader } from './timeline/Tracks.tsx';
+import { addTrackOps, clipsOn, laneOrder, moveToTrackOps } from './timeline/tracks.ts';
 
 export const pps = signal(0);              // pixels per second (0: fit)
 const expanded = signal<Set<string>>(new Set());
@@ -88,7 +90,9 @@ const sliderToZoom = (c: Composition, s: number) => (s <= 0 ? 0 : fitPps * Math.
 // ── timeline ─────────────────────────────────────────────────
 interface Row { kind: 'layer'; item: TreeItem }
 interface PropRowT { kind: 'prop'; item: TreeItem; name: string; keys: Keyframe[] }
-type AnyRow = Row | PropRowT;
+/** a lane of a sequence: its clips side by side in one row */
+interface TrackRowT { kind: 'track'; track: SequenceTrack; ids: string[] }
+type AnyRow = Row | PropRowT | TrackRowT;
 
 const PROP_LABEL: Record<string, string> = { 'transform.position': m('timeline.position'), 'transform.scale': m('timeline.scale'), 'transform.rotation': m('timeline.rotation'), 'transform.opacity': m('timeline.opacity'), 'transform.anchor': m('timeline.anchor') };
 export function propLabel(type: string, name: string): string {
@@ -123,13 +127,22 @@ export function Timeline() {
   const total = X(c.duration) + TRACK_PAD;
 
   const rows: AnyRow[] = [];
+  // a sequence: its layers without a track first (titles, shapes), then its lanes, the picture tracks top first, the sound tracks last
+  const lanes = c.tracks ? laneOrder(c) : [];
+  const videoLanes = lanes.filter((l) => l.kind === 'video'), audioLanes = lanes.filter((l) => l.kind === 'audio');
   for (const item of flatTree(c, S.collapsed.value)) {
+    if (item.layer.track && lanes.length) continue;
     rows.push({ kind: 'layer', item });
     if (expanded.value.has(item.id)) for (const [name, keys] of animatedProps(item.layer)) rows.push({ kind: 'prop', item, name, keys });
   }
+  if (lanes.length) {
+    const at = rows.length;
+    rows.splice(at, 0, ...videoLanes.map((track): AnyRow => ({ kind: 'track', track, ids: clipsOn(c, track.id) })));
+    rows.push(...audioLanes.map((track): AnyRow => ({ kind: 'track', track, ids: clipsOn(c, track.id) })));
+  }
   const sel = S.selection.value, keySel = S.keys.value;
   const fps = c.fps;
-  const order = rows.flatMap((r) => (r.kind === 'layer' ? [r.item.id] : []));
+  const order = rows.flatMap((r) => (r.kind === 'layer' ? [r.item.id] : r.kind === 'track' ? r.ids : []));
   const [snapAt, setSnapAt] = useState<number | null>(null);
   const [band, setBand] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
 
@@ -186,6 +199,7 @@ export function Timeline() {
     if (e.shiftKey || e.ctrlKey || e.metaKey) { clickSelect(e, id, order); return; }
     if (!sel.includes(id)) select([id]);
     const x0 = e.clientX, d0 = S.doc.peek(), c0 = d0.compositions[compId], l = c0.layers[id];
+    if (isLocked(c0, id)) { toast(t('timeline.trackLocked'), 'error'); return; }
     // a layer inside a selected group goes with it
     const moving = mode === 'move' && sel.includes(id) ? topLayers(c0, sel) : [id];
     const targets = snapTargets(c0, new Set(moving.flatMap((x) => subtree(c0, x))));
@@ -213,9 +227,12 @@ export function Timeline() {
       }
       if (ops.length) draft(ops); else cancelDraft();
     };
-    const up = () => {
+    const up = (ev: PointerEvent) => {
       removeEventListener('pointermove', move); removeEventListener('pointerup', up);
       setSnapAt(null);
+      // dropped on another lane of a sequence: the clip changes track, where it is in time
+      const lane = mode === 'move' && moving.length === 1 ? document.elementsFromPoint(ev.clientX, ev.clientY).find((el) => (el as HTMLElement).dataset?.track)?.getAttribute('data-track') : null;
+      if (lane && lane !== l.track) ops = [...ops, ...moveToTrackOps(ops.length ? applyOps(d0, ops).doc : d0, compId, id, lane)];
       if (!ops.length) { cancelDraft(); return; }
       const label = mode === 'in'
         ? (ops.length > 1 && l.type === 'video' ? t('timeline.trimVideoInFile') : t('common.inPoint'))
@@ -348,6 +365,9 @@ export function Timeline() {
       { label: t('topbar.trimToContent'), icon: 'collapse', disabled: !(end > 0 && end < c.duration - 0.5 / fps), onClick: () => setDuration(t('topbar.trimToContent'), end) },
       'sep',
       { label: t('panel.addALayer'), icon: 'plus', onClick: () => addLayerMenu(e) },
+      ...(c.tracks
+        ? (['video', 'audio'] as const).map((kind) => ({ label: t(kind === 'video' ? 'timeline.addVideoTrack' : 'timeline.addSoundTrack'), icon: kind === 'video' ? 'film' : 'audio', onClick: () => commit(t(kind === 'video' ? 'timeline.addVideoTrack' : 'timeline.addSoundTrack'), addTrackOps(S.doc.peek().compositions[compId], compId, kind).ops) }))
+        : [{ label: t('timeline.makeSequence'), icon: 'film' as const, onClick: () => commit(t('timeline.makeSequence'), toSequenceOps(S.doc.peek(), compId)) }]),
       { label: t('timeline.selectAll'), icon: 'layers', hint: 'Ctrl+A', disabled: !order.length, onClick: selectAll },
       { label: t('timeline.zoomToFit'), icon: 'expand', disabled: !pps.value, onClick: () => { pps.value = 0; } },
     ]);
@@ -378,6 +398,20 @@ export function Timeline() {
 
   const toggle = (set: typeof expanded, id: string) => { const s = new Set(set.value); s.has(id) ? s.delete(id) : s.add(id); set.value = s; };
 
+  /** a clip: its bar over [a, b], with what it shows (waveform, shots, fades, transition) and its two edges */
+  const clipView = (id: string, l: Layer, a: number, b: number) => (
+    <div key={id} data-layer={id} class={`clip${sel.includes(id) ? ' selected' : ''}`} style={{ left: X(a), width: Math.max(2, (b - a) * k), '--c': kindColor(l.type), opacity: l.visible === false ? 0.45 : layerActive(l, c, now) ? 1 : 0.8 }}
+      onPointerDown={(e) => dragClip(e, id, 'move')} onDblClick={() => setTime(a)}>
+      {l.type === 'audio' && <ClipWave layer={l} from={a} seconds={b - a} width={(b - a) * k} />}
+      {l.type === 'video' && !S.playing.value && <ClipFilm layer={l} from={a} seconds={b - a} width={(b - a) * k} />}
+      {(l.type === 'audio' || l.type === 'video') && (b - a) * k > 60 && <ClipFades compId={compId} id={id} layer={l} seconds={b - a} k={k} />}
+      <TransitionBand compId={compId} id={id} layer={l} k={k} />
+      {(b - a) * k > 60 && <span class="label">{layerName(id, l)}</span>}
+      <span class="edge l" onPointerDown={(e) => dragClip(e, id, 'in')} />
+      <span class="edge r" onPointerDown={(e) => dragClip(e, id, 'out')} />
+    </div>
+  );
+
   const [major, minor] = rulerStep(k, fps);
   const ticks: { t: number; major: boolean }[] = [];
   const t0 = Math.max(0, T(scroll) - major), t1 = Math.min(c.duration, T(scroll + width) + major);
@@ -404,7 +438,9 @@ export function Timeline() {
         </div>
       </div>
       <div class="tl-names" ref={names} style={{ position: 'relative' }}>
-        {rows.map((r) => r.kind === 'layer' ? (
+        {rows.map((r) => r.kind === 'track' ? (
+          <TrackHeader key={`track.${r.track.id}`} compId={compId} c={c} track={r.track} />
+        ) : r.kind === 'layer' ? (
           <div key={r.item.id} data-row={r.item.id} class={`tl-name${sel.includes(r.item.id) ? ' selected' : ''}`} style={{ paddingLeft: 6 + r.item.depth * 12 }} onClick={(e) => clickSelect(e, r.item.id, order)}>
             {r.item.layer.children
               ? <button class={`twist${S.collapsed.value.has(r.item.id) ? '' : ' open'}`} title={t('panel.foldHint')} onClick={(e) => { e.stopPropagation(); toggleFold(r.item.id, e.altKey); }}><Icon name="chevron" /></button>
@@ -428,6 +464,14 @@ export function Timeline() {
         onPointerDown={(e) => { const el = e.target as HTMLElement; if (el === e.currentTarget || el.classList.contains('tl-row') || el.classList.contains('tl-content')) emptyDown(e); }}>
         <div class="tl-content" style={{ position: 'relative', width: total, minHeight: '100%' }}>
           {rows.map((r) => {
+            if (r.kind === 'track') {
+              const { track } = r;
+              return (
+                <div key={`track.${track.id}`} data-track={track.id} class={`tl-row track${track.locked ? ' locked' : ''}${track.hidden || track.muted ? ' off' : ''}`} style={{ height: laneHeight(track) }}>
+                  {r.ids.map((id) => { const l = c.layers[id], a = l.in ?? 0; return clipView(id, l, a, Math.max(a, l.out ?? c.duration)); })}
+                </div>
+              );
+            }
             if (r.kind === 'layer') {
               const l = r.item.layer, id = r.item.id;
               // visible range: the layer's own, inside its parents'
@@ -437,16 +481,7 @@ export function Timeline() {
               const keysAll = animatedProps(l).flatMap(([, ks]) => ks.map((kf) => kf.t));
               return (
                 <div key={id} class={`tl-row`}>
-                  <div data-layer={id} class={`clip${sel.includes(id) ? ' selected' : ''}`} style={{ left: X(a), width: Math.max(2, (b - a) * k), '--c': kindColor(l.type), opacity: l.visible === false ? 0.45 : layerActive(l, c, now) ? 1 : 0.8 }}
-                    onPointerDown={(e) => dragClip(e, id, 'move')} onDblClick={() => setTime(a)}>
-                    {l.type === 'audio' && <ClipWave layer={l} from={a} seconds={b - a} width={(b - a) * k} />}
-                    {l.type === 'video' && !S.playing.value && <ClipFilm layer={l} from={a} seconds={b - a} width={(b - a) * k} />}
-                    {(l.type === 'audio' || l.type === 'video') && (b - a) * k > 60 && <ClipFades compId={compId} id={id} layer={l} seconds={b - a} k={k} />}
-                    <TransitionBand compId={compId} id={id} layer={l} k={k} />
-                    {(b - a) * k > 60 && <span class="label">{layerName(id, l)}</span>}
-                    <span class="edge l" onPointerDown={(e) => dragClip(e, id, 'in')} />
-                    <span class="edge r" onPointerDown={(e) => dragClip(e, id, 'out')} />
-                  </div>
+                  {clipView(id, l, a, b)}
                   {[...new Set(keysAll)].map((kt) => <span key={kt} class="kf summary" style={{ left: X(kt) }} />)}
                 </div>
               );
