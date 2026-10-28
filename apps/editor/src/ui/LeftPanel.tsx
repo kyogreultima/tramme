@@ -8,7 +8,8 @@ import { clickSelect, comp, commit, foldAll, S, select, toggleFold, viewDoc, toa
 import { flatTree, freshId, layerName, shiftProp, parentOf, SOUND_GROUP, soundGroupOf, subtree, topLayers, commonStem, folderOf, imagesIn, wholeFile } from '../model.ts';
 import { ColorField, longPress, openMenu, Seg, Swatch, TextInput, resolveColor, type MenuItem } from './controls.tsx';
 import { Icon, kindColor, kindIcon } from './icons.tsx';
-import { ASSET_MIME, chosenAsset } from './timeline/assets-drag.ts';
+import { ASSET_MIME, chosenAsset, COMP_MIME } from './timeline/assets-drag.ts';
+import { newSequenceFromAsset } from './timeline/place.ts';
 import { preview } from '../preview.ts';
 import { mediaDuration } from '../perception.ts';
 import { manifestOf } from '@tramme/project';
@@ -558,6 +559,14 @@ function Compositions() {
       S.compId.value = id; select([]);
     }
   };
+  const createSequence = () => {
+    const c = doc.compositions[active];
+    const id = freshId(doc.compositions, 'sequence');
+    const tracks = [{ id: 'V1', kind: 'video', magnetic: true }, { id: 'A1', kind: 'audio' }];
+    if (commit(t('panel.newSequence'), [{ op: 'add', path: pointer('compositions', id), value: { name: t('panel.sequenceN', { n: Object.keys(doc.compositions).length + 1 }), kind: 'sequence', width: c.width, height: c.height, fps: c.fps, duration: c.duration, background: null, tracks, layers: {}, order: [] } }])) {
+      S.compId.value = id; select([]);
+    }
+  };
   const menu = (e: MouseEvent | { clientX: number; clientY: number }, id: string) => {
     if ('preventDefault' in e) e.preventDefault();
     const c = doc.compositions[id];
@@ -573,9 +582,9 @@ function Compositions() {
   };
   return (
     <div>
-      <div class="section-label" style={{ display: 'flex', alignItems: 'center' }}>{t('panel.compositions')}<span style={{ flex: 1 }} /><button class="icon-btn xs" title={t('panel.newComposition')} onClick={create}><Icon name="plus" /></button></div>
+      <div class="section-label" style={{ display: 'flex', alignItems: 'center' }}>{t('panel.compositions')}<span style={{ flex: 1 }} /><button class="icon-btn xs" title={t('panel.newComposition')} onClick={(e) => openMenu(e.currentTarget.getBoundingClientRect(), [{ label: t('panel.newComposition'), icon: 'comp', onClick: create }, { label: t('panel.newSequence'), icon: 'film', onClick: createSequence }])}><Icon name="plus" /></button></div>
       {Object.entries(doc.compositions).map(([id, c]) => (
-        <div key={id} class={`list-row${id === active ? ' on' : ''}`} onClick={() => { S.compId.value = id; select([]); }}
+        <div key={id} class={`list-row${id === active ? ' on' : ''}`} onClick={() => { S.compId.value = id; select([]); }} draggable onDragStart={(e) => { e.dataTransfer?.setData(COMP_MIME, id); if (e.dataTransfer) e.dataTransfer.effectAllowed = 'copy'; }}
           onPointerDown={(e) => longPress(e, (pos) => menu(pos, id))} onContextMenu={(e) => menu(e, id)}>
           <span class="thumb"><Icon name={doc.root === id ? 'film' : c.params ? 'sliders' : 'comp'} /></span>
           <span class="name" title={c.params ? t('panel.componentWith', { params: Object.keys(c.params).join(', ') }) : undefined}>{c.name}</span>
@@ -625,6 +634,7 @@ function Assets() {
     if ('preventDefault' in e) e.preventDefault();
     openMenu(e, [
       ...(a.type === 'image' || a.type === 'audio' || a.type === 'video' || a.type === 'model' ? [{ label: t('panel.createALayer'), icon: 'plus' as const, onClick: () => use(id, a) }] : []),
+      ...(a.type === 'audio' || a.type === 'video' || a.type === 'image' ? [{ label: t('panel.newSequenceFromMedia'), icon: 'film' as const, onClick: () => { void newSequenceFromAsset(id); } }] : []),
       ...(a.type === 'audio' || a.type === 'video' ? [transcribeItem(id)] : []),
       ...(a.type === 'image' ? [{ label: t('panel.animateTheFolderN', { n: imagesIn(doc, folderOf(a.src)).length }), icon: 'film' as const, onClick: () => animateFolder(folderOf(a.src)) }] : []),
       { label: t('panel.removeFromProject'), icon: 'trash', onClick: () => commit(t('common.removeName', { name: a.name || id }), [{ op: 'remove', path: pointer('assets', id) }]) },

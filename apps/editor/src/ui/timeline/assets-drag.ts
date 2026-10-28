@@ -6,5 +6,7 @@ import { signal } from '@preact/signals';
 
 /** the drag data type of an asset of the project */
 export const ASSET_MIME = 'application/x-tramme-asset';
+/** the drag data type of a composition of the project (put on a track, it plays as one clip) */
+export const COMP_MIME = 'application/x-tramme-comp';
 
 export const chosenAsset = signal<string | null>(null);

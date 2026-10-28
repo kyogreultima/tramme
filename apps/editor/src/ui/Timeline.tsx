@@ -12,6 +12,7 @@ import { animatedProps, contentEnd, crossfadeOps, flatTree, freshId, keysOf, lay
 import { bandOf, longPress, noBrowserMenu, openMenu, Seg, useSize } from './controls.tsx';
 import { Icon, kindColor, kindIcon } from './icons.tsx';
 import { fileLength, preview } from '../preview.ts';
+import { Tabs } from './timeline/Tabs.tsx';
 import { FILM_H, FILM_W, filmThumb, filmVersion } from '../filmstrip.ts';
 import { GraphEditor } from './GraphEditor.tsx';
 import { addLayerMenu, FoldButtons, openLayerMenu } from './LeftPanel.tsx';
@@ -21,8 +22,8 @@ import { outgoingOf, TRANSITION_KINDS, transitionOf, transitionPlan, type Transi
 import { laneHeight, TrackHeader } from './timeline/Tracks.tsx';
 import { addTrackOps, clipsOn, laneOrder, moveToTrackOps } from './timeline/tracks.ts';
 import { dropOps } from './timeline/clipDrag.ts';
-import { ASSET_MIME } from './timeline/assets-drag.ts';
-import { placeAsset } from './timeline/place.ts';
+import { ASSET_MIME, COMP_MIME } from './timeline/assets-drag.ts';
+import { placeAsset, placeComp } from './timeline/place.ts';
 
 export const pps = signal(0);              // pixels per second (0: fit)
 const expanded = signal<Set<string>>(new Set());
@@ -61,6 +62,7 @@ export function Transport() {
         <button class="icon-btn" data-step="end" title={t('timeline.endEnd')} onClick={() => setTime(c.duration)}><Icon name="end" /></button>
         <button class={`icon-btn${S.loop.value ? ' on' : ''}`} title={t('timeline.loop')} onClick={() => { S.loop.value = !S.loop.value; }}><Icon name="loop" /></button>
       </div>
+      <Tabs />
       <div class="timecode">
         <input value={text ?? timecode(now, c.fps)} title={t('timeline.timeSFrame8')}
           onFocus={(e) => (e.target as HTMLInputElement).select()}
@@ -486,14 +488,15 @@ export function Timeline() {
               const { track } = r;
               return (
                 <div key={`track.${track.id}`} data-track={track.id} class={`tl-row track${track.locked ? ' locked' : ''}${track.hidden || track.muted ? ' off' : ''}${dropLane === track.id ? ' drop' : ''}`} style={{ height: laneHeight(track) }}
-                  onDragOver={(e) => { if (!e.dataTransfer?.types.includes(ASSET_MIME)) return; e.preventDefault(); setDropLane(track.id); }}
+                  onDragOver={(e) => { if (!e.dataTransfer?.types.includes(ASSET_MIME) && !e.dataTransfer?.types.includes(COMP_MIME)) return; e.preventDefault(); setDropLane(track.id); }}
                   onDragLeave={() => setDropLane(null)}
                   onDrop={(e) => {
-                    const asset = e.dataTransfer?.getData(ASSET_MIME);
-                    if (!asset) return;
+                    const asset = e.dataTransfer?.getData(ASSET_MIME), inner = e.dataTransfer?.getData(COMP_MIME);
+                    if (!asset && !inner) return;
                     e.preventDefault(); setDropLane(null);
                     // the track makes room when it is magnetic, the clip lies over what is there otherwise; Alt does the other
-                    void placeAsset(asset, timeAt(e.clientX), track.id, (track.magnetic ? !e.altKey : e.altKey) ? 'insert' : 'overwrite');
+                    const mode = (track.magnetic ? !e.altKey : e.altKey) ? 'insert' : 'overwrite';
+                    if (inner) placeComp(inner, timeAt(e.clientX), track.id, mode); else void placeAsset(asset!, timeAt(e.clientX), track.id, mode);
                   }}>
                   {r.ids.map((id) => { const l = c.layers[id], a = l.in ?? 0; return clipView(id, l, a, Math.max(a, l.out ?? c.duration)); })}
                 </div>
