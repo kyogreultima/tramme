@@ -28,13 +28,13 @@ describe('the / menu', () => {
   const list = listCommands(reg);
 
   it('lists the editor\'s tools and workflows with the plugins\' ones', () => {
-    expect(list.filter((c) => c.kind === 'tool').map((c) => c.name)).toEqual(['captions', 'title', 'keyword', 'lower-third', 'svg-paths', 'kinetic-title', 'bar-chart', 'stat', 'transition', 'quote', 'logo-reveal', 'list', 'timeline', 'split-screen', 'map-journey', 'kit', 'pointer', 'terrain', 'keys', 'riffle', 'events', 'event-counter', 'event-tags', 'event-receipt', 'beats', 'shots', 'subjects', 'palette', 'space', 'still', 'track', 'callout', 'stabilize', 'proxy', 'define_component', 'instantiate', 'detach', 'component-keep', 'component-use', 'denoise', 'skin', 'upscale', 'interpolate', 'cutout', 'depth', 'photo-2.5d', 'model', 'remove-bg', 'lipsync', 'silences', 'fillers', 'check', 'motion', 'cues', 'sfx', 'sound-find', 'synth', 'generate-sound', 'voices', 'duck', 'sound-keep', 'credits', 'mix', 'generate-image', 'generate-video', 'shorts', 'sources', 'block-add', 'block-use', 'brief', 'library-add', 'library-use', 'demo.stars']);
+    expect(list.filter((c) => c.kind === 'tool').map((c) => c.name)).toEqual(['captions', 'title', 'keyword', 'lower-third', 'svg-paths', 'kinetic-title', 'bar-chart', 'stat', 'transition', 'quote', 'logo-reveal', 'list', 'timeline', 'split-screen', 'map-journey', 'kit', 'pointer', 'terrain', 'keys', 'riffle', 'events', 'event-counter', 'event-tags', 'event-receipt', 'beats', 'shots', 'subjects', 'palette', 'space', 'still', 'track', 'callout', 'stabilize', 'proxy', 'define_component', 'instantiate', 'detach', 'component-keep', 'component-use', 'denoise', 'skin', 'upscale', 'interpolate', 'cutout', 'depth', 'photo-2.5d', 'model', 'remove-bg', 'lipsync', 'silences', 'ripple_delete', 'insert_clip', 'overwrite_clip', 'ripple_trim', 'roll', 'slip', 'slide', 'detach_audio', 'link', 'sync_clips', 'add_adjustment', 'match_look', 'publish', 'fillers', 'check', 'motion', 'cues', 'sfx', 'sound-find', 'synth', 'generate-sound', 'voices', 'duck', 'sound-keep', 'credits', 'mix', 'generate-image', 'generate-video', 'shorts', 'sources', 'block-add', 'block-use', 'brief', 'library-add', 'library-use', 'demo.stars']);
     expect(list.filter((c) => c.kind === 'prompt').map((c) => `${c.name}:${c.from}`)).toEqual(['analyze:tramme', 'dress:tramme', 'review:tramme', 'polish:tramme', 'sound-design:tramme', 'shorts:tramme', 'transcript:tramme', 'cut-silences:tramme', 'beats:tramme', 'still:tramme', 'night:sky']);
   });
 
   it('finds commands by name first, then by title or description', () => {
     expect(matchCommands(list, 'ti').map((c) => c.name)[0]).toBe('title');
-    expect(matchCommands(list, 'star').map((c) => c.name)).toEqual(['demo.stars']);
+    expect(matchCommands(list, 'stars').map((c) => c.name)).toEqual(['demo.stars']);
     expect(matchCommands(list, 'night scene').map((c) => c.name)).toEqual(['night']);
     expect(matchCommands(list, '').length).toBe(list.length);
   });
