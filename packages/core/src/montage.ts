@@ -488,3 +488,55 @@ export function pasteAttributesOps(doc: TrammeDoc, compId: string, from: string,
   }
   return ops;
 }
+
+/** how long a clip may overlap the one before it on its track: the length of its transition */
+const allowedOverlap = (l: Layer): number => Number(staticValue((l.effects ?? []).find((e) => e.type === 'fx.transition')?.props?.duration)) || 0;
+
+/**
+ * A composition turned into a sequence: the pictures (video, image) laid on
+ * video tracks, the sounds on audio tracks, every other layer left free, and
+ * nothing moved in time or in the stack. A picture goes on the lowest track
+ * that holds nothing it overlaps and sits above every picture it overlaps
+ * that was under it, so the picture is drawn as before. Run again, it finds
+ * nothing to do.
+ */
+export function toSequenceOps(doc: TrammeDoc, compId: string): Op[] {
+  const c = doc.compositions[compId], half = 0.5 / c.fps;
+  const tracks = structuredClone(c.tracks ?? []);
+  const lane = (kind: 'video' | 'audio', n: number) => {
+    const id = `${kind === 'video' ? 'V' : 'A'}${n}`;
+    if (!tracks.some((t) => t.id === id)) tracks.push({ id, kind });
+    return id;
+  };
+  const rangeOf = (l: Layer): [number, number] => [l.in ?? 0, l.out ?? c.duration];
+  const clash = (a: Layer, b: Layer) => {
+    const [ai, ao] = rangeOf(a), [bi, bo] = rangeOf(b), late = ai <= bi ? b : a;
+    return Math.min(ao, bo) - Math.max(ai, bi) > allowedOverlap(late) + half;
+  };
+  const laneNumber = (l: Layer) => Number(String(l.track).slice(1)) || 1;
+  const placedOn = new Map<string, { layer: Layer; n: number }[]>([['video', []], ['audio', []]]);
+  for (const l of Object.values(c.layers)) {
+    const t = tracks.find((x) => x.id === l.track);
+    if (t) placedOn.get(t.kind)!.push({ layer: l, n: laneNumber(l) });
+  }
+  const ops: Op[] = [];
+  for (const id of c.order) {
+    const l = c.layers[id];
+    if (!l || l.children || l.track || !['video', 'image', 'audio'].includes(l.type)) continue;
+    const kind = l.type === 'audio' ? 'audio' : 'video', mine = placedOn.get(kind)!;
+    const n = kind === 'video'
+      ? 1 + Math.max(0, ...mine.filter((m) => clash(m.layer, l)).map((m) => m.n))
+      : (() => { let k = 1; while (mine.some((m) => m.n === k && clash(m.layer, l))) k++; return k; })();
+    mine.push({ layer: l, n });
+    ops.push({ op: 'add', path: pointer('compositions', compId, 'layers', id, 'track'), value: lane(kind, n) });
+  }
+  if (!ops.length && c.kind === 'sequence') return [];
+  const rank = (t: { kind: string; id: string }) => (t.kind === 'video' ? 0 : 1) * 1e6 + (Number(t.id.slice(1)) || 0);
+  tracks.sort((a, b) => rank(a) - rank(b));
+  if (!tracks.length) tracks.push({ id: 'V1', kind: 'video' }, { id: 'A1', kind: 'audio' });
+  return [
+    ...(c.kind === 'sequence' ? [] : [{ op: 'add', path: pointer('compositions', compId, 'kind'), value: 'sequence' } as Op]),
+    ...(JSON.stringify(tracks) === JSON.stringify(c.tracks) ? [] : [{ op: 'add', path: pointer('compositions', compId, 'tracks'), value: tracks } as Op]),
+    ...ops,
+  ];
+}

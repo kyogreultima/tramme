@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyOps, closeGapOps, cutsOf, detachAudioOps, insertOps, isLocked, linkOps, linkedIds, overwriteOps, pasteAttributesOps, pasteOps, unlinkOps, rippleDeleteOps, rippleTrimOps, rollOps, slideOps, slipOps, syncOrderOps, trackClips, type Composition, type Op, type TrammeDoc } from '../src/index.ts';
+import { applyOps, closeGapOps, cutsOf, detachAudioOps, insertOps, isLocked, linkOps, linkedIds, overwriteOps, pasteAttributesOps, pasteOps, unlinkOps, rippleDeleteOps, rippleTrimOps, rollOps, slideOps, slipOps, syncOrderOps, toSequenceOps, trackClips, type Composition, type Op, type TrammeDoc } from '../src/index.ts';
 
 /** a sequence of 10 s: V1 holds a (0-5) and b (4-9, a transition of 1 s over a), A1 holds the sound of a, linked to it */
 export function sequence(): Composition {
@@ -450,5 +450,49 @@ describe('paste', () => {
     expect((c.layers.b.transform!.opacity as { $k: { t: number }[] }).$k.map((k) => k.t)).toEqual([3, 4]);
     expect(c.layers.b.blend).toBeUndefined();
     expect(range(c, 'b')).toEqual([3, 6]);
+  });
+});
+
+describe('turning a composition into a sequence', () => {
+  const plain = (): Composition => ({
+    name: 'Film', width: 640, height: 360, fps: 30, duration: 10, background: null,
+    order: ['v1', 'v2', 'logo', 'voice', 'title', 'g'],
+    layers: {
+      v1: { type: 'video', in: 0, out: 5, props: { video: 'one' } },
+      v2: { type: 'video', in: 5, out: 10, props: { video: 'two' } },
+      logo: { type: 'image', in: 2, out: 4, props: { image: 'logo' } },
+      voice: { type: 'audio', in: 0, out: 10, props: { audio: 'voice' } },
+      title: { type: 'text', props: { text: 'Hi' } },
+      g: { type: 'group', children: ['inner'] },
+      inner: { type: 'video', in: 0, out: 2, props: { video: 'three' } },
+    },
+  });
+
+  it('puts the pictures on V1, the sounds on A1, leaves the rest free, and keeps the draw order', () => {
+    const d = docOf(plain()), c = after(d, toSequenceOps(d, 'main'));
+    expect(c.kind).toBe('sequence');
+    expect(c.tracks).toEqual([{ id: 'V1', kind: 'video' }, { id: 'V2', kind: 'video' }, { id: 'A1', kind: 'audio' }]);
+    expect([c.layers.v1.track, c.layers.v2.track, c.layers.voice.track]).toEqual(['V1', 'V1', 'A1']);
+    expect(c.layers.title.track).toBeUndefined();
+    expect(c.layers.inner.track).toBeUndefined();
+    expect(c.order).toEqual(plain().order);
+  });
+
+  it('puts a picture over another one on the track above', () => {
+    const d = docOf(plain()), c = after(d, toSequenceOps(d, 'main'));
+    expect(c.layers.logo.track).toBe('V2');
+  });
+
+  it('keeps clips joined by a transition on one track', () => {
+    const c0 = plain(); c0.layers.v2.in = 4; c0.layers.v2.effects = [{ id: 'tr', type: 'fx.transition', props: { from: 'v1', duration: 1 } }];
+    delete c0.layers.logo;
+    c0.order = c0.order.filter((x) => x !== 'logo');
+    const d = docOf(c0), c = after(d, toSequenceOps(d, 'main'));
+    expect([c.layers.v1.track, c.layers.v2.track]).toEqual(['V1', 'V1']);
+  });
+
+  it('gives the same document when applied twice', () => {
+    const d = docOf(plain()), once = after(d, toSequenceOps(d, 'main'));
+    expect(toSequenceOps(docOf(once), 'main')).toEqual([]);
   });
 });
