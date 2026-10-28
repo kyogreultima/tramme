@@ -1155,7 +1155,13 @@
     "syncing": "Comparing the sounds…",
     "syncNeedsTwo": "Select two clips with a sound, at normal speed",
     "syncNoSound": "{name} has no sound to compare",
-    "syncNoMatch": "{a} and {b} do not share a sound that can be lined up"
+    "syncNoMatch": "{a} and {b} do not share a sound that can be lined up",
+    "makeMulticam": "Cut between these cameras",
+    "multicam": "Multicam",
+    "multicamNeedsTwo": "Select two videos of the same scene",
+    "switchCamera": "Switch camera",
+    "cameraN": "Camera {n}",
+    "closeMulticam": "Close the multicam"
   },
   "topbar": {
     "tenBit": "10 bits",

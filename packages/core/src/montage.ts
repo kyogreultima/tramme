@@ -6,7 +6,7 @@
 import { applyOps, pointer, type Op } from './ops.ts';
 import { staticValue } from './props.ts';
 import { carriedStart, round6, shiftLayerOps, shiftLayerValues, splitLayerOps, subtree, trimInOps } from './timing.ts';
-import type { Composition, Layer, TrammeDoc } from './types.ts';
+import type { Composition, Layer, SequenceTrack, TrammeDoc } from './types.ts';
 
 /** where a clip sits on its track: its id, its in point and its out point (the composition's end when it has none) */
 export interface Footprint { id: string; in: number; out: number }
@@ -616,4 +616,86 @@ export function splitAtOps(doc: TrammeDoc, compId: string, ids: string[], at: nu
     } else ops.push({ op: 'remove', path: pointer('compositions', compId, 'layers', news[0], 'link') });
   }
   return { ops, ids: made.map((m) => m.id) };
+}
+
+/** a new track: a video one above the others, a sound one after them, numbered after the last of its kind; the first one makes the composition a sequence */
+export function addTrackOps(c: Composition, compId: string, kind: 'video' | 'audio'): { ops: Op[]; id: string } {
+  const tracks = c.tracks ?? [], prefix = kind === 'video' ? 'V' : 'A';
+  let n = tracks.filter((t) => t.kind === kind).length + 1;
+  while (tracks.some((t) => t.id === `${prefix}${n}`)) n++;
+  const track: SequenceTrack = { id: `${prefix}${n}`, kind };
+  const at = kind === 'video' ? tracks.filter((t) => t.kind === 'video').length : tracks.length;
+  const next = [...tracks.slice(0, at), track, ...tracks.slice(at)];
+  return {
+    id: track.id,
+    ops: [
+      ...(c.kind === 'sequence' ? [] : [{ op: 'add', path: pointer('compositions', compId, 'kind'), value: 'sequence' } as Op]),
+      { op: 'add', path: pointer('compositions', compId, 'tracks'), value: next },
+    ],
+  };
+}
+
+
+/**
+ * Cameras on one scene set up to be cut between: each on a track of its own
+ * (made when there are not enough), the first on show and the others hidden,
+ * every picture muted, and the sound of the first on a sound track of its own
+ * for the whole scene. The cameras should be lined up in time already (syncing
+ * by sound). Nothing for fewer than two videos, or when a track involved is
+ * locked.
+ */
+export function multicamOps(doc: TrammeDoc, compId: string, ids: string[]): Op[] {
+  const c = doc.compositions[compId], cams = ids.filter((id) => c.layers[id]?.type === 'video' && !c.layers[id].children);
+  if (cams.length < 2 || cams.some((id) => isLocked(c, id))) return [];
+  const videoTracks = (d: TrammeDoc) => (d.compositions[compId].tracks ?? []).filter((x) => x.kind === 'video');
+  let sound: string | undefined;
+  const steps: ((d: TrammeDoc) => Op[])[] = [
+    (d) => chain(d, Array.from({ length: Math.max(0, cams.length - videoTracks(d).length) }, () => (x: TrammeDoc) => addTrackOps(x.compositions[compId], compId, 'video').ops)),
+    (d) => (d.compositions[compId].tracks?.some((x) => x.kind === 'audio' && !x.locked) ? [] : addTrackOps(d.compositions[compId], compId, 'audio').ops),
+    (d) => {
+      const lanes = videoTracks(d), lp = (id: string) => pointer('compositions', compId, 'layers', id);
+      return cams.flatMap((id, i): Op[] => [
+        { op: 'add', path: `${lp(id)}/track`, value: lanes[i].id },
+        ...(i === 0 ? (d.compositions[compId].layers[id].visible === undefined ? [] : [{ op: 'remove', path: `${lp(id)}/visible` } as Op]) : [{ op: 'add', path: `${lp(id)}/visible`, value: false } as Op]),
+        { op: 'add', path: `${lp(id)}/props/muted`, value: true },
+      ]);
+    },
+    (d) => {
+      sound = d.compositions[compId].tracks!.find((x) => x.kind === 'audio' && !x.locked)?.id;
+      // the first camera's sound, on its own, linked to nothing: the whole scene plays it
+      const first = { ...d, compositions: { ...d.compositions, [compId]: { ...d.compositions[compId], layers: { ...d.compositions[compId].layers, [cams[0]]: { ...d.compositions[compId].layers[cams[0]], props: { ...d.compositions[compId].layers[cams[0]].props, muted: false } } } } } } as TrammeDoc;
+      const detached = sound ? detachAudioOps(first, compId, cams[0], sound) : null;
+      if (!detached) return [];
+      const lp = (id: string) => pointer('compositions', compId, 'layers', id);
+      return [...detached.ops, { op: 'remove', path: `${lp(cams[0])}/link` } as Op, { op: 'remove', path: `${lp(detached.id)}/link` } as Op];
+    },
+    (d) => syncOrderOps(d, compId),
+  ];
+  const ops = chain(doc, steps);
+  const after = applyOps(doc, ops).doc.compositions[compId];
+  return cams.some((id) => after.tracks?.find((x) => x.id === after.layers[id].track)?.locked) ? [] : ops;
+}
+
+/**
+ * The camera shown changes at `at`: a camera is the clip playing on a track
+ * (`angles` are the tracks, `to` the one to show); every camera that plays
+ * there is cut in two, and from the cut the chosen one is on show and the
+ * others hidden. The cameras are plain clips afterwards, so an export needs
+ * nothing more. Nothing when the chosen camera does not play at `at`, is
+ * already the one on show, or a clip is locked.
+ */
+export function switchAngleOps(doc: TrammeDoc, compId: string, angles: string[], to: string, at: number): Op[] {
+  const c = doc.compositions[compId], half = 0.5 / c.fps;
+  const playing = (trackId: string) => trackClips(c, trackId).find((k) => k.in + half < at && at < k.out - half)?.id;
+  const live = angles.map(playing).filter((id): id is string => !!id), chosen = playing(to);
+  if (!chosen || live.some((id) => isLocked(c, id))) return [];
+  const showing = live.find((id) => c.layers[id].visible !== false);
+  if (showing === chosen) return [];
+  const rest = new Map<string, string>();
+  const steps = live.map((id) => (d: TrammeDoc): Op[] => { const cut = splitLayerOps(d, compId, id, at); if (cut) rest.set(id, cut.id); return cut?.ops ?? []; });
+  steps.push(() => live.flatMap((id): Op[] => {
+    const lp = pointer('compositions', compId, 'layers', rest.get(id)!);
+    return id === chosen ? (c.layers[id].visible === undefined ? [] : [{ op: 'remove', path: `${lp}/visible` }]) : [{ op: 'add', path: `${lp}/visible`, value: false }];
+  }));
+  return chain(doc, steps);
 }
