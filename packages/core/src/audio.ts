@@ -8,7 +8,7 @@
 import { propKind, sampleKeyframes, staticValue } from './props.ts';
 import { integrate, mediaTime } from './track.ts';
 import { trackOff } from './montage.ts';
-import type { Composition, Keyframe, TrammeDoc } from './types.ts';
+import type { Composition, Keyframe, Layer, TrammeDoc } from './types.ts';
 
 /** what a sound is in the mix: effects share the room, music and ambience are the bed, the voice leads */
 export type SoundRole = 'effect' | 'music' | 'voice' | 'ambience';
@@ -69,6 +69,8 @@ export interface AudioClip {
   compress: number;
   /** share of reverb, 0 (dry) to 1 */
   reverb: number;
+  /** left (-1) to right (1), from the mixer's pan of its track; absent: centred */
+  pan?: number;
 }
 
 /** what a sound's names say it is, when its layer does not say its role (a layer's length says nothing: an effect often runs to the end) */
@@ -79,6 +81,26 @@ const ENVELOPE_RATE = 50;
 
 const num = (v: unknown, d: number) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+
+/** the mixer's say over a layer: the faders of its track and of the bus it feeds (a still part in dB, the moving ones as curves), and the pan */
+function trackMixer(comp: Composition, layer: Layer, at: number, end: number, doc: TrammeDoc): { db: number; curves: [number, number][][]; pan: number } {
+  const own = comp.tracks?.find((t) => t.id === layer.track);
+  const chain = own ? [own, ...(own.to ? comp.tracks!.filter((t) => t.id === own.to) : [])] : [];
+  let db = 0, pan = 0;
+  const curves: [number, number][][] = [];
+  for (const t of chain) {
+    const moving = envelopeOf(t.volume, at, end, doc);
+    if (moving) curves.push(moving); else db += num(staticValue(t.volume), 0);
+    pan += t.pan ?? 0;
+  }
+  return { db, curves, pan: clamp(pan, -1, 1) };
+}
+
+/** a gain curve (when the sound's own gain moves) and the faders' curves added, with `base` (dB) added everywhere: [time, dB] at every time any of the curves has a point */
+function sumCurves(own: [number, number][] | null, base: number, curves: [number, number][][]): [number, number][] {
+  const times = [...new Set([...(own ? [own] : []), ...curves].flatMap((c) => c.map(([t]) => t)))].sort((a, b) => a - b);
+  return times.map((t) => [t, (own ? curveAt(own, t) : 0) + base + curves.reduce((s, c) => s + curveAt(c, t), 0)] as [number, number]);
+}
 
 /** the gain of a layer over [at, end]: null when it does not move */
 function envelopeOf(prop: unknown, at: number, end: number, doc: TrammeDoc): [number, number][] | null {
@@ -113,7 +135,10 @@ export function audioClips(doc: TrammeDoc, compId: string): AudioClip[] {
     if (hidden || end <= at) continue;
     const rateCurve = envelopeOf(props.rate, layer.in ?? 0, end, doc)?.map(([t, v]) => [t, clamp(v, 0, 4)] as [number, number]) ?? null;
     const duration = end - at, rate = rateCurve ? curveAt(rateCurve, at) : clamp(num(staticValue(props.rate), 1), 0, 4);
-    const envelope = envelopeOf(props.gain, at, end, doc), lowCutCurve = envelopeOf(props.lowCut, at, end, doc);
+    const own = envelopeOf(props.gain, at, end, doc), lowCutCurve = envelopeOf(props.lowCut, at, end, doc);
+    // the fader of its track and of the bus it feeds, over its own gain
+    const mixer = trackMixer(comp, layer, at, end, doc);
+    const envelope = mixer.curves.length ? sumCurves(own, (own ? 0 : num(staticValue(props.gain), 0)) + mixer.db, mixer.curves) : own ? own.map(([t, v]) => [t, v + mixer.db] as [number, number]) : null;
     const role = staticValue(props.role), visual = staticValue(props.visual);
     const start = Math.max(0, num(staticValue(props.start), 0));
     // looping: the section [start, loopEnd] wraps as long as the layer runs
@@ -133,8 +158,9 @@ export function audioClips(doc: TrammeDoc, compId: string): AudioClip[] {
       // a group starting after the layer skips the beginning of its file
       offset,
       ...(loops ? { loopStart: start, loopEnd } : {}),
-      gainDb: envelope ? envelope[0][1] : num(staticValue(props.gain), 0),
+      gainDb: envelope ? envelope[0][1] : num(staticValue(props.gain), 0) + mixer.db,
       envelope,
+      ...(mixer.pan ? { pan: mixer.pan } : {}),
       fadeIn: clamp(num(staticValue(props.fadeIn), 0), 0, duration),
       fadeOut: clamp(num(staticValue(props.fadeOut), 0), 0, duration),
       rate,

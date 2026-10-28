@@ -13,6 +13,7 @@ import { bandOf, longPress, noBrowserMenu, openMenu, Seg, useSize } from './cont
 import { Icon, kindColor, kindIcon } from './icons.tsx';
 import { fileLength, preview } from '../preview.ts';
 import { Tabs } from './timeline/Tabs.tsx';
+import { Mixer } from './Mixer.tsx';
 import { syncClips } from '../sync.ts';
 import { makeMulticam } from './Multicam.tsx';
 import { matchLooks } from '../looks-run.ts';
@@ -79,8 +80,9 @@ export function Transport() {
         options={[
           { value: 'timeline', label: t('common.timeline'), icon: 'timeline', tour: 'bottom-tab-timeline' },
           { value: 'graph', label: t('common.curves'), icon: 'curve', tour: 'bottom-tab-graph' },
+          ...(c.tracks?.some((x) => x.kind === 'audio') || tab === 'mixer' ? [{ value: 'mixer', label: t('timeline.mixer'), icon: 'sliders', tour: 'bottom-tab-mixer' }] : []),
         ]}
-        onChange={(v) => { S.bottomTab.value = v as 'timeline' | 'graph'; }} />
+        onChange={(v) => { S.bottomTab.value = v as 'timeline' | 'graph' | 'mixer'; }} />
       <div class="tl-zoom" title={t('timeline.timelineZoomCtrlWheel')}>
         <Icon name="minus" size={12} />
         <input type="range" min={0} max={100} value={zoomToSlider(c)} onInput={(e) => { pps.value = sliderToZoom(c, Number((e.target as HTMLInputElement).value)); }} />
@@ -754,5 +756,5 @@ export function deleteKeys(): boolean {
 }
 
 export function Bottom() {
-  return S.bottomTab.value === 'graph' ? <GraphEditor /> : <Timeline />;
+  return S.bottomTab.value === 'graph' ? <GraphEditor /> : S.bottomTab.value === 'mixer' ? <Mixer /> : <Timeline />;
 }

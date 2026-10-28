@@ -32,9 +32,11 @@ export function cutsOf(c: Composition, trackId: string): { left: string; right: 
   return out;
 }
 
-/** a layer sitting on a track that is switched off for `flag`: hidden (not drawn, not heard) or muted (not heard) */
+/** a layer sitting on a track that is switched off for `flag`: hidden (not drawn, not heard) or muted (not heard, and so is a track whose bus is muted) */
 export function trackOff(c: Composition, l: Layer, flag: 'hidden' | 'muted'): boolean {
-  return !!l.track && !!c.tracks?.find((t) => t.id === l.track)?.[flag];
+  const t = l.track ? c.tracks?.find((x) => x.id === l.track) : undefined;
+  if (!t) return false;
+  return !!t[flag] || (flag === 'muted' && !!t.to && !!c.tracks!.find((x) => x.id === t.to)?.muted);
 }
 
 /** the clips that share a link with `id`, itself included (just itself when it is not linked) */
