@@ -3,10 +3,10 @@
 // it out. The timeline's gestures, the keyboard and the assistant's tools all
 // call these, so a ripple is the same ripple wherever it comes from.
 
-import { pointer, type Op } from './ops.ts';
+import { applyOps, pointer, type Op } from './ops.ts';
 import { staticValue } from './props.ts';
-import { round6, shiftLayerOps, subtree } from './timing.ts';
-import type { Composition, TrammeDoc } from './types.ts';
+import { round6, shiftLayerOps, splitLayerOps, subtree, trimInOps } from './timing.ts';
+import type { Composition, Layer, TrammeDoc } from './types.ts';
 
 /** where a clip sits on its track: its id, its in point and its out point (the composition's end when it has none) */
 export interface Footprint { id: string; in: number; out: number }
@@ -139,4 +139,111 @@ export function closeGapOps(doc: TrammeDoc, compId: string, trackId: string, at:
     prevOut = Math.max(prevOut, clips[i].out);
   }
   return [];
+}
+
+/** steps run one after the other, each on the document the earlier ones left: the operations of all, in order */
+function chain(doc: TrammeDoc, steps: ((d: TrammeDoc) => Op[])[]): Op[] {
+  const all: Op[] = [];
+  let d = doc;
+  for (const step of steps) {
+    const ops = step(d);
+    if (!ops.length) continue;
+    all.push(...ops);
+    d = applyOps(d, ops).doc;
+  }
+  return all;
+}
+
+/**
+ * The draw order of a sequence: the clips of the tracks in track order (a
+ * higher track above a lower one, a later clip above an earlier one on its
+ * track), the sounds under them, in the place the first clip held in the
+ * stack; layers without a track keep their order and their side. Nothing
+ * when the order is already right or the composition has no tracks.
+ */
+export function syncOrderOps(doc: TrammeDoc, compId: string): Op[] {
+  const c = doc.compositions[compId];
+  if (!c.tracks) return [];
+  const index = (id: string) => c.tracks!.findIndex((t) => t.id === c.layers[id].track);
+  const isClip = (id: string) => !!c.layers[id]?.track && index(id) >= 0;
+  const clips = c.order.filter(isClip);
+  if (!clips.length) return [];
+  const audio = (id: string) => c.tracks![index(id)].kind === 'audio';
+  const sorted = [...clips].sort((x, y) => Number(audio(y)) - Number(audio(x)) || index(x) - index(y) || (c.layers[x].in ?? 0) - (c.layers[y].in ?? 0) || x.localeCompare(y));
+  const first = c.order.findIndex(isClip);
+  const rest = c.order.filter((id) => !isClip(id));
+  const before = c.order.slice(0, first).filter((id) => !isClip(id));
+  const next = [...before, ...sorted, ...rest.slice(before.length)];
+  return next.every((id, i) => id === c.order[i]) ? [] : [{ op: 'replace', path: pointer('compositions', compId, 'order'), value: next }];
+}
+
+/** the composition lengthened to the end of its last clip when that goes past its duration */
+function fitDurationOps(doc: TrammeDoc, compId: string): Op[] {
+  const c = doc.compositions[compId];
+  const end = Math.max(0, ...c.order.map((id) => c.layers[id]?.out ?? 0));
+  return end > c.duration + 1e-9 ? [{ op: 'replace', path: pointer('compositions', compId, 'duration'), value: +end.toFixed(4) }] : [];
+}
+
+/** the clip as it goes on the track: `layer` placed at `at`, as long as it is */
+function placed(c: Composition, layer: Layer, trackId: string, at: number): { clip: Layer; len: number } {
+  const len = round6((layer.out ?? c.duration) - (layer.in ?? 0));
+  return { clip: { ...structuredClone(layer), track: trackId, in: round6(at), out: round6(at + len) }, len };
+}
+
+const addClipOps = (compId: string, id: string, clip: Layer): Op[] => [
+  { op: 'add', path: pointer('compositions', compId, 'layers', id), value: clip },
+  { op: 'add', path: pointer('compositions', compId, 'order', '-'), value: id },
+];
+
+/**
+ * A clip put on a track at `at`, pushing the rest aside: a clip it falls in
+ * is cut in two there, and everything from `at` on the track moves later by
+ * the new clip's length. Nothing when the track, or a clip that would move, is
+ * locked.
+ */
+export function insertOps(doc: TrammeDoc, compId: string, id: string, layer: Layer, trackId: string, at: number): Op[] {
+  const c = doc.compositions[compId], half = 0.5 / c.fps;
+  const { clip, len } = placed(c, layer, trackId, at);
+  if (!(len > 0) || trackLocked(c, trackId)) return [];
+  const clips = trackClips(c, trackId);
+  if (clips.some((k) => k.out > at && isLocked(c, k.id))) return [];
+  return chain(doc, [
+    (d) => chain(d, clips.filter((k) => k.in < at - half && k.out > at + half).map((k) => (x: TrammeDoc) => splitLayerOps(x, compId, k.id, at)?.ops ?? [])),
+    (d) => chain(d, trackClips(d.compositions[compId], trackId).filter((k) => k.in >= at - half).map((k) => (x: TrammeDoc) => shiftLayerOps(x, compId, k.id, len))),
+    () => addClipOps(compId, id, clip),
+    (d) => syncOrderOps(d, compId),
+    (d) => fitDurationOps(d, compId),
+  ]);
+}
+
+/**
+ * A clip put on a track at `at`, over what is there: the clips it covers are
+ * removed, one it covers in part is trimmed on that side (the head of a video
+ * carries the start of its file), one that holds it is cut in three. Nothing
+ * when the track, or a clip it touches, is locked.
+ */
+export function overwriteOps(doc: TrammeDoc, compId: string, id: string, layer: Layer, trackId: string, at: number): Op[] {
+  const c = doc.compositions[compId], half = 0.5 / c.fps;
+  const { clip, len } = placed(c, layer, trackId, at);
+  const end = clip.out!;
+  if (!(len > 0) || trackLocked(c, trackId)) return [];
+  const touched = trackClips(c, trackId).filter((k) => k.in < end - half && k.out > at + half);
+  if (touched.some((k) => isLocked(c, k.id))) return [];
+  const covered = touched.filter((k) => k.in >= at - half && k.out <= end + half).map((k) => k.id);
+  const steps: ((d: TrammeDoc) => Op[])[] = [(d) => removeLayersOps(d, compId, covered)];
+  for (const k of touched) {
+    if (covered.includes(k.id)) continue;
+    if (k.in < at - half && k.out > end + half) {
+      steps.push((d) => {
+        const cut = splitLayerOps(d, compId, k.id, at);
+        return cut ? [...cut.ops, ...trimInOps(applyOps(d, cut.ops).doc, compId, cut.id, end)] : [];
+      });
+    } else if (k.in < at - half) {
+      steps.push(() => [{ op: 'add', path: pointer('compositions', compId, 'layers', k.id, 'out'), value: round6(at) }]);
+    } else {
+      steps.push((d) => trimInOps(d, compId, k.id, end));
+    }
+  }
+  steps.push(() => addClipOps(compId, id, clip), (d) => syncOrderOps(d, compId), (d) => fitDurationOps(d, compId));
+  return chain(doc, steps);
 }
