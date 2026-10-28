@@ -9,8 +9,8 @@
 // their model cards (licence, size, input) and are listed in
 // docs/roadmap-loop/to-validate.md until they are tried.
 
-export type ModelTask = 'cutout-person' | 'cutout-any' | 'detection' | 'depth' | 'transcription' | 'vad' | 'face';
-export const MODEL_TASKS: ModelTask[] = ['cutout-person', 'cutout-any', 'detection', 'depth', 'transcription', 'vad', 'face'];
+export type ModelTask = 'cutout-person' | 'cutout-any' | 'detection' | 'depth' | 'transcription' | 'vad' | 'face' | 'upscale';
+export const MODEL_TASKS: ModelTask[] = ['cutout-person', 'cutout-any', 'detection', 'depth', 'transcription', 'vad', 'face', 'upscale'];
 
 /** a matte network read with onnxruntime: a square picture in, a matte out */
 export interface MatteAdapter {
@@ -46,6 +46,12 @@ export interface VadAdapter {
 /** a MediaPipe task file (its graph and weights in one), run by MediaPipe's own runtime */
 export interface MediaPipeAdapter { kind: 'mediapipe' }
 
+/** the core's own engine (Lanczos): no model, nothing to download; what a task falls back on */
+export interface EngineAdapter { kind: 'engine' }
+
+/** a super-resolution network read with onnxruntime: a fixed square tile in, the tile four times as large out (esrgan.ts cuts the picture in tiles); `more` are the other files of the model, its weights beside the graph */
+export interface EsrganAdapter { kind: 'esrgan'; tile: number; pad: number; more: string[] }
+
 export interface ModelEntry {
   id: string;
   task: ModelTask;
@@ -62,8 +68,11 @@ export interface ModelEntry {
   commercial: boolean | null;
   /** tried with the tool in this version (what to know before choosing the others: the settings' notes) */
   checked: boolean;
-  adapter: MatteAdapter | PipelineAdapter | VadAdapter | MediaPipeAdapter;
+  adapter: MatteAdapter | PipelineAdapter | VadAdapter | MediaPipeAdapter | EngineAdapter | EsrganAdapter;
 }
+
+/** the files a model keeps in the cache: its source, and the others of a model in several files; none for the built-in engine */
+export const filesOf = (m: ModelEntry): string[] => (m.adapter.kind === 'engine' ? [] : [m.source, ...(m.adapter.kind === 'esrgan' ? m.adapter.more : [])]);
 
 const U2NET: MatteAdapter = { kind: 'matte', side: 320, mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225], byMax: true, output: 'prob' };
 const ISNET: MatteAdapter = { kind: 'matte', side: 1024, mean: [0.5, 0.5, 0.5], std: [1, 1, 1], byMax: false, output: 'range' };
@@ -128,6 +137,13 @@ export const MODELS: ModelEntry[] = [
   },
   // the export that gives the cross attentions: onnx-community/whisper-large-v3-turbo has none, so it cannot time the words
   { id: 'whisper-large-v3-turbo', task: 'transcription', name: 'Whisper large v3 turbo', source: 'onnx-community/whisper-large-v3-turbo_timestamped', revision: 'main', mb: 1090, licence: 'MIT', commercial: true, checked: true, adapter: ASR },
+  // enlarging a picture: the core's Lanczos by default (the fallback of every other row), a network for the fine texture Lanczos cannot invent; a video stays with the engine (a network over every frame would take hours)
+  { id: 'lanczos-enlarge', task: 'upscale', name: 'Lanczos (built in)', source: '', revision: 'builtin', mb: 0, licence: '', commercial: true, checked: true, adapter: { kind: 'engine' } },
+  {
+    id: 'realesr-general-x4v3', task: 'upscale', name: 'Real-ESRGAN general x4 v3', revision: '4c80f3da1a8a85f0757a9e7f79e08d0307220eb5',
+    source: 'https://huggingface.co/TheGuy444/Real-ESRGAN-ONNX/resolve/4c80f3da1a8a85f0757a9e7f79e08d0307220eb5/onnx/model.onnx',
+    mb: 4.9, licence: 'BSD-3-Clause', commercial: true, checked: true, adapter: { kind: 'esrgan', tile: 128, pad: 8, more: ['https://huggingface.co/TheGuy444/Real-ESRGAN-ONNX/resolve/4c80f3da1a8a85f0757a9e7f79e08d0307220eb5/onnx/model.data'] },
+  },
 ];
 
 /** the models known for a task, the default first */

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { cachePrefix, defaultModel, HUB_PREFIX, isHubId, madeBy, MODEL_TASKS, MODELS, modelsFor, resolveModel } from '../src/models.ts';
+import { cachePrefix, defaultModel, filesOf, HUB_PREFIX, isHubId, madeBy, MODEL_TASKS, MODELS, modelsFor, resolveModel } from '../src/models.ts';
 
 describe('the models of the editor', () => {
   it('have a default per task, the one each tool ran before the settings', () => {
-    expect(MODEL_TASKS.map((t) => defaultModel(t).id)).toEqual(['u2net-human-seg', 'u2netp', 'yolos-tiny', 'depth-anything-v2-small', 'whisper-small', 'silero-vad', 'face-landmarker']);
+    expect(MODEL_TASKS.map((t) => defaultModel(t).id)).toEqual(['u2net-human-seg', 'u2netp', 'yolos-tiny', 'depth-anything-v2-small', 'whisper-small', 'silero-vad', 'face-landmarker', 'lanczos-enlarge']);
     // the voice detector and the face landmarker could not be fetched where they were written: tried on a device first (docs/roadmap-loop/to-validate.md); its tool falls back on the energy of the sound
     for (const t of MODEL_TASKS) if (t !== 'vad' && t !== 'face') expect(defaultModel(t).checked, t).toBe(true);
   });
@@ -18,6 +18,18 @@ describe('the models of the editor', () => {
     expect(new Set(MODELS.map((m) => m.id)).size).toBe(MODELS.length);
     for (const m of modelsFor('cutout-any')) expect(m.adapter.kind).toBe('matte');
     for (const m of modelsFor('depth')) expect(m.adapter).toMatchObject({ kind: 'pipeline', pipeline: 'depth-estimation' });
+  });
+
+  it('enlarge with the built-in engine by default, a network a choice that downloads its graph and its weights', () => {
+    expect(defaultModel('upscale')).toMatchObject({ id: 'lanczos-enlarge', adapter: { kind: 'engine' }, mb: 0 });
+    expect(filesOf(defaultModel('upscale'))).toEqual([]);
+    const net = modelsFor('upscale')[1];
+    expect(net).toMatchObject({ id: 'realesr-general-x4v3', licence: 'BSD-3-Clause', commercial: true, adapter: { kind: 'esrgan', tile: 128 } });
+    expect(filesOf(net)).toHaveLength(2);
+    expect(filesOf(net)[0]).toMatch(/\/onnx\/model\.onnx$/);
+    expect(filesOf(net)[1]).toMatch(/\/onnx\/model\.data$/);
+    // its files are pinned to the revision that was tried
+    for (const f of filesOf(net)) expect(f).toContain(net.revision);
   });
 
   it('read a choice: a known model, a model hub id for a pipeline task, the default otherwise', () => {

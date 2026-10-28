@@ -10,6 +10,9 @@
 import { between, enlarge, flowField, pointer, type Op, type ToolType } from '@tramme/core';
 import { canvasOf, jobId, rgbaOf, runVideoJob, type Frame } from './longjob.ts';
 import { canvas, loadImage } from './perception.ts';
+import { chosenModel } from './settings.ts';
+import { enlargeWithModel } from './esrgan-run.ts';
+import { madeBy } from './models.ts';
 import { t } from './i18n/index.ts';
 
 /** the layers of the composition showing an asset, and the asset of a layer or the one named */
@@ -31,12 +34,19 @@ const upscale: ToolType<{ asset?: string }> = {
   async run(a, ctx) {
     const { asset, a: src, layers, c } = targetOf(ctx, a.asset, ['image', 'video']);
     const id = `${asset}-2x`.slice(0, 64), had = !!ctx.doc.assets[id];
-    let path: string;
+    let path: string, made = 'lanczos', engine = '';
     if (src.type === 'image') {
       ctx.progress?.(0, 1, t('longjob.enlarging'));
       const img = await loadImage(ctx.assetUrl(asset)), pic = canvas(img.naturalWidth, img.naturalHeight);
       pic.g.drawImage(img, 0, 0);
-      const big = canvasOf(enlarge(rgbaOf(pic.c), 2));
+      // the network the settings choose, when one is: the core's Lanczos when it is not, or when the network cannot load
+      const entry = chosenModel('upscale');
+      let enlarged = null as ReturnType<typeof enlarge> | null;
+      if (entry.adapter.kind === 'esrgan') {
+        try { enlarged = await enlargeWithModel(entry, rgbaOf(pic.c), (d, n) => ctx.progress?.(d, n, t('longjob.enlarging')), ctx.signal); made = madeBy(entry); }
+        catch (e) { if ((e as Error).name === 'AbortError') throw e; engine = `${entry.name} could not run (${(e as Error).message}): Lanczos used instead`; }
+      }
+      const big = canvasOf(enlarged ?? enlarge(rgbaOf(pic.c), 2));
       const blob = await new Promise<Blob>((res, rej) => big.toBlob((b) => (b ? res(b) : rej(new Error('the picture could not be encoded'))), 'image/png'));
       path = await ctx.writeFile(`assets/upscale/${asset}.png`, blob);
     } else {
@@ -53,7 +63,7 @@ const upscale: ToolType<{ asset?: string }> = {
     for (const l of layers) ops.push({ op: 'replace', path: pointer('compositions', ctx.compId, 'layers', l, 'props', c.layers[l].type), value: id });
     return {
       ops, reload: had ? [id] : [], label: t('longjob.enlarged'), notice: t('longjob.enlarged'),
-      text: `${asset} enlarged twice (asset "${id}"); ${layers.length ? `the layers ${layers.join(', ')} now show it, at the same size on screen` : 'no layer showed it here'}. The original stays in the project.`,
+      text: `${asset} enlarged twice by ${made} (asset "${id}"); ${layers.length ? `the layers ${layers.join(', ')} now show it, at the same size on screen` : 'no layer showed it here'}. The original stays in the project.${engine ? ` ${engine}.` : ''}`,
     };
   },
 };

@@ -32,7 +32,7 @@ function sileroVad(): Promise<(x: Float32Array) => Promise<Float32Array>> {
     const { rate, window: W } = entry.adapter;
     // transformers.js sets onnxruntime up (where its wasm files are): load it first
     await import('@huggingface/transformers');
-    const ort = await import('onnxruntime-web');
+    const ort = await import('onnxruntime-web/webgpu');
     const session = await ort.InferenceSession.create(await hubFile(entry.source), { executionProviders: ['wasm'] });
     const v5 = session.inputNames.includes('state'), ctxN = v5 ? (rate === 16000 ? 64 : 32) : 0;
     return async (x: Float32Array) => {
