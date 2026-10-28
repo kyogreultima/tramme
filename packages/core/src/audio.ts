@@ -7,6 +7,7 @@
 
 import { propKind, sampleKeyframes, staticValue } from './props.ts';
 import { integrate, mediaTime } from './track.ts';
+import { trackOff } from './montage.ts';
 import type { Composition, Keyframe, TrammeDoc } from './types.ts';
 
 /** what a sound is in the mix: effects share the room, music and ambience are the bed, the voice leads */
@@ -97,7 +98,7 @@ export function audioClips(doc: TrammeDoc, compId: string): AudioClip[] {
   const parent = new Map<string, string>();
   for (const [id, l] of Object.entries(comp.layers)) for (const k of l.children ?? []) parent.set(k, id);
   for (const [layerId, layer] of Object.entries(comp.layers)) {
-    if (layer.visible === false || (layer.type !== 'audio' && layer.type !== 'video')) continue;
+    if (layer.visible === false || trackOff(comp, layer, 'hidden') || trackOff(comp, layer, 'muted') || (layer.type !== 'audio' && layer.type !== 'video')) continue;
     const props = layer.props ?? {};
     if (layer.type === 'video' && staticValue(props.muted) === true) continue;
     const asset = staticValue(layer.type === 'audio' ? props.audio : props.video);

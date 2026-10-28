@@ -10,6 +10,7 @@ import { applyMat, invertMat, layerMatrix } from './math.ts';
 import { audioReader, type AudioReader } from './analysis.ts';
 import { eventsReader, type EventsReader } from './events.ts';
 import { integrate, mediaClockOf, mediaMoments, mediaTime, trackId, trackReader, type MediaClock, type TrackReader } from './track.ts';
+import { trackOff } from './montage.ts';
 import { compileExpr, type ExprScope } from './expr.ts';
 import { fieldOf, modifierParams, seedOf, type ModifierContext, type ModifierType, type TimeField } from './modifiers.ts';
 import { asExpr, asKeyframed, asLink, easeFn, modsOf, propKind, resolveTokens, sampleKeyframes, staticValue, tokenValue } from './props.ts';
@@ -239,7 +240,7 @@ export class Evaluator {
     const out: EvaluatedLayer[] = [];
     for (const id of ids) {
       const layer = ctx.comp.layers[id];
-      if (!layer || layer.visible === false || !layerActive(layer, ctx.comp, ctx.t)) continue;
+      if (!layer || layer.visible === false || trackOff(ctx.comp, layer, 'hidden') || !layerActive(layer, ctx.comp, ctx.t)) continue;
       out.push(this.layer(ctx, id));
     }
     return out;

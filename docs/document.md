@@ -190,7 +190,7 @@ A film put together from clips is a composition with `"kind": "sequence"` and a 
 }
 ```
 
-- A track is `{ id, kind: "video" | "audio", name?, locked?, hidden?, muted?, solo?, magnetic?, height? }`. A locked track cannot be edited by the operations; a magnetic one closes its gaps by itself; `hidden` and `muted` are in the document (the exported film follows them), `solo` is a view of the preview only.
+- A track is `{ id, kind: "video" | "audio", name?, locked?, hidden?, muted?, magnetic?, height? }`. A locked track cannot be edited by the operations; a magnetic one closes its gaps by itself; a layer on a `hidden` track is neither drawn nor heard, on a `muted` track it is drawn but silent (the exported film follows both). Soloing a track is a view of the editor's preview only, it is not written in the document.
 - A layer's `track` puts it on a track of its composition (an unknown track is an error). Clips of one track follow one another; where a transition makes two overlap, the cut is the middle of the overlap.
 - Clips sharing a `link` move, split and are deleted together (a video and its sound detached onto an audio layer). A link joining a single clip is noted by the `sequence` check.
 - The draw order of `order` follows the tracks (a higher track above a lower one, a later clip above an earlier one); layers with no track keep their place.
