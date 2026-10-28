@@ -26,6 +26,12 @@ export async function mediaDuration(url: string): Promise<number> {
   try { return await input.computeDuration(); } catch { return 0; } finally { input.dispose(); }
 }
 
+/** whether a media file has a sound of its own (read from its container, a few kB of it); false when it cannot be read */
+export async function hasSound(url: string): Promise<boolean> {
+  const input = new Input({ source: new UrlSource(url, { getRetryDelay: (tries) => (tries < 3 ? 0.5 : null) }), formats: ALL_FORMATS });
+  try { return !!(await input.getPrimaryAudioTrack()); } catch { return false; } finally { input.dispose(); }
+}
+
 /** a picture, decoded */
 export async function loadImage(url: string): Promise<HTMLImageElement> {
   const img = new Image();
