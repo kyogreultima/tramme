@@ -1185,7 +1185,15 @@
     "measure": "Mesurer le mix",
     "measuring": "Mesure…",
     "noSoundToMeasure": "Il n'y a pas de son à mesurer",
-    "noSoundTracks": "Pas encore de piste de son : le mixeur montre les pistes d'une séquence"
+    "noSoundTracks": "Pas encore de piste de son : le mixeur montre les pistes d'une séquence",
+    "recordVoiceover": "Enregistrer une voix off",
+    "recordHint": "Enregistrer une voix off à partir de la tête de lecture : casque conseillé, un appui l'arrête, Échap l'abandonne",
+    "voiceTake": "Voix off {n}",
+    "noMicrophone": "Le micro n'est pas utilisable : autorisez-le dans le navigateur",
+    "cannotRecordHere": "La voix off ne peut pas aller sur cette piste",
+    "countIn": "Enregistrement dans {n}",
+    "recordingNow": "Enregistrement",
+    "savingTake": "Enregistrement de la prise…"
   },
   "topbar": {
     "tenBit": "10 bits",

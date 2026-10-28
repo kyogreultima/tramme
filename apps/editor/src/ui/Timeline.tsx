@@ -14,6 +14,7 @@ import { Icon, kindColor, kindIcon } from './icons.tsx';
 import { fileLength, preview } from '../preview.ts';
 import { Tabs } from './timeline/Tabs.tsx';
 import { Mixer } from './Mixer.tsx';
+import { recording, toggleVoiceover } from '../voiceover-run.ts';
 import { syncClips } from '../sync.ts';
 import { makeMulticam } from './Multicam.tsx';
 import { matchLooks } from '../looks-run.ts';
@@ -65,6 +66,8 @@ export function Transport() {
         <button class="icon-btn" title={t('timeline.nextFrame')} onClick={() => frameStep(1)}><Icon name="next" /></button>
         <button class="icon-btn" data-step="end" title={t('timeline.endEnd')} onClick={() => setTime(c.duration)}><Icon name="end" /></button>
         <button class={`icon-btn${S.loop.value ? ' on' : ''}`} title={t('timeline.loop')} onClick={() => { S.loop.value = !S.loop.value; }}><Icon name="loop" /></button>
+        <button class={`icon-btn rec${recording.value ? ' on' : ''}`} title={t('timeline.recordHint')} aria-label={t('timeline.recordVoiceover')} onClick={() => { void toggleVoiceover(); }}><Icon name="mic" /></button>
+        {recording.value && <span class="rec-state mono">{recording.value.stage === 'count' ? t('timeline.countIn', { n: recording.value.n }) : recording.value.stage === 'record' ? t('timeline.recordingNow') : t('timeline.savingTake')}</span>}
       </div>
       <Tabs />
       <div class="timecode">

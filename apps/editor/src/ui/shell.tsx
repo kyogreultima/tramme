@@ -17,6 +17,7 @@ import { settingsOpen } from '../settings.ts';
 import { QuestionDialog } from './QuestionDialog.tsx';
 import { SourceMonitor } from './Source.tsx';
 import { MulticamPanel } from './Multicam.tsx';
+import { cancelVoiceover } from '../voiceover-run.ts';
 import { t } from '../i18n/index.ts';
 
 /** the shortcuts of a project open, the same in the studio and the atelier */
@@ -58,6 +59,7 @@ export function useShortcuts() {
         return;
       }
       if (e.key === 'Delete' || e.key === 'Backspace') { if (!deleteKeys() && !rippleOnMagnetic()) deleteSelection(); return; }
+      if (e.key === 'Escape' && cancelVoiceover()) return;
       if (e.key === 'Escape') { select([]); S.keys.value = []; S.assistantFull.value = false; }
     };
     addEventListener('keydown', key);
