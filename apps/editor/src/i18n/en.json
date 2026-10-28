@@ -848,7 +848,13 @@
     "addTag": "Add a tag…",
     "binName": "Name of the bin, then Enter",
     "tagName": "Name of the tag, then Enter",
-    "noMediaMatches": "No media matches"
+    "noMediaMatches": "No media matches",
+    "fileMissing": "The file is missing",
+    "relinkFile": "Find the file…",
+    "mediaMissing": "{n} media have lost their file",
+    "relinkMissing": "Find the files…",
+    "relinked": "{n} media found again",
+    "relinkNone": "None of those files matches the missing media"
   },
   "models": {
     "loading": "Loading…",

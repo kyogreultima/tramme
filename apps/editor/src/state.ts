@@ -43,6 +43,8 @@ export const S = {
   collapsed: signal<Set<string>>(new Set()),
   /** sound layers the preview plays alone (none: all); the exports keep the whole mix */
   solo: signal<Set<string>>(new Set()),
+  /** the assets whose file is missing, as the preview found them */
+  offline: signal<string[]>([]),
   /** keyframes selected in the timeline: 'layerId|prop|index' */
   keys: signal<string[]>([]),
   safe: signal(false),

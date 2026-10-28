@@ -157,7 +157,8 @@ export class Renderer {
       const parsed = DocSchema.safeParse(doc);
       if (!parsed.success) throw new Error(`invalid document: ${parsed.error.issues[0]?.message}`);
     }
-    await this.assets.sync(doc, reload);
+    // the preview goes on without a file that is missing; an export refuses, naming every one
+    await this.assets.sync(doc, reload, this.isolate);
     const samePlugins = this.registry && !fresh && !reload.length && doc.plugins === this.doc?.plugins && (doc.plugins || []).every((id) => doc.assets[id] === this.doc.assets[id]);
     const registry = samePlugins ? this.registry : this.base.clone();
     if (!samePlugins) for (const id of doc.plugins || []) {

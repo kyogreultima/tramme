@@ -47,6 +47,10 @@ export class AssetStore {
   sandboxModules = false;
   /** a video with a proxy plays its proxy (the editor's preview, when its setting asks); exports always read the original */
   useProxies = false;
+  /** the assets whose file could not be loaded (id → why), kept by `sync(…, tolerate)`: the preview shows them offline and goes on, an export refuses */
+  readonly offline = new Map<string, string>();
+  /** what each failed asset was when it failed: it is not asked for again until it changes or is reloaded */
+  private failed = new Map<string, string>();
 
   /** what a loaded asset is kept under: its entry, and for a video with a proxy, which of the two plays */
   private keyOf(a: Asset): string {
@@ -82,9 +86,11 @@ export class AssetStore {
   has(id: string) { return this.loaded.has(id); }
 
   /** load what the document needs and is not loaded yet; `reload` forces some ids (a module edited on disk) */
-  async sync(doc: TrammeDoc, reload: string[] = []): Promise<void> {
+  async sync(doc: TrammeDoc, reload: string[] = [], tolerate = false): Promise<void> {
     this.doc = doc;
     for (const id of this.loaded.keys()) if (!doc.assets[id]) this.loaded.delete(id);
+    for (const id of [...this.offline.keys()]) if (!doc.assets[id]) { this.offline.delete(id); this.failed.delete(id); }
+    const refused: string[] = [];
     if (reload.length) this.version++;
     await Promise.all(Object.entries(doc.assets).map(async ([id, a]) => {
       // the sandbox owns the project's plugin modules: their code never loads here
@@ -96,12 +102,18 @@ export class AssetStore {
         if (have.key === key) { have.entry = a; return; }
       }
       const key = this.keyOf(a);
+      if (tolerate && this.failed.get(id) === key && !reload.includes(id)) return;
       try {
         this.loaded.set(id, { key, entry: a, value: await this.load(id, a) });
+        this.offline.delete(id); this.failed.delete(id);
       } catch (e) {
-        throw new Error(`asset "${id}" (${a.src}): ${(e as Error).message}`);
+        const why = `asset "${id}" (${a.src}): ${(e as Error).message}`;
+        this.loaded.delete(id);
+        if (!tolerate) { refused.push(why); return; }
+        this.offline.set(id, (e as Error).message); this.failed.set(id, key);
       }
     }));
+    if (refused.length) throw new Error(refused.join('\n'));
     // the document's fonts are loaded above, one by one; the page's own (its
     // CSS) are waited for a moment only: Chrome may leave one of them loading
     // for good, and the preview would never open (nor wait again at each edit)

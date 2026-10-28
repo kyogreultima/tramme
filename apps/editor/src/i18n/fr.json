@@ -848,7 +848,13 @@
     "addTag": "Ajouter une étiquette…",
     "binName": "Nom du dossier, puis Entrée",
     "tagName": "Nom de l'étiquette, puis Entrée",
-    "noMediaMatches": "Aucun média ne correspond"
+    "noMediaMatches": "Aucun média ne correspond",
+    "fileMissing": "Le fichier est introuvable",
+    "relinkFile": "Retrouver le fichier…",
+    "mediaMissing": "{n} média ont perdu leur fichier",
+    "relinkMissing": "Retrouver les fichiers…",
+    "relinked": "{n} média retrouvés",
+    "relinkNone": "Aucun de ces fichiers ne correspond aux médias manquants"
   },
   "models": {
     "loading": "Chargement…",
