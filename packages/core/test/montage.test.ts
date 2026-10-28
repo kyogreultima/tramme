@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { registry } from './fixtures.ts';
-import { applyOps, audioClips, closeGapOps, Evaluator, cutsOf, detachAudioOps, insertOps, isLocked, linkOps, linkedIds, overwriteOps, pasteAttributesOps, pasteOps, unlinkOps, rippleDeleteOps, rippleTrimOps, rollOps, slideOps, slipOps, splitAtOps, syncOrderOps, toSequenceOps, trackClips, type Composition, type Op, type TrammeDoc } from '../src/index.ts';
+import { applyOps, audioClips, closeGapOps, multicamOps, switchAngleOps, Evaluator, cutsOf, detachAudioOps, insertOps, isLocked, linkOps, linkedIds, overwriteOps, pasteAttributesOps, pasteOps, unlinkOps, rippleDeleteOps, rippleTrimOps, rollOps, slideOps, slipOps, splitAtOps, syncOrderOps, toSequenceOps, trackClips, type Composition, type Op, type TrammeDoc } from '../src/index.ts';
 
 /** a sequence of 10 s: V1 holds a (0-5) and b (4-9, a transition of 1 s over a), A1 holds the sound of a, linked to it */
 export function sequence(): Composition {
@@ -566,5 +566,63 @@ describe('splitting at a time', () => {
     c0.layers.u = { type: 'video', track: 'V3', in: 3.5, out: 5, props: { video: 'q' } }; c0.tracks!.push({ id: 'V3', kind: 'video' }); c0.order.push('u');
     const d = docOf(c0), r = splitAtOps(d, 'main', [], 4);
     expect(r.ids.sort()).toEqual(['b-2', 'u-2']);
+  });
+});
+
+describe('a multicam', () => {
+  /** three cameras on the same scene, side by side on V1 as they were dropped, lined up in time */
+  const cameras = (): Composition => ({
+    name: 'Seq', kind: 'sequence', width: 640, height: 360, fps: 30, duration: 10, background: null,
+    tracks: [{ id: 'V1', kind: 'video' }],
+    order: ['cam1', 'cam2', 'cam3'],
+    layers: {
+      cam1: { type: 'video', track: 'V1', in: 0, out: 10, props: { video: 'one' } },
+      cam2: { type: 'video', track: 'V1', in: 0, out: 10, props: { video: 'two' } },
+      cam3: { type: 'video', track: 'V1', in: 0.5, out: 9.5, props: { video: 'three' } },
+    },
+  });
+
+  it('is set up with one camera per track, the first on show, the others hidden, one sound for all', () => {
+    const d = docOf(cameras()), c = after(d, multicamOps(d, 'main', ['cam1', 'cam2', 'cam3']));
+    expect(c.tracks!.map((t) => t.id)).toEqual(['V1', 'V2', 'V3', 'A1']);
+    expect([c.layers.cam1.track, c.layers.cam2.track, c.layers.cam3.track]).toEqual(['V1', 'V2', 'V3']);
+    expect([c.layers.cam1.visible, c.layers.cam2.visible, c.layers.cam3.visible]).toEqual([undefined, false, false]);
+    expect([c.layers.cam1.props!.muted, c.layers.cam2.props!.muted, c.layers.cam3.props!.muted]).toEqual([true, true, true]);
+    const sound = Object.values(c.layers).filter((l) => l.type === 'audio');
+    expect(sound).toHaveLength(1);
+    expect([sound[0].track, sound[0].props!.audio, sound[0].link]).toEqual(['A1', 'one', undefined]);
+    expect(c.layers.cam1.link).toBeUndefined();
+  });
+
+  it('needs two cameras, and refuses a locked track', () => {
+    const d = docOf(cameras());
+    expect(multicamOps(d, 'main', ['cam1'])).toEqual([]);
+    d.compositions.main.tracks![0].locked = true;
+    expect(multicamOps(d, 'main', ['cam1', 'cam2'])).toEqual([]);
+  });
+
+  const rigged = () => { const c0 = cameras(); delete c0.layers.cam3; c0.order = ['cam1', 'cam2']; const d = docOf(c0); return docOf(after(d, multicamOps(d, 'main', ['cam1', 'cam2']))); };
+  const shown = (c: Composition) => Object.entries(c.layers).filter(([, l]) => l.type === 'video' && l.visible !== false).map(([id, l]) => ({ id, in: l.in!, out: l.out! })).sort((a, b) => a.in - b.in);
+
+  it('cuts every camera at the point and shows the other one from there (the cameras are known by their tracks)', () => {
+    const d = rigged(), c = after(d, switchAngleOps(d, 'main', ['V1', 'V2'], 'V2', 4));
+    expect(range(c, 'cam1')).toEqual([0, 4]);
+    expect(range(c, 'cam2')).toEqual([0, 4]);
+    expect(shown(c).map((s) => [s.in, s.out])).toEqual([[0, 4], [4, 10]]);
+    expect(c.layers[shown(c)[1].id].props!.video).toBe('two');
+  });
+
+  it('three switches give four segments with no gap', () => {
+    let d = rigged();
+    for (const [to, at] of [['V2', 2], ['V1', 5], ['V2', 8]] as const) d = docOf(after(d, switchAngleOps(d, 'main', ['V1', 'V2'], to, at)));
+    const s = shown(d.compositions.main);
+    expect(s.map((x) => [x.in, x.out])).toEqual([[0, 2], [2, 5], [5, 8], [8, 10]]);
+    expect(s.map((x) => d.compositions.main.layers[x.id].props!.video)).toEqual(['one', 'two', 'one', 'two']);
+  });
+
+  it('does nothing when that camera is already on show, or the point is outside the cameras', () => {
+    const d = rigged();
+    expect(switchAngleOps(d, 'main', ['V1', 'V2'], 'V1', 4)).toEqual([]);
+    expect(switchAngleOps(d, 'main', ['V1', 'V2'], 'V2', 12)).toEqual([]);
   });
 });

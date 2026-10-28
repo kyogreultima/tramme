@@ -1155,7 +1155,13 @@
     "syncing": "Comparaison des sons…",
     "syncNeedsTwo": "Sélectionnez deux plans avec du son, à vitesse normale",
     "syncNoSound": "{name} n'a pas de son à comparer",
-    "syncNoMatch": "{a} et {b} n'ont pas de son commun à caler"
+    "syncNoMatch": "{a} et {b} n'ont pas de son commun à caler",
+    "makeMulticam": "Monter ces caméras en multicam",
+    "multicam": "Multicam",
+    "multicamNeedsTwo": "Sélectionnez deux vidéos de la même scène",
+    "switchCamera": "Changer de caméra",
+    "cameraN": "Caméra {n}",
+    "closeMulticam": "Fermer le multicam"
   },
   "topbar": {
     "tenBit": "10 bits",

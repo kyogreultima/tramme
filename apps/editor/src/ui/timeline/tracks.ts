@@ -35,22 +35,8 @@ export function trackChangeOps(c: Composition, compId: string, trackId: string, 
   return ops;
 }
 
-/** a new track: a video one above the others, a sound one after them, numbered after the last of its kind; the first one makes the composition a sequence */
-export function addTrackOps(c: Composition, compId: string, kind: 'video' | 'audio'): { ops: Op[]; id: string } {
-  const tracks = c.tracks ?? [], prefix = kind === 'video' ? 'V' : 'A';
-  let n = tracks.filter((t) => t.kind === kind).length + 1;
-  while (tracks.some((t) => t.id === `${prefix}${n}`)) n++;
-  const track: SequenceTrack = { id: `${prefix}${n}`, kind };
-  const at = kind === 'video' ? tracks.filter((t) => t.kind === 'video').length : tracks.length;
-  const next = [...tracks.slice(0, at), track, ...tracks.slice(at)];
-  return {
-    id: track.id,
-    ops: [
-      ...(c.kind === 'sequence' ? [] : [{ op: 'add', path: pointer('compositions', compId, 'kind'), value: 'sequence' } as Op]),
-      { op: 'add', path: pointer('compositions', compId, 'tracks'), value: next },
-    ],
-  };
-}
+/** a new track, in the core with the other operations of a sequence (`addTrackOps`): re-exported for the timeline */
+export { addTrackOps } from '@tramme/core';
 
 /** a track taken away; nothing while clips sit on it */
 export function removeTrackOps(doc: TrammeDoc, compId: string, trackId: string): Op[] {
