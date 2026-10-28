@@ -83,6 +83,19 @@ export function carriedStart(l: Layer, din: number): number | null {
   return null;
 }
 
+const shiftRecord = <T extends Record<string, Prop> | undefined>(o: T, dt: number): T => (o && Object.fromEntries(Object.entries(o).map(([k, v]) => [k, shiftProp(v, dt)])) as T);
+
+/** a copy of a layer with every keyframe it holds moved `dt` seconds later (its transform, props, effects and masks); its in and out points are left as they are */
+export function shiftLayerValues(layer: Layer, dt: number): Layer {
+  const out: Layer = structuredClone(layer);
+  if (!dt) return out;
+  if (out.transform) out.transform = shiftRecord(out.transform as Record<string, Prop>, dt) as Layer['transform'];
+  if (out.props) out.props = shiftRecord(out.props, dt);
+  if (out.effects) out.effects = out.effects.map((e) => ({ ...e, props: shiftRecord(e.props, dt) }));
+  if (out.masks) out.masks = out.masks.map((m) => ({ ...m, props: shiftRecord(m.props as Record<string, Prop>, dt) as typeof m.props }));
+  return out;
+}
+
 /** the in point of a layer moved to `at`, what it plays staying in place (the head cut off, or brought back) */
 export function trimInOps(doc: TrammeDoc, compId: string, id: string, at: number): Op[] {
   const l = doc.compositions[compId].layers[id], lp = pointer('compositions', compId, 'layers', id);
