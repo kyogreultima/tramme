@@ -1185,7 +1185,15 @@
     "measure": "Measure the mix",
     "measuring": "Measuring…",
     "noSoundToMeasure": "There is no sound to measure",
-    "noSoundTracks": "No sound track yet: the mixer shows the tracks of a sequence"
+    "noSoundTracks": "No sound track yet: the mixer shows the tracks of a sequence",
+    "recordVoiceover": "Record a voice-over",
+    "recordHint": "Record a voice-over from the playhead: headphones advised, a press ends it, Escape drops it",
+    "voiceTake": "Voice-over {n}",
+    "noMicrophone": "The microphone cannot be used: allow it in the browser",
+    "cannotRecordHere": "The voice-over cannot go on that track",
+    "countIn": "Recording in {n}",
+    "recordingNow": "Recording",
+    "savingTake": "Saving the take…"
   },
   "topbar": {
     "tenBit": "10 bits",
