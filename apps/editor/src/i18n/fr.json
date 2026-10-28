@@ -1130,7 +1130,11 @@
     "placeName": "Placer {name}",
     "cannotNest": "Une composition ne peut pas se contenir elle-même",
     "newSequenceName": "Nouvelle séquence depuis {name}",
-    "closeTab": "Fermer l'onglet"
+    "closeTab": "Fermer l'onglet",
+    "makeAChapter": "En faire un chapitre",
+    "notAChapter": "Ne plus être un chapitre",
+    "copyChapters": "Copier les chapitres en liste",
+    "chaptersCopied": "{n} chapitre(s) copié(s)"
   },
   "topbar": {
     "tenBit": "10 bits",

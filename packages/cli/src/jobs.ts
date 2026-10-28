@@ -4,10 +4,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { Page } from 'puppeteer-core';
-import type { TrammeDoc } from '@tramme/core';
+import { chaptersOf, type TrammeDoc } from '@tramme/core';
 import type { FrameParts } from '@tramme/render/src/timing.ts';
 import { openDoc, type DocInfo } from './browser.ts';
-import { encoder, frameKind, joinSegments, type VideoFormat } from './media.ts';
+import { addChapters, encoder, frameKind, joinSegments, type VideoFormat } from './media.ts';
 import type { Server } from './server.ts';
 
 export interface VideoJob {
@@ -64,6 +64,14 @@ async function mixTo(page: Page, from: number, to: number, out: string): Promise
 }
 
 export async function renderVideo(server: Server, page: Page, job: VideoJob, onProgress?: (done: number, total: number) => void) {
+  const r = await renderFilm(server, page, job, onProgress);
+  // the chapters of the span rendered, written into the file
+  const from = (job.from ?? 0), seconds = r.frames / r.info.fps;
+  await addChapters(job.format ?? 'mp4', job.out, chaptersOf(r.info.markers, from, from + seconds), seconds);
+  return r;
+}
+
+async function renderFilm(server: Server, page: Page, job: VideoJob, onProgress?: (done: number, total: number) => void) {
   const format = job.format ?? 'mp4';
   const info: DocInfo = await openDoc(page, server.port, job.docUrl, job.compId);
   const f0 = Math.round((job.from ?? 0) * info.fps);
