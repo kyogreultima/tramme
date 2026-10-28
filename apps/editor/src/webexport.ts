@@ -4,6 +4,7 @@
 // sequence. The audio layers are mixed in an OfflineAudioContext. Lottie and
 // SVG come from @tramme/interop.
 
+import { frameSpan } from './exportspan.ts';
 import { AudioBufferSource, BufferTarget, CanvasSource, canEncodeAudio, getFirstEncodableVideoCodec, Mp4OutputFormat, Output, Quality, VideoSample, VideoSampleSource, WebMOutputFormat } from 'mediabunny';
 import { applyPalette, GIFEncoder, quantize } from 'gifenc';
 import { zipSync } from 'fflate';
@@ -30,12 +31,14 @@ export interface WebExportOptions {
   signal?: AbortSignal;
   /** MP4 and WebM: 10 bits a channel when this browser encodes it (deepCodec), read from the half-float frame */
   depth?: 8 | 10;
+  /** [from, to] in seconds: only that part of the film, and of its sound */
+  range?: [number, number];
 }
 
 export interface WebExportResult { blob: Blob; ext: string; warnings: string[] }
 
 /** the composition's sounds (audio layers, sound of videos), through the mixer of the preview, or null */
-const mixAudio = (r: Renderer) => mixComposition(r.doc, r.compId, (id) => r.assets.url(id));
+const mixAudio = (r: Renderer, span?: { from: number; to: number }) => mixComposition(r.doc, r.compId, (id) => r.assets.url(id), span ? { from: span.from, to: span.to } : {});
 
 const wav = (buf: AudioBuffer) => new Blob([encodeWav(buf) as BlobPart], { type: 'audio/wav' });
 
@@ -82,14 +85,16 @@ export async function exportInBrowser(doc: TrammeDoc, base: string, format: WebF
   const sandboxHost = () => pluginHost(base);
   try {
     const { fps, duration } = r.comp;
+    // the part of the film to render, in frames (the whole film without a range)
+    const span = frameSpan(fps, duration, opts.range), f0 = span.f0;
     // the render size (the width is rounded to a multiple of 8)
     const W = canvas.width, H = canvas.height;
     if (format === 'wav') {
-      const sound = await mixAudio(r);
+      const sound = await mixAudio(r, opts.range && span);
       if (!sound) throw new Error(t('export.noSoundLayerIn'));
       return { blob: wav(sound), ext: 'wav', warnings: [] };
     }
-    const frames = Math.round(duration * fps);
+    const frames = span.f1 - span.f0;
     // straight RGBA of frame f (alpha kept)
     const rgba = new Uint8Array(W * H * 4);
     // the sandbox's picture, read as pixels
@@ -129,12 +134,13 @@ export async function exportInBrowser(doc: TrammeDoc, base: string, format: WebF
       const c2 = document.createElement('canvas');
       c2.width = W; c2.height = H;
       const ctx = c2.getContext('2d')!;
-      for (let f = 0; f < frames; f++) {
+      for (let k = 0; k < frames; k++) {
+        const f = f0 + k;
         aborted(opts.signal);
         ctx.putImageData(new ImageData(new Uint8ClampedArray(await readFrame(f)), W, H), 0, 0);
         const png = await new Promise<Blob>((res, rej) => c2.toBlob((b) => (b ? res(b) : rej(new Error(t('export.pngFailed')))), 'image/png'));
-        files[`${String(f).padStart(5, '0')}.png`] = [new Uint8Array(await png.arrayBuffer()), { level: 0 }];
-        opts.onProgress?.(f + 1, frames);
+        files[`${String(k).padStart(5, '0')}.png`] = [new Uint8Array(await png.arrayBuffer()), { level: 0 }];
+        opts.onProgress?.(k + 1, frames);
       }
       return { blob: new Blob([zipSync(files) as BlobPart], { type: 'application/zip' }), ext: 'png.zip', warnings: [] };
     }
@@ -144,7 +150,8 @@ export async function exportInBrowser(doc: TrammeDoc, base: string, format: WebF
       const step = Math.ceil(fps / 50), delay = Math.round((1000 * step) / fps);
       const gif = GIFEncoder();
       const total = Math.ceil(frames / step);
-      for (let f = 0, i = 0; f < frames; f += step, i++) {
+      for (let k = 0, i = 0; k < frames; k += step, i++) {
+        const f = f0 + k;
         aborted(opts.signal);
         const px = await readFrame(f);
         const palette = quantize(px, 256, { format: 'rgba4444', oneBitAlpha: true });
@@ -169,7 +176,7 @@ export async function exportInBrowser(doc: TrammeDoc, base: string, format: WebF
     const wide = deep ? new Uint16Array(W * H * 4) : null, planes = deep ? new Uint16Array(W * H * 1.5) : null;
     const codec = await getFirstEncodableVideoCodec(webm ? ['vp9', 'vp8', 'av1'] : ['avc', 'vp9', 'av1'], { width: W, height: H });
     if (!codec) throw new Error(t('export.noVideoCodecAvailable', { w: W, h: H }));
-    const sound = await mixAudio(r);
+    const sound = await mixAudio(r, opts.range && span);
     const audioCodec = webm ? 'opus' : (await canEncodeAudio('aac')) ? 'aac' : 'opus';
     const encode = async (hardwareAcceleration: 'no-preference' | 'prefer-software'): Promise<Blob> => {
       const target = new BufferTarget();
@@ -189,16 +196,17 @@ export async function exportInBrowser(doc: TrammeDoc, base: string, format: WebF
       }
       await output.start();
       try {
-        for (let f = 0; f < frames; f++) {
+        for (let k = 0; k < frames; k++) {
+          const f = f0 + k;
           aborted(opts.signal);
           if (deep) {
             await complete(f, true);
             r.compositor.readRGBA16(wide!);
-            const sample = new VideoSample(i420p10(wide!, W, H, planes!), { format: 'I420P10', codedWidth: W, codedHeight: H, timestamp: f / fps, duration: 1 / fps });
+            const sample = new VideoSample(i420p10(wide!, W, H, planes!), { format: 'I420P10', codedWidth: W, codedHeight: H, timestamp: k / fps, duration: 1 / fps });
             await encoderStep((video as VideoSampleSource).add(sample), opts.signal);
             sample.close();
           } else if (video instanceof VideoSampleSource) {
-            const sample = new VideoSample(await readFrame(f), { format: 'RGBA', codedWidth: W, codedHeight: H, timestamp: f / fps, duration: 1 / fps });
+            const sample = new VideoSample(await readFrame(f), { format: 'RGBA', codedWidth: W, codedHeight: H, timestamp: k / fps, duration: 1 / fps });
             await encoderStep(video.add(sample), opts.signal);
             sample.close();
           } else {
@@ -208,9 +216,9 @@ export async function exportInBrowser(doc: TrammeDoc, base: string, format: WebF
             } else {
               await complete(f, false);
             }
-            await encoderStep(video.add(f / fps, 1 / fps), opts.signal);
+            await encoderStep(video.add(k / fps, 1 / fps), opts.signal);
           }
-          opts.onProgress?.(f + 1, frames);
+          opts.onProgress?.(k + 1, frames);
         }
         if (audio && sound) await encoderStep(audio.add(sound), opts.signal);
         await encoderStep(output.finalize(), opts.signal);

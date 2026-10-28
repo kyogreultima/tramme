@@ -13,6 +13,9 @@ import { ago, contentEnd, fmtSeconds, snap } from '../model.ts';
 import { shortsOf } from '../shorts.ts';
 import { openMenu, Popover, Select, Toggle, type MenuItem } from './controls.tsx';
 import { PublishPanel } from './PublishPanel.tsx';
+import { ExportQueueList } from './ExportQueueList.tsx';
+import { exportQueue } from '../export-queue.ts';
+import { exportRangeOf, frameSpan } from '../exportspan.ts';
 import { VIDEO, WEB_FORMATS, type WebFormat } from '../formats.ts';
 import { Icon } from './icons.tsx';
 import { LogoMark } from './Logo.tsx';
@@ -119,6 +122,8 @@ type ExpState = { done: number; total: number } | Done | { error: string };
 const expState = signal<ExpState | null>(null);
 const expFormat = signal<WebFormat>('mp4');
 const expSamples = signal('doc');
+/** the marked part of the film only, when it has marks */
+const expRange = signal(true);
 /** 10 bits a channel (MP4, WebM), when this browser encodes it */
 const expDeep = signal(false);
 const expBatch = signal<{ i: number; n: number; name: string } | null>(null);
@@ -131,6 +136,8 @@ function ExportPop({ anchor, onClose }: { anchor: HTMLElement; onClose: () => vo
   const format = expFormat.value, samples = expSamples.value, state = expState.value, batch = expBatch.value;
   const setFormat = (id: WebFormat) => { expFormat.value = id; expState.value = null; };
   const video = VIDEO.has(format);
+  // the part between the in mark and the out mark, when there are marks and it is asked for
+  const marked = exportRangeOf(c), range = marked && expRange.value ? marked : undefined;
   // a 10-bit codec this browser encodes at this size, asked before the export offers it (undefined: still asking)
   const deepable = format === 'mp4' || format === 'webm';
   const [deepLabel, setDeepLabel] = useState<string | null | undefined>(undefined);
@@ -149,13 +156,13 @@ function ExportPop({ anchor, onClose }: { anchor: HTMLElement; onClose: () => vo
   const run = async () => {
     const t0 = performance.now(), at = S.time.peek();
     expAbort.current = new AbortController();
-    expState.value = { done: 0, total: VIDEO.has(expFormat.value) ? Math.round(c.duration * c.fps) : 1 };
+    expState.value = { done: 0, total: VIDEO.has(expFormat.value) ? frameSpan(c.fps, c.duration, range).f1 - frameSpan(c.fps, c.duration, range).f0 : 1 };
     try {
       const { exportInBrowser } = await import('../webexport.ts');
       const r = await exportInBrowser(S.doc.peek(), new URL(S.docUrl.peek(), location.href).href, expFormat.value, {
         compId: S.compId.peek(), registry: S.registry.peek(), t: at, signal: expAbort.current.signal,
         samples: expSamples.value === 'doc' ? undefined : Number(expSamples.value),
-        depth: expDeep.value && deepable && deepLabel ? 10 : 8,
+        depth: expDeep.value && deepable && deepLabel ? 10 : 8, range,
         onProgress: (done, total) => { if (done % 3 === 0 || done === total) expState.value = { done, total }; },
       });
       const stem = safeName(S.project.peek().name);
@@ -188,6 +195,12 @@ function ExportPop({ anchor, onClose }: { anchor: HTMLElement; onClose: () => vo
       if ((e as Error).name !== 'AbortError') expState.value = { error: (e as Error).message };
     } finally { expBatch.value = null; expAbort.current = null; }
   };
+  // the film as it is now, put in line: the editor goes on while it renders
+  const enqueue = () => exportQueue.add({
+    id: `${Date.now()}-${exportQueue.jobs.length}`, label: t('topbar.queuedName', { name: S.project.peek().name, format }), format,
+    doc: S.doc.peek(), base: new URL(S.docUrl.peek(), location.href).href, compId: S.compId.peek(), registry: S.registry.peek(), project: S.project.peek().name,
+    samples: expSamples.value === 'doc' ? undefined : Number(expSamples.value), depth: expDeep.value && deepable && deepLabel ? 10 : 8, range, t: S.time.peek(),
+  });
   // a copy in the project's renders/ folder (kept out of .tramme archives)
   const keep = async (done: Done) => {
     try {
@@ -207,6 +220,7 @@ function ExportPop({ anchor, onClose }: { anchor: HTMLElement; onClose: () => vo
         ))}
       </div>
       <div class="row"><span class="muted">{t('common.image')}</span><span class="mono">{c.width}×{c.height} · {t('common.nFps', { n: c.fps })} · {fmtSeconds(c.duration)}</span></div>
+      {marked && video && <label class="row export-range"><span class="muted">{t('topbar.onlyMarked', { from: fmtSeconds(marked[0]), to: fmtSeconds(marked[1]) })}</span><Toggle on={expRange.value} onChange={(v) => { expRange.value = v; }} /></label>}
       {empty && <div class="export-trim"><span>{t('topbar.contentEndsAt', { end: fmtSeconds(end), duration: fmtSeconds(c.duration) })}</span><button class="btn sm" disabled={running()} onClick={trim}>{t('topbar.trimToContent')}</button></div>}
       {shorts.length > 1 && <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {batch
@@ -241,9 +255,10 @@ function ExportPop({ anchor, onClose }: { anchor: HTMLElement; onClose: () => vo
         </div>
       </div>}
       {state && 'error' in state && <div class="prop-note err">{state.error}</div>}
+      <ExportQueueList />
       {running()
         ? <button class="btn" onClick={() => expAbort.current?.abort()}><Icon name="stop" />{t('topbar.cancelExport')}</button>
-        : <button class="btn primary" onClick={run}><Icon name="download" />{t('common.export')}</button>}
+        : <div class="export-go"><button class="btn" title={t('topbar.addToQueue')} onClick={enqueue}><Icon name="plus" />{t('topbar.addToQueue')}</button><button class="btn primary" onClick={run}><Icon name="download" />{t('common.export')}</button></div>}
     </Popover>
   );
 }

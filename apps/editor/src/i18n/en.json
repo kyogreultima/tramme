@@ -1193,7 +1193,12 @@
     "cannotRecordHere": "The voice-over cannot go on that track",
     "countIn": "Recording in {n}",
     "recordingNow": "Recording",
-    "savingTake": "Saving the take…"
+    "savingTake": "Saving the take…",
+    "exportStartHere": "Start the export here",
+    "exportEndHere": "End the export here",
+    "clearExportRange": "Export the whole film again",
+    "exportIn": "In",
+    "exportOut": "Out"
   },
   "topbar": {
     "tenBit": "10 bits",
@@ -1234,7 +1239,15 @@
     "redoCtrlShiftZ": "Redo (Ctrl+Shift+Z)",
     "moreOptions": "More options",
     "exportAllShorts": "Export all the shorts ({n})",
-    "shortOfN": "{name} · {i}/{n}"
+    "shortOfN": "{name} · {i}/{n}",
+    "queue": "Queue",
+    "clearQueue": "Clear the finished",
+    "queueWaiting": "waiting",
+    "queueCancelled": "stopped",
+    "queueFailed": "failed",
+    "addToQueue": "Add to the queue",
+    "onlyMarked": "Only the marked part, {from} to {to}",
+    "queuedName": "{name} · {format}"
   },
   "viewport": {
     "waveform": "Waveform",

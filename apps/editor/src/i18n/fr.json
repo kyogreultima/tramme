@@ -1193,7 +1193,12 @@
     "cannotRecordHere": "La voix off ne peut pas aller sur cette piste",
     "countIn": "Enregistrement dans {n}",
     "recordingNow": "Enregistrement",
-    "savingTake": "Enregistrement de la prise…"
+    "savingTake": "Enregistrement de la prise…",
+    "exportStartHere": "Commencer l'export ici",
+    "exportEndHere": "Finir l'export ici",
+    "clearExportRange": "Exporter de nouveau tout le film",
+    "exportIn": "Début",
+    "exportOut": "Fin"
   },
   "topbar": {
     "tenBit": "10 bits",
@@ -1234,7 +1239,15 @@
     "redoCtrlShiftZ": "Rétablir (Ctrl+Maj+Z)",
     "moreOptions": "Plus d'options",
     "exportAllShorts": "Exporter tous les shorts ({n})",
-    "shortOfN": "{name} · {i}/{n}"
+    "shortOfN": "{name} · {i}/{n}",
+    "queue": "File d'attente",
+    "clearQueue": "Vider les terminés",
+    "queueWaiting": "en attente",
+    "queueCancelled": "arrêté",
+    "queueFailed": "échec",
+    "addToQueue": "Mettre en file",
+    "onlyMarked": "Seulement la partie marquée, de {from} à {to}",
+    "queuedName": "{name} · {format}"
   },
   "viewport": {
     "waveform": "Forme d'onde",

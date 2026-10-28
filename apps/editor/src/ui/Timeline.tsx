@@ -15,6 +15,7 @@ import { fileLength, preview } from '../preview.ts';
 import { Tabs } from './timeline/Tabs.tsx';
 import { Mixer } from './Mixer.tsx';
 import { recording, toggleVoiceover } from '../voiceover-run.ts';
+import { clearRangeOps, setRangeOps } from '../exportspan.ts';
 import { syncClips } from '../sync.ts';
 import { makeMulticam } from './Multicam.tsx';
 import { matchLooks } from '../looks-run.ts';
@@ -394,6 +395,9 @@ export function Timeline() {
       { section: timecode(at, fps) },
       { label: t('timeline.setTimeHere'), icon: 'target', onClick: () => { S.playing.value = false; setTime(at); } },
       ...(chaptersOf(c.markers).length ? [{ label: t('timeline.copyChapters'), icon: 'copy' as const, onClick: () => { const list = chaptersOf(c.markers); void navigator.clipboard?.writeText(chapterList(list)); toast(t('timeline.chaptersCopied', { n: list.length }), 'info', 1500); } }] : []),
+      { label: t('timeline.exportStartHere'), icon: 'start', hint: 'I', onClick: () => commit(t('timeline.exportStartHere'), setRangeOps(c, compId, 'in', at)) },
+      { label: t('timeline.exportEndHere'), icon: 'end', hint: 'O', onClick: () => commit(t('timeline.exportEndHere'), setRangeOps(c, compId, 'out', at)) },
+      ...(c.markers?.some((x) => x.kind === 'in' || x.kind === 'out') ? [{ label: t('timeline.clearExportRange'), icon: 'x' as const, onClick: () => commit(t('timeline.clearExportRange'), clearRangeOps(c, compId)) }] : []),
       { label: t('timeline.addMarkerHere'), icon: 'marker', onClick: () => commit(t('timeline.addMarkerHere'), [{ op: 'add', path: pointer('compositions', compId, 'markers'), value: [...list, { id: mid, t: at, label: t('timeline.markerN', { n: list.length + 1 }) }].sort((a, b) => a.t - b.t) }]) },
       { label: t('timeline.endHere'), icon: 'end', disabled: at <= 0 || at === c.duration, onClick: () => setDuration(t('timeline.endHere'), at) },
       { label: t('topbar.trimToContent'), icon: 'collapse', disabled: !(end > 0 && end < c.duration - 0.5 / fps), onClick: () => setDuration(t('topbar.trimToContent'), end) },
@@ -463,9 +467,9 @@ export function Timeline() {
             <div key={tk.t} class={`tick${tk.major ? '' : ' minor'}`} style={{ left: X(tk.t) }}>{tk.major && <span>{rulerLabel(tk.t, fps)}</span>}</div>
           ))}
           {(c.markers || []).map((m) => (
-            <div key={m.id} data-marker={m.id} class={`tl-marker${m.kind === 'scene' ? ' scene' : m.kind === 'chapter' ? ' chapter' : ''}`} style={{ left: X(m.t) }} title={`${m.label ?? m.id} · ${timecode(m.t, fps)}`}
+            <div key={m.id} data-marker={m.id} class={`tl-marker${m.kind === 'scene' ? ' scene' : m.kind === 'chapter' ? ' chapter' : m.kind === 'in' || m.kind === 'out' ? ` range ${m.kind}` : ''}`} style={{ left: X(m.t) }} title={`${m.label ?? m.id} · ${timecode(m.t, fps)}`}
               onDblClick={(e) => { e.stopPropagation(); setTime(m.t); }}>
-              {k * 0.4 > 30 && <span>{m.label ?? m.id}</span>}
+              {k * 0.4 > 30 && <span>{m.kind === 'in' ? t('timeline.exportIn') : m.kind === 'out' ? t('timeline.exportOut') : m.label ?? m.id}</span>}
             </div>
           ))}
           <Playhead x={X} />
