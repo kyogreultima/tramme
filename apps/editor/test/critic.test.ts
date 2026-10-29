@@ -354,3 +354,77 @@ describe('the critique tool', () => {
     await expect(run(good())).rejects.toThrow(/no assistant/i);
   });
 });
+
+describe('takes of a scene', () => {
+  const takesTool = criticTools.find((t) => t.name === 'scene-takes')!;
+  const ctxOf2 = (doc: TrammeDoc) => ({ doc, compId: 'main', time: 0, selection: [], registry, readText: async () => null, files: async () => [], assetUrl: () => '', fileUrl: () => '', signal: new AbortController().signal }) as never;
+  const apply = (doc: TrammeDoc, ops: { op: string; path: string; value?: unknown }[]): TrammeDoc => {
+    const next = JSON.parse(JSON.stringify(doc)) as TrammeDoc;
+    for (const o of ops) {
+      const parts = o.path.split('/').filter(Boolean).map((p) => p.replace(/~1/g, '/').replace(/~0/g, '~'));
+      let c = next as unknown as Record<string, unknown>;
+      for (const p of parts.slice(0, -1)) c = c[p] as Record<string, unknown>;
+      if (o.op === 'remove') delete c[parts.at(-1)!]; else c[parts.at(-1)!] = o.value;
+    }
+    return next;
+  };
+  const run = async (doc: TrammeDoc, input: object) => takesTool.run(input as never, ctxOf2(doc)) as Promise<{ ops?: { op: string; path: string; value?: unknown }[]; text?: string }>;
+
+  it('make: 2 copies the scene into a take, and the root still plays the original', async () => {
+    const doc = good();
+    const out = await run(doc, { scene: 'Scene 2', make: 2 });
+    const next = apply(doc, out.ops!);
+    expect(Object.keys(next.compositions).filter((c) => c.startsWith('s2'))).toEqual(['s2', 's2~take2']);
+    expect(Object.values(next.compositions['s2~take2'].layers).map((l) => l.type)).toEqual(Object.values(doc.compositions.s2.layers).map((l) => l.type));
+    expect(next.compositions['s2~take2'].name).toBe('Scene 2 (take 2)');
+    expect((next.compositions.main.layers.c2.props as { comp: string }).comp).toBe('s2');
+    expect(out.text).toMatch(/built differently/);
+  });
+
+  it('make: 3 gives two takes', async () => {
+    const out = await run(good(), { scene: 'Scene 1', make: 3 });
+    expect(out.ops!.filter((o) => o.op === 'add' && /take/.test(o.path)).length).toBe(2);
+  });
+
+  it('keep: a take makes the root play it, removes the original and the other takes, and leaves no dangling reference', async () => {
+    const doc = apply(good(), (await run(good(), { scene: 'Scene 2', make: 3 })).ops!);
+    const out = await run(doc, { scene: 'Scene 2', keep: 's2~take2' });
+    const next = apply(doc, out.ops!);
+    expect((next.compositions.main.layers.c2.props as { comp: string }).comp).toBe('s2~take2');
+    expect(Object.keys(next.compositions).filter((c) => c.startsWith('s2'))).toEqual(['s2~take2']);
+    const comps = Object.values(next.compositions).flatMap((c) => Object.values(c.layers).filter((l) => l.type === 'comp').map((l) => (l.props as { comp: string }).comp));
+    expect(comps.every((c) => c in next.compositions)).toBe(true);
+  });
+
+  it('keep: the original removes the takes only', async () => {
+    const doc = apply(good(), (await run(good(), { scene: 'Scene 2', make: 2 })).ops!);
+    const next = apply(doc, (await run(doc, { scene: 'Scene 2', keep: 's2' })).ops!);
+    expect(Object.keys(next.compositions).filter((c) => c.startsWith('s2'))).toEqual(['s2']);
+  });
+
+  it('keep: something that is not a take of that scene, or a take the user removed, is an error naming it', async () => {
+    const doc = good();
+    await expect(run(doc, { scene: 'Scene 2', keep: 's1' })).rejects.toThrow(/s1/);
+    await expect(run(doc, { scene: 'Scene 2', keep: 's2~take2' })).rejects.toThrow(/s2~take2/);
+    await expect(run(doc, { scene: 'Nowhere', make: 2 })).rejects.toThrow(/Nowhere/);
+  });
+
+  it('critique with takes sends one consult with each take\'s strip, labelled, and counts one round', async () => {
+    const seen: { text: string; images: number }[] = [];
+    resetCritic();
+    const strip = (id: string) => ({ ...{ strips: [{ url: 'data:image/jpeg;base64,AAAA', caption: `strips of ${id}` }], target: null, plan: null, facts: 'Format.', moments: [], issues: [] } });
+    setCriticHost({
+      via: () => ({ route: 'server', model: 'claude-opus-5-5' }), rounds: () => 1, likeness: async () => null,
+      gather: async (_c, comp) => strip(comp),
+      consult: async (req) => { seen.push({ text: req.text, images: req.images.length }); return { text: JSON.stringify({ verdict: 'not yet', score: 6, fixes: [{ what: 's2~take2 is best', why: 'closer' }] }), usage: { requests: 1, input: 1, cacheRead: 0, cacheWrite: 0, cacheWrite1h: 0, output: 1 } }; },
+    });
+    const doc = apply(good(), (await run(good(), { scene: 'Scene 2', make: 2 })).ops!);
+    const out = await criticTools.find((t) => t.name === 'critique')!.run({ takes: ['s2', 's2~take2'] } as never, ctxOf2(doc)) as { text: string };
+    expect(seen).toHaveLength(1);
+    expect(seen[0].images).toBe(2);
+    expect(seen[0].text).toContain('Take "s2"');
+    expect(seen[0].text).toContain('Take "s2~take2"');
+    expect(out.text).toContain('s2~take2 is best');
+    expect(consultsOf()?.n).toBe(1);
+  });
+});

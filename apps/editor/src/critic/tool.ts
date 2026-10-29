@@ -5,12 +5,13 @@
 // agrees. It counts its rounds and each scene's failures within the turn, and
 // asks for takes of a scene that fails twice.
 
-import { runChecks, likeness, type ToolContext, type ToolType } from '@tramme/core';
+import { pointer, runChecks, likeness, type Op, type ToolContext, type ToolType } from '@tramme/core';
 import { CRITIC_SYSTEM, NO_USAGE, addUsage, parseVerdict, type Usage } from '@tramme/assistant';
 import { consult, seesPictures, type ConsultRequest, type Via } from '../ai/consult.ts';
 import { FILM_PLAN_PATH, parsePlan } from '../filmplan.ts';
 import { analyses } from '../perception.ts';
 import { renderAndTarget } from '../review.ts';
+import { scenesOf } from '../scenes.ts';
 import { t } from '../i18n/index.ts';
 import { doneIssues, type DoneIssue } from './done.ts';
 import { gather, type Evidence } from './evidence.ts';
@@ -56,6 +57,13 @@ export function consultsOf(): (Usage & { n: number; model: string }) | undefined
 /** a data URL as the parts a request takes */
 const imageOf = (url: string) => { const m = /^data:([^;]+);base64,(.*)$/.exec(url); return m ? { mediaType: m[1], data: m[2] } : null; };
 
+/** the strips of each take, side by side and labelled (the first picture of each, the target and the plan of the first) */
+async function gatherTakes(ctx: ToolContext, takes: string[]): Promise<Evidence> {
+  for (const id of takes) if (!ctx.doc.compositions[id]) throw new Error(`${id}: no such take`);
+  const each = await Promise.all(takes.map((id) => host.gather(ctx, id, [])));
+  return { ...each[0], strips: each.flatMap((e, i) => e.strips.slice(0, 1).map((s) => ({ url: s.url, caption: `Take "${takes[i]}": ${s.caption}` }))), moments: [], issues: [] };
+}
+
 const measuredLines = (found: DoneIssue[]) => found.map((i) => `- [${i.id}]${i.scene ? ` ${i.scene}:` : ''} ${i.line}`);
 
 interface Input { compId?: string; takes?: string[] }
@@ -96,7 +104,7 @@ const critique: ToolType<Input> = {
 
     // the film in motion, the target and the plan: all the critic has
     let evidence: Evidence;
-    try { evidence = await host.gather(ctx, id, issues); } catch (e) { return measuredOnly(`The critic could not look at the film: ${(e as Error).message}`); }
+    try { evidence = takes?.length ? await gatherTakes(ctx, takes) : await host.gather(ctx, id, issues); } catch (e) { return measuredOnly(`The critic could not look at the film: ${(e as Error).message}`); }
     const pictures = [...(evidence.target ? [evidence.target] : []), ...evidence.strips.map((s) => s.url)].map(imageOf).filter((x): x is NonNullable<typeof x> => !!x);
     const takesText = takes?.length ? `\n\nThese are takes of one scene, built differently (their strips follow, in this order): ${takes.join(', ')}. Name the best in the "what" of your first fix and say why it beats the others.` : '';
     const text = [
@@ -130,4 +138,60 @@ const critique: ToolType<Input> = {
   },
 };
 
-export const CRITIC_TOOLS: ToolType[] = [critique as ToolType];
+/** the compositions that are the original of a scene and its takes: "price", "price~take2", "price~take3" */
+const TAKE = /~take\d+$/;
+const baseOf = (id: string) => id.replace(TAKE, '');
+
+interface TakesInput { scene: string; make?: 2 | 3; keep?: string }
+
+const sceneTakes: ToolType<TakesInput> = {
+  name: 'scene-takes', title: 'Takes of a scene',
+  description: 'copies a scene that failed twice into two or three takes to rebuild differently, and keeps the best one afterwards: the others and the original are removed',
+  input: {
+    type: 'object',
+    properties: {
+      scene: { type: 'string', title: 'Scene', description: 'its name, or the id of its composition' },
+      make: { type: 'integer', enum: [2, 3], title: 'Takes', description: 'how many versions in all, the original included' },
+      keep: { type: 'string', title: 'Keep', description: 'the composition to keep: a take, or the original; the rest of the scene’s takes are removed' },
+    },
+    required: ['scene'],
+  },
+  ai: {
+    when: 'a scene the critic names for the second time: make two or three takes, build each differently (another kind of picture or another composition, not the same scene in other colours), have the critic compare them (use_tool "critique" with takes), keep the best',
+    avoid: 'takes of a scene that failed once; takes that differ only in colour',
+  },
+  async run({ scene, make, keep }, ctx) {
+    const root = ctx.doc.compositions[ctx.compId];
+    const wanted = scene.toLowerCase();
+    const found = scenesOf(ctx.doc, ctx.compId).find((s) => s.id === scene || s.name.toLowerCase() === wanted || s.comp === scene);
+    if (!found?.comp) throw new Error(`${scene}: no scene of that name that plays a composition of its own`);
+    const base = baseOf(found.comp), layerId = found.id;
+    const all = Object.keys(ctx.doc.compositions).filter((c) => c === base || (baseOf(c) === base && TAKE.test(c)));
+    if (keep) {
+      if (!all.includes(keep)) throw new Error(`${keep}: not a take of ${found.name} (its versions: ${all.join(', ')})`);
+      const ops: Op[] = [];
+      if (root.layers[layerId] && (root.layers[layerId].props as { comp?: string } | undefined)?.comp !== keep) ops.push({ op: 'replace', path: pointer('compositions', ctx.compId, 'layers', layerId, 'props', 'comp'), value: keep });
+      for (const c of all) if (c !== keep) ops.push({ op: 'remove', path: pointer('compositions', c) });
+      // the kept take takes the scene's own name back
+      if (keep !== base) ops.push({ op: 'replace', path: pointer('compositions', keep, 'name'), value: ctx.doc.compositions[base]?.name ?? found.name });
+      return { ops, label: `Keep ${keep}`, text: `${keep} is now ${found.name}; ${all.length - 1} other version(s) removed.` };
+    }
+    const count = make ?? 2;
+    const ops: Op[] = [], made: string[] = [];
+    for (let n = 2; n <= count; n++) {
+      const id = `${base}~take${n}`;
+      if (ctx.doc.compositions[id]) continue;
+      // the composition is plain data and its layer ids are its own: a copy keeps every reference inside it (children, clips, links)
+      const copy = JSON.parse(JSON.stringify(ctx.doc.compositions[base])) as { name?: string };
+      copy.name = `${ctx.doc.compositions[base].name ?? found.name} (take ${n})`;
+      ops.push({ op: 'add', path: pointer('compositions', id), value: copy });
+      made.push(id);
+    }
+    return {
+      ops, label: `${count} takes of ${found.name}`,
+      text: `${found.name} copied into ${made.length} take(s): ${made.join(', ')} (the root still plays the original). Each take must be built differently: another kind of picture or another composition, never the same scene in other colours. Then compare them (use_tool "critique" with takes: [${[...all, ...made].map((x) => `"${x}"`).join(', ')}]) and keep the best (use_tool "scene-takes" with keep).`,
+    };
+  },
+};
+
+export const CRITIC_TOOLS: ToolType[] = [critique as ToolType, sceneTakes as ToolType];
