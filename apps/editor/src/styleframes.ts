@@ -84,6 +84,7 @@ const styleFrames: ToolType<Input> = {
     // a frame held from an earlier call, kept as the target
     if (a.keep) {
       const h = takeHeld(a.keep);
+      if (h && !h.take) return text(`${h.made.length} frames are held under "${a.keep}": say which one to keep, keep: "${a.keep}:<n>" (1 to ${h.made.length}).`);
       if (!h?.take) return text(`Nothing is held under "${a.keep}": frames are held for this session only, and a frame is kept once. The plan keeps its target${plan.target ? ` (${plan.target})` : ' (none yet)'}; have the frames drawn again if you need another.`);
       const x = h.extra as unknown as HeldFrames, meta = x.frames[h.take - 1];
       const d = plan.directions.find((y) => y.name === meta.direction) ?? plan.directions[0];

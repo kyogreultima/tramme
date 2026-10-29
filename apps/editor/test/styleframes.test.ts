@@ -191,6 +191,19 @@ describe('the style-frames tool', () => {
     expect(stale.text).toMatch(/nothing is held/i);
   });
 
+  it('asks which frame when the id is given without a number, and keeps the frames held', async () => {
+    vi.spyOn(api, 'generateImages').mockImplementation(async () => made());
+    const { ctx, written } = ctxOf(filesWith(plan([direction('Ink'), direction('Paper')])));
+    confirm.turnBegins(true);
+    const held = await run({}, ctx);
+    const id = /keep: "(takes-[a-z0-9]+):<n>"/.exec(held.text!)![1];
+    const out = await run({ keep: id }, ctx);
+    expect(out.text).toContain(`keep: "${id}:<n>"`);
+    expect(out.text).not.toMatch(/nothing is held/i);
+    expect(written.size).toBe(0);
+    expect((await run({ keep: `${id}:1` }, ctx)).ops!.length).toBeGreaterThan(0);
+  });
+
   it('puts one choice per frame to the user, and keeps the one they pick', async () => {
     vi.spyOn(api, 'generateImages').mockImplementation(async () => made());
     setPrefs({ confirmPaid: false });
