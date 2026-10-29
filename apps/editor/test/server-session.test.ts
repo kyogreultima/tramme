@@ -380,3 +380,21 @@ describe('a conversation saved before its calls kept their line', () => {
     expect(recallDetails(fresh, [])).toBe(fresh);
   });
 });
+
+describe('a request without tools (the critic)', () => {
+  it('sends no tools, runs none, and ends after one answer even when the model asks for one', async () => {
+    const sent = serve(first);
+    const { runner, calls } = fakeRunner();
+    const events = await drain(new ServerSession().turn('Judge this.', 'claude-opus-5-5', 'system prompt', runner, new AbortController().signal, { tools: false }));
+    expect(sent).toHaveLength(1);
+    expect('tools' in sent[0].body).toBe(false);
+    expect(calls).toEqual([]);
+    expect(events.some((e) => e.type === 'error')).toBe(true);
+  });
+
+  it('and with tools left on, still sends them', async () => {
+    const sent = serve(second);
+    await go(new ServerSession(), fakeRunner().runner);
+    expect(Array.isArray(sent[0].body.tools)).toBe(true);
+  });
+});

@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { CHAT_INDEX, chatPath, unpackProject } from '@tramme/project';
 import type { TurnUsage } from '../apps/editor/src/api.ts';
-import { cacheShare, compare, costOf, lowerBound, totalsOf, type Totals } from './cost.ts';
+import { cacheShare, compare, costOf, criticOf, lowerBound, totalsOf, type Totals } from './cost.ts';
 
 /** a project's text files by path, from a folder or an archive */
 async function files(target: string): Promise<(p: string) => string | null> {
@@ -51,16 +51,19 @@ const k = (n: number) => `${Math.round(n / 1000)} k`;
 const money = (turns: TurnUsage[]) => { const d = totalsOf(turns).dollars; return d === null ? 'cost unknown' : `${lowerBound(turns) ? 'at least ' : ''}$${d.toFixed(2)}`; };
 const pct = (x: number) => `${Math.round(x * 100)} %`;
 
+/** what the critic's consults of a turn cost, apart (the turn's own cost is the rest) */
+const critic = (turns: TurnUsage[]) => { const c = criticOf(turns); return c.n ? `, critic ${c.n} consult${c.n > 1 ? 's' : ''} $${c.dollars.toFixed(2)}` : ''; };
+
 function line(u: TurnUsage) {
   const c = costOf(u);
   const cost = c ? `${c.lowerBound ? 'at least ' : ''}$${c.dollars.toFixed(2)}` : 'cost unknown';
-  return `${u.tools} tool calls, ${u.images} pictures, ${k(u.input + u.cacheRead + u.cacheWrite)} tokens read (${k(u.cacheRead)} from the cache, ${pct(cacheShare(u))}), ${k(u.output)} written, ${(u.ms / 60000).toFixed(1)} min, ${u.model}${u.route ? `, ${u.route}` : ''}, ${cost}`;
+  return `${u.tools} tool calls, ${u.images} pictures, ${k(u.input + u.cacheRead + u.cacheWrite)} tokens read (${k(u.cacheRead)} from the cache, ${pct(cacheShare(u))}), ${k(u.output)} written, ${(u.ms / 60000).toFixed(1)} min, ${u.model}${u.route ? `, ${u.route}` : ''}, ${cost}${critic([u])}`;
 }
 
 function summary(turns: TurnUsage[]) {
   const t = totalsOf(turns);
   const read = turns.reduce((n, u) => n + u.input + u.cacheRead + u.cacheWrite, 0);
-  return `${turns.reduce((n, u) => n + u.tools, 0)} tool calls, ${turns.reduce((n, u) => n + u.images, 0)} pictures, ${k(read)} tokens read (${pct(t.cacheShare)} from the cache), ${k(t.output)} written, ${(t.ms / 60000).toFixed(1)} min, ${money(turns)}`;
+  return `${turns.reduce((n, u) => n + u.tools, 0)} tool calls, ${turns.reduce((n, u) => n + u.images, 0)} pictures, ${k(read)} tokens read (${pct(t.cacheShare)} from the cache), ${k(t.output)} written, ${(t.ms / 60000).toFixed(1)} min, ${money(turns)}${critic(turns)}`;
 }
 
 async function report(target: string) {

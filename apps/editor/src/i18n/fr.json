@@ -89,6 +89,7 @@
     "lookingForTheLocal": "Recherche du compagnon local…",
     "theLocalCompanionIs": "Le compagnon local attend son jeton : collez celui qu'il affiche, dans le panneau de l'assistant.",
     "noAccessToClaude": "Aucune IA connectée : connectez Claude, ChatGPT (OpenAI) ou Gemini dans Réglages, Fournisseurs (ou, sur un ordinateur avec Claude Code, lancez le compagnon local).",
+    "noToolsHere": "un modèle sans outils ne peut pas en appeler un : la réponse est coupée",
     "answerCutOffLength": "réponse coupée (limite de longueur atteinte)",
     "declined": "Claude a décliné cette demande",
     "stoppedAfterNSteps": "arrêt après {n} étapes",

@@ -89,6 +89,7 @@
     "lookingForTheLocal": "Looking for the local companion…",
     "theLocalCompanionIs": "The local companion is waiting for its token: paste the one it shows, in the assistant panel.",
     "noAccessToClaude": "No AI connected: connect Claude, ChatGPT (OpenAI) or Gemini in Settings, Providers (or, on a computer with Claude Code, start the local companion).",
+    "noToolsHere": "a model without tools cannot call one: the answer was cut",
     "answerCutOffLength": "answer cut off (length limit reached)",
     "declined": "Claude declined this request",
     "stoppedAfterNSteps": "stopped after {n} steps",

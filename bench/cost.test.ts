@@ -68,3 +68,20 @@ describe('compare', () => {
     expect(compare(unknown, known).change.dollars).toBeNull();
   });
 });
+
+describe('the critic\'s consults', () => {
+  it('are priced with the turn, at their own model\'s price, and counted apart', async () => {
+    const { criticOf } = await import('./cost.ts');
+    const plain = turn({ model: 'claude-sonnet-5-5', input: 1e6 });
+    const withCritic = turn({ model: 'claude-sonnet-5-5', input: 1e6, consults: { n: 2, model: 'claude-opus-5-5', requests: 2, input: 1e6, cacheRead: 0, cacheWrite: 0, cacheWrite1h: 0, output: 0 } });
+    const a = costOf(plain)!.dollars, both = costOf(withCritic)!.dollars;
+    expect(both).toBeCloseTo(a + 4, 6);
+    expect(criticOf([plain, withCritic])).toEqual({ n: 2, dollars: 4 });
+    expect(criticOf([plain])).toEqual({ n: 0, dollars: 0 });
+  });
+
+  it('make a turn\'s cost unknown when their model has no price', () => {
+    const t = turn({ input: 1e6, consults: { n: 1, model: 'openai:gpt-5', requests: 1, input: 10, cacheRead: 0, cacheWrite: 0, cacheWrite1h: 0, output: 0 } });
+    expect(costOf(t)).toBeNull();
+  });
+});
