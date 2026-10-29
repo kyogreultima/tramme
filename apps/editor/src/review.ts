@@ -3,7 +3,7 @@
 // are tools of the editor's vocabulary, run by the assistant before it sums
 // up (use_tool) or by the user from the / menu.
 
-import { Evaluator, groupIssues, motionReport, REPORT_MAX, reportLines, runChecks, type QualityIssue, type ToolContext, type ToolType, type TrammeDoc } from '@tramme/core';
+import { Evaluator, groupIssues, motionReport, REPORT_MAX, reportHead, reportLines, runChecks, type QualityIssue, type ToolContext, type ToolType, type TrammeDoc } from '@tramme/core';
 import { pixelsOf, flowLines } from './flow.ts';
 import { analyses, canvas } from './perception.ts';
 import { masterText, soundReport } from './mixing.ts';
@@ -90,7 +90,7 @@ const check: ToolType<{ frames?: number }> = {
     const url = await sheet(ctx, times, Math.min(4, times.length), ctx.compId);
     const warnings = issues.filter((i) => i.severity === 'warning').length, notes = issues.length - warnings;
     const { lines, notice: shown } = issueReport(issues, ctx.doc, ctx.compId);
-    const head = issues.length ? `${warnings} warning(s), ${notes} note(s).` : 'No issue found by the checks.';
+    const head = reportHead(issues);
     // the sound: its master, the picture of the mix, and the moments a human checks by ear
     const listen = sound.listen.map((x) => `${x.toFixed(2)} s`).join(', ');
     const heard = sound.master ? `\n${masterText(sound.master)} The picture of the mix shows the master's waveform and spectrogram over the motion of the picture, a line at each effect (heroes red): an effect away from a motion, two hits in one place, a hit with no body show there.${listen ? ` Ask the user to listen at ${listen}: you cannot hear, they do the final listen.` : ''}` : '';
