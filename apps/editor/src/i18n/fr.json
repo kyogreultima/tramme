@@ -94,6 +94,7 @@
     "stoppedAfterNSteps": "arrêt après {n} étapes",
     "urlDoesNotAnswer": "{url} ne répond pas ({error})",
     "companionCut": "Le compagnon local ne répond pas : sa connexion a été interrompue avant la fin du tour",
+    "realWanted": "Non récupéré, car il faut votre accord : {what}. Pour l’avoir, demandez-le par son nom pendant que vous êtes là (menu /, {action}) ; sinon le film garde le nom écrit dans sa propre typographie.",
     "harvest": "Plugins écrits pendant ce tour : {files}. Pour les réutiliser dans vos autres projets : menu /, {action}.",
     "resumeIn": "Interrompu ({error}). Reprise dans {s} s, essai {n} sur {max}…",
     "serviceError": "erreur du service",
@@ -1387,6 +1388,9 @@
     "placed": "Bloc « {name} » placé."
   },
   "stock": {
+    "realTitle": "Faire récupérer ce vrai logo ou cette vraie image ?",
+    "realText": "Tramme récupérerait {what} sur Wikimedia Commons. C’est une vraie marque, personne ou produit : seulement avec votre accord, et la licence qu’il indique est conservée.",
+    "realYes": "Récupérer",
     "kept": "Résultat des bibliothèques libres gardé : {title}.",
     "found": "{n} résultats des bibliothèques libres.",
     "nothing": "Rien trouvé dans les bibliothèques libres.",
@@ -1871,6 +1875,7 @@
     "its rank in the title (1: the first)": "son rang dans le titre (1 : le premier)",
     "Joins": "Angles",
     "Keep a plugin in the library": "Garder un plugin dans la bibliothèque",
+    "Free libraries": "Bibliothèques libres",
     "Key figure": "Chiffre clé",
     "Keyword": "Mot clé",
     "Kinetic title": "Titre cinétique",

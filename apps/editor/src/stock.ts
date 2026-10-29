@@ -9,6 +9,7 @@
 import { pointer, type Op, type ToolContext, type ToolType } from '@tramme/core';
 import { unzipSync } from 'fflate';
 import { api, reach } from './api.ts';
+import { alone, askUser } from './confirm.ts';
 import { packGlb } from './glb.ts';
 import { openverse } from './openverse.ts';
 import { keepMedia, placeMedia, slugOf } from './media.ts';
@@ -16,9 +17,9 @@ import { freshId } from './model.ts';
 import { sheetOf } from './review.ts';
 import { t } from './i18n/index.ts';
 
-export type StockKind = 'photo' | 'clip' | 'texture' | 'hdri' | 'model';
+export type StockKind = 'photo' | 'clip' | 'texture' | 'hdri' | 'model' | 'real';
 export type StockLicense = 'CC0' | 'PDM' | 'CC BY' | 'Pexels';
-export type StockSource = 'polyhaven' | 'ambientcg' | 'openverse' | 'pexels';
+export type StockSource = 'polyhaven' | 'ambientcg' | 'openverse' | 'pexels' | 'commons';
 
 export interface StockFile { url: string; type: string; role?: 'color' | 'normal' | 'roughness' | 'model' | 'buffer' | 'env'; /** the name a model's glTF gives it */ name?: string }
 export interface StockHit {
@@ -28,7 +29,8 @@ export interface StockHit {
   title: string;
   thumb: string;
   author: string;
-  license: StockLicense;
+  /** one of the licences allowed, or (a real logo or picture, kept with the user's yes) the licence as Commons states it */
+  license: StockLicense | string;
   landing: string;
   files: StockFile[];
   size?: [number, number];
@@ -154,7 +156,7 @@ async function pexels(kind: 'photo' | 'clip', query: string, count: number, sign
 // ── the search ───────────────────────────────────────────────
 type Library = (query: string, count: number, signal: AbortSignal) => Promise<StockHit[]>;
 /** the libraries of each kind, the best first */
-const LIBRARIES: Record<StockKind, [StockSource, Library][]> = {
+const LIBRARIES: Record<Exclude<StockKind, 'real'>, [StockSource, Library][]> = {
   texture: [['polyhaven', (q, n, s) => polyhaven('texture', q, n, s)], ['ambientcg', ambientcg]],
   hdri: [['polyhaven', (q, n, s) => polyhaven('hdri', q, n, s)]],
   model: [['polyhaven', (q, n, s) => polyhaven('model', q, n, s)]],
@@ -163,13 +165,38 @@ const LIBRARIES: Record<StockKind, [StockSource, Library][]> = {
 };
 
 /** every library of a kind asked at once, each given 8 s; what answered, and the libraries that did not */
-export async function searchStock(kind: StockKind, query: string, count: number, signal: AbortSignal): Promise<{ hits: StockHit[]; failed: StockSource[] }> {
+export async function searchStock(kind: Exclude<StockKind, 'real'>, query: string, count: number, signal: AbortSignal): Promise<{ hits: StockHit[]; failed: StockSource[] }> {
   const libraries = LIBRARIES[kind];
   const answers = await Promise.allSettled(libraries.map(([, ask]) => ask(query, count, AbortSignal.any([signal, AbortSignal.timeout(WAIT)]))));
   const failed = libraries.filter((_, i) => answers[i].status === 'rejected').map(([name]) => name);
   if (signal.aborted) throw new Error('stopped');
   const hits = answers.flatMap((a) => (a.status === 'fulfilled' ? a.value : [])).filter((h) => allowedLicense(h.license === 'Pexels' ? 'cc0' : h.license) !== null).slice(0, count);
   return { hits, failed };
+}
+
+// ── real logos and pictures, with the user's yes ─────────────
+/** what the assistant wanted to fetch in a turn nobody was there to say yes to: listed to the user at the turn's end */
+export const realWanted = new Set<string>();
+
+const stripTags = (html: string | undefined) => (html ?? '').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+
+interface CommonsPage { title: string; imageinfo?: { url: string; thumburl?: string; descriptionurl?: string; extmetadata?: Record<string, { value?: string }> }[] }
+
+/** the first file of Wikimedia Commons for a name, as a hit (its licence as Commons states it: the user has said yes to the brand or the person) */
+async function commons(what: string, signal: AbortSignal): Promise<StockHit | null> {
+  const params = new URLSearchParams({ action: 'query', generator: 'search', gsrnamespace: '6', gsrsearch: what, gsrlimit: '5', prop: 'imageinfo', iiprop: 'url|extmetadata', iiurlwidth: '1280', format: 'json', origin: '*' });
+  const answer = await getJson<{ query?: { pages?: Record<string, CommonsPage> } }>(`https://commons.wikimedia.org/w/api.php?${params}`, AbortSignal.any([signal, AbortSignal.timeout(WAIT)]));
+  for (const [id, page] of Object.entries(answer.query?.pages ?? {})) {
+    const info = page.imageinfo?.[0];
+    if (!info) continue;
+    const meta = info.extmetadata ?? {};
+    const url = info.thumburl ?? info.url;
+    return {
+      id, source: 'commons', kind: 'real', title: page.title.replace(/^File:/, ''), thumb: url, author: stripTags(meta.Artist?.value) || 'unknown author',
+      license: stripTags(meta.LicenseShortName?.value) || 'licence unknown', landing: info.descriptionurl ?? url, files: [{ url, type: 'image/png' }],
+    };
+  }
+  return null;
 }
 
 // ── keeping a hit ────────────────────────────────────────────
@@ -191,7 +218,7 @@ function colorOfZip(zip: ArrayBuffer): Blob {
   return new Blob([files[name] as Uint8Array<ArrayBuffer>], { type: /\.png$/i.test(name) ? 'image/png' : 'image/jpeg' });
 }
 
-interface Placement { at?: number; duration?: number; background?: boolean; name?: string }
+interface Placement { at?: number; duration?: number; background?: boolean; name?: string; /** a real logo or picture: what it stands for, and that the user said yes */ real?: string }
 
 /** the hit kept in the project: its file, its record, its asset and (but an environment) its layer */
 async function keepHit(ctx: ToolContext, hit: StockHit, where: Placement): Promise<{ ops: Op[]; text: string; reload?: string[]; image?: Blob }> {
@@ -201,7 +228,7 @@ async function keepHit(ctx: ToolContext, hit: StockHit, where: Placement): Promi
   const asset = `${isModel ? 'model-' : isVideo ? 'video-' : 'image-'}${slug}`.slice(0, 64);
   if (ctx.doc.assets[asset]) return { ops: [], text: `"${hit.title}" is already in the project as ${asset}: nothing was fetched again.` };
   const main = hit.files.find((f) => f.role === 'model' || f.role === 'env' || f.role === 'color') ?? hit.files[0];
-  const record: Record<string, unknown> = { source: hit.source, id: hit.id, kind: hit.kind, title: hit.title, author: hit.author, license: hit.license, landing: hit.landing, url: main.url, ...(hit.kind === 'hdri' ? { env: true } : {}) };
+  const record: Record<string, unknown> = { source: hit.source, id: hit.id, kind: hit.kind, title: hit.title, author: hit.author, license: hit.license, landing: hit.landing, url: main.url, ...(hit.kind === 'hdri' ? { env: true } : {}), ...(where.real ? { what: where.real, permission: 'the user said yes' } : {}) };
   const at = where.at ?? 0;
   if (isModel) {
     const gltf = await (await fetchFile(main.url, ctx.signal)).json() as object;
@@ -229,20 +256,40 @@ async function keepHit(ctx: ToolContext, hit: StockHit, where: Placement): Promi
   // an environment is an image the 3D layers light themselves with: it is not placed
   if (hit.kind === 'hdri') return { ops: kept.ops, reload: kept.reload, text: `Environment ${base} It is not placed in the frame; a 3D layer reads it as its light.`, image: blob };
   const out = Math.min(c.duration, at + (where.duration ?? (isVideo ? hit.seconds : undefined) ?? c.duration));
-  const placed = placeMedia(ctx, kind, kept.asset, hit.title, { fit: 'cover', at, out, background: where.background ?? false });
+  // a logo or a real picture is shown whole at half the frame's shorter side; anything else fills the frame
+  const box = Math.round(Math.min(c.width, c.height) * 0.5);
+  const placed = placeMedia(ctx, kind, kept.asset, hit.title, { fit: where.real ? 'contain' : 'cover', at, out, background: where.background ?? false, ...(where.real ? { size: [box, box] as [number, number] } : {}) });
   return { ops: [...kept.ops, ...placed.ops], reload: kept.reload, text: `${isVideo ? 'Clip' : hit.kind === 'texture' ? 'Texture' : 'Photo'} ${base} Placed as layer ${placed.layer} from ${at.toFixed(2)} s.`, image: blob };
 }
 
-interface Input { kind: StockKind; query?: string; count?: number; use?: string; at?: number; duration?: number; background?: boolean; name?: string }
+interface Input { kind: StockKind; query?: string; what?: string; count?: number; use?: string; at?: number; duration?: number; background?: boolean; name?: string }
 
 const describe = (h: StockHit) => `- ${keyOf(h)} · ${h.title} · ${h.author} · ${h.license}${h.size ? ` · ${h.size[0]}×${h.size[1]}` : ''}${h.seconds ? ` · ${h.seconds} s` : ''}`;
+
+/** a real brand's logo, a real person or product: only with the user's yes, and never in a turn left alone */
+async function real(a: Input, ctx: ToolContext) {
+  const what = a.what?.trim();
+  if (!what) throw new Error('say what to fetch (what): the brand, the person or the product, as the user would name it');
+  if (!await askUser(t('stock.realTitle'), t('stock.realText', { what }), t('stock.realYes'))) {
+    if (alone()) {
+      realWanted.add(what);
+      return { ops: [], text: `Not fetched: ${what} needs the user's yes, and nobody is there to give it. Nothing was fetched. A wordmark set in the film's type stands for a logo, and a picture made for the film (generate-image with object) stands for a real one. The end of the turn lists "${what}" for the user, who can ask for it.` };
+    }
+    return { ops: [], text: `The user said no to fetching ${what}: nothing was fetched. Set the name in the film's type instead, and make a picture for the film.` };
+  }
+  const hit = await commons(what, ctx.signal).catch((e) => { throw new Error(`Wikimedia Commons did not answer (${(e as Error).message}): set the name in the film's type instead`); });
+  if (!hit) return { ops: [], text: `Nothing on Wikimedia Commons for "${what}". Set the name in the film's type, and make a picture for the film.` };
+  const kept = await keepHit(ctx, hit, { ...a, real: what });
+  return { ops: kept.ops, label: t('stock.kept', { title: hit.title }), text: `${kept.text} Licence as Commons states it: ${hit.license}; the user said yes, and the record says so. Credit it (credits).`, notice: t('stock.kept', { title: hit.title }) };
+}
 
 const stock: ToolType<Input> = {
   name: 'stock', title: 'Free libraries', description: 'searches the free libraries (Poly Haven and ambientCG textures, environments and models; Pexels and Openverse photos; Pexels clips), shows a contact sheet, and keeps the chosen file in the project with its licence and credit',
   input: {
     type: 'object',
     properties: {
-      kind: { enum: ['photo', 'clip', 'texture', 'hdri', 'model'], title: 'Kind', description: 'photo, clip (footage), texture (a tileable material), hdri (an environment that lights a 3D object), model (a 3D object)' },
+      kind: { enum: ['photo', 'clip', 'texture', 'hdri', 'model', 'real'], title: 'Kind', description: "photo, clip (footage), texture (a tileable material), hdri (an environment that lights a 3D object), model (a 3D object), real (the logo of a real brand, a real person or a real product: asks the user, who must say yes; alone, nothing is fetched)" },
+      what: { type: 'string', title: 'What', description: 'with real: the brand, the person or the product, as the user would name it ("the Revolut logo")' },
       query: { type: 'string', title: 'Search', description: 'two or three words in English: "ramen bowl", "worn concrete", "city night timelapse"' },
       count: { type: 'integer', minimum: 1, maximum: 8, title: 'How many', description: '6 by default' },
       use: { type: 'string', title: 'Keep', description: 'a result of the last search ("polyhaven:concrete_floor_02"): kept in the project and placed' },
@@ -258,15 +305,16 @@ const stock: ToolType<Input> = {
     avoid: "a photo of a real brand's product or of a real person (that is the real kind, with the user's yes); a library photo where an object made in the film's style fits better; more than one search per need",
   },
   async run(a, ctx) {
+    if (a.kind === 'real') return real(a, ctx);
     if (a.use) {
       let hit = seen.get(a.use) ?? [...seen.values()].find((h) => h.id === a.use && h.kind === a.kind);
-      if (!hit && a.query) { await searchStock(a.kind, a.query, a.count ?? 6, ctx.signal).then((r) => r.hits.forEach((h) => seen.set(keyOf(h), h))); hit = seen.get(a.use); }
+      if (!hit && a.query) { await searchStock(a.kind as Exclude<StockKind, 'real'>, a.query, a.count ?? 6, ctx.signal).then((r) => r.hits.forEach((h) => seen.set(keyOf(h), h))); hit = seen.get(a.use); }
       if (!hit) throw new Error(`no result "${a.use}" in this session's searches: search again (query), then keep one by its id`);
       const kept = await keepHit(ctx, hit, a);
       return { ops: kept.ops, ...(kept.reload?.length ? { reload: kept.reload } : {}), label: t('stock.kept', { title: hit.title }), text: kept.text, notice: t('stock.kept', { title: hit.title }) };
     }
     if (!a.query?.trim()) throw new Error('say what to look for (query), or the result to keep (use)');
-    const { hits, failed } = await searchStock(a.kind, a.query, Math.min(8, a.count ?? 6), ctx.signal);
+    const { hits, failed } = await searchStock(a.kind as Exclude<StockKind, 'real'>, a.query, Math.min(8, a.count ?? 6), ctx.signal);
     hits.forEach((h) => seen.set(keyOf(h), h));
     const down = failed.length ? `${failed.join(', ')} did not answer${hits.length ? ' (the others did)' : ''}.` : '';
     if (!hits.length) return { ops: [], text: `Nothing for "${a.query}" in the licences allowed (CC0, public domain, CC BY, Pexels).${down ? ` ${down}` : ''} Try other words${failed.length ? ' or later' : ''}, have one made (generate-image with object), or draw it with the engine (surface).`, notice: t('stock.nothing') };
