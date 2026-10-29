@@ -9,6 +9,30 @@ import { madeBy } from './models.ts';
 import { freshId, isToolAsset, linkedTransform, mediaAssetsOf, siblingsOf } from './model.ts';
 import { t } from './i18n/index.ts';
 
+/**
+ * A picture with its background cut out: the matte of the subject (or of a
+ * person) becomes its alpha. `kept` is the share of the picture the subject
+ * covers (0 to 1), which says when a cutout looks wrong.
+ */
+export async function cutoutBlob(source: Blob, subject: 'any' | 'person', progress?: (n: number, of: number, what: string) => void): Promise<{ blob: Blob; kept: number; width: number; height: number }> {
+  const url = URL.createObjectURL(source);
+  try {
+    const img = await loadImage(url);
+    const width = img.naturalWidth || img.width, height = img.naturalHeight || img.height;
+    const { c, g } = canvas(width, height);
+    g.drawImage(img, 0, 0, width, height);
+    progress?.(1, 3, t('removebg.reading'));
+    const matte = keep(await (await matting(subject))(c), null);
+    progress?.(2, 3, t('removebg.reading'));
+    const px = g.getImageData(0, 0, width, height);
+    let opaque = 0;
+    for (let i = 0; i < matte.length; i++) { px.data[i * 4 + 3] = matte[i]; if (matte[i] >= 128) opaque++; }
+    g.putImageData(px, 0, 0);
+    const blob = await new Promise<Blob>((done, fail) => c.toBlob((b) => (b ? done(b) : fail(new Error('the PNG could not be made'))), 'image/png'));
+    return { blob, kept: opaque / matte.length, width, height };
+  } finally { URL.revokeObjectURL(url); }
+}
+
 export const REMOVEBG_TOOLS: ToolType[] = [
   {
     name: 'remove-bg',
@@ -27,17 +51,9 @@ export const REMOVEBG_TOOLS: ToolType[] = [
       const images = Object.entries(ctx.doc.assets).filter(([, a]) => a.type === 'image');
       const id = wanted ?? mediaAssetsOf(ctx.doc, ctx.compId, ctx.selection, ['image'])[0] ?? images.filter(([aid, a]) => !isToolAsset(aid, a)).at(-1)?.[0];
       if (!id) throw new Error('the project has no picture: bring one in first');
-      const img = await loadImage(ctx.assetUrl(id));
-      const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
-      const { c, g } = canvas(iw, ih);
-      g.drawImage(img, 0, 0, iw, ih);
-      ctx.progress?.(1, 3, t('removebg.reading'));
-      const matte = keep(await (await matting(subject))(c), null);
-      ctx.progress?.(2, 3, t('removebg.reading'));
-      const px = g.getImageData(0, 0, iw, ih);
-      for (let i = 0; i < matte.length; i++) px.data[i * 4 + 3] = matte[i];
-      g.putImageData(px, 0, 0);
-      const blob = await new Promise<Blob>((done, fail) => c.toBlob((b) => (b ? done(b) : fail(new Error('the PNG could not be made'))), 'image/png'));
+      const res = await fetch(ctx.assetUrl(id));
+      if (!res.ok) throw new Error(`${id}: the picture could not be read (HTTP ${res.status})`);
+      const { blob, width: iw, height: ih } = await cutoutBlob(await res.blob(), subject, ctx.progress);
       const path = await ctx.writeFile(`assets/cutout/${id}.png`, blob);
       const nid = `${id}-cut`.slice(0, 64);
       const had = !!ctx.doc.assets[nid];

@@ -60,12 +60,12 @@ export async function keepMedia(ctx: ToolContext, kind: MediaKind, name: string,
 }
 
 /** a layer showing the file: fills the frame (cover) or shows it whole (contain); a background goes under the others */
-export function placeMedia(ctx: ToolContext, kind: MediaKind, asset: string, name: string, o: { fit: 'cover' | 'contain'; at: number; out: number; background: boolean }): { ops: Op[]; layer: string } {
+export function placeMedia(ctx: ToolContext, kind: MediaKind, asset: string, name: string, o: { fit: 'cover' | 'contain'; at: number; out: number; background: boolean; size?: [number, number] }): { ops: Op[]; layer: string } {
   const c = ctx.doc.compositions[ctx.compId];
   const id = freshId({ ...c.layers }, asset.replace(new RegExp(`^${PREFIX[kind]}`), LAYER_PREFIX[kind]));
   const at = Math.max(0, o.at), out = Math.min(c.duration, Math.max(at, o.out));
   const ops: Op[] = [
-    { op: 'add', path: pointer('compositions', ctx.compId, 'layers', id), value: { type: kind, name, in: +at.toFixed(3), out: +out.toFixed(3), transform: { position: [c.width / 2, c.height / 2] }, props: { [kind]: asset, size: [c.width, c.height], fit: o.fit } } },
+    { op: 'add', path: pointer('compositions', ctx.compId, 'layers', id), value: { type: kind, name, in: +at.toFixed(3), out: +out.toFixed(3), transform: { position: [c.width / 2, c.height / 2] }, props: { [kind]: asset, size: o.size ?? [c.width, c.height], fit: o.fit } } },
     { op: 'add', path: pointer('compositions', ctx.compId, 'order', o.background ? '0' : '-'), value: id },
   ];
   return { ops, layer: id };

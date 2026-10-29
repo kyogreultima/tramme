@@ -11,8 +11,10 @@
 import { enlarge, type ToolContext, type ToolType } from '@tramme/core';
 import { api, type ImageAsk, type MadeImage } from './api.ts';
 import { alone, chooseAmong, payFor } from './confirm.ts';
+import { FILM_PLAN_PATH, parsePlan } from './filmplan.ts';
 import { clip } from './model.ts';
 import { jpegOf } from './perception.ts';
+import { cutoutBlob } from './removebg.ts';
 import { prefs } from './settings.ts';
 import { againOps, canvasOf, dataUrl, fitSide, keepMedia, placeMedia, recordOf } from './media.ts';
 import { t } from './i18n/index.ts';
@@ -168,12 +170,20 @@ export function takeHeld(id: string): { made: MadeImage[]; extra: Record<string,
 export const takeSheet = (made: MadeImage[], size = 512): Promise<string[]> => Promise.all(made.map((m) => preview(m.blob, size)));
 
 /** what generate-image keeps with the takes it holds */
-interface HeldTake { label: string; record: Record<string, unknown>; again?: string; fit: 'cover' | 'contain'; at: number; duration?: number; background: boolean }
+interface HeldTake { label: string; record: Record<string, unknown>; again?: string; fit: 'cover' | 'contain'; at: number; duration?: number; background: boolean; object?: boolean }
+
+/** what an object is asked for: one subject on a flat ground, so its matte is clean */
+const OBJECT_ASK = 'A single object, whole and centred, on a plain flat ground of one colour, soft even light, nothing else in the frame, no text, no shadow on the ground.';
+const IN_STYLE = 'Draw it in the style of the reference picture: its rendering, light and palette, not its content.';
+/** the share of the picture an object's cutout keeps, outside which the cutout looks wrong */
+const CUT_RANGE = [0.03, 0.92] as const;
+/** an object is placed whole in a box of this share of the frame's shorter side */
+const OBJECT_SHARE = 0.6;
 
 type Input = {
   prompt?: string; name?: string; ratio?: Ratio | 'auto'; quality?: 'low' | 'medium' | 'high'; provider?: string; fit?: 'cover' | 'contain';
   at?: number; duration?: number; background?: boolean; takes?: number; keep?: string;
-  again?: string; change?: string; reference?: string; mask?: string; maskKeeps?: boolean; extend?: Ratio; upscale?: boolean;
+  again?: string; change?: string; object?: boolean; reference?: string; mask?: string; maskKeeps?: boolean; extend?: Ratio; upscale?: boolean;
 };
 
 const generateImage: ToolType<Input> = {
@@ -198,23 +208,25 @@ const generateImage: ToolType<Input> = {
       mask: { type: 'string', format: 'asset', assetType: 'image', title: 'Mask', description: 'with a reference: a picture whose white says what changes (the cutout tool makes some)' },
       maskKeeps: { type: 'boolean', title: 'The mask keeps', description: 'the mask\'s white is what stays, not what changes' },
       extend: { enum: [...RATIOS], title: 'Extend to', description: 'with a reference or again: the picture extended past its edges to these proportions, the new border drawn to match' },
+      object: { type: 'boolean', title: 'An object', description: 'one object or illustration on a flat ground, then cut out: a transparent picture placed whole at 60 % of the frame, in the style of the film\'s target when it has one; never a background' },
       upscale: { type: 'boolean', title: 'Bring to the frame', description: 'a picture smaller than the composition enlarged to its size before it is placed (the upscale tool\'s enlargement)' },
     },
   },
   ai: {
-    when: "the project has no picture for what a shot needs: a background a title reads over, a texture, an illustration in the project's colours, a prop. Describe it as drawn (technique, palette, mood) and keep quiet what the text layers will say. Takes (2 to 4) when the look is open and the user should pick; again + change to fix one thing; reference to restyle a frame of the video or an asset; extend for a wider format",
+    when: "the project has no picture for what a shot needs: a background a title reads over, a texture, an illustration in the project's colours, a prop. An object or an illustration a noun of the script stands for (a dish, a house with its price, a phone) is made with object and placed whole, one object per idea. Describe it as drawn (technique, palette, mood) and keep quiet what the text layers will say. Takes (2 to 4) when the look is open and the user should pick; again + change to fix one thing; reference to restyle a frame of the video or an asset; extend for a wider format",
     avoid: 'words in the picture (they come out crooked, and text layers can translate them); the face of a real person; a brand logo. It costs money: one picture per need, at low quality while searching, high once it is right; takes only when the choice is the user\'s',
     example: { prompt: 'flat vector illustration of a coastal road at dusk, muted blues and warm sand, large quiet sky over the sea, no text', name: 'road-dusk', background: true },
   },
   async run(a, ctx) {
     const p = prefs.peek(), c = ctx.doc.compositions[ctx.compId];
-    const fit = a.fit ?? 'cover', at = a.at ?? 0, background = a.background ?? false;
+    if (a.object && a.background) throw new Error('an object is never a background: place it whole over the other layers (or draw a background without object)');
+    const fit = a.object ? 'contain' : a.fit ?? 'cover', at = a.at ?? 0, background = a.background ?? false;
     // a take held from an earlier call: kept now, nothing drawn again
     if (a.keep) {
       const h = takeHeld(a.keep);
       if (!h?.take) throw new Error(`no take "${a.keep}" is held: takes are held for this session only — have them made again`);
       const x = h.extra as unknown as HeldTake;
-      return keepAndPlace(ctx, h.made[0], x.label, { ...x.record, take: h.take }, { again: x.again, fit: x.fit, at: x.at, duration: x.duration, background: x.background, upscale: a.upscale });
+      return keepAndPlace(ctx, h.made[0], x.label, { ...x.record, take: h.take }, { again: x.again, fit: x.fit, at: x.at, duration: x.duration, background: x.background, object: x.object, upscale: a.upscale });
     }
     // what it is made from: a record made before, a reference, or words alone
     const before = a.again ? await recordOf(ctx, 'image', a.again) : null;
@@ -222,12 +234,14 @@ const generateImage: ToolType<Input> = {
     const words = a.prompt?.trim() || (before?.prompt ? String(before.prompt) : '');
     if (!words) throw new Error('say what to draw (prompt), or name a picture made before to make again (again)');
     const provider = a.provider ?? (before?.provider ? String(before.provider) : undefined) ?? (p.pictureProvider !== 'auto' ? p.pictureProvider : undefined);
-    const source = a.reference ?? (a.again && (a.change || a.extend) ? a.again : undefined);
+    // an object is drawn in the style of the film's target, when the plan has one and the provider can work from a picture
+    const styled = a.object && !a.reference && !a.again && (!provider || CHANGERS.includes(provider)) ? parsePlan(await ctx.readText(FILM_PLAN_PATH).catch(() => null))?.target : undefined;
+    const source = a.reference ?? (a.again && (a.change || a.extend) ? a.again : undefined) ?? styled;
     if (source && provider && !CHANGERS.includes(provider)) throw new Error(`${provider} draws from words only: change a picture with OpenAI or Gemini (provider), or describe the whole picture again`);
     const ratio = a.extend ?? (a.ratio && a.ratio !== 'auto' ? a.ratio : before?.ratio ? String(before.ratio) as Ratio : ratioOf(c.width, c.height));
     const palette = source ? paletteWords(ctx.doc.tokens as never) : '';
     const prompt = [a.again ? againPrompt(words, a.change) : a.change && source ? `${words}\n\nChange this: ${a.change}. Keep what matters of the picture given.` : words,
-      a.extend ? 'Extend the picture past its edges into the empty border, seamlessly: the same scene, style, light and grain; nothing new in the middle.' : '', palette].filter(Boolean).join('\n\n');
+      a.extend ? 'Extend the picture past its edges into the empty border, seamlessly: the same scene, style, light and grain; nothing new in the middle.' : '', palette, styled ? IN_STYLE : '', a.object ? OBJECT_ASK : ''].filter(Boolean).join('\n\n');
     const takes = Math.max(1, Math.min(4, Math.round(a.takes ?? 1)));
     const quality = a.quality ?? (before?.quality ? String(before.quality) as Input['quality'] : undefined) ?? (p.pictureQuality !== 'auto' ? p.pictureQuality : undefined);
     // the reference is read first: a picture that cannot be read costs nothing
@@ -242,7 +256,7 @@ const generateImage: ToolType<Input> = {
       ...(source ? { reference: source === 'frame' ? `frame at ${at} s` : source, ...(a.mask ? { mask: a.mask } : {}), ...(a.extend ? { extend: a.extend } : {}) } : {}),
       ...(before ? { before: { ...before, before: undefined } } : {}),
     };
-    const o = { again: a.again, fit, at, duration: a.duration, background, upscale: a.upscale };
+    const o = { again: a.again, fit, at, duration: a.duration, background, object: a.object, upscale: a.upscale };
     if (made.length === 1) return keepAndPlace(ctx, made[0], label, record, o);
     // several takes: a contact sheet, the user keeps one; alone, the assistant is handed the choice
     const sheet = await takeSheet(made);
@@ -250,7 +264,7 @@ const generateImage: ToolType<Input> = {
     const picked = await chooseAmong(t('image.takesTitle'), t('image.takesText', { n: made.length, name: label }), choices);
     if (picked !== null) return keepAndPlace(ctx, made[picked], label, { ...record, take: picked + 1, takes: made.length }, o);
     if (!alone()) return { ops: [], text: `The user kept none of the ${made.length} takes of "${label}": nothing was saved. Ask what to change before drawing again.`, images: sheet.map((url, i) => ({ url, caption: `take ${i + 1}` })) };
-    const id = holdTakes(made, { label, record: { ...record, takes: made.length }, again: a.again, fit, at, duration: a.duration, background } satisfies HeldTake);
+    const id = holdTakes(made, { label, record: { ...record, takes: made.length }, again: a.again, fit, at, duration: a.duration, background, object: a.object } satisfies HeldTake);
     return {
       ops: [], label: `Takes of ${label}`,
       text: `${made.length} takes of "${label}" by ${made[0].provider}, held for this session (none saved). Look at them and keep the best one with generate-image { keep: "${id}:<n>" } — it costs nothing more.`,
@@ -260,9 +274,15 @@ const generateImage: ToolType<Input> = {
 };
 
 /** the picture kept (in place of the one made again, or as a new layer), brought to the frame's size when asked */
-async function keepAndPlace(ctx: ToolContext, made: MadeImage, label: string, record: Record<string, unknown>, o: { again?: string; fit: 'cover' | 'contain'; at: number; duration?: number; background: boolean; upscale?: boolean }) {
+async function keepAndPlace(ctx: ToolContext, made: MadeImage, label: string, record: Record<string, unknown>, o: { again?: string; fit: 'cover' | 'contain'; at: number; duration?: number; background: boolean; object?: boolean; upscale?: boolean }) {
   const c = ctx.doc.compositions[ctx.compId];
-  let blob = made.blob, grown = '';
+  let blob = made.blob, grown = '', wrong = '';
+  // an object: its ground cut away, a transparent picture; a cutout that kept almost nothing or almost everything is kept for the user to judge
+  if (o.object) {
+    const cut = await cutoutBlob(blob, 'any', ctx.progress);
+    blob = cut.blob; record = { ...record, object: true, kept: +cut.kept.toFixed(3) };
+    if (cut.kept < CUT_RANGE[0] || cut.kept > CUT_RANGE[1]) wrong = ` The cutout looks wrong: it kept ${Math.round(cut.kept * 100)} % of the picture. Make it again (a plainer ground, one subject), or judge it from the picture.`;
+  }
   if (o.upscale) {
     const up = await upscaleBlob(blob, c.width, c.height, o.fit);
     if (up) { blob = up.blob; grown = ` Brought to ${up.width}×${up.height} for the frame.`; record = { ...record, upscaled: [up.width, up.height] }; }
@@ -270,11 +290,11 @@ async function keepAndPlace(ctx: ToolContext, made: MadeImage, label: string, re
   // made again: the same asset, its layers showing the new picture; else a new asset and its layer
   const kept = await keepMedia(ctx, 'image', o.again ? String(ctx.doc.assets[o.again].src).split('/').pop()!.replace(/\.[a-z0-9]+$/i, '') : label, blob, record);
   const again = o.again ? againOps(ctx, o.again, kept) : null;
-  const placed = o.again ? null : placeMedia(ctx, 'image', kept.asset, label, { fit: o.fit, at: o.at, out: Math.min(c.duration, o.at + (o.duration ?? c.duration)), background: o.background });
+  const placed = o.again ? null : placeMedia(ctx, 'image', kept.asset, label, { fit: o.fit, at: o.at, out: Math.min(c.duration, o.at + (o.duration ?? c.duration)), background: o.background, ...(o.object ? { size: [Math.round(Math.min(c.width, c.height) * OBJECT_SHARE), Math.round(Math.min(c.width, c.height) * OBJECT_SHARE)] as [number, number] } : {}) });
   const ops = o.again ? again! : [...kept.ops, ...placed!.ops];
   return {
     ops, reload: o.again ? [o.again] : kept.reload, label: `Picture ${label}`,
-    text: `Picture made by ${made.provider} (${made.model}, ${String(record.ratio)}), saved as asset ${o.again ?? kept.asset} with its record${o.again ? ' — made again in place: every layer showing it shows the new one' : `; layer ${placed!.layer}${o.background ? ' in the background' : ''} from ${o.at.toFixed(2)} s`}.${grown} You see it: judge it (a background stays quiet under the titles) and have it made again with a sharper prompt, or again + change, when it is off.`,
+    text: `Picture made by ${made.provider} (${made.model}, ${String(record.ratio)}), saved as asset ${o.again ?? kept.asset} with its record${o.again ? ' — made again in place: every layer showing it shows the new one' : `; layer ${placed!.layer}${o.background ? ' in the background' : ''} from ${o.at.toFixed(2)} s`}.${grown}${wrong} You see it: judge it (a background stays quiet under the titles) and have it made again with a sharper prompt, or again + change, when it is off.`,
     images: [{ url: await preview(blob), caption: `${label} · ${made.provider}` }],
     notice: t('image.made', { name: label, provider: made.provider, model: made.model }),
   };
