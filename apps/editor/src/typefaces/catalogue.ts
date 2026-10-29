@@ -32,7 +32,8 @@ let loaded: Promise<Catalogue> | null = null;
 /** the catalogue, fetched once; a failed read is not kept, so the next call tries again */
 export function loadCatalogue(): Promise<Catalogue> {
   loaded ??= (async () => {
-    const r = await fetch(FILE);
+    // offline or stalled: an answer naming the file, not a wait
+    const r = await fetch(FILE, { signal: AbortSignal.timeout(20000) }).catch((e: Error) => { throw new Error(`the typeface catalogue (${FILE}) could not be read: ${e.message}`); });
     if (!r.ok) throw new Error(`the typeface catalogue could not be read (HTTP ${r.status})`);
     return (await r.json()) as Catalogue;
   })().catch((e) => { loaded = null; throw e; });

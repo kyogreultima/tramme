@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { applyOps, validate, type Op, type ToolContext, type TrammeDoc } from '@tramme/core';
 import { newProject } from '@tramme/project';
 import { TAGS, deriveTags } from '../../../scripts/typefaces/tags.ts';
@@ -440,5 +440,30 @@ describe('the typeface tools', () => {
     const bad = await world().run(project(), 'typeface-use', { family: 'anton', role: 'display', script: 'arabic' });
     expect(bad.ops ?? []).toEqual([]);
     expect(bad.text).toMatch(/arabic/);
+  });
+});
+
+describe('reading the catalogue', () => {
+  const realFetch = globalThis.fetch;
+  afterAll(() => { globalThis.fetch = realFetch; });
+  const fresh = async () => { vi.resetModules(); return (await import('../src/typefaces/catalogue.ts')).loadCatalogue; };
+
+  it('names the file when it cannot be read, and tries again next time', async () => {
+    const loadCatalogue = await fresh();
+    globalThis.fetch = (async () => new Response('no', { status: 404 })) as typeof fetch;
+    await expect(loadCatalogue()).rejects.toThrow('the typeface catalogue could not be read (HTTP 404)');
+    globalThis.fetch = (async () => { throw new TypeError('Failed to fetch'); }) as typeof fetch;
+    await expect(loadCatalogue()).rejects.toThrow(/\/typefaces\/catalogue\.json.*Failed to fetch/);
+    globalThis.fetch = (async () => new Response(JSON.stringify({ pin: '5.3.0', fonts: [] }), { status: 200 })) as typeof fetch;
+    expect(await loadCatalogue()).toEqual({ pin: '5.3.0', fonts: [] });
+  });
+
+  it('reads the file once', async () => {
+    const loadCatalogue = await fresh();
+    let reads = 0;
+    globalThis.fetch = (async () => { reads++; return new Response(JSON.stringify({ pin: '5.3.0', fonts: [] }), { status: 200 }); }) as typeof fetch;
+    await Promise.all([loadCatalogue(), loadCatalogue()]);
+    await loadCatalogue();
+    expect(reads).toBe(1);
   });
 });

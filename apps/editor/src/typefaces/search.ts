@@ -2,7 +2,7 @@
 // for titles") and by the script of the text to set. Pure functions over the
 // catalogue: nothing here reads the network or the document.
 
-import type { Catalogue, Typeface } from './catalogue.ts';
+import { TAGS, type Catalogue, type Typeface } from './catalogue.ts';
 import { slugOf } from './files.ts';
 
 // ── the script of a text ─────────────────────────────────────
@@ -71,7 +71,7 @@ interface Meaning { tags?: string[]; category?: Typeface['category']; role?: Rol
 
 const WORDS: Record<string, Meaning> = {};
 const word = (list: string[], meaning: Meaning) => { for (const w of list) WORDS[w] = meaning; };
-for (const tag of ['condensed', 'wide', 'heavy', 'light', 'serif', 'slab', 'mono', 'rounded', 'grotesque', 'geometric', 'humanist', 'neutral', 'elegant', 'playful', 'display', 'handwritten', 'techno', 'editorial', 'friendly', 'bold', 'variable', 'italic']) WORDS[tag] = { tags: [tag] };
+for (const tag of TAGS) WORDS[tag] = { tags: [tag] };
 word(['thick', 'black', 'fat', 'ultra', 'chunky'], { tags: ['heavy'] });
 word(['thin', 'hairline', 'delicate'], { tags: ['light'] });
 word(['narrow', 'compressed', 'tall'], { tags: ['condensed'] });
