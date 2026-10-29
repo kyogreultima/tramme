@@ -45,6 +45,8 @@ export class ToolRunner {
   onProgress: ((done: number, total: number, step?: string) => void) | null = null;
   /** the calls run so far (a turn's count is the difference) */
   calls = 0;
+  /** the plugin files this turn wrote (the user is told of them at its end) */
+  wrotePlugins = new Set<string>();
 
   /** the document the tools see: the user's, plus the pending proposal */
   liveDoc(): TrammeDoc {
@@ -273,6 +275,7 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
         // a computed video (a cut-out mask) may pass the single request limit: sent in parts
         if (typeof data === 'string') await api.write(id, path, new Blob([data], { type: plugin ? 'text/javascript' : /\.json$/i.test(path) ? 'application/json' : 'text/plain' }));
         else await api.writeAny(id, path, data);
+        if (plugin) this.wrotePlugins.add(path);
         return path;
       },
       renderStill: (t, id) => this.stillUrl(t, id),
@@ -354,6 +357,7 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
     const ok = (/^plugins\/.+\.(js|mjs)$/i.test(path)) || (/^assets\/.+\.(json|svg)$/i.test(path));
     if (!ok) return text('allowed writes: plugins/*.js|mjs and assets/*.json|svg. The document changes through propose_changes.', true);
     await api.write(S.project.peek().id, path, content, { type: /\.(js|mjs)$/i.test(path) ? 'text/javascript' : undefined });
+    if (path.startsWith('plugins/')) this.wrotePlugins.add(path);
     // a plugin in use is loaded again in the preview
     const assets = Object.entries(S.doc.peek().assets).filter(([, a]) => srcPath(a.src) === path).map(([id]) => id);
     if (assets.length) this.events.push({ type: 'reload', assets });

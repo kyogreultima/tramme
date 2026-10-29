@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { effortFor, effortLevels, pickModel } from '@tramme/assistant';
 import { builtinRegistry } from '@tramme/nodes';
-import { inputIssues, vocabularyDetail, vocabularyIndex } from '../src/ai/answers.ts';
+import { harvestNote, inputIssues, vocabularyDetail, vocabularyIndex } from '../src/ai/answers.ts';
 import { REVIEW_TOOLS } from '../src/review.ts';
 
 describe('effort levels', () => {
@@ -96,5 +96,19 @@ describe("the assistant's tools", () => {
     expect(detail.nodes[0].props).toEqual(reg.listNodes()[0].props);
     expect(detail.tools[0]).toMatchObject({ name: 'check', input: { type: 'object' } });
     expect(detail.unknown).toEqual(['nothing-like-it']);
+  });
+});
+
+describe('the plugins written in a turn', () => {
+  it('say nothing when none was written', () => {
+    expect(harvestNote([])).toBe('');
+  });
+
+  it('are listed once each, in order, with the action that keeps them as the user sees it', () => {
+    const note = harvestNote(['plugins/b.js', 'plugins/a.js', 'plugins/a.js']);
+    expect(note).toContain('a.js, b.js');
+    expect(note.match(/a\.js/g)).toHaveLength(1);
+    expect(note).toContain('Keep a plugin in the library');
+    expect(note).not.toContain('library-add');
   });
 });

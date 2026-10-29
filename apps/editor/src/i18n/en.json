@@ -94,6 +94,7 @@
     "stoppedAfterNSteps": "stopped after {n} steps",
     "urlDoesNotAnswer": "{url} does not answer ({error})",
     "companionCut": "The local companion does not answer: its connection was interrupted before the end of the turn",
+    "harvest": "Plugins written in this turn: {files}. To use them in your other projects: / menu, {action}.",
     "resumeIn": "Interrupted ({error}). Going on in {s} s, attempt {n} of {max}…",
     "serviceError": "service error",
     "streamCut": "the answer was interrupted: its stream ended before the model finished",

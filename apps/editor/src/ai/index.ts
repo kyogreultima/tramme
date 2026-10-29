@@ -16,6 +16,7 @@ import { api, type AiEvent, type ChatItem, type KeyedProvider, type KeyStatus, t
 import { S, toast } from '../state.ts';
 import { companionModels, companionTurn, NO_ENGINES, pairCompanion, probeCompanion, stopCompanion, type CompanionState, type Engines } from './companion.ts';
 import { passes, pause, recallDetails, ServerSession, type Message } from './server.ts';
+import { harvestNote } from './answers.ts';
 import { ToolRunner } from './tools.ts';
 import { runCall, uid } from './calls.ts';
 import { clip } from '../model.ts';
@@ -432,6 +433,7 @@ export async function* ask(p: AskPayload, signal: AbortSignal): AsyncGenerator<A
   // a proposal neither applied nor refused is dropped at the next message
   const dropped = runner.pending && !p.decisions.some((d) => d.id === runner.pending!.id) ? runner.pending : null;
   runner.clear();
+  runner.wrotePlugins.clear();
   const notes = [
     ...p.decisions.map((d) => `Your proposal ${d.id} was ${d.status === 'accepted' ? 'applied' : 'rejected'} by the user.`),
     ...(dropped ? [`Your previous proposal "${dropped.label}" got no answer; it is dropped.`] : []),
@@ -495,6 +497,8 @@ export async function* ask(p: AskPayload, signal: AbortSignal): AsyncGenerator<A
     yield { type: 'item', item: { id: uid(), role: 'assistant', text: t('ai.resumeIn', { error: failure, s: wait, n: n + 1, max: RESUME_DELAYS.length }) } };
     await pause(wait * 1000, signal);
   }
+  const harvest = harvestNote([...runner.wrotePlugins]);
+  if (harvest) yield { type: 'item', item: { id: uid(), role: 'assistant', text: harvest } };
   yield { type: 'item', item: { id: uid(), role: 'assistant', usage: { ...usage, tools: runner.calls - calls, images: seen, ms: Date.now() - started, model, route: USAGE_ROUTE[route], ...(reported ? {} : { unknown: true as const }) } } };
   yield { type: 'done' };
 }
