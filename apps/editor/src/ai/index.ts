@@ -20,6 +20,7 @@ import { harvestNote } from './answers.ts';
 import { ToolRunner } from './tools.ts';
 import { runCall, uid } from './calls.ts';
 import { clip } from '../model.ts';
+import { FILM_PLAN_PATH, parsePlan, planText } from '../filmplan.ts';
 import type { Command } from './commands.ts';
 import { describe, imageBlocks, type Attachment } from '../attachments.ts';
 import { locale, t } from '../i18n/index.ts';
@@ -454,13 +455,16 @@ export async function* ask(p: AskPayload, signal: AbortSignal): AsyncGenerator<A
   // the project's brief, when there is one, rides in the system prompt: the assistant follows it from the first word
   let brief: string | null = null;
   try { brief = (await api.readText(S.project.peek().id, 'assets/brief.json'))?.text ?? null; } catch { brief = null; }
+  // the film plan rides beside it: the kinds of picture, the scenes and the direction the assistant follows
+  let plan: string | undefined;
+  try { const parsed = parsePlan((await api.readText(S.project.peek().id, FILM_PLAN_PATH))?.text); plan = parsed ? planText(parsed) : undefined; } catch { plan = undefined; }
   // the installed plugins, named once (enabled, not turned off here): the assistant searches them when the project's own vocabulary falls short
   const offHere = offIn(S.doc.peek());
   const mine = installed.peek().filter((x) => x.enabled && !offHere.includes(x.manifest.id)).map((x) => `${x.manifest.name}${x.manifest.description ? `: ${x.manifest.description}` : ''}`);
   // the packs that ship with the editor, each entry in a line by need: reachable without being in the project
   const packs = await shippedPacks();
   // the part that is the same for every project first: the Messages API caches it apart; the other routes get the same text in one piece
-  const system = systemParts(reference, brief ?? undefined, mine, packLines(packs));
+  const system = systemParts(reference, brief ?? undefined, mine, packLines(packs), plan);
   const target = route === 'local' ? { url: localBase() } : route === 'remote' ? { url: `/api/llm/${encodeURIComponent(slotOf(model))}` } : undefined;
   // Claude by its model id; a command line by its own model name, none for its default
   const asked = engine === 'claude' ? model : modelName(model) === CLI_DEFAULT ? '' : modelName(model);
