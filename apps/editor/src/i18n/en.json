@@ -1764,7 +1764,8 @@
     "reading": "reading the shake"
   },
   "typefaces": {
-    "couldNotLoad": "could not load"
+    "couldNotLoad": "could not load",
+    "sheet": "The families, set in their own letters"
   },
   "proxy": {
     "encoding": "encoding the proxy"

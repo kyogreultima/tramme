@@ -3,6 +3,7 @@
 // catalogue: nothing here reads the network or the document.
 
 import type { Catalogue, Typeface } from './catalogue.ts';
+import { slugOf } from './files.ts';
 
 // ── the script of a text ─────────────────────────────────────
 type Range = [number, number];
@@ -193,4 +194,24 @@ export function searchTypefaces(catalogue: Catalogue, query: string, opts: { tex
   const kind = [...kinds.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
   const fallback = covering.filter((f) => described(f) && (!kind || f.category === kind)).sort((a, b) => b.weights.length - a.weights.length || (a.family < b.family ? -1 : 1));
   return result((fallback.length ? fallback : covering).map((font) => ({ font, score: 0, why: [] })), true);
+}
+
+/** the number of single-letter edits between two short words */
+function distance(a: string, b: string): number {
+  let row = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const next = [i];
+    for (let j = 1; j <= b.length; j++) next[j] = Math.min(row[j] + 1, next[j - 1] + 1, row[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    row = next;
+  }
+  return row[b.length];
+}
+
+/** the family a name points to (its id or its name, whatever the case or the spacing), else the three ids nearest to the name */
+export function findFamily(catalogue: Catalogue, name: string): { font?: Typeface; closest: string[] } {
+  const key = slugOf(name);
+  const font = catalogue.fonts.find((f) => f.id === key || slugOf(f.family) === key);
+  if (font) return { font, closest: [] };
+  const near = (f: Typeface) => distance(key, f.id) - (f.id.includes(key) || key.includes(f.id) ? key.length : 0);
+  return { closest: [...catalogue.fonts].sort((a, b) => near(a) - near(b) || (a.id < b.id ? -1 : 1)).slice(0, 3).map((f) => f.id) };
 }
