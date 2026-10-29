@@ -10,6 +10,7 @@ import { Evaluator, nestedTime, type EvaluatedLayer, type NestedTiming } from '.
 import { asKeyframed, modsOf, propKind } from './props.ts';
 import { animatedSlots, motionFigures, motionStretches, pathDeviation, sampleAddress, spanOf } from './motion.ts';
 import { layerMatrix, matMul, type Mat2D } from './math.ts';
+import { DEFAULT_PERSPECTIVE, isTilted, quadBounds, tiltQuad } from './perspective.ts';
 import { mediaTime, pictureRect } from './track.ts';
 import type { Host, NodeType, Rect, Registry } from './registry.ts';
 import { compositionOf, s2 } from './check-report.ts';
@@ -105,7 +106,7 @@ function estimateText(p: Record<string, unknown>): Rect {
  * draws their frame, named after it: `scene-01/headline`), so the checks and
  * the cues see what is drawn.
  */
-function place(ev: Evaluator, comp: Composition, t: number, layers: EvaluatedLayer[], parent: Mat2D, alpha: number, out: PlacedLayer[], prefix = '', depth = 0) {
+function place(ev: Evaluator, comp: Composition, t: number, layers: EvaluatedLayer[], parent: Mat2D, alpha: number, out: PlacedLayer[], perspective: number, prefix = '', depth = 0) {
   const doc = ev.doc;
   for (const L of layers) {
     const m = matMul(parent, layerMatrix(L.transform)), opacity = alpha * L.transform.opacity;
@@ -114,9 +115,15 @@ function place(ev: Evaluator, comp: Composition, t: number, layers: EvaluatedLay
     const text = isTextLayer(L);
     if (!r && L.node.type === 'text') r = estimateText(L.props);
     // the height of the type on screen: its size times the vertical scale of the layer
-    const textSize = text ? Math.abs(Number(L.props.size) || 0) * Math.hypot(m[2], m[3]) : undefined;
-    out.push({ id: prefix + L.id, layer: L.layer, node: L.node, props: L.props, opacity, box: r ? boxOf(m, r) : null, ...(text ? { text: String(L.props.text ?? ''), textSize } : {}) });
-    place(ev, comp, t, L.children, m, opacity, out, prefix, depth);
+    let box = r ? boxOf(m, r) : null, textSize = text ? Math.abs(Number(L.props.size) || 0) * Math.hypot(m[2], m[3]) : undefined;
+    // a layer turned around x or y is read through its projected quad: its box, and its type as high as the quad's left edge
+    if (r && isTilted(L.transform)) {
+      const q = tiltQuad(r, L.transform, parent, perspective);
+      box = q ? quadBounds(q) : null;
+      if (q && textSize !== undefined && r.h > 0) textSize = Math.abs(Number(L.props.size) || 0) * (Math.hypot(q[3][0] - q[0][0], q[3][1] - q[0][1]) / r.h);
+    }
+    out.push({ id: prefix + L.id, layer: L.layer, node: L.node, props: L.props, opacity, box, ...(text ? { text: String(L.props.text ?? ''), textSize } : {}) });
+    place(ev, comp, t, L.children, m, opacity, out, perspective, prefix, depth);
     // a nested composition, its frame centred on the layer's origin
     const inner = L.node.type === 'comp' && typeof L.props.comp === 'string' && depth < 8 ? doc.compositions[L.props.comp] : undefined;
     if (inner) {
@@ -128,7 +135,7 @@ function place(ev: Evaluator, comp: Composition, t: number, layers: EvaluatedLay
           const a = (one.rotation * Math.PI) / 180, c = Math.cos(a), s = Math.sin(a);
           const at = matMul(m, [c, s, -s, c, one.at[0], one.at[1]]);
           const lti = instanceTime(lt, one, inner.duration);
-          place(ev, inner, lti, ev.frame(lti, L.props.comp as string, one.instance).layers, matMul(at, [1, 0, 0, 1, -inner.width / 2, -inner.height / 2]), opacity, out, `${prefix}${L.id}${many ? `#${k}` : ''}/`, depth + 1);
+          place(ev, inner, lti, ev.frame(lti, L.props.comp as string, one.instance).layers, matMul(at, [1, 0, 0, 1, -inner.width / 2, -inner.height / 2]), opacity, out, perspective, `${prefix}${L.id}${many ? `#${k}` : ''}/`, depth + 1);
         }
       }
     }
@@ -138,7 +145,7 @@ function place(ev: Evaluator, comp: Composition, t: number, layers: EvaluatedLay
 /** the composition at one instant, its layers placed */
 export function sampleAt(evaluator: Evaluator, compId: string, t: number): Sample {
   const comp = evaluator.comp(compId), f = evaluator.frame(t, compId), layers: PlacedLayer[] = [];
-  place(evaluator, comp, t, f.layers, [1, 0, 0, 1, 0, 0], 1, layers);
+  place(evaluator, comp, t, f.layers, [1, 0, 0, 1, 0, 0], 1, layers, f.camera?.perspective ?? DEFAULT_PERSPECTIVE);
   return { t: +t.toFixed(4), layers };
 }
 

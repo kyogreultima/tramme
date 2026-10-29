@@ -37,7 +37,7 @@ const asset = z.strictObject({
 
 const transform = z.strictObject({
   anchor: prop.optional(), position: prop.optional(), scale: prop.optional(),
-  rotation: prop.optional(), opacity: prop.optional(), depth: prop.optional(),
+  rotation: prop.optional(), opacity: prop.optional(), depth: prop.optional(), rotationX: prop.optional(), rotationY: prop.optional(),
 });
 
 const effect = z.strictObject({
