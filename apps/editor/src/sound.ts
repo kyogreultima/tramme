@@ -670,8 +670,29 @@ const soundFind: ToolType<{ query: string; kind?: string; count?: number }> = {
   },
 };
 
+/** the records kept beside a picture, a clip or a model: the stock libraries' (beside the file), the providers' (suffixed by what they made) */
+const RECORDS = ['.json', '.image.json', '.video.json'];
+
+/** one line per picture, clip or model of the document that was fetched with a licence or made by a provider (a file the user brought is not credited) */
+async function fetchedCredits(ctx: ToolContext): Promise<string[]> {
+  const lines: string[] = [];
+  for (const [id, a] of Object.entries(ctx.doc.assets)) {
+    if (!['image', 'video', 'model'].includes(a.type) || !a.src) continue;
+    for (const suffix of RECORDS) {
+      const r = await ctx.readText(a.src.replace(/\.[a-z0-9]+$/i, suffix)).then((s) => (s ? JSON.parse(s) as Record<string, string> : null)).catch(() => null);
+      if (!r) continue;
+      const name = a.name ?? id;
+      if (r.license) lines.push(`- ${name}: ${r.title ?? name}, ${r.author ?? 'unknown author'}, ${r.license}${r.landing ?? r.url ? ` <${r.landing ?? r.url}>` : ''}`);
+      else if (r.provider) lines.push(`- ${name}: made by ${r.provider}${r.model ? ` (${r.model})` : ''}`);
+      else continue;
+      break;
+    }
+  }
+  return lines;
+}
+
 const credits: ToolType<Record<string, never>> = {
-  name: 'credits', title: 'Sound credits', description: 'lists where each sound of the composition comes from and its license (assets/sounds/CREDITS.md), to ship with the video',
+  name: 'credits', title: 'Credits', description: 'lists where each sound, picture, clip, texture and model of the project comes from and its licence (assets/CREDITS.md, and assets/sounds/CREDITS.md for the sounds), to ship with the video',
   input: { type: 'object', properties: {} },
   ai: { when: 'when the sound is done, before an export: the credits go with the video' },
   async run(_, ctx) {
@@ -689,10 +710,14 @@ const credits: ToolType<Record<string, never>> = {
       else if (e || side?.license) lines.push(`- ${name}: ${e?.title ?? side?.title ?? name}, ${side?.author ?? e?.author ?? 'unknown author'}, ${side?.license ?? e?.license ?? 'license unknown'}${side?.url ?? e?.url ? ` <${side?.url ?? e?.url}>` : ''}`);
       else lines.push(`- ${name}: brought by the user (${a.src})`);
     }
-    if (!lines.length) return { text: 'No sound in this composition.', notice: t('sound.noCredits') };
-    const text = `# Sound credits: ${c.name ?? ctx.compId}\n\n${lines.join('\n')}\n`;
-    await ctx.writeFile('assets/sounds/CREDITS.md', text);
-    return { text: `${text}\nWritten to assets/sounds/CREDITS.md.`, notice: t('sound.credits', { n: lines.length }) };
+    const fetched = await fetchedCredits(ctx);
+    if (!lines.length && !fetched.length) return { text: 'Nothing to credit: no sound in this composition, no picture, clip, texture or model fetched with a licence or made by a provider.', notice: t('sound.noCredits') };
+    // the sounds as before, beside the sounds; every credit in one file beside the video
+    const sounds = `# Sound credits: ${c.name ?? ctx.compId}\n\n${lines.join('\n')}\n`;
+    if (lines.length) await ctx.writeFile('assets/sounds/CREDITS.md', sounds);
+    const text = `# Credits: ${c.name ?? ctx.compId}\n${lines.length ? `\n## Sounds\n\n${lines.join('\n')}\n` : ''}${fetched.length ? `\n## Pictures, clips and models\n\n${fetched.join('\n')}\n` : ''}`;
+    await ctx.writeFile('assets/CREDITS.md', text);
+    return { text: `${text}\nWritten to assets/CREDITS.md.`, notice: t('sound.credits', { n: lines.length + fetched.length }) };
   },
 };
 
