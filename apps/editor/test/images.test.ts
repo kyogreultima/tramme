@@ -2,15 +2,28 @@
 // changing only what is asked, the palette said, an extension's canvas, the
 // size a picture is brought to and its sharpening; and the takes' picker.
 
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { ToolContext } from '@tramme/core';
 
 vi.stubGlobal('window', { matchMedia: () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} }), addEventListener: () => {} });
 vi.stubGlobal('document', { hidden: true, hasFocus: () => false, documentElement: { dataset: {} }, querySelector: () => null });
 vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => {}, removeItem: () => {} });
 vi.stubGlobal('addEventListener', () => {});
 
+// the files the pictures are kept in, and the canvas, are the browser's: the tool is read through what it records
+const kept: Record<string, unknown>[] = [];
+vi.mock('../src/media.ts', async (original) => ({
+  ...(await original<typeof import('../src/media.ts')>()),
+  canvasOf: (width: number, height: number) => ({ c: { width, height }, g: { drawImage() {} } }),
+  dataUrl: async () => 'data:,reference',
+  keepMedia: async (_ctx: unknown, _kind: string, _name: string, _blob: Blob, record: Record<string, unknown>) => { kept.push(record); return { asset: 'image-x', ops: [], reload: [] }; },
+  placeMedia: () => ({ ops: [], layer: 'layer-x' }),
+}));
+vi.mock('../src/perception.ts', async (original) => ({ ...(await original<typeof import('../src/perception.ts')>()), jpegOf: () => 'data:image/jpeg;base64,x' }));
+
 const images = await import('../src/images.ts');
 const confirm = await import('../src/confirm.ts');
+const { api } = await import('../src/api.ts');
 
 describe('pictures', () => {
   it('asks the proportions closest to the composition', () => {
@@ -68,5 +81,63 @@ describe('pictures', () => {
     await expect(confirm.payFor('t', 'x', 'y', 'ask', 4)).resolves.toBeUndefined();
     await expect(confirm.payFor('t', 'x', 'y', 'ask', 7)).rejects.toThrow(/allowance/);
     confirm.turnEnds();
+  });
+});
+
+const made = (n = 1) => Array.from({ length: n }, (_, i) => ({ blob: new Blob([`take ${i + 1}`]), provider: 'openai', model: 'gpt-image' }));
+
+describe('the takes, held for the session', () => {
+  it('keeps one take by its index, and lets them all go', async () => {
+    const id = images.holdTakes(made(3), { label: 'road' });
+    expect(id).toMatch(/^takes-/);
+    const second = images.takeHeld(`${id}:2`)!;
+    expect(second.made).toHaveLength(1);
+    await expect(second.made[0].blob.text()).resolves.toBe('take 2');
+    expect(second.extra.label).toBe('road');
+    expect(second.take).toBe(2);
+    expect(images.takeHeld(`${id}:2`)).toBeNull();
+    expect(images.takeHeld(id)).toBeNull();
+  });
+
+  it('answers null for a take that was never held', () => {
+    expect(images.takeHeld('takes-zzz:1')).toBeNull();
+    const id = images.holdTakes(made(2), {});
+    expect(images.takeHeld(`${id}:5`)).toBeNull();
+  });
+});
+
+describe('a style frame as the reference of a picture', () => {
+  const seen: string[] = [];
+  const ctx = {
+    doc: { compositions: { main: { width: 1920, height: 1080, fps: 30, duration: 10, layers: {}, order: [] } }, assets: {}, tokens: {} }, compId: 'main',
+    fileUrl: (path: string) => `/files/${path}`, assetUrl: () => '', signal: new AbortController().signal,
+  } as unknown as ToolContext;
+  const tool = images.IMAGE_TOOLS[0];
+  afterEach(() => { vi.restoreAllMocks(); confirm.turnEnds(); kept.length = 0; seen.length = 0; });
+  const arrange = () => {
+    vi.stubGlobal('fetch', async (url: string) => { seen.push(url); return url.includes('missing') ? { ok: false, status: 404 } : { ok: true, blob: async () => new Blob(['frame']) }; });
+    vi.stubGlobal('createImageBitmap', async () => ({ width: 1600, height: 900, close() {} }));
+    confirm.turnBegins(true);
+  };
+
+  it('reads the frame file through the project, sends it, and records its path', async () => {
+    arrange();
+    const ask = vi.spyOn(api, 'generateImages').mockResolvedValue(made());
+    await tool.run({ prompt: 'a plate, no words', provider: 'openai', reference: 'assets/frames/a.jpg' }, ctx);
+    expect(seen).toEqual(['/files/assets/frames/a.jpg']);
+    expect(ask.mock.calls[0][0].reference).toBe('data:,reference');
+    expect(kept[0].reference).toBe('assets/frames/a.jpg');
+  });
+
+  it('names the path of a frame file that is missing', async () => {
+    arrange();
+    const ask = vi.spyOn(api, 'generateImages').mockResolvedValue(made());
+    await expect(tool.run({ prompt: 'a plate', provider: 'openai', reference: 'assets/frames/missing.jpg' }, ctx)).rejects.toThrow(/assets\/frames\/missing\.jpg/);
+    expect(ask).not.toHaveBeenCalled();
+  });
+
+  it('keeps an asset id exactly as before: it must be an image asset of the project', async () => {
+    arrange();
+    await expect(tool.run({ prompt: 'a plate', provider: 'openai', reference: 'nope' }, ctx)).rejects.toThrow(/an image asset of the project/);
   });
 });
