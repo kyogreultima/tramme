@@ -5,6 +5,7 @@
 
 import { signal } from '@preact/signals';
 import { pointer, type Op, type ToolType } from '@tramme/core';
+import { KEEP_PLUGIN } from './ai/answers.ts';
 import { api } from './api.ts';
 import { t } from './i18n/index.ts';
 import { installed, installedCode, installFile, storageKind } from './installed.ts';
@@ -22,7 +23,7 @@ export async function refreshLibrary() {
 }
 
 const keep: ToolType<{ plugin: string; name?: string }> = {
-  name: 'library-add', title: 'Keep a plugin in the library', description: 'copies a plugin of this project into the library, to use it in other projects',
+  name: 'library-add', title: KEEP_PLUGIN, description: 'copies a plugin of this project into the library, to use it in other projects',
   input: {
     type: 'object',
     properties: {

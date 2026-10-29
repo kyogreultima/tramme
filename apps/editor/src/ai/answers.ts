@@ -15,10 +15,13 @@ export function inputIssues(name: string, input: unknown): string[] {
   return r.success ? [] : r.error.issues.map((i) => `${i.path.length ? i.path.join('.') : '(input)'}: ${i.message}`);
 }
 
+/** the title of the / menu action that keeps a plugin in the library: the tool's, and the words of the note below */
+export const KEEP_PLUGIN = 'Keep a plugin in the library';
+
 /** what the user is told at the end of a turn that wrote plugins: their files, once each, and the action of the / menu that keeps them for other projects ('' when none was written) */
 export function harvestNote(paths: string[]): string {
   const files = [...new Set(paths.map((p) => p.replace(/^plugins\//, '')))].sort();
-  return files.length ? t('ai.harvest', { files: files.join(', '), action: t('Keep a plugin in the library') }) : '';
+  return files.length ? t('ai.harvest', { files: files.join(', '), action: t(KEEP_PLUGIN) }) : '';
 }
 
 // ── the vocabulary's index: each entry in a line or two, its full schema on demand ──
