@@ -91,8 +91,8 @@ describe('quality checks', () => {
     // a picture bright at the top, dark at the bottom, its luminance known through the space analysis
     const d = doc({
       photo: { type: 'image', transform: { position: [540, 960] }, props: { image: 'shot', size: [1080, 1920], fit: 'fill' } },
-      washed: text('Pale', {}, { color: '#FFFFFF' }),
-      dark: text('Dark', { transform: { position: [540, 1500] } }, { color: '#000000' }),
+      washed: text('Pale', { transform: { position: [540, 400] } }, { color: '#FFFFFF' }),
+      dark: text('Dark', { transform: { position: [540, 1500] } }, { color: '#FFFFFF' }),
     });
     d.assets = { shot: { type: 'image', src: 'shot.png' }, 'space-shot': { type: 'json', src: 'shot-space.json' } };
     const space = { version: 1, kind: 'space', t: 0, width: 1080, height: 1920, cols: 1, rows: 2, busy: [0.1, 0.1], luma: [0.9, 0.15] };
@@ -114,6 +114,20 @@ describe('quality checks', () => {
     it('reads the card under the text, not the plate under the card', async () => {
       expect(await contrast(onDark({ card: card(), t: text('Price', {}, { color: '#111111' }) }))).toEqual([]);
       expect(await contrast(onDark({ card: card(), t: text('Price', {}, { color: '#F4F4F4' }) }))).toEqual(['t']);
+    });
+
+    it('measures contrast as the standard does: a muted grey on white passes, a grey on a grey does not', async () => {
+      expect(await contrast(onDark({ card: card({ fill: '#FFFFFF' }), t: text('Subtitle', {}, { color: '#7E8797' }) }))).toEqual([]);
+      expect(await contrast(onDark({ card: card({ fill: '#909090' }), t: text('Subtitle', {}, { color: '#808080' }) }))).toEqual(['t']);
+    });
+
+    it('does not judge a text while it fades in, nor a pictogram whose colours are its own', async () => {
+      const fading = text('Subtitle', { transform: { position: [540, 960], opacity: { $k: [{ t: 0, v: 0 }, { t: 1, v: 1 }] } as never } }, { color: '#7E8797' });
+      expect(await contrast(onDark({ card: card({ fill: '#FFFFFF' }), t: fading }))).toEqual([]);
+      expect(await contrast(onDark({ card: card({ fill: '#FFFFFF' }), t: text('😐', {}, { color: '#FFFFFF' }) }))).toEqual([]);
+      // half-transparent ink that stays so still sinks into its ground
+      const ghost = text('Ghost ink', { transform: { position: [540, 960], opacity: 0.5 } }, { color: '#7E8797' });
+      expect(await contrast(onDark({ card: card({ fill: '#FFFFFF' }), t: ghost }))).toEqual(['t']);
     });
 
     it('falls back to the background when the card holds only part of the text', async () => {
