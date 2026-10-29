@@ -30,6 +30,11 @@ registerTour({
       body: m('tours.sound.typeSfxToSearch'),
     },
     {
+      target: 'record', side: 'top', align: 'start',
+      title: m('tours.sound.recordYourVoice'),
+      body: m('tours.sound.theMicrophoneRecordsFrom'),
+    },
+    {
       target: 'timeline', side: 'top', align: 'start',
       before: () => press('bottom-tab-timeline'),
       title: m('tours.sound.eachSoundIsA'),

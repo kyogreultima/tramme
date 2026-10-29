@@ -30,7 +30,7 @@ registerTour({
 });
 ```
 
-A step whose target is not on screen (a panel hidden on a phone, for example) is skipped. A project opens in one of two views, the studio (the film directed in notes) or the atelier (layers, timeline, inspector): a tour about one view's places sets `available: inStudio` or `available: inAtelier`, so the help menu offers it only there.
+A step whose target is not on screen (a panel hidden on a phone, for example) is skipped, though its preparation (`before`) still runs, so the next step finds its tab open; a tour with nothing on screen is not shown and not counted as seen. A project opens in one of two views, the studio (the film directed in notes) or the atelier (layers, timeline, inspector): a tour about one view's places sets `available: inStudio` or `available: inAtelier`, so the help menu offers it only there. A tour with `auto: true` is offered when a project opens and again when it first goes to a view that has one: the atelier's tour is offered at the switch, not only when a project opens in the atelier.
 
 ## Where to point
 
@@ -39,11 +39,11 @@ Tours point at `data-tour` markers, not CSS classes: the interface can change it
 | Page | Markers |
 |---|---|
 | Home | `home-new` (the direction box), `home-more`, `home-projects`, `home-examples`, `settings`, `help` |
-| Editor, top | `project`, `view-switch`, `history`, `format`, `settings`, `help`, `export` |
-| Studio | `stage`, `direct` (the direction bar), `pin`, `storyboard`, `notes`, `direction-tab`, `viewport` |
-| Atelier, panels | `left-panel`, `left-tab-layers`, `left-tab-assets`, `left-tab-tokens`, `inspector` |
+| Editor, top | `project`, `view-switch`, `versions`, `history`, `format`, `settings`, `help`, `export` |
+| Studio | `stage`, `direct` (the direction bar), `pin`, `storyboard`, `notes`, `direction-tab`, `material` (the direction's material), `viewport` |
+| Atelier, panels | `left-panel`, `left-tab-layers`, `left-tab-assets`, `left-tab-tokens`, `inspector`, `speech` (the inspector's Speech section of a sound or video layer), `ai-resizer` (the line that sizes the chat) |
 | Atelier, preview | `viewport`, `quality` |
-| Atelier, bottom | `transport`, `timeline`, `bottom-tab-timeline`, `bottom-tab-graph` |
+| Atelier, bottom | `transport`, `record` (the voice-over button), `timeline`, `bottom-tab-timeline`, `bottom-tab-graph`, `bottom-tab-mixer` (only once the film has a sound track: point at the other tabs until then) |
 | Assistant | `assistant`, `assistant-model`, `assistant-access`, `assistant-history`, `assistant-composer` (the model and access markers are in the studio's notes too) |
 
 `press(name)` clicks a marker the way the user would (to open a tab before talking about it). For a new area of the interface, give it a `data-tour` attribute.

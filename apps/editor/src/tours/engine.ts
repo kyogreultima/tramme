@@ -98,9 +98,12 @@ export function resetSeen() { writeSeen({ ...toursState.peek(), seen: {} }); }
 export function setAutoTours(on: boolean) { writeSeen({ ...toursState.peek(), auto: on }); }
 
 // ── helpers for the steps' preparations ─────────────────────
+/** a place of the interface by its data-tour name, if it is there */
+export const marker = (name: string) => document.querySelector<HTMLElement>(`[data-tour="${name}"]`);
+
 /** clicks a place of the interface by its data-tour name (opens a tab, a panel), as the user would */
 export function press(name: string) {
-  (document.querySelector(`[data-tour="${name}"]`) as HTMLElement | null)?.click();
+  marker(name)?.click();
 }
 
 // ── playing ──────────────────────────────────────────────────
@@ -121,6 +124,19 @@ const rich = (s: string) => esc(s).replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').repl
 const nextFrame = () => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
 const token = (name: string, fallback: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
 
+/**
+ * The first step from `from`, going `dir`, whose place is on screen once prepared
+ * (-1 when none is). Each step passed on is prepared first, shown or not: a step
+ * whose place is missing is skipped, but the next one still opens its tab.
+ */
+export async function reach(count: number, from: number, dir: 1 | -1, prepare: (i: number) => Promise<void>, present: (i: number) => boolean): Promise<number> {
+  for (let i = from; i >= 0 && i < count; i += dir) {
+    await prepare(i);
+    if (present(i)) return i;
+  }
+  return -1;
+}
+
 export async function startTour(id: string) {
   const tour = tours.get(id);
   if (!tour) return;
@@ -128,6 +144,8 @@ export async function startTour(id: string) {
   const steps = tour.steps.filter((s) => s.when?.() ?? true);
   if (!steps.length) return;
   const run = async (i: number) => { try { await steps[i]?.before?.(); } catch (e) { console.warn('[tramme] visite :', (e as Error).message); } await nextFrame(); };
+  /** a message in the middle always shows; a step with a place shows when the place is on screen */
+  const present = (i: number) => !steps[i].target || !!resolve(steps[i].target);
   const driveSteps: DriveStep[] = steps.map((s) => ({
     // resolved when shown: the step's preparation may have just created the place
     element: s.target ? (() => resolve(s.target) as Element) : undefined,
@@ -149,23 +167,21 @@ export async function startTour(id: string) {
     smoothScroll: true,
     allowKeyboardControl: true,
     onNextClick: async (_el, _step, { driver: dr }) => {
-      const i = (dr.getActiveIndex() ?? 0) + 1;
-      if (i >= steps.length) { dr.destroy(); return; }
-      await run(i);
-      dr.moveNext();
+      const i = await reach(steps.length, (dr.getActiveIndex() ?? 0) + 1, 1, run, present);
+      if (i < 0) dr.destroy(); else dr.moveTo(i);
     },
     onPrevClick: async (_el, _step, { driver: dr }) => {
-      const i = (dr.getActiveIndex() ?? 0) - 1;
-      if (i < 0) return;
-      await run(i);
-      dr.movePrevious();
+      const i = await reach(steps.length, (dr.getActiveIndex() ?? 0) - 1, -1, run, present);
+      if (i >= 0) dr.moveTo(i);
     },
     onDestroyed: () => { markSeen(tour); current = null; tourActive.value = null; },
   });
   current = d;
   tourActive.value = tour.id;
-  await run(0);
-  d.drive(0);
+  const first = await reach(steps.length, 0, 1, run, present);
+  // nothing of the tour is on screen: it is not shown, nor counted as seen
+  if (first < 0) { current = null; tourActive.value = null; return; }
+  d.drive(first);
 }
 
 /** the first tour of the page not seen yet, when tours are offered on their own */

@@ -18,9 +18,12 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 - **Publishing**: presets for a vertical short, a square, a landscape film, a 4K master and a GIF, with what stands in the way listed and fixed; **export the marked part** (I and O); **exports in line**, each on the film as it was asked for; **chapters** (markers of kind `chapter`) written into the files the command line renders, and copied as a list from the browser.
 - **The assistant** has the editing operations as tools: `ripple_delete`, `insert_clip`, `overwrite_clip`, `ripple_trim`, `roll`, `slip`, `slide`, `detach_audio`, `link`, `sync_clips`, `add_adjustment`, `match_look`, `publish`. A guided tour of the lot.
 - **The hesitations cut by the fillers tool can be reviewed and put back one by one** from the media panel.
+- **Guided tours for what had none**: *Grade and match a look* (the scopes, matching a shot to another, the 10-bit export) and *Make it yours* (tokens, plugins and packs, the tours plugins bring). The montage tour gains several cameras, adjustment clips and chapters; the sound tour, recording a voice-over; the assistant tour, dictation and the messages that wait while it works. A test checks that every place a tour points at exists in the interface and is listed in [docs/tours.md](docs/tours.md).
 
 ### Fixed
 
+- **The atelier's tour is offered when a project first goes to the atelier**, not only when one opens in it: the studio is the default view, so the tour was reached only through the help menu. The editor tour's last step now lists the tours that exist.
+- **A tour step whose place is missing no longer costs the next step its preparation**: the step is skipped, but the next one still opens its tab. The mixer step of the montage tour points at the tabs until the film has a sound track, instead of vanishing.
 - **The voice detector loaded the wrong onnxruntime build** (the one whose wasm files transformers.js does not configure), so it fell back on the energy of the sound; it now loads the build the other models use.
 - **The editor's `time` helpers moved to `@tramme/core`** (`packages/core/src/timing.ts`), the editor re-exporting them: the montage operations and the assistant need them without the interface.
 

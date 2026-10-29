@@ -11,5 +11,20 @@ import './sound.ts';
 import './montage.ts';
 import './speech.ts';
 import './assistant.ts';
+import './look.ts';
+import './yours.ts';
+
+import { S } from '../state.ts';
+import { prefs } from '../settings.ts';
+import { offerTours } from './engine.ts';
+
+// The studio is the default view: the atelier's tour is offered when a project
+// first goes there, not only when one opens already in it.
+let view = prefs.peek().view;
+prefs.subscribe((p) => {
+  if (p.view === view) return;
+  view = p.view;
+  if (S.ready.peek()) setTimeout(() => offerTours('editor'), 400);
+});
 
 export * from './engine.ts';
