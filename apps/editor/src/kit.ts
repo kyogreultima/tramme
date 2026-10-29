@@ -7,6 +7,7 @@
 
 import type { Asset, Token, TrammeDoc } from '@tramme/core';
 import { inventoryOf, type Brief } from './brief.ts';
+import { slugOf } from './typefaces/files.ts';
 
 export const KIT_PATH = 'assets/sources/kit.json';
 /** the font files a kit may name */
@@ -93,7 +94,7 @@ export function applyKit(doc: TrammeDoc, kit: Kit, moved: Map<string, string>) {
   for (const f of kit.fonts) {
     const src = f.file ? relink(f.file, moved) : undefined;
     if (!src || !FONT_FILE.test(src) || !src.startsWith('assets/')) continue;
-    const id = `font-${f.family.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')}`.slice(0, 64);
+    const id = `font-${slugOf(f.family)}`;
     const weights = f.weights?.length ? `${Math.min(...f.weights)} ${Math.max(...f.weights)}` : undefined;
     doc.assets[id] = { type: 'font', src, family: f.family, name: f.family, ...(weights ? { weight: weights } : {}) } satisfies Asset;
   }

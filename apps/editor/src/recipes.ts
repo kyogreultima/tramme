@@ -9,6 +9,7 @@ import type { EaseSpec, KitType, Op, ToolContext, ToolType, TrammeDoc, Vec2 } fr
 import { pointer } from '@tramme/core';
 import { adder } from './templates.ts';
 import { clip, isToolAsset, mediaAssetsOf } from './model.ts';
+import { slugOf } from './typefaces/files.ts';
 
 // ── the look of the document ─────────────────────────────────
 type Bezier = [number, number, number, number];
@@ -588,7 +589,7 @@ const kit: ToolType<{ kit: string; background?: boolean; font?: boolean }> = {
     if (!f || a.font === false) return done('');
     if (has) return done('. The project already has a font: it stays; remove it first to take the kit\'s');
     return (async () => {
-      const slug = f.family.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+      const slug = slugOf(f.family);
       try {
         const r = await fetch(f.url);
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
