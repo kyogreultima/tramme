@@ -5,7 +5,7 @@
 
 import { Evaluator, sampleAt, type PlacedLayer, type Registry, type TrammeDoc } from '@tramme/core';
 import { builtinRegistry } from '@tramme/nodes';
-import { planIssues, type FilmPlan, type PictureKind } from './filmplan.ts';
+import { planIssues, type FilmPlan, type PictureKind, type PlanScene } from './filmplan.ts';
 import { scenesOf, type Scene } from './scenes.ts';
 import { slug } from './model.ts';
 
@@ -55,8 +55,8 @@ export function formOf(doc: TrammeDoc, compId: string, opts: { registry?: Regist
 
 const quoted = (names: string[]) => names.map((n) => `"${n}"`).join(', ').replace(/, ([^,]*)$/, ' and $1');
 
-/** the planned scene a built one stands for: by its id, its slug or its name */
-const plannedAs = (plan: FilmPlan, s: Scene) => plan.scenes.find((p) => p.id === s.id || p.id === slug(s.name) || p.name.toLowerCase() === s.name.toLowerCase());
+/** whether a built scene is the planned one: by its id, its slug or its name */
+export const planMatches = (p: PlanScene, s: Scene) => p.id === s.id || p.id === slug(s.name) || p.name.toLowerCase() === s.name.toLowerCase();
 
 /** the lines the check adds about the forms of the scenes: the repeats, the scenes built off their plan, the plan's own variety */
 export function formLines(doc: TrammeDoc, compId: string, plan: FilmPlan | null, registry?: Registry): string[] {
@@ -72,7 +72,7 @@ export function formLines(doc: TrammeDoc, compId: string, plan: FilmPlan | null,
   }
   if (plan) {
     scenes.forEach((s, i) => {
-      const planned = plannedAs(plan, s);
+      const planned = plan.scenes.find((p) => planMatches(p, s));
       if (planned && forms[i].kind && planned.kind !== forms[i].kind) out.push(`"${s.name}" is planned as ${planned.kind} but built as ${forms[i].kind} (${forms[i].why}): rebuild it in its kind, or change the plan.`);
     });
     out.push(...planIssues(plan).map((l) => `Film plan: ${l}`));
