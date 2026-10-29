@@ -3,6 +3,7 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { searchSounds, variantsOf, type SoundEntry, type ToolContext, type Transcript, type TrammeDoc } from '@tramme/core';
 import { builtinRegistry } from '@tramme/nodes';
+import { newProject } from '@tramme/project';
 import { momentsOf, SOUND_TOOLS } from '../src/sound.ts';
 import { SOUND_PRESETS } from '../src/sound-presets.ts';
 // the preferences the tools read (imported here, before any module reset)
@@ -14,6 +15,65 @@ const library = [...catalog, ...SOUND_PRESETS];
 const tool = (name: string) => SOUND_TOOLS.find((x) => x.name === name)!;
 /** the audio layers a tool adds */
 const audioLayers = (ops: any[]) => ops.filter((o) => o.op === 'add' && /^\/compositions\/main\/layers\/[^/]+$/.test(o.path) && o.value.type === 'audio').map((o) => o.value);
+
+describe('the credits', () => {
+  const credits = SOUND_TOOLS.find((x) => x.name === 'credits')!;
+  const doc = () => {
+    const d = newProject({ name: 'Credits', width: 1920, height: 1080, fps: 30, duration: 10 }).doc;
+    d.assets.bed = { type: 'audio', src: 'assets/sounds/bed.mp3', name: 'Bed' };
+    d.assets.hit = { type: 'audio', src: 'assets/sounds/hit.mp3', name: 'Hit' };
+    const c = d.compositions[d.root];
+    c.layers = { bed: { type: 'audio', props: { audio: 'bed' } }, hit: { type: 'audio', props: { audio: 'hit' } } } as never;
+    c.order = ['bed', 'hit'];
+    return d;
+  };
+  const side: Record<string, unknown> = {
+    'assets/sounds/bed.sound.json': { title: 'Calm bed', author: 'Ana', license: 'CC0', url: 'https://freesound.org/bed' },
+    'assets/sounds/hit.sound.json': { provider: 'elevenlabs', model: 'eleven_sfx' },
+  };
+  const run = async (d: TrammeDoc, extra: Record<string, unknown> = {}) => {
+    const written = new Map<string, string>();
+    const records = { ...side, ...extra };
+    const ctx = { doc: d, compId: d.root, time: 0, selection: [], registry: builtinRegistry(), signal: new AbortController().signal,
+      readText: async (p: string) => (records[p] ? JSON.stringify(records[p]) : null), writeFile: async (p: string, data: string) => { written.set(p, data); return p; } } as unknown as ToolContext;
+    const out = await credits.run({} as never, ctx) as { text: string };
+    return { out, written };
+  };
+
+  it('keep the lines of the sounds as they were, in the same order, and write the file beside the video', async () => {
+    const { out, written } = await run(doc());
+    expect(written.get('assets/CREDITS.md')).toContain('- Bed: Calm bed, Ana, CC0 <https://freesound.org/bed>\n- Hit: made by elevenlabs (eleven_sfx)');
+    expect(written.get('assets/sounds/CREDITS.md')).toBe('# Sound credits: Credits\n\n- Bed: Calm bed, Ana, CC0 <https://freesound.org/bed>\n- Hit: made by elevenlabs (eleven_sfx)\n');
+    expect(out.text).toContain('assets/CREDITS.md');
+  });
+
+  it('add the pictures, clips and models kept with a licence, and what a provider made', async () => {
+    const d = doc();
+    d.assets['image-stock-pexels-101'] = { type: 'image', src: 'assets/stock/stock-pexels-101.jpg', name: 'A bowl' };
+    d.assets['model-stock-polyhaven-alarm'] = { type: 'model', src: 'assets/stock/stock-polyhaven-alarm.glb', name: 'Alarm clock' };
+    d.assets['image-bowl'] = { type: 'image', src: 'assets/images/bowl.png', name: 'Bowl' };
+    d.assets['image-mine'] = { type: 'image', src: 'assets/mine.png', name: 'Mine' };
+    const { written } = await run(d, {
+      'assets/stock/stock-pexels-101.json': { title: 'A bowl of ramen', author: 'Pia', license: 'Pexels', landing: 'https://www.pexels.com/photo/101/' },
+      'assets/stock/stock-polyhaven-alarm.json': { title: 'Alarm Clock 01', author: 'Kirill', license: 'CC0', landing: 'https://polyhaven.com/a/alarm_clock_01' },
+      'assets/images/bowl.image.json': { provider: 'openai', model: 'gpt-image-2' },
+    });
+    const text = written.get('assets/CREDITS.md')!;
+    expect(text).toContain('## Pictures, clips and models');
+    expect(text).toContain('- A bowl: A bowl of ramen, Pia, Pexels <https://www.pexels.com/photo/101/>');
+    expect(text).toContain('- Alarm clock: Alarm Clock 01, Kirill, CC0 <https://polyhaven.com/a/alarm_clock_01>');
+    expect(text).toContain('- Bowl: made by openai (gpt-image-2)');
+    expect(text).not.toContain('Mine');
+    expect(text.indexOf('Calm bed')).toBeLessThan(text.indexOf('## Pictures'));
+  });
+
+  it('say there is nothing to credit when there is no sound and no credited file', async () => {
+    const d = newProject({ name: 'Empty', width: 1920, height: 1080, fps: 30, duration: 10 }).doc;
+    const { out, written } = await run(d);
+    expect(out.text).toMatch(/Nothing to credit/);
+    expect(written.size).toBe(0);
+  });
+});
 
 describe('the sound library', () => {
   it('holds every file it lists, once, measured and described', () => {
