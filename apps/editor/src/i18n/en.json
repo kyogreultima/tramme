@@ -1381,7 +1381,9 @@
     "listen": "To check by ear: {times}",
     "mixPicture": "The mix: waveform, spectrogram, picture motion",
     "contactSheet": "Contact sheet of the key moments",
-    "motionStrip": "Movement from {from} to {to} s"
+    "motionStrip": "Movement from {from} to {to} s",
+    "compared": "Likeness to the target {score} of 100",
+    "compareSheet": "Render, target and difference"
   },
   "blocks": {
     "saved": "Block \"{name}\" saved.",
