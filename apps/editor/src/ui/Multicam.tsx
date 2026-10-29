@@ -28,7 +28,8 @@ export async function makeMulticam(ids: string[]): Promise<boolean> {
 }
 
 export function MulticamPanel() {
-  const open = multicam.value, c = comp.value, now = uiTime.value;
+  // over every page, the start page too: the document is read only once there is one and the panel is open
+  const open = multicam.value, c = open && S.doc.value ? comp.value : null, now = uiTime.value;
   const cut = (track: string) => {
     const compId = S.compId.peek(), at = snap(S.time.peek(), S.doc.peek().compositions[compId].fps);
     commit(t('timeline.switchCamera'), switchAngleOps(S.doc.peek(), compId, multicam.peek()?.tracks ?? [], track, at));
@@ -44,7 +45,7 @@ export function MulticamPanel() {
     addEventListener('keydown', key);
     return () => removeEventListener('keydown', key);
   }, [open]);
-  if (!open || open.tracks.some((id) => !c.tracks?.some((x) => x.id === id))) return null;
+  if (!open || !c || open.tracks.some((id) => !c.tracks?.some((x) => x.id === id))) return null;
   // the camera on show at the playhead: the visible clip of its track
   const shown = (track: string) => trackClips(c, track).some((k) => k.in <= now && now < k.out && c.layers[k.id].visible !== false);
   return (
