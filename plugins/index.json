@@ -135,7 +135,7 @@
   {
     "file": "walkthrough.js",
     "name": "UI walkthrough",
-    "description": "A phone or browser frame for screenshots, a clicking cursor, and a tool that lays the walkthrough out",
+    "description": "A phone, browser or window frame for screenshots or for an interface built in layers, a clicking cursor, and tools that lay the walkthrough and the frame out",
     "commands": [
       {
         "name": "walkthrough",

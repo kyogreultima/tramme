@@ -36,7 +36,7 @@ Pivot-style stick figures: fixed-length segments posed by joint angles, two-bone
 
 ## UI walkthrough
 
-A phone or browser frame for screenshots, a clicking cursor, and a tool that lays the walkthrough out
+A phone, browser or window frame for screenshots or for an interface built in layers, a clicking cursor, and tools that lay the walkthrough and the frame out
 
 - Tools: `/walkthrough` — Lay out a walkthrough, `/device-screen` — Frame for an interface built in layers
 - Nodes: `ui.device` — Device, `ui.cursor` — Cursor

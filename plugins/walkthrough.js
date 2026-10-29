@@ -84,7 +84,8 @@ const device = {
         if (p.shadow) { ctx.save(); ctx.shadowColor = 'rgba(0,0,0,0.45)'; ctx.shadowBlur = w * 0.08; ctx.shadowOffsetY = w * 0.02; ctx.fillStyle = p.bezel; ctx.beginPath(); ctx.roundRect(-w / 2, -h / 2, w, h, radius); ctx.fill(); ctx.restore(); }
         else { ctx.fillStyle = p.bezel; ctx.beginPath(); ctx.roundRect(-w / 2, -h / 2, w, h, radius); ctx.fill(); }
       }
-      if (drawOver && !isPhone) (p.device === 'window' ? drawWindowBar : drawBrowserBar)(ctx, w, barH, p.url, family);
+      // the bars are drawn from their own top left corner: the frame's origin is its centre
+      if (drawOver && !isPhone) { ctx.save(); ctx.translate(-w / 2, -h / 2); (p.device === 'window' ? drawWindowBar : drawBrowserBar)(ctx, w, barH, p.url, family); ctx.restore(); }
       // the screen: the screenshot fits the width, the scroll pans it; without one, its colour
       if (drawUnder) {
         ctx.save();
@@ -96,12 +97,6 @@ const device = {
         } else {
           ctx.fillStyle = p.fill;
           ctx.fillRect(sx, sy, screenW, screenH);
-          if (part === 'whole') {
-            ctx.fillStyle = 'rgba(128,128,128,0.25)';
-            ctx.font = `500 ${Math.round(w * 0.05)}px ${family}system-ui, sans-serif`;
-            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-            ctx.fillText('Drop a screenshot', sx + screenW / 2, sy + screenH / 2);
-          }
         }
         ctx.restore();
       }
@@ -251,7 +246,7 @@ const deviceScreen = {
   },
 };
 
-export const meta = { id: 'tramme/walkthrough', name: 'walkthrough', version: '1.2.0', description: 'A phone or browser frame for screenshots, a clicking cursor, and a tool that lays out the walkthrough', api: 1 };
+export const meta = { id: 'tramme/walkthrough', name: 'walkthrough', version: '1.2.0', description: 'A phone, browser or window frame for screenshots or for an interface built in layers, a clicking cursor, and tools that lay out the walkthrough and the frame', api: 1 };
 export const nodes = [device, cursor];
 export const tools = [walkthrough, deviceScreen];
 export const presets = [
