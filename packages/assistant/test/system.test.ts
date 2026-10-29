@@ -63,3 +63,27 @@ describe('the packs\' entries in the prompt', () => {
     expect(systemParts(REF).fixed).not.toContain('Entries of the editor');
   });
 });
+
+describe('the finish rules', () => {
+  const { fixed } = systemParts(REF);
+  const finish = fixed.slice(fixed.indexOf('Finish:'), fixed.indexOf('Motion:'));
+
+  it('say to search the vocabulary before writing a plugin', () => {
+    expect(finish).toContain('search the vocabulary');
+    expect(finish).toContain('two or three words');
+    expect(finish).toContain('what you searched');
+  });
+
+  it('say a warning is fixed or raised, never dismissed', () => {
+    expect(finish).toContain('never dismissed');
+    expect(finish).toContain('fix the cause once');
+  });
+
+  it('say how long the speaker may be alone on screen', () => {
+    expect(finish).toContain('20 s');
+  });
+
+  it('say the plugins written are listed to the user for the library', () => {
+    expect(finish).toContain('library');
+  });
+});
