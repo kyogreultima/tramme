@@ -49,6 +49,8 @@ On the bilal project as the run of 2026-10-28 left it (the check the assistant r
 ### Step 5. The missing vocabulary ([plan](superpowers/plans/2026-10-29-taste-and-finish-step5-missing-vocabulary.md))
 
 - [ ] Interface pieces, layers in perspective, a camera onto a detail, simple 3D solids, finance charts, the comparison of a render with a picture.
+  - [x] Layers in perspective and a picture pinned on four corners (`rotationX`, `rotationY`, `fx.pin`, `pin`), a camera onto a detail (`push-in`).
+  - [ ] Interface pieces (pack), 3D solids with materials, candlesticks and price lines, `compare`, and the guide's lines on them: the plan's tasks 4 to 7 and the rest of 8 and 9.
 
 ### Step 6. The critic ([plan](superpowers/plans/2026-10-29-taste-and-finish-step6-critic.md))
 

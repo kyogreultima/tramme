@@ -76,6 +76,16 @@ describe('the direction rules', () => {
   });
 });
 
+describe('the depth and camera rules', () => {
+  const { fixed } = systemParts(REF);
+  const depth = fixed.slice(fixed.indexOf('Depth and camera:'), fixed.indexOf('Repetition:'));
+
+  it('sit after the motion rules and name the tilts, the pin and the push', () => {
+    expect(fixed.indexOf('Depth and camera:')).toBeGreaterThan(fixed.indexOf('Motion:'));
+    for (const word of ['rotationX', 'rotationY', 'pin', 'push-in']) expect(depth, word).toContain(word);
+  });
+});
+
 describe('the material rules', () => {
   const { fixed } = systemParts(REF);
   const material = fixed.slice(fixed.indexOf('Material:'), fixed.indexOf('Clips:'));
