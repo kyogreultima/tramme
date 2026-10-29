@@ -19,6 +19,10 @@ const STANDARD: Bezier = [0.4, 0, 0.2, 1], EMPHASIZED: Bezier = [0.2, 0, 0, 1];
 export function style(doc: TrammeDoc) {
   const has = (n: string, type: string) => doc.tokens?.[n]?.type === type;
   const num = (n: string, d: number) => (has(n, 'number') ? Number(doc.tokens[n].value) || d : d);
+  const fonts = Object.entries(doc.assets).filter(([, a]) => a.type === 'font');
+  /** the face of the text: the font asset named "(text)" when the film has one, else its first font */
+  const named = (role: string) => fonts.find(([, a]) => (a.name ?? '').toLowerCase().endsWith(`(${role})`))?.[0];
+  const font = named('text') ?? fonts[0]?.[0] ?? null;
   const firstColor = Object.entries(doc.tokens ?? {}).find(([n, t]) => t.type === 'color' && !/plate|bg|back|ink|night|paper/i.test(n))?.[0];
   return {
     accent: has('accent', 'color') ? '@accent' : firstColor ? `@${firstColor}` : '#2EC4B6',
@@ -32,7 +36,9 @@ export function style(doc: TrammeDoc) {
     emphasized: (has('emphasized', 'ease') ? '@emphasized' : EMPHASIZED) as EaseSpec,
     pace: num('pace', 0.6),
     stagger: num('stagger', 0.06),
-    font: Object.entries(doc.assets).find(([, a]) => a.type === 'font')?.[0] ?? null,
+    font,
+    /** the face of headlines: the font asset named "(display)" when the film has one, else the text face */
+    display: named('display') ?? font,
   };
 }
 
@@ -91,11 +97,11 @@ const kineticTitle: ToolType<TitleArgs> = {
     const words = a.text.split(/\s+/).filter(Boolean);
     if (!words.length) throw new Error('kinetic-title: text is empty');
     // lines within 84 % of the width
-    const space = measure(doc, ' ', size, weight, s.font), max = c.width * 0.84;
+    const space = measure(doc, ' ', size, weight, s.display), max = c.width * 0.84;
     const lines: { word: string; w: number; i: number }[][] = [[]];
     let lineW = 0;
     words.forEach((word, i) => {
-      const w = measure(doc, word, size, weight, s.font);
+      const w = measure(doc, word, size, weight, s.display);
       if (lines.at(-1)!.length && lineW + space + w > max) { lines.push([]); lineW = 0; }
       lineW += (lines.at(-1)!.length ? space : 0) + w;
       lines.at(-1)!.push({ word, w, i });
@@ -122,7 +128,7 @@ const kineticTitle: ToolType<TitleArgs> = {
         if (kind === 'blur') effects.push({ id: 'blur', type: 'fx.blur', props: { radius: { $k: [{ t: t0, v: Math.round(size * 0.25), ease: s.enter }, { t: r(t1 + 0.1), v: 0 }] } } });
         children.push(add(`word-${i + 1}`, {
           type: 'text', name: word, transform, ...(effects.length ? { effects } : {}),
-          props: { text: word, size, weight, align: 'left', baseline: 'middle', tracking: -0.01, color: a.emphasis === i + 1 ? s.accent : s.ink, ...(s.font ? { font: s.font } : {}) },
+          props: { text: word, size, weight, align: 'left', baseline: 'middle', tracking: -0.01, color: a.emphasis === i + 1 ? s.accent : s.ink, ...(s.display ? { font: s.display } : {}) },
         }, false));
         x += w + space;
       }
@@ -172,7 +178,7 @@ const barChart: ToolType<ChartArgs> = {
     const slot = boxW / rows.length, bw = r(slot * 0.62), labelSize = Math.round(u * 0.034), valueSize = Math.round(u * 0.052);
     const { add, done } = adder(doc, ctx.compId);
     const fadeOut = { $k: [{ t: r(end - 0.35), v: 1, ease: s.exit }, { t: end, v: 0 }] };
-    if (a.title) add('chart-title', { type: 'text', name: a.title, in: at, out: end, transform: { position: { $k: [{ t: at, v: [r(c.width / 2), r(base - boxH - u * 0.1 + u * 0.03)], ease: s.enter }, { t: r(at + s.pace), v: [r(c.width / 2), r(base - boxH - u * 0.1)] }] }, opacity: { $k: [{ t: at, v: 0, ease: s.enter }, { t: r(at + s.pace), v: 1 }, { t: r(end - 0.35), v: 1, ease: s.exit }, { t: end, v: 0 }] } }, props: { text: a.title, size: Math.round(u * 0.055), weight: 800, align: 'center', baseline: 'middle', color: s.ink, ...(s.font ? { font: s.font } : {}) } });
+    if (a.title) add('chart-title', { type: 'text', name: a.title, in: at, out: end, transform: { position: { $k: [{ t: at, v: [r(c.width / 2), r(base - boxH - u * 0.1 + u * 0.03)], ease: s.enter }, { t: r(at + s.pace), v: [r(c.width / 2), r(base - boxH - u * 0.1)] }] }, opacity: { $k: [{ t: at, v: 0, ease: s.enter }, { t: r(at + s.pace), v: 1 }, { t: r(end - 0.35), v: 1, ease: s.exit }, { t: end, v: 0 }] } }, props: { text: a.title, size: Math.round(u * 0.055), weight: 800, align: 'center', baseline: 'middle', color: s.ink, ...(s.display ? { font: s.display } : {}) } });
     add('chart-axis', { type: 'shape.rect', name: 'Axis', in: at, out: end, transform: { position: [r(c.width / 2), base], scale: { $k: [{ t: at, v: [0, 1], ease: s.enter }, { t: r(at + s.pace), v: [1, 1] }] }, opacity: fadeOut }, props: { size: [r(boxW), Math.max(2, Math.round(u * 0.004))], fill: s.ink } });
     const best = rows.reduce((b, x, i) => (x.value > rows[b].value ? i : b), 0);
     rows.forEach((row, i) => {
@@ -212,7 +218,7 @@ const stat: ToolType<StatArgs> = {
     const roll = r(Math.max(0.9, s.pace * 2.2));
     const { add, done } = adder(doc, ctx.compId);
     const fade = (t0: number) => enterThenOut(s, t0, t0 + s.pace * 0.6, end);
-    add('stat-value', { type: 'text.counter', name: a.value, in: at, out: end, transform: { position: { $k: [{ t: at, v: [r(c.width / 2), r(y + size * 0.15)], ease: s.enter }, { t: r(at + s.pace), v: [r(c.width / 2), r(y)] }] }, opacity: fade(at) }, props: { from: a.value.replace(/\d/g, '0'), to: a.value, progress: { $k: [{ t: at, v: 0, ease: s.enter }, { t: r(at + roll), v: 1 }] }, turns: 1, size, weight: 900, align: 'center', color: s.accent, ...(s.font ? { font: s.font } : {}) } });
+    add('stat-value', { type: 'text.counter', name: a.value, in: at, out: end, transform: { position: { $k: [{ t: at, v: [r(c.width / 2), r(y + size * 0.15)], ease: s.enter }, { t: r(at + s.pace), v: [r(c.width / 2), r(y)] }] }, opacity: fade(at) }, props: { from: a.value.replace(/\d/g, '0'), to: a.value, progress: { $k: [{ t: at, v: 0, ease: s.enter }, { t: r(at + roll), v: 1 }] }, turns: 1, size, weight: 900, align: 'center', color: s.accent, ...(s.display ? { font: s.display } : {}) } });
     if (a.label) add('stat-label', { type: 'text', name: a.label, in: at, out: end, transform: { position: { $k: [{ t: r(at + roll * 0.6), v: [r(c.width / 2), r(y + size * 0.42)], ease: s.enter }, { t: r(at + roll * 0.6 + s.pace), v: [r(c.width / 2), r(y + size * 0.36)] }] }, opacity: fade(r(at + roll * 0.6)) }, props: { text: a.label, size: Math.round(u * 0.05), weight: 600, align: 'center', baseline: 'top', color: s.ink, ...(s.font ? { font: s.font } : {}) } });
     return { ops: done(), label: `Key figure ${a.value}`, text: `Key figure ${a.value} rolling up from ${at} s for ${roll} s, on screen until ${end} s.` };
   },
@@ -289,21 +295,21 @@ const quote: ToolType<{ text: string; author?: string; at?: number; duration?: n
   run(a, ctx) {
     const doc = ctx.doc, c = compOf(ctx), s = style(doc), at = atOf(ctx, a.at), end = r(at + (a.duration ?? 5));
     const u = Math.min(c.width, c.height), size = a.text.length > 120 ? Math.round(u * 0.062) : Math.round(u * 0.075), weight = 500;
-    const lines = wrapWords(doc, a.text, size, weight, s.font, 0.74, c.width);
+    const lines = wrapWords(doc, a.text, size, weight, s.display, 0.74, c.width);
     const words = lines.flat();
     if (!words.length) throw new Error('quote: text is empty');
     const lh = size * 1.34, y = a.place === 'top' ? c.height * 0.26 : a.place === 'bottom' ? c.height * 0.62 : c.height * 0.42;
     const { add, done } = adder(doc, ctx.compId);
     const children: string[] = [];
-    children.push(add('quote-mark', { type: 'text', name: 'Quote mark', transform: { position: [0, r(-(lines.length * lh) / 2 - size * 0.28)], opacity: { $k: [{ t: at, v: 0, ease: s.enter }, { t: r(at + s.pace), v: 1 }] } }, props: { text: '“', size: Math.round(size * 2.4), weight: 900, align: 'left', baseline: 'alphabetic', color: s.accent, ...(s.font ? { font: s.font } : {}) } }, false));
+    children.push(add('quote-mark', { type: 'text', name: 'Quote mark', transform: { position: [0, r(-(lines.length * lh) / 2 - size * 0.28)], opacity: { $k: [{ t: at, v: 0, ease: s.enter }, { t: r(at + s.pace), v: 1 }] } }, props: { text: '“', size: Math.round(size * 2.4), weight: 900, align: 'left', baseline: 'alphabetic', color: s.accent, ...(s.display ? { font: s.display } : {}) } }, false));
     let rank = 0;
-    const space = measure(doc, ' ', size, weight, s.font);
+    const space = measure(doc, ' ', size, weight, s.display);
     lines.forEach((line, li) => {
-      const total = line.reduce((t, wd) => t + measure(doc, wd, size, weight, s.font), 0) + space * (line.length - 1);
+      const total = line.reduce((t, wd) => t + measure(doc, wd, size, weight, s.display), 0) + space * (line.length - 1);
       let x = -total / 2;
       for (const word of line) {
-        const w = measure(doc, word, size, weight, s.font), t0 = r(at + 0.25 + rank * s.stagger * 1.6), cy = r(li * lh - ((lines.length - 1) * lh) / 2);
-        children.push(add(`quote-word-${rank + 1}`, { type: 'text', name: word, transform: { anchor: [0, 0], position: [r(x), cy], opacity: { $k: [{ t: t0, v: 0, ease: s.enter }, { t: r(t0 + s.pace * 0.9), v: 1 }] } }, props: { text: word, size, weight, align: 'left', baseline: 'top', color: a.emphasis === rank + 1 ? s.accent : s.ink, ...(s.font ? { font: s.font } : {}) } }, false));
+        const w = measure(doc, word, size, weight, s.display), t0 = r(at + 0.25 + rank * s.stagger * 1.6), cy = r(li * lh - ((lines.length - 1) * lh) / 2);
+        children.push(add(`quote-word-${rank + 1}`, { type: 'text', name: word, transform: { anchor: [0, 0], position: [r(x), cy], opacity: { $k: [{ t: t0, v: 0, ease: s.enter }, { t: r(t0 + s.pace * 0.9), v: 1 }] } }, props: { text: word, size, weight, align: 'left', baseline: 'top', color: a.emphasis === rank + 1 ? s.accent : s.ink, ...(s.display ? { font: s.display } : {}) } }, false));
         x += w + space;
         rank++;
       }
@@ -384,7 +390,7 @@ const listRecipe: ToolType<{ items: string; title?: string; marker?: 'check' | '
     const blockW = mw * 1.9 + maxText, top = c.height * (a.title ? 0.4 : 0.44) - ((items.length - 1) * lh) / 2;
     const { add, done } = adder(doc, ctx.compId);
     const fadeOut = { $k: [{ t: r(end - 0.35), v: 1, ease: s.exit }, { t: end, v: 0 }] };
-    if (a.title) add('list-title', { type: 'text', name: a.title, in: at, out: end, transform: { position: [r(c.width / 2), r(top - lh * 0.9)], opacity: enterThenOut(s, at, at + s.pace, end) }, props: { text: a.title, size: Math.round(u * 0.06), weight: 800, align: 'center', baseline: 'middle', color: s.ink, ...(s.font ? { font: s.font } : {}) } });
+    if (a.title) add('list-title', { type: 'text', name: a.title, in: at, out: end, transform: { position: [r(c.width / 2), r(top - lh * 0.9)], opacity: enterThenOut(s, at, at + s.pace, end) }, props: { text: a.title, size: Math.round(u * 0.06), weight: 800, align: 'center', baseline: 'middle', color: s.ink, ...(s.display ? { font: s.display } : {}) } });
     const children: string[] = [];
     items.forEach((item, i) => {
       const t0 = r(at + 0.2 + i * step), y = r(i * lh), x0 = -blockW / 2;
@@ -434,7 +440,7 @@ const timeline: ToolType<{ data: string; title?: string; at?: number; duration?:
     const labelSize = Math.round(u * 0.036), textSize = Math.round(u * 0.03);
     const { add, done } = adder(doc, ctx.compId);
     const fadeOut = { $k: [{ t: r(end - 0.35), v: 1, ease: s.exit }, { t: end, v: 0 }] };
-    if (a.title) add('timeline-title', { type: 'text', name: a.title, in: at, out: end, transform: { position: [r(c.width / 2), r(lineY - u * 0.22)], opacity: enterThenOut(s, at, at + s.pace, end) }, props: { text: a.title, size: Math.round(u * 0.06), weight: 800, align: 'center', baseline: 'middle', color: s.ink, ...(s.font ? { font: s.font } : {}) } });
+    if (a.title) add('timeline-title', { type: 'text', name: a.title, in: at, out: end, transform: { position: [r(c.width / 2), r(lineY - u * 0.22)], opacity: enterThenOut(s, at, at + s.pace, end) }, props: { text: a.title, size: Math.round(u * 0.06), weight: 800, align: 'center', baseline: 'middle', color: s.ink, ...(s.display ? { font: s.display } : {}) } });
     // the rect is drawn centred on its origin: the anchor sits on the middle of its left edge, so the line grows from x 0.11 toward 0.89, centred on the dots
     add('timeline-line', { type: 'shape.rect', name: 'Line', in: at, out: end, transform: { anchor: [-r(span / 2), 0], position: [r(c.width * 0.11), r(lineY)], scale: { $k: [{ t: at, v: [0, 1], ease: s.enter }, { t: r(at + s.pace * 2), v: [1, 1] }] }, opacity: fadeOut }, props: { size: [r(span), r(Math.max(2, u * 0.004))], fill: s.ink } });
     events.forEach((ev, i) => {
