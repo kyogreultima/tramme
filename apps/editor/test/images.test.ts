@@ -12,13 +12,16 @@ vi.stubGlobal('addEventListener', () => {});
 
 // the files the pictures are kept in, and the canvas, are the browser's: the tool is read through what it records
 const kept: Record<string, unknown>[] = [];
+const placed: Record<string, unknown>[] = [];
 vi.mock('../src/media.ts', async (original) => ({
   ...(await original<typeof import('../src/media.ts')>()),
   canvasOf: (width: number, height: number) => ({ c: { width, height }, g: { drawImage() {} } }),
   dataUrl: async () => 'data:,reference',
   keepMedia: async (_ctx: unknown, _kind: string, _name: string, _blob: Blob, record: Record<string, unknown>) => { kept.push(record); return { asset: 'image-x', ops: [], reload: [] }; },
-  placeMedia: () => ({ ops: [], layer: 'layer-x' }),
+  placeMedia: (_ctx: unknown, _kind: string, asset: string, name: string, o: Record<string, unknown>) => { placed.push({ asset, name, ...o }); return { ops: [], layer: 'layer-x' }; },
 }));
+let cut = 0.4;
+vi.mock('../src/removebg.ts', async (original) => ({ ...(await original<typeof import('../src/removebg.ts')>()), cutoutBlob: async () => ({ blob: new Blob(['cut'], { type: 'image/png' }), kept: cut }) }));
 vi.mock('../src/perception.ts', async (original) => ({ ...(await original<typeof import('../src/perception.ts')>()), jpegOf: () => 'data:image/jpeg;base64,x' }));
 
 const images = await import('../src/images.ts');
@@ -111,9 +114,11 @@ describe('a style frame as the reference of a picture', () => {
   const ctx = {
     doc: { compositions: { main: { width: 1920, height: 1080, fps: 30, duration: 10, layers: {}, order: [] } }, assets: {}, tokens: {} }, compId: 'main',
     fileUrl: (path: string) => `/files/${path}`, assetUrl: () => '', signal: new AbortController().signal,
+    readText: async (path: string) => files.get(path) ?? null,
   } as unknown as ToolContext;
+  const files = new Map<string, string>();
   const tool = images.IMAGE_TOOLS[0];
-  afterEach(() => { vi.restoreAllMocks(); confirm.turnEnds(); kept.length = 0; seen.length = 0; });
+  afterEach(() => { vi.restoreAllMocks(); confirm.turnEnds(); kept.length = 0; placed.length = 0; seen.length = 0; files.clear(); cut = 0.4; });
   const arrange = () => {
     vi.stubGlobal('fetch', async (url: string) => { seen.push(url); return url.includes('missing') ? { ok: false, status: 404 } : { ok: true, blob: async () => new Blob(['frame']) }; });
     vi.stubGlobal('createImageBitmap', async () => ({ width: 1600, height: 900, close() {} }));
@@ -139,5 +144,49 @@ describe('a style frame as the reference of a picture', () => {
   it('keeps an asset id exactly as before: it must be an image asset of the project', async () => {
     arrange();
     await expect(tool.run({ prompt: 'a plate', provider: 'openai', reference: 'nope' }, ctx)).rejects.toThrow(/an image asset of the project/);
+  });
+
+  describe('an object on a transparent ground', () => {
+    const SUFFIX = 'A single object, whole and centred, on a plain flat ground of one colour, soft even light, nothing else in the frame, no text, no shadow on the ground.';
+
+    it('asks for one object on a flat ground, cuts it out, and places it whole', async () => {
+      arrange();
+      const ask = vi.spyOn(api, 'generateImages').mockResolvedValue(made());
+      await tool.run({ prompt: 'a ceramic bowl of ramen', object: true }, ctx);
+      expect(ask.mock.calls[0][0].prompt.trimEnd().endsWith(SUFFIX)).toBe(true);
+      expect(kept[0]).toMatchObject({ object: true, kept: 0.4 });
+      expect(placed[0]).toMatchObject({ fit: 'contain', background: false, size: [648, 648] });
+    });
+
+    it('draws in the style of the film\'s target when the plan has one', async () => {
+      arrange();
+      files.set('assets/film-plan.json', JSON.stringify({ version: 1, kind: 'film-plan', updated: '', idea: 'x', kinds: [], scenes: [], directions: [], target: 'assets/frames/the-app-ink.jpg' }));
+      const ask = vi.spyOn(api, 'generateImages').mockResolvedValue(made());
+      await tool.run({ prompt: 'a phone', object: true, provider: 'openai' }, ctx);
+      expect(seen).toEqual(['/files/assets/frames/the-app-ink.jpg']);
+      expect(ask.mock.calls[0][0].reference).toBe('data:,reference');
+      expect(ask.mock.calls[0][0].prompt).toContain('in the style of the reference picture: its rendering, light and palette, not its content');
+      expect(kept[0].reference).toBe('assets/frames/the-app-ink.jpg');
+    });
+
+    it('never makes an object the background', async () => {
+      arrange();
+      const ask = vi.spyOn(api, 'generateImages').mockResolvedValue(made());
+      await expect(tool.run({ prompt: 'a phone', object: true, background: true }, ctx)).rejects.toThrow(/never a background/);
+      expect(ask).not.toHaveBeenCalled();
+    });
+
+    it('keeps the asset and says the cutout looks wrong when the subject is almost gone, or almost everything', async () => {
+      arrange();
+      vi.spyOn(api, 'generateImages').mockResolvedValue(made());
+      cut = 0.01;
+      const small = await tool.run({ prompt: 'a lamp', object: true }, ctx) as { text: string };
+      expect(small.text).toMatch(/cutout looks wrong/);
+      expect(kept).toHaveLength(1);
+      cut = 0.95;
+      expect(((await tool.run({ prompt: 'a lamp', object: true }, ctx)) as { text: string }).text).toMatch(/cutout looks wrong/);
+      cut = 0.4;
+      expect(((await tool.run({ prompt: 'a lamp', object: true }, ctx)) as { text: string }).text).not.toMatch(/cutout looks wrong/);
+    });
   });
 });
