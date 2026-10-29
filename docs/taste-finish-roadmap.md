@@ -2,7 +2,7 @@
 
 How Tramme's assistant reaches the production level of the `marketing` reference from a prompt alone, with no asset given, and dresses a talking video as a human editor would. The design is [the spec](superpowers/specs/2026-10-29-taste-and-finish-design.md): the bar is the level of finish, never the look or the genre. Each step gets its own plan in `docs/superpowers/plans/`, lands on its own and is measured before the next; tick the boxes as they land.
 
-Status: steps 1 and 2 built, waiting for their measure (the baseline of step 0 is the user's to run, from the `taste-baseline` tag).
+Status: steps 1 to 5 built, waiting for their measure (the baseline of step 0 is the user's to run, from the `taste-baseline` tag).
 
 ## Measuring
 
@@ -48,9 +48,10 @@ On the bilal project as the run of 2026-10-28 left it (the check the assistant r
 
 ### Step 5. The missing vocabulary ([plan](superpowers/plans/2026-10-29-taste-and-finish-step5-missing-vocabulary.md))
 
-- [ ] Interface pieces, layers in perspective, a camera onto a detail, simple 3D solids, finance charts, the comparison of a render with a picture.
+- [x] Interface pieces, layers in perspective, a camera onto a detail, simple 3D solids, finance charts, the comparison of a render with a picture.
   - [x] Layers in perspective and a picture pinned on four corners (`rotationX`, `rotationY`, `fx.pin`, `pin`), a camera onto a detail (`push-in`).
-  - [ ] Interface pieces (pack), 3D solids with materials, candlesticks and price lines, `compare`, and the guide's lines on them: the plan's tasks 4 to 7 and the rest of 8 and 9.
+  - [x] Interface pieces (pack and `screen`), 3D solids with materials (`solid.3d`), candlesticks and price lines, `compare`, and the guide's lines on them.
+- [ ] One dev run on the trial server (the dressing brief of bilal and one launch brief): whether the interface scenes used `screen`, whether layers were tilted, whether `push-in` and `compare` ran, the operations per scene against step 4's run, the cost. Spends the user's quota, waits for their go.
 
 ### Step 6. The critic ([plan](superpowers/plans/2026-10-29-taste-and-finish-step6-critic.md))
 
