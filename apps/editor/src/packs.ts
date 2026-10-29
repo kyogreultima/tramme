@@ -27,6 +27,8 @@ export interface PackEntry {
   version?: string;
   /** the pack's tools as the / menu lists them, generated from the modules by scripts/packs/index.ts */
   commands?: PackCommand[];
+  /** what each of the pack's nodes, effects and tools is for, one line each, generated with the commands */
+  entries?: { name: string; kind: 'node' | 'tool' | 'effect'; line: string }[];
   /** the French of those commands' titles and descriptions */
   fr?: Record<string, string>;
 }
