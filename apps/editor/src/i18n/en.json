@@ -1763,6 +1763,9 @@
   "stabilize": {
     "reading": "reading the shake"
   },
+  "typefaces": {
+    "couldNotLoad": "could not load"
+  },
   "proxy": {
     "encoding": "encoding the proxy"
   },

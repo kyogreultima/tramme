@@ -4,6 +4,7 @@ import { TAGS, deriveTags } from '../../../scripts/typefaces/tags.ts';
 import type { Catalogue } from '../src/typefaces/catalogue.ts';
 import { FONTSOURCE_PIN, defaultWeights, fontFiles, slugOf } from '../src/typefaces/files.ts';
 import { scriptsOf, searchTypefaces } from '../src/typefaces/search.ts';
+import { specimenPlan } from '../src/typefaces/specimen.ts';
 
 const read = <T>(rel: string): T => JSON.parse(readFileSync(new URL(rel, import.meta.url), 'utf8'));
 const catalogue = read<Catalogue>('../data/typefaces.json');
@@ -234,5 +235,70 @@ describe('files at the pinned version', () => {
     expect(defaultWeights(font('archivo-black'), 'text')).toEqual([400]);
     expect(defaultWeights(font('lato'), 'display')).toEqual([700]);
     expect(defaultWeights({ ...font('lato'), weights: [300, 500] }, 'text')).toEqual([500]);
+  });
+});
+
+describe('the specimen sheet plan', () => {
+  const font = (id: string) => catalogue.fonts.find((f) => f.id === id)!;
+  const three = ['bebas-neue', 'inter', 'lora'].map(font);
+
+  it('lays out two columns of cells, the third on the second row', () => {
+    const plan = specimenPlan(three, {});
+    expect(plan.cells.map((c) => c.id)).toEqual(['bebas-neue', 'inter', 'lora']);
+    const [a, b, c] = plan.cells;
+    expect(a.y).toBe(b.y);
+    expect(b.x).toBeGreaterThan(a.x + a.w - 1);
+    expect(c.x).toBe(a.x);
+    expect(c.y).toBeGreaterThan(a.y + a.h - 1);
+    expect(plan.w).toBeGreaterThanOrEqual(b.x + b.w);
+    expect(plan.h).toBeGreaterThanOrEqual(c.y + c.h);
+  });
+
+  it('gives each cell its label, a large heavy line, a reading line and a figures line within its bounds', () => {
+    for (const cell of specimenPlan(three, {}).cells) {
+      expect(cell.lines).toHaveLength(4);
+      const [label, large, reading, figures] = cell.lines;
+      expect(label.text).toBe(font(cell.id).family);
+      expect(label.font).toMatch(/sans-serif$/);
+      expect(label.font).not.toContain(font(cell.id).family);
+      expect(large.font).toContain(`"${font(cell.id).family}"`);
+      expect(reading.font).toContain(`"${font(cell.id).family}"`);
+      expect(large.size).toBeGreaterThan(reading.size);
+      expect(figures.text).toBe('0123456789 · 40 € · 12,50 %');
+      for (const l of cell.lines) {
+        expect(l.y, cell.id).toBeGreaterThanOrEqual(0);
+        expect(l.y + l.size, cell.id).toBeLessThanOrEqual(cell.h);
+        expect(l.text.length * l.size * 0.55, `${cell.id}: ${l.text}`).toBeLessThanOrEqual(cell.w + 1);
+      }
+    }
+  });
+
+  it('writes the large line in the family\'s heaviest sensible weight, clamped to the weights it has', () => {
+    const [bebas, inter, lora] = specimenPlan(three, {}).cells.map((c) => c.lines[1].font);
+    expect(bebas).toBe('400 64px "Bebas Neue", sans-serif');
+    expect(inter).toBe('800 64px "Inter", sans-serif');
+    expect(lora).toMatch(/^700 64px "Lora"/);
+  });
+
+  it('cuts a sample longer than the cell with an ellipsis', () => {
+    const long = 'Une très longue phrase pour voir où elle est coupée dans la cellule';
+    const cell = specimenPlan([font('inter')], { text: long }).cells[0];
+    for (const l of cell.lines.slice(1, 3)) expect(l.text.endsWith('…') || l.text === long).toBe(true);
+    expect(cell.lines[1].text.endsWith('…')).toBe(true);
+    expect(cell.lines[1].text.length).toBeLessThan(long.length);
+  });
+
+  it('keeps six cells of seven fonts, and nothing of none', () => {
+    const seven = catalogue.fonts.slice(0, 7);
+    expect(specimenPlan(seven, {}).cells).toHaveLength(6);
+    const none = specimenPlan([], {});
+    expect(none.cells).toEqual([]);
+    expect(none.h).toBe(0);
+  });
+
+  it('uses the text it is given for the samples', () => {
+    const cell = specimenPlan([font('inter')], { text: 'Évasion' }).cells[0];
+    expect(cell.lines[1].text).toBe('Évasion');
+    expect(cell.lines[2].text).toBe('Évasion');
   });
 });
