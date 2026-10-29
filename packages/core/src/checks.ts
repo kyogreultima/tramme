@@ -424,6 +424,49 @@ const textContrast: CheckType = {
   },
 };
 
+/** a stretch of this many seconds (or more) with only the speaker on screen is worth a note, twice as much a warning */
+const BARE_NOTE = 12, BARE_WARNING = 20;
+
+const coverage: CheckType = {
+  name: 'coverage', title: 'Coverage', description: 'a stretch of a talking video with nothing on screen but the speaker',
+  texts: ['Only the speaker is on screen from {from} s to {to} s ({len} s)'],
+  run({ comp, samples }) {
+    const frame = comp.width * comp.height, whole: Rect = { x: 0, y: 0, w: comp.width, h: comp.height };
+    // the speaker is the media that fills the frame in most of the samples: a talking video, however it was cut
+    const filled = new Map<string, number>();
+    for (const s of samples) {
+      const here = new Set<string>();
+      for (const p of s.layers) if (p.node.type === 'video' && p.opacity > 0.3 && p.box && overlapArea(p.box, whole) >= 0.6 * frame) here.add(String(p.props.video));
+      for (const a of here) filled.set(a, (filled.get(a) ?? 0) + 1);
+    }
+    const [speaker, n] = [...filled.entries()].sort((a, b) => b[1] - a[1])[0] ?? [];
+    if (speaker === undefined || n < samples.length / 2) return [];
+    // what is on screen all film long (a logo, a frame, a progress bar) covers nothing
+    const seen = new Map<string, number>();
+    for (const s of samples) for (const p of s.layers) if (p.opacity > 0.3) seen.set(p.id, (seen.get(p.id) ?? 0) + 1);
+    const covers = (p: PlacedLayer) => p.opacity > 0.3 && !(p.node.type === 'video' && p.props.video === speaker) && p.node.type !== 'audio' && p.node.type !== 'captions'
+      && p.node.composes !== 'adjust' && !p.node.container && (seen.get(p.id) ?? 0) <= 0.8 * samples.length;
+    const out: QualityIssue[] = [];
+    let from = -1;
+    const close = (to: number) => {
+      const len = s2(to - from);
+      if (len < BARE_NOTE) return;
+      out.push({
+        check: 'coverage', severity: len > BARE_WARNING ? 'warning' : 'info', t: s2(from),
+        message: `Only the speaker is on screen from ${s2(from)} s to ${s2(to)} s (${len} s): put a title, an illustration or a keyword on it.`,
+        say: { text: 'Only the speaker is on screen from {from} s to {to} s ({len} s)', params: { from: s2(from), to: s2(to), len } },
+      });
+    };
+    for (const s of samples) {
+      const bare = !s.layers.some(covers);
+      if (bare && from < 0) from = s.t;
+      else if (!bare && from >= 0) { close(s.t); from = -1; }
+    }
+    if (from >= 0) close(comp.duration);
+    return out;
+  },
+};
+
 const overSubject: CheckType = {
   name: 'text-over-subject', title: 'Text over a person', description: 'text covering the face or the body of someone filmed (after the subjects tool)',
   texts: ['"{name}" covers a face at {t} s', '"{name}" covers someone at {t} s'],
@@ -779,7 +822,7 @@ const repeated: CheckType = {
   },
 };
 
-export const BUILTIN_CHECKS: CheckType[] = [textSize, textTime, safeZone, overlap, crossing, overSubject, overDetail, textContrast, crowd, stillness, linearTravel, springSettle, twinMotion, abruptEntrance, straightTravel, uniformStagger, repeated, sequenceCheck];
+export const BUILTIN_CHECKS: CheckType[] = [textSize, textTime, safeZone, overlap, crossing, overSubject, overDetail, textContrast, coverage, crowd, stillness, linearTravel, springSettle, twinMotion, abruptEntrance, straightTravel, uniformStagger, repeated, sequenceCheck];
 
 /** every check of the registry on one composition, the failures of a check reported as issues */
 export async function runChecks(doc: TrammeDoc, registry: Registry, compId = doc.root, { step = 0.25, only, data = () => undefined }: { step?: number; only?: string[]; data?: (assetId: string) => unknown } = {}): Promise<QualityIssue[]> {

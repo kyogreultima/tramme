@@ -138,6 +138,58 @@ describe('quality checks', () => {
     });
   });
 
+  describe('coverage of a talking video', () => {
+    const long = (layers: Record<string, Partial<Layer>>, duration = 40) => { const d = doc(layers); d.compositions.main.duration = duration; return d; };
+    const clip = (asset: string, from?: number, to?: number): Partial<Layer> => ({ type: 'video', in: from, out: to, transform: { position: [540, 960] }, props: { video: asset, size: [1080, 1920] } });
+    const title = (id: string, from: number, to: number) => ({ [id]: text(id, { in: from, out: to }) });
+    const coverage = async (d: TrammeDoc) => (await runChecks(d, builtinRegistry())).filter((i) => i.check === 'coverage');
+
+    it('flags a film with only the speaker and the captions on screen', async () => {
+      const found = await coverage(long({ talk: clip('talk'), words: { type: 'captions' } as Partial<Layer> }));
+      expect(found).toHaveLength(1);
+      expect(found[0]).toMatchObject({ severity: 'warning', t: 0 });
+      expect(found[0].message).toContain('from 0 s to 40 s (40 s)');
+    });
+
+    it('counts a speaker cut into pieces as one stretch', async () => {
+      const found = await coverage(long({ a: clip('talk', 0, 10), b: clip('talk', 10, 20), c: clip('talk', 20, 30), d: clip('talk', 30, 40) }));
+      expect(found).toHaveLength(1);
+      expect(found[0].message).toContain('(40 s)');
+    });
+
+    it('calls a gap of 12 to 20 s a note and a longer one a warning', async () => {
+      const gaps = await coverage(long({ talk: clip('talk'), ...title('one', 0, 3), ...title('two', 20, 23) }, 26));
+      expect(gaps.map((i) => `${i.severity}:${i.t}`)).toEqual(['info:3']);
+      const open = await coverage(long({ talk: clip('talk'), ...title('one', 0, 3) }, 26));
+      expect(open.map((i) => `${i.severity}:${i.t}`)).toEqual(['warning:3']);
+    });
+
+    it('lets a picture, another clip or a composition cover the speaker', async () => {
+      const d = long({
+        talk: clip('talk'),
+        pic: { type: 'image', in: 10, out: 14, transform: { position: [540, 960] }, props: { image: 'pic', size: [1080, 1920], fit: 'fill' } },
+        broll: clip('broll', 25, 30),
+        scene: { type: 'comp', in: 30, out: 36, transform: { position: [540, 960] }, props: { comp: 'inner' } },
+      });
+      d.compositions.inner = { name: 'Inner', width: 1080, height: 1920, fps: 30, duration: 6, layers: {}, order: [] };
+      expect(await coverage(d)).toEqual([]);
+    });
+
+    it('does not count a logo on all film, nor an adjustment layer', async () => {
+      const found = await coverage(long({
+        talk: clip('talk'),
+        logo: { type: 'shape.rect', transform: { position: [100, 100] }, props: { size: [80, 80] } },
+        grade: { type: 'adjust' } as Partial<Layer>,
+      }));
+      expect(found).toHaveLength(1);
+    });
+
+    it('stays silent without a full-frame video, and on a short one', async () => {
+      expect(await coverage(long({ ...title('t', 0, 40) }))).toEqual([]);
+      expect(await coverage(long({ talk: clip('talk') }, 10))).toEqual([]);
+    });
+  });
+
   it('run the checks of a plugin, and report one that fails', async () => {
     const custom: CheckType = { name: 'brand', description: 'logo present', run: () => [{ check: 'brand', severity: 'warning', message: 'no logo' }] };
     const broken: CheckType = { name: 'broken', description: 'fails', run: () => { throw new Error('boom'); } };
