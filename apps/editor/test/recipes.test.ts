@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { applyOps, runChecks, validate, type ToolContext, type TrammeDoc } from '@tramme/core';
 import { newProject } from '@tramme/project';
-import { BUILTIN_KITS, parseData, parseEvents, parseStops } from '../src/recipes.ts';
+import { BUILTIN_KITS, parseData, parseEvents, parseStops, style } from '../src/recipes.ts';
 import { editorRegistry } from '../src/vocabulary.ts';
 
 const reg = editorRegistry();
@@ -160,5 +160,46 @@ describe('recipes', () => {
     await expect(use(project(), 'timeline', { data: 'nothing' })).rejects.toThrow(/two events/);
     await expect(use(project(), 'list', { items: 'a,b,c,d,e,f,g,h,i' })).rejects.toThrow(/at most/);
     await expect(use(project(), 'quote', { text: '   ' })).rejects.toThrow(/empty/);
+  });
+});
+
+describe('the faces of a film', () => {
+  const withFonts = (...names: string[]) => {
+    const doc = project();
+    return { ...doc, assets: { ...doc.assets, ...Object.fromEntries(names.map((name) => [`font-${name.split(' ')[0].toLowerCase()}`, { type: 'font' as const, src: `assets/fonts/${name}.woff2`, family: name.split(' (')[0], name }])) } };
+  };
+  /** the layers of the main composition, the children of groups included, by id */
+  const layersOf = (doc: TrammeDoc) => Object.entries(doc.compositions.main.layers);
+
+  it('tell the display face from the text face', () => {
+    const two = withFonts('Bebas (display)', 'Inter (text)');
+    expect(style(two)).toMatchObject({ display: 'font-bebas', font: 'font-inter' });
+    // listed the other way round, the names decide
+    const swapped = withFonts('Inter (text)', 'Bebas (display)');
+    expect(style(swapped)).toMatchObject({ display: 'font-bebas', font: 'font-inter' });
+    expect(style(withFonts('Karla')).display).toBe('font-karla');
+    expect(style(withFonts('Karla')).font).toBe('font-karla');
+    expect(style(withFonts('Inter (text)')).display).toBe('font-inter');
+    expect(style(project())).toMatchObject({ display: null, font: null });
+  });
+
+  it('write the headlines in the display face and the rest in the text face', async () => {
+    let doc = await use(withFonts('Bebas (display)', 'Inter (text)'), 'kinetic-title', { text: 'Make it count', at: 0.5, duration: 3 });
+    doc = await use(doc, 'list', { items: 'Plan, Build, Measure', title: 'How we work', at: 4, duration: 3 });
+    doc = await use(doc, 'stat', { value: '42', label: 'answers', at: 8, duration: 3 });
+    doc = await use(doc, 'timeline', { data: '2020: Launch, 2022: Series B', title: 'The road', at: 11, duration: 3 });
+    doc = await use(doc, 'bar-chart', { data: '2022: 12, 2023: 30', title: 'Growth', at: 14, duration: 3 });
+    doc = await use(doc, 'quote', { text: 'Invent the future', author: 'Alan Kay', at: 17, duration: 3 });
+    const of = (name: string) => layersOf(doc).find(([id]) => id.startsWith(name))?.[1].props?.font;
+    expect(of('word')).toBe('font-bebas');
+    for (const title of ['list-title', 'stat-value', 'timeline-title', 'chart-title', 'quote-word']) expect(of(title), title).toBe('font-bebas');
+    for (const rest of ['list-text', 'stat-label', 'timeline-label', 'timeline-text', 'bar-label', 'bar-value', 'quote-author']) expect(of(rest), rest).toBe('font-inter');
+    expect(validate(doc, reg)).toEqual([]);
+  });
+
+  it('keep one font for everything when the film has only one', async () => {
+    const doc = await use(withFonts('Karla'), 'list', { items: 'One, Two', title: 'Steps', at: 0, duration: 3 });
+    const fonts = new Set(layersOf(doc).map(([, l]) => l.props?.font).filter(Boolean));
+    expect([...fonts]).toEqual(['font-karla']);
   });
 });
