@@ -1386,6 +1386,12 @@
     "saved": "Bloc « {name} » enregistré.",
     "placed": "Bloc « {name} » placé."
   },
+  "stock": {
+    "kept": "Résultat des bibliothèques libres gardé : {title}.",
+    "found": "{n} résultats des bibliothèques libres.",
+    "nothing": "Rien trouvé dans les bibliothèques libres.",
+    "sheet": "Bibliothèques libres"
+  },
   "surface": {
     "list": "Surfaces listées.",
     "laid": "Surface {kind} posée."

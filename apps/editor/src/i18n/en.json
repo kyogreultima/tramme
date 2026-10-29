@@ -1386,6 +1386,12 @@
     "saved": "Block \"{name}\" saved.",
     "placed": "Block \"{name}\" placed."
   },
+  "stock": {
+    "kept": "Free library result kept: {title}.",
+    "found": "{n} results from the free libraries.",
+    "nothing": "Nothing found in the free libraries.",
+    "sheet": "Free libraries"
+  },
   "surface": {
     "list": "Surfaces listed.",
     "laid": "Surface {kind} laid."
