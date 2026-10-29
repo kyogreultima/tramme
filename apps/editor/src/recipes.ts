@@ -24,6 +24,8 @@ export function style(doc: TrammeDoc) {
     accent: has('accent', 'color') ? '@accent' : firstColor ? `@${firstColor}` : '#2EC4B6',
     accent2: has('accent2', 'color') ? '@accent2' : has('accent', 'color') ? '@accent' : '#F4B860',
     ink: has('ink', 'color') ? '@ink' : '#FFFFFF',
+    /** the kit's plate when the document has one; each recipe says what it falls back to */
+    plate: has('plate', 'color') ? '@plate' : undefined,
     enter: (has('enter', 'ease') ? '@enter' : ENTER) as EaseSpec,
     exit: (has('exit', 'ease') ? '@exit' : EXIT) as EaseSpec,
     standard: (has('standard', 'ease') ? '@standard' : STANDARD) as EaseSpec,
@@ -377,7 +379,7 @@ const listRecipe: ToolType<{ items: string; title?: string; marker?: 'check' | '
     const u = Math.min(c.width, c.height), size = Math.round(u * 0.05), lh = size * 2.2, marker = a.marker ?? 'check';
     const mw = size * 1.05, step = Math.max(s.stagger * 2, 0.14);
     // the numbers sit on dots of the accent: the plate's colour reads there, the ink (often the accent's neighbour in light) does not
-    const onAccent = doc.tokens?.plate?.type === 'color' ? '@plate' : '#0B0F12';
+    const onAccent = s.plate ?? '#0B0F12';
     const maxText = Math.max(...items.map((item) => measure(doc, item, size, 600, s.font)));
     const blockW = mw * 1.9 + maxText, top = c.height * (a.title ? 0.4 : 0.44) - ((items.length - 1) * lh) / 2;
     const { add, done } = adder(doc, ctx.compId);
@@ -471,7 +473,7 @@ const splitScreen: ToolType<{ assets?: string[]; layout?: 'half' | 'thirds'; gap
     const u = Math.min(c.width, c.height), gap = r(a.gap ?? Math.max(3, u * 0.008));
     const cellW = (c.width - gap * (n - 1)) / n;
     const { add, done } = adder(doc, ctx.compId);
-    add('split-bg', { type: 'shape.rect', name: 'Split · background', in: at, out: end, transform: { position: [r(c.width / 2), r(c.height / 2)] }, props: { size: [c.width, c.height], fill: doc.tokens?.plate?.type === 'color' ? '@plate' : '#000000' } });
+    add('split-bg', { type: 'shape.rect', name: 'Split · background', in: at, out: end, transform: { position: [r(c.width / 2), r(c.height / 2)] }, props: { size: [c.width, c.height], fill: s.plate ?? '#000000' } });
     ids.forEach((id, i) => {
       const kind = (doc.assets[id]?.type ?? 'image') as 'image' | 'video';
       const x0 = r(cellW * (i + 0.5) + gap * i), t0 = r(at + i * Math.max(s.stagger * 2, 0.12));
@@ -510,7 +512,7 @@ const mapJourney: ToolType<{ stops: string; names?: string; map?: string; at?: n
     const doc = ctx.doc, c = compOf(ctx), s = style(doc), at = atOf(ctx, a.at);
     const u = Math.min(c.width, c.height), pts = stops.map(([fx, fy]) => [r(fx * c.width), r(fy * c.height)] as Vec2);
     const names = (a.names ?? '').split(',').map((x) => x.trim()).filter(Boolean);
-    const plate = doc.tokens?.plate?.type === 'color' ? '@plate' : '#FFFFFF';
+    const plate = s.plate ?? '#FFFFFF';
     // the dot's ride: the whole trip lasts pace×1.8 s a leg, shared between the legs by their length
     const lens = pts.slice(1).map((p, i) => Math.hypot(p[0] - pts[i][0], p[1] - pts[i][1]));
     const start = r(at + 0.3), totalLen = Math.max(lens.reduce((t, l) => t + l, 0), 1e-9), travel = Math.max(1.2, s.pace * 1.8 * (pts.length - 1));
