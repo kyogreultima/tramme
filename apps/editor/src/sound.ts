@@ -7,6 +7,7 @@
 // layer; the mixer of @tramme/render plays it the same in the preview and
 // the exports.
 
+import { openverse } from './openverse.ts';
 import { audioClips, Evaluator, isAudioAnalysis, layerClock, pointer, searchSounds, soundCues, soundFigures, soundFlaws, staticValue, variantsOf, type Layer, type Op, type SoundCue, type SoundEntry, type SoundFigures, type SoundRole, type SoundVisual, type ToolContext, type ToolType } from '@tramme/core';
 import { encodeWav, renderSynth, SYNTH_MAX } from '@tramme/render';
 import { api } from './api.ts';
@@ -624,8 +625,6 @@ const cues: ToolType<{ layers?: unknown }> = {
 };
 
 /** the free recordings of Openverse (Freesound, CC0 only): found, judged, the good ones kept with their credit. Without a key it answers 20 results a page at most */
-const OPENVERSE = 'https://api.openverse.org/v1/audio/';
-
 const soundFind: ToolType<{ query: string; kind?: string; count?: number }> = {
   name: 'sound-find', title: 'Find recordings', description: 'searches free recordings (CC0 from Freesound, through Openverse) for what the library lacks, judges each one (two events in one clip, a steady noise, clicks, a clipped take) and keeps the good ones in your library with their credit',
   input: {
@@ -642,9 +641,7 @@ const soundFind: ToolType<{ query: string; kind?: string; count?: number }> = {
     avoid: 'writing a hit or a whoosh as code instead; meme sounds',
   },
   async run({ query, kind = 'sfx', count = 4 }, ctx) {
-    const r = await fetch(`${OPENVERSE}?${new URLSearchParams({ q: query, license: 'cc0', source: 'freesound', page_size: '20' })}`, { signal: ctx.signal });
-    if (!r.ok) throw new Error(`Openverse: HTTP ${r.status}`);
-    const found = ((await r.json()) as { results?: { id: string; title: string; url: string; duration?: number; creator?: string; foreign_landing_url?: string; tags?: { name: string }[] }[] }).results ?? [];
+    const found = await openverse('audio', { q: query, license: 'cc0', source: 'freesound', page_size: '20' }, ctx.signal) as { id: string; title: string; url: string; duration?: number; creator?: string; foreign_landing_url?: string; tags?: { name: string }[] }[];
     // short sounds only: a motion effect, not a recording session
     const short = found.filter((x) => x.url && (x.duration ?? 0) > 0 && (x.duration ?? 0) <= 12000);
     const kept: SoundEntry[] = [], refused: string[] = [];

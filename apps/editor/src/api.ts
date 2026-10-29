@@ -169,6 +169,10 @@ export const api = {
     const params = new URLSearchParams(Object.entries(q).filter(([, v]) => v) as [string, string][]);
     return (await call<{ voices: Voice[] }>(`/api/voices?${params}`, { signal }, reach)).voices;
   },
+  /** ambientCG's search of materials, or one material's zip (the server passes them on: ambientCG sends no CORS headers) */
+  stockAmbient(what: 'search' | 'zip', params: Record<string, string>, signal?: AbortSignal): Promise<Response> {
+    return reach(`/api/stock/ambientcg/${what}?${new URLSearchParams(params)}`, { signal });
+  },
   /** the search of Pexels (photos or clips) with the user's key, as Pexels answers it */
   async stockPexels(kind: 'photos' | 'videos', query: string, count: number, signal?: AbortSignal): Promise<unknown> {
     return call<unknown>(`/api/stock/pexels/${kind}?${new URLSearchParams({ query, per_page: String(count) })}`, { signal }, reach);

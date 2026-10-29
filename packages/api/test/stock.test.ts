@@ -64,4 +64,22 @@ describe('the stock route', () => {
     expect(res!.status).toBe(429);
     expect(((await res!.json()) as { error: string }).error).toMatch(/pexels/i);
   });
+
+  it('passes the search of ambientCG through, without a key', async () => {
+    const s = stubFetch(new Response(JSON.stringify({ foundAssets: [{ assetId: 'Concrete048' }] }), { headers: { 'content-type': 'application/json' } }));
+    const res = await ask(s.reach(false), 'stock/ambientcg/search?q=concrete&limit=6');
+    expect(res.status).toBe(200);
+    expect(s.calls[0].url).toBe('https://ambientcg.com/api/v2/full_json?type=Material&q=concrete&limit=6&include=downloadData%2CpreviewData');
+    expect(await res.json()).toEqual({ foundAssets: [{ assetId: 'Concrete048' }] });
+  });
+
+  it('passes an ambientCG zip through, and only a file name', async () => {
+    const s = stubFetch(new Response(new Uint8Array([0x50, 0x4b, 3, 4]), { headers: { 'content-type': 'application/zip' } }));
+    const res = await ask(s.reach(false), 'stock/ambientcg/zip?file=Concrete048_1K-JPG.zip');
+    expect(s.calls[0].url).toBe('https://ambientcg.com/get?file=Concrete048_1K-JPG.zip');
+    expect(res.headers.get('content-type')).toBe('application/zip');
+    expect(new Uint8Array(await res.arrayBuffer())).toEqual(new Uint8Array([0x50, 0x4b, 3, 4]));
+    expect((await ask(s.reach(false), 'stock/ambientcg/zip?file=..%2F..%2Fetc')).status).toBe(400);
+    expect(s.calls).toHaveLength(1);
+  });
 });

@@ -49,12 +49,12 @@ export interface KeptMedia {
   reload: string[];
 }
 
-/** a picture or clip kept under its assets folder with its record, replaced when made again */
-export async function keepMedia(ctx: ToolContext, kind: MediaKind, name: string, blob: Blob, made: unknown): Promise<KeptMedia> {
+/** a picture or clip kept under its assets folder (or the one given: the stock libraries' own) with its record, replaced when made again */
+export async function keepMedia(ctx: ToolContext, kind: MediaKind, name: string, blob: Blob, made: unknown, dir?: string): Promise<KeptMedia> {
   const slug = slugOf(name, NAME_FALLBACK[kind]);
   const asset = `${PREFIX[kind]}${slug}`.slice(0, 64);
-  const src = await ctx.writeFile(`${DIR[kind]}/${slug}.${extOf(kind, blob.type)}`, blob);
-  await ctx.writeFile(`${DIR[kind]}/${slug}${RECORD[kind]}`, JSON.stringify(made, null, 1));
+  const src = await ctx.writeFile(`${dir ?? DIR[kind]}/${slug}.${extOf(kind, blob.type)}`, blob);
+  await ctx.writeFile(`${dir ?? DIR[kind]}/${slug}${dir ? '.json' : RECORD[kind]}`, JSON.stringify(made, null, 1));
   const had = !!ctx.doc.assets[asset];
   return { asset, src, reload: had ? [asset] : [], ops: [{ op: had ? 'replace' : 'add', path: pointer('assets', asset), value: { type: kind, src, name } }] };
 }
