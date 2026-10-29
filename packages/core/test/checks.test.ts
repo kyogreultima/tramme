@@ -24,6 +24,20 @@ describe('quality checks', () => {
     expect(t.box!.y + t.box!.h / 2).toBeCloseTo(40);
   });
 
+  it('read a tilted layer through its projected quad', async () => {
+    const flat = text('Tilted price', {}, { size: 60 }), tilted = text('Tilted price', { transform: { position: [540, 960], rotationX: 70 } }, { size: 60 });
+    expect(await checks(doc({ price: flat }))).not.toContain('text-size:price');
+    // text turned by 70 degrees reads about 20 px high: smaller than a phone can read
+    expect(await checks(doc({ price: tilted }))).toContain('text-size:price');
+    const [s] = sampleComposition(new Evaluator(doc({ price: tilted }), builtinRegistry()), 'main', 1);
+    const placed = s.layers.find((p) => p.id === 'price')!;
+    expect(placed.textSize).toBeGreaterThan(18);
+    expect(placed.textSize).toBeLessThan(25);
+    const [f] = sampleComposition(new Evaluator(doc({ price: flat }), builtinRegistry()), 'main', 1);
+    // the box is the quad's: shorter than the flat one
+    expect(placed.box!.h).toBeLessThan(f.layers[0].box!.h * 0.6);
+  });
+
   it('find nothing to say on a clean composition', async () => {
     expect(await checks(doc({ title: text('A clear title', { in: 0.5 }) }))).toEqual(['stillness:']);
   });

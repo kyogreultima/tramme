@@ -461,6 +461,8 @@ export const TRANSFORM_SCHEMA: PropSchema = {
   rotation: { type: 'number', default: 0, label: 'Rotation', unit: 'deg' },
   opacity: { type: 'number', default: 1, label: 'Opacity', min: 0, max: 1, step: 0.01 },
   depth: { type: 'number', default: 0, label: 'Depth', unit: 'px', step: 10, description: 'behind the screen when positive, in front when negative: parallax and depth blur with the composition camera' },
+  rotationX: { type: 'number', default: 0, label: 'Tilt X', unit: 'deg', description: "turns the layer around its horizontal (X) axis through its anchor, seen from the composition camera's perspective (1000 px without a camera): positive brings the bottom toward the viewer" },
+  rotationY: { type: 'number', default: 0, label: 'Tilt Y', unit: 'deg', description: "turns the layer around its vertical (Y) axis through its anchor, seen from the composition camera's perspective (1000 px without a camera): positive sends the right side away" },
 };
 
 /** schema of a layer's drawn mask: its outline in the layer's space, how it combines with the masks before it, its edge */

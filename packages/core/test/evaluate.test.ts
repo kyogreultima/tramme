@@ -62,7 +62,7 @@ describe('evaluation', () => {
     expect(f0.layers.map((l) => l.id)).toEqual(['bg']);
     expect(f0.background).toBe('#1C1917');
     expect(f0.layers[0].props.fill).toBe('#F5F0E8');
-    expect(f0.layers[0].transform).toEqual({ anchor: [0, 0], position: [0, 0], scale: [1, 1], rotation: 0, opacity: 1, depth: 0 });
+    expect(f0.layers[0].transform).toEqual({ anchor: [0, 0], position: [0, 0], scale: [1, 1], rotation: 0, opacity: 1, depth: 0, rotationX: 0, rotationY: 0 });
     const f = ev().frame(2.5);
     expect(f.layers.map((l) => l.id)).toEqual(['bg', 'grp']);
     expect(f.layers[1].children.map((l) => l.id)).toEqual(['a', 'b']);

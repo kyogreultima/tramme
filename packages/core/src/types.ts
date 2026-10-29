@@ -100,6 +100,10 @@ export interface Transform {
   opacity?: Prop<number>;
   /** px behind the screen (negative: in front), for the composition camera */
   depth?: Prop<number>;
+  /** degrees: turns the layer around its horizontal axis, in perspective */
+  rotationX?: Prop<number>;
+  /** degrees: turns the layer around its vertical axis, in perspective */
+  rotationY?: Prop<number>;
 }
 
 /** a 2.5D camera: layers at a depth move with parallax and blur away from the focus */

@@ -24,6 +24,8 @@ export interface EvaluatedTransform {
   rotation: number;
   opacity: number;
   depth: number;
+  rotationX: number;
+  rotationY: number;
 }
 
 export interface EvaluatedCamera { pan: Vec2; zoom: number; perspective: number; focus: number; blur: number }
