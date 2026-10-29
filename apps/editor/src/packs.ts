@@ -49,6 +49,11 @@ export async function shippedPacks(): Promise<PackEntry[]> {
   }
 }
 
+/** what the assistant's instructions list of the packs: one line per entry, `name (pack): what it is for` */
+export function packLines(packs: PackEntry[]): string[] {
+  return packs.flatMap((p) => (p.entries ?? []).map((e) => `${e.name} (${p.name}): ${e.line}`));
+}
+
 /** a pack file's stem: its data folder beside the module, and its meta id (tramme/<stem>) */
 export const packStem = (file: string) => file.replace(/\.(js|mjs)$/i, '');
 export const packIdOf = (file: string) => `tramme/${packStem(file)}`;

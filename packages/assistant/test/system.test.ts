@@ -42,3 +42,24 @@ describe('the system prompt in cache order', () => {
     expect(systemPrompt(REF, 'BRIEF')).toBe(joinSystem(parts));
   });
 });
+
+describe('the packs\' entries in the prompt', () => {
+  const LINE = 'ui.device (UI walkthrough): a phone, browser or window frame around an interface';
+
+  it('ride in the fixed part, after the reference, and not in the variable one', () => {
+    const { fixed, variable } = systemParts(REF, 'BRIEF', undefined, [LINE]);
+    expect(fixed).toContain(LINE);
+    expect(fixed).toContain("Entries of the editor's packs, by need");
+    expect(fixed.indexOf(LINE)).toBeGreaterThan(fixed.indexOf(REF));
+    expect(variable).not.toContain(LINE);
+  });
+
+  it('keep the fixed part the same for every project', () => {
+    expect(systemParts(REF, 'ONE', ['plug: x'], [LINE]).fixed).toBe(systemParts(REF, 'TWO', undefined, [LINE]).fixed);
+  });
+
+  it('change nothing without packs', () => {
+    expect(systemParts(REF, 'BRIEF', ['plug: x'], []).fixed).toBe(systemParts(REF, 'BRIEF', ['plug: x']).fixed);
+    expect(systemParts(REF).fixed).not.toContain('Entries of the editor');
+  });
+});
