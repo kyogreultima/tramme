@@ -354,6 +354,27 @@ const hex = ([r, g, b]: [number, number, number]) => `#${[r, g, b].map((v) => v.
 const saturation = ([r, g, b]: [number, number, number]) => { const mx = Math.max(r, g, b), mn = Math.min(r, g, b); return mx ? (mx - mn) / mx : 0; };
 const luma = ([r, g, b]: [number, number, number]) => (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
 
+/** the main colours of a picture drawn on a canvas, and the plate, ink and accent they give (the ink always reads on the plate) */
+export function paletteOf(g: CanvasRenderingContext2D, w: number, h: number) {
+  const colours = dominant(g.getImageData(0, 0, w, h).data);
+  if (!colours.length) throw new Error('no colour found');
+  // the plate: the largest dark or light group; the ink: the most contrasting; the accent: the most saturated of the rest
+  const plate = colours[0].rgb, ink = [...colours].sort((x, y) => Math.abs(luma(y.rgb) - luma(plate)) - Math.abs(luma(x.rgb) - luma(plate)))[0].rgb;
+  const inkSafe: [number, number, number] = Math.abs(luma(ink) - luma(plate)) < 0.45 ? (luma(plate) > 0.5 ? [17, 17, 17] : [255, 255, 255]) : ink;
+  const accent = [...colours].filter((c) => c.rgb !== plate).sort((x, y) => saturation(y.rgb) * (0.5 + y.share) - saturation(x.rgb) * (0.5 + x.share))[0]?.rgb ?? inkSafe;
+  return { colours, plate: hex(plate), ink: hex(inkSafe), accent: hex(accent) };
+}
+
+/** the colour tokens a palette sets: each colour, then plate, ink and accent (`from` names the picture they come from) */
+export function paletteOps(p: ReturnType<typeof paletteOf>, from: string): Op[] {
+  return [
+    ...p.colours.map((c, i) => ({ op: 'add' as const, path: pointer('tokens', `picture${i + 1}`), value: { type: 'color', value: hex(c.rgb), description: `${Math.round(c.share * 100)} % of ${from}` } })),
+    { op: 'add', path: pointer('tokens', 'plate'), value: { type: 'color', value: p.plate } },
+    { op: 'add', path: pointer('tokens', 'ink'), value: { type: 'color', value: p.ink } },
+    { op: 'add', path: pointer('tokens', 'accent'), value: { type: 'color', value: p.accent } },
+  ];
+}
+
 const palette: ToolType<{ asset?: string; t?: number; tokens?: boolean }> = {
   name: 'palette', title: 'Colours of a picture', description: 'takes the main colours of an image or a video frame and offers them as colour tokens (plate, ink, accent)',
   input: {
@@ -380,21 +401,11 @@ const palette: ToolType<{ asset?: string; t?: number; tokens?: boolean }> = {
         g.drawImage(f.canvas as CanvasImageSource, 0, 0, 96, 96);
       } finally { input.dispose(); }
     }
-    const colours = dominant(g.getImageData(0, 0, 96, 96).data);
-    if (!colours.length) throw new Error('no colour found');
-    // the plate: the largest dark or light group; the ink: the most contrasting; the accent: the most saturated of the rest
-    const plate = colours[0].rgb, ink = [...colours].sort((x, y) => Math.abs(luma(y.rgb) - luma(plate)) - Math.abs(luma(x.rgb) - luma(plate)))[0].rgb;
-    const inkSafe: [number, number, number] = Math.abs(luma(ink) - luma(plate)) < 0.45 ? (luma(plate) > 0.5 ? [17, 17, 17] : [255, 255, 255]) : ink;
-    const accent = [...colours].filter((c) => c.rgb !== plate).sort((x, y) => saturation(y.rgb) * (0.5 + y.share) - saturation(x.rgb) * (0.5 + x.share))[0]?.rgb ?? inkSafe;
-    const ops: Op[] = tokens ? [
-      ...colours.map((c, i) => ({ op: 'add' as const, path: pointer('tokens', `picture${i + 1}`), value: { type: 'color', value: hex(c.rgb), description: `${Math.round(c.share * 100)} % of ${asset}` } })),
-      { op: 'add', path: pointer('tokens', 'plate'), value: { type: 'color', value: hex(plate) } },
-      { op: 'add', path: pointer('tokens', 'ink'), value: { type: 'color', value: hex(inkSafe) } },
-      { op: 'add', path: pointer('tokens', 'accent'), value: { type: 'color', value: hex(accent) } },
-    ] : [];
+    const p = paletteOf(g, 96, 96), { colours } = p;
+    const ops: Op[] = tokens ? paletteOps(p, asset) : [];
     return {
       ops, label: `Colours of ${a.name ?? asset}`,
-      text: `Main colours of "${asset}"${a.type === 'video' ? ` at ${at} s` : ''}: ${colours.map((c) => `${hex(c.rgb)} (${Math.round(c.share * 100)} %)`).join(', ')}. ${tokens ? `Tokens set: picture1..${colours.length}, plate ${hex(plate)}, ink ${hex(inkSafe)}, accent ${hex(accent)}.` : ''}`,
+      text: `Main colours of "${asset}"${a.type === 'video' ? ` at ${at} s` : ''}: ${colours.map((c) => `${hex(c.rgb)} (${Math.round(c.share * 100)} %)`).join(', ')}. ${tokens ? `Tokens set: picture1..${colours.length}, plate ${p.plate}, ink ${p.ink}, accent ${p.accent}.` : ''}`,
       notice: t('perception.paletteDone', { colours: colours.map((c) => hex(c.rgb)).join(' ') }),
     };
   },

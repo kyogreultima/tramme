@@ -60,11 +60,20 @@ export function paletteWords(tokens: Record<string, { type: string; value: unkno
   return hex.length ? `The project's palette: ${hex.slice(0, 6).join(', ')} — keep to these colours.` : '';
 }
 
-/** a bitmap of an image file, a project asset or a still of the composition */
+/** where the style frames of a film are kept */
+export const FRAMES_DIR = 'assets/frames/';
+
+/** a bitmap of an image file, a project asset, a style frame or a still of the composition */
 export async function bitmapOf(ctx: ToolContext, source: string, at: number): Promise<ImageBitmap> {
   if (source === 'frame') {
     const url = await ctx.renderStill(at);
     return createImageBitmap(await (await fetch(url)).blob());
+  }
+  // a file of the project under the frames (a style frame is a target, never an asset of the document)
+  if (source.startsWith(FRAMES_DIR)) {
+    const res = await fetch(ctx.fileUrl(source));
+    if (!res.ok) throw new Error(`${source}: the style frame could not be read (HTTP ${res.status})`);
+    return createImageBitmap(await res.blob());
   }
   const a = ctx.doc.assets[source];
   if (!a || a.type !== 'image') throw new Error(`${source}: an image asset of the project, or "frame" for a still of the composition, is expected`);
@@ -126,7 +135,40 @@ async function referenceOf(ctx: ToolContext, o: { source: string; at: number; ma
 
 // ── the takes ────────────────────────────────────────────────
 /** takes held for the assistant when nobody was there to choose: kept in memory for this session only, never saved */
-const held = new Map<string, { made: MadeImage[]; label: string; record: Record<string, unknown>; again?: string; fit: 'cover' | 'contain'; at: number; duration?: number; background: boolean }>();
+const held = new Map<string, { made: MadeImage[]; extra: Record<string, unknown> }>();
+
+/** pictures drawn by a provider, paid for first: the user's yes or the turn's allowance, each one counted (a tool's `paid` says what it costs and what to do instead) */
+export async function drawTakes(ctx: ToolContext, ask: ImageAsk, paid: { what: string; instead: string }): Promise<MadeImage[]> {
+  await payFor(t('image.paidTitle'), paid.what, t('image.paidYes'), paid.instead, ask.n ?? 1);
+  return api.generateImages(ask, ctx.signal);
+}
+
+/** takes held for this session with what the tool needs to keep one later; the id to keep them by */
+export function holdTakes(made: MadeImage[], extra: Record<string, unknown>): string {
+  const id = `takes-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  held.set(id, { made, extra });
+  return id;
+}
+
+/**
+ * Takes held: "takes-…:n" gives that take alone and lets them all go; the bare
+ * id gives them all and keeps them. Null when nothing is held under it.
+ */
+export function takeHeld(id: string): { made: MadeImage[]; extra: Record<string, unknown>; take?: number } | null {
+  const [key, n] = id.split(':'), h = held.get(key);
+  if (!h) return null;
+  if (n === undefined) return h;
+  const pick = h.made[Number(n) - 1];
+  if (!pick) return null;
+  held.delete(key);
+  return { made: [pick], extra: h.extra, take: Number(n) };
+}
+
+/** the takes side by side as small pictures, for the user to choose from and the model to judge */
+export const takeSheet = (made: MadeImage[], size = 512): Promise<string[]> => Promise.all(made.map((m) => preview(m.blob, size)));
+
+/** what generate-image keeps with the takes it holds */
+interface HeldTake { label: string; record: Record<string, unknown>; again?: string; fit: 'cover' | 'contain'; at: number; duration?: number; background: boolean }
 
 type Input = {
   prompt?: string; name?: string; ratio?: Ratio | 'auto'; quality?: 'low' | 'medium' | 'high'; provider?: string; fit?: 'cover' | 'contain';
@@ -169,12 +211,10 @@ const generateImage: ToolType<Input> = {
     const fit = a.fit ?? 'cover', at = a.at ?? 0, background = a.background ?? false;
     // a take held from an earlier call: kept now, nothing drawn again
     if (a.keep) {
-      const [id, n] = a.keep.split(':');
-      const h = held.get(id);
-      const pick = h?.made[Number(n) - 1];
-      if (!h || !pick) throw new Error(`no take "${a.keep}" is held: takes are held for this session only — have them made again`);
-      held.delete(id);
-      return keepAndPlace(ctx, pick, h.label, { ...h.record, take: Number(n) }, { again: h.again, fit: h.fit, at: h.at, duration: h.duration, background: h.background, upscale: a.upscale });
+      const h = takeHeld(a.keep);
+      if (!h?.take) throw new Error(`no take "${a.keep}" is held: takes are held for this session only — have them made again`);
+      const x = h.extra as unknown as HeldTake;
+      return keepAndPlace(ctx, h.made[0], x.label, { ...x.record, take: h.take }, { again: x.again, fit: x.fit, at: x.at, duration: x.duration, background: x.background, upscale: a.upscale });
     }
     // what it is made from: a record made before, a reference, or words alone
     const before = a.again ? await recordOf(ctx, 'image', a.again) : null;
@@ -190,11 +230,11 @@ const generateImage: ToolType<Input> = {
       a.extend ? 'Extend the picture past its edges into the empty border, seamlessly: the same scene, style, light and grain; nothing new in the middle.' : '', palette].filter(Boolean).join('\n\n');
     const takes = Math.max(1, Math.min(4, Math.round(a.takes ?? 1)));
     const quality = a.quality ?? (before?.quality ? String(before.quality) as Input['quality'] : undefined) ?? (p.pictureQuality !== 'auto' ? p.pictureQuality : undefined);
-    // it costs money: the user says yes first, or the turn's allowance does (as for the sounds), each take counted
-    await payFor(t('image.paidTitle'), takes > 1 ? t('image.paidTakes', { n: takes, prompt: clip(words, 140) }) : t('image.paidText', { prompt: clip(words, 140) }), t('image.paidYes'), 'ask the user for a picture instead', takes);
+    // the reference is read first: a picture that cannot be read costs nothing
     const ref = source ? await referenceOf(ctx, { source, at, mask: a.mask, maskKeeps: a.maskKeeps, extend: a.extend }) : null;
     const ask: ImageAsk = { prompt, ratio, quality, provider, size: p.pictureSize === 'small' ? 'small' : undefined, n: takes, ...(ref ? { reference: ref.reference, ...(ref.mask ? { mask: ref.mask } : {}) } : {}) };
-    const made = await api.generateImages(ask, ctx.signal);
+    // it costs money: the user says yes first, or the turn's allowance does (as for the sounds), each take counted
+    const made = await drawTakes(ctx, ask, { what: takes > 1 ? t('image.paidTakes', { n: takes, prompt: clip(words, 140) }) : t('image.paidText', { prompt: clip(words, 140) }), instead: 'ask the user for a picture instead' });
     const label = a.again ? String(ctx.doc.assets[a.again].name ?? a.again.replace(/^image-/, '')) : a.name ?? words.toLowerCase().split(/\s+/).slice(0, 4).join('-');
     const record: Record<string, unknown> = {
       prompt: words, provider: made[0].provider, model: made[0].model, ratio, ...(quality ? { quality } : {}),
@@ -205,13 +245,12 @@ const generateImage: ToolType<Input> = {
     const o = { again: a.again, fit, at, duration: a.duration, background, upscale: a.upscale };
     if (made.length === 1) return keepAndPlace(ctx, made[0], label, record, o);
     // several takes: a contact sheet, the user keeps one; alone, the assistant is handed the choice
-    const sheet = await Promise.all(made.map((m) => preview(m.blob, 512)));
+    const sheet = await takeSheet(made);
     const choices = sheet.map((url, i) => ({ url, label: t('image.take', { n: i + 1 }) }));
     const picked = await chooseAmong(t('image.takesTitle'), t('image.takesText', { n: made.length, name: label }), choices);
     if (picked !== null) return keepAndPlace(ctx, made[picked], label, { ...record, take: picked + 1, takes: made.length }, o);
     if (!alone()) return { ops: [], text: `The user kept none of the ${made.length} takes of "${label}": nothing was saved. Ask what to change before drawing again.`, images: sheet.map((url, i) => ({ url, caption: `take ${i + 1}` })) };
-    const id = `takes-${Date.now().toString(36)}`;
-    held.set(id, { made, label, record: { ...record, takes: made.length }, again: a.again, fit, at, duration: a.duration, background });
+    const id = holdTakes(made, { label, record: { ...record, takes: made.length }, again: a.again, fit, at, duration: a.duration, background } satisfies HeldTake);
     return {
       ops: [], label: `Takes of ${label}`,
       text: `${made.length} takes of "${label}" by ${made[0].provider}, held for this session (none saved). Look at them and keep the best one with generate-image { keep: "${id}:<n>" } — it costs nothing more.`,
