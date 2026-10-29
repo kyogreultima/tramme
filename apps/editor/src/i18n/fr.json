@@ -1369,6 +1369,8 @@
   },
   "review": {
     "issues": "{warnings} alerte(s), {notes} remarque(s) :",
+    "similar": "({n} semblables)",
+    "moreKinds": "{n} autre(s) type(s) de problème, non listés",
     "noIssue": "Aucun problème trouvé. La planche montre les moments clés.",
     "listen": "À vérifier à l'oreille : {times}",
     "mixPicture": "Le mix : forme d'onde, spectrogramme, mouvement de l'image",
