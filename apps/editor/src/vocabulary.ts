@@ -9,6 +9,7 @@ import { BLOCK_TOOLS } from './blocks.ts';
 import { BRIEF_TOOLS } from './brief.ts';
 import { FILM_PLAN_TOOLS } from './filmplan.ts';
 import { STYLE_FRAME_TOOLS } from './styleframes.ts';
+import { CAMERA_TOOLS } from './camera.ts';
 import { PIN_TOOLS } from './pin.ts';
 import { STOCK_TOOLS } from './stock.ts';
 import { SURFACE_TOOLS } from './surfaces.ts';
@@ -113,5 +114,5 @@ export const EDITOR_PROMPTS: PromptType[] = [
 
 /** the base vocabulary of the editor, before a document's plugins */
 export function editorRegistry() {
-  return builtinRegistry().registerTool(...EDITOR_TOOLS, ...SVG_TOOLS, ...RECIPE_TOOLS, ...TYPEFACE_TOOLS, ...FIGURE_TOOLS, ...EVENT_TOOLS, ...PERCEPTION_TOOLS, ...TRACKING_TOOLS, ...STABILIZE_TOOLS, ...PROXY_TOOLS, ...COMPONENT_TOOLS, ...DENOISE_TOOLS, ...SKIN_TOOLS, ...LONG_TOOLS, ...CUTOUT_TOOLS, ...DEPTH_TOOLS, ...MODEL_TOOLS, ...REMOVEBG_TOOLS, ...LIPSYNC_TOOLS, ...CUTS_TOOLS, ...MONTAGE_TOOLS, ...FILLERS_TOOLS, ...REVIEW_TOOLS, ...SOUND_TOOLS, ...MIXING_TOOLS, ...IMAGE_TOOLS, ...VIDEO_TOOLS, ...SHORTS_TOOLS, ...SOURCE_TOOLS, ...BLOCK_TOOLS, ...BRIEF_TOOLS, ...FILM_PLAN_TOOLS, ...STYLE_FRAME_TOOLS, ...SURFACE_TOOLS, ...STOCK_TOOLS, ...PIN_TOOLS, ...LIBRARY_TOOLS).registerPrompt(...EDITOR_PROMPTS).registerKit(...BUILTIN_KITS).registerPreset(...EDITOR_PRESETS);
+  return builtinRegistry().registerTool(...EDITOR_TOOLS, ...SVG_TOOLS, ...RECIPE_TOOLS, ...TYPEFACE_TOOLS, ...FIGURE_TOOLS, ...EVENT_TOOLS, ...PERCEPTION_TOOLS, ...TRACKING_TOOLS, ...STABILIZE_TOOLS, ...PROXY_TOOLS, ...COMPONENT_TOOLS, ...DENOISE_TOOLS, ...SKIN_TOOLS, ...LONG_TOOLS, ...CUTOUT_TOOLS, ...DEPTH_TOOLS, ...MODEL_TOOLS, ...REMOVEBG_TOOLS, ...LIPSYNC_TOOLS, ...CUTS_TOOLS, ...MONTAGE_TOOLS, ...FILLERS_TOOLS, ...REVIEW_TOOLS, ...SOUND_TOOLS, ...MIXING_TOOLS, ...IMAGE_TOOLS, ...VIDEO_TOOLS, ...SHORTS_TOOLS, ...SOURCE_TOOLS, ...BLOCK_TOOLS, ...BRIEF_TOOLS, ...FILM_PLAN_TOOLS, ...STYLE_FRAME_TOOLS, ...SURFACE_TOOLS, ...STOCK_TOOLS, ...PIN_TOOLS, ...CAMERA_TOOLS, ...LIBRARY_TOOLS).registerPrompt(...EDITOR_PROMPTS).registerKit(...BUILTIN_KITS).registerPreset(...EDITOR_PRESETS);
 }

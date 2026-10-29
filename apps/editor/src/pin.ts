@@ -12,7 +12,7 @@ const CORNERS = ['tl', 'tr', 'br', 'bl'] as const;
 const STEP = 0.1;
 
 /** the quad of a layer of the root composition at a time: where its box lands on screen, tilt and camera included */
-function quadAt(ev: Evaluator, compId: string, id: string, t: number): Quad {
+export function quadAt(ev: Evaluator, compId: string, id: string, t: number): Quad {
   const frame = ev.frame(t, compId), L = frame.layers.find((x) => x.id === id);
   if (!L) throw new Error(`${id}: not drawn at ${t.toFixed(2)} s (outside its in and out points, or hidden)`);
   const host = { layerId: id, t, frame: Math.round(t * frame.comp.fps), fps: frame.comp.fps, width: frame.comp.width, height: frame.comp.height, duration: frame.comp.duration, asset: () => null, assetInfo: () => undefined, assetUrl: () => '' };
