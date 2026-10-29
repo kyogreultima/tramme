@@ -315,9 +315,17 @@ export const tools = [{
   input: { type: 'object', properties: { count: { type: 'integer', minimum: 1, maximum: 200 } }, required: ['count'] },
   ai: { when: 'a night sky or a festive background', avoid: 'more than 60 stars on a small format' },
   async run({ count }, ctx) {
-    // ctx: doc (with the pending proposal), compId, time, selection, registry,
-    // assetUrl(id), readText(path), files(), fileUrl(path), writeFile(path, data), renderStill(t), transcript(assetId),
-    // fetch(url, init): an installed plugin's declared requests (meta.permissions), a Response
+    // ctx, all of it:
+    //   doc: the document with the pending proposal applied (read only); compId: the composition the user is on;
+    //   time: the editor's current time (s); selection: ids of the selected layers; registry: the document's vocabulary
+    //   assetUrl(id): absolute URL of an asset's file; fileUrl(path): the same for any project file
+    //   readText(path): a text file of the project, or null; files(): every file of the project (path, size)
+    //   writeFile(path, data): under assets/ (computed data), or a plugin under plugins/ (.js, .mjs); returns the path
+    //   renderStill(t, compId?): a JPEG data URL of a frame, pending proposal included
+    //   transcript(assetId, { ask }?): the transcript of a sound or video asset (the user is asked to make it when missing)
+    //   signal: aborted when the user stops the turn; progress(done, total, step?): how far a long tool is
+    //   packFile(path): a data file beside a shipped pack (plugins/<pack>/), for the packs only
+    //   fetch(url, init): an installed plugin's declared requests (meta.permissions), a Response
     const ops = [/* JSON Patch operations on ctx.doc */];
     return { text: `${count} stars`, ops, label: 'Star field' };
   },
@@ -340,7 +348,7 @@ In the editor's preview, a node or effect that fails is drawn as a red frame and
 
 Tools also appear in the chat's `/` menu, with a form generated from `input` (`title` as the label; `format: 'asset'` with `assetType` picks an asset, `format: 'layer'` a layer). Once the required fields are filled, the tool runs at once without a model; words written after the command send it to the assistant instead.
 
-In the editor, a project plugin's authoring code runs in a sandbox of its own: one worker per project, with no page rights (its network reaches the project's own origin only). The tools and checks cross a message bridge for what they need — the document, the project's files, stills, transcripts — and the nodes are drawn there too: each frame the engine sends a layer's evaluated props, the frame's numbers and the other layers' data, and one picture comes back, drawn over the layer's bounds, with its outline as SVG path data and its viewport handles as plain data (a first pass defers, so exports and stills wait for the exact picture while the preview keeps the last one). A node's vector export (`svg`, `lottie`) is computed in the sandbox and primed before a conversion reads it. The assistant's surface does not change: `use_tool` and `list_nodes` speak in names and schemas as before. What still runs on the page, said plainly: the module's load, the modifiers, the Canvas2D effects, and the stepping of simulations — the tail of the isolation plan ([plugin-isolation.md](plugin-isolation.md)). The command line keeps its own rule: it loads plugins in Node, with a local tool's rights.
+In the editor, a project plugin's authoring code runs in a sandbox of its own: one worker per project, with no page rights: no DOM, no `window`, Canvas2D or WebGL2 on an `OffscreenCanvas` for drawing, and a network that reaches the project's own origin only, plus what `ctx.fetch` allows of the origins and provider routes the plugin declared in `meta.permissions` (a plugin that declares none has no `ctx.fetch`). The tools and checks cross a message bridge for what they need — the document, the project's files, stills, transcripts — and the nodes are drawn there too: each frame the engine sends a layer's evaluated props, the frame's numbers and the other layers' data, and one picture comes back, drawn over the layer's bounds, with its outline as SVG path data and its viewport handles as plain data (a first pass defers, so exports and stills wait for the exact picture while the preview keeps the last one). A node's vector export (`svg`, `lottie`) is computed in the sandbox and primed before a conversion reads it. The assistant's surface does not change: `use_tool` and `list_nodes` speak in names and schemas as before. What still runs on the page, said plainly: the module's load, the modifiers, the Canvas2D effects, and the stepping of simulations — the tail of the isolation plan ([plugin-isolation.md](plugin-isolation.md)). The command line keeps its own rule: it loads plugins in Node, with a local tool's rights.
 
 A plugin may also export `checks`: quality checks run by the `check` tool (assistant and `/check`) next to the built-in ones (text size, reading time, safe zone, overlapping text, text crossing an element, text over a person or on a busy area, low contrast behind text, crowded entrances, still stretches). A check reads the composition sampled four times a second, each layer placed in composition space, and returns issues:
 
