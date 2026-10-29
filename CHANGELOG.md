@@ -10,6 +10,10 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Added
 
+- **The assistant finds what already ships** ([taste and finish](docs/taste-finish-roadmap.md), step 1): the packs' entries are listed by need in its instructions, it is told to search the vocabulary before writing a plugin, and the plugins it wrote in a turn are listed to you at the end, to keep in the library.
+- **A phone, browser or window frame around an interface built in layers**: the *Frame for an interface built in layers* tool of the walkthrough pack lays the frame with a content group that the screen clips; `ui.device` draws without a screenshot and in two parts.
+- **`tramme check <doc>`** prints the picture checks of a project, folded by cause.
+- **A coverage check** for a talking video: the stretches with only the speaker on screen (a note from 12 s, a warning from 20 s).
 - **A timeline by tracks** ([montage.md](docs/montage.md)): a composition can be a *sequence*, its clips on picture and sound tracks with lock, hide, mute, solo, a magnetic mode that closes gaps, a height, and an adjustment clip for a range of tracks. The format gains optional fields only (`kind: "sequence"`, `tracks`, a clip's `track` and `link`, a track's `volume`, `pan`, `bus`, `to`); a document without them is read as before.
 - **The edits of a video editor**, one function each in `@tramme/core` and the same for the keys, the mouse, the assistant: ripple delete, ripple trim, roll, slip, slide, insert, overwrite, reorder on a magnetic track, linked clips, a video's sound detached on its own track, copy and paste with the look, cut at the playhead (Ctrl+B, Q, W, Shift+Delete, L, `,` and `.`).
 - **Media**: bins, tags and a search that also finds a word said in a clip; a source monitor with in and out marks and **sub-clips**; media gone missing listed offline (the preview goes on, an export names them, "Find the files…" brings them back); clips lined up **by their sound**; **multicam** (one camera per track, a panel that cuts between them); drag a media or a composition onto a lane; several compositions open in tabs.
@@ -22,6 +26,8 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Fixed
 
+- **The check reads like a list you can act on**: issues of one cause are one line (the worst one, the span, the compositions concerned), at most twelve lines reach the assistant, the rest counted.
+- **Contrast** is measured against the card the text sits on, in the composition it is played in, with the standard's ratio (3:1); a text still fading in and a pictogram are not judged, and neither is text over a layer whose colour is unknown.
 - **The atelier's tour is offered when a project first goes to the atelier**, not only when one opens in it: the studio is the default view, so the tour was reached only through the help menu. The editor tour's last step now lists the tours that exist.
 - **A tour step whose place is missing no longer costs the next step its preparation**: the step is skipped, but the next one still opens its tab. The mixer step of the montage tour points at the tabs until the film has a sound track, instead of vanishing.
 - **The voice detector loaded the wrong onnxruntime build** (the one whose wasm files transformers.js does not configure), so it fell back on the energy of the sound; it now loads the build the other models use.

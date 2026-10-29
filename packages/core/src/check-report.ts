@@ -5,6 +5,12 @@
 import type { QualityIssue } from './checks.ts';
 import type { TrammeDoc } from './types.ts';
 
+/** the first line of a report: how many warnings and notes in all (not kinds), or that nothing was found */
+export function reportHead(issues: QualityIssue[]): string {
+  const warnings = issues.filter((i) => i.severity === 'warning').length;
+  return issues.length ? `${warnings} warning(s), ${issues.length - warnings} note(s).` : 'No issue found by the checks.';
+}
+
 /** a kind of issue: the check that found it and its severity, with everything it found */
 export interface IssueGroup {
   check: string;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { compositionOf, groupIssues, reportLines, type Layer, type QualityIssue, type TrammeDoc } from '../src/index.ts';
+import { compositionOf, groupIssues, reportHead, reportLines, type Layer, type QualityIssue, type TrammeDoc } from '../src/index.ts';
 
 const comp = (name: string, layers: Record<string, Partial<Layer>>) => ({ name, width: 1080, height: 1920, fps: 30, duration: 6, layers: layers as Record<string, Layer>, order: Object.keys(layers) });
 /** a film of scenes: main plays s2 ("Illustration 2") and s3, and s2 plays an inner composition by one more level */
@@ -29,6 +29,12 @@ describe('where a layer sits', () => {
 });
 
 describe('the report of the checks', () => {
+  it('opens with the counts of issues, not of kinds, or with the good news', () => {
+    expect(reportHead(sizes(5, 'x/'))).toBe('5 warning(s), 0 note(s).');
+    expect(reportHead([...sizes(2, 'x/'), issue('crowd', 'info', 'c')])).toBe('2 warning(s), 1 note(s).');
+    expect(reportHead([])).toBe('No issue found by the checks.');
+  });
+
   it('folds 38 alike into one line naming the worst, the span and the composition', () => {
     const groups = groupIssues(sizes(38, 's2/'));
     expect(groups).toHaveLength(1);
