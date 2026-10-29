@@ -41,6 +41,9 @@ export interface StockHit {
 const WAIT = 8000;
 const STOCK_DIR = 'assets/stock';
 
+/** the licences a hit may carry: what may be used, shown and changed (the Pexels licence is the library's own) */
+const ALLOWED: StockLicense[] = ['CC0', 'PDM', 'CC BY', 'Pexels'];
+
 /** a licence as the libraries spell it, when it may be used, shown and changed (CC0, public domain, CC BY), else null */
 export function allowedLicense(raw: string | undefined): StockLicense | null {
   const l = (raw ?? '').trim().toLowerCase();
@@ -170,7 +173,7 @@ export async function searchStock(kind: Exclude<StockKind, 'real'>, query: strin
   const answers = await Promise.allSettled(libraries.map(([, ask]) => ask(query, count, AbortSignal.any([signal, AbortSignal.timeout(WAIT)]))));
   const failed = libraries.filter((_, i) => answers[i].status === 'rejected').map(([name]) => name);
   if (signal.aborted) throw new Error('stopped');
-  const hits = answers.flatMap((a) => (a.status === 'fulfilled' ? a.value : [])).filter((h) => allowedLicense(h.license === 'Pexels' ? 'cc0' : h.license) !== null).slice(0, count);
+  const hits = answers.flatMap((a) => (a.status === 'fulfilled' ? a.value : [])).filter((h) => ALLOWED.includes(h.license as StockLicense)).slice(0, count);
   return { hits, failed };
 }
 
