@@ -76,6 +76,22 @@ describe('the direction rules', () => {
   });
 });
 
+describe('the material rules', () => {
+  const { fixed } = systemParts(REF);
+  const material = fixed.slice(fixed.indexOf('Material:'), fixed.indexOf('Clips:'));
+
+  it('sit between the pictures and the clips and name the object, the surface, the libraries, the credits and the yes', () => {
+    expect(fixed.indexOf('Material:')).toBeGreaterThan(fixed.indexOf('Pictures:'));
+    expect(fixed.indexOf('Material:')).toBeLessThan(fixed.indexOf('Clips:'));
+    for (const word of ['object', 'surface', 'stock', 'credits', 'wordmark', "the user's yes"]) expect(material, word).toContain(word);
+  });
+
+  it('leave the pictures to what is drawn from words', () => {
+    const pictures = fixed.slice(fixed.indexOf('Pictures:'), fixed.indexOf('Material:'));
+    expect(pictures).not.toContain('a texture, an illustration, a prop');
+  });
+});
+
 describe('the packs\' entries in the prompt', () => {
   const LINE = 'ui.device (UI walkthrough): a phone, browser or window frame around an interface';
 
