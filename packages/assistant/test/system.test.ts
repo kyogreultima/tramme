@@ -43,6 +43,39 @@ describe('the system prompt in cache order', () => {
   });
 });
 
+describe('the film plan in the prompt', () => {
+  it('rides in the variable part, and leaves the fixed part to the cache', () => {
+    const { fixed, variable } = systemParts(REF, undefined, [], [], 'PLAN TEXT');
+    expect(variable).toContain('The film plan of the project (assets/film-plan.json)');
+    expect(variable).toContain('PLAN TEXT');
+    expect(fixed).not.toContain('PLAN TEXT');
+    expect(fixed).toBe(systemParts(REF).fixed);
+  });
+
+  it('follows the brief, and is absent without a plan', () => {
+    const { variable } = systemParts(REF, 'BRIEF', [], [], 'PLAN TEXT');
+    expect(variable.indexOf('BRIEF')).toBeLessThan(variable.indexOf('PLAN TEXT'));
+    expect(systemParts(REF, 'BRIEF').variable).not.toContain('film plan');
+    expect(systemPrompt(REF, 'BRIEF', [], [], 'PLAN TEXT')).toBe(joinSystem(systemParts(REF, 'BRIEF', [], [], 'PLAN TEXT')));
+  });
+});
+
+describe('the direction rules', () => {
+  const { fixed } = systemParts(REF);
+  const direction = fixed.slice(fixed.indexOf('Direction:'), fixed.indexOf('Whole films:'));
+
+  it('sit before the rules of whole films and name the plan, the frames and the target', () => {
+    expect(fixed.indexOf('Direction:')).toBeGreaterThan(-1);
+    expect(fixed.indexOf('Direction:')).toBeLessThan(fixed.indexOf('Whole films:'));
+    for (const word of ['film-plan', 'kinds of picture', 'style-frames', 'target', 'never placed', 'retyped']) expect(direction, word).toContain(word);
+  });
+
+  it('keep the example as one kind among the others, and name the style frames where the directions are proposed', () => {
+    expect(direction).toContain('one kind among the others');
+    expect(fixed.slice(fixed.indexOf('Sources:'))).toContain('style-frames');
+  });
+});
+
 describe('the packs\' entries in the prompt', () => {
   const LINE = 'ui.device (UI walkthrough): a phone, browser or window frame around an interface';
 
