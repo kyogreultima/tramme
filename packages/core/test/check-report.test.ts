@@ -60,8 +60,37 @@ describe('the report of the checks', () => {
     ]);
   });
 
+  it('keeps apart the problems of one check that are not the same problem', () => {
+    const say = (text: string) => ({ text, params: {} });
+    const sound = [
+      issue('sound', 'warning', 'The master is at -18 LUFS', { say: say('The master is at {lufs} LUFS') }),
+      issue('sound', 'warning', 'whoosh is off its cue', { say: say('{name} is off its cue'), layers: ['whoosh'] }),
+      issue('sound', 'warning', 'hit is off its cue', { say: say('{name} is off its cue'), layers: ['hit'] }),
+      issue('sound', 'warning', 'The music is over the voice', { say: say('The music is over the voice') }),
+    ];
+    const { lines } = reportLines(groupIssues(sound), { doc: doc(), compId: 'main' });
+    expect(lines).toHaveLength(3);
+    expect(lines.join(' | ')).toContain('The master is at -18 LUFS');
+    expect(lines.join(' | ')).toContain('The music is over the voice');
+    expect(lines.join(' | ')).toContain('sound x2');
+  });
+
+  it('keeps apart messages without a template by what their words say, not their figures', () => {
+    const lone = [issue('sequence', 'warning', 'a1 is a sound on the picture track'), issue('sequence', 'warning', 'b2 overlaps c3 by 4 frames'), issue('sequence', 'warning', 'z9 is a sound on the picture track')];
+    expect(groupIssues(lone)).toHaveLength(2);
+  });
+
+  it('puts the longest stretch first, and says where every one of them is', () => {
+    const run = (t: number, len: number) => issue('coverage', 'warning', `Only the speaker is on screen from ${t} s to ${t + len} s (${len} s)`, { t, rank: len, say: { text: 'Only the speaker is on screen from {from} s to {to} s ({len} s)' } });
+    const groups = groupIssues([run(6.75, 20.25), run(44.5, 32.75), run(92, 22.75)]);
+    expect(groups[0].worst.t).toBe(44.5);
+    const [line] = reportLines(groups, { doc: doc(), compId: 'main' }).lines;
+    expect(line).toContain('at 6.75 s, 44.5 s, 92 s');
+    expect(line).not.toContain('(6.75 s to 92 s)');
+  });
+
   it('puts warnings first, then the biggest group', () => {
-    const groups = groupIssues([issue('crowd', 'info', 'a'), issue('crowd', 'info', 'b'), issue('crowd', 'info', 'c'), issue('safe-zone', 'warning', 'd'), ...sizes(2, 'x/')]);
+    const groups = groupIssues([issue('crowd', 'info', 'a', { say: { text: 'crowd' } }), issue('crowd', 'info', 'b', { say: { text: 'crowd' } }), issue('crowd', 'info', 'c', { say: { text: 'crowd' } }), issue('safe-zone', 'warning', 'd'), ...sizes(2, 'x/')]);
     expect(groups.map((g) => `${g.check}:${g.count}`)).toEqual(['text-size:2', 'safe-zone:1', 'crowd:3']);
   });
 

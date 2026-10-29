@@ -5,11 +5,23 @@
 import type { QualityIssue } from './checks.ts';
 import type { TrammeDoc } from './types.ts';
 
-/** the first line of a report: how many warnings and notes in all (not kinds), or that nothing was found */
-export function reportHead(issues: QualityIssue[]): string {
+/** a number to two decimals, as the messages say moments and sizes */
+export const s2 = (n: number) => +n.toFixed(2);
+
+/** how many warnings and notes in all (issues, not kinds) */
+export function reportCounts(issues: QualityIssue[]): { warnings: number; notes: number } {
   const warnings = issues.filter((i) => i.severity === 'warning').length;
-  return issues.length ? `${warnings} warning(s), ${issues.length - warnings} note(s).` : 'No issue found by the checks.';
+  return { warnings, notes: issues.length - warnings };
 }
+
+/** the first line of a report: the counts, or that nothing was found */
+export function reportHead(issues: QualityIssue[]): string {
+  const { warnings, notes } = reportCounts(issues);
+  return issues.length ? `${warnings} warning(s), ${notes} note(s).` : 'No issue found by the checks.';
+}
+
+/** what makes two issues of one check the same problem: their template, else their words without the names and figures */
+const kindOf = (i: QualityIssue) => i.say?.text ?? i.message.replace(/"[^"]*"/g, '"#"').replace(/\S*\d\S*/g, '#');
 
 /** a kind of issue: the check that found it and its severity, with everything it found */
 export interface IssueGroup {
@@ -23,6 +35,8 @@ export interface IssueGroup {
   /** the first and the last moment found (s) */
   from?: number;
   to?: number;
+  /** every moment found, in order found */
+  times: number[];
 }
 
 /**
@@ -41,17 +55,17 @@ export function compositionOf(doc: TrammeDoc, compId: string, layerId: string): 
   return cur;
 }
 
-/** the issues folded by check and severity: warnings first, then the groups with the most issues */
+/** the issues folded by check, severity and kind of problem: warnings first, then the groups with the most issues */
 export function groupIssues(issues: QualityIssue[]): IssueGroup[] {
   const groups = new Map<string, IssueGroup>();
   for (const i of issues) {
-    const key = `${i.severity}|${i.check}`;
+    const key = `${i.severity}|${i.check}|${kindOf(i)}`;
     let g = groups.get(key);
-    if (!g) groups.set(key, g = { check: i.check, severity: i.severity, count: 0, worst: i, layers: [] });
+    if (!g) groups.set(key, g = { check: i.check, severity: i.severity, count: 0, worst: i, layers: [], times: [] });
     g.count++;
     if ((i.rank ?? -Infinity) > (g.worst.rank ?? -Infinity)) g.worst = i;
     for (const id of i.layers ?? []) if (!g.layers.includes(id)) g.layers.push(id);
-    if (i.t !== undefined) { g.from = Math.min(g.from ?? i.t, i.t); g.to = Math.max(g.to ?? i.t, i.t); }
+    if (i.t !== undefined) { g.from = Math.min(g.from ?? i.t, i.t); g.to = Math.max(g.to ?? i.t, i.t); g.times.push(i.t); }
   }
   const rank = (g: IssueGroup) => (g.severity === 'warning' ? 0 : 1);
   return [...groups.values()].sort((a, b) => rank(a) - rank(b) || b.count - a.count);
@@ -60,7 +74,6 @@ export function groupIssues(issues: QualityIssue[]): IssueGroup[] {
 /** the groups a report lists before it counts the rest */
 export const REPORT_MAX = 12;
 const LAYERS_SHOWN = 5, COMPOSITIONS_SHOWN = 3;
-const s2 = (t: number) => +t.toFixed(2);
 
 /** the compositions a group's layers sit in, by name, in the order found */
 function placesOf(g: IssueGroup, doc: TrammeDoc, compId: string): string {
@@ -76,7 +89,9 @@ export function reportLines(groups: IssueGroup[], opts: { doc: TrammeDoc; compId
     // one issue prints as it was found
     if (g.count === 1) return `- [${g.severity}] ${g.worst.message}${g.worst.layers?.length ? ` (layers: ${g.worst.layers.join(', ')})` : ''}`;
     const where = g.layers.length ? ` in ${placesOf(g, opts.doc, opts.compId)}` : '';
-    const span = g.from !== undefined && g.to !== undefined && g.to > g.from ? ` (${s2(g.from)} s to ${s2(g.to)} s)` : '';
+    // layers say where an issue is; without them its moments do (every one, not the span between the first and the last)
+    const span = g.layers.length ? (g.from !== undefined && g.to !== undefined && g.to > g.from ? ` (${s2(g.from)} s to ${s2(g.to)} s)` : '')
+      : g.times.length ? ` at ${g.times.slice(0, 6).map((t) => `${s2(t)} s`).join(', ')}${g.times.length > 6 ? `, +${g.times.length - 6} more` : ''}` : '';
     const some = g.layers.slice(0, LAYERS_SHOWN).join(', ');
     const more = g.layers.length > LAYERS_SHOWN ? `, +${g.layers.length - LAYERS_SHOWN} more` : '';
     return `- [${g.severity}] ${g.check} x${g.count}${where}${span}, worst: ${g.worst.message}${g.layers.length ? ` (layers: ${some}${more})` : ''}`;
