@@ -384,22 +384,25 @@ export interface SystemParts { fixed: string; variable: string }
  * instructions so that it is served from the cache across projects, and the
  * parts that change come last. reference is docs/document.md; brief is the
  * project's own taste (assets/brief.json), when there is one; installed: the
- * plugins installed on the user's device, one line each (name: what it is for).
+ * plugins installed on the user's device, one line each (name: what it is for);
+ * packs: the lines of the editor's packs' entries by need (the same for every project).
  */
-export function systemParts(reference: string, brief?: string, installed?: string[]): SystemParts {
+export function systemParts(reference: string, brief?: string, installed?: string[], packs?: string[]): SystemParts {
   const variable = [
     installed?.length ? `Plugins installed on this device, offered in every project (their nodes and tools are not in the list_nodes index: search them with list_nodes { query }; a layer of one copies the plugin into the project):\n${installed.map((x) => `- ${x}`).join('\n')}` : '',
     brief ? `The brief of the project (assets/brief.json), the taste of this project, over your defaults where they differ:\n${brief}` : '',
   ].filter(Boolean).join('\n\n');
-  return { fixed: `${INSTRUCTIONS}\n\n${reference}`, variable };
+  // the editor's packs are the same for every project: they ride with the cached part
+  const entries = packs?.length ? `\n\nEntries of the editor's packs, by need (usable even when the project holds none; the first use adds the pack to the project; list_nodes { types } gives the full entry):\n${packs.map((x) => `- ${x}`).join('\n')}` : '';
+  return { fixed: `${INSTRUCTIONS}\n\n${reference}${entries}`, variable };
 }
 
 /** the two parts as one text (the routes that cache by themselves, or not at all) */
 export const joinSystem = ({ fixed, variable }: SystemParts): string => (variable ? `${fixed}\n\n${variable}` : fixed);
 
 /** the system prompt as one text */
-export function systemPrompt(reference: string, brief?: string, installed?: string[]): string {
-  return joinSystem(systemParts(reference, brief, installed));
+export function systemPrompt(reference: string, brief?: string, installed?: string[], packs?: string[]): string {
+  return joinSystem(systemParts(reference, brief, installed, packs));
 }
 
 export interface TurnContext {

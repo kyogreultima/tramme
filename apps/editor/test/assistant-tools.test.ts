@@ -80,7 +80,7 @@ describe("the assistant's tools", () => {
     const index = vocabularyIndex(reg, { installed });
     expect(index).not.toContain('weather-today');
     expect(index).toContain('brand-check');
-    expect(index).toContain("1 more entries come from the editor's packs and the plugins installed");
+    expect(index).toContain("1 more entries come from the plugins installed on this device and the editor's packs, whose entries by need the instructions list");
     const found = vocabularyIndex(reg, { installed, query: 'Forecast' });
     // the project's own first, the installed after, nothing else
     expect(found.indexOf('brand-check')).toBeLessThan(found.indexOf('weather-today'));

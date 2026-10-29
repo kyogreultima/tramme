@@ -1986,4 +1986,11 @@ describe('the packs\' entries by need', () => {
     expect(walk.find((e) => e.name === 'ui.device')?.kind).toBe('node');
     expect(walk.find((e) => e.name === 'device-screen')?.kind).toBe('tool');
   });
+  it('lists the entries as prompt lines: the name, its pack, what it is for', async () => {
+    const { packLines } = await import('../src/packs.ts');
+    const lines = packLines(INDEX as never);
+    expect(lines.length).toBe(index.reduce((n, e) => n + (e.entries?.length ?? 0), 0));
+    expect(lines.some((l) => l.startsWith('ui.device (UI walkthrough): '))).toBe(true);
+    expect(lines.every((l) => !l.includes(String.fromCharCode(10)))).toBe(true);
+  });
 });
