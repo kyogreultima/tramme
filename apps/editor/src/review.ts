@@ -3,7 +3,7 @@
 // are tools of the editor's vocabulary, run by the assistant before it sums
 // up (use_tool) or by the user from the / menu.
 
-import { Evaluator, groupIssues, motionReport, REPORT_MAX, reportCounts, reportHead, reportLines, runChecks, type QualityIssue, type ToolContext, type ToolType, type TrammeDoc } from '@tramme/core';
+import { Evaluator, groupIssues, likeness, pictureDiff, motionReport, REPORT_MAX, reportCounts, reportHead, reportLines, runChecks, type QualityIssue, type ToolContext, type ToolType, type TrammeDoc } from '@tramme/core';
 import { pixelsOf, flowLines } from './flow.ts';
 import { analyses, canvas } from './perception.ts';
 import { masterText, soundReport } from './mixing.ts';
@@ -148,4 +148,70 @@ const motion: ToolType<{ t: number; span?: number; steps?: number }> = {
   },
 };
 
-export const REVIEW_TOOLS: ToolType[] = [check, motion];
+/** the part of a picture of src's size that covers a frame of dst's proportions: its whole when they match, else centred */
+export function coverRect(src: { w: number; h: number }, dst: { w: number; h: number }): { sx: number; sy: number; sw: number; sh: number } {
+  const k = Math.max(dst.w / src.w, dst.h / src.h), sw = dst.w / k, sh = dst.h / k;
+  return { sx: (src.w - sw) / 2, sy: (src.h - sh) / 2, sw, sh };
+}
+
+/** a sentence when the target is not the render's shape (empty when it is, within a few percent) */
+export function proportionNote(render: { w: number; h: number }, target: { w: number; h: number }): string {
+  const a = render.w / render.h, b = target.w / target.h;
+  return Math.abs(a - b) / a < 0.03 ? '' : `The proportions differ (render ${render.w}:${render.h}, target ${target.w}:${target.h}): the target is fitted to cover the render, so its edges are cut.`;
+}
+
+const SIDE = 480;
+
+const compare: ToolType<{ target?: string; t?: number; compId?: string }> = {
+  name: 'compare', title: 'Compare with a picture', description: "draws the render of a moment beside a target picture (the kept style frame, or any image) and their difference, and scores how alike they are in palette, layout and light, with what differs most in words",
+  input: {
+    type: 'object',
+    properties: {
+      target: { type: 'string', title: 'Target', description: 'an image asset of the project or a path in it; by default the style frame kept in the film plan' },
+      t: { type: 'number', minimum: 0, title: 'At (s)', description: 'the moment of the render (the editor time by default)' },
+      compId: { type: 'string', title: 'Composition' },
+    },
+  },
+  ai: { when: 'after rebuilding a scene from the kept style frame: compare the render with it, read what differs most, fix that, compare again. The score is a guide to look in the same direction, never a goal to push to 100', avoid: 'comparing a scene with a frame that shows other content as if the content should match; chasing the score once palette, layout and light are near' },
+  async run({ target, t: at, compId }, ctx) {
+    const plan = parsePlan(await ctx.readText(FILM_PLAN_PATH).catch(() => null));
+    const want = target ?? plan?.target;
+    if (!want) throw new Error('give a target: an image asset of the project or a path in it, or keep a style frame in the film plan first (use_tool style-frames)');
+    const asset = ctx.doc.assets[want];
+    let url: string;
+    if (asset?.type === 'image') url = ctx.assetUrl(want);
+    else if ((await ctx.files()).some((f) => f.path === want)) url = ctx.fileUrl(want);
+    else throw new Error(`the target "${want}" is neither an image asset nor a file of the project`);
+    const id = compId ?? ctx.compId, comp = ctx.doc.compositions[id];
+    if (!comp) throw new Error(`unknown composition: ${id}`);
+    const time = Math.max(0, Math.min(at ?? ctx.time, comp.duration));
+    const [render, goal] = await Promise.all([ctx.renderStill(time, id).then(decode), decode(url)]);
+    // both on one canvas size, the render's shape; the target covers it
+    const W = comp.width >= comp.height ? SIDE : Math.round((SIDE * comp.width) / comp.height), H = comp.width >= comp.height ? Math.round((SIDE * comp.height) / comp.width) : SIDE;
+    const a = canvas(W, H), b = canvas(W, H), c = coverRect({ w: goal.naturalWidth, h: goal.naturalHeight }, { w: W, h: H });
+    a.g.drawImage(render, 0, 0, W, H);
+    b.g.drawImage(goal, c.sx, c.sy, c.sw, c.sh, 0, 0, W, H);
+    const pa = { data: a.g.getImageData(0, 0, W, H).data, width: W, height: H }, pb = { data: b.g.getImageData(0, 0, W, H).data, width: W, height: H };
+    const { image } = pictureDiff(pa, pb, { diff: true });
+    const d = canvas(W, H);
+    d.g.putImageData(new ImageData(new Uint8ClampedArray(image!), W, H), 0, 0);
+    const like = likeness(pa, pb);
+    const url2 = sheetOf([{ image: a.c, label: `${time.toFixed(2)} s` }, { image: b.c, label: 'target' }, { image: d.c, label: 'difference' }], W, H, 3);
+    const note = proportionNote({ w: comp.width, h: comp.height }, { w: goal.naturalWidth, h: goal.naturalHeight });
+    return {
+      text: `Likeness to the target ${like.score}/100: palette ${like.palette}, layout ${like.layout}, light ${like.light}. ${like.words.length ? `What differs most: ${like.words.join('; ')}.` : 'Nothing stands out.'}${note ? ` ${note}` : ''} The sheet shows the render, the target and their difference (red). The score is a guide: the frame is a target in look, not in content, so judge by eye first.`,
+      notice: t('review.compared', { score: like.score }),
+      images: [{ url: url2, caption: t('review.compareSheet') }],
+    };
+  },
+};
+
+/** an image at an address, decoded */
+async function decode(url: string): Promise<HTMLImageElement> {
+  const image = new Image();
+  image.src = url;
+  await image.decode();
+  return image;
+}
+
+export const REVIEW_TOOLS: ToolType[] = [check, motion, compare];

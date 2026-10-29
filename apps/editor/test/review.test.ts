@@ -40,3 +40,29 @@ describe('the check as it is read', () => {
     expect(issueReport([], doc, 'main')).toEqual({ lines: [], notice: [] });
   });
 });
+
+describe('the comparison of a render with a picture', () => {
+  it('fits a target of other proportions to cover the render, and says they differ', async () => {
+    const { coverRect, proportionNote } = await import('../src/review.ts');
+    // a 9:16 target onto a 16:9 render: the target's width is kept, a slice of its height is taken
+    const r = coverRect({ w: 1080, h: 1920 }, { w: 1920, h: 1080 });
+    expect(r.sw).toBe(1080);
+    expect(r.sh).toBeCloseTo((1080 * 1080) / 1920, 6);
+    expect(r.sx).toBe(0);
+    expect(r.sy).toBeCloseTo((1920 - r.sh) / 2, 6);
+    // the same proportions: the whole picture
+    expect(coverRect({ w: 800, h: 450 }, { w: 1920, h: 1080 })).toEqual({ sx: 0, sy: 0, sw: 800, sh: 450 });
+    expect(proportionNote({ w: 1920, h: 1080 }, { w: 1080, h: 1920 })).toMatch(/proportions differ/);
+    expect(proportionNote({ w: 1920, h: 1080 }, { w: 1280, h: 720 })).toBe('');
+  });
+
+  it('asks for a target when there is none and no film plan holds one', async () => {
+    const { REVIEW_TOOLS } = await import('../src/review.ts');
+    const compare = REVIEW_TOOLS.find((t) => t.name === 'compare')!;
+    expect(compare).toBeTruthy();
+    const { doc } = newProject({ name: 'T', width: 1920, height: 1080, fps: 30, duration: 4 });
+    const ctx = { doc, compId: doc.root, time: 0, readText: async () => null, files: async () => [], fileUrl: () => '', signal: new AbortController().signal } as never;
+    await expect(compare.run({}, ctx)).rejects.toThrow(/give a target/);
+    await expect(compare.run({ target: 'nothing-here' }, ctx)).rejects.toThrow(/nothing-here/);
+  });
+});

@@ -9,7 +9,7 @@ const sized = (type: string): NodeType => ({
   type, title: type, category: 'Test', props: { size: { type: 'vec2', default: [600, 600], label: 'Size' } },
   bounds: ({ size: [w, h] }: { size: [number, number] }) => ({ x: -w / 2, y: -h / 2, w, h }), render: {},
 });
-const registry = builtinRegistry().register(...['ui.device', 'chart.bar', 'solid.3d', 'map.route', 'diagram.balance'].map(sized));
+const registry = builtinRegistry().register(...['ui.device', 'chart.bar', 'map.route', 'diagram.balance'].map(sized));
 
 const W = 1920, H = 1080;
 /** layers sit at the centre of the frame unless they say otherwise */

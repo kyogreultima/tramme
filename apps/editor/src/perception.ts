@@ -4,13 +4,14 @@
 // vocabulary, run by the assistant (use_tool) or from the / menu.
 
 import { ALL_FORMATS, AudioBufferSink, CanvasSink, Input, UrlSource } from 'mediabunny';
-import { analyseAudio, clearMargins, freeSides, largestFree, pointer, type Op, type ToolContext, type ToolType } from '@tramme/core';
+import { analyseAudio, busyGrid, clearMargins, dominant, freeSides, largestFree, pointer, type Op, type ToolContext, type ToolType } from '@tramme/core';
 import { t } from './i18n/index.ts';
 import { freshId } from './model.ts';
 import { progressCallback, type DownloadProgress } from './model-cache.ts';
 import { madeBy, type ModelEntry } from './models.ts';
 import { chosenModel } from './settings.ts';
 
+export { dominant };
 export const RATE = 16000;
 
 /** a canvas and its 2D context, set up for reading its pixels often */
@@ -328,28 +329,6 @@ const subjects: ToolType<{ asset?: string; every?: number }> = {
 };
 
 // ── colours of the picture ───────────────────────────────────
-/** the main colours of a picture: k-means on its pixels, the largest groups first */
-export function dominant(px: Uint8ClampedArray, k = 5): { rgb: [number, number, number]; share: number }[] {
-  const pts: [number, number, number][] = [];
-  for (let i = 0; i < px.length; i += 4) if (px[i + 3] > 128) pts.push([px[i], px[i + 1], px[i + 2]]);
-  if (!pts.length) return [];
-  // seeds spread along the brightness, then a few rounds of assignment
-  const sorted = [...pts].sort((a, b) => a[0] + a[1] + a[2] - (b[0] + b[1] + b[2]));
-  let centres = Array.from({ length: k }, (_, i) => [...sorted[Math.floor(((i + 0.5) * sorted.length) / k)]] as [number, number, number]);
-  let counts: number[] = [];
-  for (let round = 0; round < 8; round++) {
-    const sums = centres.map(() => [0, 0, 0]);
-    counts = centres.map(() => 0);
-    for (const p of pts) {
-      let best = 0, bd = Infinity;
-      centres.forEach((c, j) => { const d = (p[0] - c[0]) ** 2 + (p[1] - c[1]) ** 2 + (p[2] - c[2]) ** 2; if (d < bd) { bd = d; best = j; } });
-      sums[best][0] += p[0]; sums[best][1] += p[1]; sums[best][2] += p[2]; counts[best]++;
-    }
-    centres = centres.map((c, j) => (counts[j] ? [sums[j][0] / counts[j], sums[j][1] / counts[j], sums[j][2] / counts[j]] : c) as [number, number, number]);
-  }
-  return centres.map((c, j) => ({ rgb: c.map(Math.round) as [number, number, number], share: counts[j] / pts.length })).filter((c) => c.share > 0.01).sort((a, b) => b.share - a.share);
-}
-
 const hex = ([r, g, b]: [number, number, number]) => `#${[r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('').toUpperCase()}`;
 const saturation = ([r, g, b]: [number, number, number]) => { const mx = Math.max(r, g, b), mn = Math.min(r, g, b); return mx ? (mx - mn) / mx : 0; };
 const luma = ([r, g, b]: [number, number, number]) => (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
@@ -412,28 +391,8 @@ const palette: ToolType<{ asset?: string; t?: number; tokens?: boolean }> = {
 };
 
 // ── free space of a frame ────────────────────────────────────
-/** how busy each cell of a small grid is (edge energy, robustly scaled) and its mean luminance */
-function busyGrid(g: CanvasRenderingContext2D, w: number, h: number): { busy: number[]; luma: number[] } {
-  const px = g.getImageData(0, 0, w, h).data;
-  const luma = new Float32Array(w * h);
-  for (let i = 0; i < luma.length; i++) luma[i] = (0.2126 * px[i * 4] + 0.7152 * px[i * 4 + 1] + 0.0722 * px[i * 4 + 2]) / 255;
-  /** the luminance at x, y, held at the edges so the border cells are measured too */
-  const at = (x: number, y: number) => luma[Math.min(h - 1, Math.max(0, y)) * w + Math.min(w - 1, Math.max(0, x))];
-  const energy = new Float32Array(w * h);
-  let max = 0;
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-    const i = y * w + x;
-    const dx = Math.abs(at(x + 1, y) - at(x - 1, y)) + Math.abs(at(x + 1, y + 1) - at(x - 1, y + 1));
-    const dy = Math.abs(at(x, y + 1) - at(x, y - 1)) + Math.abs(at(x + 1, y + 1) - at(x + 1, y - 1));
-    const e = dx + dy + (1 - Math.abs(luma[i] * 2 - 1)) * 0.12; // edges, and a little for flat brightness (text lands there well anyway)
-    energy[i] = e;
-    if (e > max) max = e;
-  }
-  // robust scale: the 95th percentile, so one hot edge does not flatten the rest
-  const sorted = [...energy].sort((a, b) => a - b);
-  const cap = sorted[Math.floor(sorted.length * 0.95)] || 1;
-  return { busy: [...energy].map((e) => Math.min(1, e / cap)), luma: [...luma] };
-}
+/** how busy each cell of a small canvas is and its luminance (the measure is the core's) */
+const busyOf = (g: CanvasRenderingContext2D, w: number, h: number) => busyGrid(g.getImageData(0, 0, w, h).data, w, h);
 
 const space: ToolType<{ asset?: string; t?: number }> = {
   name: 'space', title: 'Free space', description: 'finds where a frame stays clear (the free sides, the largest clear rectangle) so titles and captions land where nothing matters sits',
@@ -467,7 +426,7 @@ const space: ToolType<{ asset?: string; t?: number }> = {
     const gw = w >= h ? 48 : 27, gh = w >= h ? 27 : 48;
     const { g } = canvas(gw, gh);
     g.drawImage(source, 0, 0, gw, gh);
-    const { busy, luma } = busyGrid(g, gw, gh);
+    const { busy, luma } = busyOf(g, gw, gh);
     const grid = { cols: gw, rows: gh, busy };
     const sides = freeSides(grid), rect = largestFree(grid), margins = clearMargins(grid);
     const data = { version: 1, kind: 'space', source: asset, t: at, width: w, height: h, cols: gw, rows: gh, busy, luma, sides, rect, margins };
