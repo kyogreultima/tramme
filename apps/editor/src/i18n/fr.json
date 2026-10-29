@@ -1385,6 +1385,10 @@
     "saved": "Bloc « {name} » enregistré.",
     "placed": "Bloc « {name} » placé."
   },
+  "surface": {
+    "list": "Surfaces listées.",
+    "laid": "Surface {kind} posée."
+  },
   "styleFrames": {
     "paidText": "Un fournisseur va dessiner {n} image(s) de style du film, ce qui coûte de l’argent (chacune compte) : « {prompt} »",
     "pickTitle": "Quelle image est la cible du film ?",
