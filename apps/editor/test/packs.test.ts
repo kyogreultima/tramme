@@ -1931,6 +1931,23 @@ describe('the device frame around built layers', () => {
     expect(over.some((c) => c.startsWith('clip('))).toBe(false);
   });
 
+  it('draws the bar of a browser or a window at the top of the frame, not across its middle', () => {
+    for (const kind of ['browser', 'window']) {
+      const ctx = recorder();
+      device.render.canvas2d!(ctx, props({ device: kind, part: 'over', size: [1100, 720] }) as never, host);
+      const bar = ctx.calls.findIndex((c) => c.startsWith('roundRect(0,0,1100,54'));
+      expect(bar, kind).toBeGreaterThan(-1);
+      expect(ctx.calls.slice(0, bar), kind).toContain('translate(-550,-360)');
+      expect(ctx.calls.slice(bar), kind).toContain('restore()');
+    }
+  });
+
+  it('draws nothing of its own on an empty screen but the colour of the screen', () => {
+    const ctx = recorder();
+    device.render.canvas2d!(ctx, props() as never, host);
+    expect(ctx.calls.some((c) => c.startsWith('fillText('))).toBe(false);
+  });
+
   it('device-screen lays the frame around a content group the screen clips', async () => {
     const { doc } = newProject({ name: 'T', width: 1920, height: 1080, fps: 30, duration: 6 });
     const out = await runTool(walkthrough.tools[1], doc, { device: 'phone', name: 'Phone' });
