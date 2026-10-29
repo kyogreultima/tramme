@@ -376,6 +376,8 @@ const listRecipe: ToolType<{ items: string; title?: string; marker?: 'check' | '
     const doc = ctx.doc, c = compOf(ctx), s = style(doc), at = atOf(ctx, a.at), end = r(at + (a.duration ?? 5));
     const u = Math.min(c.width, c.height), size = Math.round(u * 0.05), lh = size * 2.2, marker = a.marker ?? 'check';
     const mw = size * 1.05, step = Math.max(s.stagger * 2, 0.14);
+    // the numbers sit on dots of the accent: the plate's colour reads there, the ink (often the accent's neighbour in light) does not
+    const onAccent = doc.tokens?.plate?.type === 'color' ? '@plate' : '#0B0F12';
     const maxText = Math.max(...items.map((item) => measure(doc, item, size, 600, s.font)));
     const blockW = mw * 1.9 + maxText, top = c.height * (a.title ? 0.4 : 0.44) - ((items.length - 1) * lh) / 2;
     const { add, done } = adder(doc, ctx.compId);
@@ -386,7 +388,7 @@ const listRecipe: ToolType<{ items: string; title?: string; marker?: 'check' | '
       const t0 = r(at + 0.2 + i * step), y = r(i * lh), x0 = -blockW / 2;
       if (marker === 'number') {
         children.push(add(`list-dot-${i + 1}`, { type: 'shape.ellipse', name: `Dot ${i + 1}`, transform: { position: [r(x0 + mw / 2), y], scale: { $k: [{ t: t0, v: [0, 0], ease: POP }, { t: r(t0 + s.pace * 0.6), v: [1, 1] }] } }, props: { size: [r(mw), r(mw)], fill: s.accent } }, false));
-        children.push(add(`list-num-${i + 1}`, { type: 'text', name: String(i + 1), transform: { position: [r(x0 + mw / 2), y], opacity: { $k: [{ t: r(t0 + s.pace * 0.3), v: 0, ease: s.enter }, { t: r(t0 + s.pace * 0.7), v: 1 }] } }, props: { text: String(i + 1), size: Math.round(mw * 0.62), weight: 800, align: 'center', baseline: 'middle', color: s.ink, ...(s.font ? { font: s.font } : {}) } }, false));
+        children.push(add(`list-num-${i + 1}`, { type: 'text', name: String(i + 1), transform: { position: [r(x0 + mw / 2), y], opacity: { $k: [{ t: r(t0 + s.pace * 0.3), v: 0, ease: s.enter }, { t: r(t0 + s.pace * 0.7), v: 1 }] } }, props: { text: String(i + 1), size: Math.round(mw * 0.62), weight: 800, align: 'center', baseline: 'middle', color: onAccent, ...(s.font ? { font: s.font } : {}) } }, false));
       } else if (marker === 'dash') {
         children.push(add(`list-dash-${i + 1}`, { type: 'shape.rect', name: `Dash ${i + 1}`, transform: { position: [r(x0 + mw / 2), y], scale: { $k: [{ t: t0, v: [0, 1], ease: s.enter }, { t: r(t0 + s.pace * 0.5), v: [1, 1] }] } }, props: { size: [r(mw), r(Math.max(2, size * 0.08))], fill: s.accent } }, false));
       } else {
