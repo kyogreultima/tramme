@@ -145,7 +145,7 @@ const iconTool = {
     required: ['icons'],
   },
   ai: {
-    when: 'a point a picture says faster than a word, a step of a process, a feature list; three reasons to switch get three icons beside their lines',
+    when: 'Lucide icons found by word and drawn on: a point a picture says faster than a word, a step of a process, a feature list; three reasons to switch get three icons beside their lines',
     avoid: 'an icon per word, more than five on screen at once, icons as decoration, two icon families in one film; vague words (money, growth) return a contact sheet: name the icons it shows before proposing them',
     example: { icons: 'trending-up, shield-check, users', layout: 'row', size: 96, color: '@accent' },
   },

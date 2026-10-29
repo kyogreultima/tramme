@@ -14,7 +14,44 @@
       "Add a chart": "Ajouter un graphique",
       "a bar, line, donut, race, scatter or function chart from a JSON data set of the project or from a CSV (separators, quotes and decimal commas read), sized and placed in the composition, with an optional title above it": "un histogramme, une courbe, un anneau, une course, un nuage ou une fonction depuis un jeu de données JSON du projet ou depuis un CSV (séparateurs, guillemets et virgules décimales lus), dimensionné et placé dans la composition, avec un titre optionnel au-dessus"
     },
-    "version": "1.1.0"
+    "version": "1.1.0",
+    "entries": [
+      {
+        "name": "chart.bar",
+        "kind": "node",
+        "line": "comparing a few figures (revenue by quarter, votes by candidate)"
+      },
+      {
+        "name": "chart.line",
+        "kind": "node",
+        "line": "a value over time (a price, an audience, a temperature)"
+      },
+      {
+        "name": "chart.donut",
+        "kind": "node",
+        "line": "parts of a whole (shares, budget lines)"
+      },
+      {
+        "name": "chart.race",
+        "kind": "node",
+        "line": "a ranking over time (market shares, medals, populations)"
+      },
+      {
+        "name": "chart.scatter",
+        "kind": "node",
+        "line": "two measures together (spend against reach, years against life)"
+      },
+      {
+        "name": "chart.function",
+        "kind": "node",
+        "line": "a curve the tool sampled (the tool takes the points; the node never computes)"
+      },
+      {
+        "name": "chart",
+        "kind": "tool",
+        "line": "a bar, line, donut, race, scatter or function chart from a JSON data set of the project or from a CSV (separa…"
+      }
+    ]
   },
   {
     "file": "kinetic.js",
@@ -22,7 +59,14 @@
     "description": "Text that moves letter by letter: typewriter, wave, scatter, drop, mask",
     "commands": [],
     "fr": {},
-    "version": "1.1.0"
+    "version": "1.1.0",
+    "entries": [
+      {
+        "name": "text.kinetic",
+        "kind": "node",
+        "line": "titles that move letter by letter (an opening line, a punchline)"
+      }
+    ]
   },
   {
     "file": "physics.js",
@@ -30,7 +74,34 @@
     "description": "Confetti, bouncing balls, a rope, and letters that drop and settle — deterministic simulations",
     "commands": [],
     "fr": {},
-    "version": "1.1.0"
+    "version": "1.1.0",
+    "entries": [
+      {
+        "name": "phys.confetti",
+        "kind": "node",
+        "line": "a celebration, a reveal, an end card"
+      },
+      {
+        "name": "phys.bounce",
+        "kind": "node",
+        "line": "energy behind a logo or a counter"
+      },
+      {
+        "name": "phys.rope",
+        "kind": "node",
+        "line": "something strung across the frame that should sag and swing (a banner, a cable, a washing line)"
+      },
+      {
+        "name": "phys.text-drop",
+        "kind": "node",
+        "line": "a word that lands (a punchline, a brand)"
+      },
+      {
+        "name": "phys.bodies",
+        "kind": "node",
+        "line": "a rigid-body pile (blocks, balls) that builds itself"
+      }
+    ]
   },
   {
     "file": "styk.js",
@@ -47,7 +118,19 @@
       "Stick figure": "Silhouette",
       "adds a Pivot-style stick figure layer: the blue man or the plain black one, or the man already walking (a 1 s walk cycle keyframed pose by pose), at a scale and a colour": "ajoute un calque de silhouette à la Pivot : l'homme en bleu ou le noir et fin, ou l'homme déjà en marche (un pas d'1 s, posé keyframe par keyframe), à une échelle et une couleur"
     },
-    "version": "1.0.0"
+    "version": "1.0.0",
+    "entries": [
+      {
+        "name": "styk.figure",
+        "kind": "node",
+        "line": "a Pivot-style figure of fixed-length segments, posed by joint angles, IK targets or stretch, drawn frame by f…"
+      },
+      {
+        "name": "styk-figure",
+        "kind": "tool",
+        "line": "adds a Pivot-style stick figure layer"
+      }
+    ]
   },
   {
     "file": "walkthrough.js",
@@ -71,7 +154,29 @@
       "Frame for an interface built in layers": "Cadre pour une interface construite en calques",
       "a phone, browser or window frame whose screen holds layers you build: the frame under and over an empty content group that the screen clips": "un cadre de téléphone, de navigateur ou de fenêtre dont l'écran porte les calques que vous construisez : le cadre dessous et dessus un groupe de contenu vide que l'écran découpe"
     },
-    "version": "1.2.0"
+    "version": "1.2.0",
+    "entries": [
+      {
+        "name": "ui.device",
+        "kind": "node",
+        "line": "a phone, browser or window frame around an interface"
+      },
+      {
+        "name": "ui.cursor",
+        "kind": "node",
+        "line": "showing where to tap or click on a walkthrough"
+      },
+      {
+        "name": "walkthrough",
+        "kind": "tool",
+        "line": "a sequence of screenshots in a phone or a browser frame, one composition, a cut per screen, each with an opti…"
+      },
+      {
+        "name": "device-screen",
+        "kind": "tool",
+        "line": "an interface drawn in layers (rows, cards, buttons, prices) inside a phone, a browser or a window"
+      }
+    ]
   },
   {
     "file": "a11y.js",
@@ -79,7 +184,8 @@
     "description": "Text size, contrast, blinking and time-to-read, checked with the others",
     "commands": [],
     "fr": {},
-    "version": "1.0.0"
+    "version": "1.0.0",
+    "entries": []
   },
   {
     "file": "localize.js",
@@ -103,7 +209,19 @@
       "Apply a translation": "Appliquer une traduction",
       "a translated array of sentences becomes a transcript asset retimed over the original, and the compositions captioning the original are duplicated for the language": "une liste de phrases traduites devient un actif de transcription recalé sur l'original, et les compositions qui sous-titrent l'original sont dupliquées pour la langue"
     },
-    "version": "1.0.0"
+    "version": "1.0.0",
+    "entries": [
+      {
+        "name": "localize",
+        "kind": "tool",
+        "line": "cuts a transcript into numbered sentences for the model to translate"
+      },
+      {
+        "name": "localize-apply",
+        "kind": "tool",
+        "line": "a translated array of sentences becomes a transcript asset retimed over the original, and the compositions ca…"
+      }
+    ]
   },
   {
     "file": "icons.js",
@@ -123,7 +241,14 @@
       "Icons": "Icônes",
       "finds pictograms by name, tag or a few words and lays them as editable stroke groups: a row, a grid, or one beside each line of a list; when the words are vague, the candidates come back as a contact sheet": "trouve des pictogrammes par nom, étiquette ou quelques mots et les pose en groupes de traits éditables : en ligne, en grille, ou à côté de chaque ligne d'une liste ; quand les mots sont vagues, les candidates reviennent en planche"
     },
-    "version": "1.0.0"
+    "version": "1.0.0",
+    "entries": [
+      {
+        "name": "icon",
+        "kind": "tool",
+        "line": "Lucide icons found by word and drawn on"
+      }
+    ]
   },
   {
     "file": "diagram.js",
@@ -140,7 +265,14 @@
       "Diagram": "Diagramme",
       "a flow, architecture, cycle or tree written as flowchart text (a Mermaid subset) or JSON, laid out layered, ring or hub, and built as editable boxes, labels and edges that draw themselves in reading order; one route can be highlighted": "un flux, une architecture, un cycle ou un arbre écrit en texte flowchart (un sous-ensemble de Mermaid) ou JSON, disposé en couches, anneau ou étoile, et construit en boîtes, libellés et arêtes éditables qui se tracent dans l'ordre de lecture ; une route peut être mise en avant"
     },
-    "version": "1.0.0"
+    "version": "1.0.0",
+    "entries": [
+      {
+        "name": "diagram",
+        "kind": "tool",
+        "line": "a pipeline, an architecture, a lifecycle, a decision flow"
+      }
+    ]
   },
   {
     "file": "codeview.js",
@@ -157,7 +289,24 @@
     "fr": {
       "Show code on screen": "Montrer du code à l’écran",
       "code or a terminal session in a window frame, typed at a readable rhythm, the lines that matter highlighted, a long file cut to what fits": "du code ou une session de terminal dans un cadre de fenêtre, tapé à un rythme lisible, les lignes qui comptent soulevées, un long fichier coupé à ce qui tient"
-    }
+    },
+    "entries": [
+      {
+        "name": "codeview.code",
+        "kind": "node",
+        "line": "typed code and highlighted changes, for a developer tool's film"
+      },
+      {
+        "name": "codeview.terminal",
+        "kind": "node",
+        "line": "a build or a test run under the voice"
+      },
+      {
+        "name": "code-screen",
+        "kind": "tool",
+        "line": "code or a terminal session in a window frame, typed at a readable rhythm, the lines that matter highlighted,…"
+      }
+    ]
   },
   {
     "file": "rhythm.js",
@@ -165,7 +314,8 @@
     "description": "Rhythm and coherence checks: cuts off the beat, even shots, a palette drifting off the tokens, near-duplicate type sizes",
     "version": "1.0.0",
     "commands": [],
-    "fr": {}
+    "fr": {},
+    "entries": []
   },
   {
     "file": "screencast.js",
@@ -182,7 +332,14 @@
     "fr": {
       "Play a screen recording": "Jouer une capture d’écran",
       "a recording as a product film: the picture zooms where things happen and out before each page change, a click found is marked with the cursor's ripple": "une capture jouée comme un film produit : l’image zoome là où ça se passe et dézoome avant chaque changement de page, un clic repéré est marqué de l’onde du curseur"
-    }
+    },
+    "entries": [
+      {
+        "name": "screencast",
+        "kind": "tool",
+        "line": "a product film from a screen recording"
+      }
+    ]
   },
   {
     "file": "handmade.js",
@@ -202,7 +359,24 @@
     "fr": {
       "Annotate a layer": "Annoter une couche",
       "a rough circle, underline, box, highlight, strike or bracket around a layer, drawn on a beat after it lands, following it when it moves": "un cercle, un souligné, un cadre, un surlignage, une rature ou un crochet dessinés autour d’une couche, tracés un temps après qu’elle est posée, qui la suivent quand elle bouge"
-    }
+    },
+    "entries": [
+      {
+        "name": "sketch.shape",
+        "kind": "node",
+        "line": "the marks an explainer draws around its point"
+      },
+      {
+        "name": "fx.boil",
+        "kind": "effect",
+        "line": "a film in the sketchbook look"
+      },
+      {
+        "name": "annotate",
+        "kind": "tool",
+        "line": "the one thing that matters on screen gets its mark, a beat after it lands"
+      }
+    ]
   },
   {
     "file": "chat.js",
@@ -219,7 +393,24 @@
     "fr": {
       "Play a conversation": "Jouer une conversation",
       "a text-message story timed by reading: bubbles entering, typing indicators, the thread scrolling — in the walkthrough pack's phone, or full frame in 9:16": "une histoire en messages chronométrée à la lecture : des bulles qui entrent, des indicateurs de saisie, le fil qui défile — dans le téléphone du pack visite guidée, ou plein cadre en 9:16"
-    }
+    },
+    "entries": [
+      {
+        "name": "chat.thread",
+        "kind": "node",
+        "line": "a text-message story"
+      },
+      {
+        "name": "chat.notice",
+        "kind": "node",
+        "line": "a story that opens on what the phone says"
+      },
+      {
+        "name": "chat",
+        "kind": "tool",
+        "line": "a text-message story for a short video"
+      }
+    ]
   },
   {
     "file": "emoji.js",
@@ -239,7 +430,14 @@
     "fr": {
       "Place an emoji": "Placer un emoji",
       "one or several emoji as picture layers, found by name or by the character itself, the files they use copied into the project so they draw the same everywhere": "un ou plusieurs emoji comme couches d’image, trouvés par nom ou par le caractère lui-même, les fichiers utilisés copiés dans le projet pour qu’ils se dessinent pareil partout"
-    }
+    },
+    "entries": [
+      {
+        "name": "emoji",
+        "kind": "tool",
+        "line": "emoji from the pack's own set"
+      }
+    ]
   },
   {
     "file": "maps.js",
@@ -262,7 +460,19 @@
     "fr": {
       "Draw a map": "Dessiner une carte",
       "places named in words found offline among the shipped places and countries, the projection and the framing chosen from what is shown, the project holding only the shapes the map shows": "des lieux nommés en mots, trouvés hors ligne parmi les lieux et pays livrés, la projection et le cadrage choisis d’après ce qui est montré, le projet ne tenant que les formes que la carte montre"
-    }
+    },
+    "entries": [
+      {
+        "name": "map.view",
+        "kind": "node",
+        "line": "places in the world: offices on a map, a journey drawn as a great circle, one country highlighted"
+      },
+      {
+        "name": "map",
+        "kind": "tool",
+        "line": "a map of places found offline by name (\"our offices in Lyon, Montreal and Dakar\")"
+      }
+    ]
   },
   {
     "file": "audiogram.js",
@@ -279,7 +489,19 @@
     "fr": {
       "Make an audiogram": "Faire un audiogramme",
       "an extract of a podcast or an interview as a clip: the cover, the name, the wave moving with the voice, the words said, a progress bar — laid out for the format": "un extrait de podcast ou d’entretien en clip : la pochette, le nom, l’onde qui bouge avec la voix, les mots dits, une barre de progression — disposé pour le format"
-    }
+    },
+    "entries": [
+      {
+        "name": "audiogram.wave",
+        "kind": "node",
+        "line": "the sound made visible on an audiogram"
+      },
+      {
+        "name": "audiogram",
+        "kind": "tool",
+        "line": "a podcast extract for the feeds"
+      }
+    ]
   },
   {
     "file": "math.js",
@@ -299,7 +521,19 @@
     "fr": {
       "Show a formula": "Montrer une formule",
       "a TeX formula laid out in STIX Two Math, written on or changing into a second one, the font's glyph table copied into the project so it draws the same everywhere": "une formule TeX disposée en STIX Two Math, écrite ou changeant en une seconde, la table de glyphes de la police copiée dans le projet pour qu’elle se dessine pareil partout"
-    }
+    },
+    "entries": [
+      {
+        "name": "math.formula",
+        "kind": "node",
+        "line": "an explainer's formula"
+      },
+      {
+        "name": "formula",
+        "kind": "tool",
+        "line": "a formula the film reads out"
+      }
+    ]
   },
   {
     "file": "matter.js",
@@ -307,7 +541,24 @@
     "description": "Morphs, liquids and paper: one shape becoming another without twisting, seeded blobs, a torn sheet crossing the frame",
     "version": "1.0.0",
     "commands": [],
-    "fr": {}
+    "fr": {},
+    "entries": [
+      {
+        "name": "matter.morph",
+        "kind": "node",
+        "line": "an icon becoming another (a seed into a sprout, a phone into a checkmark), a logo changing as the scene chang…"
+      },
+      {
+        "name": "matter.liquid",
+        "kind": "node",
+        "line": "a transition between two scenes (mode flood: key the progress 0 to 1 over the cut to cover, 1 to 0 to drain)…"
+      },
+      {
+        "name": "matter.paper",
+        "kind": "node",
+        "line": "a transition with a hand-made feel"
+      }
+    ]
   },
   {
     "file": "print.js",
@@ -315,7 +566,29 @@
     "description": "Print looks: halftone, riso inks, grain and duotone — as GLSL passes and stacked presets",
     "version": "1.0.0",
     "commands": [],
-    "fr": {}
+    "fr": {},
+    "entries": [
+      {
+        "name": "print.halftone",
+        "kind": "effect",
+        "line": "a print look over a whole film or one scene"
+      },
+      {
+        "name": "print.riso",
+        "kind": "effect",
+        "line": "a whole film or title card as a risograph"
+      },
+      {
+        "name": "print.grain",
+        "kind": "effect",
+        "line": "a texture over flat generated pictures (backgrounds, gradients) so they stop looking synthetic"
+      },
+      {
+        "name": "print.duotone",
+        "kind": "effect",
+        "line": "a still, a cover, a title card carrying the brand's two colours"
+      }
+    ]
   },
   {
     "file": "qr.js",
@@ -323,7 +596,14 @@
     "description": "QR codes written in the pack's own code: square, rounded or dotted modules, a logo in the middle, revealed module by module, a check for what a phone cannot scan",
     "version": "1.0.0",
     "commands": [],
-    "fr": {}
+    "fr": {},
+    "entries": [
+      {
+        "name": "qr.code",
+        "kind": "node",
+        "line": "an end card the viewer scans"
+      }
+    ]
   },
   {
     "file": "extrude.js",
@@ -340,6 +620,13 @@
     "fr": {
       "Extrude a logo in 3D": "Extruder un logo en 3D",
       "the path layers of a logo or an icon (a group from the svg-paths tool, or one path) extruded with a bevel into a .glb model, drawn by the built-in 3D model layer turning on its turntable": "les couches de tracé d’un logo ou d’une icône (un groupe de l’outil svg-paths, ou un seul tracé) extrudées avec un biseau en un modèle .glb, dessiné par la couche de modèle 3D intégrée qui tourne sur son plateau"
-    }
+    },
+    "entries": [
+      {
+        "name": "extrude",
+        "kind": "tool",
+        "line": "a logo or an icon that turns in 3D for an opening or an end card"
+      }
+    ]
   }
 ]

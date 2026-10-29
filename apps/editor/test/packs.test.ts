@@ -21,6 +21,7 @@ import * as a11y from '../../../plugins/a11y.js';
 import * as physics from '../../../plugins/physics.js';
 import * as styk from '../../../plugins/styk.js';
 import * as walkthrough from '../../../plugins/walkthrough.js';
+import { needLine } from '../../../scripts/packs/entries.ts';
 import * as localize from '../../../plugins/localize.js';
 import { lex, tokenDiff, typingTimes, parseSession, maxLines, ansiRuns, readable, contrastOf } from '../../../plugins/codeview.js';
 import * as codeview from '../../../plugins/codeview.js';
@@ -1952,5 +1953,37 @@ describe('the device frame around built layers', () => {
     expect(out.text).toContain('Phone · content');
     expect(out.text).toMatch(/centre/);
     expect(comp.order).toContain(Object.entries(comp.layers).find(([, l]) => l === group)![0]);
+  });
+});
+
+describe('the packs\' entries by need', () => {
+  it('reads a line from the notes: the first sentence, one line, at most 110 characters', () => {
+    expect(needLine({ ai: { when: 'a phone or browser frame for an interface. Then more detail' } })).toBe('a phone or browser frame for an interface');
+    const long = needLine({ ai: { when: `${'word '.repeat(40)}end` } });
+    expect(long.length).toBeLessThanOrEqual(110);
+    expect(long.endsWith('…')).toBe(true);
+    expect(needLine({ ai: { when: 'a "quoted"\n  thing; and more' } })).toBe('a "quoted" thing');
+    expect(needLine({ description: 'what it does', title: 'Title' })).toBe('what it does');
+    expect(needLine({ title: 'Only a title' })).toBe('Only a title');
+  });
+
+  const index = INDEX as unknown as { file: string; entries?: { name: string; kind: string; line: string }[] }[];
+  it('the shipped index carries a short line for each node, tool and effect of every pack', () => {
+    const modules = (import.meta as ImportMeta & { glob: (p: string, o: { eager: true }) => Record<string, unknown> }).glob('../../../plugins/*.js', { eager: true }) as Record<string, import('@tramme/core').PluginModule>;
+    let total = 0;
+    for (const { file, entries = [] } of index) {
+      const mod = modules[`../../../plugins/${file}`];
+      const made = [...(mod.nodes ?? []), ...(mod.effects ?? []), ...(mod.tools ?? [])];
+      expect(entries.length, file).toBe(made.length);
+      for (const e of entries) {
+        expect(e.line.length, `${file} ${e.name}`).toBeGreaterThan(0);
+        expect(e.line.length, `${file} ${e.name}`).toBeLessThanOrEqual(110);
+        total += e.line.length;
+      }
+    }
+    expect(total).toBeLessThanOrEqual(6000);
+    const walk = index.find((e) => e.file === 'walkthrough.js')!.entries!;
+    expect(walk.find((e) => e.name === 'ui.device')?.kind).toBe('node');
+    expect(walk.find((e) => e.name === 'device-screen')?.kind).toBe('tool');
   });
 });

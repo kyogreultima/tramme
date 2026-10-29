@@ -378,7 +378,7 @@ const map = {
     },
     required: ['places'],
   },
-  ai: { when: '"our offices in Lyon, Montreal and Dakar": the tool finds the places offline, frames them, and the project carries only those countries; a route joins the places the way a plane flies, the camera travelling with it', avoid: 'more than about eight pins on one map, an ambiguous name answered with a guess (the tool asks back), a world map when three countries tell the story' },
+  ai: { when: 'a map of places found offline by name ("our offices in Lyon, Montreal and Dakar"): the tool finds the places offline, frames them, and the project carries only those countries; a route joins the places the way a plane flies, the camera travelling with it', avoid: 'more than about eight pins on one map, an ambiguous name answered with a guess (the tool asks back), a world map when three countries tell the story' },
   async run(a, ctx) {
     const comp = ctx.doc.compositions[ctx.compId];
     const asks = String(a.places ?? '').split(',').map((s) => s.trim()).filter(Boolean);

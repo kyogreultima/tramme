@@ -84,7 +84,7 @@ const emoji = {
       duration: { type: 'number', title: 'Duration', description: 'how long each shows (2 s by default)' },
     },
   },
-  ai: { when: 'a point a picture says faster than a word: a reaction on a message in a chat thread, a celebration on a result, one clear pictogram in a title; the pack\'s set draws the same on every machine', avoid: 'an emoji per word, more than three on screen, emoji as decoration around everything, and the system font (never: the pack ships its own)' },
+  ai: { when: 'emoji from the pack\'s own set: a point a picture says faster than a word: a reaction on a message in a chat thread, a celebration on a result, one clear pictogram in a title; the pack\'s set draws the same on every machine', avoid: 'an emoji per word, more than three on screen, emoji as decoration around everything, and the system font (never: the pack ships its own)' },
   async run(a, ctx) {
     const data = await ctx.packFile('index.json').then((t) => JSON.parse(t));
     const thread = a.layer ? ctx.doc.compositions[ctx.compId]?.layers?.[a.layer] : null;

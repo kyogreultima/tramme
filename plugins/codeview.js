@@ -290,7 +290,7 @@ function familyOf(p, host) {
 const codeNode = {
   type: 'codeview.code', title: 'Code', category: 'Code',
   description: 'a program on screen in the kit\'s mono typeface, coloured by its tokens, typed or changed from a previous version',
-  ai: { when: 'a developer tool\'s film: a function typed, a change shown (fill "from" with the previous version and key "progress"), lines highlighted while the voice points at them; keep to the lines that matter', avoid: 'a whole file at once (cut it to the lines the voice speaks about), type under 24 px, code as a picture the viewer cannot read in time; the code view is never for prose' },
+  ai: { when: 'typed code and highlighted changes, for a developer tool\'s film: a function typed, a change shown (fill "from" with the previous version and key "progress"), lines highlighted while the voice points at them; keep to the lines that matter', avoid: 'a whole file at once (cut it to the lines the voice speaks about), type under 24 px, code as a picture the viewer cannot read in time; the code view is never for prose' },
   props: {
     code: { type: 'string', default: 'const ready = true;\nship();', label: 'Code', description: 'the code shown, in the language set; multiline' },
     lang: { type: 'enum', default: 'js', options: LANGS, label: 'Language', animatable: false },

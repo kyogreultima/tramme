@@ -454,7 +454,7 @@ export function worldAt(world, dt, t) {
 const bodiesNode = {
   type: 'phys.bodies', title: 'Bodies', category: 'Physics',
   description: 'boxes, circles and convex shapes that fall, collide, stack and come to rest — impulses, friction, restitution, sleep, the frame and floors as static segments',
-  ai: { when: 'a pile that builds itself: blocks dropped into a frame, balls settling, a stack knocked over; the bodies are what the props list, the floor the frame\'s bottom unless the walls are off', avoid: 'more than 40 bodies (the solver crawls), restitution over 0.5 in a pile (it never settles), bodies the viewer counts individually' },
+  ai: { when: 'a rigid-body pile (blocks, balls) that builds itself: blocks dropped into a frame, balls settling, a stack knocked over; the bodies are what the props list, the floor the frame\'s bottom unless the walls are off', avoid: 'more than 40 bodies (the solver crawls), restitution over 0.5 in a pile (it never settles), bodies the viewer counts individually' },
   props: {
     bodies: { type: 'json', default: [
       { kind: 'box', x: 0, y: -320, w: 120, h: 120 },

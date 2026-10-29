@@ -10,6 +10,7 @@
 // Run after a pack lands or its tools change; every pack task's last step.
 
 import { readFileSync, writeFileSync } from 'node:fs';
+import { needLine, type Described } from './entries.ts';
 
 const root = new URL('../../', import.meta.url);
 const indexUrl = new URL('plugins/index.json', root);
@@ -18,8 +19,9 @@ const check = process.argv.includes('--check');
 
 interface PackModule {
   meta?: { version?: string };
-  tools?: { name: string; title?: string; description: string }[];
-  nodes?: { type: string; title: string }[];
+  tools?: (Described & { name: string; title?: string; description: string })[];
+  nodes?: (Described & { type: string; title: string })[];
+  effects?: (Described & { type: string; title: string })[];
   checks?: { name: string; title: string }[];
   messages?: { fr?: Record<string, string> };
 }
@@ -31,6 +33,8 @@ interface Entry {
   /** the version the pack's module declares, for the update offers of a project's copy */
   version?: string;
   commands?: { name: string; title: string; description: string }[];
+  /** what each node, effect and tool is for, one line each: the assistant's prompt lists them so it finds a pack's piece before it writes its own */
+  entries?: { name: string; kind: 'node' | 'tool' | 'effect'; line: string }[];
   fr?: Record<string, string>;
 }
 
@@ -42,6 +46,11 @@ for (const entry of index) {
   const mod: PackModule = await import(new URL(`plugins/${entry.file}`, root).href);
   entry.version = mod.meta?.version;
   entry.commands = (mod.tools ?? []).map((t) => ({ name: t.name, title: t.title ?? t.name, description: t.description }));
+  entry.entries = [
+    ...(mod.nodes ?? []).map((n) => ({ name: n.type, kind: 'node' as const, line: needLine(n) })),
+    ...(mod.effects ?? []).map((n) => ({ name: n.type, kind: 'effect' as const, line: needLine(n) })),
+    ...(mod.tools ?? []).map((n) => ({ name: n.name, kind: 'tool' as const, line: needLine(n) })),
+  ];
   shapes.set(entry.file, {
     nodes: (mod.nodes ?? []).map((n) => ({ type: n.type, title: n.title })),
     checks: (mod.checks ?? []).map((c) => ({ name: c.name, title: c.title })),
