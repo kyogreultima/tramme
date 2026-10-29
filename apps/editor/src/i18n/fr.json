@@ -2925,6 +2925,9 @@
   "stabilize": {
     "reading": "lecture du tremblement"
   },
+  "typefaces": {
+    "couldNotLoad": "chargement impossible"
+  },
   "proxy": {
     "encoding": "encodage du proxy"
   }
