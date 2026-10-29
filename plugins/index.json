@@ -14,7 +14,7 @@
       "Add a chart": "Ajouter un graphique",
       "a bar, line, donut, race, scatter or function chart from a JSON data set of the project or from a CSV (separators, quotes and decimal commas read), sized and placed in the composition, with an optional title above it": "un histogramme, une courbe, un anneau, une course, un nuage ou une fonction depuis un jeu de données JSON du projet ou depuis un CSV (séparateurs, guillemets et virgules décimales lus), dimensionné et placé dans la composition, avec un titre optionnel au-dessus"
     },
-    "version": "1.1.0",
+    "version": "1.2.0",
     "entries": [
       {
         "name": "chart.bar",
@@ -45,6 +45,16 @@
         "name": "chart.function",
         "kind": "node",
         "line": "a curve the tool sampled (the tool takes the points; the node never computes)"
+      },
+      {
+        "name": "chart.candles",
+        "kind": "node",
+        "line": "a market over time with its range in each period (a price, a rate)"
+      },
+      {
+        "name": "chart.price",
+        "kind": "node",
+        "line": "a price or a rate over time with its moments named"
       },
       {
         "name": "chart",

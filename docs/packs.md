@@ -7,7 +7,7 @@ The plugin packs that ship with the editor: one self-contained file each in `plu
 Bar, line and donut charts from a data set, animated, with a layout tool and a readability check
 
 - Tools: `/chart` — Add a chart
-- Nodes: `chart.bar` — Bar chart, `chart.line` — Line chart, `chart.donut` — Donut chart, `chart.race` — Race chart, `chart.scatter` — Scatter, `chart.function` — Function
+- Nodes: `chart.bar` — Bar chart, `chart.line` — Line chart, `chart.donut` — Donut chart, `chart.race` — Race chart, `chart.scatter` — Scatter, `chart.function` — Function, `chart.candles` — Candlesticks, `chart.price` — Price line
 - Checks: `chart-readability` — Chart readability
 
 ## Kinetic type

@@ -16,7 +16,7 @@ export function seriesOf(p, host) {
   if (p.data) { try { raw = host.asset(p.data); } catch { raw = p.values; } }
   const list = Array.isArray(raw) ? raw : Array.isArray(raw?.series) ? raw.series : [];
   return list
-    .map((d) => (Array.isArray(d) ? { label: String(d[0] ?? ''), value: Number(d[1]) } : { label: String(d?.label ?? ''), value: Number(d?.value) }))
+    .map((d) => (typeof d === 'number' ? { label: '', value: d } : Array.isArray(d) ? { label: String(d[0] ?? ''), value: Number(d[1]) } : { label: String(d?.label ?? ''), value: Number(d?.value) }))
     .filter((d) => Number.isFinite(d.value));
 }
 
@@ -336,7 +336,7 @@ const chartTool = {
     type: 'object',
     properties: {
       data: { type: 'string', format: 'asset', assetType: 'json', title: 'Data set' },
-      kind: { enum: ['bar', 'line', 'donut', 'race', 'scatter', 'function'], title: 'Kind', description: 'bar by default; a race takes a table of periods by entries, a function the sampled points' },
+      kind: { enum: ['bar', 'line', 'donut', 'race', 'scatter', 'function', 'candles', 'price'], title: 'Kind', description: 'bar by default; a race takes a table of periods by entries, a function the sampled points, candles a list of { o, h, l, c }, a price a list of numbers' },
       title: { type: 'string', title: 'Title', description: 'a line above the chart, when the chart needs one' },
       orientation: { enum: ['vertical', 'horizontal'], title: 'Bar orientation' },
       points: { type: 'array', title: 'Points', items: { type: 'array', items: { type: 'number' } }, description: 'a function only: [[x, y], …] sampled from x = 0 to 1 — computed, never guessed' },
@@ -392,7 +392,7 @@ const chartTool = {
     const accent = ctx.doc.tokens?.accent?.type === 'color';
     props.size = size;
     if (kind === 'bar' && orientation) props.orientation = orientation;
-    if (kind !== 'donut' && accent) props.fill = '@accent';
+    if (kind !== 'donut' && kind !== 'candles' && accent) props.fill = '@accent';
     // a race runs over the composition: a period a second at least, the last one held
     if (kind === 'race' && props.table.length > 1) {
       const end = Math.max(1.6, Math.min(c.duration - 0.8, 0.4 + (props.table.length - 1) * Math.max(1, (c.duration - 1.2) / (props.table.length - 1))));
@@ -692,8 +692,169 @@ const functionNode = {
   },
 };
 
-export const meta = { id: 'tramme/charts', name: 'charts', version: '1.1.0', description: 'Bar, line, donut, race, scatter and function charts from a data set, with a layout tool and a readability check', api: 1 };
-export const nodes = [barNode, lineNode, donutNode, raceNode, scatterNode, functionNode];
+/** the scale of a price chart: the lowest low and the highest high on a readable step, never from zero */
+export function priceRange(lo, hi, count = 4) {
+  if (!(hi > lo)) { const pad = Math.abs(hi) * 0.05 || 1; lo -= pad; hi += pad; }
+  const raw = (hi - lo) / Math.max(1, count);
+  const pow = Math.pow(10, Math.floor(Math.log10(raw)));
+  const step = [1, 2, 2.5, 5, 10].map((m) => m * pow).find((s) => s >= raw) ?? 10 * pow;
+  return { min: +(Math.floor(lo / step) * step).toFixed(6), max: +(Math.ceil(hi / step) * step).toFixed(6), step };
+}
+
+/** the candles as [{ o, h, l, c, label }]: the json `data` asset when there is one, the inline values otherwise; rows may be [o, h, l, c] */
+export function candlesOf(p, host) {
+  let raw = p.values;
+  if (p.data) { try { raw = host.asset(p.data); } catch { raw = p.values; } }
+  const list = Array.isArray(raw) ? raw : Array.isArray(raw?.series) ? raw.series : [];
+  return list
+    .map((d) => (Array.isArray(d) ? { o: +d[0], h: +d[1], l: +d[2], c: +d[3], label: String(d[4] ?? '') } : { o: Number(d?.o), h: Number(d?.h), l: Number(d?.l), c: Number(d?.c), label: String(d?.label ?? '') }))
+    .filter((d) => [d.o, d.h, d.l, d.c].every(Number.isFinite))
+    .map((d) => ({ ...d, h: Math.max(d.h, d.o, d.c), l: Math.min(d.l, d.o, d.c) }));
+}
+
+/** the colour with an alpha, for a gradient to fade into: only hex colours can; null for the others */
+const fadeOf = (color, a) => {
+  const m = /^#([0-9a-f]{6})$/i.exec(String(color).trim());
+  return m ? `rgba(${[0, 2, 4].map((i) => parseInt(m[1].slice(i, i + 2), 16)).join(',')},${a})` : null;
+};
+
+/** a tag at the right of a chart: a pill of the colour with the value written in it */
+function tag(ctx, p, host, text, x, y, color, size) {
+  ctx.font = FONT(p, host, size, 800);
+  const w = ctx.measureText(text).width + size * 0.9, h = size * 1.6;
+  ctx.fillStyle = color; ctx.beginPath(); ctx.roundRect(x, y - h / 2, w, h, h / 2); ctx.fill();
+  ctx.fillStyle = '#FFFFFF'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(text, x + size * 0.45, y);
+}
+
+/** the grid of a price chart: a line and its figure at each step of the scale, in a plot w wide and h high */
+function priceGrid(ctx, p, host, range, w, top, h, size) {
+  ctx.strokeStyle = 'rgba(128,128,128,0.25)'; ctx.lineWidth = 1; ctx.font = FONT(p, host, size, 500); ctx.fillStyle = 'rgba(128,128,128,0.85)'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  for (let v = range.min; v <= range.max + range.step * 0.001; v += range.step) {
+    const y = top + h - ((v - range.min) / (range.max - range.min)) * h;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+    ctx.fillText(fmt(+v.toFixed(6)), w + size * 0.5, y);
+  }
+}
+
+const candlesNode = {
+  type: 'chart.candles', title: 'Candlesticks', category: 'Charts',
+  ai: { when: 'a market over time with its range in each period (a price, a rate): open, high, low and close as candles that appear left to right, the last close tagged', avoid: 'more than 40 candles in 9:16; candles for a value that has no range inside a period (a line says it)' },
+  props: {
+    data: DATA,
+    values: { type: 'json', default: [{ o: 100, h: 108, l: 97, c: 106 }, { o: 106, h: 112, l: 103, c: 104 }, { o: 104, h: 109, l: 99, c: 108 }, { o: 108, h: 118, l: 107, c: 116 }, { o: 116, h: 121, l: 110, c: 112 }, { o: 112, h: 125, l: 111, c: 123 }], label: 'Candles', animatable: false, description: '[{ o, h, l, c, label? }, …] (open, high, low, close), used when there is no data set' },
+    up: { type: 'color', default: '#22C58B', label: 'Up', animatable: false },
+    down: { type: 'color', default: '#F0506E', label: 'Down', animatable: false },
+    drawFor: { type: 'number', default: 1.6, min: 0.2, unit: 's', label: 'Draw over', animatable: false },
+    grid: { type: 'bool', default: true, label: 'Grid', animatable: false },
+    last: { type: 'bool', default: true, label: 'Last close', animatable: false, description: 'a tag at the last close, in its colour, with its value' },
+    size: { type: 'vec2', default: [900, 500], label: 'Size', unit: 'px' },
+    font: { type: 'asset', assetType: 'font', default: null, nullable: true, label: 'Font', animatable: false },
+  },
+  bounds: ({ size: [w, h] }) => ({ x: -w / 2, y: -h / 2, w, h }),
+  path({ size: [w, h] }) { const s = new Path2D(); s.rect(-w / 2, -h / 2, w, h); return s; },
+  render: {
+    canvas2d(ctx, p, host) {
+      const data = candlesOf(p, host);
+      if (!data.length) return;
+      const [w, h] = p.size;
+      if (w <= 0 || h <= 0) return;
+      const u = Math.min(w, h), size = Math.round(u * 0.04);
+      const t = host.t - (host.layerIn ?? 0), revealed = Math.min(1, t / Math.max(0.001, p.drawFor));
+      const range = priceRange(Math.min(...data.map((d) => d.l)), Math.max(...data.map((d) => d.h)));
+      const margin = p.grid || p.last ? size * 4.2 : 0, plotW = w - margin, top = size, plotH = h - size * 2;
+      const yOf = (v) => top + plotH - ((v - range.min) / (range.max - range.min)) * plotH;
+      ctx.save();
+      ctx.translate(-w / 2, -h / 2);
+      if (p.grid) priceGrid(ctx, p, host, range, plotW, top, plotH, size);
+      const slot = plotW / data.length, bodyW = slot * 0.62;
+      data.forEach((d, i) => {
+        const g = Math.min(1, Math.max(0, revealed * data.length - i));
+        if (g <= 0) return;
+        const k = ease_(g), mid = (d.h + d.l) / 2, grow = (v) => mid + (v - mid) * k;
+        const color = d.c >= d.o ? p.up : p.down, cx = i * slot + slot / 2;
+        ctx.strokeStyle = color; ctx.lineWidth = Math.max(1.5, slot * 0.08); ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(cx, yOf(grow(d.h))); ctx.lineTo(cx, yOf(grow(d.l))); ctx.stroke();
+        const yo = yOf(grow(Math.max(d.o, d.c))), yc = yOf(grow(Math.min(d.o, d.c)));
+        ctx.fillStyle = color; ctx.fillRect(cx - bodyW / 2, yo, bodyW, Math.max(1.5, yc - yo));
+      });
+      if (p.last && revealed >= 1) {
+        const c = data[data.length - 1], color = c.c >= c.o ? p.up : p.down, y = yOf(c.c);
+        ctx.strokeStyle = color; ctx.lineWidth = 1; ctx.setLineDash([size * 0.3, size * 0.3]);
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(plotW, y); ctx.stroke(); ctx.setLineDash([]);
+        tag(ctx, p, host, fmt(c.c), plotW + size * 0.3, y, color, size);
+      }
+      // the labels under the candles, thinned so they do not touch
+      if (data.some((d) => d.label)) {
+        ctx.font = FONT(p, host, size * 0.8, 500); ctx.fillStyle = 'rgba(128,128,128,0.9)'; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+        const every = Math.ceil(data.length / 8);
+        data.forEach((d, i) => { if (d.label && i % every === 0) ctx.fillText(d.label, i * slot + slot / 2, h - size * 0.1); });
+      }
+      ctx.restore();
+    },
+  },
+};
+
+const priceNode = {
+  type: 'chart.price', title: 'Price line', category: 'Charts',
+  ai: { when: 'a price or a rate over time with its moments named: a line that draws itself, a gradient under it, a dot and a few words at the events that explain it, the last value tagged', avoid: 'more than four markers; markers that nobody names in the voice; a scale from zero when the story is the shape' },
+  props: {
+    data: DATA,
+    values: { type: 'json', default: [101, 104, 102, 108, 115, 111, 119, 126, 122, 131], label: 'Values', animatable: false, description: 'numbers only, left to right' },
+    markers: { type: 'json', default: [{ at: 4, label: 'Launch' }, { at: 7, label: 'Peak' }], label: 'Markers', animatable: false, description: '[{ at: index of the value, label }, …]' },
+    area: { type: 'bool', default: true, label: 'Fill under', animatable: false, description: 'a gradient under the line, from its colour to transparent' },
+    fill: { type: 'paint', default: '#2EC4B6', label: 'Line' },
+    last: { type: 'bool', default: true, label: 'Last value', animatable: false, description: 'a tag at the end of the line with its value' },
+    drawFor: { type: 'number', default: 1.6, min: 0.2, unit: 's', label: 'Draw over', animatable: false },
+    grid: { type: 'bool', default: true, label: 'Grid', animatable: false },
+    size: { type: 'vec2', default: [900, 500], label: 'Size', unit: 'px' },
+    font: { type: 'asset', assetType: 'font', default: null, nullable: true, label: 'Font', animatable: false },
+  },
+  bounds: ({ size: [w, h] }) => ({ x: -w / 2, y: -h / 2, w, h }),
+  path({ size: [w, h] }) { const s = new Path2D(); s.rect(-w / 2, -h / 2, w, h); return s; },
+  render: {
+    canvas2d(ctx, p, host) {
+      const data = seriesOf(p, host);
+      if (!data.length) return;
+      const [w, h] = p.size;
+      if (w <= 0 || h <= 0) return;
+      const u = Math.min(w, h), size = Math.round(u * 0.04);
+      const t = host.t - (host.layerIn ?? 0), revealed = Math.min(1, t / Math.max(0.001, p.drawFor));
+      const range = priceRange(Math.min(...data.map((d) => d.value)), Math.max(...data.map((d) => d.value)));
+      const margin = p.grid || p.last ? size * 4.2 : 0, plotW = w - margin, top = size * 2.4, plotH = h - top - size;
+      const pts = data.map((d, i) => [data.length === 1 ? plotW / 2 : (i * plotW) / (data.length - 1), top + plotH - ((d.value - range.min) / (range.max - range.min)) * plotH]);
+      ctx.save();
+      ctx.translate(-w / 2, -h / 2);
+      if (p.grid) priceGrid(ctx, p, host, range, plotW, top, plotH, size);
+      ctx.save();
+      ctx.beginPath(); ctx.rect(0, 0, plotW * revealed + 1, h); ctx.clip();
+      const trace = () => { ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for (const [x, y] of pts.slice(1)) ctx.lineTo(x, y); };
+      if (p.area) {
+        trace(); ctx.lineTo(pts[pts.length - 1][0], top + plotH); ctx.lineTo(pts[0][0], top + plotH); ctx.closePath();
+        const from = fadeOf(p.fill, 0.34), to = fadeOf(p.fill, 0);
+        if (from && to) { const g = ctx.createLinearGradient(0, top, 0, top + plotH); g.addColorStop(0, from); g.addColorStop(1, to); ctx.fillStyle = g; ctx.fill(); }
+        else { ctx.globalAlpha = 0.16; ctx.fillStyle = p.fill; ctx.fill(); ctx.globalAlpha = 1; }
+      }
+      trace(); ctx.strokeStyle = p.fill; ctx.lineWidth = Math.max(2.5, u * 0.009); ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.stroke();
+      ctx.restore();
+      // the events: a dot on the line and the words above it, when the line has reached them
+      for (const m of Array.isArray(p.markers) ? p.markers : []) {
+        const i = Math.round(Number(m?.at));
+        if (!(i >= 0 && i < pts.length) || revealed < (pts.length === 1 ? 1 : i / (pts.length - 1))) continue;
+        const [x, y] = pts[i];
+        ctx.fillStyle = '#FFFFFF'; ctx.strokeStyle = p.fill; ctx.lineWidth = Math.max(2.5, u * 0.008);
+        ctx.beginPath(); ctx.arc(x, y, Math.max(4, u * 0.014), 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.font = FONT(p, host, size, 700); ctx.fillStyle = 'rgba(255,255,255,0.94)'; ctx.textBaseline = 'alphabetic';
+        ctx.textAlign = x > plotW - size * 4 ? 'right' : x < size * 4 ? 'left' : 'center';
+        ctx.fillText(String(m.label ?? ''), x, Math.max(size, y - size * 1.1));
+      }
+      if (p.last && revealed >= 1) tag(ctx, p, host, fmt(data[data.length - 1].value), plotW + size * 0.3, pts[pts.length - 1][1], typeof p.fill === 'string' ? p.fill : '#2EC4B6', size);
+      ctx.restore();
+    },
+  },
+};
+
+export const meta = { id: 'tramme/charts', name: 'charts', version: '1.2.0', description: 'Bar, line, donut, race, scatter, function, candlestick and price-line charts from a data set, with a layout tool and a readability check', api: 1 };
+export const nodes = [barNode, lineNode, donutNode, raceNode, scatterNode, functionNode, candlesNode, priceNode];
 export const tools = [chartTool];
 export const checks = [chartCheck];
 export const presets = [
@@ -702,6 +863,13 @@ export const presets = [
 ];
 export const messages = {
   fr: {
+    'Candlesticks': 'Chandeliers', 'Price line': 'Courbe de cours', 'Candles': 'Chandeliers', 'Up': 'Hausse', 'Down': 'Baisse', 'Last close': 'Dernière clôture', 'Last value': 'Dernière valeur', 'Markers': 'Repères',
+    '[{ o, h, l, c, label? }, …] (open, high, low, close), used when there is no data set': '[{ o, h, l, c, label ? }, …] (ouverture, plus haut, plus bas, clôture), utilisées quand il n\'y a pas de jeu de données',
+    'a tag at the last close, in its colour, with its value': 'une étiquette à la dernière clôture, de sa couleur, avec sa valeur',
+    'numbers only, left to right': 'nombres seulement, de gauche à droite',
+    '[{ at: index of the value, label }, …]': '[{ at : rang de la valeur, label }, …]',
+    'a gradient under the line, from its colour to transparent': 'un dégradé sous la courbe, de sa couleur à transparent',
+    'a tag at the end of the line with its value': 'une étiquette au bout de la courbe avec sa valeur',
     "Kind": "Type",
     "Title": "Titre",
     "a line above the chart, when the chart needs one": "une ligne au-dessus du graphique, quand il en a besoin",
@@ -730,7 +898,7 @@ export const messages = {
     'a curve the tool sampled (the tool takes the points; the node never computes): a formula drawn on, a dot travelling along it, the area under it filling; the pack\'s ticks keep the axes readable': 'une courbe échantillonnée par l’outil (l’outil prend les points ; le nœud ne calcule jamais) : une formule qui se trace, un point qui voyage le long, l’aire dessous qui se remplit ; les graduations du pack gardent les axes lisibles',
     'points the model invented without computing (a wrong curve is worse than none), more than two curves on one frame, a tangent nobody asked for': 'des points inventés sans calcul (une courbe fausse est pire que pas de courbe), plus de deux courbes sur une image, une tangente que personne ne demande',
     'a bar, line, donut, race, scatter or function chart from a JSON data set of the project or from a CSV (separators, quotes and decimal commas read), sized and placed in the composition, with an optional title above it': 'un histogramme, une courbe, un anneau, une course, un nuage ou une fonction depuis un jeu de données JSON du projet ou depuis un CSV (séparateurs, guillemets et virgules décimales lus), dimensionné et placé dans la composition, avec un titre optionnel au-dessus',
-    'bar by default; a race takes a table of periods by entries, a function the sampled points': 'histogramme par défaut ; une course prend une table de périodes par concurrents, une fonction les points échantillonnés',
+    'bar by default; a race takes a table of periods by entries, a function the sampled points, candles a list of { o, h, l, c }, a price a list of numbers': 'histogramme par défaut ; une course prend une table de périodes par concurrents, une fonction les points échantillonnés, des chandeliers une liste de { o, h, l, c }, un cours une liste de nombres',
     'a function only: [[x, y], …] sampled from x = 0 to 1 — computed, never guessed': 'pour une fonction : [[x, y], …] échantillonné de x = 0 à 1 — calculé, jamais deviné',
     'a race only: how many race at once (12 at most in 9:16, 20 in 16:9)': 'pour une course : combien courent en même temps (12 au plus en 9:16, 20 en 16:9)',
     'a chart with too many categories, labels too long for their bars, overlapping labels on a scatter, or more than 12 entries racing in 9:16, is a chart nobody reads': 'un graphique à trop de catégories, aux libellés trop longs pour ses barres, aux étiquettes qui se chevauchent sur un nuage, ou à plus de 12 concurrents en 9:16, est un graphique que personne ne lit',

@@ -1089,6 +1089,74 @@ describe('charts', () => {
     const scatter = placed('chart.scatter', { labels: true, values: [{ name: 'A', x: 10, y: 10 }, { name: 'B', x: 12, y: 12 }] }, 'Scatter');
     expect(run(1920, 1080, [scatter]).some((i) => i.message.includes('collide'))).toBe(true);
   });
+  it('1.2: plain numbers are a series, and candles and price lines read their own data', () => {
+    expect(seriesOf({ values: [12, 18] }, {} as never)).toEqual([{ label: '', value: 12 }, { label: '', value: 18 }]);
+  });
+
+  describe('1.2: candlesticks and price lines', () => {
+    const candles = charts.nodes.find((n) => n.type === 'chart.candles')!;
+    const price = charts.nodes.find((n) => n.type === 'chart.price')!;
+    const host = (t: number) => ({ t, layerIn: 0, asset: () => { throw new Error('no asset'); } }) as never;
+    const props = (node: { props: Record<string, { default: unknown }> }, extra: Record<string, unknown>) => ({ ...Object.fromEntries(Object.entries(node.props).map(([k, d]) => [k, d.default])), ...extra });
+    /** what a node draws: each body's colour, the wicks' strokes, the texts, the arcs */
+    function drawn(node: typeof candles, p: Record<string, unknown>, t: number) {
+      const ctx = recorder() as unknown as Record<string, unknown> & { calls: string[] };
+      const bodies: string[] = [], wicks: string[] = [], texts: string[] = [];
+      ctx.fillRect = () => { bodies.push(String(ctx.fillStyle)); };
+      ctx.stroke = () => { wicks.push(String(ctx.strokeStyle)); };
+      ctx.fillText = (s: unknown) => { texts.push(String(s)); };
+      node.render.canvas2d!(ctx as never, p as never, host(t));
+      return { bodies, wicks, texts, calls: ctx.calls };
+    }
+    const three = [{ o: 10, h: 14, l: 9, c: 13 }, { o: 13, h: 15, l: 8, c: 9 }, { o: 9, h: 12, l: 7, c: 11 }];
+
+    it('draws a body and a wick per candle, up in the up colour and down in the down one', () => {
+      const d = drawn(candles, props(candles, { values: three, up: '#00AA00', down: '#CC0000', grid: false, last: false, drawFor: 1 }), 2);
+      expect(d.bodies).toEqual(['#00AA00', '#CC0000', '#00AA00']);
+      expect(d.wicks.filter((c) => c === '#00AA00' || c === '#CC0000').length).toBe(3);
+    });
+
+    it('draws them left to right over drawFor', () => {
+      const four = [...three, { o: 11, h: 13, l: 10, c: 12 }];
+      const at = (t: number) => drawn(candles, props(candles, { values: four, grid: false, last: false, drawFor: 2 }), t).bodies.length;
+      expect(at(0)).toBe(0);
+      expect(at(1)).toBe(2);
+      expect(at(2)).toBe(4);
+    });
+
+    it('holds the lowest low and the highest high on its scale', () => {
+      const r = charts.priceRange(7, 15);
+      expect(r.min).toBeLessThanOrEqual(7);
+      expect(r.max).toBeGreaterThanOrEqual(15);
+      expect(r.max).toBeLessThan(25);
+      expect(charts.priceRange(5, 5).max).toBeGreaterThan(5);
+    });
+
+    it('writes the last close in a tag when asked', () => {
+      expect(drawn(candles, props(candles, { values: three, last: true, drawFor: 1 }), 2).texts).toContain('11');
+      expect(drawn(candles, props(candles, { values: three, last: false, grid: false, drawFor: 1 }), 2).texts).not.toContain('11');
+    });
+
+    it('a price line marks its points with a dot and a label each, and writes its last value', () => {
+      const p = props(price, { values: [10, 12, 9, 14, 13], markers: [{ at: 1, label: 'Launch' }, { at: 3, label: 'Peak' }], last: true, drawFor: 1, grid: false });
+      const d = drawn(price as never, p, 2);
+      expect(d.texts).toEqual(expect.arrayContaining(['Launch', 'Peak', '13']));
+      const noMarks = drawn(price as never, { ...p, markers: [] }, 2);
+      expect(d.calls.filter((c) => c.startsWith('arc(')).length - noMarks.calls.filter((c) => c.startsWith('arc(')).length).toBe(2);
+      expect(drawn(price as never, { ...p, last: false, markers: [] }, 2).texts).not.toContain('13');
+    });
+
+    it('the chart tool lays candles and a price line sized for the composition', async () => {
+      for (const kind of ['candles', 'price']) {
+        const { doc } = newProject({ name: 'T', width: 1080, height: 1920, fps: 30, duration: 6 });
+        doc.assets.px = { type: 'json', src: 'assets/data/px.json', name: 'Px' } as never;
+        const out = await runTool(charts.tools[0], doc, { data: 'px', kind });
+        const next = applyOps(doc, out.ops).doc;
+        expect(Object.values(next.compositions[doc.root].layers).some((l) => l.type === `chart.${kind}`)).toBe(true);
+        for (const b of boxesOf(next)) expect(inside(b, 1080, 1920)).toBe(true);
+      }
+    });
+  });
 });
 
 describe('kinetic type', () => {
