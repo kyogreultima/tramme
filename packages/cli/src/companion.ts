@@ -68,7 +68,7 @@ export async function startCompanion(opts: { port?: number; origins?: string[]; 
   /** stops the turn running, if any */
   const stopTurn = () => { turn?.stop(); };
 
-  async function runTurn(body: { engine?: string; prompt?: string; system?: string; model?: string; effort?: string; sessionId?: string; images?: { mediaType: string; data: string }[] }, res: http.ServerResponse) {
+  async function runTurn(body: { engine?: string; prompt?: string; system?: string; model?: string; effort?: string; sessionId?: string; images?: { mediaType: string; data: string }[]; tools?: boolean }, res: http.ServerResponse) {
     if (typeof body.prompt !== 'string' || typeof body.system !== 'string') throw new Error('prompt and system expected');
     const engine: Engine = ENGINES.find((e) => e === body.engine) ?? 'claude';
     // one conversation at a time: a new message stops the previous one
@@ -85,7 +85,7 @@ export async function startCompanion(opts: { port?: number; origins?: string[]; 
       await runEngine(engine, t, {
         prompt: body.prompt, system: body.system, model: typeof body.model === 'string' ? body.model : '', effort: body.effort, sessionId: body.sessionId,
         images: Array.isArray(body.images) ? body.images.slice(0, 20) : [],
-        mcpUrl: `http://127.0.0.1:${port}/mcp/${t.key}`,
+        mcpUrl: `http://127.0.0.1:${port}/mcp/${t.key}`, tools: body.tools !== false,
       });
     } catch (e) {
       if (!t.abort.signal.aborted) t.send({ type: 'error', message: (e as Error).message });

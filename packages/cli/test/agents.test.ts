@@ -49,3 +49,19 @@ describe('the tools served to the command lines', () => {
     await client.close();
   });
 });
+
+describe('what Claude is given for a request without tools', () => {
+  it('has no Tramme tools, one turn and no session to resume', async () => {
+    const { claudeOptions } = await import('../src/agents.ts');
+    const turn = { send: () => {}, abort: new AbortController(), stop: () => {} } as never;
+    const request = { prompt: 'Judge.', system: 's', model: 'claude-opus-5-5', images: [], mcpUrl: '', sessionId: 'old' };
+    const bare = claudeOptions(turn, { ...request, tools: false }, 'claude-opus-5-5', 'medium');
+    expect(bare.mcpServers).toBeUndefined();
+    expect(bare.maxTurns).toBe(1);
+    expect(bare.resume).toBeUndefined();
+    const full = claudeOptions(turn, request, 'claude-opus-5-5', 'medium');
+    expect(Object.keys(full.mcpServers ?? {})).toEqual(['tramme']);
+    expect(full.maxTurns).toBeUndefined();
+    expect(full.resume).toBe('old');
+  });
+});

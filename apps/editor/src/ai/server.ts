@@ -232,6 +232,8 @@ export interface TurnOptions {
   effort?: Effort;
   /** how long the cache keeps the conversation: 5 minutes, or an hour (written for more, read back later at the same price) */
   cacheTtl?: '5m' | '1h';
+  /** false: a request with no tools, answered once (a review by a model that has not seen the work being made) */
+  tools?: boolean;
 }
 
 export class ServerSession {
@@ -329,13 +331,19 @@ export class ServerSession {
     const turnStart = this.messages.length - 1;
     for (let step = 0; step < MAX_STEPS; step++) {
       const { content, stop, invalid, declined } = yield* this.streamed(signal, () => (providerOf(model) === 'anthropic'
-        ? this.request(model, system, opts.effort ?? DEFAULT_EFFORT, signal, opts.cacheTtl)
-        : this.chat(model, typeof system === 'string' ? system : joinSystem(system), signal, opts.target!, turnStart, opts.effort)));
+        ? this.request(model, system, opts.effort ?? DEFAULT_EFFORT, signal, opts.cacheTtl, opts.tools !== false)
+        : this.chat(model, typeof system === 'string' ? system : joinSystem(system), signal, opts.target!, turnStart, opts.effort, opts.tools !== false)));
       // empty text blocks are refused when sent back
       const kept = content.filter((b) => !(b.type === 'text' && !b.text));
       this.messages.push({ role: 'assistant', content: kept.length ? kept : [{ type: 'text', text: '…' }] });
       const calls = kept.filter((b) => b.type === 'tool_use');
       if (stop === 'refusal') { yield { type: 'error', message: declined ? `${t('ai.declined')} (${declined})` : t('ai.declined') }; return; }
+      // no tools were offered: a call is an answer that cannot be followed, and the turn ends with it
+      if (opts.tools === false) {
+        if (calls.length) yield { type: 'error', message: t('ai.noToolsHere') };
+        else if (stop === 'max_tokens') yield { type: 'error', message: t('ai.answerCutOffLength') };
+        return;
+      }
       if (!calls.length) {
         if (stop === 'max_tokens') yield { type: 'error', message: t('ai.answerCutOffLength') };
         return;
@@ -359,14 +367,14 @@ export class ServerSession {
   }
 
   /** one streamed request to a model of the chat format; yields the text as it comes, returns the content blocks */
-  private async *chat(model: string, system: string, signal: AbortSignal, target: ChatTarget, turnStart: number, effort?: Effort): AsyncGenerator<AiEvent, Answer> {
+  private async *chat(model: string, system: string, signal: AbortSignal, target: ChatTarget, turnStart: number, effort?: Effort, tools = true): AsyncGenerator<AiEvent, Answer> {
     const res = await this.post(model, `${target.url}/chat/completions`, () => {
       const vision = this.takes(model, 'vision'), level = effort && this.takes(model, 'effort') ? effort : undefined, counted = this.takes(model, 'usage');
       return {
         // a model without vision gets a note instead of the images; one without levels runs at its own; a server that does not count tokens is not asked to
         parts: ['vision', ...(level ? ['effort' as const] : []), ...(counted ? ['usage' as const] : [])],
         body: {
-          model: modelName(model), stream: true, tools: CHAT_TOOLS,
+          model: modelName(model), stream: true, ...(tools ? { tools: CHAT_TOOLS } : {}),
           ...(counted ? { stream_options: { include_usage: true } } : {}),
           messages: toChat(this.messages, system, { vision, gemini: providerOf(model) === 'gemini', imagesFrom: turnStart }),
           // the effort level: reasoning_effort, or OpenRouter's own field
@@ -397,7 +405,7 @@ export class ServerSession {
   }
 
   /** a Messages API request: the conversation as it was sent before, plus the parts the model still takes */
-  private attempt(model: string, system: string | SystemParts, effort: Effort, cacheTtl?: '5m' | '1h'): Attempt {
+  private attempt(model: string, system: string | SystemParts, effort: Effort, cacheTtl?: '5m' | '1h', tools = true): Attempt {
     const parts: Part[] = [];
     const { fixed, variable } = typeof system === 'string' ? { fixed: system, variable: '' } : system;
     // a part is sent while the model takes it, and noted as sent
@@ -431,7 +439,7 @@ export class ServerSession {
           { type: 'text', text: fixed, cache_control: { type: 'ephemeral', ...(on('hour') ? { ttl: '1h' } : {}) } },
           ...(variable ? [{ type: 'text', text: variable }] : []),
         ],
-        tools: TOOL_SPECS, messages,
+        ...(tools ? { tools: TOOL_SPECS } : {}), messages,
         ...(thinking ? { thinking } : {}),
         ...(adaptive && on('effort') ? { output_config: { effort } } : {}),
         ...(context ? { context_management: { edits: [CLEAR_OLD_RESULTS] } } : {}),
@@ -441,11 +449,11 @@ export class ServerSession {
   }
 
   /** one streamed request; yields the text as it comes, returns the content blocks */
-  private async *request(model: string, system: string | SystemParts, effort: Effort, signal: AbortSignal, cacheTtl?: '5m' | '1h'): AsyncGenerator<AiEvent, Answer> {
+  private async *request(model: string, system: string | SystemParts, effort: Effort, signal: AbortSignal, cacheTtl?: '5m' | '1h', tools = true): AsyncGenerator<AiEvent, Answer> {
     let stripped = false;
     // thinking that no longer matches its history (the conversation was changed elsewhere): sent without it, once
     const recover = (message: string) => !stripped && /signature/i.test(message) && (stripped = true, this.stripThinking(), true);
-    const res = await this.post(model, '/api/claude/v1/messages', () => this.attempt(model, system, effort, cacheTtl), signal, recover);
+    const res = await this.post(model, '/api/claude/v1/messages', () => this.attempt(model, system, effort, cacheTtl, tools), signal, recover);
     const blocks: Block[] = [];
     const json: string[] = [];
     const items: string[] = [];

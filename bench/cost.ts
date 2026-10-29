@@ -10,13 +10,28 @@ import { PRICES } from './prices.ts';
 const M = 1e6;
 
 /** the dollars of a turn, and whether they are a lower bound; null when the model has no price or the route reported no usage */
-export function costOf(u: TurnUsage): { dollars: number; lowerBound: boolean } | null {
-  const price = PRICES[u.model];
-  if (!price || u.unknown) return null;
+/** the dollars of some tokens at a model's price, and whether they are a lower bound; null when the model has none */
+function priced(u: Usage, model: string): { dollars: number; lowerBound: boolean } | null {
+  const price = PRICES[model];
+  if (!price) return null;
   // a line kept before the lifetimes were told has no hour of writes
   const hour = Math.min(u.cacheWrite, u.cacheWrite1h || 0);
   const dollars = (u.input * price.input + u.cacheRead * price.cacheRead + (u.cacheWrite - hour) * price.cacheWrite5m + hour * price.cacheWrite1h + u.output * price.output) / M;
   return { dollars, lowerBound: !!price.lowerBound };
+}
+
+/** the dollars of a turn (its critic's consults included, each at its own model's price), and whether they are a lower bound; null when a model has no price or the route reported no usage */
+export function costOf(u: TurnUsage): { dollars: number; lowerBound: boolean } | null {
+  if (u.unknown) return null;
+  const own = priced(u, u.model), critic = u.consults ? priced(u.consults, u.consults.model) : { dollars: 0, lowerBound: false };
+  return own && critic ? { dollars: own.dollars + critic.dollars, lowerBound: own.lowerBound || critic.lowerBound } : null;
+}
+
+/** how many consults the critic made in these turns, and what they cost (what the unknown ones would add is not counted) */
+export function criticOf(turns: TurnUsage[]): { n: number; dollars: number } {
+  let n = 0, dollars = 0;
+  for (const u of turns) if (u.consults) { n += u.consults.n; dollars += priced(u.consults, u.consults.model)?.dollars ?? 0; }
+  return { n, dollars };
 }
 
 /** the share of what the model read that came from the cache (0 when it read nothing) */

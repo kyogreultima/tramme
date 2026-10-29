@@ -12,7 +12,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type http from 'node:http';
 import spawn from 'cross-spawn';
-import { createSdkMcpServer, query, tool, type SDKMessage, type SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
+import { createSdkMcpServer, query, tool, type Options, type SDKMessage, type SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { ADAPTIVE, DEFAULT_EFFORT, EFFORTS, ENGINES, MODELS, TOOLS, UsageMeter, type Effort, type Engine, type ToolResult } from '@tramme/assistant';
@@ -41,6 +41,8 @@ export interface TurnRequest {
   images: { mediaType: string; data: string }[];
   /** where the command lines reach Tramme's tools this turn */
   mcpUrl: string;
+  /** false: no Tramme tools, one answer, no earlier session (a request in a fresh context) */
+  tools?: boolean;
 }
 
 const TOOL_TIMEOUT = 15 * 60_000;
@@ -139,6 +141,36 @@ function kill(child: ReturnType<typeof spawn>) {
 
 // ── Claude: the Agent SDK ────────────────────────────────────
 
+/** what Claude Code is given for a request: only Tramme's tools, run by the editor, unless the request asks for none */
+export function claudeOptions(t: Turn, r: TurnRequest, model: string, effort: Effort): Options {
+  const tools = r.tools !== false;
+  return {
+    model,
+    systemPrompt: r.system,
+    // only Tramme's tools, run by the editor: no files, no shell, no settings, no account connectors
+    tools: [] as string[],
+    ...(tools ? {
+      mcpServers: {
+        tramme: createSdkMcpServer({
+          name: 'tramme', version: '1.0.0', alwaysLoad: true,
+          tools: TOOLS.map((def) => tool(def.name, def.description, def.schema.shape, async (input: unknown) => asMcp(await callEditor(t, def.name, input)))),
+        }),
+      },
+    } : { maxTurns: 1 }),
+    strictMcpConfig: true,
+    settingSources: [] as never[],
+    canUseTool: async (name: string, input: Record<string, unknown>) => (name.startsWith('mcp__tramme__') && tools
+      ? { behavior: 'allow' as const, updatedInput: input }
+      : { behavior: 'deny' as const, message: `Tool ${name} is not available in Tramme.` }),
+    // thinking shown to the user as it goes (summarized)
+    ...(ADAPTIVE.has(model) ? { thinking: { type: 'adaptive' as const, display: 'summarized' as const }, effort } : {}),
+    includePartialMessages: true,
+    abortController: t.abort,
+    cwd: os.tmpdir(),
+    ...(r.sessionId && tools ? { resume: r.sessionId } : {}),
+  };
+}
+
 async function runClaude(t: Turn, r: TurnRequest) {
   const model = MODELS.some(([id]) => id === r.model) ? r.model : MODELS[0][0];
   const effort: Effort = EFFORTS.find((e) => e === r.effort) ?? DEFAULT_EFFORT;
@@ -152,32 +184,7 @@ async function runClaude(t: Turn, r: TurnRequest) {
       } as SDKUserMessage;
     })()
     : r.prompt;
-  const q = query({
-    prompt,
-    options: {
-      model,
-      systemPrompt: r.system,
-      // only Tramme's tools, run by the editor: no files, no shell, no settings, no account connectors
-      tools: [],
-      mcpServers: {
-        tramme: createSdkMcpServer({
-          name: 'tramme', version: '1.0.0', alwaysLoad: true,
-          tools: TOOLS.map((def) => tool(def.name, def.description, def.schema.shape, async (input: unknown) => asMcp(await callEditor(t, def.name, input)))),
-        }),
-      },
-      strictMcpConfig: true,
-      settingSources: [],
-      canUseTool: async (name: string, input: Record<string, unknown>) => (name.startsWith('mcp__tramme__')
-        ? { behavior: 'allow' as const, updatedInput: input }
-        : { behavior: 'deny' as const, message: `Tool ${name} is not available in Tramme.` }),
-      // thinking shown to the user as it goes (summarized)
-      ...(ADAPTIVE.has(model) ? { thinking: { type: 'adaptive' as const, display: 'summarized' as const }, effort } : {}),
-      includePartialMessages: true,
-      abortController: t.abort,
-      cwd: os.tmpdir(),
-      ...(r.sessionId ? { resume: r.sessionId } : {}),
-    },
-  });
+  const q = query({ prompt, options: claudeOptions(t, r, model, effort) });
   t.stop = () => { t.abort.abort(); q.interrupt().catch(() => {}); };
   let message = 0;
   const thinking = new Set<string>();
@@ -270,13 +277,13 @@ async function runCodex(t: Turn, r: TurnRequest) {
       // Tramme's instructions instead of a coding agent's, Tramme's tools instead of the shell and the web
       `model_instructions_file=${toml(instructions)}`,
       'features.shell_tool=false', 'web_search="disabled"', 'approval_policy="never"',
-      `mcp_servers.tramme.url=${toml(r.mcpUrl)}`, 'mcp_servers.tramme.tool_timeout_sec=900', 'mcp_servers.tramme.default_tools_approval_mode="approve"',
+      ...(r.tools === false ? [] : [`mcp_servers.tramme.url=${toml(r.mcpUrl)}`, 'mcp_servers.tramme.tool_timeout_sec=900', 'mcp_servers.tramme.default_tools_approval_mode="approve"']),
       'model_reasoning_summary="auto"',
       ...(level ? [`model_reasoning_effort="${level}"`] : []),
     ].flatMap((c) => ['-c', c]);
     const common = ['--json', '--skip-git-repo-check', '--ignore-user-config', '-s', 'read-only', '-C', path.join(WORKDIR, 'codex'), ...(r.model ? ['-m', r.model] : [])];
     // images first: -i takes every value up to the next option
-    const args = r.sessionId
+    const args = r.sessionId && r.tools !== false
       ? ['exec', ...common, 'resume', r.sessionId, ...images, ...config, '-']
       : ['exec', ...images, ...common, ...config, '-'];
     let n = 0;
@@ -317,14 +324,14 @@ async function runAntigravity(t: Turn, r: TurnRequest) {
     // the workspace: Tramme's agent (its body is the system prompt; of the built-in tools, view_file alone, for the images) and the turn's MCP address
     const agents = path.join(workspace, '.agents');
     fs.mkdirSync(path.join(agents, 'agents'), { recursive: true });
-    fs.writeFileSync(path.join(agents, 'mcp_config.json'), JSON.stringify({ mcpServers: { tramme: { serverUrl: r.mcpUrl } } }, null, 2));
+    fs.writeFileSync(path.join(agents, 'mcp_config.json'), JSON.stringify({ mcpServers: r.tools === false ? {} : { tramme: { serverUrl: r.mcpUrl } } }, null, 2));
     fs.writeFileSync(path.join(agents, 'agents', 'tramme.md'), `---\nname: tramme\ndescription: The assistant of the Tramme editor\ntools: [view_file]\nsubagent: false\n---\n${r.system}\n`);
     // images: files of the turn, named in the message (its input takes text only)
     const images = writeImages(dir, r.images);
     const text = images.length ? `Images joined to this message (open them with view_file):\n${images.join('\n')}\n\n${r.prompt}` : r.prompt;
     const level = EFFORTS.find((e) => e === r.effort);
     const args = ['--agent', 'tramme', '--input-format', 'stream-json', '--output-format', 'stream-json',
-      ...(r.sessionId ? ['--conversation', r.sessionId] : []), ...(r.model ? ['--model', r.model] : []), ...(level ? ['--effort', level] : [])];
+      ...(r.sessionId && r.tools !== false ? ['--conversation', r.sessionId] : []), ...(r.model ? ['--model', r.model] : []), ...(level ? ['--effort', level] : [])];
     const open = new Set<number>();
     let failed = false;
     await runLines(t, COMMAND.antigravity, args, {
