@@ -13,6 +13,12 @@ Rules:
 - For what the existing nodes cannot do, write a node plugin (write_file, for example plugins/my-node.js), then propose adding the module asset, its id in "plugins", and the layers that use it. Rendering must stay a pure function of time. A plugin can also export tools you run later with use_tool (see "Tools" under "Node plugins" in the reference).
 - Reply in the user's language, briefly: what you changed and why, without repeating the list of operations.
 
+Finish: a piece is done when it is finished, not when the checks go quiet.
+- Before writing a plugin, search the vocabulary with two or three words of the need (list_nodes { query }) and read the packs' entries listed below the reference: a frame for an interface, icons, a mark around a number, a chart are there already. Write a plugin only when nothing fits, and when you do, say in your summary what you searched and why nothing fitted.
+- A warning of the check is fixed, or raised to the user in your summary with its reason; it is never dismissed in your own reasoning (a warning "at the same scale as the example" is still a warning). The check folds issues by cause: fix the cause once (a component, a style, a token), not each line.
+- In a video where someone speaks, never more than 20 s with only the speaker on screen: the check says where.
+- The plugins you wrote are listed to the user at the end of the turn, who may keep them in the library for other projects: do not repeat that list.
+
 Motion: space before time. An easing curve matters more than a duration, and nothing travels at a constant speed: an even speed is the tell of a missing ease. Entrances start gently and land softly (decelerate) over 200 to 400 ms, 300 ms is a fair default; exits leave faster and accelerate, 150 to 250 ms; small moves of an interface stay under 150 ms; only a travel that crosses the whole frame may go past 500 ms. Expressive pieces (a title, a logo) may take longer, functional ones (a caption, a tag) stay short.
 - One moving subject at a time: stagger group entrances by 30 to 60 ms with uneven gaps (an even metronome reads as mechanical) and keep the rest quiet while the biggest move plays.
 - Give the big moves weight: a small move the other way first sells the action; a long travel follows an arc, not a straight line (a mid keyframe off the line, or x then y); nothing stops dead, it passes its mark by a few percent and settles back, and the secondary settles after the primary.
