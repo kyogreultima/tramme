@@ -1907,3 +1907,50 @@ describe('extrude', () => {
     await expect(runTool(extrude.tools[0], doc, { layer: 'hole', bevel: 0 })).resolves.toBeTruthy();
   });
 });
+
+describe('the device frame around built layers', () => {
+  const device = walkthrough.nodes[0];
+  const props = (extra: Record<string, unknown> = {}) => ({ screen: null, device: 'phone', scroll: 0, url: '', bezel: '#12171D', shadow: true, size: [560, 1120], font: null, fill: '#FFFFFF', part: 'whole', ...extra });
+  const host = { asset: () => { throw new Error('no asset'); } } as never;
+
+  it('gives the screen\'s rectangle of the frame, the numbers the drawing uses', () => {
+    expect(walkthrough.screenOf({ size: [560, 1120], device: 'phone' })).toMatchObject({ x: -260.4, y: -540.4, w: 520.8, h: 1080.8 });
+    expect(walkthrough.screenOf({ size: [560, 1120], device: 'phone' }).radius).toBeCloseTo(560 * 0.09 * 0.72, 6);
+    // a browser keeps room for its bar under the top edge
+    expect(walkthrough.screenOf({ size: [1100, 720], device: 'browser' })).toMatchObject({ x: -550, y: -360 + 720 * 0.075, w: 1100, h: 720 - 720 * 0.075 });
+  });
+
+  it('draws the frame without a screenshot, and each part apart', () => {
+    const draw = (extra: Record<string, unknown>) => { const ctx = recorder(); device.render.canvas2d!(ctx, props(extra) as never, host); return ctx.calls; };
+    expect(draw({}).filter((c) => c.startsWith('fill(')).length).toBeGreaterThan(1);
+    const under = draw({ part: 'under' }), over = draw({ part: 'over' }), whole = draw({});
+    // the notch (a rounded rect after the screen) belongs to the over part only
+    expect(under.filter((c) => c.startsWith('roundRect(')).length).toBeLessThan(whole.filter((c) => c.startsWith('roundRect(')).length);
+    expect(over.filter((c) => c.startsWith('roundRect(')).length).toBe(1);
+    expect(over.some((c) => c.startsWith('clip('))).toBe(false);
+  });
+
+  it('device-screen lays the frame around a content group the screen clips', async () => {
+    const { doc } = newProject({ name: 'T', width: 1920, height: 1080, fps: 30, duration: 6 });
+    const out = await runTool(walkthrough.tools[1], doc, { device: 'phone', name: 'Phone' });
+    const comp = applyOps(doc, out.ops as never).doc.compositions[doc.root];
+    const group = Object.values(comp.layers).find((l) => l.name === 'Phone')!;
+    expect(group.type).toBe('group');
+    const kids = (group.children ?? []).map((id) => ({ id, ...comp.layers[id] }));
+    expect(kids.map((k) => k.type)).toEqual(['ui.device', 'shape.rect', 'group', 'ui.device']);
+    expect(kids[1].name).toBe('Phone · screen');
+    expect(kids[2].name).toBe('Phone · content');
+    expect(kids[0].props).toMatchObject({ part: 'under' });
+    expect(kids[3].props).toMatchObject({ part: 'over' });
+    expect(kids[1].visible).toBe(false);
+    expect(kids[2].clip).toBe(kids[1].id);
+    // 86 % of the composition's height by default
+    expect((kids[0].props!.size as number[])[1]).toBe(Math.round(1080 * 0.86));
+    const s = walkthrough.screenOf({ size: kids[0].props!.size as [number, number], device: 'phone' });
+    expect(kids[1].props).toMatchObject({ size: [s.w, s.h], radius: s.radius });
+    expect(out.text).toContain(`${Math.round(s.w)} x ${Math.round(s.h)} px`);
+    expect(out.text).toContain('Phone · content');
+    expect(out.text).toMatch(/centre/);
+    expect(comp.order).toContain(Object.entries(comp.layers).find(([, l]) => l === group)![0]);
+  });
+});
