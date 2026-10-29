@@ -371,6 +371,11 @@ export function lumaUnder(p: PlacedLayer, t: number, tb: Rect, data: (id: string
   return area > 0 ? sum / area : null;
 }
 
+/** an encoded luminance (0 black to 1 white, as the colours and the analyses give it) as light, for the contrast ratio of the standard */
+const toLinear = (y: number) => (y <= 0.04045 ? y / 12.92 : ((y + 0.055) / 1.055) ** 2.4);
+/** the ratio below which text is hard to read (the standard's 3:1 for large text; size has its own check) */
+const MIN_CONTRAST = 3;
+
 /** the topmost layer under a text that holds at least 90 % of it (its card, its plate, a picture), the compositions and groups the text is played through left out */
 function groundOf(layers: PlacedLayer[], p: PlacedLayer): PlacedLayer | null {
   const area = p.box!.w * p.box!.h;
@@ -387,9 +392,14 @@ const textContrast: CheckType = {
   texts: ['"{name}" is hard to read at {t} s: its colour is too close to what is behind it (contrast {cr}:1)'],
   run({ samples, data, compId, doc }) {
     const out = new Map<string, QualityIssue>();
+    // the most opaque a text gets: a fade towards it is passing, ink that stays half transparent is not
+    const top = new Map<string, number>();
+    for (const s of samples) for (const p of s.layers) top.set(p.id, Math.max(top.get(p.id) ?? 0, p.opacity));
     for (const s of samples) {
       for (const p of s.layers) {
         if (out.has(p.id) || !p.box || p.textSize === undefined || p.opacity < 0.5 || !p.text?.trim()) continue;
+        // pictograms keep their own colours, and a fade is judged where it lands
+        if (!/[\p{L}\p{N}]/u.test(p.text) || p.opacity < top.get(p.id)! - 0.05) continue;
         const ink = paintLuma(p.props.color, doc.tokens);
         if (ink === null) continue;
         // what is under: the picture with a free-space analysis that covers most of the text, else the card it sits on, else the background of the composition it is played in
@@ -411,8 +421,8 @@ const textContrast: CheckType = {
         if (bgL === null) continue;
         // half-transparent ink sinks into its ground
         const mixed = ink * p.opacity + bgL * (1 - p.opacity);
-        const cr = (Math.max(mixed, bgL) + 0.05) / (Math.min(mixed, bgL) + 0.05);
-        if (cr >= 2.5) continue;
+        const cr = (Math.max(toLinear(mixed), toLinear(bgL)) + 0.05) / (Math.min(toLinear(mixed), toLinear(bgL)) + 0.05);
+        if (cr >= MIN_CONTRAST) continue;
         out.set(p.id, {
           check: 'text-contrast', severity: 'warning', t: s.t, layers: [p.id],
           message: `"${name(p)}" is hard to read at ${s2(s.t)} s: its colour is too close to ${bg} (contrast ${cr.toFixed(1)}:1). A colour further from it, or a soft shadow, would hold.`,

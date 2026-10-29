@@ -1,5 +1,6 @@
 // tramme: command line.
 //   tramme validate <doc>
+//   tramme check    <doc> [--comp id]                                  the picture checks, issues folded by cause
 //   tramme still    <doc> --t 0.5,1.2 [--out dir] [--samples n] [--comp id]
 //   tramme render   <doc> [--format mp4|mov|webm|gif|png] [--out file] [--samples n] [--from s] [--to s] [--crf 16] [--mute] [--comp id] [--pages n] [--depth 8|10]
 //   tramme export   <doc> --format lottie|svg|wav [--t s] [--comp id] [--out file]
@@ -79,6 +80,12 @@ async function cmdValidate(file: string) {
   if (!issues.length) { console.log(`${file} : valide`); return; }
   for (const i of issues) console.log(`  ${i.path || '/'} : ${i.message}`);
   throw new Error(`${issues.length} issue(s)`);
+}
+
+async function cmdCheck(file: string) {
+  const doc = readDoc(file);
+  const { checkReport } = await import('./check.ts');
+  console.log(await checkReport(doc, await registryOf(file, doc).registry, str('comp')));
 }
 
 async function cmdStill(file: string) {
@@ -265,6 +272,7 @@ function cmdSchema() {
 
 const COMMANDS: Record<string, () => Promise<void> | void> = {
   validate: () => cmdValidate(pos[0]),
+  check: () => cmdCheck(pos[0]),
   still: () => cmdStill(pos[0]),
   render: () => cmdRender(pos[0]),
   compare: () => cmdCompare(pos[0], pos[1]),
@@ -287,7 +295,7 @@ const COMMANDS: Record<string, () => Promise<void> | void> = {
 
 const run = COMMANDS[cmd];
 if (!run) {
-  console.log('usage: tramme <validate|still|render|export|import|pack|unpack|nodes|compare|schema|bench|load|agent> ... (see the header of packages/cli/src/main.ts)');
+  console.log('usage: tramme <validate|check|still|render|export|import|pack|unpack|nodes|compare|schema|bench|load|agent> ... (see the header of packages/cli/src/main.ts)');
   process.exit(cmd ? 1 : 0);
 }
 try {
