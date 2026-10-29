@@ -1471,6 +1471,24 @@
     "issue.loudness": "Le volume visé est {from}, ce format veut {to} LUFS"
   },
   "content": {
+    "Typefaces": "Polices",
+    "looks for open typefaces by character (\"condensed grotesque, heavy, for titles\"), lists the families found and shows them on a specimen sheet set in their own letters": "cherche des polices libres par caractère (\"grotesque condensée, grasse, pour des titres\"), liste les familles trouvées et les montre sur une planche composée dans leurs propres lettres",
+    "Use a typeface": "Utiliser une police",
+    "brings a typeface into the project: its files are fetched at a pinned version and kept under assets/fonts with a record of where they come from, and added as font assets that layers take as their font": "apporte une police dans le projet : ses fichiers sont récupérés à une version fixée et gardés dans assets/fonts avec une fiche de leur origine, puis ajoutés comme ressources de police que les calques prennent pour police",
+    "two or three words: the shape (condensed, serif, slab, mono, rounded, handwritten), the weight (heavy, light), the feel (elegant, playful, techno, editorial, friendly, neutral), the use (titles, body, ui, quote, numbers)": "deux ou trois mots : la forme (condensed, serif, slab, mono, rounded, handwritten), la graisse (heavy, light), le ton (elegant, playful, techno, editorial, friendly, neutral), l'usage (titles, body, ui, quote, numbers)",
+    "the words that will be set in it, so only families whose letters cover them come back (accents, Cyrillic, Greek, Arabic, Hebrew, Japanese…)": "les mots qui y seront composés, pour ne garder que les familles dont les lettres les couvrent (accents, cyrillique, grec, arabe, hébreu, japonais…)",
+    "keep to one kind: sans-serif, serif, display, monospace or handwriting": "se limiter à un genre : sans-serif, serif, display, monospace ou handwriting",
+    "families to show, 1 to 6 (4 by default)": "familles à montrer, de 1 à 6 (4 par défaut)",
+    "Family": "Famille",
+    "the id or the name given by the typefaces tool (inter, \"Bebas Neue\")": "l'identifiant ou le nom donné par l'outil typefaces (inter, \"Bebas Neue\")",
+    "display: the face of titles, in its heaviest sensible weight; text: the face of everything else, in regular and bold": "display : la police des titres, dans sa graisse la plus forte qui reste raisonnable ; text : la police de tout le reste, en normal et en gras",
+    "display": "titre",
+    "text": "texte",
+    "Weights": "Graisses",
+    "static families only: the weights to bring in (the role's usual ones by default); a variable family always comes whole": "familles statiques seulement : les graisses à apporter (celles habituelles du rôle par défaut) ; une famille variable vient toujours entière",
+    "also bring the italic, when the family has one": "apporter aussi l'italique, quand la famille en a un",
+    "Script": "Écriture",
+    "the subset of letters when the text is not Latin: cyrillic, greek, arabic, hebrew, devanagari, thai, japanese, korean, chinese-simplified, latin-ext, vietnamese": "le jeu de lettres quand le texte n'est pas latin : cyrillic, greek, arabic, hebrew, devanagari, thai, japanese, korean, chinese-simplified, latin-ext, vietnamese",
     "Keep the pitch": "Garder la hauteur",
     "Semitones": "Demi-tons",
     "an effect on the sound: its pitch moved (semitones), a robot, a telephone, a radio, a megaphone, an echo": "un effet sur le son : sa hauteur déplacée (demi-tons), un robot, un téléphone, une radio, un mégaphone, un écho",
@@ -2926,7 +2944,8 @@
     "reading": "lecture du tremblement"
   },
   "typefaces": {
-    "couldNotLoad": "chargement impossible"
+    "couldNotLoad": "chargement impossible",
+    "sheet": "Les familles, composées dans leurs propres lettres"
   },
   "proxy": {
     "encoding": "encodage du proxy"

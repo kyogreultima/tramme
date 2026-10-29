@@ -1,9 +1,12 @@
 import { readFileSync } from 'node:fs';
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { applyOps, validate, type Op, type ToolContext, type TrammeDoc } from '@tramme/core';
+import { newProject } from '@tramme/project';
 import { TAGS, deriveTags } from '../../../scripts/typefaces/tags.ts';
 import type { Catalogue } from '../src/typefaces/catalogue.ts';
 import { FONTSOURCE_PIN, defaultWeights, fontFiles, slugOf } from '../src/typefaces/files.ts';
 import { scriptsOf, searchTypefaces } from '../src/typefaces/search.ts';
+import { editorRegistry } from '../src/vocabulary.ts';
 import { specimenPlan } from '../src/typefaces/specimen.ts';
 
 const read = <T>(rel: string): T => JSON.parse(readFileSync(new URL(rel, import.meta.url), 'utf8'));
@@ -300,5 +303,142 @@ describe('the specimen sheet plan', () => {
     const cell = specimenPlan([font('inter')], { text: 'Évasion' }).cells[0];
     expect(cell.lines[1].text).toBe('Évasion');
     expect(cell.lines[2].text).toBe('Évasion');
+  });
+});
+
+describe('the typeface tools', () => {
+  const reg = editorRegistry();
+  const project = () => newProject({ name: 'Type', width: 1080, height: 1920, fps: 30, duration: 6 }).doc;
+  const WOFF2 = new Uint8Array([119, 79, 70, 50]);
+
+  /** a project folder in memory; the tools run against it */
+  function world() {
+    const files = new Map<string, Blob | string>();
+    const ctxOf = (doc: TrammeDoc): ToolContext => ({
+      doc, compId: doc.root, time: 0, selection: [], registry: reg,
+      writeFile: async (path: string, data: Blob | string) => { files.set(path, data); return path; },
+      readText: async (path: string) => { const v = files.get(path); return typeof v === 'string' ? v : null; },
+    } as unknown as ToolContext);
+    const run = async (doc: TrammeDoc, name: string, input: Record<string, unknown>) => (await reg.tool(name).tool.run(input, ctxOf(doc))) as { text?: string; ops?: Op[]; images?: { url: string }[] };
+    return { files, run, apply: (doc: TrammeDoc, out: { ops?: Op[] }) => applyOps(doc, out.ops ?? []).doc };
+  }
+
+  // a network that serves the catalogue and the font files (except the ones in `refused`), and a page that can draw
+  const realFetch = globalThis.fetch, realDocument = (globalThis as { document?: unknown }).document, realFontFace = (globalThis as { FontFace?: unknown }).FontFace;
+  let refused: string[] = [], asked: string[] = [];
+  beforeAll(() => {
+    const anything: object = new Proxy(function () {}, { get: (_, k) => (k === 'measureText' ? () => ({ width: 10 }) : anything), set: () => true, apply: () => anything });
+    (globalThis as { document?: unknown }).document = { createElement: () => ({ width: 0, height: 0, getContext: () => anything, toDataURL: () => 'data:image/jpeg;base64,AAAA' }), fonts: { add() {} } };
+    (globalThis as { FontFace?: unknown }).FontFace = class { source: string; constructor(_family: string, source: string) { this.source = source; } async load() { if (refused.some((r) => this.source.includes(r))) throw new Error('refused'); return this; } };
+    globalThis.fetch = (async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.endsWith('/typefaces/catalogue.json')) return new Response(readFileSync(new URL('../data/typefaces.json', import.meta.url)), { status: 200 });
+      asked.push(url);
+      if (refused.some((r) => url.includes(r))) return new Response('no', { status: 404 });
+      return new Response(new Blob([WOFF2]), { status: 200 });
+    }) as typeof fetch;
+  });
+  afterAll(() => { globalThis.fetch = realFetch; (globalThis as { document?: unknown }).document = realDocument; (globalThis as { FontFace?: unknown }).FontFace = realFontFace; });
+  beforeEach(() => { refused = []; asked = []; });
+
+  it('typefaces answers a character with a list and a specimen sheet', async () => {
+    const out = await world().run(project(), 'typefaces', { query: 'condensed heavy titles' });
+    const ids = [...out.text!.matchAll(/^- ([a-z0-9-]+) /gm)].map((m) => m[1]);
+    expect(ids.length).toBeGreaterThan(0);
+    expect(ids.length).toBeLessThanOrEqual(4);
+    for (const id of ids) expect(catalogue.fonts.some((f) => f.id === id), id).toBe(true);
+    expect(out.images).toHaveLength(1);
+    expect(out.images![0].url).toMatch(/^data:image\/jpeg/);
+    expect(out.ops).toBeUndefined();
+  });
+
+  it('typefaces says which words it did not know and still lists families', async () => {
+    const out = await world().run(project(), 'typefaces', { query: 'zebra' });
+    expect(out.text).toMatch(/zebra/);
+    expect(out.text).toMatch(/did not know/i);
+    expect([...out.text!.matchAll(/^- ([a-z0-9-]+) /gm)].length).toBeGreaterThan(0);
+  });
+
+  it('typefaces says so when no family covers the text, with no empty sheet', async () => {
+    const out = await world().run(project(), 'typefaces', { query: 'serif', text: 'こんにちは مرحبا' });
+    expect(out.text).toMatch(/no family/i);
+    expect(out.images ?? []).toEqual([]);
+  });
+
+  it('typefaces lists the families whose files could not be drawn', async () => {
+    refused = ['/lora@', '/lora:'];
+    const out = await world().run(project(), 'typefaces', { query: 'lora' });
+    expect(out.text).toMatch(/could not load: Lora/);
+    expect(out.images).toHaveLength(1);
+  });
+
+  it('typeface-use brings a variable family in as one file and one asset', async () => {
+    const w = world();
+    const out = await w.run(project(), 'typeface-use', { family: 'inter', role: 'text' });
+    expect([...w.files.keys()].sort()).toEqual(['assets/fonts/inter-latin-vf-normal.woff2', 'assets/fonts/inter.json']);
+    expect(out.ops).toHaveLength(1);
+    expect(out.ops![0]).toMatchObject({ op: 'add', path: '/assets/font-inter', value: { type: 'font', src: 'assets/fonts/inter-latin-vf-normal.woff2', family: 'Inter', name: 'Inter (text)', weight: '100 900' } });
+    expect(JSON.parse(w.files.get('assets/fonts/inter.json') as string)).toMatchObject({ family: 'Inter', id: 'inter', license: 'OFL-1.1', source: 'fontsource', version: '5.3.0', roles: ['text'] });
+    expect(out.text).toContain('font-inter');
+    expect(out.text).toContain('OFL-1.1');
+    expect(validate(w.apply(project(), out), reg)).toEqual([]);
+  });
+
+  it('typeface-use twice adds no asset and fetches nothing', async () => {
+    const w = world();
+    let doc = project();
+    doc = w.apply(doc, await w.run(doc, 'typeface-use', { family: 'Inter', role: 'text' }));
+    const before = asked.length;
+    const again = await w.run(doc, 'typeface-use', { family: 'inter', role: 'text' });
+    expect(again.ops ?? []).toEqual([]);
+    expect(asked.length).toBe(before);
+    expect(again.text).toMatch(/already/i);
+  });
+
+  it('typeface-use takes a static family at its default weight', async () => {
+    const w = world();
+    const out = await w.run(project(), 'typeface-use', { family: 'bebas-neue', role: 'display' });
+    expect(out.ops).toHaveLength(1);
+    expect(out.ops![0]).toMatchObject({ path: '/assets/font-bebas-neue', value: { name: 'Bebas Neue (display)', weight: '400' } });
+    expect([...w.files.keys()]).toContain('assets/fonts/bebas-neue-latin-400-normal.woff2');
+  });
+
+  it('typeface-use names the assets of several weights and styles apart', async () => {
+    const out = await world().run(project(), 'typeface-use', { family: 'lato', role: 'text', weights: [400, 700], italic: true });
+    expect(out.ops!.map((o) => (o as { path: string }).path)).toEqual(['/assets/font-lato', '/assets/font-lato-italic', '/assets/font-lato-700', '/assets/font-lato-700-italic']);
+  });
+
+  it('typeface-use answers a wrong name with the closest ids', async () => {
+    const w = world();
+    const out = await w.run(project(), 'typeface-use', { family: 'Intr', role: 'text' });
+    expect(out.ops ?? []).toEqual([]);
+    expect(out.text).toMatch(/inter/);
+    expect(w.files.size).toBe(0);
+  });
+
+  it('typeface-use changes nothing when one file does not download', async () => {
+    refused = ['-700-normal'];
+    const w = world();
+    const out = await w.run(project(), 'typeface-use', { family: 'lato', role: 'text', weights: [400, 700] });
+    expect(out.ops ?? []).toEqual([]);
+    expect(out.text).toMatch(/could not|HTTP 404/i);
+    expect(w.files.size).toBe(0);
+  });
+
+  it('typeface-use names a display and a text face apart', async () => {
+    const w = world();
+    let doc = project();
+    doc = w.apply(doc, await w.run(doc, 'typeface-use', { family: 'bebas-neue', role: 'display' }));
+    doc = w.apply(doc, await w.run(doc, 'typeface-use', { family: 'inter', role: 'text' }));
+    expect(Object.values(doc.assets).map((a) => a.name)).toEqual(['Bebas Neue (display)', 'Inter (text)']);
+    expect(validate(doc, reg)).toEqual([]);
+  });
+
+  it('typeface-use takes a subset of another script under its own asset', async () => {
+    const out = await world().run(project(), 'typeface-use', { family: 'inter', role: 'text', script: 'cyrillic' });
+    expect(out.ops![0]).toMatchObject({ path: '/assets/font-inter-cyrillic', value: { src: 'assets/fonts/inter-cyrillic-vf-normal.woff2' } });
+    const bad = await world().run(project(), 'typeface-use', { family: 'anton', role: 'display', script: 'arabic' });
+    expect(bad.ops ?? []).toEqual([]);
+    expect(bad.text).toMatch(/arabic/);
   });
 });
