@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { applyOps, type Composition, type TrammeDoc } from '@tramme/core';
-import { dropOps } from '../src/ui/timeline/clipDrag.ts';
+import { dropOps, endMoveOps, withLinks } from '../src/ui/timeline/clipDrag.ts';
 
 /** three clips end to end on a magnetic V1 */
 const seq = (magnetic = true): Composition => ({
@@ -53,5 +53,49 @@ describe('a drag ending on a free track', () => {
   it('moves several clips together', () => {
     const d = docOf(seq(false)), c = applyOps(d, dropOps(d, 'main', ['b', 'c'], 1)).doc.compositions.main;
     expect(ranges(c)).toEqual({ a: [0, 3], b: [4, 7], c: [7, 10] });
+  });
+});
+
+describe('a drag let go', () => {
+  it('over its own lane on a magnetic track still reorders the clips', () => {
+    const d = docOf(seq()), c = applyOps(d, endMoveOps(d, 'main', ['c'], -4.3, 'V1')).doc.compositions.main;
+    expect(ranges(c)).toEqual({ a: [0, 3], b: [6, 9], c: [3, 6] });
+  });
+
+  it('over another lane moves the clip there, where it is in time', () => {
+    const c0 = seq(); c0.tracks!.splice(1, 0, { id: 'V2', kind: 'video' });
+    const d = docOf(c0), c = applyOps(d, endMoveOps(d, 'main', ['c'], 0, 'V2')).doc.compositions.main;
+    expect([c.layers.c.track, c.layers.c.in, c.layers.c.out]).toEqual(['V2', 6, 9]);
+  });
+
+  it('outside every lane is the move of the clips as they were dragged', () => {
+    const d = docOf(seq(false)), c = applyOps(d, endMoveOps(d, 'main', ['c'], -1, null)).doc.compositions.main;
+    expect(ranges(c).c).toEqual([5, 8]);
+  });
+});
+
+describe('clips linked to the ones dragged', () => {
+  const linked = (): Composition => {
+    const c0 = seq(false);
+    c0.layers.b.link = 'kb'; c0.layers.sb = { type: 'audio', track: 'A1', link: 'kb', in: 3, out: 6, props: { audio: 'two' } }; c0.order.push('sb');
+    return c0;
+  };
+
+  it('go with them', () => {
+    const d = docOf(linked()), c = applyOps(d, dropOps(d, 'main', ['b'], 1)).doc.compositions.main;
+    expect([ranges(c).b, ranges(c).sb]).toEqual([[4, 7], [4, 7]]);
+    expect(withLinks(d.compositions.main, ['b']).sort()).toEqual(['b', 'sb']);
+  });
+
+  it('are as locked as the clips: a locked sound keeps its picture where it is', () => {
+    const c0 = linked(); c0.tracks![1].locked = true;
+    const d = docOf(c0);
+    expect(dropOps(d, 'main', ['b'], 1)).toEqual([]);
+  });
+
+  it('a selection that holds one locked clip moves none', () => {
+    const c0 = seq(false); c0.tracks!.push({ id: 'V2', kind: 'video', locked: true }); c0.layers.c.track = 'V2';
+    const d = docOf(c0);
+    expect(dropOps(d, 'main', ['a', 'c'], 1)).toEqual([]);
   });
 });

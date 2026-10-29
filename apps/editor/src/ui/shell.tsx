@@ -10,6 +10,7 @@ import { MenuHost } from './controls.tsx';
 import { deleteSelection, duplicateSelection } from './LeftPanel.tsx';
 import { deleteKeys, pps } from './Timeline.tsx';
 import { rippleOnMagnetic, runEditKey } from './timeline/edit-keys.ts';
+import { markerJump } from './timeline/shortcuts.ts';
 import { uploads } from '../files.ts';
 import { transcriptions } from '../speech.ts';
 import { SettingsDialog } from './Settings.tsx';
@@ -62,8 +63,9 @@ export function useShortcuts() {
         commit(t('timeline.addMarkerHere'), [{ op: 'add', path: pointer('compositions', S.compId.value, 'markers'), value: [...list, { id, t: snap(S.time.peek(), c.fps), label: t('timeline.markerN', { n: list.length + 1 }) }].sort((a, b) => a.t - b.t) }]);
         return;
       }
-      if (!mod && /^[1-9]$/.test(e.key)) {
-        const m = [...(comp.peek().markers ?? [])].sort((a, b) => a.t - b.t)[Number(e.key) - 1];
+      const jump = markerJump(e);
+      if (jump !== null) {
+        const m = [...(comp.peek().markers ?? [])].sort((a, b) => a.t - b.t)[jump - 1];
         if (m) { S.playing.value = false; setTime(m.t); }
         return;
       }

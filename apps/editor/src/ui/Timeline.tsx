@@ -6,7 +6,7 @@
 
 import { signal } from '@preact/signals';
 import { useLayoutEffect, useRef, useState } from 'preact/hooks';
-import { applyOps, chapterList, chaptersOf, cutsOf, isLocked, layerActive, pointer, rippleTrimOps, rollOps, slideOps, slipOps, staticValue, toSequenceOps, type Composition, type Keyframe, type Layer, type Op, type SequenceTrack } from '@tramme/core';
+import { chapterList, chaptersOf, cutsOf, isLocked, layerActive, pointer, rippleTrimOps, rollOps, slideOps, slipOps, staticValue, toSequenceOps, type Composition, type Keyframe, type Layer, type Op, type SequenceTrack } from '@tramme/core';
 import { clickSelect, comp, commit, draft, cancelDraft, S, select, selectAll, setTime, frameStep, toast, toggleFold, uiTime, viewDoc } from '../state.ts';
 import { animatedProps, contentEnd, crossfadeOps, flatTree, freshId, keysOf, layerName, parentOf, parseTime, propPath, rawProp, rulerLabel, shiftLayerOps, snap, splitLayerOps, subtree, timecode, topLayers, trimInOps, type TreeItem } from '../model.ts';
 import { bandOf, longPress, noBrowserMenu, openMenu, Seg, useSize } from './controls.tsx';
@@ -26,8 +26,8 @@ import { peaksOf, wavePath, wavesReady } from '../waveforms.ts';
 import { m, t, tr } from '../i18n/index.ts';
 import { outgoingOf, TRANSITION_KINDS, transitionOf, transitionPlan, type TransitionKind } from '../transitions.ts';
 import { laneHeight, TrackHeader } from './timeline/Tracks.tsx';
-import { addTrackOps, clipsOn, laneOrder, moveToTrackOps } from './timeline/tracks.ts';
-import { dropOps } from './timeline/clipDrag.ts';
+import { addTrackOps, clipsOn, laneOrder } from './timeline/tracks.ts';
+import { endMoveOps, withLinks } from './timeline/clipDrag.ts';
 import { ASSET_MIME, COMP_MIME } from './timeline/assets-drag.ts';
 import { placeAsset, placeComp } from './timeline/place.ts';
 
@@ -218,9 +218,10 @@ export function Timeline() {
     if (!tool && (e.shiftKey || e.ctrlKey || e.metaKey)) { clickSelect(e, id, order); return; }
     if (!sel.includes(id)) select([id]);
     const x0 = e.clientX, d0 = S.doc.peek(), c0 = d0.compositions[compId], l = c0.layers[id];
-    if (isLocked(c0, id)) { toast(t('timeline.trackLocked'), 'error'); return; }
-    // a layer inside a selected group goes with it
-    const moving = mode === 'move' && sel.includes(id) ? topLayers(c0, sel) : [id];
+    // a layer inside a selected group goes with it, and the clips linked to what is dragged; one locked among them keeps all of them
+    const dragged = mode === 'move' && sel.includes(id) ? topLayers(c0, sel) : [id];
+    const moving = mode === 'move' ? withLinks(c0, dragged) : dragged;
+    if ([id, ...moving].some((x) => isLocked(c0, x))) { toast(t('timeline.trackLocked'), 'error'); return; }
     const targets = snapTargets(c0, new Set(moving.flatMap((x) => subtree(c0, x))));
     const tin = l.in ?? 0, tout = l.out ?? c0.duration;
     const edges = mode === 'move' ? moving.flatMap((x) => [c0.layers[x].in ?? 0, c0.layers[x].out ?? c0.duration]) : [mode === 'in' ? tin : tout];
@@ -259,9 +260,9 @@ export function Timeline() {
       removeEventListener('pointermove', move); removeEventListener('pointerup', up);
       setSnapAt(null);
       // dropped on another lane of a sequence: the clip changes track, where it is in time
-      const lane = !tool && mode === 'move' && moving.length === 1 ? document.elementsFromPoint(ev.clientX, ev.clientY).find((el) => (el as HTMLElement).dataset?.track)?.getAttribute('data-track') : null;
-      if (!tool && mode === 'move' && magnetic && !lane) ops = dropOps(d0, compId, moving, lastDt);
-      else if (lane && lane !== l.track) ops = [...ops, ...moveToTrackOps(ops.length ? applyOps(d0, ops).doc : d0, compId, id, lane)];
+      const lane = !tool && mode === 'move' && dragged.length === 1 ? document.elementsFromPoint(ev.clientX, ev.clientY).find((el) => (el as HTMLElement).dataset?.track)?.getAttribute('data-track') : null;
+      // let go: over another lane the clip changes track, over its own a magnetic track puts it among the others
+      if (!tool && mode === 'move') ops = endMoveOps(d0, compId, dragged, lastDt, lane ?? null);
       if (!ops.length) { cancelDraft(); return; }
       const label = tool ? t(TOOL_LABEL[tool]) : mode === 'in'
         ? (ops.length > 1 && l.type === 'video' ? t('timeline.trimVideoInFile') : t('common.inPoint'))

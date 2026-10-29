@@ -25,6 +25,11 @@ export const KEYMAP: Record<EditCommand, Chord> = {
   unlink: { key: 'l', mod: true, shift: true },
 };
 
+/** the marker a number key jumps to (1 to 9); none with Alt, Ctrl or Cmd, which belong to the cameras of a multicam and to the browser */
+export function markerJump(e: { key: string; ctrlKey: boolean; metaKey: boolean; altKey: boolean }): number | null {
+  return !e.ctrlKey && !e.metaKey && !e.altKey && /^[1-9]$/.test(e.key) ? Number(e.key) : null;
+}
+
 export function commandFor(e: { key: string; ctrlKey: boolean; metaKey: boolean; shiftKey: boolean; altKey: boolean }): EditCommand | null {
   const key = e.key.toLowerCase() === 'backspace' ? 'delete' : e.key.toLowerCase(), mod = e.ctrlKey || e.metaKey;
   for (const [cmd, ch] of Object.entries(KEYMAP) as [EditCommand, Chord][]) {

@@ -3,7 +3,7 @@
 import { signal } from '@preact/signals';
 import { Fragment } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { addLayer, applyOps, layerActive, moveLayer, pointer, propKind, removeLayer, staticValue, type Asset, type KeyframedProp, type Prop, type StaticProp, type Vec2, type TrammeDoc, type Layer, type NodeType, type Op, type PresetType, type TokenType } from '@tramme/core';
+import { addLayer, applyOps, isLocked, layerActive, moveLayer, pointer, propKind, removeLayer, staticValue, type Asset, type KeyframedProp, type Prop, type StaticProp, type Vec2, type TrammeDoc, type Layer, type NodeType, type Op, type PresetType, type TokenType } from '@tramme/core';
 import { clickSelect, comp, commit, foldAll, S, select, toggleFold, viewDoc, toast, uiTime } from '../state.ts';
 import { fitCompOps, flatTree, freshId, layerName, shiftProp, parentOf, SOUND_GROUP, soundGroupOf, subtree, topLayers, commonStem, folderOf, imagesIn, wholeFile } from '../model.ts';
 import { ColorField, longPress, openMenu, Seg, Swatch, TextInput, resolveColor, type MenuItem } from './controls.tsx';
@@ -169,6 +169,8 @@ export function deleteSelection() {
   if (!sel.length) return;
   // a layer inside another selected one goes with its parent
   const roots = topLayers(c, sel);
+  // a clip of a locked track (or linked to one) is not removed, by any key
+  if (roots.some((id) => isLocked(c, id))) { toast(t('timeline.trackLocked'), 'error'); return; }
   const ops: Op[] = [];
   let cur = doc;
   for (const id of roots) {
