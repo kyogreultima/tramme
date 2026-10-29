@@ -19,6 +19,8 @@ import { passes, pause, recallDetails, ServerSession, type Message } from './ser
 import { harvestNote, realNote } from './answers.ts';
 import { realWanted } from '../stock.ts';
 import { ToolRunner } from './tools.ts';
+import { criticModel, type Via } from './consult.ts';
+import { consultsOf, resetCritic, setCriticHost } from '../critic/tool.ts';
 import { runCall, uid } from './calls.ts';
 import { clip } from '../model.ts';
 import { FILM_PLAN_PATH, parsePlan, planText } from '../filmplan.ts';
@@ -47,11 +49,13 @@ export interface AiSettings {
   resume: boolean;
   /** how long the conversation stays in the cache of the Messages API: 5 minutes, or an hour (costs more to write, less when the user comes back later) */
   cacheTtl: '5m' | '1h';
+  /** how many times a turn may have the film reviewed by the critic (a model that did not make it); 0 turns it off */
+  criticRounds: number;
 }
 
 const KEY = 'tramme.assistant';
 function loadSettings(): AiSettings {
-  const d: AiSettings = { model: DEFAULT_MODEL, prefer: 'auto', companionUrl: `http://127.0.0.1:${COMPANION_PORT}`, token: '', localUrl: LOCAL_URL, efforts: {}, notify: true, apply: 'off', resume: true, cacheTtl: '5m' };
+  const d: AiSettings = { model: DEFAULT_MODEL, prefer: 'auto', companionUrl: `http://127.0.0.1:${COMPANION_PORT}`, token: '', localUrl: LOCAL_URL, efforts: {}, notify: true, apply: 'off', resume: true, cacheTtl: '5m', criticRounds: 2 };
   try {
     // the settings kept under the tool's former name (model, companion token) are taken over
     const s = { ...d, ...JSON.parse(localStorage.getItem(KEY) ?? localStorage.getItem('emotion.assistant') ?? '{}') } as AiSettings;
@@ -63,6 +67,7 @@ function loadSettings(): AiSettings {
     s.notify = s.notify !== false;
     s.resume = s.resume !== false;
     s.cacheTtl = s.cacheTtl === '1h' ? '1h' : '5m';
+    s.criticRounds = Number.isInteger(s.criticRounds) ? Math.min(4, Math.max(0, s.criticRounds)) : d.criticRounds;
     // the former boolean becomes 'turn' (applied at the end of the turn, as before)
     const old = s as AiSettings & { autoApply?: boolean };
     s.apply = s.apply === 'turn' || s.apply === 'all' ? s.apply : old.autoApply === true ? 'turn' : 'off';
@@ -427,6 +432,21 @@ function commandNote(c: Command, input?: Record<string, unknown>): string {
   return `The user called the tool "${c.name}" (/${c.name}): run it with use_tool, its input taken from their message and the context (selection, time), then check the result.${filled}`;
 }
 
+/** where a critic's consult goes: the route the turn takes and the critic's model on it; null when the assistant has no route */
+export function criticVia(): Via | null {
+  const route = aiRoute.peek();
+  if (!route) return null;
+  const turnModel = aiSettings.peek().model, model = criticModel(route, turnModel), engine = engineOf(turnModel);
+  // a command line takes its own model name, none for its default
+  const asked = route === 'companion' && engine !== 'claude' ? (modelName(model) === CLI_DEFAULT ? '' : modelName(model)) : model;
+  return {
+    route, model: asked, effort: currentEffort(model),
+    ...(route === 'local' ? { target: { url: localBase() } } : route === 'remote' ? { target: { url: `/api/llm/${encodeURIComponent(slotOf(model))}` } } : {}),
+    ...(route === 'companion' && engine ? { engine, link: link() } : {}),
+  };
+}
+setCriticHost({ via: criticVia, rounds: () => aiSettings.peek().criticRounds });
+
 /** one user message; yields the assistant's events */
 export async function* ask(p: AskPayload, signal: AbortSignal): AsyncGenerator<AiEvent> {
   if (!aiRoute.peek()) await refreshStatus();
@@ -435,6 +455,7 @@ export async function* ask(p: AskPayload, signal: AbortSignal): AsyncGenerator<A
   // a proposal neither applied nor refused is dropped at the next message
   const dropped = runner.pending && !p.decisions.some((d) => d.id === runner.pending!.id) ? runner.pending : null;
   runner.clear();
+  resetCritic();
   runner.wrotePlugins.clear();
   realWanted.clear();
   const notes = [
@@ -507,7 +528,7 @@ export async function* ask(p: AskPayload, signal: AbortSignal): AsyncGenerator<A
   if (harvest) yield { type: 'item', item: { id: uid(), role: 'assistant', text: harvest } };
   const wanted = realNote([...realWanted]);
   if (wanted) yield { type: 'item', item: { id: uid(), role: 'assistant', text: wanted } };
-  yield { type: 'item', item: { id: uid(), role: 'assistant', usage: { ...usage, tools: runner.calls - calls, images: seen, ms: Date.now() - started, model, route: USAGE_ROUTE[route], ...(reported ? {} : { unknown: true as const }) } } };
+  yield { type: 'item', item: { id: uid(), role: 'assistant', usage: { ...usage, tools: runner.calls - calls, images: seen, ms: Date.now() - started, model, route: USAGE_ROUTE[route], ...(reported ? {} : { unknown: true as const }), ...(consultsOf() ? { consults: consultsOf() } : {}) } } };
   yield { type: 'done' };
 }
 

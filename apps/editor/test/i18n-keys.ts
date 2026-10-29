@@ -15,6 +15,7 @@ import { builtinRegistry } from '@tramme/nodes';
 import { EDITOR_PROMPTS, EDITOR_TOOLS } from '../src/vocabulary.ts';
 import { FIGURE_TOOLS } from '../src/figures.ts';
 import { REVIEW_TOOLS } from '../src/review.ts';
+import { CRITIC_TOOLS } from '../src/critic/tool.ts';
 import { BUILTIN_KITS, RECIPE_TOOLS } from '../src/recipes.ts';
 import { TYPEFACE_TOOLS } from '../src/typefaces/tools.ts';
 import { EVENT_TOOLS } from '../src/events.ts';
@@ -80,7 +81,7 @@ export function registryKeys(): Set<string> {
   schema(SOUND_MIX_SCHEMA);
   schema(MASK_SCHEMA);
   // the editor's tools and workflows, shown in the chat's / menu
-  const tools = [...EDITOR_TOOLS, ...RECIPE_TOOLS, ...TYPEFACE_TOOLS, ...FIGURE_TOOLS, ...EVENT_TOOLS, ...PERCEPTION_TOOLS, ...TRACKING_TOOLS, ...STABILIZE_TOOLS, ...PROXY_TOOLS, ...COMPONENT_TOOLS, ...DENOISE_TOOLS, ...SKIN_TOOLS, ...LONG_TOOLS, ...CUTOUT_TOOLS, ...DEPTH_TOOLS, ...MODEL_TOOLS, ...REMOVEBG_TOOLS, ...LIPSYNC_TOOLS, ...CUTS_TOOLS, ...MONTAGE_TOOLS, ...FILLERS_TOOLS, ...REVIEW_TOOLS, ...SOUND_TOOLS, ...MIXING_TOOLS, ...SOURCE_TOOLS, ...LIBRARY_TOOLS];
+  const tools = [...EDITOR_TOOLS, ...RECIPE_TOOLS, ...TYPEFACE_TOOLS, ...FIGURE_TOOLS, ...EVENT_TOOLS, ...PERCEPTION_TOOLS, ...TRACKING_TOOLS, ...STABILIZE_TOOLS, ...PROXY_TOOLS, ...COMPONENT_TOOLS, ...DENOISE_TOOLS, ...SKIN_TOOLS, ...LONG_TOOLS, ...CUTOUT_TOOLS, ...DEPTH_TOOLS, ...MODEL_TOOLS, ...REMOVEBG_TOOLS, ...LIPSYNC_TOOLS, ...CUTS_TOOLS, ...MONTAGE_TOOLS, ...FILLERS_TOOLS, ...REVIEW_TOOLS, ...CRITIC_TOOLS, ...SOUND_TOOLS, ...MIXING_TOOLS, ...SOURCE_TOOLS, ...LIBRARY_TOOLS];
   for (const x of [...tools, ...EDITOR_PROMPTS, ...BUILTIN_CHECKS, ...BUILTIN_KITS, ...EDITOR_PRESETS]) { add(x.title); add(x.description); }
   for (const c of BUILTIN_CHECKS) for (const text of c.texts ?? []) add(text);
   for (const text of Object.values(SOUND_TEXTS)) add(text);
