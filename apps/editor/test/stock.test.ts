@@ -15,7 +15,8 @@ vi.stubGlobal('addEventListener', () => {});
 vi.mock('../src/review.ts', async (original) => ({ ...(await original<typeof import('../src/review.ts')>()), sheetOf: () => 'data:image/jpeg;base64,sheet' }));
 
 const { api } = await import('../src/api.ts');
-const { STOCK_TOOLS, searchStock, allowedLicense } = await import('../src/stock.ts');
+const confirm = await import('../src/confirm.ts');
+const { STOCK_TOOLS, searchStock, allowedLicense, realWanted } = await import('../src/stock.ts');
 const { packGlb } = await import('../src/glb.ts');
 const { SOUND_TOOLS } = await import('../src/sound.ts');
 const { editorRegistry } = await import('../src/vocabulary.ts');
@@ -48,6 +49,7 @@ const OV = { results: [
 const PX_PHOTOS = { photos: [{ id: 101, width: 4000, height: 3000, url: 'https://www.pexels.com/photo/101/', photographer: 'Pia', alt: 'A bowl of ramen', src: { original: 'https://px.example/101-o.jpg', large2x: 'https://px.example/101-l.jpg', medium: 'https://px.example/101-m.jpg' } }] };
 const PX_VIDEOS = { videos: [{ id: 202, width: 1920, height: 1080, url: 'https://www.pexels.com/video/202/', image: 'https://px.example/202.jpg', duration: 12, user: { name: 'Vik' }, video_files: [{ link: 'https://px.example/202-4k.mp4', width: 3840, file_type: 'video/mp4' }, { link: 'https://px.example/202-hd.mp4', width: 1920, file_type: 'video/mp4' }] }] };
 
+const COMMONS = { query: { pages: { 7: { title: 'File:Revolut logo.svg', imageinfo: [{ url: 'https://upload.example/Revolut.svg', thumburl: 'https://upload.example/1280px-Revolut.svg.png', descriptionurl: 'https://commons.wikimedia.org/wiki/File:Revolut_logo.svg', extmetadata: { LicenseShortName: { value: 'Public domain' }, Artist: { value: '<a href="x">Revolut Ltd</a>' } } }] } } } };
 const asked: string[] = [];
 let refused: string[] = [];
 beforeEach(() => {
@@ -62,6 +64,7 @@ beforeEach(() => {
     const files = /^https:\/\/api\.polyhaven\.com\/files\/(\w+)/.exec(url);
     if (files) return jsonRes(PH_FILES[files[1]]);
     if (url.startsWith('https://api.openverse.org/v1/images/')) return jsonRes(OV);
+    if (url.startsWith('https://commons.wikimedia.org/w/api.php')) return jsonRes(COMMONS);
     if (url.startsWith('https://api.openverse.org/v1/audio/')) return jsonRes({ results: [] });
     if (url === 'https://dl.polyhaven.org/alarm_clock_01_1k.gltf') return jsonRes(GLTF);
     if (url === 'https://dl.polyhaven.org/alarm_clock_01.bin') return new Response(new Uint8Array(8));
@@ -70,7 +73,7 @@ beforeEach(() => {
   vi.spyOn(api, 'stockAmbient').mockImplementation(async () => jsonRes(ACG));
   vi.spyOn(api, 'stockPexels').mockImplementation(async (kind) => (kind === 'photos' ? PX_PHOTOS : PX_VIDEOS));
 });
-afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); confirm.turnEnds(); realWanted.clear(); });
 
 const signal = () => new AbortController().signal;
 const project = (): TrammeDoc => newProject({ name: 'Stock', width: 1920, height: 1080, fps: 30, duration: 20 }).doc;
@@ -240,6 +243,54 @@ describe('the stock tool', () => {
 
   it('refuses a result no search showed', async () => {
     await expect(world().run({ kind: 'photo', use: 'pexels:999' })).rejects.toThrow(/no result "pexels:999"/);
+  });
+});
+
+describe('real logos and pictures', () => {
+  const input = { kind: 'real', what: 'the Revolut logo' };
+
+  it('asks the user by name, and on yes searches Wikimedia Commons and keeps the file with its licence and their yes', async () => {
+    const w = world();
+    const pending = w.run(input);
+    await vi.waitFor(() => expect(confirm.question.peek()).toBeTruthy());
+    expect(confirm.question.peek()!.text).toContain('the Revolut logo');
+    confirm.answer(true);
+    const out = await pending;
+    const commons = new URL(asked.find((u) => u.startsWith('https://commons.wikimedia.org/w/api.php'))!);
+    expect(Object.fromEntries(commons.searchParams)).toMatchObject({ action: 'query', generator: 'search', gsrnamespace: '6', gsrsearch: 'the Revolut logo', prop: 'imageinfo', iiprop: 'url|extmetadata' });
+    const record = JSON.parse(w.files.get('assets/stock/stock-commons-7.json') as string);
+    expect(record).toMatchObject({ source: 'commons', kind: 'real', title: 'Revolut logo.svg', author: 'Revolut Ltd', license: 'Public domain', landing: 'https://commons.wikimedia.org/wiki/File:Revolut_logo.svg', permission: 'the user said yes', what: 'the Revolut logo' });
+    expect(out.ops!.length).toBeGreaterThan(0);
+    expect(realWanted.size).toBe(0);
+  });
+
+  it('fetches nothing on no, and says to set the name in the type of the film', async () => {
+    const pending = world().run(input);
+    await vi.waitFor(() => expect(confirm.question.peek()).toBeTruthy());
+    confirm.answer(false);
+    const out = await pending;
+    expect(out.ops ?? []).toEqual([]);
+    expect(asked.some((u) => u.includes('wikimedia'))).toBe(false);
+    expect(out.text).toMatch(/film's type/);
+  });
+
+  it('is never fetched in a turn left alone: it is listed for the user, a wordmark and a picture made for the film stand for it', async () => {
+    confirm.turnBegins(true);
+    const out = await world().run(input);
+    expect(out.ops ?? []).toEqual([]);
+    expect(asked).toEqual([]);
+    expect([...realWanted]).toEqual(['the Revolut logo']);
+    expect(out.text).toMatch(/wordmark set in the film's type/);
+    expect(out.text).toMatch(/picture made for the film/);
+  });
+
+  it('wants to know what, and answers when Commons has nothing', async () => {
+    await expect(world().run({ kind: 'real' })).rejects.toThrow(/what/);
+    vi.stubGlobal('fetch', async () => jsonRes({ query: { pages: {} } }));
+    const pending = world().run(input);
+    await vi.waitFor(() => expect(confirm.question.peek()).toBeTruthy());
+    confirm.answer(true);
+    expect((await pending).text).toMatch(/Nothing on Wikimedia Commons/);
   });
 });
 

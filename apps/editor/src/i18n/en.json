@@ -94,6 +94,7 @@
     "stoppedAfterNSteps": "stopped after {n} steps",
     "urlDoesNotAnswer": "{url} does not answer ({error})",
     "companionCut": "The local companion does not answer: its connection was interrupted before the end of the turn",
+    "realWanted": "Not fetched, because it needs your yes: {what}. To have it, ask for it by name while you are here (/ menu, {action}); otherwise the film keeps the name set in its own type.",
     "harvest": "Plugins written in this turn: {files}. To use them in your other projects: / menu, {action}.",
     "resumeIn": "Interrupted ({error}). Going on in {s} s, attempt {n} of {max}…",
     "serviceError": "service error",
@@ -1387,6 +1388,9 @@
     "placed": "Block \"{name}\" placed."
   },
   "stock": {
+    "realTitle": "Have this real logo or picture fetched?",
+    "realText": "Tramme would fetch {what} from Wikimedia Commons. It is a real brand, person or product: only with your yes, and the licence it states is kept.",
+    "realYes": "Fetch it",
     "kept": "Free library result kept: {title}.",
     "found": "{n} results from the free libraries.",
     "nothing": "Nothing found in the free libraries.",

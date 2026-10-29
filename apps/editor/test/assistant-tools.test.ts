@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { effortFor, effortLevels, pickModel } from '@tramme/assistant';
 import { builtinRegistry } from '@tramme/nodes';
-import { harvestNote, inputIssues, vocabularyDetail, vocabularyIndex } from '../src/ai/answers.ts';
+import { harvestNote, realNote, inputIssues, vocabularyDetail, vocabularyIndex } from '../src/ai/answers.ts';
 import { REVIEW_TOOLS } from '../src/review.ts';
 
 describe('effort levels', () => {
@@ -96,6 +96,20 @@ describe("the assistant's tools", () => {
     expect(detail.nodes[0].props).toEqual(reg.listNodes()[0].props);
     expect(detail.tools[0]).toMatchObject({ name: 'check', input: { type: 'object' } });
     expect(detail.unknown).toEqual(['nothing-like-it']);
+  });
+});
+
+describe('the real logos and pictures wanted in a turn', () => {
+  it('say nothing when none was wanted', () => {
+    expect(realNote([])).toBe('');
+  });
+
+  it('are named, once each, with what to do about them', () => {
+    const note = realNote(['the Revolut logo', 'a photo of Mbappé', 'the Revolut logo']);
+    expect(note).toContain('the Revolut logo');
+    expect(note).toContain('a photo of Mbappé');
+    expect(note.match(/Revolut/g)).toHaveLength(1);
+    expect(note).toContain('Free libraries');
   });
 });
 

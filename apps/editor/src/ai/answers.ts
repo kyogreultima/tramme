@@ -15,6 +15,9 @@ export function inputIssues(name: string, input: unknown): string[] {
   return r.success ? [] : r.error.issues.map((i) => `${i.path.length ? i.path.join('.') : '(input)'}: ${i.message}`);
 }
 
+/** the title of the / menu action that fetches from the free libraries: the tool's, and the words of the note below */
+export const FREE_LIBRARIES = 'Free libraries';
+
 /** the title of the / menu action that keeps a plugin in the library: the tool's, and the words of the note below */
 export const KEEP_PLUGIN = 'Keep a plugin in the library';
 
@@ -22,6 +25,12 @@ export const KEEP_PLUGIN = 'Keep a plugin in the library';
 export function harvestNote(paths: string[]): string {
   const files = [...new Set(paths.map((p) => p.replace(/^plugins\//, '')))].sort();
   return files.length ? t('ai.harvest', { files: files.join(', '), action: t(KEEP_PLUGIN) }) : '';
+}
+
+/** what the user is told at the end of a turn that wanted real logos or pictures it could not fetch alone: each once, and what to do ('' when none) */
+export function realNote(wanted: string[]): string {
+  const list = [...new Set(wanted)];
+  return list.length ? t('ai.realWanted', { what: list.join(', '), action: t(FREE_LIBRARIES) }) : '';
 }
 
 // ── the vocabulary's index: each entry in a line or two, its full schema on demand ──
