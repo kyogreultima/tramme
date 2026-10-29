@@ -43,7 +43,8 @@ On the bilal project as the run of 2026-10-28 left it (the check the assistant r
 
 ### Step 4. Material ([plan](superpowers/plans/2026-10-29-taste-and-finish-step4-material.md))
 
-- [ ] Objects and illustrations made as assets, textures and light drawn by the engine, free libraries (CC0 textures and models, licensed photos and clips) with credits, real logos only with the user's yes.
+- [x] Objects and illustrations made as assets, textures and light drawn by the engine, free libraries (CC0 textures and models, licensed photos and clips) with credits, real logos only with the user's yes.
+- [ ] One dev run on the trial server (the dressing brief of bilal and one launch brief): objects, surfaces and stock files each film used, whether any scene stayed a flat plate, the real logos listed, the cost against step 3. Spends the user's quota, waits for their go.
 
 ### Step 5. The missing vocabulary ([plan](superpowers/plans/2026-10-29-taste-and-finish-step5-missing-vocabulary.md))
 

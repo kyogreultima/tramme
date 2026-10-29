@@ -58,6 +58,10 @@ Done when: asked for "a night-sky background", the assistant has one made, propo
 
   `upscale`: the picture enlarged by a whole factor (up to four) with the upscale tool's own enlargement (Lanczos and a light sharpening, in core), before it is saved and placed. No learned super-resolution yet: the detail is the picture's own, enlarged.
 
+### Step 4b. Objects
+
+- [x] `object`: a single subject on a flat ground, cut out with the matte of `remove-bg` (`cutoutBlob`), kept as a transparent PNG with `object: true` and the share of the picture the subject covers in its record, placed whole; in the style of the film's target when there is one. Never a background.
+
 ### Step 5. Moving pictures
 
 - [x] Video providers as footage layers: the same record (`.video.json`), the same gate, seconds billed, the shots tool finding the cuts of what comes back.
