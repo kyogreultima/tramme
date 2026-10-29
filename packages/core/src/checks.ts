@@ -12,6 +12,7 @@ import { animatedSlots, motionFigures, motionStretches, pathDeviation, sampleAdd
 import { layerMatrix, matMul, type Mat2D } from './math.ts';
 import { mediaTime, pictureRect } from './track.ts';
 import type { Host, NodeType, Rect, Registry } from './registry.ts';
+import { compositionOf } from './check-report.ts';
 import { sequenceCheck } from './montage-checks.ts';
 import type { Composition, Layer, TrammeDoc, Vec2 } from './types.ts';
 
@@ -370,17 +371,28 @@ export function lumaUnder(p: PlacedLayer, t: number, tb: Rect, data: (id: string
   return area > 0 ? sum / area : null;
 }
 
+/** the topmost layer under a text that holds at least 90 % of it (its card, its plate, a picture), the compositions and groups the text is played through left out */
+function groundOf(layers: PlacedLayer[], p: PlacedLayer): PlacedLayer | null {
+  const area = p.box!.w * p.box!.h;
+  let found: PlacedLayer | null = null;
+  for (const q of layers.slice(0, layers.indexOf(p))) {
+    if (!q.box || q.textSize !== undefined || q.opacity < 0.5 || q.node.container || p.id.startsWith(`${q.id}/`) || p.id.startsWith(`${q.id}#`)) continue;
+    if (area > 0 && overlapArea(p.box!, q.box) >= 0.9 * area) found = q;
+  }
+  return found;
+}
+
 const textContrast: CheckType = {
   name: 'text-contrast', title: 'Low contrast', description: 'text whose colour sits too close to what is behind it (against a picture after the space tool, or the composition background)',
   texts: ['"{name}" is hard to read at {t} s: its colour is too close to what is behind it (contrast {cr}:1)'],
-  run({ samples, data, comp, doc }) {
+  run({ samples, data, compId, doc }) {
     const out = new Map<string, QualityIssue>();
     for (const s of samples) {
       for (const p of s.layers) {
         if (out.has(p.id) || !p.box || p.textSize === undefined || p.opacity < 0.5 || !p.text?.trim()) continue;
         const ink = paintLuma(p.props.color, doc.tokens);
         if (ink === null) continue;
-        // what is under: the picture with a free-space analysis that covers most of the text, else the composition's own background
+        // what is under: the picture with a free-space analysis that covers most of the text, else the card it sits on, else the background of the composition it is played in
         let bgL: number | null = null, bg = '';
         let cover = 0;
         for (const q of s.layers) {
@@ -390,7 +402,12 @@ const textContrast: CheckType = {
           const cov = overlapArea(p.box, q.box) / (p.box.w * p.box.h || 1);
           if (cov > cover) { cover = cov; bgL = l; bg = q.node.type === 'video' ? 'footage' : 'a picture'; }
         }
-        if (cover < 0.6) { bgL = paintLuma(comp.background, doc.tokens); bg = 'the background'; }
+        if (cover < 0.6) {
+          const under = groundOf(s.layers, p);
+          // a layer under the text whose colour is not known (a plugin's node, a picture without analysis, a gradient): not judged
+          if (under) { bgL = under.node.type.startsWith('shape.') ? paintLuma(under.props.fill, doc.tokens) : null; bg = 'the card behind it'; }
+          else { bgL = paintLuma(doc.compositions[compositionOf(doc, compId, p.id)]?.background, doc.tokens); bg = 'the background'; }
+        }
         if (bgL === null) continue;
         // half-transparent ink sinks into its ground
         const mixed = ink * p.opacity + bgL * (1 - p.opacity);
