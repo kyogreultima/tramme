@@ -26,6 +26,8 @@ export interface QualityIssue {
   /** when it happens (s) */
   t?: number;
   layers?: string[];
+  /** how bad it is among issues of its check (higher is worse): the report shows the worst of a kind first */
+  rank?: number;
 }
 
 /** a layer at one instant, in composition space */
@@ -160,7 +162,7 @@ const textSize: CheckType = {
       if (!seen.has(p.id) || seen.get(p.id)!.px > p.textSize) seen.set(p.id, { px: p.textSize, t: s.t, p });
     }
     return [...seen.values()].map(({ px, t, p }) => ({
-      check: 'text-size', severity: 'warning', t, layers: [p.id],
+      check: 'text-size', severity: 'warning', t, layers: [p.id], rank: min / Math.max(1, px),
       message: `"${name(p)}" is about ${Math.round(px)} px high at ${s2(t)} s: too small to read on a phone (at least ${min} px).`,
       say: { text: '"{name}" is about {px} px high: too small to read on a phone (at least {min} px)', params: { name: name(p), px: Math.round(px), min } },
     }));

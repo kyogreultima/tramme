@@ -3,7 +3,7 @@
 // are tools of the editor's vocabulary, run by the assistant before it sums
 // up (use_tool) or by the user from the / menu.
 
-import { Evaluator, motionReport, runChecks, type QualityIssue, type ToolContext, type ToolType, type TrammeDoc } from '@tramme/core';
+import { Evaluator, groupIssues, motionReport, REPORT_MAX, reportLines, runChecks, type QualityIssue, type ToolContext, type ToolType, type TrammeDoc } from '@tramme/core';
 import { pixelsOf, flowLines } from './flow.ts';
 import { analyses, canvas } from './perception.ts';
 import { masterText, soundReport } from './mixing.ts';
@@ -70,6 +70,15 @@ export function keyTimes(doc: TrammeDoc, compId: string, issues: QualityIssue[],
   return [...new Set(picked.map((x) => +x.toFixed(2)))].sort((a, b) => a - b).slice(0, n);
 }
 
+/** the issues of a check as lines: for the model, grouped by cause with the worst of each; for the user, the same groups in their language */
+export function issueReport(issues: QualityIssue[], doc: TrammeDoc, compId: string): { lines: string[]; notice: string[] } {
+  const groups = groupIssues(issues);
+  const { lines, hidden } = reportLines(groups, { doc, compId });
+  const notice = groups.slice(0, REPORT_MAX).map((g) => `- ${g.worst.say ? t(g.worst.say.text, g.worst.say.params) : g.worst.message}${g.count > 1 ? ` ${t('review.similar', { n: g.count - 1 })}` : ''}`);
+  if (hidden) notice.push(`- ${t('review.moreKinds', { n: hidden })}`);
+  return { lines, notice };
+}
+
 const check: ToolType<{ frames?: number }> = {
   name: 'check', title: 'Check the composition', description: "runs the quality checks (readability, safe zone, overlaps, pacing; the sound: the master's loudness and peak, each effect on its cue and heard over the bed, the music under the voice, dips and silences) and shows a contact sheet of the key moments and the picture of the mix",
   input: { type: 'object', properties: { frames: { type: 'integer', minimum: 2, maximum: 12, title: 'Frames' } } },
@@ -80,9 +89,8 @@ const check: ToolType<{ frames?: number }> = {
     const times = keyTimes(ctx.doc, ctx.compId, issues, frames);
     const url = await sheet(ctx, times, Math.min(4, times.length), ctx.compId);
     const warnings = issues.filter((i) => i.severity === 'warning').length, notes = issues.length - warnings;
-    const lines = issues.map((i) => `- [${i.severity}] ${i.message}${i.layers?.length ? ` (layers: ${i.layers.join(', ')})` : ''}`);
+    const { lines, notice: shown } = issueReport(issues, ctx.doc, ctx.compId);
     const head = issues.length ? `${warnings} warning(s), ${notes} note(s).` : 'No issue found by the checks.';
-    const shown = issues.map((i) => `- ${i.say ? t(i.say.text, i.say.params) : i.message}`);
     // the sound: its master, the picture of the mix, and the moments a human checks by ear
     const listen = sound.listen.map((x) => `${x.toFixed(2)} s`).join(', ');
     const heard = sound.master ? `\n${masterText(sound.master)} The picture of the mix shows the master's waveform and spectrogram over the motion of the picture, a line at each effect (heroes red): an effect away from a motion, two hits in one place, a hit with no body show there.${listen ? ` Ask the user to listen at ${listen}: you cannot hear, they do the final listen.` : ''}` : '';

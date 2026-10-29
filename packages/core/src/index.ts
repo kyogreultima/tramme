@@ -22,6 +22,7 @@ export * from './sounds.ts';
 export * from './transcript.ts';
 export * from './tools.ts';
 export * from './checks.ts';
+export * from './check-report.ts';
 export * from './motion.ts';
 export * from './cues.ts';
 export * from './analysis.ts';
