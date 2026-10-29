@@ -1382,6 +1382,9 @@
     "saved": "Block \"{name}\" saved.",
     "placed": "Block \"{name}\" placed."
   },
+  "filmPlan": {
+    "written": "Film plan written (assets/film-plan.json)."
+  },
   "brief": {
     "written": "Brief of the project written (assets/brief.json)."
   },
