@@ -130,6 +130,40 @@ describe('quality checks', () => {
       expect(await contrast(onDark({ card: card({ fill: '#FFFFFF' }), t: ghost }))).toEqual(['t']);
     });
 
+    const scene = (back?: string, textColor = '#F4F4F4') => {
+      const d = doc({ scene: { type: 'comp', transform: { position: [540, 960] }, props: { comp: 'card' } } });
+      d.compositions.card = { name: 'Card', width: 1080, height: 1920, fps: 30, duration: 6, ...(back ? { background: back } : {}), layers: { t: text('Price', {}, { color: textColor }) as Layer }, order: ['t'] };
+      return d;
+    };
+
+    it('judges the text of a transparent composition against what plays it', async () => {
+      const d = scene();
+      d.compositions.main.background = '#F0F0F0';
+      expect(await contrast(d)).toEqual(['scene/t']);
+    });
+
+    it('judges the text on its composition\'s own plate, not the picture it covers', async () => {
+      const d = scene('#101010', '#151515');
+      d.compositions.main.layers = { photo: { type: 'video', transform: { position: [540, 960] }, props: { video: 'v', size: [1080, 1920] } }, ...d.compositions.main.layers } as never;
+      d.compositions.main.order = ['photo', 'scene'];
+      expect(await contrast(d)).toEqual(['scene/t']);
+    });
+
+    it('does not take a translucent card for a ground', async () => {
+      const frosted = card({ fill: 'rgba(255,255,255,0.08)' });
+      expect(await contrast(onDark({ frosted, t: text('Price', {}, { color: '#F4F4F4' }) }))).toEqual([]);
+    });
+
+    it('judges a text that is dimmed and held', async () => {
+      const dimmed = text('Held', { transform: { position: [540, 960], opacity: { $k: [{ t: 0, v: 1 }, { t: 1, v: 1 }, { t: 1.25, v: 0.6 }] } as never } }, { color: '#6B7280' });
+      expect(await contrast(onDark({ card: card({ fill: '#FFFFFF' }), t: dimmed }))).toEqual(['t']);
+    });
+
+    it('judges the symbols drawn in the ink colour, not the pictograms', async () => {
+      expect(await contrast(onDark({ card: card({ fill: '#FFFFFF' }), t: text('→', {}, { color: '#F4F4F4' }) }))).toEqual(['t']);
+      expect(await contrast(onDark({ card: card({ fill: '#FFFFFF' }), t: text('✅', {}, { color: '#F4F4F4' }) }))).toEqual([]);
+    });
+
     it('falls back to the background when the card holds only part of the text', async () => {
       const half = card();
       half.props = { size: [322, 300], fill: '#F4F4F4' };
@@ -196,6 +230,21 @@ describe('quality checks', () => {
         grade: { type: 'adjust' } as Partial<Layer>,
       }));
       expect(found).toHaveLength(1);
+    });
+
+    it('counts the sub-clips of one media as one speaker', async () => {
+      const d = long({ a: clip('s1', 0, 10), b: clip('s2', 10, 20), c: clip('s3', 20, 30), e: clip('s4', 30, 40) });
+      d.assets = { talk: { type: 'video', src: 'talk.mp4' }, ...Object.fromEntries(['s1', 's2', 's3', 's4'].map((id) => [id, { type: 'video', of: 'talk', range: [0, 10] }])) } as never;
+      const found = await coverage(d);
+      expect(found).toHaveLength(1);
+      expect(found[0].message).toContain('(40 s)');
+    });
+
+    it('says the longest stretch is the worst, and does not count a screen without the speaker', async () => {
+      const found = await coverage(long({ talk: clip('talk', 0, 30), ...title('one', 0, 3) }, 40));
+      expect(found).toHaveLength(1);
+      expect(found[0].message).toContain('from 3 s to 30 s (27 s)');
+      expect(found[0].rank).toBe(27);
     });
 
     it('stays silent without a full-frame video, and on a short one', async () => {

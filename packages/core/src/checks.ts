@@ -12,7 +12,7 @@ import { animatedSlots, motionFigures, motionStretches, pathDeviation, sampleAdd
 import { layerMatrix, matMul, type Mat2D } from './math.ts';
 import { mediaTime, pictureRect } from './track.ts';
 import type { Host, NodeType, Rect, Registry } from './registry.ts';
-import { compositionOf } from './check-report.ts';
+import { compositionOf, s2 } from './check-report.ts';
 import { sequenceCheck } from './montage-checks.ts';
 import type { Composition, Layer, TrammeDoc, Vec2 } from './types.ts';
 
@@ -151,7 +151,6 @@ export function sampleComposition(evaluator: Evaluator, compId: string, step = 0
 const u = (c: Composition) => Math.min(c.width, c.height);
 const name = (p: PlacedLayer) => p.layer.name ?? p.id;
 const words = (s: string) => s.split(/\s+/).filter(Boolean).length;
-const s2 = (t: number) => +t.toFixed(2);
 
 const textSize: CheckType = {
   name: 'text-size', title: 'Text size', description: 'text too small to read on a phone',
@@ -375,16 +374,52 @@ export function lumaUnder(p: PlacedLayer, t: number, tb: Rect, data: (id: string
 const toLinear = (y: number) => (y <= 0.04045 ? y / 12.92 : ((y + 0.055) / 1.055) ** 2.4);
 /** the ratio below which text is hard to read (the standard's 3:1 for large text; size has its own check) */
 const MIN_CONTRAST = 3;
+/** a text made of pictograms keeps the colours of its glyphs, whatever its colour says */
+const PICTOGRAMS = /^[\p{Extended_Pictographic}\p{Emoji_Modifier}‍️\s]*$/u;
 
-/** the topmost layer under a text that holds at least 90 % of it (its card, its plate, a picture), the compositions and groups the text is played through left out */
-function groundOf(layers: PlacedLayer[], p: PlacedLayer): PlacedLayer | null {
+/** how opaque a colour is, 0 to 1 (1 for the notations that carry no alpha, and for what cannot be read) */
+function paintAlpha(paint: unknown, tokens?: Record<string, { type: string; value: unknown }>): number {
+  let c = paint;
+  if (typeof c === 'string' && c.startsWith('@')) c = tokens?.[c.slice(1)]?.value;
+  const a = typeof c === 'string' ? /^rgba\(\s*[\d.]+[,\s]+[\d.]+[,\s]+[\d.]+[,\s/]+([\d.]+)(%?)\s*\)/.exec(c.trim()) : null;
+  return a ? Math.min(1, Number(a[1]) / (a[2] ? 100 : 1)) : 1;
+}
+
+/** the prefix of the composition that plays the one a prefix names (`s2/inner/` to `s2/`, `s2/` to the root's `''`) */
+const upFrom = (prefix: string) => prefix.slice(0, prefix.slice(0, -1).lastIndexOf('/') + 1);
+
+/** what a text sits on: a luminance (null when it cannot be known: the text is not judged) and how to name it */
+interface Ground { luma: number | null; name: string }
+
+/**
+ * The ground of a text. Its own composition first (the layers carrying its id
+ * prefix): the topmost opaque layer under it that holds at least 90 % of it, a
+ * shape's fill being the card; failing that the composition's own background;
+ * a composition without one is transparent, so the search goes on in the
+ * composition that plays it, from the layer that plays it down.
+ */
+function groundOf(layers: PlacedLayer[], p: PlacedLayer, doc: TrammeDoc, compId: string): Ground {
   const area = p.box!.w * p.box!.h;
-  let found: PlacedLayer | null = null;
-  for (const q of layers.slice(0, layers.indexOf(p))) {
-    if (!q.box || q.textSize !== undefined || q.opacity < 0.5 || q.node.container || p.id.startsWith(`${q.id}/`) || p.id.startsWith(`${q.id}#`)) continue;
-    if (area > 0 && overlapArea(p.box!, q.box) >= 0.9 * area) found = q;
+  let prefix = p.id.slice(0, p.id.lastIndexOf('/') + 1), until = layers.indexOf(p);
+  for (;;) {
+    let found: PlacedLayer | null = null;
+    for (const q of layers.slice(0, until)) {
+      // the layers of this composition only; groups and compositions the text is played through are not its ground
+      if (!q.id.startsWith(prefix) || q.id.slice(prefix.length).includes('/')) continue;
+      if (!q.box || q.textSize !== undefined || q.node.container || q.opacity < 0.9) continue;
+      // a translucent fill (a frosted card) lets what is under it show: the ground is further down
+      if (q.node.type.startsWith('shape.') && paintAlpha(q.props.fill, doc.tokens) < 0.9) continue;
+      if (area > 0 && overlapArea(p.box!, q.box) >= 0.9 * area) found = q;
+    }
+    // a layer whose colour is not known (a plugin's node, a picture without analysis, a gradient) leaves the text unjudged
+    if (found) return { luma: found.node.type.startsWith('shape.') ? paintLuma(found.props.fill, doc.tokens) : null, name: 'the card behind it' };
+    const back = doc.compositions[compositionOf(doc, compId, `${prefix}x`)]?.background;
+    if (back !== undefined && back !== null) return { luma: paintLuma(back, doc.tokens), name: 'the background' };
+    const player = prefix ? layers.findIndex((q) => q.id === prefix.slice(0, -1)) : -1;
+    if (player < 0) return { luma: null, name: 'the background' };
+    prefix = upFrom(prefix);
+    until = player;
   }
-  return found;
 }
 
 const textContrast: CheckType = {
@@ -392,39 +427,37 @@ const textContrast: CheckType = {
   texts: ['"{name}" is hard to read at {t} s: its colour is too close to what is behind it (contrast {cr}:1)'],
   run({ samples, data, compId, doc }) {
     const out = new Map<string, QualityIssue>();
-    // the most opaque a text gets: a fade towards it is passing, ink that stays half transparent is not
-    const top = new Map<string, number>();
-    for (const s of samples) for (const p of s.layers) top.set(p.id, Math.max(top.get(p.id) ?? 0, p.opacity));
-    for (const s of samples) {
+    // a composition with a background hides what is drawn under it: a picture under one is not the ground of its text
+    const plated = (prefix: string) => { const b = doc.compositions[compositionOf(doc, compId, `${prefix}x`)]?.background; return b !== undefined && b !== null; };
+    const reaches = (from: string, to: string) => { for (let pre = from; ; pre = upFrom(pre)) { if (pre === to) return true; if (!pre || plated(pre)) return false; } };
+    const levelOf = (id: string) => id.slice(0, id.lastIndexOf('/') + 1);
+    // the opacity of each layer sample by sample: a fade is passing, judged where it lands; ink that stays dimmed is judged
+    const opacities = samples.map((s) => new Map(s.layers.map((p) => [p.id, p.opacity])));
+    for (const [i, s] of samples.entries()) {
       for (const p of s.layers) {
-        if (out.has(p.id) || !p.box || p.textSize === undefined || p.opacity < 0.5 || !p.text?.trim()) continue;
-        // pictograms keep their own colours, and a fade is judged where it lands
-        if (!/[\p{L}\p{N}]/u.test(p.text) || p.opacity < top.get(p.id)! - 0.05) continue;
+        if (out.has(p.id) || !p.box || p.textSize === undefined || p.opacity < 0.5 || !p.text?.trim() || PICTOGRAMS.test(p.text)) continue;
+        const near = [opacities[i - 1]?.get(p.id), opacities[i + 1]?.get(p.id)].filter((o): o is number => o !== undefined);
+        if (near.length && near.every((o) => Math.abs(o - p.opacity) > 0.03)) continue;
         const ink = paintLuma(p.props.color, doc.tokens);
         if (ink === null) continue;
         // what is under: the picture with a free-space analysis that covers most of the text, else the card it sits on, else the background of the composition it is played in
         let bgL: number | null = null, bg = '';
         let cover = 0;
         for (const q of s.layers) {
-          if (q.id === p.id || (q.node.type !== 'video' && q.node.type !== 'image') || !q.box) continue;
+          if (q.id === p.id || (q.node.type !== 'video' && q.node.type !== 'image') || !q.box || !reaches(levelOf(p.id), levelOf(q.id))) continue;
           const l = lumaUnder(q, s.t, p.box, data);
           if (l === null) continue;
           const cov = overlapArea(p.box, q.box) / (p.box.w * p.box.h || 1);
           if (cov > cover) { cover = cov; bgL = l; bg = q.node.type === 'video' ? 'footage' : 'a picture'; }
         }
-        if (cover < 0.6) {
-          const under = groundOf(s.layers, p);
-          // a layer under the text whose colour is not known (a plugin's node, a picture without analysis, a gradient): not judged
-          if (under) { bgL = under.node.type.startsWith('shape.') ? paintLuma(under.props.fill, doc.tokens) : null; bg = 'the card behind it'; }
-          else { bgL = paintLuma(doc.compositions[compositionOf(doc, compId, p.id)]?.background, doc.tokens); bg = 'the background'; }
-        }
+        if (cover < 0.6) ({ luma: bgL, name: bg } = groundOf(s.layers, p, doc, compId));
         if (bgL === null) continue;
         // half-transparent ink sinks into its ground
         const mixed = ink * p.opacity + bgL * (1 - p.opacity);
         const cr = (Math.max(toLinear(mixed), toLinear(bgL)) + 0.05) / (Math.min(toLinear(mixed), toLinear(bgL)) + 0.05);
         if (cr >= MIN_CONTRAST) continue;
         out.set(p.id, {
-          check: 'text-contrast', severity: 'warning', t: s.t, layers: [p.id],
+          check: 'text-contrast', severity: 'warning', t: s.t, layers: [p.id], rank: MIN_CONTRAST / cr,
           message: `"${name(p)}" is hard to read at ${s2(s.t)} s: its colour is too close to ${bg} (contrast ${cr.toFixed(1)}:1). A colour further from it, or a soft shadow, would hold.`,
           say: { text: '"{name}" is hard to read at {t} s: its colour is too close to what is behind it (contrast {cr}:1)', params: { name: name(p), t: s2(s.t), cr: cr.toFixed(1) } },
         });
@@ -440,13 +473,15 @@ const BARE_NOTE = 12, BARE_WARNING = 20;
 const coverage: CheckType = {
   name: 'coverage', title: 'Coverage', description: 'a stretch of a talking video with nothing on screen but the speaker',
   texts: ['Only the speaker is on screen from {from} s to {to} s ({len} s)'],
-  run({ comp, samples }) {
+  run({ comp, samples, doc }) {
     const frame = comp.width * comp.height, whole: Rect = { x: 0, y: 0, w: comp.width, h: comp.height };
+    // the media of a layer: a sub-clip is its media's
+    const mediaOf = (p: PlacedLayer) => { const id = String(p.props.video); return doc.assets[id]?.of ?? id; };
     // the speaker is the media that fills the frame in most of the samples: a talking video, however it was cut
     const filled = new Map<string, number>();
     for (const s of samples) {
       const here = new Set<string>();
-      for (const p of s.layers) if (p.node.type === 'video' && p.opacity > 0.3 && p.box && overlapArea(p.box, whole) >= 0.6 * frame) here.add(String(p.props.video));
+      for (const p of s.layers) if (p.node.type === 'video' && p.opacity > 0.3 && p.box && overlapArea(p.box, whole) >= 0.6 * frame) here.add(mediaOf(p));
       for (const a of here) filled.set(a, (filled.get(a) ?? 0) + 1);
     }
     const [speaker, n] = [...filled.entries()].sort((a, b) => b[1] - a[1])[0] ?? [];
@@ -454,7 +489,8 @@ const coverage: CheckType = {
     // what is on screen all film long (a logo, a frame, a progress bar) covers nothing
     const seen = new Map<string, number>();
     for (const s of samples) for (const p of s.layers) if (p.opacity > 0.3) seen.set(p.id, (seen.get(p.id) ?? 0) + 1);
-    const covers = (p: PlacedLayer) => p.opacity > 0.3 && !(p.node.type === 'video' && p.props.video === speaker) && p.node.type !== 'audio' && p.node.type !== 'captions'
+    const isSpeaker = (p: PlacedLayer) => p.node.type === 'video' && mediaOf(p) === speaker;
+    const covers = (p: PlacedLayer) => p.opacity > 0.3 && !isSpeaker(p) && p.node.type !== 'audio' && p.node.type !== 'captions'
       && p.node.composes !== 'adjust' && !p.node.container && (seen.get(p.id) ?? 0) <= 0.8 * samples.length;
     const out: QualityIssue[] = [];
     let from = -1;
@@ -462,13 +498,14 @@ const coverage: CheckType = {
       const len = s2(to - from);
       if (len < BARE_NOTE) return;
       out.push({
-        check: 'coverage', severity: len > BARE_WARNING ? 'warning' : 'info', t: s2(from),
+        check: 'coverage', severity: len > BARE_WARNING ? 'warning' : 'info', t: s2(from), rank: len,
         message: `Only the speaker is on screen from ${s2(from)} s to ${s2(to)} s (${len} s): put a title, an illustration or a keyword on it.`,
         say: { text: 'Only the speaker is on screen from {from} s to {to} s ({len} s)', params: { from: s2(from), to: s2(to), len } },
       });
     };
     for (const s of samples) {
-      const bare = !s.layers.some(covers);
+      // bare: the speaker is there and nothing else is (a screen without the speaker is no stretch of the speaker)
+      const bare = s.layers.some((p) => isSpeaker(p) && p.opacity > 0.3) && !s.layers.some(covers);
       if (bare && from < 0) from = s.t;
       else if (!bare && from >= 0) { close(s.t); from = -1; }
     }
