@@ -5,5 +5,6 @@
   "openrouter": { "origin": "https://openrouter.ai" },
   "zai": { "origin": "https://api.z.ai" },
   "elevenlabs": { "origin": "https://api.elevenlabs.io" },
+  "pexels": { "origin": "https://api.pexels.com" },
   "hydracept": { "origin": "https://api.hydracept.com", "fields": [{ "name": "project", "required": true }, { "name": "environment" }] }
 }

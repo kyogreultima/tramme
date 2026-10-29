@@ -18,6 +18,7 @@ export interface Env {
   ZAI_API_KEY?: string;
   GLM_API_KEY?: string;
   ELEVENLABS_API_KEY?: string;
+  PEXELS_API_KEY?: string;
   /** Hydracept: its key, and the project (cpr_...) and environment the key belongs to */
   HYDRACEPT_API_KEY?: string;
   HYDRACEPT_PROJECT?: string;

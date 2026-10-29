@@ -11,6 +11,7 @@
 //   GET    /api/voices                          ?provider=&search=&language=&accent=&gender= -> the voices of a voice-over
 //   POST   /api/generate-image                  {prompt, ratio?, quality?, provider?} -> the picture file
 //   POST   /api/generate-video                  {prompt, ratio?, duration?, source?, provider?} -> the clip file
+//   GET    /api/stock/pexels/:kind              ?query=&per_page= -> photos or videos of Pexels (the user's key)
 //   POST   /api/transcribe                      {audio: WAV base64, language?} -> words with their timing (OpenAI)
 
 import { claude, claudeConfig } from './claude.ts';
@@ -19,6 +20,7 @@ import { failure, json } from './http.ts';
 export { ELEVEN_VOICE_MODELS, type Voice } from './generate.ts';
 export { HYDRACEPT_VOICE_MODELS } from './hydracept.ts';
 import { generateImage, imageConfig } from './images.ts';
+import { stock } from './stock.ts';
 import type { Keys } from './keys.ts';
 import { llm, llmConfig, models } from './llm.ts';
 import { transcribe, transcribeConfig } from './transcribe.ts';
@@ -31,7 +33,7 @@ export interface Reach {
 }
 
 /** the routes of providers, under /api/ */
-export const PROVIDER_ROUTES = ['claude', 'llm', 'models', 'generate', 'voices', 'generate-image', 'generate-video', 'transcribe'];
+export const PROVIDER_ROUTES = ['claude', 'llm', 'models', 'generate', 'voices', 'generate-image', 'generate-video', 'transcribe', 'stock'];
 
 /** what is connected, as /api/config tells it */
 export const providersConfig = (keys: Keys) => ({ claude: claudeConfig(keys), llm: llmConfig(keys), keys: keys.status(), sound: soundConfig(keys), images: imageConfig(keys), videos: videoConfig(keys), transcribe: transcribeConfig(keys) });
@@ -47,6 +49,7 @@ export async function providerRoute(req: Request, reach: Reach, parts: string[])
   if (parts[0] === 'generate-image' && m === 'POST') return generateImage(req, reach);
   if (parts[0] === 'generate-video' && m === 'POST') return generateVideo(req, reach);
   if (parts[0] === 'transcribe' && m === 'POST') return transcribe(req, reach);
+  if (parts[0] === 'stock' && m === 'GET') return stock(req, reach, parts.slice(1));
   return null;
 }
 

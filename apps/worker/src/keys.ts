@@ -12,6 +12,7 @@ const SECRET: Record<KeyedProvider, { name: string; read(env: Env): string | und
   openrouter: { name: 'OPENROUTER_API_KEY', read: (e) => e.OPENROUTER_API_KEY },
   zai: { name: 'ZAI_API_KEY', read: (e) => e.ZAI_API_KEY ?? e.GLM_API_KEY },
   elevenlabs: { name: 'ELEVENLABS_API_KEY', read: (e) => e.ELEVENLABS_API_KEY },
+  pexels: { name: 'PEXELS_API_KEY', read: (e) => e.PEXELS_API_KEY },
   hydracept: { name: 'HYDRACEPT_API_KEY', read: (e) => e.HYDRACEPT_API_KEY, fields: { project: (e) => e.HYDRACEPT_PROJECT, environment: (e) => e.HYDRACEPT_ENVIRONMENT } },
 };
 
