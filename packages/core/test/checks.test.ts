@@ -106,6 +106,38 @@ describe('quality checks', () => {
     expect((await runChecks(doc({ t: text('Ghost', {}, { color: '#F0EFEA' }) }), builtinRegistry())).some((i) => i.check === 'text-contrast')).toBe(false);
   });
 
+  describe('contrast against what the text sits on', () => {
+    const contrast = async (d: TrammeDoc, reg = builtinRegistry()) => (await runChecks(d, reg)).filter((i) => i.check === 'text-contrast').map((i) => i.layers?.join());
+    const card = (extra: Record<string, unknown> = {}): Partial<Layer> => ({ type: 'shape.rect', transform: { position: [540, 960] }, props: { size: [900, 300], fill: '#F4F4F4', ...extra } });
+    const onDark = (layers: Record<string, Partial<Layer>>) => { const d = doc(layers); d.compositions.main.background = '#101010'; return d; };
+
+    it('reads the card under the text, not the plate under the card', async () => {
+      expect(await contrast(onDark({ card: card(), t: text('Price', {}, { color: '#111111' }) }))).toEqual([]);
+      expect(await contrast(onDark({ card: card(), t: text('Price', {}, { color: '#F4F4F4' }) }))).toEqual(['t']);
+    });
+
+    it('falls back to the background when the card holds only part of the text', async () => {
+      const half = card();
+      half.props = { size: [322, 300], fill: '#F4F4F4' };
+      half.transform = { position: [379, 960] };
+      expect(await contrast(onDark({ half, t: text('Half on card', {}, { color: '#111111' }) }))).toEqual(['t']);
+    });
+
+    it('does not judge text on a layer whose colour it cannot read', async () => {
+      const reg = builtinRegistry().clone().use({ nodes: [{ type: 'x.plate', title: 'Plate', category: 'x', props: { size: { type: 'vec2', default: [900, 300] } }, bounds: ({ size: [w, h] }: { size: number[] }) => ({ x: -w / 2, y: -h / 2, w, h }), render: { canvas2d() {} } }] } as never, 'x');
+      const d = onDark({ plate: { type: 'x.plate', transform: { position: [540, 960] }, props: { size: [900, 300] } }, t: text('Price', {}, { color: '#111111' }) });
+      expect(await contrast(d, reg)).toEqual([]);
+    });
+
+    it('reads the background of the composition the text is played in', async () => {
+      const d = onDark({ scene: { type: 'comp', transform: { position: [540, 960] }, props: { comp: 'card' } } });
+      d.compositions.card = { name: 'Card', width: 1080, height: 1920, fps: 30, duration: 6, background: '#F4F4F4', layers: { t: text('Price', {}, { color: '#111111' }) as Layer }, order: ['t'] };
+      expect(await contrast(d)).toEqual([]);
+      d.compositions.card.layers.t.props!.color = '#F4F4F4';
+      expect(await contrast(d)).toEqual(['scene/t']);
+    });
+  });
+
   it('run the checks of a plugin, and report one that fails', async () => {
     const custom: CheckType = { name: 'brand', description: 'logo present', run: () => [{ check: 'brand', severity: 'warning', message: 'no logo' }] };
     const broken: CheckType = { name: 'broken', description: 'fails', run: () => { throw new Error('boom'); } };
