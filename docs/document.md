@@ -411,6 +411,14 @@ Before building a film or dressing a video, the assistant writes a plan and has 
 
 An object a noun of the script stands for is made with `generate-image` and `object: true`: one subject on a flat ground, cut out with the matte of `remove-bg`, a transparent PNG (record `object: true, kept`: the share of the picture kept) placed whole at 60 % of the frame's shorter side, in the style of the kept style frame when the film plan has one. A cutout that kept under 3 % or over 92 % of the picture is kept for you to judge and reported as looking wrong.
 
+## Tilts, the corner pin and the push-in
+
+A layer's transform has two more properties, `rotationX` and `rotationY` (degrees, 0 by default: a document written before them renders exactly as before). They turn the layer around its horizontal or vertical axis through its anchor, seen from the composition camera's perspective (its `perspective`, 1000 px without a camera): a positive `rotationX` brings the bottom toward the viewer, a positive `rotationY` sends the right side away. A tilted layer, or a layer carrying `fx.pin`, is drawn alone as it would be flat, then carried onto its quad by one WebGL pass; a group is flattened into its picture first, so its children are warped together. At 90 degrees a layer is edge on and nothing shows; a layer with a corner at or behind the eye is not drawn. The checks read a tilted layer through its projected quad (its box, and its type as high as the quad's left edge), the viewport outlines it with its quad, and the Lottie and SVG exports draw it flat and say so.
+
+`fx.pin` (the corner pin) carries the layer's box onto four corners in composition pixels (`tl`, `tr`, `br`, `bl`; all four equal means not set). The `pin` tool adds it: with `corners`, or with `onto`, another layer whose projected quad is sampled every tenth of a second and keyed on the four corners. The pin ignores the composition camera.
+
+`push-in` keys the composition camera onto a layer: the zoom that makes it fill 0.6 of the frame (1.1 to 3), raised until its smallest text reads when it can be, the pan that centres it without the frame leaving the composition, held 1.2 s and, by default, back. A composition without a camera gets one at the defaults. A layer that is off the frame, hidden at that time or larger than the frame gets a text and no operation.
+
 ## Operations
 
 Every change is a list of JSON Patch operations (RFC 6902) on JSON Pointer paths: `add`, `remove`, `replace`, `move`, `test`. For example, animating a layer's opacity:
