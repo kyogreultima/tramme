@@ -495,6 +495,8 @@ export interface ToolResult {
   isError?: boolean;
 }
 
+export { CRITIC_SYSTEM, parseVerdict, type Fix, type Verdict } from './critic.ts';
+
 // ── what a turn costs ────────────────────────────────────────
 /** the tokens of a turn's requests: fresh input, input read from the cache, input written to it (cacheWrite1h: the share kept an hour, priced apart), output */
 export interface Usage { requests: number; input: number; cacheRead: number; cacheWrite: number; cacheWrite1h: number; output: number }
