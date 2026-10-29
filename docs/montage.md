@@ -18,14 +18,14 @@ A clip dropped on another lane changes track. On a magnetic track, a drag lets t
 | Q, W | trim the start, the end of the selected clips to the playhead (ripple on a magnetic track) |
 | Delete | delete; on a magnetic track, close the gap behind |
 | Shift+Delete | delete and close the gap, whatever the track |
-| Ctrl+C, Ctrl+V | copy clips, paste them at the playhead (inserted on a magnetic track, laid over elsewhere) |
+| Ctrl+C, Ctrl+V | copy clips, paste them at the playhead, each on the track it came from (inserted on a magnetic track, laid over elsewhere); copies that were linked stay linked |
 | Ctrl+Alt+V | paste the look (transform, effects, masks, blend, speed) onto the selection |
 | L, Ctrl+Shift+L | link, unlink the selected clips |
 | , and . | insert, lay over the media chosen in the media panel at the playhead |
 | I, O | mark the start, the end of what an export renders |
 | Shift+Z | the whole timeline in view |
 
-With the mouse: **Shift** on the edge of a clip rolls the cut between two shots; **Alt** and drag a clip slips what it shows in its file; **Ctrl+Alt** and drag slides it between its neighbours; **Alt** while dropping media does the other of insert and lay over.
+With the mouse: **Shift** on the edge of a clip rolls the cut between two shots; **Alt** and drag a clip slips what it shows in its file; **Ctrl+Alt** and drag slides it between its neighbours (only a neighbour it touches changes; the track keeps its length); **Alt** while dropping media does the other of insert and lay over.
 
 ## Media
 
