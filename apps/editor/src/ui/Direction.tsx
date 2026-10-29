@@ -9,6 +9,7 @@ import { api } from '../api.ts';
 import { running } from '../ai/conversation.ts';
 import { attachFiles, draft } from '../attachments.ts';
 import { BRIEF_PATH, briefOf, briefOp, parseBrief, type Brief, type BriefInput } from '../brief.ts';
+import { FILM_PLAN_PATH, KIND_LABEL, parsePlan, type FilmPlan } from '../filmplan.ts';
 import { commit, S, toast } from '../state.ts';
 import { sourcesOf, type Source } from '../sources.ts';
 import { studio } from '../studio.ts';
@@ -38,6 +39,7 @@ function BriefField({ label, hint, value, rows, onSave }: { label: string; hint:
 export function Direction() {
   const doc = S.doc.value, project = S.project.value.id, busy = running.value;
   const [brief, setBrief] = useState<Brief | null>(null);
+  const [plan, setPlan] = useState<FilmPlan | null>(null);
   const [sources, setSources] = useState<Source[]>([]);
   const [saved, setSaved] = useState(false);
   const files = useRef<HTMLInputElement>(null);
@@ -45,6 +47,7 @@ export function Direction() {
   useEffect(() => {
     if (busy) return;
     api.readText(project, BRIEF_PATH).then((f) => setBrief(parseBrief(f?.text))).catch(() => setBrief(null));
+    api.readText(project, FILM_PLAN_PATH).then((f) => setPlan(parsePlan(f?.text))).catch(() => setPlan(null));
     api.info(project).then((i) => setSources(sourcesOf(S.doc.peek(), i.files))).catch(() => setSources([]));
   }, [busy, project, doc.assets]);
 
@@ -65,6 +68,18 @@ export function Direction() {
 
   return (
     <div class="direction">
+      {plan && (
+        <section class="dir-section dir-plan">
+          <div class="dir-head"><h4>{t('studio.direction.plan')}</h4></div>
+          {plan.target && <img class="dir-target" src={api.fileUrl(project, plan.target)} alt={t('studio.direction.target')} loading="lazy" />}
+          <p class="dir-idea">{plan.idea}</p>
+          <ul class="dir-scenes">{plan.scenes.map((s) => <li key={s.id}><span>{s.name}</span><span class="dir-kind">{t(KIND_LABEL[s.kind])}</span></li>)}</ul>
+          <div class="dir-actions">
+            <button class="btn sm" onClick={() => prefill(t('studio.direction.otherFramesWords'))}>{t('studio.direction.otherFrames')}</button>
+          </div>
+        </section>
+      )}
+
       <section class="dir-section">
         <div class="dir-head"><h4>{t('studio.direction.brief')}</h4>{saved && <span class="dir-saved"><Icon name="check" />{t('topbar.saved')}</span>}</div>
         <p class="dir-hint">{t('studio.direction.briefHint')}</p>
