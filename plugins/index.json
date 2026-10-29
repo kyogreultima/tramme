@@ -58,13 +58,20 @@
         "name": "walkthrough",
         "title": "Lay out a walkthrough",
         "description": "a sequence of screenshots in a phone or a browser frame, one composition, a cut per screen, each with an optional caption and a slow scroll"
+      },
+      {
+        "name": "device-screen",
+        "title": "Frame for an interface built in layers",
+        "description": "a phone, browser or window frame whose screen holds layers you build: the frame under and over an empty content group that the screen clips"
       }
     ],
     "fr": {
       "Lay out a walkthrough": "Monter une visite guidée",
-      "a sequence of screenshots in a phone or a browser frame, one composition, a cut per screen, each with an optional caption and a slow scroll": "une suite de captures dans un cadre de téléphone ou de navigateur, une composition, une coupe par écran, chacune avec une légende optionnelle et un défilement lent"
+      "a sequence of screenshots in a phone or a browser frame, one composition, a cut per screen, each with an optional caption and a slow scroll": "une suite de captures dans un cadre de téléphone ou de navigateur, une composition, une coupe par écran, chacune avec une légende optionnelle et un défilement lent",
+      "Frame for an interface built in layers": "Cadre pour une interface construite en calques",
+      "a phone, browser or window frame whose screen holds layers you build: the frame under and over an empty content group that the screen clips": "un cadre de téléphone, de navigateur ou de fenêtre dont l'écran porte les calques que vous construisez : le cadre dessous et dessus un groupe de contenu vide que l'écran découpe"
     },
-    "version": "1.1.0"
+    "version": "1.2.0"
   },
   {
     "file": "a11y.js",
