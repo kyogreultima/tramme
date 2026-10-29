@@ -7,52 +7,8 @@
 // enough to hold the whole model whatever its shape.
 
 import { type NodeType, type NodeGL } from '@tramme/core';
-import { parseGltf, sampleChannel, type GltfModel, type GltfNode, type Quat } from './gltf.ts';
-
-// ── a small mat4 kit (column-major, like WebGL) ──────────────
-
-type Mat4 = Float32Array;
-
-const M = (): Mat4 => new Float32Array(16);
-const ident = (m: Mat4): Mat4 => { m.fill(0); m[0] = m[5] = m[10] = m[15] = 1; return m; };
-const mul = (out: Mat4, a: Mat4, b: Mat4): Mat4 => {
-  for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) {
-    out[c * 4 + r] = a[r] * b[c * 4] + a[4 + r] * b[c * 4 + 1] + a[8 + r] * b[c * 4 + 2] + a[12 + r] * b[c * 4 + 3];
-  }
-  return out;
-};
-const trs = (out: Mat4, t: ArrayLike<number>, q: Quat, s: ArrayLike<number>): Mat4 => {
-  const [x, y, z, w] = q, x2 = x + x, y2 = y + y, z2 = z + z;
-  const xx = x * x2, xy = x * y2, xz = x * z2, yy = y * y2, yz = y * z2, zz = z * z2, wx = w * x2, wy = w * y2, wz = w * z2;
-  out[0] = (1 - (yy + zz)) * s[0]; out[1] = (xy + wz) * s[0]; out[2] = (xz - wy) * s[0]; out[3] = 0;
-  out[4] = (xy - wz) * s[1]; out[5] = (1 - (xx + zz)) * s[1]; out[6] = (yz + wx) * s[1]; out[7] = 0;
-  out[8] = (xz + wy) * s[2]; out[9] = (yz - wx) * s[2]; out[10] = (1 - (xx + yy)) * s[2]; out[11] = 0;
-  out[12] = t[0]; out[13] = t[1]; out[14] = t[2]; out[15] = 1;
-  return out;
-};
-const turnY = (out: Mat4, a: number): Mat4 => { ident(out); const c = Math.cos(a), s = Math.sin(a); out[0] = c; out[2] = -s; out[8] = s; out[10] = c; return out; };
-const turnX = (out: Mat4, a: number): Mat4 => { ident(out); const c = Math.cos(a), s = Math.sin(a); out[5] = c; out[6] = s; out[9] = -s; out[10] = c; return out; };
-const move = (out: Mat4, t: ArrayLike<number>): Mat4 => { ident(out); out[12] = t[0]; out[13] = t[1]; out[14] = t[2]; return out; };
-const project = (out: Mat4, fovY: number, aspect: number, near: number, far: number): Mat4 => {
-  const f = 1 / Math.tan(fovY / 2), k = 1 / (near - far);
-  out.fill(0); out[0] = f / aspect; out[5] = f; out[10] = (far + near) * k; out[11] = -1; out[14] = 2 * far * near * k;
-  return out;
-};
-const lookAt = (out: Mat4, eye: number[], at: number[]): Mat4 => {
-  let zx = eye[0] - at[0], zy = eye[1] - at[1], zz = eye[2] - at[2];
-  const zl = Math.hypot(zx, zy, zz) || 1; zx /= zl; zy /= zl; zz /= zl;
-  let xx = zz, xz = -zx; const xy = 0; // up (0,1,0) × z
-  const xl = Math.hypot(xx, xy, xz) || 1; xx /= xl; xz /= xl;
-  const yx = zy * xz - zz * xy, yy = zz * xx - zx * xz, yz = zx * xy - zy * xx;
-  out[0] = xx; out[1] = yx; out[2] = zx; out[3] = 0;
-  out[4] = xy; out[5] = yy; out[6] = zy; out[7] = 0;
-  out[8] = xz; out[9] = yz; out[10] = zz; out[11] = 0;
-  out[12] = -(xx * eye[0] + xy * eye[1] + xz * eye[2]);
-  out[13] = -(yx * eye[0] + yy * eye[1] + yz * eye[2]);
-  out[14] = -(zx * eye[0] + zy * eye[1] + zz * eye[2]);
-  out[15] = 1;
-  return out;
-};
+import { parseGltf, sampleChannel, type GltfModel, type GltfNode } from './gltf.ts';
+import { M, ident, mul, trs, turnY, turnX, move, project, lookAt, uploadMesh, envTexture, rgbOf, setLit, LIT_FRAG, LIT_VERT, type Mat4, type Upload } from './gl3d.ts';
 
 // ── the parsed files and their uploads ───────────────────────
 
@@ -60,7 +16,7 @@ const lookAt = (out: Mat4, eye: number[], at: number[]): Mat4 => {
 const models = new Map<string, GltfModel>();
 const modelUrls = new Map<string, string>();
 /** uploaded meshes, keyed by asset id; made again when the context is new */
-interface Uploads { gl: WebGL2RenderingContext; prims: { vao: WebGLVertexArrayObject; count: number; color: number[] }[] }
+interface Uploads { gl: WebGL2RenderingContext; prims: (Upload & { color: number[] })[] }
 const uploads = new Map<string, Uploads>();
 
 const FOV = 35 * Math.PI / 180;
@@ -117,6 +73,7 @@ export const model: NodeType = {
     pitch: { type: 'number', default: 0, min: -89, max: 89, step: 1, unit: 'deg', label: 'Pitch' },
     explode: { type: 'number', default: 0, min: 0, max: 1, step: 0.01, label: 'Explode', description: 'the parts drift away from the centre' },
     light: { type: 'enum', default: 'studio', options: ['studio', 'sun', 'flat'], animatable: false, label: 'Light' },
+    env: { type: 'asset', default: null, nullable: true, assetType: 'image', animatable: false, label: 'Environment', description: 'an equirectangular picture that lights the model by reflection; empty: the light above' },
   },
   async load(p, host) {
     if (!p.source) return;
@@ -142,7 +99,9 @@ export const model: NodeType = {
       gl.clearColor(0, 0, 0, 0);
       gl.enable(gl.DEPTH_TEST);
       gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-      const prog = g.program(FRAG, VERT);
+      let env: { tex: WebGLTexture; lod: number } | null = null;
+      if (p.env) { try { env = envTexture(gl, host.asset<TexImageSource & object>(p.env)); } catch { env = null; } }
+      const prog = env ? g.program(LIT_FRAG, LIT_VERT) : g.program(FRAG, VERT);
       gl.useProgram(prog);
       let up = uploads.get(p.source);
       if (!up || up.gl !== gl) { up = { gl, prims: [] }; upload(m.roots, gl, up); uploads.set(p.source, up); }
@@ -150,7 +109,8 @@ export const model: NodeType = {
       gl.uniformMatrix4fv(gl.getUniformLocation(prog, 'uProj'), false, project(M(), FOV, aspect, m.radius / 32, m.radius * 8));
       const dist = m.radius / Math.sin(FOV / 2) * 1.06;
       gl.uniformMatrix4fv(gl.getUniformLocation(prog, 'uView'), false, lookAt(M(), [m.center[0], m.center[1], m.center[2] + dist], [m.center[0], m.center[1], m.center[2]]));
-      gl.uniform1i(gl.getUniformLocation(prog, 'uLight'), p.light === 'sun' ? 1 : p.light === 'flat' ? 2 : 0);
+      if (env) setLit(g, prog, { mat: 1, roughness: 0.4, eye: [m.center[0], m.center[1], m.center[2] + dist], env, top: rgbOf('#DDE6F5'), bottom: rgbOf('#1B2230') });
+      else gl.uniform1i(gl.getUniformLocation(prog, 'uLight'), p.light === 'sun' ? 1 : p.light === 'flat' ? 2 : 0);
       const uModel = gl.getUniformLocation(prog, 'uModel'), uColor = gl.getUniformLocation(prog, 'uColor');
       const ta = host.t - (host.layerIn ?? 0);
       const at = m.duration > 0 ? ta - Math.floor(ta / m.duration) * m.duration : 0;
@@ -182,30 +142,12 @@ export const model: NodeType = {
   },
 };
 
-/** one buffer per primitive, attribute 0 the positions, 1 the normals (or up) */
+/** one upload per primitive, in the order the walk meets them */
 function upload(roots: GltfNode[], gl: WebGL2RenderingContext, up: Uploads) {
   const walk = (n: GltfNode) => {
-    for (const prim of n.prims) {
-      const vao = gl.createVertexArray()!;
-      gl.bindVertexArray(vao);
-      gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer()!);
-      gl.bufferData(gl.ARRAY_BUFFER, prim.positions, gl.STATIC_DRAW);
-      gl.enableVertexAttribArray(0);
-      gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
-      if (prim.normals) {
-        gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer()!);
-        gl.bufferData(gl.ARRAY_BUFFER, prim.normals, gl.STATIC_DRAW);
-        gl.enableVertexAttribArray(1);
-        gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 0, 0);
-      } else {
-        gl.disableVertexAttribArray(1);
-        gl.vertexAttrib3f(1, 0, 1, 0);
-      }
-      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, gl.createBuffer()!);
-      gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, prim.indices, gl.STATIC_DRAW);
-      up.prims.push({ vao, count: prim.indices.length, color: prim.color });
-    }
+    for (const prim of n.prims) up.prims.push({ ...uploadMesh(gl, prim), color: prim.color });
     n.children.forEach(walk);
   };
   roots.forEach(walk);
+  gl.bindVertexArray(null);
 }
