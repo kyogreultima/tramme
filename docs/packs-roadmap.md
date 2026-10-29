@@ -2,7 +2,7 @@
 
 The general-purpose plugin packs that ship with the editor (`plugins/*.js`, listed in `plugins/index.json`, added to a project from the Code section): the ones to come, and what Tramme needs first so they can exist. A pack is an ordinary plugin. It gives the assistant and the editor a new vocabulary — what they can build in one move, what they can check — for any film, never for one video.
 
-Status: steps 0 to 17 are shipped (step 17 without its text, waiting on decision 4) (step 5 keeps its real recordings to check on a device; step 7 keeps its set of 300 emoji to confirm on a device). Shipped packs: charts, kinetic type, physics, stick figures, icons, diagrams, UI walkthrough, accessibility checks, localization ([plugins-roadmap.md](plugins-roadmap.md), step 10). The packs after step 0 are taken in order, each one landing whole. The decisions still open are listed at the end. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
+Status: steps 0 to 17 are shipped (step 17 without its text, waiting on decision 4) (step 5 keeps its real recordings to check on a device; step 7 keeps its set of 300 emoji to confirm on a device). Shipped packs: charts, kinetic type, physics, stick figures, icons, diagrams, UI walkthrough, interface pieces, accessibility checks, localization ([plugins-roadmap.md](plugins-roadmap.md), step 10). The packs after step 0 are taken in order, each one landing whole. The decisions still open are listed at the end. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
 
 ## Why
 
@@ -222,6 +222,16 @@ Done when: the QR of an end card scans from a phone off the exported video (to c
   The tool takes a group of path layers (what svg-paths makes) or one path, reads the holes by even-odd nesting, writes one primitive per colour, and hides the flat logo it came from. To check on a device: the .glb opened in a second glTF viewer, and the bevel under the studio light on a real logo.
 
 Done when: a logo given as an SVG turns on a turntable under the studio light, and its `.glb` opens in any glTF viewer.
+
+### Step 18. Interface pieces (`interface.js`)
+
+- [x] Ten nodes, in a light and a dark palette sized from their width (an 8 pt grid scaled): `ui.row`, `ui.plan`, `ui.cart`, `ui.ring`, `ui.bar`, `ui.badge`, `ui.toast`, `ui.toggle`, `ui.button`, `ui.table`. Their text goes through the engine, so it stays editable.
+- [x] The `screen` tool: it reads the size of the screen `device-screen` made (the walkthrough pack), stacks the pieces from its top with their entrances, gives the screen the theme's colour, and leaves out what does not fit, saying how many and the height they needed.
+- [x] Tests: the pieces at both themes and both ends of their scale, the stacking, the money in two languages, the screen on a phone, what is left out.
+
+  The toast carries ten Lucide glyphs of its own (a pack cannot read another pack's data); any other pictogram is a layer of the Icons pack beside it.
+
+Done when: a phone screen of a to-do list, a plan card and a cart is three calls, in either theme, and reads at 1080 × 1920.
 
 ## Decisions
 

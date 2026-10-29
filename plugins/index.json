@@ -628,5 +628,79 @@
         "line": "a logo or an icon that turns in 3D for an opening or an end card"
       }
     ]
+  },
+  {
+    "file": "interface.js",
+    "name": "Interface",
+    "description": "Rows, plan cards, a cart, rings, bars, badges, toasts, toggles, buttons and tables in a light or a dark palette, and a tool that fills a device screen with them",
+    "version": "1.0.0",
+    "commands": [
+      {
+        "name": "screen",
+        "title": "Fill a screen with pieces",
+        "description": "rows, plan cards, a cart, rings, bars, badges, toasts, toggles, buttons and tables stacked from the top of the screen device-screen made, each sized from that screen and entering in turn"
+      }
+    ],
+    "entries": [
+      {
+        "name": "ui.row",
+        "kind": "node",
+        "line": "a to-do row with a checkbox, a setting, a list entry with a figure on its right"
+      },
+      {
+        "name": "ui.plan",
+        "kind": "node",
+        "line": "a price or plan card"
+      },
+      {
+        "name": "ui.cart",
+        "kind": "node",
+        "line": "a cart or an order summary"
+      },
+      {
+        "name": "ui.ring",
+        "kind": "node",
+        "line": "a level, a score or a goal as a ring that fills"
+      },
+      {
+        "name": "ui.bar",
+        "kind": "node",
+        "line": "a progress or an XP bar"
+      },
+      {
+        "name": "ui.badge",
+        "kind": "node",
+        "line": "a small status or count"
+      },
+      {
+        "name": "ui.toast",
+        "kind": "node",
+        "line": "a notification that slides in over a screen"
+      },
+      {
+        "name": "ui.toggle",
+        "kind": "node",
+        "line": "a setting with a switch"
+      },
+      {
+        "name": "ui.button",
+        "kind": "node",
+        "line": "a call to action or a form button in one of its states"
+      },
+      {
+        "name": "ui.table",
+        "kind": "node",
+        "line": "a list of people or items with an avatar, a name and a figure"
+      },
+      {
+        "name": "screen",
+        "kind": "tool",
+        "line": "an interface built in layers in a phone or a browser, after device-screen"
+      }
+    ],
+    "fr": {
+      "Fill a screen with pieces": "Remplir un écran de pièces",
+      "rows, plan cards, a cart, rings, bars, badges, toasts, toggles, buttons and tables stacked from the top of the screen device-screen made, each sized from that screen and entering in turn": "des lignes, cartes d'offre, un panier, anneaux, barres, pastilles, notifications, interrupteurs, boutons et tableaux empilés depuis le haut de l'écran fait par device-screen, chacun dimensionné d'après cet écran et entrant à son tour"
+    }
   }
 ]

@@ -46,11 +46,13 @@ import * as matter from '../../../plugins/matter.js';
 import * as print from '../../../plugins/print.js';
 import * as qr from '../../../plugins/qr.js';
 import * as extrude from '../../../plugins/extrude.js';
+import * as iface from '../../../plugins/interface.js';
+import { layoutPieces, insetOf } from '../../../plugins/interface.js';
 import { parseGltf } from '../../../packages/nodes/src/gltf.ts';
 import { stepWorld } from '../../../plugins/physics.js';
 
 // the packs are JavaScript on purpose: their shape is checked at runtime by Registry.use, which these tests run
-const PACKS = [charts, kinetic, a11y, physics, styk, icons, diagram, walkthrough, localize, codeview, rhythm, screencast, handmade, chat, emoji, maps, audiogram, math, matter, print, qr, extrude] as unknown as import('@tramme/core').PluginModule[];
+const PACKS = [charts, kinetic, a11y, physics, styk, icons, diagram, walkthrough, localize, codeview, rhythm, screencast, handmade, chat, emoji, maps, audiogram, math, matter, print, qr, extrude, iface] as unknown as import('@tramme/core').PluginModule[];
 
 /** the shipped index, as the script writes it: each entry's commands and their French */
 const INDEX: { file: string; name: string; description?: string; commands?: { name: string; title: string; description: string }[]; fr?: Record<string, string> }[] =
@@ -1970,6 +1972,155 @@ describe('the device frame around built layers', () => {
     expect(out.text).toContain('Phone · content');
     expect(out.text).toMatch(/centre/);
     expect(comp.order).toContain(Object.entries(comp.layers).find(([, l]) => l === group)![0]);
+  });
+});
+
+describe('interface pieces', () => {
+  const node = (type: string) => iface.nodes.find((n) => n.type === type)!;
+  /** a node's props at their defaults, then the given ones */
+  const propsOf = (type: string, extra: Record<string, unknown> = {}) => ({ ...Object.fromEntries(Object.entries(node(type).props).map(([k, d]) => [k, (d as { default: unknown }).default])), ...extra });
+  // the engine's host throws for an id the document does not hold, as `assetInfo` and `asset` do in the editor and the CLI
+  const host = { t: 0, layerIn: 0, asset: (id: string) => { throw new Error(`unknown asset: ${id}`); }, assetInfo: (id: string) => { throw new Error(`unknown asset: ${id}`); } } as never;
+  /** what a node writes, and the calls it makes */
+  function draw(type: string, extra: Record<string, unknown> = {}) {
+    const ctx = recorder() as CanvasRenderingContext2D & { calls: string[] };
+    const texts: string[] = [];
+    (ctx as unknown as Record<string, unknown>).fillText = (s: unknown) => { texts.push(String(s)); };
+    node(type).render.canvas2d!(ctx, propsOf(type, extra) as never, host);
+    return { calls: ctx.calls, texts };
+  }
+  const phone = async (comp = { width: 1080, height: 1920 }) => {
+    const { doc } = newProject({ name: 'T', ...comp, fps: 30, duration: 6 });
+    const out = await runTool(walkthrough.tools[1], doc, { device: 'phone', name: 'Phone' });
+    const next = applyOps(doc, out.ops as never).doc;
+    const layers = next.compositions[doc.root].layers;
+    const content = Object.entries(layers).find(([, l]) => l.name === 'Phone · content')![0];
+    return { doc: next, content, layers };
+  };
+  const screenTool = iface.tools.find((t) => t.name === 'screen')!;
+
+  it('has the ten pieces and the screen tool', () => {
+    expect(iface.nodes.map((n) => n.type)).toEqual(['ui.row', 'ui.plan', 'ui.cart', 'ui.ring', 'ui.bar', 'ui.badge', 'ui.toast', 'ui.toggle', 'ui.button', 'ui.table']);
+    for (const n of iface.nodes) for (const k of ['theme', 'accent', 'font', 'width', 'scale']) expect(n.props, `${n.type} ${k}`).toHaveProperty(k);
+  });
+
+  it('every piece draws at both themes, at both ends of its scale, without throwing', () => {
+    for (const n of iface.nodes) for (const theme of ['light', 'dark']) for (const scale of [0.5, 2]) {
+      const { calls } = draw(n.type, { theme, scale });
+      expect(calls.length, `${n.type} ${theme} ${scale}`).toBeGreaterThan(2);
+    }
+  });
+
+  it('light and dark are two palettes, not one inverted', () => {
+    const fills = (theme: string) => draw('ui.row', { theme }).calls.filter((c) => c.startsWith('fill(')).length;
+    expect(fills('light')).toBe(fills('dark'));
+    const colours = (theme: string) => { const ctx = recorder(); const seen: string[] = []; const proxy = new Proxy(ctx, { set: (t, k, v) => { if (k === 'fillStyle') seen.push(String(v)); return Reflect.set(t, k, v); } }); node('ui.row').render.canvas2d!(proxy, propsOf('ui.row', { theme }) as never, host); return seen; };
+    expect(colours('light')).not.toEqual(colours('dark'));
+    expect(colours('dark')).toContain(iface.PALETTE.dark.text);
+    expect(iface.PALETTE.dark.text).not.toBe(iface.PALETTE.light.text);
+    expect(iface.PALETTE.dark.surface).not.toBe(iface.PALETTE.light.surface);
+  });
+
+  it('a row that is done draws its check mark; one that is not draws none', () => {
+    const ticks = (done: boolean, check = 'box') => draw('ui.row', { done, check }).calls.filter((c) => c.startsWith('lineTo(')).length;
+    expect(ticks(true)).toBeGreaterThan(ticks(false));
+    expect(ticks(true, 'circle')).toBeGreaterThan(ticks(false, 'circle'));
+    expect(ticks(true, 'none')).toBe(ticks(false, 'none'));
+  });
+
+  it('the height of a plan grows with its features, for the same width', () => {
+    const h = (n: number) => node('ui.plan').bounds!(propsOf('ui.plan', { features: Array.from({ length: n }, (_, i) => `feature ${i}`) }) as never)!.h;
+    expect(h(5)).toBeGreaterThan(h(2));
+    expect(h(2)).toBeGreaterThan(h(0));
+    // the box is as wide as the piece, hung from its top edge so a stack of them does not overlap
+    expect(node('ui.plan').bounds!(propsOf('ui.plan', { width: 600 }) as never)).toMatchObject({ x: -300, y: 0, w: 600 });
+  });
+
+  it('a cart without a total shows the sum of quantity by price, formatted for its language', () => {
+    const items = [{ name: 'Mug', qty: 2, price: 30 }, { name: 'Tote', qty: 1, price: 60 }];
+    const flat = (s: string[]) => s.map((t) => t.replace(/\s/g, ' '));
+    expect(flat(draw('ui.cart', { items, currency: 'EUR', locale: 'fr', total: 0 }).texts)).toContain('120 €');
+    expect(draw('ui.cart', { items, currency: 'EUR', locale: 'en', total: 0 }).texts).toContain('€120');
+    // a total that is given wins over the sum, and a discount comes off the computed one
+    expect(draw('ui.cart', { items, currency: 'EUR', locale: 'en', total: 99 }).texts).toContain('€99');
+    expect(draw('ui.cart', { items, currency: 'EUR', locale: 'en', total: 0, discount: 20 }).texts).toContain('€100');
+  });
+
+  it('a ring and a bar draw more of themselves as their value grows', () => {
+    const arcOf = (value: number) => draw('ui.ring', { value }).calls.filter((c) => c.startsWith('arc(')).length;
+    expect(arcOf(0.5)).toBeGreaterThanOrEqual(2);
+    // the track and the fill are the two rounded rectangles: the fill is the narrower
+    const fillW = (value: number) => Math.min(...draw('ui.bar', { value, width: 340 }).calls.filter((c) => c.startsWith('roundRect(')).map((c) => Number(c.split(',')[2])));
+    expect(fillW(0.9)).toBeGreaterThan(fillW(0.3));
+    expect(fillW(0.5)).toBeLessThan(340);
+    // the track is the same whatever the value: only the fill changes
+    expect(draw('ui.bar', { value: 0.2 }).calls.length).toBe(draw('ui.bar', { value: 0.9 }).calls.length);
+  });
+
+  it('stacks pieces from the top with the gap between them', () => {
+    const heights = [80, 120, 60];
+    const rows = layoutPieces(heights.map(() => ({ piece: 'row', props: {} })), 300, 16, (_p, i) => heights[i]);
+    expect(rows.map((r) => r.y)).toEqual([0, 96, 232]);
+    expect(rows.map((r) => r.h)).toEqual(heights);
+    // with the pieces' own heights: each starts where the one before ends, plus the gap
+    const real = layoutPieces([{ piece: 'plan', props: {} }, { piece: 'row', props: {} }, { piece: 'button', props: {} }], 600, 24);
+    expect(real[0].y).toBe(0);
+    expect(real[1].y).toBeCloseTo(real[0].h + 24, 6);
+    expect(real[2].y).toBeCloseTo(real[1].y + real[1].h + 24, 6);
+    expect(real[0].h).toBe(node('ui.plan').bounds!(propsOf('ui.plan', { width: 600 }) as never)!.h);
+  });
+
+  it('screen lays one layer per piece in the content group device-screen made, as wide as the screen less two insets', async () => {
+    const { doc, content, layers } = await phone();
+    const s = walkthrough.screenOf({ size: [Math.round(Math.round(1920 * 0.86) * 0.5), Math.round(1920 * 0.86)], device: 'phone' });
+    const out = await runTool(screenTool, doc, { into: content, pieces: [{ piece: 'row', props: { text: 'Buy milk' } }, { piece: 'plan' }, { piece: 'button', props: { label: 'Pay' } }] });
+    const after = applyOps(doc, out.ops as never).doc.compositions[doc.root].layers;
+    const added = (after[content].children ?? []).filter((id) => !(layers[content].children ?? []).includes(id)).map((id) => after[id]);
+    expect(added.map((l) => l.type)).toEqual(['ui.row', 'ui.plan', 'ui.button']);
+    for (const l of added) expect((l.props!.width as number)).toBe(Math.round(s.w) - 2 * insetOf(s.w));
+    expect((added[0].props as Record<string, unknown>).text).toBe('Buy milk');
+    // they enter one after the other, and nothing starts before the screen does
+    const ins = added.map((l) => l.in ?? 0);
+    expect(ins[1]).toBeGreaterThan(ins[0]);
+    expect(ins[2]).toBeGreaterThan(ins[1]);
+    expect(out.text).toContain('3 piece');
+  });
+
+  it('screen gives the screen the colour of its theme, and a title first', async () => {
+    const { doc, content, layers } = await phone();
+    const under = Object.entries(layers).find(([, l]) => l.type === 'ui.device' && (l.props as Record<string, unknown>).part === 'under')![0];
+    const out = await runTool(screenTool, doc, { into: content, theme: 'dark', title: 'Your cart', pieces: [{ piece: 'badge', props: { text: 'New' } }] });
+    expect(out.ops).toContainEqual(expect.objectContaining({ path: `/compositions/${doc.root}/layers/${under}/props/fill`, value: iface.PALETTE.dark.bg }));
+    const after = applyOps(doc, out.ops as never).doc.compositions[doc.root].layers;
+    const kids = (after[content].children ?? []).map((id) => after[id]);
+    expect(kids.map((l) => l.type)).toEqual(['text', 'ui.badge']);
+    expect((kids[1].props as Record<string, unknown>).theme).toBe('dark');
+    // the badge sits under the title, not on it
+    const y = (l: { transform?: { position?: unknown } }) => { const p = l.transform!.position as { $k?: { v: number[] }[] } | number[]; return Array.isArray(p) ? p[1] : p.$k!.at(-1)!.v[1]; };
+    expect(y(kids[1])).toBeGreaterThan(y(kids[0]));
+  });
+
+  it('screen leaves out the pieces that do not fit, saying how many and the height they needed', async () => {
+    const { doc, content, layers } = await phone();
+    const out = await runTool(screenTool, doc, { into: content, pieces: Array.from({ length: 14 }, () => ({ piece: 'plan' })) });
+    const after = applyOps(doc, out.ops as never).doc.compositions[doc.root].layers;
+    const kept = (after[content].children ?? []).length - (layers[content].children ?? []).length;
+    expect(kept).toBeGreaterThan(0);
+    expect(kept).toBeLessThan(14);
+    expect(out.text).toContain(`${14 - kept} of 14 pieces left out`);
+    expect(out.text).toMatch(/need \d+ px/);
+  });
+
+  it('screen names the group when it is not a content group', async () => {
+    const { doc } = await phone();
+    const plain = { ...doc, compositions: { ...doc.compositions, [doc.root]: { ...doc.compositions[doc.root], layers: { ...doc.compositions[doc.root].layers, plain: { type: 'group', name: 'Plain', children: [] } } } } } as TrammeDoc;
+    await expect(screenTool.run({ into: 'plain', pieces: [{ piece: 'row' }] } as never, { doc: plain, compId: plain.root, registry: registryOf() } as never)).rejects.toThrow(/plain/);
+    await expect(screenTool.run({ into: 'nowhere', pieces: [{ piece: 'row' }] } as never, { doc: plain, compId: plain.root, registry: registryOf() } as never)).rejects.toThrow(/nowhere/);
+  });
+
+  it('the pack\'s index lines exist', () => {
+    const entry = INDEX.find((e) => e.file === 'interface.js') as unknown as { entries: { name: string; kind: string }[] };
+    expect(entry.entries.map((e) => e.name)).toEqual([...iface.nodes.map((n) => n.type), 'screen']);
   });
 });
 
