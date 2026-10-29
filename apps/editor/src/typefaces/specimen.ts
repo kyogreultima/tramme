@@ -12,6 +12,9 @@ export interface SpecimenLine { text: string; font: string; size: number; y: num
 export interface SpecimenCell { id: string; label: string; x: number; y: number; w: number; h: number; lines: SpecimenLine[] }
 export interface SpecimenPlan { w: number; h: number; cells: SpecimenCell[] }
 
+/** the id of the cell holding the picture the families are matched against */
+export const TARGET_CELL = 'target';
+
 const PAD = 24, GAP = 16, INSET = 20, CELL_H = 250, MAX_CELLS = 6;
 const LARGE = 64, READING = 22, FIGURES = 26, LABEL = 14;
 const SAMPLE = 'Aa Gg Rr 24', READING_SAMPLE = 'Quick brown fox jumps over the lazy dog', FIGURES_SAMPLE = '0123456789 · 40 € · 12,50 %';
@@ -27,18 +30,21 @@ const clip = (text: string, size: number, width: number) => {
 
 const face = (f: Typeface, weight: number, size: number) => `${weight} ${size}px "${f.family}", sans-serif`;
 
-export function specimenPlan(fonts: Typeface[], opts: { text?: string; width?: number }): SpecimenPlan {
-  const shown = fonts.slice(0, MAX_CELLS);
+export function specimenPlan(fonts: Typeface[], opts: { text?: string; width?: number; target?: boolean }): SpecimenPlan {
+  const before = opts.target ? 1 : 0;
+  const shown = fonts.slice(0, MAX_CELLS - before);
   const w = opts.width ?? 1200;
   const cellW = Math.floor((w - 2 * PAD - GAP) / 2);
   const inner = cellW - 2 * INSET;
   const text = opts.text?.trim();
-  const rows = Math.ceil(shown.length / 2);
-  const cells = shown.map((f, i): SpecimenCell => {
+  const rows = Math.ceil((shown.length + before) / 2);
+  const place = (i: number) => ({ x: PAD + (i % 2) * (cellW + GAP), y: PAD + Math.floor(i / 2) * (CELL_H + GAP), w: cellW, h: CELL_H });
+  const cells = shown.map((f, k): SpecimenCell => {
+    const i = k + before;
     const display = defaultWeights(f, 'display')[0], regular = defaultWeights(f, 'text')[0];
     return {
       id: f.id, label: f.family,
-      x: PAD + (i % 2) * (cellW + GAP), y: PAD + Math.floor(i / 2) * (CELL_H + GAP), w: cellW, h: CELL_H,
+      ...place(i),
       lines: [
         { text: f.family, font: `500 ${LABEL}px sans-serif`, size: LABEL, y: 16 },
         { text: clip(text ?? SAMPLE, LARGE, inner), font: face(f, display, LARGE), size: LARGE, y: 44 },
@@ -47,6 +53,7 @@ export function specimenPlan(fonts: Typeface[], opts: { text?: string; width?: n
       ],
     };
   });
+  if (opts.target) cells.unshift({ id: TARGET_CELL, label: 'target', ...place(0), lines: [] });
   return { w, h: rows ? 2 * PAD + rows * CELL_H + (rows - 1) * GAP : 0, cells };
 }
 
@@ -61,11 +68,11 @@ async function load(f: Typeface, subset: string): Promise<void> {
 }
 
 /** the sheet as a JPEG data URL, and the families whose files could not be loaded (their cell says so) */
-export async function specimenSheet(fonts: Typeface[], opts: { text?: string }): Promise<{ url: string; failed: string[] }> {
-  const plan = specimenPlan(fonts, opts);
+export async function specimenSheet(fonts: Typeface[], opts: { text?: string; target?: ImageBitmap }): Promise<{ url: string; failed: string[] }> {
+  const plan = specimenPlan(fonts, { text: opts.text, target: !!opts.target });
   const subset = scriptsOf(opts.text ?? '').find((s) => s !== 'latin') ?? 'latin';
   const missing = new Set<string>();
-  await Promise.all(plan.cells.map((cell) => load(fonts.find((f) => f.id === cell.id)!, subset).catch(() => { missing.add(cell.id); })));
+  await Promise.all(plan.cells.filter((cell) => cell.id !== TARGET_CELL).map((cell) => load(fonts.find((f) => f.id === cell.id)!, subset).catch(() => { missing.add(cell.id); })));
   // loaded on first use: the sheet is the only thing here that needs the browser's canvas
   const { canvas } = await import('../perception.ts');
   const { c, g } = canvas(plan.w, Math.max(plan.h, 1));
@@ -73,6 +80,17 @@ export async function specimenSheet(fonts: Typeface[], opts: { text?: string }):
   g.textBaseline = 'top';
   for (const cell of plan.cells) {
     g.fillStyle = '#161c21'; g.fillRect(cell.x, cell.y, cell.w, cell.h);
+    if (cell.id === TARGET_CELL && opts.target) {
+      // the picture scaled to cover its cell, with its label in a corner
+      const k = Math.max(cell.w / opts.target.width, cell.h / opts.target.height), w = opts.target.width * k, h = opts.target.height * k;
+      g.save(); g.beginPath(); g.rect(cell.x, cell.y, cell.w, cell.h); g.clip();
+      g.drawImage(opts.target, cell.x + (cell.w - w) / 2, cell.y + (cell.h - h) / 2, w, h);
+      g.restore();
+      g.font = `500 ${LABEL}px sans-serif`;
+      g.fillStyle = 'rgba(0,0,0,0.7)'; g.fillRect(cell.x + 8, cell.y + 8, g.measureText(cell.label).width + 16, LABEL + 10);
+      g.fillStyle = '#ffffff'; g.fillText(cell.label, cell.x + 16, cell.y + 13);
+      continue;
+    }
     const failed = missing.has(cell.id);
     cell.lines.forEach((line, i) => {
       if (failed && i > 0) return;

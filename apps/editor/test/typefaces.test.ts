@@ -299,6 +299,18 @@ describe('the specimen sheet plan', () => {
     expect(none.h).toBe(0);
   });
 
+  it('puts the target in the first cell, the families after it, five at most', () => {
+    const plan = specimenPlan(three, { target: true });
+    expect(plan.cells).toHaveLength(4);
+    expect(plan.cells[0]).toMatchObject({ id: 'target', label: 'target', lines: [] });
+    expect(plan.cells.slice(1).map((c) => c.id)).toEqual(['bebas-neue', 'inter', 'lora']);
+    expect(plan.cells[1].x).toBeGreaterThan(plan.cells[0].x);
+    expect(plan.cells[2].y).toBeGreaterThan(plan.cells[0].y);
+    expect(specimenPlan(catalogue.fonts.slice(0, 7), { target: true }).cells).toHaveLength(6);
+    expect(specimenPlan([], { target: true }).cells.map((c) => c.id)).toEqual(['target']);
+    expect(specimenPlan(three, {})).toEqual(specimenPlan(three, { target: false }));
+  });
+
   it('uses the text it is given for the samples', () => {
     const cell = specimenPlan([font('inter')], { text: 'Évasion' }).cells[0];
     expect(cell.lines[1].text).toBe('Évasion');
@@ -315,7 +327,7 @@ describe('the typeface tools', () => {
   function world() {
     const files = new Map<string, Blob | string>();
     const ctxOf = (doc: TrammeDoc): ToolContext => ({
-      doc, compId: doc.root, time: 0, selection: [], registry: reg,
+      doc, compId: doc.root, time: 0, selection: [], registry: reg, fileUrl: (path: string) => `/files/${path}`,
       writeFile: async (path: string, data: Blob | string) => { files.set(path, data); return path; },
       readText: async (path: string) => { const v = files.get(path); return typeof v === 'string' ? v : null; },
     } as unknown as ToolContext);
@@ -350,6 +362,22 @@ describe('the typeface tools', () => {
     expect(out.images).toHaveLength(1);
     expect(out.images![0].url).toMatch(/^data:image\/jpeg/);
     expect(out.ops).toBeUndefined();
+  });
+
+  it('typefaces sets the style frame beside the families when it is given one to compare', async () => {
+    vi.stubGlobal('window', { matchMedia: () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} }), addEventListener: () => {} });
+    vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => {}, removeItem: () => {} });
+    vi.stubGlobal('addEventListener', () => {});
+    vi.stubGlobal('createImageBitmap', async () => ({ width: 1600, height: 900, close() {} }));
+    try {
+      const out = await world().run(project(), 'typefaces', { query: 'condensed heavy titles', count: 6, compare: 'assets/frames/the-app-ink.jpg' });
+      expect(asked).toContain('/files/assets/frames/the-app-ink.jpg');
+      expect(out.text).toMatch(/The first cell is the target: pick the family whose lettering is closest to it/);
+      expect([...out.text!.matchAll(/^- ([a-z0-9-]+) /gm)]).toHaveLength(5);
+      expect(out.images).toHaveLength(1);
+      refused = ['frames/missing.jpg'];
+      await expect(world().run(project(), 'typefaces', { query: 'serif', compare: 'assets/frames/missing.jpg' })).rejects.toThrow(/assets\/frames\/missing\.jpg/);
+    } finally { vi.unstubAllGlobals(); }
   });
 
   it('typefaces says which words it did not know and still lists families', async () => {

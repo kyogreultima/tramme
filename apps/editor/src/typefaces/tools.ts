@@ -29,7 +29,7 @@ function describe(f: Typeface): string {
   ].join(' · ');
 }
 
-const typefaces: ToolType<{ query: string; text?: string; category?: string; count?: number }> = {
+const typefaces: ToolType<{ query: string; text?: string; category?: string; count?: number; compare?: string }> = {
   name: 'typefaces', title: 'Typefaces', description: 'looks for open typefaces by character ("condensed grotesque, heavy, for titles"), lists the families found and shows them on a specimen sheet set in their own letters',
   input: {
     type: 'object',
@@ -37,7 +37,8 @@ const typefaces: ToolType<{ query: string; text?: string; category?: string; cou
       query: { type: 'string', title: 'Character', description: 'two or three words: the shape (condensed, serif, slab, mono, rounded, handwritten), the weight (heavy, light), the feel (elegant, playful, techno, editorial, friendly, neutral), the use (titles, body, ui, quote, numbers)' },
       text: { type: 'string', title: 'Text', description: 'the words that will be set in it, so only families whose letters cover them come back (accents, Cyrillic, Greek, Arabic, Hebrew, Japanese…)' },
       category: { type: 'string', title: 'Kind', description: 'keep to one kind: sans-serif, serif, display, monospace or handwriting' },
-      count: { type: 'integer', title: 'How many', description: 'families to show, 1 to 6 (4 by default)', minimum: 1, maximum: 6 },
+      count: { type: 'integer', title: 'How many', description: 'families to show, 1 to 6 (4 by default; 5 at most beside a picture to compare)', minimum: 1, maximum: 6 },
+      compare: { type: 'string', title: 'Compare with', description: 'a picture whose lettering the family should match: an image asset, a style frame of the film (assets/frames/...) or "frame" for a still of the composition; it is drawn in the first cell of the sheet' },
     },
     required: ['query'],
   },
@@ -45,9 +46,11 @@ const typefaces: ToolType<{ query: string; text?: string; category?: string; cou
     when: 'when a film has no typeface yet, or the user asks for a style of lettering, before the first title is built; look at the sheet, then bring the one or two families chosen in with typeface-use',
     avoid: 'choosing a family by its name alone; leaving the system font; more than two families in one film',
   },
-  async run(a) {
+  async run(a, ctx) {
     const catalogue = await loadCatalogue();
-    const count = Math.max(1, Math.min(Math.round(a.count ?? 4), 6));
+    // loaded on first use: the picture to match is read by the pictures' own reader
+    const target = a.compare ? await (await import('../images.ts')).bitmapOf(ctx, a.compare, ctx.time) : undefined;
+    const count = Math.max(1, Math.min(Math.round(a.count ?? 4), target ? 5 : 6));
     const found = searchTypefaces(catalogue, a.query, { text: a.text, category: a.category as Typeface['category'] | undefined, count });
     if (!found.found.length) {
       const need = scriptsOf(a.text ?? '');
@@ -59,8 +62,9 @@ const typefaces: ToolType<{ query: string; text?: string; category?: string; cou
     lines.push(...found.found.map((x) => describe(x.font)));
     const fonts = found.found.map((x) => x.font);
     try {
-      const sheet = await specimenSheet(fonts, { text: a.text });
+      const sheet = await specimenSheet(fonts, { text: a.text, target });
       if (sheet.failed.length) lines.push(`could not load: ${sheet.failed.join(', ')}`);
+      if (target) lines.push('The first cell is the target: pick the family whose lettering is closest to it (width, weight, contrast, the shape of a, g, R).');
       lines.push('Look at the sheet, choose one or two (a display face for titles, a text face for the rest), then bring them in with typeface-use.');
       return { text: lines.join('\n'), images: [{ url: sheet.url, caption: t('typefaces.sheet') }] };
     } catch (e) {
