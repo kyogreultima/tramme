@@ -25,6 +25,27 @@ describe('placing a clip from the media on a track', () => {
     expect(c.layers[r.id].props!.muted).toBe(true);
   });
 
+  it('puts the sound on a track nothing else plays on, never over a music bed', () => {
+    const c0 = seq();
+    c0.layers.bed = { type: 'audio', track: 'A1', in: 0, out: 10, props: { audio: 'bed' } }; c0.order.push('bed');
+    const d = docOf(c0), r = placeClipOps(d, 'main', 'x', { layer: video, withSound: true }, 3, 'V1', 'insert')!, c = applyOps(d, r.ops).doc.compositions.main;
+    const sound = Object.values(c.layers).find((l) => l.type === 'audio' && l.props!.audio === 'x')!;
+    expect(sound.track).not.toBe('A1');
+    expect(c.tracks!.find((t) => t.id === sound.track)!.kind).toBe('audio');
+    expect(c.layers.bed.track).toBe('A1');
+  });
+
+  it('pushes the sounds of the shots it pushes, and puts its own in the room left', () => {
+    const c0 = seq();
+    c0.layers.a.link = 'ka'; c0.layers.sa = { type: 'audio', track: 'A1', link: 'ka', in: 0, out: 3, props: { audio: 'one' } };
+    c0.layers.b.link = 'kb'; c0.layers.sb = { type: 'audio', track: 'A1', link: 'kb', in: 3, out: 6, props: { audio: 'two' } };
+    c0.order.push('sa', 'sb');
+    const d = docOf(c0), r = placeClipOps(d, 'main', 'x', { layer: video, withSound: true }, 3, 'V1', 'insert')!, c = applyOps(d, r.ops).doc.compositions.main;
+    expect([c.layers.b.in, c.layers.sb.in]).toEqual([5, 5]);
+    const mine = Object.values(c.layers).find((l) => l.type === 'audio' && l.props!.audio === 'x')!;
+    expect([mine.track, mine.in, mine.out]).toEqual(['A1', 3, 5]);
+  });
+
   it('makes a sound track when there is none', () => {
     const c0 = seq(); c0.tracks = [{ id: 'V1', kind: 'video' }];
     const d = docOf(c0), r = placeClipOps(d, 'main', 'x', { layer: video, withSound: true }, 0, 'V1', 'overwrite')!;

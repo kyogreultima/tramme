@@ -358,7 +358,7 @@ describe('slide', () => {
   });
 
   it('carries the keyframes of the moved clip', () => {
-    const c0 = three(); c0.layers.b.transform = { position: { $k: [{ t: 3, v: [0, 0] }, { t: 5, v: [10, 0] }] } };
+    const c0 = three(); c0.layers.b.transform = { position: { $k: [{ t: 3, v: [0, 0] }, { t: 5, v: [10, 0] }] } }; c0.layers.c.props!.start = 5;
     const d = docOf(c0), c = after(d, slideOps(d, 'main', 'b', -1));
     expect((c.layers.b.transform!.position as { $k: { t: number }[] }).$k.map((k) => k.t)).toEqual([2, 4]);
   });

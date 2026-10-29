@@ -5,7 +5,7 @@
 
 import { applyOps, pointer, type Op } from './ops.ts';
 import { staticValue } from './props.ts';
-import { carriedStart, round6, shiftLayerOps, shiftLayerValues, splitLayerOps, subtree, trimInOps } from './timing.ts';
+import { carriedStart, round6, shiftKeysOps, shiftLayerOps, shiftLayerValues, splitLayerOps, subtree, trimInOps } from './timing.ts';
 import type { Composition, Layer, SequenceTrack, TrammeDoc } from './types.ts';
 
 /** where a clip sits on its track: its id, its in point and its out point (the composition's end when it has none) */
@@ -88,10 +88,19 @@ const cutTo4 = (x: number) => Math.trunc(x * 1e4) / 1e4;
 
 const trackLocked = (c: Composition, trackId: string) => !!c.tracks?.find((t) => t.id === trackId)?.locked;
 
-/** the operations moving each of these clips by its own shift, or none when one of them cannot move (locked) */
+/** a time written the way the cuts write theirs: to the ten-thousandth, so the two edges of a cut are the same number */
+const r4 = (x: number) => +x.toFixed(4);
+
+/**
+ * The operations moving each of these clips by its own shift, the clips linked
+ * to them by the same shift (a picture and its sound stay together; a linked
+ * clip with a shift of its own keeps that one), or none when one of them cannot
+ * move (locked).
+ */
 function shiftAll(doc: TrammeDoc, compId: string, shifts: Map<string, number>): Op[] | null {
-  const c = doc.compositions[compId], ops: Op[] = [];
-  for (const [id, dt] of shifts) {
+  const c = doc.compositions[compId], all = new Map(shifts), ops: Op[] = [];
+  for (const [id, dt] of shifts) for (const m of linkedIds(c, id)) if (!all.has(m)) all.set(m, dt);
+  for (const [id, dt] of all) {
     if (isLocked(c, id)) return null;
     ops.push(...shiftLayerOps(doc, compId, id, dt));
   }
@@ -125,7 +134,9 @@ export function rippleDeleteOps(doc: TrammeDoc, compId: string, ids: string[]): 
     for (const [s, e] of merged) {
       const next = kept.find((k) => k.in >= s - half);
       if (!next) continue;
-      const d = round6(next.in >= e ? e - s : next.in - s);
+      // a clip before the removed span that runs into it (the one a transition came in over) is where the closing begins
+      const from = Math.min(e, Math.max(s, ...kept.filter((k) => k.in < s - half).map((k) => k.out)));
+      const d = round6(next.in >= e ? e - from : next.in - from);
       if (d <= 0) continue;
       for (const k of kept) if (k.in >= next.in - 1e-9) shifts.set(k.id, (shifts.get(k.id) ?? 0) - d);
     }
@@ -196,8 +207,8 @@ function fitDurationOps(doc: TrammeDoc, compId: string): Op[] {
 
 /** the clip as it goes on the track: `layer` placed at `at`, as long as it is, its keyframes moved with it */
 function placed(c: Composition, layer: Layer, trackId: string, at: number): { clip: Layer; len: number } {
-  const len = round6((layer.out ?? c.duration) - (layer.in ?? 0));
-  return { clip: { ...shiftLayerValues(layer, at - (layer.in ?? 0)), track: trackId, in: round6(at), out: round6(at + len) }, len };
+  const len = r4((layer.out ?? c.duration) - (layer.in ?? 0));
+  return { clip: { ...shiftLayerValues(layer, at - (layer.in ?? 0)), track: trackId, in: r4(at), out: r4(r4(at) + len) }, len };
 }
 
 const addClipOps = (compId: string, id: string, clip: Layer): Op[] => [
@@ -223,9 +234,11 @@ export function insertOps(doc: TrammeDoc, compId: string, id: string, layer: Lay
 function makeRoomOps(doc: TrammeDoc, compId: string, trackId: string, at: number, len: number): Op[] | null {
   const c = doc.compositions[compId], half = 0.5 / c.fps, clips = trackClips(c, trackId);
   if (trackLocked(c, trackId) || clips.some((k) => k.out > at && isLocked(c, k.id))) return null;
+  const cut = clips.filter((k) => k.in < at - half && k.out > at + half).map((k) => k.id);
   return chain(doc, [
-    (d) => chain(d, clips.filter((k) => k.in < at - half && k.out > at + half).map((k) => (x: TrammeDoc) => splitLayerOps(x, compId, k.id, at)?.ops ?? [])),
-    (d) => chain(d, trackClips(d.compositions[compId], trackId).filter((k) => k.in >= at - half).map((k) => (x: TrammeDoc) => shiftLayerOps(x, compId, k.id, len))),
+    // the clip it falls in, and the clips linked to it, cut in two; the halves after the cut linked to each other
+    (d) => (cut.length ? splitAtOps(d, compId, cut, at).ops : []),
+    (d) => shiftAll(d, compId, new Map(trackClips(d.compositions[compId], trackId).filter((k) => k.in >= at - half).map((k) => [k.id, len] as [string, number]))) ?? [],
   ]);
 }
 
@@ -249,10 +262,13 @@ export function overwriteOps(doc: TrammeDoc, compId: string, id: string, layer: 
     if (k.in < at - half && k.out > end + half) {
       steps.push((d) => {
         const cut = splitLayerOps(d, compId, k.id, at);
-        return cut ? [...cut.ops, ...trimInOps(applyOps(d, cut.ops).doc, compId, cut.id, end)] : [];
+        if (!cut) return [];
+        // the second half is no longer the clip its link was made for
+        const free: Op[] = d.compositions[compId].layers[k.id].link ? [{ op: 'remove', path: pointer('compositions', compId, 'layers', cut.id, 'link') }] : [];
+        return [...cut.ops, ...trimInOps(applyOps(d, cut.ops).doc, compId, cut.id, end), ...free];
       });
     } else if (k.in < at - half) {
-      steps.push(() => [{ op: 'add', path: pointer('compositions', compId, 'layers', k.id, 'out'), value: round6(at) }]);
+      steps.push(() => [{ op: 'add', path: pointer('compositions', compId, 'layers', k.id, 'out'), value: r4(at) }]);
     } else {
       steps.push((d) => trimInOps(d, compId, k.id, end));
     }
@@ -304,6 +320,8 @@ export function rippleTrimOps(doc: TrammeDoc, compId: string, id: string, edge: 
       ops.push({ op: 'add', path: `${mp}/out`, value: round6(mout + grow) });
       const s = carriedStart(ml, dt);
       if (s !== null) ops.push({ op: 'add', path: `${mp}/props/start`, value: round6(s) });
+      // the head cut off (or brought back) takes the animation of the picture with it
+      ops.push(...shiftKeysOps(doc, compId, m, grow));
     }
     const track = trackClips(c, ml.track), at = track.findIndex((k) => k.id === m);
     for (const k of track.slice(at + 1)) shifts.set(k.id, (shifts.get(k.id) ?? 0) + grow);
@@ -359,25 +377,34 @@ export function slipOps(doc: TrammeDoc, compId: string, id: string, d: number, f
 /**
  * A clip moved by `d` between its neighbours, the track keeping its length:
  * the clip before it ends later (or earlier) by `d`, the one after starts
- * later (or earlier) by `d`, its file carried. Limited so each neighbour keeps
- * a frame. Nothing when the track, or a clip it touches, is locked.
+ * later (or earlier) by `d`, its file carried; only a neighbour that touches
+ * it is changed. Limited so each neighbour keeps a frame and stays within its
+ * file. The clips linked to the three go by the same amounts. Nothing when
+ * the track, or a clip it touches, is locked.
  */
-export function slideOps(doc: TrammeDoc, compId: string, id: string, d: number): Op[] {
-  const c = doc.compositions[compId], l = c.layers[id], fr = 1 / c.fps;
+export function slideOps(doc: TrammeDoc, compId: string, id: string, d: number, fileLength?: (asset: string) => number | undefined): Op[] {
+  const c = doc.compositions[compId], l = c.layers[id], fr = 1 / c.fps, half = fr / 2;
   if (!l || !l.track) return [];
-  const track = trackClips(c, l.track), at = track.findIndex((k) => k.id === id);
-  const before = track[at - 1], after = track[at + 1];
+  const track = trackClips(c, l.track), at = track.findIndex((k) => k.id === id), mine = track[at];
+  const touching = (x: Footprint | undefined, y: number) => (x && Math.abs(y) <= half ? x : undefined);
+  const before = touching(track[at - 1], (track[at - 1]?.out ?? Infinity) - mine.in), after = touching(track[at + 1], (track[at + 1]?.in ?? Infinity) - mine.out);
   if ([id, before?.id, after?.id].some((x) => x && isLocked(c, x))) return [];
   let dt = d;
-  if (before) dt = Math.max(dt, fr - (before.out - before.in));
-  if (after) dt = Math.min(dt, after.out - after.in - fr);
+  if (before) {
+    dt = Math.max(dt, fr - (before.out - before.in));
+    dt = Math.min(dt, handles(c.layers[before.id], before.out - before.in, fileLength)[1]);
+  }
+  if (after) {
+    dt = Math.min(dt, after.out - after.in - fr);
+    dt = Math.max(dt, handles(c.layers[after.id], after.out - after.in)[0]);
+  }
   if (!before) dt = Math.max(dt, -(l.in ?? 0));
   dt = cutTo4(dt);
   if (Math.abs(dt) < 1e-9) return [];
   return [
-    ...shiftLayerOps(doc, compId, id, dt),
-    ...(before ? [{ op: 'add', path: pointer('compositions', compId, 'layers', before.id, 'out'), value: round6(before.out + dt) } as Op] : []),
-    ...(after ? trimInOps(doc, compId, after.id, after.in + dt) : []),
+    ...linkedIds(c, id).flatMap((m) => shiftLayerOps(doc, compId, m, dt)),
+    ...(before ? linkedIds(c, before.id).map((m): Op => ({ op: 'add', path: pointer('compositions', compId, 'layers', m, 'out'), value: round6((c.layers[m].out ?? c.duration) + dt) })) : []),
+    ...(after ? linkedIds(c, after.id).flatMap((m) => trimInOps(doc, compId, m, (c.layers[m].in ?? 0) + dt)) : []),
   ];
 }
 
@@ -442,13 +469,16 @@ export function detachAudioOps(doc: TrammeDoc, compId: string, id: string, audio
 }
 
 /**
- * Clips pasted on a track at `at`, keeping their distances from one another
- * and their keyframes: in `insert` mode room is made for all of them at once,
- * in `overwrite` mode they lie over what is there. Only clips (no groups). The
- * copies are not linked to anything.
+ * Clips pasted at `at`, keeping their distances from one another and their
+ * keyframes. Each goes back to the track it was copied from when the
+ * composition has it (a sound on its sound track), else to `trackId`. In
+ * `insert` mode room is made on the picture's track (what is linked to the
+ * clips that move goes with them), the other clips lie over their tracks; in
+ * `overwrite` mode all lie over what is there. Only clips (no groups). Copies
+ * that were linked to each other are linked, to a link of their own.
  */
 export function pasteOps(doc: TrammeDoc, compId: string, clips: Layer[], trackId: string | null, at: number, mode: 'insert' | 'overwrite'): Op[] {
-  const c = doc.compositions[compId], leaves = clips.filter((l) => !l.children).map((l) => { const { link: _link, ...rest } = l; return rest as Layer; });
+  const c = doc.compositions[compId], copied = clips.filter((l) => !l.children), leaves = copied.map((l) => { const { link: _link, ...rest } = l; return rest as Layer; });
   if (!leaves.length) return [];
   const base = Math.min(...leaves.map((l) => l.in ?? 0)), total = Math.max(...leaves.map((l) => l.out ?? c.duration)) - base;
   const taken = new Set<string>(), ids = leaves.map(() => freshId(c, 'paste', taken));
@@ -463,14 +493,31 @@ export function pasteOps(doc: TrammeDoc, compId: string, clips: Layer[], trackId
       (d) => fitDurationOps(d, compId),
     ]);
   }
-  if (mode === 'overwrite') return chain(doc, leaves.map((l, i) => (d: TrammeDoc) => overwriteOps(d, compId, ids[i], l, trackId, at + (l.in ?? 0) - base)));
-  const room = makeRoomOps(doc, compId, trackId, at, round6(total));
+  const lanes = leaves.map((l) => (l.track && c.tracks?.some((x) => x.id === l.track && (x.kind === 'audio') === (l.type === 'audio')) ? l.track : trackId));
+  const main = lanes[Math.max(0, leaves.findIndex((l) => l.type !== 'audio'))];
+  const where = (l: Layer) => at + (l.in ?? 0) - base;
+  // the copies that were linked to each other, linked again to a link of their own
+  const relink = (d: TrammeDoc): Op[] => {
+    const groups = new Map<string, string[]>(), ops: Op[] = [];
+    copied.forEach((l, i) => { if (l.link) groups.set(l.link, [...(groups.get(l.link) ?? []), ids[i]]); });
+    let now = d;
+    for (const members of groups.values()) {
+      if (members.length < 2) continue;
+      const link = freshLink(now.compositions[compId]), made = members.map((id): Op => ({ op: 'add', path: pointer('compositions', compId, 'layers', id, 'link'), value: link }));
+      ops.push(...made);
+      now = applyOps(now, made).doc;
+    }
+    return ops;
+  };
+  if (mode === 'overwrite') return chain(doc, [...leaves.map((l, i) => (d: TrammeDoc) => overwriteOps(d, compId, ids[i], l, lanes[i], where(l))), relink]);
+  const room = makeRoomOps(doc, compId, main, at, r4(total));
   if (!room) return [];
   return chain(doc, [
     () => room,
-    ...leaves.map((l, i) => () => addClipOps(compId, ids[i], placed(c, l, trackId, at + (l.in ?? 0) - base).clip)),
+    ...leaves.map((l, i) => (d: TrammeDoc) => (lanes[i] === main ? addClipOps(compId, ids[i], placed(d.compositions[compId], l, main, where(l)).clip) : overwriteOps(d, compId, ids[i], l, lanes[i], where(l)))),
     (d) => syncOrderOps(d, compId),
     (d) => fitDurationOps(d, compId),
+    relink,
   ]);
 }
 
@@ -570,7 +617,9 @@ export function reorderOps(doc: TrammeDoc, compId: string, id: string, centre: n
   const c = doc.compositions[compId], me = c.layers[id];
   if (!me?.track || isLocked(c, id)) return [];
   const all = trackClips(c, me.track), rest = all.filter((k) => k.id !== id), mine = all.find((k) => k.id === id)!;
-  const len = round6(mine.out - mine.in), was = all.indexOf(mine);
+  // a clip a transition joins to its neighbour has no place of its own to leave: take the transition off first
+  if (rest.some((k) => Math.min(k.out, mine.out) - Math.max(k.in, mine.in) > 0.5 / c.fps)) return [];
+  const len = r4(mine.out - mine.in), was = all.indexOf(mine);
   const slot = rest.filter((k) => (k.in + k.out) / 2 < centre).length;
   if (slot === was) return [];
   // closing up behind the clip, then opening where it goes: each clip's net shift
@@ -580,7 +629,7 @@ export function reorderOps(doc: TrammeDoc, compId: string, id: string, centre: n
   const shifts = new Map(rest.flatMap((k, j) => (Math.abs(net[j]) > 1e-9 ? [[k.id, net[j]] as [string, number]] : [])));
   const moved = shiftAll(doc, compId, shifts);
   if (!moved) return [];
-  const delta = round6(landing - mine.in);
+  const delta = r4(landing - mine.in);
   return [...moved, ...linkedIds(c, id).flatMap((m) => shiftLayerOps(doc, compId, m, delta))];
 }
 
@@ -639,43 +688,53 @@ export function addTrackOps(c: Composition, compId: string, kind: 'video' | 'aud
 
 
 /**
- * Cameras on one scene set up to be cut between: each on a track of its own
- * (made when there are not enough), the first on show and the others hidden,
- * every picture muted, and the sound of the first on a sound track of its own
- * for the whole scene. The cameras should be lined up in time already (syncing
- * by sound). Nothing for fewer than two videos, or when a track involved is
- * locked.
+ * Cameras on one scene set up to be cut between: each on a picture track
+ * nothing else plays on in its range (made when there is none), the first on
+ * show and the others hidden, every picture muted, and the sound of the first
+ * kept for the whole scene (the one it came with, or its own detached on a
+ * sound track); the sounds the other cameras came with are silenced, and
+ * nothing is linked any more. The cameras should be lined up in time already
+ * (syncing by sound). Nothing for fewer than two videos, or when one is locked.
  */
 export function multicamOps(doc: TrammeDoc, compId: string, ids: string[]): Op[] {
-  const c = doc.compositions[compId], cams = ids.filter((id) => c.layers[id]?.type === 'video' && !c.layers[id].children);
-  if (cams.length < 2 || cams.some((id) => isLocked(c, id))) return [];
-  const videoTracks = (d: TrammeDoc) => (d.compositions[compId].tracks ?? []).filter((x) => x.kind === 'video');
-  let sound: string | undefined;
-  const steps: ((d: TrammeDoc) => Op[])[] = [
-    (d) => chain(d, Array.from({ length: Math.max(0, cams.length - videoTracks(d).length) }, () => (x: TrammeDoc) => addTrackOps(x.compositions[compId], compId, 'video').ops)),
-    (d) => (d.compositions[compId].tracks?.some((x) => x.kind === 'audio' && !x.locked) ? [] : addTrackOps(d.compositions[compId], compId, 'audio').ops),
-    (d) => {
-      const lanes = videoTracks(d), lp = (id: string) => pointer('compositions', compId, 'layers', id);
-      return cams.flatMap((id, i): Op[] => [
-        { op: 'add', path: `${lp(id)}/track`, value: lanes[i].id },
-        ...(i === 0 ? (d.compositions[compId].layers[id].visible === undefined ? [] : [{ op: 'remove', path: `${lp(id)}/visible` } as Op]) : [{ op: 'add', path: `${lp(id)}/visible`, value: false } as Op]),
-        { op: 'add', path: `${lp(id)}/props/muted`, value: true },
-      ]);
-    },
-    (d) => {
-      sound = d.compositions[compId].tracks!.find((x) => x.kind === 'audio' && !x.locked)?.id;
-      // the first camera's sound, on its own, linked to nothing: the whole scene plays it
-      const first = { ...d, compositions: { ...d.compositions, [compId]: { ...d.compositions[compId], layers: { ...d.compositions[compId].layers, [cams[0]]: { ...d.compositions[compId].layers[cams[0]], props: { ...d.compositions[compId].layers[cams[0]].props, muted: false } } } } } } as TrammeDoc;
-      const detached = sound ? detachAudioOps(first, compId, cams[0], sound) : null;
-      if (!detached) return [];
-      const lp = (id: string) => pointer('compositions', compId, 'layers', id);
-      return [...detached.ops, { op: 'remove', path: `${lp(cams[0])}/link` } as Op, { op: 'remove', path: `${lp(detached.id)}/link` } as Op];
-    },
-    (d) => syncOrderOps(d, compId),
-  ];
-  const ops = chain(doc, steps);
-  const after = applyOps(doc, ops).doc.compositions[compId];
-  return cams.some((id) => after.tracks?.find((x) => x.id === after.layers[id].track)?.locked) ? [] : ops;
+  const c0 = doc.compositions[compId], cams = ids.filter((id) => c0.layers[id]?.type === 'video' && !c0.layers[id].children);
+  if (cams.length < 2 || cams.some((id) => isLocked(c0, id))) return [];
+  const lane: Record<string, string> = {}, lp = (id: string) => pointer('compositions', compId, 'layers', id);
+  const sounds = (c: Composition, id: string) => linkedIds(c, id).filter((m) => m !== id && c.layers[m].type === 'audio');
+  const steps: ((d: TrammeDoc) => Op[])[] = cams.map((id) => (d: TrammeDoc) => {
+    // the first picture track nothing but the cameras plays on in this camera's range, and no other camera has taken
+    const c = d.compositions[compId], l = c.layers[id], a = l.in ?? 0, b = l.out ?? c.duration, used = new Set(Object.values(lane));
+    const free = (c.tracks ?? []).find((t) => t.kind === 'video' && !t.locked && !used.has(t.id) && !trackClips(c, t.id).some((k) => !cams.includes(k.id) && k.in < b && k.out > a));
+    if (free) { lane[id] = free.id; return []; }
+    const add = addTrackOps(c, compId, 'video');
+    lane[id] = add.id;
+    return add.ops;
+  });
+  // the first camera has no sound of its own on a layer: its sound is put on a sound track
+  steps.push((d) => {
+    const c = d.compositions[compId], first = c.layers[cams[0]];
+    if (sounds(c, cams[0]).length || staticValue(first.props?.muted) === true) return [];
+    const track = c.tracks?.find((x) => x.kind === 'audio' && !x.locked && !x.bus);
+    const add = track ? null : addTrackOps(c, compId, 'audio');
+    const made = detachAudioOps(add ? applyOps(d, add.ops).doc : d, compId, cams[0], track?.id ?? add!.id);
+    return made ? [...(add?.ops ?? []), ...made.ops] : [];
+  });
+  steps.push((d) => {
+    const c = d.compositions[compId], ops: Op[] = [];
+    cams.forEach((id, i) => {
+      const l = c.layers[id];
+      ops.push({ op: 'add', path: `${lp(id)}/track`, value: lane[id] });
+      if (i === 0) { if (l.visible !== undefined) ops.push({ op: 'remove', path: `${lp(id)}/visible` }); }
+      else ops.push({ op: 'add', path: `${lp(id)}/visible`, value: false });
+      ops.push(l.props ? { op: 'add', path: `${lp(id)}/props/muted`, value: true } : { op: 'add', path: `${lp(id)}/props`, value: { muted: true } });
+      // the sound of another camera is silenced, whatever it was linked to
+      if (i > 0) for (const m of sounds(c, id)) ops.push({ op: 'add', path: `${lp(m)}/visible`, value: false });
+      for (const m of linkedIds(c, id)) if (c.layers[m].link) ops.push({ op: 'remove', path: `${lp(m)}/link` });
+    });
+    return ops;
+  });
+  steps.push((d) => syncOrderOps(d, compId));
+  return chain(doc, steps);
 }
 
 /**

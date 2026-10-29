@@ -51,7 +51,25 @@ export function animatedProps(layer: Layer): [string, Keyframe[]][] {
   return out;
 }
 
-/** move a layer and its descendants in time: in/out and every keyframe */
+/**
+ * The keyframes of a layer moved `dt` later, one operation per animated
+ * property: its transform, its props, the props of its effects and of its
+ * masks. (Its in and out points are left as they are.)
+ */
+export function shiftKeysOps(doc: TrammeDoc, compId: string, id: string, dt: number): Op[] {
+  const l = doc.compositions[compId].layers[id], moved = shiftLayerValues(l, dt), ops: Op[] = [];
+  if (!dt) return ops;
+  const some = (from: Record<string, Prop> | undefined, to: Record<string, Prop> | undefined, ...at: (string | number)[]) => {
+    for (const k of Object.keys(from ?? {})) if (propKind(from![k]) === 'keyframes') ops.push({ op: 'replace', path: pointer('compositions', compId, 'layers', id, ...at, k), value: to![k] });
+  };
+  some(l.transform as Record<string, Prop> | undefined, moved.transform as Record<string, Prop> | undefined, 'transform');
+  some(l.props, moved.props, 'props');
+  l.effects?.forEach((e, i) => some(e.props, moved.effects![i].props, 'effects', i, 'props'));
+  l.masks?.forEach((m, i) => some(m.props as Record<string, Prop>, moved.masks![i].props as Record<string, Prop>, 'masks', i, 'props'));
+  return ops;
+}
+
+/** move a layer and its descendants in time: in/out and every keyframe (effects and masks included) */
 export function shiftLayerOps(doc: TrammeDoc, compId: string, id: string, dt: number): Op[] {
   const comp = doc.compositions[compId];
   const ops: Op[] = [];
@@ -59,7 +77,7 @@ export function shiftLayerOps(doc: TrammeDoc, compId: string, id: string, dt: nu
     const l = comp.layers[lid];
     if (l.in !== undefined || lid === id) ops.push({ op: 'add', path: pointer('compositions', compId, 'layers', lid, 'in'), value: round6(Math.max(0, (l.in ?? 0) + dt)) });
     if (l.out !== undefined || lid === id) ops.push({ op: 'add', path: pointer('compositions', compId, 'layers', lid, 'out'), value: round6((l.out ?? comp.duration) + dt) });
-    for (const [name] of animatedProps(l)) ops.push({ op: 'replace', path: propPath(compId, lid, name), value: shiftProp(rawProp(doc, compId, lid, name)!, dt) });
+    ops.push(...shiftKeysOps(doc, compId, lid, dt));
   }
   return ops;
 }

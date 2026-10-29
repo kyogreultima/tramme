@@ -3,7 +3,7 @@
 // the drop on a lane, the keys and the assistant use (place.ts reads the file
 // and commits).
 
-import { applyOps, detachAudioOps, insertOps, overwriteOps, pointer, type Layer, type Op, type TrammeDoc } from '@tramme/core';
+import { applyOps, detachAudioOps, insertOps, overwriteOps, pointer, trackClips, type Layer, type Op, type TrammeDoc } from '@tramme/core';
 import { freshId } from '../../model.ts';
 import { addTrackOps } from './tracks.ts';
 
@@ -36,7 +36,9 @@ export function placeClipOps(doc: TrammeDoc, compId: string, base: string, p: Pl
   if (!(p.withSound && clip.type === 'video')) return { ops, id };
   let after = applyOps(doc, ops).doc;
   const more: Op[] = [];
-  let sound = after.compositions[compId].tracks?.find((x) => x.kind === 'audio' && !x.locked)?.id;
+  // its sound goes on a sound track nothing else plays on in that range (a music bed stays whole), the sounds of the shots it pushed having moved already
+  const c2 = after.compositions[compId], put = c2.layers[id], lo = put.in ?? 0, hi = put.out ?? c2.duration, half = 0.5 / c2.fps;
+  let sound = c2.tracks?.find((x) => x.kind === 'audio' && !x.locked && !x.bus && !trackClips(c2, x.id).some((k) => k.in < hi - half && k.out > lo + half))?.id;
   if (!sound) {
     const add = addTrackOps(after.compositions[compId], compId, 'audio');
     more.push(...add.ops);
