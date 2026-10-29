@@ -1382,6 +1382,9 @@
     "saved": "Bloc « {name} » enregistré.",
     "placed": "Bloc « {name} » placé."
   },
+  "filmPlan": {
+    "written": "Plan du film écrit (assets/film-plan.json)."
+  },
   "brief": {
     "written": "Brief du projet écrit (assets/brief.json)."
   },
