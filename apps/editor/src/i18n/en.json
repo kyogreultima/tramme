@@ -981,6 +981,9 @@
     "pictureSizeHint": "Small asks the provider's cheapest size; the upscale tool brings a picture to the frame's size afterwards.",
     "pictureSizeSmall": "Small",
     "pictureSizeLarge": "Large",
+    "styleFrames": "Style frames",
+    "styleFramesHint": "How many pictures the assistant has drawn from a film's directions before building it (each one is paid). Off: it builds from the direction's words.",
+    "styleFramesOff": "Off",
     "videos": "Videos",
     "videosHint": "What the assistant and the / menu use when they have a clip made and the ask names nothing. A clip made by a provider costs money: it is asked first, and each second is billed.",
     "videoProvider": "Provider",
@@ -1381,6 +1384,12 @@
   "blocks": {
     "saved": "Block \"{name}\" saved.",
     "placed": "Block \"{name}\" placed."
+  },
+  "styleFrames": {
+    "paidText": "A provider will draw {n} style frame(s) of the film, which costs money (each one counts): \"{prompt}\"",
+    "pickTitle": "Which frame is the film's target?",
+    "pickText": "{n} style frames for \"{scene}\": click the one to build the film toward; the others are not saved.",
+    "kept": "Style frame kept: {path}"
   },
   "filmPlan": {
     "written": "Film plan written (assets/film-plan.json)."

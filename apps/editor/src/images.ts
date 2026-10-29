@@ -21,7 +21,7 @@ import { t } from './i18n/index.ts';
 const RATIOS = ['21:9', '16:9', '9:16', '5:4', '4:5', '3:2', '2:3', '4:3', '3:4', '1:1'] as const;
 type Ratio = (typeof RATIOS)[number];
 /** the providers that change an existing picture (the others draw from words only) */
-const CHANGERS = ['openai', 'gemini'];
+export const CHANGERS = ['openai', 'gemini'];
 
 /** the ratio closest to the composition's proportions */
 export function ratioOf(w: number, h: number): Ratio {
@@ -100,7 +100,7 @@ export function extension(w: number, h: number, ratio: string): { width: number;
  * an asset whose white says what changes (or stays, `maskKeeps`), or the
  * extension's border when the picture is extended.
  */
-async function referenceOf(ctx: ToolContext, o: { source: string; at: number; mask?: string; maskKeeps?: boolean; extend?: string }): Promise<{ reference: string; mask?: string; size: [number, number] }> {
+export async function referenceOf(ctx: ToolContext, o: { source: string; at: number; mask?: string; maskKeeps?: boolean; extend?: string }): Promise<{ reference: string; mask?: string; size: [number, number] }> {
   const img = await bitmapOf(ctx, o.source, o.at);
   try {
     const k = fitSide(img.width, img.height);

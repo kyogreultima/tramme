@@ -305,6 +305,9 @@ function Pictures() {
       <Row label={t('settings.pictureSize')} hint={t('settings.pictureSizeHint')}>
         <Seg value={p.pictureSize} options={[['small', t('settings.pictureSizeSmall')], ['large', t('settings.pictureSizeLarge')]]} onChange={(v) => setPrefs({ pictureSize: v as Preferences['pictureSize'] })} />
       </Row>
+      <Row label={t('settings.styleFrames')} hint={t('settings.styleFramesHint')}>
+        <Seg value={String(p.styleFrames)} options={[['0', t('settings.styleFramesOff')], ['2', '2'], ['3', '3']]} onChange={(v) => setPrefs({ styleFrames: Number(v) as Preferences['styleFrames'] })} />
+      </Row>
     </Section>
   );
 }

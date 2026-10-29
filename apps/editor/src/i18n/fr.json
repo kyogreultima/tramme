@@ -981,6 +981,9 @@
     "pictureSizeHint": "Petite demande la taille la moins chère du fournisseur ; l’outil d’agrandissement amène ensuite l’image à la taille du cadre.",
     "pictureSizeSmall": "Petite",
     "pictureSizeLarge": "Grande",
+    "styleFrames": "Images de style",
+    "styleFramesHint": "Combien d’images l’assistant fait dessiner à partir des directions d’un film avant de le construire (chacune est payante). Désactivé : il construit à partir des mots de la direction.",
+    "styleFramesOff": "Désactivé",
     "videos": "Vidéos",
     "videosHint": "Ce que l’assistant et le menu / utilisent quand ils font faire un clip et que la demande ne dit rien. Un clip fait par un fournisseur coûte de l’argent : on vous le demande d’abord, et chaque seconde est facturée.",
     "videoProvider": "Fournisseur",
@@ -1381,6 +1384,12 @@
   "blocks": {
     "saved": "Bloc « {name} » enregistré.",
     "placed": "Bloc « {name} » placé."
+  },
+  "styleFrames": {
+    "paidText": "Un fournisseur va dessiner {n} image(s) de style du film, ce qui coûte de l’argent (chacune compte) : « {prompt} »",
+    "pickTitle": "Quelle image est la cible du film ?",
+    "pickText": "{n} images de style pour « {scene} » : cliquez sur celle vers laquelle construire le film ; les autres ne sont pas enregistrées.",
+    "kept": "Image de style gardée : {path}"
   },
   "filmPlan": {
     "written": "Plan du film écrit (assets/film-plan.json)."
