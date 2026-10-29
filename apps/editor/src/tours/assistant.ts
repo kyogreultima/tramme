@@ -32,6 +32,16 @@ registerTour({
       body: m('tours.assistant.justWriteWhatYou'),
     },
     {
+      target: 'assistant-composer', side: 'top', align: 'center',
+      title: m('tours.assistant.dictate'),
+      body: m('tours.assistant.theMicrophoneWritesWhat'),
+    },
+    {
+      target: 'assistant-composer', side: 'top', align: 'center',
+      title: m('tours.assistant.whileItWorks'),
+      body: m('tours.assistant.keepWritingMessagesQueue'),
+    },
+    {
       target: 'viewport', side: 'left', align: 'center',
       title: m('tours.assistant.proposals'),
       body: m('tours.assistant.itsChangesArriveAs'),
