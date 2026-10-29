@@ -6,7 +6,7 @@
 import { comp, S, select } from '../state.ts';
 import { studio } from '../studio.ts';
 import { mediaOf } from '../ui/Transcribe.tsx';
-import { inAtelier, inStudio, press, registerTour } from './engine.ts';
+import { composer, inAtelier, inStudio, press, registerTour } from './engine.ts';
 import { m } from '../i18n/index.ts';
 
 /** the first layer of the open composition playing a sound or a video of the project */
@@ -18,8 +18,6 @@ const showSpeech = async () => {
   await new Promise((r) => requestAnimationFrame(r));
   document.querySelector('[data-tour="speech"]')?.closest('.section')?.scrollIntoView({ block: 'center' });
 };
-/** where one writes to the assistant, in either view */
-const composer = () => document.querySelector('[data-tour="direct"]') ?? document.querySelector('[data-tour="assistant-composer"]');
 
 registerTour({
   id: 'speech',

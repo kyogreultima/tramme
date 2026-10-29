@@ -485,7 +485,7 @@ export function Viewport({ bare = false, inset = INSET, overlay, intercept }: Vi
   return (
     <div class={`viewport${bare ? ' bare' : ''}`} data-tour="viewport" ref={host} onWheel={onWheel} onPointerDownCapture={touchDown} onPointerMove={touchMove} onPointerUp={touchUp} onPointerCancel={touchUp} style={{ cursor: spaceDown ? 'grab' : undefined }}>
       {!bare && grading() && <Scopes />}
-      {!bare && <div class="toolbar" onPointerDown={(e) => e.stopPropagation()}>
+      {!bare && <div class="toolbar" data-tour="viewport-tools" onPointerDown={(e) => e.stopPropagation()}>
         <button class="zoom" onClick={zoomMenu} title={t('viewport.zoomCtrlWheel')}>{Math.round(scale * 100)} %</button>
         <span class="sep" />
         <button class={`icon-btn sm round${safe ? ' on' : ''}`} title={t('viewport.safeZones')} onClick={() => { S.safe.value = !safe; }}><Icon name="safe" /></button>

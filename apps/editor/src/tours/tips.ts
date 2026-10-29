@@ -74,6 +74,11 @@ registerTour({
       body: m('tours.tips.theDotsOfAProperty'),
     },
     {
+      target: 'inspector', side: 'left', align: 'start',
+      title: m('tours.tips.masksOnALayer'),
+      body: m('tours.tips.theMasksSectionAdds'),
+    },
+    {
       target: 'ai-resizer', side: 'left', align: 'center',
       title: m('tours.tips.theLinesBetween'),
       body: m('tours.tips.everyLineBetween'),
@@ -82,6 +87,11 @@ registerTour({
       target: 'viewport', side: 'left', align: 'center',
       title: m('tours.tips.moveAroundTheFrame'),
       body: m('tours.tips.theWheelZoomsThe'),
+    },
+    {
+      target: 'viewport-tools', side: 'bottom', align: 'start',
+      title: m('tours.tips.framingAids'),
+      body: m('tours.tips.safeZonesTheGrid'),
     },
     {
       target: 'transport', side: 'top', align: 'center',

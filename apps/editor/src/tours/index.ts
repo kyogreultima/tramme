@@ -12,6 +12,7 @@ import './montage.ts';
 import './speech.ts';
 import './assistant.ts';
 import './look.ts';
+import './tools.ts';
 import './yours.ts';
 
 import { S } from '../state.ts';

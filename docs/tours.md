@@ -42,7 +42,7 @@ Tours point at `data-tour` markers, not CSS classes: the interface can change it
 | Editor, top | `project`, `view-switch`, `versions`, `history`, `format`, `settings`, `help`, `export` |
 | Studio | `stage`, `direct` (the direction bar), `pin`, `storyboard`, `notes`, `direction-tab`, `material` (the direction's material), `viewport` |
 | Atelier, panels | `left-panel`, `left-tab-layers`, `left-tab-assets`, `left-tab-tokens`, `inspector`, `speech` (the inspector's Speech section of a sound or video layer), `ai-resizer` (the line that sizes the chat) |
-| Atelier, preview | `viewport`, `quality` |
+| Atelier, preview | `viewport`, `viewport-tools` (safe zones, grid, onion skin), `quality` |
 | Atelier, bottom | `transport`, `record` (the voice-over button), `timeline`, `bottom-tab-timeline`, `bottom-tab-graph`, `bottom-tab-mixer` (only once the film has a sound track: point at the other tabs until then) |
 | Assistant | `assistant`, `assistant-model`, `assistant-access`, `assistant-history`, `assistant-composer` (the model and access markers are in the studio's notes too) |
 
