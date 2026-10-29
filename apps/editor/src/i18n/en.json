@@ -1385,6 +1385,10 @@
     "saved": "Block \"{name}\" saved.",
     "placed": "Block \"{name}\" placed."
   },
+  "surface": {
+    "list": "Surfaces listed.",
+    "laid": "Surface {kind} laid."
+  },
   "styleFrames": {
     "paidText": "A provider will draw {n} style frame(s) of the film, which costs money (each one counts): \"{prompt}\"",
     "pickTitle": "Which frame is the film's target?",
