@@ -4,6 +4,7 @@
 
 import type { AiNotes, JsonSchema, PropSchema, Registry } from '@tramme/core';
 import { TOOLS } from '@tramme/assistant';
+import { t } from '../i18n/index.ts';
 import { clip } from '../model.ts';
 
 /** what is wrong with a tool's input against its schema, one line per problem */
@@ -12,6 +13,12 @@ export function inputIssues(name: string, input: unknown): string[] {
   if (!def) return [];
   const r = def.schema.safeParse(input);
   return r.success ? [] : r.error.issues.map((i) => `${i.path.length ? i.path.join('.') : '(input)'}: ${i.message}`);
+}
+
+/** what the user is told at the end of a turn that wrote plugins: their files, once each, and the action of the / menu that keeps them for other projects ('' when none was written) */
+export function harvestNote(paths: string[]): string {
+  const files = [...new Set(paths.map((p) => p.replace(/^plugins\//, '')))].sort();
+  return files.length ? t('ai.harvest', { files: files.join(', '), action: t('Keep a plugin in the library') }) : '';
 }
 
 // ── the vocabulary's index: each entry in a line or two, its full schema on demand ──

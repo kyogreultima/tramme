@@ -94,6 +94,7 @@
     "stoppedAfterNSteps": "arrêt après {n} étapes",
     "urlDoesNotAnswer": "{url} ne répond pas ({error})",
     "companionCut": "Le compagnon local ne répond pas : sa connexion a été interrompue avant la fin du tour",
+    "harvest": "Plugins écrits pendant ce tour : {files}. Pour les réutiliser dans tes autres projets : menu /, {action}.",
     "resumeIn": "Interrompu ({error}). Reprise dans {s} s, essai {n} sur {max}…",
     "serviceError": "erreur du service",
     "streamCut": "la réponse a été interrompue : son flux s'est arrêté avant que le modèle ait fini",
