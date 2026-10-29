@@ -101,6 +101,9 @@ export function setAutoTours(on: boolean) { writeSeen({ ...toursState.peek(), au
 /** a place of the interface by its data-tour name, if it is there */
 export const marker = (name: string) => document.querySelector<HTMLElement>(`[data-tour="${name}"]`);
 
+/** where one writes to the assistant, in either view */
+export const composer = () => marker('direct') ?? marker('assistant-composer');
+
 /** clicks a place of the interface by its data-tour name (opens a tab, a panel), as the user would */
 export function press(name: string) {
   marker(name)?.click();
