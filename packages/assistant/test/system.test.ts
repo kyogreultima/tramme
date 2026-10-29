@@ -67,7 +67,7 @@ describe('the direction rules', () => {
   it('sit before the rules of whole films and name the plan, the frames and the target', () => {
     expect(fixed.indexOf('Direction:')).toBeGreaterThan(-1);
     expect(fixed.indexOf('Direction:')).toBeLessThan(fixed.indexOf('Whole films:'));
-    for (const word of ['film-plan', 'kinds of picture', 'style-frames', 'target', 'never placed', 'retyped']) expect(direction, word).toContain(word);
+    for (const word of ['film-plan', 'kinds of picture', 'style-frames', 'target', 'never placed', 'retyped', 'use_tool "compare"']) expect(direction, word).toContain(word);
   });
 
   it('keep the example as one kind among the others, and name the style frames where the directions are proposed', () => {
@@ -80,9 +80,9 @@ describe('the depth and camera rules', () => {
   const { fixed } = systemParts(REF);
   const depth = fixed.slice(fixed.indexOf('Depth and camera:'), fixed.indexOf('Repetition:'));
 
-  it('sit after the motion rules and name the tilts, the pin and the push', () => {
+  it('sit after the motion rules and name the tilts, the pin, the push, the screens of pieces and the solids', () => {
     expect(fixed.indexOf('Depth and camera:')).toBeGreaterThan(fixed.indexOf('Motion:'));
-    for (const word of ['rotationX', 'rotationY', 'pin', 'push-in']) expect(depth, word).toContain(word);
+    for (const word of ['rotationX', 'rotationY', 'pin', 'push-in', 'device-screen', 'screen', 'solid.3d']) expect(depth, word).toContain(word);
   });
 });
 
@@ -93,7 +93,7 @@ describe('the material rules', () => {
   it('sit between the pictures and the clips and name the object, the surface, the libraries, the credits and the yes', () => {
     expect(fixed.indexOf('Material:')).toBeGreaterThan(fixed.indexOf('Pictures:'));
     expect(fixed.indexOf('Material:')).toBeLessThan(fixed.indexOf('Clips:'));
-    for (const word of ['object', 'surface', 'stock', 'credits', 'wordmark', "the user's yes"]) expect(material, word).toContain(word);
+    for (const word of ['object', 'surface', 'stock', 'credits', 'wordmark', "the user's yes", 'solid.3d']) expect(material, word).toContain(word);
   });
 
   it('leave the pictures to what is drawn from words', () => {
