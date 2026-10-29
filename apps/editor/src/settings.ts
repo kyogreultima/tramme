@@ -56,6 +56,8 @@ export interface Preferences {
   pictureProvider: 'auto' | 'openai' | 'gemini' | 'zai' | 'hydracept';
   pictureQuality: 'auto' | 'low' | 'medium' | 'high';
   pictureSize: 'small' | 'large';
+  /** style frames drawn from a film's directions before it is built: how many (0 turns them off; each is a paid picture) */
+  styleFrames: 0 | 2 | 3;
   /** clips made by a provider: the one by default (auto: the first connected), and their length in seconds */
   videoProvider: 'auto' | 'hydracept';
   videoSeconds: 4 | 6 | 8;
@@ -66,7 +68,7 @@ export interface Preferences {
 export const DEFAULT_PREFERENCES: Preferences = {
   language: 'auto', theme: 'studio', view: 'studio', motion: 'auto', still: 'display', blur: 'document', exactFrames: true, scrubAudio: true, sandboxPreview: false,
   effectsDb: -8, musicDb: -14, duckDb: -12, varySounds: true, confirmPaid: true, paidPerTurn: 10, voiceProvider: 'auto', voice: '', voiceModel: '', previewVolume: 1, previewMuted: false, proxies: true, models: {}, pluginsOff: [], recentCommands: [],
-  pictureProvider: 'auto', pictureQuality: 'auto', pictureSize: 'large',
+  pictureProvider: 'auto', pictureQuality: 'auto', pictureSize: 'large', styleFrames: 2,
   videoProvider: 'auto', videoSeconds: 8, dictation: 'local',
 };
 
@@ -152,6 +154,8 @@ function load(): Preferences {
     if (!['auto', 'openai', 'gemini', 'zai', 'hydracept'].includes(p.pictureProvider)) p.pictureProvider = DEFAULT_PREFERENCES.pictureProvider;
     if (!['auto', 'low', 'medium', 'high'].includes(p.pictureQuality)) p.pictureQuality = DEFAULT_PREFERENCES.pictureQuality;
     if (!['small', 'large'].includes(p.pictureSize)) p.pictureSize = DEFAULT_PREFERENCES.pictureSize;
+    if (![0, 2, 3].includes(Number(p.styleFrames))) p.styleFrames = DEFAULT_PREFERENCES.styleFrames;
+    else p.styleFrames = Number(p.styleFrames) as Preferences['styleFrames'];
     if (!['auto', 'hydracept'].includes(p.videoProvider)) p.videoProvider = DEFAULT_PREFERENCES.videoProvider;
     const seconds = Number(p.videoSeconds);
     p.videoSeconds = ([4, 6, 8] as number[]).includes(seconds)
