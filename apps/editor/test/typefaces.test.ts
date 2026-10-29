@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { TAGS, deriveTags } from '../../../scripts/typefaces/tags.ts';
 import type { Catalogue } from '../src/typefaces/catalogue.ts';
+import { FONTSOURCE_PIN, defaultWeights, fontFiles, slugOf } from '../src/typefaces/files.ts';
 import { scriptsOf, searchTypefaces } from '../src/typefaces/search.ts';
 
 const read = <T>(rel: string): T => JSON.parse(readFileSync(new URL(rel, import.meta.url), 'utf8'));
@@ -177,5 +178,61 @@ describe('search by character', () => {
   it('respects the count and the category', () => {
     expect(search('sans', { count: 2 }).found).toHaveLength(2);
     for (const x of search('heavy', { category: 'serif', count: 6 }).found) expect(x.font.category).toBe('serif');
+  });
+});
+
+describe('files at the pinned version', () => {
+  const font = (id: string) => catalogue.fonts.find((f) => f.id === id)!;
+  const CDN = 'https://cdn.jsdelivr.net/fontsource/fonts';
+
+  it('make a slug of a family name', () => {
+    expect(slugOf('Noto Sans')).toBe('noto-sans');
+    expect(slugOf('M PLUS 1')).toBe('m-plus-1');
+    expect(slugOf('Playwrite DE Grund')).toBe('playwrite-de-grund');
+    expect(slugOf('  Baloo 2 + ')).toBe('baloo-2');
+    expect(slugOf('x'.repeat(80))).toHaveLength(48);
+    expect(FONTSOURCE_PIN).toBe(catalogue.pin);
+  });
+
+  it('gives one file for a variable family and a weight range', () => {
+    expect(fontFiles(font('inter'), {})).toEqual([{ url: `${CDN}/inter:vf@5.3.0/latin-wght-normal.woff2`, path: 'assets/fonts/inter-latin-vf-normal.woff2', weight: '100 900', style: 'normal' }]);
+    expect(fontFiles(font('inter'), { italic: true }).map((f) => f.style)).toEqual(['normal', 'italic']);
+    expect(fontFiles(font('inter'), { italic: true })[1].url).toBe(`${CDN}/inter:vf@5.3.0/latin-wght-italic.woff2`);
+    expect(fontFiles(font('inter'), { weights: [700] })).toHaveLength(1);
+  });
+
+  it('asks for the full axes only where there are more than weight and two others', () => {
+    const [flex] = fontFiles(font('roboto-flex'), {});
+    expect(flex.url).toBe(`${CDN}/roboto-flex:vf@5.3.0/latin-full-normal.woff2`);
+    expect(flex.weight).toBe('100 1000');
+    expect(fontFiles(font('open-sans'), {})[0].url).toContain('/latin-wght-normal.woff2');
+  });
+
+  it('gives only the requested weights of a static family', () => {
+    expect(fontFiles(font('anton'), {})).toEqual([{ url: `${CDN}/anton@5.3.0/latin-400-normal.woff2`, path: 'assets/fonts/anton-latin-400-normal.woff2', weight: '400', style: 'normal' }]);
+    expect(fontFiles(font('lato'), { weights: [700] }).map((f) => f.weight)).toEqual(['700']);
+    expect(fontFiles(font('lato'), { weights: [400, 700], italic: true }).map((f) => `${f.weight} ${f.style}`)).toEqual(['400 normal', '400 italic', '700 normal', '700 italic']);
+    expect(fontFiles(font('lato'), {}).map((f) => f.weight)).toEqual(['400', '700']);
+  });
+
+  it('takes the nearest weight the family has', () => {
+    expect(fontFiles(font('lato'), { weights: [500] }).map((f) => f.weight)).toEqual(['400']);
+    expect(fontFiles(font('lato'), { weights: [600] }).map((f) => f.weight)).toEqual(['700']);
+    expect(fontFiles(font('lato'), { weights: [600, 700] }).map((f) => f.weight)).toEqual(['700']);
+    expect(fontFiles(font('anton'), { weights: [900] }).map((f) => f.weight)).toEqual(['400']);
+  });
+
+  it('changes the stem with the subset, and keeps to static files where no variable one exists', () => {
+    expect(fontFiles(font('inter'), { subset: 'cyrillic' })[0]).toMatchObject({ url: `${CDN}/inter:vf@5.3.0/cyrillic-wght-normal.woff2`, path: 'assets/fonts/inter-cyrillic-vf-normal.woff2' });
+    expect(fontFiles(font('noto-sans-jp'), { subset: 'japanese', weights: [700] })).toEqual([{ url: `${CDN}/noto-sans-jp@5.3.0/japanese-700-normal.woff2`, path: 'assets/fonts/noto-sans-jp-japanese-700-normal.woff2', weight: '700', style: 'normal' }]);
+  });
+
+  it('chooses default weights by role', () => {
+    expect(defaultWeights(font('bebas-neue'), 'display')).toEqual([400]);
+    expect(defaultWeights(font('inter'), 'display')).toEqual([800]);
+    expect(defaultWeights(font('inter'), 'text')).toEqual([400, 700]);
+    expect(defaultWeights(font('archivo-black'), 'text')).toEqual([400]);
+    expect(defaultWeights(font('lato'), 'display')).toEqual([700]);
+    expect(defaultWeights({ ...font('lato'), weights: [300, 500] }, 'text')).toEqual([500]);
   });
 });
