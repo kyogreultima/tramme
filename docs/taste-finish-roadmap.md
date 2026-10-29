@@ -35,27 +35,28 @@ On the bilal project as the run of 2026-10-28 left it (the check the assistant r
 
 - [x] A catalogue of open typefaces searched by character, a specimen sheet drawn by the engine, the chosen files copied into the project at a pinned version, type pairing in the guide.
 
-### Step 3. Direction: kinds of picture, then style frames
+### Step 3. Direction: kinds of picture, then style frames ([plan](superpowers/plans/2026-10-29-taste-and-finish-step3-direction.md))
 
-- [ ] The direction picks the few kinds of picture a film alternates, so no form repeats scene after scene.
-- [ ] Two or three style frames drawn by an image model, one kept as the target: palette to tokens, type matched to the catalogue, plates and objects made again as assets, the scene rebuilt in layers.
+- [x] The direction picks the few kinds of picture a film alternates, so no form repeats scene after scene.
+- [x] Two or three style frames drawn by an image model, one kept as the target: palette to tokens, type matched to the catalogue, plates and objects made again as assets, the scene rebuilt in layers.
+- [ ] One dev run on the trial server (the dressing brief of bilal and one launch brief, twice each): the kinds each plan chose, the frame kept, whether two runs of one brief keep different frames, the cost. Spends the user's quota, waits for their go.
 
-### Step 4. Material
+### Step 4. Material ([plan](superpowers/plans/2026-10-29-taste-and-finish-step4-material.md))
 
 - [ ] Objects and illustrations made as assets, textures and light drawn by the engine, free libraries (CC0 textures and models, licensed photos and clips) with credits, real logos only with the user's yes.
 
-### Step 5. The missing vocabulary
+### Step 5. The missing vocabulary ([plan](superpowers/plans/2026-10-29-taste-and-finish-step5-missing-vocabulary.md))
 
 - [ ] Interface pieces, layers in perspective, a camera onto a detail, simple 3D solids, finance charts, the comparison of a render with a picture.
 
-### Step 6. The critic
+### Step 6. The critic ([plan](superpowers/plans/2026-10-29-taste-and-finish-step6-critic.md))
 
 - [ ] A separate review in a fresh context, on motion rather than stills, with a definition of done and variants instead of endless fixes; the number of rounds is a setting.
 
-### Step 7. Scene by scene
+### Step 7. Scene by scene ([plan](superpowers/plans/2026-10-29-taste-and-finish-step7-scene-by-scene.md))
 
 - [ ] The direction, the kept style frame and the scene list written to the project; each scene built in a fresh context that inherits only them.
 
-### Step 8. A library of references
+### Step 8. A library of references ([plan](superpowers/plans/2026-10-29-taste-and-finish-step8-references.md))
 
 - [ ] Annotated in words, never as copied media: what makes a frame or a cut work, and the faults to avoid.
