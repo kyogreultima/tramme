@@ -12,7 +12,7 @@
 // (a path prop of format 'curve') as sampler2D u_<name>, 256 values in red.
 // Programs are compiled once per source.
 
-import { curveTable, parseColor, type Lut3D, type PathValue, type PropSchema } from '@tramme/core';
+import { applyHomography, curveTable, homography, invertHomography, parseColor, type Lut3D, type PathValue, type PropSchema, type Quad } from '@tramme/core';
 
 const VERT = `#version 300 es
 out vec2 vUv;
@@ -173,6 +173,67 @@ function texture(gl: WebGL2RenderingContext, src: TexImageSource): WebGLTexture 
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
   return t;
+}
+
+// ── a picture warped onto a quad ─────────────────────────────
+
+/** the pixels a quad covers, whole ones (`scale`: canvas pixels per unit of the quad) */
+export function warpBox(to: Quad, scale: number): { x: number; y: number; w: number; h: number } {
+  const xs = to.map((p) => p[0] * scale), ys = to.map((p) => p[1] * scale);
+  const x = Math.floor(Math.min(...xs)), y = Math.floor(Math.min(...ys));
+  return { x, y, w: Math.ceil(Math.max(...xs)) - x, h: Math.ceil(Math.max(...ys)) - y };
+}
+
+const WARP = `#version 300 es
+precision highp float;
+in vec2 vUv; out vec4 fragColor;
+uniform sampler2D uImage; uniform vec2 uRes; uniform mat3 uInv;
+void main() {
+  vec3 s = uInv * vec3(gl_FragCoord.x, uRes.y - gl_FragCoord.y, 1.0);
+  if (s.z <= 0.0) { fragColor = vec4(0.0); return; }
+  vec2 uv = vec2(s.x / s.z / uRes.x, 1.0 - s.y / s.z / uRes.y);
+  if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) { fragColor = vec4(0.0); return; }
+  fragColor = texture(uImage, uv);
+}`;
+
+/**
+ * A picture (a canvas of the frame's size) drawn through the projective map
+ * of `from` onto `to`, both quads in canvas pixels times `scale`: one pass on
+ * the shared WebGL2 canvas, bilinear, premultiplied. It is drawn into `ctx`
+ * with the alpha, the blend and the filter `ctx` holds.
+ */
+export function warpQuad(ctx: CanvasRenderingContext2D, source: CanvasImageSource, from: Quad, to: Quad, scale = 1): void {
+  const g = context(), { gl } = g, { width: w, height: h } = ctx.canvas;
+  const sc = (q: Quad) => q.map((p) => [p[0] * scale, p[1] * scale]) as Quad;
+  const hom = homography(sc(from), sc(to));
+  // where the whole picture lands: only that box is drawn
+  const lands = ([[0, 0], [w, 0], [w, h], [0, h]] as [number, number][]).map((p) => applyHomography(hom, p)) as Quad;
+  const finite = lands.every((p) => Number.isFinite(p[0]) && Number.isFinite(p[1]));
+  const box = finite ? warpBox(lands, 1) : { x: 0, y: 0, w, h };
+  const x0 = Math.max(0, box.x), y0 = Math.max(0, box.y), x1 = Math.min(w, box.x + box.w), y1 = Math.min(h, box.y + box.h);
+  if (x1 <= x0 || y1 <= y0) return;
+  if (g.canvas.width !== w || g.canvas.height !== h) { g.canvas.width = w; g.canvas.height = h; }
+  const p = program(g, WARP);
+  const image = texture(gl, source as TexImageSource);
+  try {
+    const inv = invertHomography(hom);
+    gl.viewport(0, 0, w, h);
+    gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.useProgram(p);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, image);
+    gl.uniform1i(gl.getUniformLocation(p, 'uImage'), 0);
+    gl.uniform2f(gl.getUniformLocation(p, 'uRes'), w, h);
+    // column-major
+    gl.uniformMatrix3fv(gl.getUniformLocation(p, 'uInv'), false, [inv[0], inv[3], inv[6], inv[1], inv[4], inv[7], inv[2], inv[5], inv[8]]);
+    gl.bindVertexArray(g.vao);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.drawImage(g.canvas as CanvasImageSource, x0, y0, x1 - x0, y1 - y0, x0, y0, x1 - x0, y1 - y0);
+    ctx.restore();
+  } finally {
+    gl.deleteTexture(image);
+  }
 }
 
 // ── the nodes' WebGL2 service ────────────────────────────────

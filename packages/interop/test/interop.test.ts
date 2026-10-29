@@ -9,6 +9,21 @@ const root = path.resolve(import.meta.dirname, '../../..');
 const load = (p: string): TrammeDoc => JSON.parse(fs.readFileSync(path.join(root, p), 'utf8'));
 const reg = builtinRegistry();
 
+describe('layers turned or pinned in perspective', () => {
+  const doc = (): TrammeDoc => ({
+    schema: 'tramme/1', meta: { title: 'Tilt' }, tokens: {}, assets: {}, root: 'main',
+    compositions: { main: { name: 'Main', width: 1920, height: 1080, fps: 30, duration: 2, order: ['card'], layers: { card: { type: 'shape.rect', name: 'Card', props: { size: [300, 200] }, transform: { position: [960, 540], rotationY: 30 } } } } },
+  } as unknown as TrammeDoc);
+
+  it('are exported flat to Lottie, and the warning names the layer', () => {
+    expect(toLottie(doc(), reg).warnings.join(' | ')).toMatch(/"Card" is turned or pinned in perspective: drawn flat/);
+  });
+
+  it('are exported flat to SVG, and the warning names the layer', () => {
+    expect(toSvg(doc(), reg, 0).warnings.join(' | ')).toMatch(/"Card" is turned or pinned in perspective: drawn flat/);
+  });
+});
+
 describe('export Lottie', () => {
   const { lottie, warnings } = toLottie(load('packages/interop/test/fixtures/showcase.tramme.json'), reg);
   const byName = (layers: any[], nm: string) => layers.find((l) => l.nm === nm);

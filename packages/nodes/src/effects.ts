@@ -52,6 +52,23 @@ export const shadow: EffectType<{ color: string; blur: number; offset: [number, 
   },
 };
 
+/**
+ * Pins the layer's picture on four corners (composition pixels): the render
+ * draws the layer alone, then carries its box onto them. It has no filter and
+ * no GLSL: the layer pass of the renderer reads it. All four corners equal
+ * (the default) is "not set": the layer is drawn as it is.
+ */
+export const pin: EffectType<{ tl: [number, number]; tr: [number, number]; br: [number, number]; bl: [number, number] }> = {
+  type: 'fx.pin', title: 'Corner pin', category: 'Distort', stage: 'layer',
+  description: "carries the layer's picture onto four corners, in perspective: a screen on a monitor, a card on a table",
+  props: {
+    tl: { type: 'vec2', default: [0, 0], unit: 'px', label: 'Top left' },
+    tr: { type: 'vec2', default: [0, 0], unit: 'px', label: 'Top right' },
+    br: { type: 'vec2', default: [0, 0], unit: 'px', label: 'Bottom right' },
+    bl: { type: 'vec2', default: [0, 0], unit: 'px', label: 'Bottom left' },
+  },
+};
+
 const glows = (strength: number) => Math.max(1, Math.min(4, Math.round(strength)));
 
 export const glow: EffectType<{ color: string; radius: number; strength: number }> = {

@@ -6,7 +6,7 @@
 import { signal } from '@preact/signals';
 import type { ComponentChildren } from 'preact';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { Evaluator, getAt, layerActive, pointer, propKind, anchorShift, movePathVertex, setPathTangent, insertPathVertex, removePathVertex, nearestOnPath, pathD, localFrame, neighbourDrawings, type Composition, type TrammeDoc, type EvaluatedLayer, type Handle, type PathValue, type Prop, type Rect, type Vec2 } from '@tramme/core';
+import { DEFAULT_PERSPECTIVE, Evaluator, getAt, isTilted, staticValue, tiltQuad, layerActive, pointer, propKind, anchorShift, movePathVertex, setPathTangent, insertPathVertex, removePathVertex, nearestOnPath, pathD, localFrame, neighbourDrawings, type Composition, type TrammeDoc, type EvaluatedLayer, type Handle, type PathValue, type Prop, type Rect, type Vec2 } from '@tramme/core';
 import { drawingRect } from '@tramme/nodes';
 import { localMatrix } from '@tramme/render';
 import { comp, commit, draft, cancelDraft, S, select, viewDoc, previewDoc, toast, uiTime } from '../state.ts';
@@ -46,6 +46,15 @@ function geometry(ev: Evaluator, c: Composition, compId: string, id: string, t: 
 const corners = (b: Rect): Vec2[] => [[b.x, b.y], [b.x + b.w, b.y], [b.x + b.w, b.y + b.h], [b.x, b.y + b.h]];
 const apply = (m: DOMMatrix, [x, y]: Vec2): Vec2 => { const p = m.transformPoint(new DOMPoint(x, y)); return [p.x, p.y]; };
 const poly = (pts: Vec2[]) => pts.map((p) => p.join(',')).join(' ');
+
+/** where a layer's box lands on the stage: through its 2D matrix, or its projected quad when it is turned around x or y */
+function outline(g: Geo, c: Composition): Vec2[] {
+  if (isTilted(g.layer.transform)) {
+    const q = tiltQuad(g.bounds, g.layer.transform, [g.parent.a, g.parent.b, g.parent.c, g.parent.d, g.parent.e, g.parent.f], Number(staticValue(c.camera?.perspective)) || DEFAULT_PERSPECTIVE);
+    if (q) return q;
+  }
+  return corners(g.bounds).map((p) => apply(g.matrix, p));
+}
 
 function inside(g: Geo, p: Vec2): boolean {
   const q = g.matrix.inverse().transformPoint(new DOMPoint(p[0], p[1]));
@@ -507,10 +516,10 @@ export function Viewport({ bare = false, inset = INSET, overlay, intercept }: Vi
             <text class="safe-label" x={z.rect.x + 6 / scale} y={z.rect.y - 6 / scale} style={{ fontSize: 10 / scale }}>{z.label}</text>
           </g>)}
           {onionSkin()}
-          {hoverGeo && <polygon class="gizmo-hover" points={poly(corners(hoverGeo.bounds).map((p) => apply(hoverGeo.matrix, p)))} />}
-          {!bare && selected.length > 1 && selected.map((id) => { const g = geometry(ev, c, compId, id, now); return g && <polygon key={id} class="gizmo-box" points={poly(corners(g.bounds).map((p) => apply(g.matrix, p)))} />; })}
+          {hoverGeo && <polygon class="gizmo-hover" points={poly(outline(hoverGeo, c))} />}
+          {!bare && selected.length > 1 && selected.map((id) => { const g = geometry(ev, c, compId, id, now); return g && <polygon key={id} class="gizmo-box" points={poly(outline(g, c))} />; })}
           {geo && (() => {
-            const pts = corners(geo.bounds).map((p) => apply(geo.matrix, p));
+            const pts = outline(geo, c);
             const tr = geo.layer.transform;
             const anchor = apply(geo.parent, tr.position);
             const topMid: Vec2 = [(pts[0][0] + pts[1][0]) / 2, (pts[0][1] + pts[1][1]) / 2];

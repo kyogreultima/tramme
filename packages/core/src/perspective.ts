@@ -27,23 +27,29 @@ const rad = (deg: number) => (deg * Math.PI) / 180;
  * Null when a corner sits at or behind the eye.
  */
 export function tiltQuad(box: Rect, t: EvaluatedTransform, parent: Mat2D, perspective: number): Quad | null {
-  const cx = Math.cos(rad(t.rotationX ?? 0)), sx = Math.sin(rad(t.rotationX ?? 0));
-  const cy = Math.cos(rad(t.rotationY ?? 0)), sy = Math.sin(rad(t.rotationY ?? 0));
-  // the 2D part, without the anchor (the turn already happened around it)
-  const m = matMul(parent, layerMatrix({ ...t, anchor: [0, 0] }));
   const corners: Vec2[] = [[box.x, box.y], [box.x + box.w, box.y], [box.x + box.w, box.y + box.h], [box.x, box.y + box.h]];
   const out: Vec2[] = [];
-  for (const [px, py] of corners) {
-    const x0 = px - t.anchor[0], y0 = py - t.anchor[1];
-    // z is positive away from the viewer
-    const y1 = y0 * cx, z1 = -y0 * sx;
-    const x2 = x0 * cy - z1 * sy, z2 = x0 * sy + z1 * cy;
-    const d = perspective + z2;
-    if (d <= 1) return null;
-    const k = perspective / d;
-    out.push(applyMat(m, [x2 * k, y1 * k]));
+  for (const p of corners) {
+    const q = tiltPoint(p, t, parent, perspective);
+    if (!q) return null;
+    out.push(q);
   }
   return out as Quad;
+}
+
+/** where one point of a layer's local space lands (see tiltQuad); null at or behind the eye */
+export function tiltPoint([px, py]: Vec2, t: EvaluatedTransform, parent: Mat2D, perspective: number): Vec2 | null {
+  const cx = Math.cos(rad(t.rotationX ?? 0)), sx = Math.sin(rad(t.rotationX ?? 0));
+  const cy = Math.cos(rad(t.rotationY ?? 0)), sy = Math.sin(rad(t.rotationY ?? 0));
+  const x0 = px - t.anchor[0], y0 = py - t.anchor[1];
+  // z is positive away from the viewer
+  const y1 = y0 * cx, z1 = -y0 * sx;
+  const x2 = x0 * cy - z1 * sy, z2 = x0 * sy + z1 * cy;
+  const d = perspective + z2;
+  if (d <= 1) return null;
+  const k = perspective / d;
+  // the 2D part, without the anchor (the turn already happened around it)
+  return applyMat(matMul(parent, layerMatrix({ ...t, anchor: [0, 0] })), [x2 * k, y1 * k]);
 }
 
 /** the quad of a layer's box: the turned and projected one when it is tilted, else the box through the 2D matrix */
