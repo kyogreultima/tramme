@@ -17,6 +17,8 @@ const EXT: Record<MediaKind, Record<string, string>> = {
   video: { 'video/mp4': 'mp4', 'video/webm': 'webm', 'video/quicktime': 'mov' },
 };
 const FALLBACK: Record<MediaKind, string> = { image: 'png', video: 'mp4' };
+/** the extension a file of this type is kept under */
+export const extOf = (kind: MediaKind, type: string) => EXT[kind][type] ?? FALLBACK[kind];
 const NAME_FALLBACK: Record<MediaKind, string> = { image: 'picture', video: 'clip' };
 
 export const slugOf = (name: string, fallback = 'media') => name.toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 56) || fallback;
@@ -51,7 +53,7 @@ export interface KeptMedia {
 export async function keepMedia(ctx: ToolContext, kind: MediaKind, name: string, blob: Blob, made: unknown): Promise<KeptMedia> {
   const slug = slugOf(name, NAME_FALLBACK[kind]);
   const asset = `${PREFIX[kind]}${slug}`.slice(0, 64);
-  const src = await ctx.writeFile(`${DIR[kind]}/${slug}.${EXT[kind][blob.type] ?? FALLBACK[kind]}`, blob);
+  const src = await ctx.writeFile(`${DIR[kind]}/${slug}.${extOf(kind, blob.type)}`, blob);
   await ctx.writeFile(`${DIR[kind]}/${slug}${RECORD[kind]}`, JSON.stringify(made, null, 1));
   const had = !!ctx.doc.assets[asset];
   return { asset, src, reload: had ? [asset] : [], ops: [{ op: had ? 'replace' : 'add', path: pointer('assets', asset), value: { type: kind, src, name } }] };

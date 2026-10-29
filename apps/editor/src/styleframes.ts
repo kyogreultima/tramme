@@ -9,8 +9,10 @@ import type { MadeImage } from './api.ts';
 import { alone, chooseAmong } from './confirm.ts';
 import { FILM_PLAN_PATH, parsePlan, planOp, type Direction, type FilmPlan, type PlanScene, type StyleFrame } from './filmplan.ts';
 import { CHANGERS, FRAMES_DIR, drawTakes, holdTakes, ratioOf, referenceOf, takeHeld, takeSheet } from './images.ts';
+import { extOf } from './media.ts';
 import { clip, slug } from './model.ts';
 import { canvas, paletteOf, paletteOps } from './perception.ts';
+import { planMatches } from './forms.ts';
 import { scenesOf } from './scenes.ts';
 import { prefs } from './settings.ts';
 import { t } from './i18n/index.ts';
@@ -18,7 +20,6 @@ import { t } from './i18n/index.ts';
 const FINISHED = 'A frame from a finished, art-directed film: every element designed, nothing generic.';
 const OVER = "Redraw the picture given as this finished frame: keep its subject and composition, and bring its style, light, materials and palette to the direction's.";
 const BUILD_FROM_WORDS = "build from the direction's words (type, palette, light, materials, framing) instead";
-const EXT: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
 
 /** a finished frame of the film at the composition's proportions: the scene's idea, then the direction's five fields */
 export function framePrompt(plan: FilmPlan, d: Direction, scene: PlanScene, format: { width: number; height: number }): string {
@@ -39,7 +40,7 @@ const text = (s: string): ToolOutput => ({ ops: [], text: s });
 /** the frame kept as the target: its file and record, the plan, the palette of the film */
 async function keepFrame(ctx: ToolContext, plan: FilmPlan, scene: string, d: Direction, made: MadeImage, prompt: string, take?: number): Promise<ToolOutput> {
   const base = `${FRAMES_DIR}${scene}-${slug(d.name)}`;
-  const path = await ctx.writeFile(`${base}.${EXT[made.blob.type] ?? 'jpg'}`, made.blob);
+  const path = await ctx.writeFile(`${base}.${extOf('image', made.blob.type)}`, made.blob);
   await ctx.writeFile(`${base}.json`, JSON.stringify({ prompt, provider: made.provider, model: made.model, direction: d.name, scene, ...(take ? { take } : {}) }, null, 1));
   const entry: StyleFrame = { path, direction: d.name, scene, provider: made.provider, model: made.model };
   const next: FilmPlan = {
@@ -99,7 +100,7 @@ const styleFrames: ToolType<Input> = {
     // one frame per direction (at most the count), or the takes of the only one
     const n = a.count ?? p.styleFrames;
     const jobs = plan.directions.length > 1 ? plan.directions.slice(0, n).map((d) => ({ d, n: 1 })) : [{ d: plan.directions[0], n }];
-    const at = scenesOf(ctx.doc, ctx.compId).find((s) => s.name.toLowerCase() === scene.name.toLowerCase() || s.id === scene.id)?.from ?? ctx.time;
+    const at = scenesOf(ctx.doc, ctx.compId).find((s) => planMatches(scene, s))?.from ?? ctx.time;
     const ref = a.over ? await referenceOf(ctx, { source: 'frame', at }) : null;
     const made: MadeImage[] = [], meta: HeldFrames['frames'] = [];
     let stopped = '';
