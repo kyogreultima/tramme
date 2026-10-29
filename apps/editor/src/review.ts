@@ -7,6 +7,8 @@ import { Evaluator, groupIssues, motionReport, REPORT_MAX, reportCounts, reportH
 import { pixelsOf, flowLines } from './flow.ts';
 import { analyses, canvas } from './perception.ts';
 import { masterText, soundReport } from './mixing.ts';
+import { FILM_PLAN_PATH, parsePlan } from './filmplan.ts';
+import { formLines } from './forms.ts';
 import { t } from './i18n/index.ts';
 
 const CELL = 360;
@@ -91,11 +93,13 @@ const check: ToolType<{ frames?: number }> = {
     const { warnings, notes } = reportCounts(issues);
     const { lines, notice: shown } = issueReport(issues, ctx.doc, ctx.compId);
     const head = reportHead(issues);
+    // the form each scene is built in: notes beside the issues, which the cap above does not count
+    const forms = formLines(ctx.doc, ctx.compId, parsePlan(await ctx.readText(FILM_PLAN_PATH).catch(() => null)), ctx.registry);
     // the sound: its master, the picture of the mix, and the moments a human checks by ear
     const listen = sound.listen.map((x) => `${x.toFixed(2)} s`).join(', ');
     const heard = sound.master ? `\n${masterText(sound.master)} The picture of the mix shows the master's waveform and spectrogram over the motion of the picture, a line at each effect (heroes red): an effect away from a motion, two hits in one place, a hit with no body show there.${listen ? ` Ask the user to listen at ${listen}: you cannot hear, they do the final listen.` : ''}` : '';
     return {
-      text: `${head}\n${lines.join('\n')}\nContact sheet at ${times.map((x) => `${x} s`).join(', ')}: judge the composition, the hierarchy and the rhythm.${heard}`,
+      text: `${head}\n${lines.join('\n')}${forms.map((l) => `\n${l}`).join('')}\nContact sheet at ${times.map((x) => `${x} s`).join(', ')}: judge the composition, the hierarchy and the rhythm.${heard}`,
       notice: [issues.length ? t('review.issues', { warnings, notes }) : t('review.noIssue'), ...shown, ...(listen ? [t('review.listen', { times: listen })] : [])].join('\n'),
       images: [{ url, caption: t('review.contactSheet') }, ...(sound.image ? [{ url: sound.image, caption: t('review.mixPicture') }] : [])],
     };
