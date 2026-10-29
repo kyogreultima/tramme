@@ -6,7 +6,7 @@
 // target, are recorded in the same file.
 
 import { pointer, type Op, type ToolType, type TrammeDoc } from '@tramme/core';
-import { t } from './i18n/index.ts';
+import { m, t } from './i18n/index.ts';
 import { slug } from './model.ts';
 
 export const FILM_PLAN_PATH = 'assets/film-plan.json';
@@ -26,6 +26,11 @@ export const KIND_LINE: Record<PictureKind, string> = {
   map: 'a place, a route',
 };
 export const PICTURE_KINDS = Object.keys(KIND_LINE) as PictureKind[];
+/** what each kind is called to the user (the studio's direction panel) */
+export const KIND_LABEL: Record<PictureKind, string> = {
+  interface: m('studio.kinds.interface'), type: m('studio.kinds.type'), object: m('studio.kinds.object'), data: m('studio.kinds.data'), diagram: m('studio.kinds.diagram'),
+  photo: m('studio.kinds.photo'), '3d': m('studio.kinds.3d'), character: m('studio.kinds.character'), map: m('studio.kinds.map'),
+};
 
 export interface Direction { name: string; type: string; palette: string; light: string; materials: string; framing: string }
 export interface PlanScene { id: string; name: string; kind: PictureKind; idea: string; hero?: boolean; comp?: string; seconds?: number }

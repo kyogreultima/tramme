@@ -1568,8 +1568,23 @@
       "redo": "Redo it",
       "redoWords": "Redo this scene: "
     },
+    "kinds": {
+      "interface": "Interface",
+      "type": "Type",
+      "object": "Object",
+      "data": "Data",
+      "diagram": "Diagram",
+      "photo": "Photo",
+      "3d": "3D",
+      "character": "Character",
+      "map": "Map"
+    },
     "direction": {
       "title": "Direction",
+      "plan": "The film plan",
+      "target": "The style frame the film is built toward",
+      "otherFrames": "Other frames",
+      "otherFramesWords": "Draw other style frames for this film, from directions different from the one kept, and keep the strongest as the target.",
       "brief": "The brief",
       "briefHint": "What Tramme follows, over its own habits. It writes it from your material and your notes; correct it here.",
       "about": "About",

@@ -121,7 +121,7 @@ export const STAGE_LABEL: Record<Stage, string> = {
 };
 
 const READING = new Set(['get_document', 'list_nodes', 'read_file', 'list_files', 'get_transcript', 'media_frame', 'evaluate']);
-const DIRECTING = new Set(['brief', 'palette']);
+const DIRECTING = new Set(['brief', 'palette', 'film-plan', 'style-frames']);
 const REVIEWING = new Set(['check', 'motion', 'subjects']);
 const SOUND = /^(sfx|synth|generate-sound|duck|mix|cues|credits|voices|sound-)/;
 
