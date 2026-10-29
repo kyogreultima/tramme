@@ -185,18 +185,12 @@ const compare: ToolType<{ target?: string; t?: number; compId?: string }> = {
     const id = compId ?? ctx.compId, comp = ctx.doc.compositions[id];
     if (!comp) throw new Error(`unknown composition: ${id}`);
     const time = Math.max(0, Math.min(at ?? ctx.time, comp.duration));
-    const [render, goal] = await Promise.all([ctx.renderStill(time, id).then(decode), decode(url)]);
-    // both on one canvas size, the render's shape; the target covers it
-    const W = comp.width >= comp.height ? SIDE : Math.round((SIDE * comp.width) / comp.height), H = comp.width >= comp.height ? Math.round((SIDE * comp.height) / comp.width) : SIDE;
-    const a = canvas(W, H), b = canvas(W, H), c = coverRect({ w: goal.naturalWidth, h: goal.naturalHeight }, { w: W, h: H });
-    a.g.drawImage(render, 0, 0, W, H);
-    b.g.drawImage(goal, c.sx, c.sy, c.sw, c.sh, 0, 0, W, H);
-    const pa = { data: a.g.getImageData(0, 0, W, H).data, width: W, height: H }, pb = { data: b.g.getImageData(0, 0, W, H).data, width: W, height: H };
+    const { a, b, pa, pb, goal, W, H } = await renderAndTarget(ctx, url, id, time);
     const { image } = pictureDiff(pa, pb, { diff: true });
     const d = canvas(W, H);
     d.g.putImageData(new ImageData(new Uint8ClampedArray(image!), W, H), 0, 0);
     const like = likeness(pa, pb);
-    const url2 = sheetOf([{ image: a.c, label: `${time.toFixed(2)} s` }, { image: b.c, label: 'target' }, { image: d.c, label: 'difference' }], W, H, 3);
+    const url2 = sheetOf([{ image: a, label: `${time.toFixed(2)} s` }, { image: b, label: 'target' }, { image: d.c, label: 'difference' }], W, H, 3);
     const note = proportionNote({ w: comp.width, h: comp.height }, { w: goal.naturalWidth, h: goal.naturalHeight });
     return {
       text: `Likeness to the target ${like.score}/100: palette ${like.palette}, layout ${like.layout}, light ${like.light}. ${like.words.length ? `What differs most: ${like.words.join('; ')}.` : 'Nothing stands out.'}${note ? ` ${note}` : ''} The sheet shows the render, the target and their difference (red). The score is a guide: the frame is a target in look, not in content, so judge by eye first.`,
@@ -205,6 +199,23 @@ const compare: ToolType<{ target?: string; t?: number; compId?: string }> = {
     };
   },
 };
+
+/**
+ * The render of a moment and a target picture on one canvas size, the render's
+ * shape, the target fitted to cover it: both canvases and their pixels, and the
+ * target as it was (for its proportions). The compare tool and the critic read
+ * the same pair.
+ */
+export async function renderAndTarget(ctx: ToolContext, url: string, compId: string, time: number) {
+  const comp = ctx.doc.compositions[compId];
+  const [render, goal] = await Promise.all([ctx.renderStill(time, compId).then(decode), decode(url)]);
+  const W = comp.width >= comp.height ? SIDE : Math.round((SIDE * comp.width) / comp.height), H = comp.width >= comp.height ? Math.round((SIDE * comp.height) / comp.width) : SIDE;
+  const a = canvas(W, H), b = canvas(W, H), c = coverRect({ w: goal.naturalWidth, h: goal.naturalHeight }, { w: W, h: H });
+  a.g.drawImage(render, 0, 0, W, H);
+  b.g.drawImage(goal, c.sx, c.sy, c.sw, c.sh, 0, 0, W, H);
+  const pa = { data: a.g.getImageData(0, 0, W, H).data, width: W, height: H }, pb = { data: b.g.getImageData(0, 0, W, H).data, width: W, height: H };
+  return { a: a.c, b: b.c, pa, pb, goal, W, H };
+}
 
 /** an image at an address, decoded */
 async function decode(url: string): Promise<HTMLImageElement> {

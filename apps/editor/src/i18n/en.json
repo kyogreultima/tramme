@@ -1069,6 +1069,8 @@
     "notifyDone": "Tell me when the assistant is done",
     "resume": "Go on after a network failure",
     "resumeHint": "A task cut by the network or a busy server starts again by itself, waiting longer each time (2 s to 1 min, 6 attempts). Never after a used-up quota or a refused key.",
+    "criticRounds": "Critic rounds",
+    "criticRoundsHint": "How many times the film is reviewed by a model that did not make it, in one turn (0 turns the critic off). Each review costs a request on the strongest model.",
     "cacheTtl": "Conversation cache",
     "cacheTtlHint": "How long Claude keeps the conversation ready, through the server's key. 5 minutes is the cheapest to write; an hour costs more to write and less when you come back after more than five minutes.",
     "cacheTtl5m": "5 minutes",
@@ -1385,6 +1387,13 @@
     "motionStrip": "Movement from {from} to {to} s",
     "compared": "Likeness to the target {score} of 100",
     "compareSheet": "Render, target and difference"
+  },
+  "critic": {
+    "measured": "{n} thing(s) missing by measure",
+    "nothingMeasured": "Nothing missing by measure",
+    "failed": "The critic could not answer: {error}",
+    "done": "The critic says the film is done",
+    "notYet": "The critic says not yet: {n} thing(s) to fix"
   },
   "blocks": {
     "saved": "Block \"{name}\" saved.",

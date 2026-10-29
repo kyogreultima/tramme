@@ -1,9 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { newProject } from '@tramme/project';
 import { builtinRegistry } from '@tramme/nodes';
 import type { QualityIssue, TrammeDoc } from '@tramme/core';
 import { factsOf, momentsOf, stripPictures } from '../src/critic/evidence.ts';
 import { doneIssues } from '../src/critic/done.ts';
+import { CRITIC_TOOLS as criticTools, consultsOf, resetCritic, setCriticHost } from '../src/critic/tool.ts';
 
 const registry = builtinRegistry();
 
@@ -106,30 +107,31 @@ describe('what the critic is told', () => {
   });
 });
 
+/** two scenes of 4 s as compositions, overlapping by 0.4 s: each has a picture, its words in two sizes, a hero marker, a music layer, nothing provisional */
+function good(): TrammeDoc {
+  const { doc } = newProject({ name: 'G', width: 1920, height: 1080, fps: 30, duration: 8 });
+  doc.assets.pic = { type: 'image', src: 'assets/pic.png', name: 'Pic' } as never;
+  doc.assets.snd = { type: 'audio', src: 'assets/snd.mp3', name: 'Snd' } as never;
+  const root = doc.compositions[doc.root];
+  const scene = (name: string) => ({ name, width: 1920, height: 1080, fps: 30, duration: 4, layers: {
+    pic: { type: 'image', name: 'Picture', props: { image: 'pic', size: [1200, 800] } },
+    title: { type: 'text', name: 'Title', props: { text: 'A clear idea', size: 96 } },
+    sub: { type: 'text', name: 'Sub', props: { text: 'told in a line', size: 40 } },
+    note: { type: 'text', name: 'Note', props: { text: 'and a detail', size: 40 } },
+  }, order: ['pic', 'title', 'sub', 'note'] });
+  doc.compositions.s1 = scene('Scene 1') as never;
+  doc.compositions.s2 = scene('Scene 2') as never;
+  root.layers = {
+    c1: { type: 'comp', name: 'Scene 1', in: 0, out: 4, props: { comp: 's1' } },
+    c2: { type: 'comp', name: 'Scene 2', in: 3.6, out: 8, props: { comp: 's2' } },
+    music: { type: 'audio', name: 'Music', props: { audio: 'snd' } },
+  } as never;
+  root.order = ['c1', 'c2', 'music'];
+  root.markers = [{ id: 'h', t: 5, label: 'The point', kind: 'hero' }];
+  return doc;
+}
+
 describe('what done means, measured', () => {
-  /** two scenes of 4 s as compositions, overlapping by 0.4 s: each has a picture, its words in two sizes, a hero marker, a music layer, nothing provisional */
-  function good(): TrammeDoc {
-    const { doc } = newProject({ name: 'G', width: 1920, height: 1080, fps: 30, duration: 8 });
-    doc.assets.pic = { type: 'image', src: 'assets/pic.png', name: 'Pic' } as never;
-    doc.assets.snd = { type: 'audio', src: 'assets/snd.mp3', name: 'Snd' } as never;
-    const root = doc.compositions[doc.root];
-    const scene = (name: string) => ({ name, width: 1920, height: 1080, fps: 30, duration: 4, layers: {
-      pic: { type: 'image', name: 'Picture', props: { image: 'pic', size: [1200, 800] } },
-      title: { type: 'text', name: 'Title', props: { text: 'A clear idea', size: 96 } },
-      sub: { type: 'text', name: 'Sub', props: { text: 'told in a line', size: 40 } },
-      note: { type: 'text', name: 'Note', props: { text: 'and a detail', size: 40 } },
-    }, order: ['pic', 'title', 'sub', 'note'] });
-    doc.compositions.s1 = scene('Scene 1') as never;
-    doc.compositions.s2 = scene('Scene 2') as never;
-    root.layers = {
-      c1: { type: 'comp', name: 'Scene 1', in: 0, out: 4, props: { comp: 's1' } },
-      c2: { type: 'comp', name: 'Scene 2', in: 3.6, out: 8, props: { comp: 's2' } },
-      music: { type: 'audio', name: 'Music', props: { audio: 'snd' } },
-    } as never;
-    root.order = ['c1', 'c2', 'music'];
-    root.markers = [{ id: 'h', t: 5, label: 'The point', kind: 'hero' }];
-    return doc;
-  }
   const ids = (doc: TrammeDoc, issues: QualityIssue[] = [], plan = null as never) => [...new Set(doneIssues(doc, 'main', registry, plan, issues).map((i) => i.id))];
   const issue = (check: string, severity: 'warning' | 'info', extra: Partial<QualityIssue> = {}): QualityIssue => ({ check, severity, t: 5, rank: 1, layers: [], message: `${check}`, ...extra });
 
@@ -233,5 +235,122 @@ describe('what done means, measured', () => {
     expect(ids(good(), [issue('text-size', 'warning')])).toEqual(['readable']);
     expect(ids(good(), [issue('text-time', 'warning')])).toEqual(['readable']);
     expect(ids(good(), [issue('text-size', 'info')])).toEqual([]);
+  });
+});
+
+describe('the critique tool', () => {
+  const usage = { requests: 1, input: 1000, cacheRead: 0, cacheWrite: 0, cacheWrite1h: 0, output: 100 };
+  const EVIDENCE = { strips: [{ url: 'data:image/jpeg;base64,AAAA', caption: 'Strips 1. cut (3.0 s)' }], target: 'data:image/jpeg;base64,BBBB', plan: 'Idea: x', facts: 'Format 1920 x 1080.', moments: [], issues: [] };
+  const answer = (verdict: object) => JSON.stringify(verdict);
+  const calls: { text: string; images: number }[] = [];
+  let reply = answer({ verdict: 'done', score: 9, fixes: [] });
+  let failing = false;
+
+  const ctxOf = (doc: TrammeDoc) => ({ doc, compId: 'main', time: 0, selection: [], registry, readText: async () => null, files: async () => [], assetUrl: () => '', fileUrl: () => '', signal: new AbortController().signal }) as never;
+  const critique = criticTools.find((t) => t.name === 'critique')!;
+  const run = (doc: TrammeDoc, input: object = {}) => critique.run(input as never, ctxOf(doc)) as Promise<{ text?: string; notice?: string }>;
+
+  beforeEach(() => {
+    calls.length = 0; reply = answer({ verdict: 'done', score: 9, fixes: [] }); failing = false;
+    resetCritic();
+    setCriticHost({
+      via: () => ({ route: 'server', model: 'claude-opus-5-5' }),
+      rounds: () => 2,
+      gather: async () => EVIDENCE,
+      likeness: async () => null,
+      consult: async (req) => { if (failing) throw new Error('overloaded'); calls.push({ text: req.text, images: req.images.length }); return { text: reply, usage }; },
+    });
+  });
+
+  it('says done when nothing is missing by measure and the critic says done', async () => {
+    const out = await run(good());
+    expect(out.text).toContain('Verdict: done');
+    expect(out.text).toContain('Score 9/10');
+    expect(calls).toHaveLength(1);
+    // the target first, then the strips; the facts and the plan are in the text
+    expect(calls[0].images).toBe(2);
+    expect(calls[0].text).toContain('Format 1920 x 1080.');
+    expect(calls[0].text).toContain('Idea: x');
+  });
+
+  it('says not yet while something is missing by measure, whatever the critic says, the measured line first', async () => {
+    const doc = good();
+    delete doc.compositions.main.layers.music;
+    const out = await run(doc);
+    expect(out.text).toContain('Verdict: not yet');
+    expect(out.text!.indexOf('the film has no sound')).toBeGreaterThan(-1);
+    expect(out.text!.indexOf('the film has no sound')).toBeLessThan(out.text!.indexOf('Verdict'));
+    expect(out.text).toMatch(/not to be argued with/i);
+  });
+
+  it('lists the three fixes the critic gives, with their scene, what and why', async () => {
+    reply = answer({ verdict: 'not yet', score: 5, fixes: [{ scene: 'Price', what: 'push onto the figure', why: 'it is the point' }] });
+    const out = await run(good());
+    expect(out.text).toContain('Price: push onto the figure');
+    expect(out.text).toContain('it is the point');
+  });
+
+  it('asks for takes when a scene is named a second time in the turn', async () => {
+    reply = answer({ verdict: 'not yet', score: 5, fixes: [{ scene: 'Price', what: 'a', why: 'b' }] });
+    expect((await run(good())).text).not.toContain('failed twice');
+    const second = await run(good());
+    expect(second.text).toContain('Price failed twice');
+    expect(second.text).toContain('scene-takes');
+  });
+
+  it('makes no consult once the rounds are used, and says what is left to raise in the summary', async () => {
+    setCriticHost({ rounds: () => 1 });
+    await run(good());
+    const out = await run(good());
+    expect(calls).toHaveLength(1);
+    expect(out.text).toMatch(/rounds are used/);
+    expect(out.text).toMatch(/summary/);
+  });
+
+  it('makes no consult with zero rounds, and gives only the measured issues', async () => {
+    setCriticHost({ rounds: () => 0 });
+    const doc = good();
+    delete doc.compositions.main.layers.music;
+    const out = await run(doc);
+    expect(calls).toHaveLength(0);
+    expect(out.text).toContain('the film has no sound');
+    expect(out.text).toMatch(/critic is off/i);
+  });
+
+  it('makes no consult with a model that cannot see, and says why', async () => {
+    setCriticHost({ via: () => ({ route: 'local', model: 'local:llama3.1:8b' }) });
+    const out = await run(good());
+    expect(calls).toHaveLength(0);
+    expect(out.text).toMatch(/needs a model that sees pictures/);
+  });
+
+  it('reports a consult that fails and does not count the round', async () => {
+    setCriticHost({ rounds: () => 1 });
+    failing = true;
+    const out = await run(good());
+    expect(out.text).toContain('overloaded');
+    failing = false;
+    await run(good());
+    expect(calls).toHaveLength(1);
+  });
+
+  it('reports a critic that answers in prose as not yet, with its words', async () => {
+    reply = 'Looks fine to me, done.';
+    const out = await run(good());
+    expect(out.text).toContain('Verdict: not yet');
+    expect(out.text).toContain('Looks fine to me, done.');
+  });
+
+  it('adds what the consults cost to the turn, apart: two consults, n: 2', async () => {
+    await run(good());
+    await run(good());
+    expect(consultsOf()).toMatchObject({ n: 2, input: 2000, output: 200, model: 'claude-opus-5-5' });
+    resetCritic();
+    expect(consultsOf()).toBeUndefined();
+  });
+
+  it('says there is no route when none is available', async () => {
+    setCriticHost({ via: () => null });
+    await expect(run(good())).rejects.toThrow(/no assistant/i);
   });
 });

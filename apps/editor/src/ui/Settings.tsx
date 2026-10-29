@@ -414,6 +414,9 @@ function Behavior() {
       <Row label={t('settings.resume')} hint={t('settings.resumeHint')}>
         <Toggle on={a.resume} onChange={(on) => setAiSettings({ resume: on })} />
       </Row>
+      <Row label={t('settings.criticRounds')} hint={t('settings.criticRoundsHint')}>
+        <Level value={a.criticRounds} min={0} max={4} unit="" onChange={(v) => setAiSettings({ criticRounds: v })} />
+      </Row>
       <Row label={t('settings.cacheTtl')} hint={t('settings.cacheTtlHint')}>
         <Seg value={a.cacheTtl} options={[['5m', t('settings.cacheTtl5m')], ['1h', t('settings.cacheTtl1h')]]} onChange={(v) => setAiSettings({ cacheTtl: v as AiSettings['cacheTtl'] })} />
       </Row>

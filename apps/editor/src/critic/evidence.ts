@@ -109,11 +109,11 @@ export interface Evidence {
   issues: QualityIssue[];
 }
 
-/** the evidence of a film: its checks, its moments, a strip around each, the style frame it was made towards, the plan and the facts */
-export async function gather(ctx: ToolContext, compId: string): Promise<Evidence> {
+/** the evidence of a film (its checks, when they were run already are passed): its checks, its moments, a strip around each, the style frame it was made towards, the plan and the facts */
+export async function gather(ctx: ToolContext, compId: string, checked?: QualityIssue[]): Promise<Evidence> {
   const doc = ctx.doc, comp = doc.compositions[compId];
   const plan = parsePlan(await ctx.readText(FILM_PLAN_PATH).catch(() => null));
-  const issues = await runChecks(doc, ctx.registry, compId, { data: await analyses(ctx) });
+  const issues = checked ?? await runChecks(doc, ctx.registry, compId, { data: await analyses(ctx) });
   const moments = momentsOf(doc, compId, ctx.registry, issues);
   const shown = moments.slice(0, PER_PICTURE * PICTURES);
   const times = shown.map((m) => AROUND.map((o) => +Math.min(Math.max(0, m.t + o), Math.max(0, comp.duration - 0.01)).toFixed(3)));

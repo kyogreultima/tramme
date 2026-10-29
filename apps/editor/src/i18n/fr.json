@@ -1069,6 +1069,8 @@
     "notifyDone": "Me prévenir quand l'assistant a fini",
     "resume": "Reprendre après une coupure réseau",
     "resumeHint": "Une tâche coupée par le réseau ou un serveur surchargé repart seule, en attendant un peu plus à chaque fois (de 2 s à 1 min, 6 essais). Jamais après un quota épuisé ou une clé refusée.",
+    "criticRounds": "Tours du critique",
+    "criticRoundsHint": "Combien de fois le film est relu, en un tour, par un modèle qui ne l’a pas fait (0 coupe le critique). Chaque relecture coûte une requête sur le modèle le plus fort.",
     "cacheTtl": "Cache de la conversation",
     "cacheTtlHint": "Combien de temps Claude garde la conversation prête, par la clé du serveur. 5 minutes est le moins cher à écrire ; une heure coûte plus cher à écrire et moins quand vous revenez après plus de cinq minutes.",
     "cacheTtl5m": "5 minutes",
@@ -1385,6 +1387,13 @@
     "motionStrip": "Mouvement de {from} à {to} s",
     "compared": "Ressemblance à la cible : {score} sur 100",
     "compareSheet": "Rendu, cible et différence"
+  },
+  "critic": {
+    "measured": "{n} point(s) manquant(s) à la mesure",
+    "nothingMeasured": "Rien ne manque à la mesure",
+    "failed": "Le critique n’a pas pu répondre : {error}",
+    "done": "Le critique dit que le film est terminé",
+    "notYet": "Le critique dit pas encore : {n} point(s) à corriger"
   },
   "blocks": {
     "saved": "Bloc « {name} » enregistré.",
@@ -1913,6 +1922,11 @@
     "Studio top": "Studio, haut",
     "Studio bottom": "Studio, bas",
     "the square frame the solid is drawn in": "le cadre carré où le solide est dessiné",
+    "Review the film": "Relire le film",
+    "a review of the film by a model that did not make it, in a fresh context: it checks what done means by measure, looks at strips of the film around every cut and entrance against the style frame, and answers done or not yet with the three things that matter most": "une relecture du film par un modèle qui ne l’a pas fait, dans un contexte neuf : il vérifie à la mesure ce que « terminé » veut dire, regarde des bandes du film autour de chaque coupe et de chaque entrée face à l’image de style, et répond terminé ou pas encore avec les trois choses qui comptent le plus",
+    "the film; the one on screen by default": "le film ; celui à l’écran par défaut",
+    "Takes": "Prises",
+    "the compositions that are takes of one scene (use_tool \"scene-takes\"): the critic compares them and names the best": "les compositions qui sont des prises d’une même scène (use_tool « scene-takes ») : le critique les compare et nomme la meilleure",
     "Look at a movement": "Regarder un mouvement",
     "Loop": "Boucle",
     "Loop the section": "Boucler la section",
