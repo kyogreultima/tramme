@@ -26,7 +26,8 @@
     "tramme": "node packages/cli/src/main.ts",
     "edit": "node packages/cli/src/main.ts edit",
     "schema": "node packages/cli/src/main.ts schema",
-    "packs:index": "node scripts/packs/index.ts"
+    "packs:index": "node scripts/packs/index.ts",
+    "typefaces:catalogue": "node scripts/typefaces/catalogue.ts"
   },
   "engines": {
     "node": ">=24"
