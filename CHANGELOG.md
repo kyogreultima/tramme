@@ -26,6 +26,8 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Fixed
 
+- **The bar of a browser or window frame** (the walkthrough pack) is drawn at the top of its frame; it was drawn from the frame's centre, under the screenshot, so its dots and address never showed.
+- **The numbers of the list recipe** are in the plate's colour on their accent dots, not white on yellow.
 - **The check reads like a list you can act on**: issues of one cause are one line (the worst one, the span, the compositions concerned), at most twelve lines reach the assistant, the rest counted.
 - **Contrast** is measured against the card the text sits on, in the composition it is played in, with the standard's ratio (3:1); a text still fading in and a pictogram are not judged, and neither is text over a layer whose colour is unknown.
 - **The atelier's tour is offered when a project first goes to the atelier**, not only when one opens in it: the studio is the default view, so the tour was reached only through the help menu. The editor tour's last step now lists the tours that exist.
