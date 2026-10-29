@@ -5,7 +5,7 @@
 // and reported. Finishing effects (grain, bloom) and motion blur are not part
 // of a vector frame.
 
-import { drawingAt, Evaluator, isTrimmed, localFrame, parseColor, trimRuns, type TrammeDoc, type EvaluatedLayer, type Paint, type PathValue, type Registry, type SvgHost, type TrimProps } from '@tramme/core';
+import { drawingAt, Evaluator, isTilted, isTrimmed, localFrame, parseColor, trimRuns, type TrammeDoc, type EvaluatedLayer, type Paint, type PathValue, type Registry, type SvgHost, type TrimProps } from '@tramme/core';
 import { toBase64 } from './bytes.ts';
 
 export interface SvgOptions {
@@ -220,6 +220,7 @@ class SvgWriter {
 
   layer(L: EvaluatedLayer, compId: string, t: number): string {
     if (L.transform.opacity <= 0) return '';
+    if (isTilted(L.transform) || L.effects.some((e) => e.type === 'fx.pin')) this.warn(`"${L.layer.name ?? L.id}" is turned or pinned in perspective: drawn flat in SVG`);
     let clip = '';
     if (L.clip) {
       const id = this.id('c');

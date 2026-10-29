@@ -169,6 +169,8 @@ class Exporter {
 
   layer(compId: string, id: string, layer: Layer, range: [number, number], ind: number): Json | null {
     const name = layer.name ?? id;
+    const turned = (v: unknown) => v !== undefined && v !== null && v !== 0;
+    if (turned(layer.transform?.rotationX) || turned(layer.transform?.rotationY) || layer.effects?.some((e) => e.type === 'fx.pin')) this.warn(`"${name}" is turned or pinned in perspective: drawn flat in Lottie`);
     if (!this.reg.hasNode(layer.type)) { this.warn(`unknown type "${layer.type}": "${name}" left out`); return null; }
     const P = (n: string) => layer.props?.[n];
     const def = (n: string) => this.reg.node(layer.type).props[n];

@@ -10,8 +10,8 @@
 // When the environment isolates errors (the editor's preview), a layer that
 // fails is drawn as a red frame and reported; the rest of the frame renders.
 
-import { layerMatrix, pathD, type BlendMode, type Lut3D, type PathValue, type EvaluatedFrame, type EvaluatedLayer, type EvaluatedTransform, type Host, type Registry } from '@tramme/core';
-import { glPass, nodeContext, resizeNode } from './gpu.ts';
+import { applyMat, DEFAULT_PERSPECTIVE, isTilted, layerMatrix, pathD, tiltPoint, type BlendMode, type Quad, type Lut3D, type PathValue, type EvaluatedFrame, type EvaluatedLayer, type EvaluatedTransform, type Host, type Registry } from '@tramme/core';
+import { glPass, nodeContext, resizeNode, warpQuad } from './gpu.ts';
 
 const BLEND: Record<BlendMode, GlobalCompositeOperation> = {
   normal: 'source-over', multiply: 'multiply', screen: 'screen', overlay: 'overlay',
@@ -53,6 +53,8 @@ export interface DrawEnv {
   layerAt?: (layerId: string) => EvaluatedLayer | null;
   /** the composition time of the frame (GLSL effects' uTime) */
   t?: number;
+  /** the composition camera's perspective, px: the distance layers turned around x or y are seen from (1000 without a camera) */
+  perspective?: number;
 }
 
 /** a layer that failed: its outline in red, hatched, so the problem shows where it is */
@@ -178,6 +180,52 @@ const lutsOf = (env: DrawEnv, id: string) => (_name: string, value: unknown): Lu
   try { const v = env.host(id).asset<Lut3D>(value); return v && v.kind === 'lut3d' ? v : null; } catch { return null; }
 };
 
+/** a layer's corner pin in canvas pixels, when it has one set (the four corners are not all the same) */
+function pinOf(L: EvaluatedLayer, env: DrawEnv): Quad | null {
+  const e = L.effects.find((x) => x.type === 'fx.pin');
+  if (!e) return null;
+  const [kx, ky] = env.scale ?? [1, 1], c = ['tl', 'tr', 'br', 'bl'].map((k) => e.props[k] as [number, number] | undefined);
+  if (c.some((p) => !p) || c.every((p) => p![0] === c[0]![0] && p![1] === c[0]![1])) return null;
+  return c.map((p) => [p![0] * kx, p![1] * ky]) as Quad;
+}
+
+/** the box of a layer and what it holds, in its own space: its node's bounds, and its children's through their transforms (a group has no bounds of its own) */
+function contentBox(L: EvaluatedLayer, env: DrawEnv): { x: number; y: number; w: number; h: number } | null {
+  const pts: [number, number][] = [];
+  const add = (b: { x: number; y: number; w: number; h: number }, m?: ReturnType<typeof layerMatrix>) => {
+    for (const p of [[b.x, b.y], [b.x + b.w, b.y], [b.x + b.w, b.y + b.h], [b.x, b.y + b.h]] as [number, number][]) pts.push(m ? applyMat(m, p) : p);
+  };
+  try { const b = L.node.bounds?.(L.props, env.host(L.id)); if (b) add(b); } catch { /* none */ }
+  for (const c of L.children) { const b = contentBox(c, env); if (b) add(b, layerMatrix(c.transform)); }
+  if (!pts.length) return null;
+  const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]), x = Math.min(...xs), y = Math.min(...ys);
+  return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y };
+}
+
+/**
+ * Where a warped layer's picture goes: the corners of its box as drawn flat
+ * (`from`, canvas pixels), and where they land when it is pinned or turned in
+ * perspective (`to`). Null when it is not drawn: a corner behind the eye.
+ */
+function warpOf(L: EvaluatedLayer, env: DrawEnv, at: DOMMatrix, parent: DOMMatrix): { from: Quad; to: Quad } | null | 'flat' {
+  const perspective = env.perspective ?? DEFAULT_PERSPECTIVE;
+  const pin = pinOf(L, env);
+  if (!pin && !isTilted(L.transform)) return 'flat';
+  const b = contentBox(L, env);
+  if (!b) return 'flat';
+  const local: [number, number][] = [[b.x, b.y], [b.x + b.w, b.y], [b.x + b.w, b.y + b.h], [b.x, b.y + b.h]];
+  const from = local.map(([x, y]) => { const p = at.transformPoint({ x, y }); return [p.x, p.y]; }) as Quad;
+  if (pin) return { from, to: pin };
+  const up: [number, number, number, number, number, number] = [parent.a, parent.b, parent.c, parent.d, parent.e, parent.f];
+  const to: [number, number][] = [];
+  for (const p of local) {
+    const q = tiltPoint(p, L.transform, up, perspective);
+    if (!q) return null;
+    to.push(q);
+  }
+  return { from, to: to as Quad };
+}
+
 function drawLayer(ctx: CanvasRenderingContext2D, L: EvaluatedLayer, env: DrawEnv) {
   if (L.transform.opacity <= 0) return;
   if (!L.node.render.canvas2d && !L.node.render.gl && !L.children.length) return;
@@ -195,10 +243,13 @@ function drawLayer(ctx: CanvasRenderingContext2D, L: EvaluatedLayer, env: DrawEn
     .map((e) => ({ e, type: env.registry.hasEffect(e.type) ? env.registry.effect(e.type) : null }))
     .filter((x) => x.type?.stage === 'layer' && (x.type.canvas2d || x.type.gl));
   const masks = L.masks ?? [];
-  if (fx.length || masks.length) {
+  // a layer turned around x or y, or pinned, is drawn alone as it would be flat, then carried onto its quad
+  const warped = isTilted(L.transform) || !!pinOf(L, env);
+  if (fx.length || masks.length || warped) {
     const { width: w, height: h } = ctx.canvas;
     const off = env.pool.get(w, h);
-    off.setTransform(ctx.getTransform());
+    const parent = ctx.getTransform();
+    off.setTransform(parent);
     off.transform(m.a, m.b, m.c, m.d, m.e, m.f);
     const at = off.getTransform();
     drawContent(off, L, env);
@@ -227,7 +278,10 @@ function drawLayer(ctx: CanvasRenderingContext2D, L: EvaluatedLayer, env: DrawEn
     if (filter) ctx.filter = filter;
     // a filter runs over what it is given: the layer's box grown by the filters' reach, not the whole frame (outside it the layer is empty)
     const box = filter ? filterBox(L, env, at, fx, k, w, h) : null;
-    if (box) {
+    const warp = warped ? warpOf(L, env, at, parent) : 'flat';
+    if (warp === null) { /* a corner behind the eye: not drawn */ }
+    else if (warp !== 'flat') warpQuad(ctx, off.canvas, warp.from, warp.to);
+    else if (box) {
       // clipped too: the filter's own layer is as large as the clip
       if (box.w > 0 && box.h > 0) { ctx.beginPath(); ctx.rect(box.x, box.y, box.w, box.h); ctx.clip(); ctx.drawImage(off.canvas, box.x, box.y, box.w, box.h, box.x, box.y, box.w, box.h); }
     }
@@ -358,7 +412,7 @@ function drawThroughCamera(ctx: CanvasRenderingContext2D, frame: EvaluatedFrame,
   };
   // a root layer drawn alone for an effect (a matte, a displacement map) goes through the camera too, so it lines up with what it shapes
   const roots = new Set(frame.comp.order);
-  const seen: DrawEnv = { ...env, layerAt: (id) => { const L = env.layerAt?.(id) ?? null; return L && roots.has(id) ? place(L) : L; } };
+  const seen: DrawEnv = { ...env, perspective: cam.perspective, layerAt: (id) => { const L = env.layerAt?.(id) ?? null; return L && roots.has(id) ? place(L) : L; } };
   for (const L of frame.layers) {
     const placed = place(L);
     if (!placed) continue;
