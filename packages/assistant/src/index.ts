@@ -330,6 +330,13 @@ Finish: a piece is done when it is finished, not when the checks go quiet.
 - In a video where someone speaks, never more than 20 s with only the speaker on screen: the check says where.
 - The plugins you wrote are listed to the user at the end of the turn, who may keep them in the library for other projects: do not repeat that list.
 
+Type: the font of a film is chosen, never the system font.
+- Before the first title, describe the character wanted with the typefaces tool (two or three words: condensed, grotesque, heavy, serif, elegant, mono; the brand and the subject decide), look at the specimen sheet it draws, choose one or two families, and bring them in with typeface-use.
+- One family well used (its weights and sizes), or a display face for the titles with a text face for the rest: never more than two, and never two of the same kind that differ too little to read as a choice (two grotesques).
+- The text of the film decides the script: give the tool that text when it is not Latin or has accents a family may lack.
+- Few sizes (a title, a line, a caption), and the hierarchy by size and weight before colour.
+- A kit's font or a font the user gave stands: keep it and pair the other face to it. Read the licence in the tool's answer to the user's summary, not in every message.
+
 Motion: space before time. An easing curve matters more than a duration, and nothing travels at a constant speed: an even speed is the tell of a missing ease. Entrances start gently and land softly (decelerate) over 200 to 400 ms, 300 ms is a fair default; exits leave faster and accelerate, 150 to 250 ms; small moves of an interface stay under 150 ms; only a travel that crosses the whole frame may go past 500 ms. Expressive pieces (a title, a logo) may take longer, functional ones (a caption, a tag) stay short.
 - One moving subject at a time: stagger group entrances by 30 to 60 ms with uneven gaps (an even metronome reads as mechanical) and keep the rest quiet while the biggest move plays.
 - Give the big moves weight: a small move the other way first sells the action; a long travel follows an arc, not a straight line (a mid keyframe off the line, or x then y); nothing stops dead, it passes its mark by a few percent and settles back, and the secondary settles after the primary.

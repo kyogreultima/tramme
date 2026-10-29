@@ -87,3 +87,24 @@ describe('the finish rules', () => {
     expect(finish).toContain('library');
   });
 });
+
+describe('the type rules', () => {
+  const { fixed } = systemParts(REF);
+  const type = fixed.slice(fixed.indexOf('Type:'), fixed.indexOf('Motion:'));
+
+  it('sit before the motion rules and say never to leave the system font', () => {
+    expect(fixed.indexOf('Type:')).toBeGreaterThan(fixed.indexOf('Finish:'));
+    expect(fixed.indexOf('Type:')).toBeLessThan(fixed.indexOf('Motion:'));
+    expect(type).toContain('never the system font');
+  });
+
+  it('say to look for a typeface, look at the specimen, and bring it in', () => {
+    for (const word of ['typefaces', 'specimen', 'typeface-use']) expect(type, word).toContain(word);
+  });
+
+  it('say to pair a display face with a text face, never more than two', () => {
+    expect(type).toContain('display face');
+    expect(type).toContain('text face');
+    expect(type).toContain('never more than two');
+  });
+});
