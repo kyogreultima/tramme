@@ -169,6 +169,10 @@ export const api = {
     const params = new URLSearchParams(Object.entries(q).filter(([, v]) => v) as [string, string][]);
     return (await call<{ voices: Voice[] }>(`/api/voices?${params}`, { signal }, reach)).voices;
   },
+  /** the search of Pexels (photos or clips) with the user's key, as Pexels answers it */
+  async stockPexels(kind: 'photos' | 'videos', query: string, count: number, signal?: AbortSignal): Promise<unknown> {
+    return call<unknown>(`/api/stock/pexels/${kind}?${new URLSearchParams({ query, per_page: String(count) })}`, { signal }, reach);
+  },
   /**
    * pictures made by a provider with the user's key: one, or n takes of the
    * same ask; a reference (a data URL) to change, a mask beside it

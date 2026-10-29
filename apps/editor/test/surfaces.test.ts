@@ -61,7 +61,7 @@ describe('the surface tool', () => {
     const applied = applyOps(doc, (await run(doc, { kind: 'gradient', colors: ['#112233', '#ffcc00'], amount: 0.8, speed: 2 })).ops!).doc, c = applied.compositions[applied.root];
     expect(c.layers[c.order[0]].props).toMatchObject({ colorA: '#112233', colorB: '#ffcc00', p1: 0.8, p2: 2 });
     const plain = applyOps(doc, (await run(doc, { kind: 'grain' })).ops!).doc;
-    expect(plain.compositions[plain.root].layers[plain.compositions[plain.root].order.at(-1)!].props.colorA).toBeDefined();
+    expect(plain.compositions[plain.root].layers[plain.compositions[plain.root].order.at(-1)!].props!.colorA).toBeDefined();
   });
 
   it('places it for a span of the film when asked', async () => {

@@ -29,6 +29,7 @@ const PROVIDERS: ProviderInfo[] = [
   { id: 'openrouter', name: 'OpenRouter', hint: m('settings.providerOpenrouter'), keys: 'https://openrouter.ai/keys' },
   { id: 'zai', name: 'Z.AI (GLM)', hint: m('settings.providerZai'), keys: 'https://z.ai/manage-apikey/apikey-list' },
   { id: 'elevenlabs', name: 'ElevenLabs', hint: m('settings.providerElevenlabs'), keys: 'https://elevenlabs.io/app/settings/api-keys' },
+  { id: 'pexels', name: 'Pexels', hint: m('settings.providerPexels'), keys: 'https://www.pexels.com/api/' },
   { id: 'hydracept', name: 'Hydracept', hint: m('settings.providerHydracept'), keys: 'https://app.hydracept.com', fields: {
     project: { label: m('settings.hydraceptProject'), placeholder: 'cpr_...' },
     environment: { label: m('settings.hydraceptEnvironment'), placeholder: 'development' },
