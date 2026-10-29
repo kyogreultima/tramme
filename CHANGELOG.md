@@ -10,6 +10,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Added
 
+- **Typefaces** ([taste and finish](docs/taste-finish-roadmap.md), step 2): the `typefaces` tool looks for open families by character ("condensed grotesque, heavy, for titles") and shows them on a specimen sheet set in their own letters; `typeface-use` brings the chosen ones into the project as font assets, their files at a pinned version under `assets/fonts/` with a record of their licence. The recipes write headlines in the display face and the rest in the text face, and the assistant's instructions tell it to pair a display face with a text face and never to leave the system font. See [Typefaces](docs/document.md#typefaces).
 - **The assistant finds what already ships** ([taste and finish](docs/taste-finish-roadmap.md), step 1): the packs' entries are listed by need in its instructions, it is told to search the vocabulary before writing a plugin, and the plugins it wrote in a turn are listed to you at the end, to keep in the library.
 - **A phone, browser or window frame around an interface built in layers**: the *Frame for an interface built in layers* tool of the walkthrough pack lays the frame with a content group that the screen clips; `ui.device` draws without a screenshot and in two parts.
 - **`tramme check <doc>`** prints the picture checks of a project, folded by cause.

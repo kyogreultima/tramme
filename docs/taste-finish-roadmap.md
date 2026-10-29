@@ -2,7 +2,7 @@
 
 How Tramme's assistant reaches the production level of the `marketing` reference from a prompt alone, with no asset given, and dresses a talking video as a human editor would. The design is [the spec](superpowers/specs/2026-10-29-taste-and-finish-design.md): the bar is the level of finish, never the look or the genre. Each step gets its own plan in `docs/superpowers/plans/`, lands on its own and is measured before the next; tick the boxes as they land.
 
-Status: step 1 built, waiting for its measure (the baseline of step 0 is the user's to run, from the `taste-baseline` tag).
+Status: steps 1 and 2 built, waiting for their measure (the baseline of step 0 is the user's to run, from the `taste-baseline` tag).
 
 ## Measuring
 
@@ -31,9 +31,9 @@ Every step is measured on the bench: the grid of [bench/README.md](../bench/READ
 
 On the bilal project as the run of 2026-10-28 left it (the check the assistant read during that run returned 496 warnings and 29 notes), `tramme check` now reads in six lines (65 warnings, 33 notes of the final document), no contrast warning remains on the interface texts, and the coverage check finds the stretches where the speaker is alone (44.5 s to 77.25 s, 92 s to 114.75 s, 172 s to 193.5 s, and one at the start).
 
-### Step 2. Typefaces
+### Step 2. Typefaces ([plan](superpowers/plans/2026-10-29-taste-and-finish-step2-typefaces.md))
 
-- [ ] A catalogue of open typefaces searched by character, a specimen sheet drawn by the engine, the chosen files copied into the project at a pinned version, type pairing in the guide.
+- [x] A catalogue of open typefaces searched by character, a specimen sheet drawn by the engine, the chosen files copied into the project at a pinned version, type pairing in the guide.
 
 ### Step 3. Direction: kinds of picture, then style frames
 
