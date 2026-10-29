@@ -298,7 +298,9 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
     const issues = toolInputIssues(tool.input, input);
     if (issues.length) return text(`input refused by ${name}:\n${issues.join('\n')}`, true);
     let out;
-    try { out = toolOutput(await tool.run(input, this.toolContext(doc, reg))); }
+    // a plugin brought from the library is no plugin written in this turn: it is not offered back to it
+    const brought = name === 'library-use' ? new Set(this.wrotePlugins) : null;
+    try { out = toolOutput(await tool.run(input, this.toolContext(doc, reg))); if (brought) this.wrotePlugins = brought; }
     catch (e) { if (this.signal.aborted) return text(`${name}: stopped by the user`, true); return text(`${name} (plugin ${from}) failed: ${(e as Error).message}`, true); }
     const content: ToolResult['content'] = [];
     for (const img of out.images ?? []) {
