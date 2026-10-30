@@ -65,4 +65,5 @@ On the bilal project as the run of 2026-10-28 left it (the check the assistant r
 
 ### Step 8. A library of references ([plan](superpowers/plans/2026-10-29-taste-and-finish-step8-references.md))
 
-- [ ] Annotated in words, never as copied media: what makes a frame or a cut work, and the faults to avoid.
+- [x] Annotated in words, never as copied media: what makes a frame or a cut work, and the faults to avoid.
+- [ ] Two dev briefs on the trial server: which references were read, whether the direction cites a principle, whether the critic's fixes name a fault of the list, the cost the tool calls add. Spends quota, waits for the user's go.
