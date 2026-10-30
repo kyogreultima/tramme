@@ -2,6 +2,7 @@
 // link previews, the search engines' structured data, robots.txt, llms.txt.
 
 import { APP, REPO } from './links';
+import { FAQ } from './faq';
 
 export const SITE = {
   /** the public address (SITE_URL overrides it, for a deployment elsewhere) */
@@ -14,7 +15,7 @@ export const SITE = {
   preview: { width: 1200, height: 630, alt: 'Tramme: motion design, directed in words. The editor, with a composition, its layers and its timeline.' },
 };
 
-/** the structured data of the landing page (schema.org): the site, and the app it presents, on the
+/** the structured data of the landing page (schema.org): the site, its questions, and the app it presents, on the
  *  web and on the systems of its latest release (lib/download.ts) */
 export function landingData(site: URL, preview: string, systems: string[]) {
   const home = site.href;
@@ -36,6 +37,11 @@ export function landingData(site: URL, preview: string, systems: string[]) {
         license: 'https://www.apache.org/licenses/LICENSE-2.0',
         sameAs: [REPO],
         author: { '@type': 'Person', name: 'Aziz Chanou' },
+      },
+      {
+        '@type': 'FAQPage',
+        '@id': `${home}#faq`,
+        mainEntity: FAQ.map(({ q, a }) => ({ '@type': 'Question', name: q, acceptedAnswer: { '@type': 'Answer', text: a } })),
       },
       {
         '@type': 'SoftwareSourceCode',
