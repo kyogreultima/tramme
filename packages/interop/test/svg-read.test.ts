@@ -143,3 +143,16 @@ describe('the SVG reader', () => {
     expect(r.shapes[0].path.v[0]).toEqual([7, 2]); // (1,1) scaled by 2 then moved by 5
   });
 });
+
+describe('a line element', () => {
+  it('is read from its two ends, as a contour of two points', () => {
+    const { shapes } = readSvg('<svg width="24" height="24"><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>');
+    expect(shapes.map((s) => s.path.v)).toEqual([[[12, 8], [12, 12]], [[12, 16], [12.01, 16]]]);
+    expect(shapes.every((s) => s.path.closed === false)).toBe(true);
+  });
+
+  it('follows its transform like any other shape', () => {
+    const { shapes } = readSvg('<svg width="24" height="24"><g transform="translate(10 0)"><line x1="0" y1="0" x2="4" y2="0"/></g></svg>');
+    expect(shapes[0].path.v).toEqual([[10, 0], [14, 0]]);
+  });
+});
