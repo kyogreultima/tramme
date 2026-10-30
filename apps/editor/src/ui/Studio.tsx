@@ -17,7 +17,7 @@ import { draft } from '../attachments.ts';
 import { IDEAS } from '../ideas.ts';
 import { comp, S, uiTime } from '../state.ts';
 import { timecode } from '../model.ts';
-import { anchor, direct, focused, focusScene, liveStage, noteSent, notes, pinAt, STAGE_LABEL, studio, takes, turns } from '../studio.ts';
+import { addRetouch, anchor, direct, focused, focusScene, liveStage, noteSent, sendRetouches, STAGE_LABEL, studio, takes, turns } from '../studio.ts';
 import { Composer, join } from './composer.tsx';
 import { useSize } from './controls.tsx';
 import { Lightbox, progressOf, useElapsed } from './chat.tsx';
@@ -26,6 +26,7 @@ import { LogoMark } from './Logo.tsx';
 import { SidePanel } from './Notes.tsx';
 import { TakeActions } from './thread.tsx';
 import { Overlays, useShortcuts } from './shell.tsx';
+import { AreaReview, Marks, PinChips, PinTools, pressPicture, RetouchList } from './Retouch.tsx';
 import { Storyboard } from './Storyboard.tsx';
 import { TopBar } from './TopBar.tsx';
 import { Viewport } from './Viewport.tsx';
@@ -58,7 +59,7 @@ const SCENE = [
 ];
 
 function Chips({ empty }: { empty: boolean }) {
-  if (running.value || S.proposal.value?.status === 'pending' || aiRoute.value === null || studio.pin.value) return null;
+  if (running.value || S.proposal.value?.status === 'pending' || aiRoute.value === null || studio.pins.value.length) return null;
   const list = empty ? STARTERS : focused.value ? SCENE : FILM;
   return (
     <div class="chips">
@@ -103,26 +104,9 @@ function TakePill() {
   );
 }
 
-/** the notes pinned on the picture near this moment, and the one being written */
-function Pins() {
-  const now = uiTime.value, placing = studio.pin.value;
-  const near = notes.value.filter(({ note }) => note.pin && Math.abs(note.at! - now) < 0.75);
-  return (
-    <div class="pins">
-      {near.map(({ n, note }) => (
-        <button key={note.id} class="pin" style={{ left: `${note.pin![0] * 100}%`, top: `${note.pin![1] * 100}%` }} title={note.text}
-          onPointerDown={(e) => e.stopPropagation()} onClick={() => { studio.panel.value = 'notes'; studio.flash.value = note.id; }}>
-          <span>{n}</span>
-        </button>
-      ))}
-      {placing && <span class="pin new" style={{ left: `${placing[0] * 100}%`, top: `${placing[1] * 100}%` }}><span>{notes.value.length + 1}</span></span>}
-    </div>
-  );
-}
-
 /** what the note will be about, and the pin */
 function DirectBar({ area }: { area: RefObject<HTMLTextAreaElement> }) {
-  const pin = studio.pin.value, pinning = studio.pinning.value, f = focused.value, fps = comp.value.fps;
+  const pin = studio.pins.value.length > 0, pinning = studio.pinning.value, f = focused.value, fps = comp.value.fps;
   const placeholder = pin ? t('studio.placeholderPin') : f ? t('studio.placeholderScene', { name: f.name }) : t('studio.placeholder');
   const context = (
     <span class="direct-context">
@@ -130,17 +114,15 @@ function DirectBar({ area }: { area: RefObject<HTMLTextAreaElement> }) {
         ? <button class="ctx-chip on" title={t('studio.clearFocus')} onClick={() => focusScene(null)}><Icon name="target" /><span>{f.name}</span><Icon name="x" /></button>
         : <span class="ctx-chip" title={t('studio.wholeFilmHint')}><Icon name="film" /><span>{t('studio.wholeFilm')}</span></span>}
       <span class="ctx-chip mono" title={t('studio.momentHint')}>{timecode(uiTime.value, fps)}</span>
-      {pin && <button class="ctx-chip on" title={t('studio.unpin')} onClick={() => { studio.pin.value = null; }}><Icon name="pin" /><span>{t('studio.pinned')}</span><Icon name="x" /></button>}
+      <PinChips />
     </span>
   );
-  const tools = (
-    <button class={`icon-btn sm${pinning || pin ? ' on' : ''}`} title={t('studio.pinHint')} data-tour="pin"
-      onClick={() => { if (pin) studio.pin.value = null; studio.pinning.value = !pinning && !pin; }}><Icon name="pin" /></button>
-  );
+  const tools = <PinTools />;
+  const list = { count: studio.retouches.value.length, onAdd: (text: string, voice: boolean) => addRetouch(text, voice), onSendAll: () => { void sendRetouches(); } };
   return (
     <div class={`direct${pinning ? ' pinning' : ''}`} data-tour="direct">
-      {pinning && <div class="direct-hint"><Icon name="pin" />{t('studio.pinNow')}</div>}
-      <Composer placeholder={placeholder} anchor={anchor} tools={tools} context={context} onSent={noteSent} area={area} />
+      {pinning && <div class="direct-hint"><Icon name={studio.tool.value === 'point' ? 'pin' : studio.tool.value === 'path' ? 'curve' : 'box'} />{studio.tool.value === 'point' ? t('studio.pinNow') : studio.tool.value === 'path' ? t('studio.pathNow') : t('studio.areaNow')}</div>}
+      <Composer placeholder={placeholder} anchor={anchor} tools={tools} context={context} onSent={noteSent} area={area} list={list} />
     </div>
   );
 }
@@ -165,13 +147,13 @@ function useStudioKeys(area: RefObject<HTMLTextAreaElement>) {
     const key = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement;
       if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable || e.ctrlKey || e.metaKey || e.altKey) {
-        if (e.key === 'Escape' && el === area.current && (studio.pin.peek() || studio.pinning.peek())) { noteSent(); }
+        if (e.key === 'Escape' && el === area.current && (studio.pins.peek().length || studio.pinning.peek() || studio.review.peek())) { noteSent(); }
         return;
       }
       if (e.key === 'n' || e.key === 'N') { e.preventDefault(); area.current?.focus(); }
       else if (e.key === 'p' || e.key === 'P') { e.preventDefault(); studio.pinning.value = !studio.pinning.peek(); S.playing.value = false; }
       else if (e.key === 'Escape') {
-        if (studio.pin.peek() || studio.pinning.peek()) noteSent();
+        if (studio.pins.peek().length || studio.pinning.peek() || studio.review.peek()) noteSent();
         else focusScene(null);
       }
     };
@@ -205,15 +187,8 @@ export function Studio() {
     mq.addEventListener('change', change);
     return () => { ro.disconnect(); mq.removeEventListener('change', change); };
   }, []);
-  // a press on the picture pins the note there, on what is under it; the box takes the words
-  const pressPicture = (p: Vec2, _e: PointerEvent, hit: () => string | null) => {
-    const c = comp.peek(), clamp = (v: number) => Math.min(1, Math.max(0, v));
-    const id = hit(), l = id ? c.layers[id] : null;
-    pinAt([+clamp(p[0] / c.width).toFixed(4), +clamp(p[1] / c.height).toFixed(4)], l && id ? { id, name: l.name ?? id, type: l.type } : null);
-    S.playing.value = false;
-    requestAnimationFrame(() => area.current?.focus());
-    return true;
-  };
+  // a press on the picture draws with the tool in hand: a point, a path to follow, a group to select
+  const press = (p: Vec2, e: PointerEvent, hit: () => string | null, toComp: (e: { clientX: number; clientY: number }) => Vec2) => pressPicture(p, e, hit, toComp, area);
   // the notes beside the film widen or narrow like the atelier's panels
   const [sideW, sideHandle] = useSize('studio-side', 384, 330, 640);
   const [dropping, setDropping] = useState(false);
@@ -228,10 +203,12 @@ export function Studio() {
       <div class="studio-body" style={{ '--side-w': `${sideW}px` }}>
         <main class="studio-main">
           <section class={`studio-stage${busy ? ' working' : ''}${pending ? ' has-take' : ''}${studio.pinning.value ? ' pinning' : ''}${empty ? ' is-empty' : ''}`} data-tour="stage">
-            <Viewport bare inset={narrow ? [52, 12, 14, 12] : [60, 32, footH + 22, 32]} overlay={<Pins />} intercept={pressPicture} />
+            <Viewport bare inset={narrow ? [52, 12, 14, 12] : [60, 32, footH + 22, 32]} overlay={<Marks />} intercept={press} />
             {empty && <Invitation />}
             <div class="stage-top">{busy ? <WorkPill /> : pending ? <TakePill /> : null}</div>
             <div class="stage-foot" ref={foot}>
+              <AreaReview />
+              <RetouchList />
               <Chips empty={empty} />
               <DirectBar area={area} />
             </div>

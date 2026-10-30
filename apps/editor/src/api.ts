@@ -26,6 +26,8 @@ export interface ChatItem {
   at?: number;
   scene?: string;
   pin?: [number, number];
+  /** user: everything drawn on the picture for this note (points, paths, areas), with the pin above standing for the first */
+  pins?: import('./retouch.ts').Pin[];
   /** user: files joined to the message (files of the project) */
   attachments?: { path: string; name: string; kind: FileKind; asset?: string }[];
   /** assistant activity: tool name and short description; use: the vocabulary's tool a use_tool call runs; detail: once done, why it failed or the tool's own line for the user (who made a sound, a picture); start and duration in ms */

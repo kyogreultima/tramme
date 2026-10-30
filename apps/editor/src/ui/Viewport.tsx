@@ -111,7 +111,7 @@ export interface ViewportProps {
   /** drawn over the picture and sized like it (the studio's pins) */
   overlay?: ComponentChildren;
   /** a press on the picture, in composition pixels, taken before the selection sees it (a note pinned): true when taken; hit: the layer under it */
-  intercept?: (p: Vec2, e: PointerEvent, hit: () => string | null) => boolean;
+  intercept?: (p: Vec2, e: PointerEvent, hit: () => string | null, toComp: (e: { clientX: number; clientY: number }) => Vec2) => boolean;
 }
 
 /** the room the atelier keeps around the picture: its toolbar above */
@@ -431,7 +431,7 @@ export function Viewport({ bare = false, inset = INSET, overlay, intercept }: Vi
     if (e.button === 1 || (e.button === 0 && spaceDown)) { e.preventDefault(); dragPan(e); return; }
     if (e.button !== 0 || S.draft.peek()) return;
     const p = toComp(e);
-    if (intercept?.(p, e, () => pick(p))) return;
+    if (intercept?.(p, e, () => pick(p), toComp)) return;
     if (geo && selected.length === 1 && inside(geo, p) && !e.altKey) { dragMove(e, selected[0], geo); return; }
     const id = pick(p);
     if (!id && e.pointerType === 'touch') { dragPan(e, () => { if (!e.shiftKey) select([]); }); return; }

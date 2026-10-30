@@ -15,6 +15,7 @@ import { attaching, pending } from '../attachments.ts';
 import { enqueue, flushQueue, held, queue, written, type Queued } from './queue.ts';
 import { acceptProposal, comp, propose, rejectProposal, S, toast, uiTime } from '../state.ts';
 import { clip, layerName, timecode } from '../model.ts';
+import { anchorPoint, marksOf, type Pin } from '../retouch.ts';
 import { away, notify } from '../notify.ts';
 import { turnBegins, turnEnds } from '../confirm.ts';
 import { preview } from '../preview.ts';
@@ -35,7 +36,7 @@ let ending = false;
 const decisions = new Map<string, string>();
 
 /** what a studio note is about besides the time: the scene, the point of the picture and the layer under it */
-export interface Anchor { scene?: { name: string; from: number; to: number }; pin?: [number, number]; under?: { id: string; name: string; type: string } }
+export interface Anchor { scene?: { name: string; from: number; to: number }; pins?: Pin[] }
 
 /** what the message is about; reactive when called during render */
 export function contextLine(live = false): { text: string; data: Record<string, unknown> } {
@@ -103,14 +104,20 @@ export async function startTurn(messages: Queued[], command?: { cmd: Command; in
   chat.value = [...chat.value, ...messages.map((m): ChatItem => ({
     id: uid(), role: 'user', text: m.text, context: m.context, at: m.at,
     ...(m.anchor?.scene ? { scene: m.anchor.scene.name } : {}),
-    ...(m.anchor?.pin ? { pin: m.anchor.pin } : {}),
+    ...(m.anchor?.pins?.length ? { pins: m.anchor.pins, pin: anchorPoint(m.anchor.pins[0]) } : {}),
     ...(m.attachments.length ? { attachments: m.attachments.map(({ path, name, kind, asset }) => ({ path, name, kind, asset })) } : {}),
   }))];
   const ds = [...decisions].map(([id, status]) => ({ id, status }));
   decisions.clear();
   // changes applied without the user: the turn works on its own, nothing is asked
   const auto = aiSettings.peek().apply !== 'off';
-  const contexts = messages.map(({ data, anchor }) => ({ ...data, autonomous: auto, ...(anchor?.scene ? { scene: anchor.scene } : {}), ...(anchor?.pin ? { point: anchor.pin, ...(anchor.under ? { under: anchor.under } : {}) } : {}) }));
+  // the marks are numbered across the whole turn: "mark 3" is one mark, whichever message it was drawn for
+  let marked = 1;
+  const contexts = messages.map(({ data, anchor }) => {
+    const marks = marksOf(anchor?.pins ?? [], marked);
+    marked += marks.length;
+    return { ...data, autonomous: auto, ...(anchor?.scene ? { scene: anchor.scene } : {}), ...(marks.length ? { marks } : {}) };
+  });
   const last = messages.length - 1, attachments = messages.flatMap((m) => m.attachments);
   await consume((signal) => ask({
     text: messages[last].text, context: contexts[last], doc: S.doc.peek(), decisions: ds, attachments, command: command?.cmd, commandInput: command?.input,

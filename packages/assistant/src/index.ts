@@ -458,9 +458,19 @@ export interface TurnContext {
   /** the message is a note pinned on the picture: where, in fractions of the frame from its top left corner, and the layer under it */
   point?: [number, number];
   under?: { id: string; name: string; type: string };
+  /** what the user drew on the picture for this message, numbered: points, paths to follow, groups of layers chosen */
+  marks?: Mark[];
   /** the user's changes apply without them (they may be away): the turn works on its own */
   autonomous?: boolean;
 }
+
+type Under = { id: string; name: string; type: string };
+
+/** a mark drawn on the picture, in fractions of the frame from its top left corner */
+export type Mark =
+  | { n: number; kind: 'point'; at: [number, number]; under?: Under }
+  | { n: number; kind: 'path'; points: [number, number][]; under?: Under }
+  | { n: number; kind: 'area'; points: [number, number][]; layers: Under[] };
 
 /** a fraction of the frame, as a percentage */
 const pct = (x: number) => `${Math.round(x * 100)} %`;
@@ -468,12 +478,29 @@ const pct = (x: number) => `${Math.round(x * 100)} %`;
 /** what a turn left alone is told: it never waits on the user */
 const AUTONOMOUS = 'Mode: on your own. Your changes apply without the user, who may be away for a long while: do not stop on a question a sensible choice answers (a format, a voice, a wording, a direction). Where the rules say to ask or to propose directions first, take the one you would recommend and go on; say in your summary what you chose and assumed. Stop only when truly blocked (a missing key or source). Paid generations are not asked for: each turn has an allowance, and the library or synth take over once it is used.';
 
+const xy = (p: [number, number]) => `(${+p[0].toFixed(3)}, ${+p[1].toFixed(3)})`;
+const layerOf = (l: Under) => `${l.name} (${l.id}, ${l.type})`;
+
+/** a mark in words, for the model that cannot see the user's finger */
+function markLine(m: Mark, time: number | undefined): string {
+  const at = time === undefined ? '' : `, at ${time} s`;
+  if (m.kind === 'point') return `Mark ${m.n}: a point at ${pct(m.at[0])} across and ${pct(m.at[1])} down the frame${at}${m.under ? `, on the layer ${layerOf(m.under)}` : ''}.`;
+  if (m.kind === 'path') {
+    const a = m.points[0], b = m.points[m.points.length - 1], mid = m.points.slice(1, -1).map(xy).join(' ');
+    return `Mark ${m.n}: a path drawn on the picture from ${xy(a)} to ${xy(b)}${mid ? ` through ${mid}` : ''} (fractions of the frame from its top left corner)${at}${m.under ? `, starts on the layer ${layerOf(m.under)}` : ''}: it is the movement to follow, or the line to lay things along; sample it, do not approximate it with one straight move.`;
+  }
+  return m.layers.length
+    ? `Mark ${m.n}: a selection of these layers, chosen by the user: ${m.layers.map(layerOf).join(', ')}${at}. They are the whole group and nothing else: leave every other layer as it is.`
+    : `Mark ${m.n}: an area drawn on the picture, ${xy(m.points[0])} round to ${xy(m.points[m.points.length - 1])}${at}. The user did not choose layers: it is about what shows inside it (render that frame to see it).`;
+}
+
 /** what a message is about: where the user was, what was selected, the scene, the pin */
 function contextLines(ctx: TurnContext): string[] {
   return [
     `Composition: ${ctx.compId} · time ${ctx.time} s (frame ${ctx.frame})`,
     `Selection: ${ctx.selection?.length ? ctx.selection.map((s) => `${s.name} (${s.id}, ${s.type})`).join(', ') : 'none'}`,
     ...(ctx.scene ? [`Scene: "${ctx.scene.name}", from ${ctx.scene.from} s to ${ctx.scene.to} s: the message is about this scene; leave the others as they are unless it asks otherwise.`] : []),
+    ...(ctx.marks ?? []).map((m) => markLine(m, ctx.time)),
     ...(ctx.point ? [`Note pinned on the picture at ${pct(ctx.point[0])} across and ${pct(ctx.point[1])} down the frame, at ${ctx.time} s: it is about what shows there${ctx.under ? `, on the layer ${ctx.under.name} (${ctx.under.id}, ${ctx.under.type}) of this composition` : ''} (render that frame to see it).`] : []),
   ];
 }

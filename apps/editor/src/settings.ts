@@ -50,6 +50,8 @@ export interface Preferences {
   models: Partial<Record<ModelTask, string>>;
   /** installed plugins turned off on this device (their file names) */
   pluginsOff: string[];
+  /** the studio: after an area is drawn, the layers it proposes are confirmed always, only when more than three, or never */
+  areaConfirm: 'always' | 'many' | 'never';
   /** look for a newer version on its own, every twelve hours */
   checkUpdates: boolean;
   /** when it looked last (ms), and the newest version the user was told of */
@@ -72,7 +74,7 @@ export interface Preferences {
 
 export const DEFAULT_PREFERENCES: Preferences = {
   language: 'auto', theme: 'studio', view: 'studio', motion: 'auto', still: 'display', blur: 'document', exactFrames: true, scrubAudio: true, sandboxPreview: false,
-  effectsDb: -8, musicDb: -14, duckDb: -12, varySounds: true, confirmPaid: true, paidPerTurn: 10, voiceProvider: 'auto', voice: '', voiceModel: '', previewVolume: 1, previewMuted: false, proxies: true, models: {}, pluginsOff: [], checkUpdates: true, lastUpdateCheck: 0, updateNotified: '', recentCommands: [],
+  effectsDb: -8, musicDb: -14, duckDb: -12, varySounds: true, confirmPaid: true, paidPerTurn: 10, voiceProvider: 'auto', voice: '', voiceModel: '', previewVolume: 1, previewMuted: false, proxies: true, models: {}, pluginsOff: [], areaConfirm: 'always', checkUpdates: true, lastUpdateCheck: 0, updateNotified: '', recentCommands: [],
   pictureProvider: 'auto', pictureQuality: 'auto', pictureSize: 'large', styleFrames: 2,
   videoProvider: 'auto', videoSeconds: 8, dictation: 'local',
 };
@@ -155,6 +157,7 @@ function load(): Preferences {
     const models = p.models && typeof p.models === 'object' ? p.models : {};
     p.models = Object.fromEntries(MODEL_TASKS.filter((k) => typeof models[k] === 'string').map((k) => [k, models[k]]));
     p.pluginsOff = Array.isArray(p.pluginsOff) ? p.pluginsOff.filter((x) => typeof x === 'string') : [];
+    p.areaConfirm = p.areaConfirm === 'many' || p.areaConfirm === 'never' ? p.areaConfirm : 'always';
     p.checkUpdates = p.checkUpdates !== false;
     p.lastUpdateCheck = Number.isFinite(p.lastUpdateCheck) ? p.lastUpdateCheck : 0;
     p.updateNotified = typeof p.updateNotified === 'string' ? p.updateNotified : '';
