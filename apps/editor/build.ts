@@ -202,6 +202,9 @@ fs.cpSync(path.join(ROOT, 'plugins'), path.join(DIST, 'plugins'), { recursive: t
 // the catalogue of open typefaces the assistant searches (scripts/typefaces/catalogue.ts), read when a typeface is looked for
 fs.mkdirSync(path.join(DIST, 'typefaces'), { recursive: true });
 fs.copyFileSync(path.join(HERE, 'data/typefaces.json'), path.join(DIST, 'typefaces/catalogue.json'));
+// the craft's references, in words (principles and faults), read when the assistant looks one up
+fs.mkdirSync(path.join(DIST, 'references'), { recursive: true });
+fs.copyFileSync(path.join(HERE, 'data/references.json'), path.join(DIST, 'references/catalogue.json'));
 // pdf.js parses documents (the sources of a project) in a worker of its own, at a fixed address (src/pdf.ts)
 fs.copyFileSync(createRequire(import.meta.url).resolve('pdfjs-dist/build/pdf.worker.min.mjs'), path.join(DIST, 'pdf.worker.mjs'));
 
