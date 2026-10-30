@@ -1,0 +1,38 @@
+---
+// What is kept where: the projects, the keys, what the assistant sends, and
+// what this site itself does. Each line is what the code and the deploy docs
+// say (README, docs/deploy.md, apps/site).
+import Base from '../layouts/Base.astro';
+import Nav from '../components/Nav.astro';
+import PageHead from '../components/PageHead.astro';
+import Footer from '../components/Footer.astro';
+import { docHref } from '../lib/docs';
+---
+
+<Base title="Privacy, what is kept where" description="Where Tramme keeps your projects and your keys, what the assistant sends to the AI provider you choose, and what this site does.">
+  <Nav />
+  <main>
+    <PageHead title="What is kept where." lead="Tramme has no accounts: your projects and your keys stay with you." />
+    <section class="wrap body">
+      <div class="prose">
+        <h2>Your projects</h2>
+        <p>In the app in your browser, the server keeps nothing: your projects stay in your browser. On the desktop, they are folders of your computer (<code>Documents/Tramme</code> by default, which you can change). A project can be exported as a <code>.tramme</code> file at any time.</p>
+
+        <h2>Your keys</h2>
+        <p>The keys of the AI providers you connect stay on your side: in a key vault the editor cannot read, in the browser app, and in the system keychain, on the desktop.</p>
+
+        <h2>What the assistant sends</h2>
+        <p>When you ask the assistant for something, your words, and the frames or files it needs to answer, go to the AI provider you chose, with your key, and are handled under that provider's terms. In the browser app your browser calls the provider itself; on the desktop, the app does. No Tramme server sits in between. Nothing is sent to a provider until you use the assistant or a tool that needs one. <a href={docHref('assistant')}>How the assistant works</a>.</p>
+
+        <h2>This site</h2>
+        <p>It is a static site: it sets no cookies, runs no analytics code and loads no third-party script or font. It remembers one thing, whether you chose the light or the dark theme, in your browser's local storage; that choice never leaves your browser. The site is delivered by Cloudflare, which, like any host, handles the requests it receives.</p>
+      </div>
+    </section>
+  </main>
+  <Footer />
+</Base>
+
+<style>
+  .body { margin-top: clamp(40px, 5vw, 64px); }
+  code { font-size: 0.92em; padding: 2px 6px; border-radius: 6px; background: var(--panel); }
+</style>

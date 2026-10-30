@@ -6,9 +6,6 @@ import { PAGES, docHref } from '../src/lib/docs';
 
 const SRC = path.join(import.meta.dirname, '../src');
 
-/** pages the redesign adds, each removed from here by the task that makes it */
-const PENDING = ['/pricing/', '/about/', '/privacy/'];
-
 const links: NavLink[] = [...MENUS.flatMap((m) => m.links), ...BAR_LINKS, ...FOOTER.flatMap((m) => m.links)];
 const components = fs.readdirSync(path.join(SRC, 'components')).filter((f) => f.endsWith('.astro')).map((f) => fs.readFileSync(path.join(SRC, 'components', f), 'utf8')).join('\n');
 
@@ -17,7 +14,7 @@ describe('the site map', () => {
     const docs = new Set(PAGES.map((p) => docHref(p.slug)));
     for (const { href } of links.filter((l) => !l.href.startsWith('https://'))) {
       const [page, fragment] = href.split('#');
-      const exists = page === '/' || PENDING.includes(page) || docs.has(page)
+      const exists = page === '/' || docs.has(page)
         || fs.existsSync(path.join(SRC, 'pages', `${page.replace(/^\/|\/$/g, '')}.astro`));
       expect(exists, `${href} leads nowhere`).toBe(true);
       if (fragment) expect(components, `${href}: no id="${fragment}" in a component`).toContain(`id="${fragment}"`);

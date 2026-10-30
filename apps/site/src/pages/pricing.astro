@@ -1,0 +1,38 @@
+---
+// What Tramme costs: nothing, and what can cost money besides it
+import Base from '../layouts/Base.astro';
+import Nav from '../components/Nav.astro';
+import PageHead from '../components/PageHead.astro';
+import AppLink from '../components/AppLink.astro';
+import DownloadLink from '../components/DownloadLink.astro';
+import Footer from '../components/Footer.astro';
+import { docHref } from '../lib/docs';
+import { repoFile } from '../lib/links';
+---
+
+<Base title="Pricing, Tramme is free" description="Tramme is free and open source, in the browser and on the desktop. Only the AI provider you choose for the assistant can cost money, billed by that provider to your own account.">
+  <Nav />
+  <main>
+    <PageHead title="Free, and open source." lead="There is nothing to buy and no account to create." />
+    <section class="wrap body">
+      <div class="prose">
+        <h2>What is free</h2>
+        <p>All of it: the app in your browser, the desktop app for Windows, macOS and Linux, the command line, the engine and its source code. Tramme is released under the <a href={repoFile('LICENSE')}>Apache-2.0 licence</a>: use it for your own films or for clients, change it, keep what you make.</p>
+
+        <h2>What can cost money</h2>
+        <p>Only the AI the assistant talks to. Tramme does not sell it: you connect your own account with a provider (Claude, OpenAI, Gemini, OpenRouter, Z.AI), and that provider bills its usage to you, at its own prices. The assistant waits for your yes before anything that costs money, such as a transcription.</p>
+        <p>You can use Tramme without any AI. The studio's notes and takes need the assistant, but the atelier, the engine and the export do not.</p>
+
+        <h2>What it does not have</h2>
+        <p>Tiers, a trial, a watermark on what you export. The <a href={docHref('limits')}>known limits</a> are about what the engine cannot do yet, not about what you have paid.</p>
+      </div>
+      <div class="ctas"><AppLink /><DownloadLink /></div>
+    </section>
+  </main>
+  <Footer />
+</Base>
+
+<style>
+  .body { display: grid; gap: 32px; margin-top: clamp(40px, 5vw, 64px); }
+  .ctas { display: flex; flex-wrap: wrap; gap: 10px; }
+</style>
