@@ -26,7 +26,7 @@ import { LogoMark } from './Logo.tsx';
 import { SidePanel } from './Notes.tsx';
 import { TakeActions } from './thread.tsx';
 import { Overlays, useShortcuts } from './shell.tsx';
-import { AreaReview, Marks, PinChips, PinTools, pressPicture, RetouchList } from './Retouch.tsx';
+import { Marks, PinChips, PinTools, pressPicture } from './Retouch.tsx';
 import { Storyboard } from './Storyboard.tsx';
 import { TopBar } from './TopBar.tsx';
 import { Viewport } from './Viewport.tsx';
@@ -211,7 +211,6 @@ export function Studio() {
             {empty && <Invitation />}
             <div class="stage-top">{busy ? <WorkPill /> : pending ? <TakePill /> : null}</div>
             <div class="stage-foot" ref={foot}>
-              <div class="foot-float"><AreaReview /><RetouchList /></div>
               <Chips empty={empty} />
               <DirectBar area={area} />
             </div>

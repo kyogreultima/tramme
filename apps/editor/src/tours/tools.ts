@@ -24,6 +24,9 @@ registerTour({
     { ...at, title: m('tours.tools.followTitle'), body: m('tours.tools.followBody') },
     { ...at, title: m('tours.tools.madeTitle'), body: m('tours.tools.madeBody') },
     { ...at, title: m('tours.tools.reuseTitle'), body: m('tours.tools.reuseBody') },
+    { ...at, title: m('tours.tools.screenTitle'), body: m('tours.tools.screenBody') },
+    { ...at, title: m('tours.tools.craftTitle'), body: m('tours.tools.craftBody') },
     { ...at, title: m('tours.tools.checkTitle'), body: m('tours.tools.checkBody') },
+    { ...at, title: m('tours.tools.reviewTitle'), body: m('tours.tools.reviewBody') },
   ],
 });

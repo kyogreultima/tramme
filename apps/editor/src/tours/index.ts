@@ -4,6 +4,7 @@
 
 import './home.ts';
 import './studio.ts';
+import './retouch.ts';
 import './editor.ts';
 import './tips.ts';
 import './drawn.ts';

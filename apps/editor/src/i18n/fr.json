@@ -296,6 +296,8 @@
       "forClaudeTwoPaths": "Pour Claude, deux chemins : le **compagnon local** (votre connexion Claude Code, sans clé), ou la clé du serveur. On y règle aussi l'adresse des modèles locaux. La pastille de l'en-tête dit quel chemin est utilisé.",
       "theModel": "Le modèle",
       "claudeOpusForThe": "Claude : Opus pour le travail le plus soigné, Sonnet pour un bon équilibre, Haiku pour aller vite. Le menu propose aussi les modèles **OpenAI**, **Gemini** et **OpenRouter** dont le serveur a la clé, et les **modèles locaux** (Ollama, LM Studio). On peut changer de modèle en cours de conversation.",
+      "tagTitle": "Mentionner avec @",
+      "tagBody": "Tapez **@** dans la zone pour désigner une ressource du projet : l’assistant sait de quel fichier vous parlez. Cela marche aussi dans la zone de l’accueil, pour la matière ajoutée.",
       "ask": "Demander",
       "justWriteWhatYou": "Écrivez simplement ce que vous voulez. « ça », « ce calque », « ici » désignent la **sélection** et l'**instant courant**, rappelés sous le champ.",
       "dictate": "Dicter",
@@ -383,6 +385,20 @@
       "allGuidedToursAre": "Toutes les visites guidées sont ici, à tout moment. Une autre vous attend à la première ouverture d'un projet.",
       "describeTheFilm": "Décrivez le film que vous voulez, ajoutez sa matière (documents, images, vidéos, un dossier entier), choisissez un format : le projet s'ouvre dans le studio, Tramme déjà au travail. Un projet vierge, une vidéo ou un fichier à ouvrir : **Autres façons de commencer**."
     },
+    "retouch": {
+      "title": "Retoucher avec des repères et une liste",
+      "summary": "Plusieurs repères, chemins, sélections, une liste de retouches envoyée d’un coup.",
+      "introTitle": "Retoucher en une fois",
+      "introBody": "Marquez ce que vous voulez sur l’image, dites quoi changer, et ajoutez-le à une **liste**. Quand elle est prête, envoyez tout : l’assistant fait toutes les retouches en un seul tour.",
+      "toolsTitle": "Trois façons de marquer",
+      "toolsBody": "Le **point** dit « ici ». Le **chemin** est une ligne que vous tracez pour que l’assistant la suive : « déplace ça le long ». La **sélection** est une ligne ou une boucle tracée sur des calques pour en choisir un groupe. Les repères s’empilent, numérotés ; appuyez sur sa pastille pour en retirer un.",
+      "areaTitle": "Vous confirmez ce que la sélection désigne",
+      "areaBody": "Après avoir entouré des calques, ils sont **proposés**, pas choisis : dans le panneau latéral, retirez ceux que vous ne vouliez pas, touchez un calque sur l’image pour en ajouter un, puis utilisez-les. Vous pouvez aussi garder le tracé comme indication, sans calque choisi. **Réglages → Comportement** décide quand on vous le demande : toujours, au-delà de trois calques, ou jamais.",
+      "listTitle": "La liste des retouches",
+      "listBody": "Le bouton **+** ajoute vos mots et vos repères à la liste, qui attend à côté du film : réordonnez, reprenez-en une pour la modifier, retirez-la. L’image ne change jamais de taille. Entrée envoie toujours une seule note tout de suite.",
+      "voiceTitle": "À la voix ou au clavier",
+      "voiceBody": "Le **micro** écrit ce que vous dites dans la zone : relisez, puis ajoutez à la liste comme une autre. **Tout envoyer** lance la liste en un tour, chaque retouche avec ses repères, son moment et sa scène."
+    },
     "studio": {
       "title": "Découvrir le studio",
       "summary": "Diriger le film avec des mots : notes, scènes, prises.",
@@ -391,7 +407,7 @@
       "direct": "La barre de direction",
       "directBody": "Dites ce que vous voulez, comme à un monteur : « l'intro traîne », « un titre plus fort ici ». **Entrée** envoie. **/** ouvre les outils et les workflows.",
       "pin": "Épingler une note",
-      "pinBody": "Un clic sur l'image y épingle votre note : elle porte sur ce qui s'y montre à ce moment. L'épingle (**P**) fait de même.",
+      "pinBody": "Un clic sur l’image y épingle votre note : elle porte sur ce qui s’y montre à ce moment. À côté, tracez un **chemin** que l’assistant suivra, ou une **sélection** autour de calques ; marquez-en autant qu’il faut.",
       "storyboard": "Le film, scène par scène",
       "storyboardBody": "Cliquez une scène pour la mettre en avant : vos notes et les suggestions portent sur elle. Glissez pour parcourir le film.",
       "notes": "Notes et prises",
@@ -517,6 +533,12 @@
     "tools.reuseTitle": "Réutiliser",
     "tools.reuseBody": "**/block-add** enregistre une sélection habillée comme bloc du projet et **/block-use** la repose, n'importe où. **/component-keep**, **/component-use**, **/instantiate** et **/detach** travaillent avec les composants, une pièce à paramètres posée autant de fois qu'il faut. **/library-add** et **/library-use** gardent un plugin à partager entre les projets.",
     "tools.checkTitle": "Contrôler le travail",
+    "tools.reviewTitle": "Relire",
+    "tools.reviewBody": "**/critique** fait relire le film par un modèle qui ne l’a pas fait, face à une liste mesurée de ce que « terminé » veut dire ; **/compare** place un rendu à côté d’une image cible avec ce qui diffère le plus ; **/scene-takes** fait des prises d’une scène qui a échoué deux fois et garde la meilleure.",
+    "tools.craftTitle": "Le métier",
+    "tools.craftBody": "**/references** lit en mots ce qui fait qu’une image ou une coupe fonctionne, et les défauts à éviter, et prévient quand vos films gardés convergent vers un même look ; **/reference-keep** garde un film que vous aimez, avec pourquoi il fonctionne.",
+    "tools.screenTitle": "Écrans d’interface",
+    "tools.screenBody": "**/screen** remplit un cadre de téléphone ou de navigateur (fait par /device-screen) de lignes, cartes d’offre, panier, anneaux, barres, notifications et tableaux, en thème clair ou sombre.",
     "tools.checkBody": "**/check** lance les contrôles de qualité et donne une planche-contact des moments qui comptent. **/motion** montre une bande d'images pour juger un mouvement. L'assistant lance les deux avant de conclure."
   },
   "assistant": {

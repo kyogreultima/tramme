@@ -18,7 +18,7 @@ load(project.doc, project.manifest, '', '');
 
 let host: HTMLElement;
 beforeEach(() => { st.resetRetouch(); queueMod.queue.value = []; setPrefs({ areaConfirm: 'always' }); host = document.createElement('div'); document.body.appendChild(host); });
-afterEach(() => { render(null, host); host.remove(); vi.restoreAllMocks(); });
+afterEach(() => { render(null, host); host.remove(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 const mount = async (v: ReturnType<typeof h>) => { await act(() => { render(v, host); }); };
 const click = async (el: Element | null | undefined) => { await act(async () => { (el as HTMLElement).click(); }); };
@@ -135,5 +135,26 @@ describe('the setting of the confirmation', () => {
     expect(prefs.peek().areaConfirm).toBe('many');
     await click([...row().querySelectorAll('button')].find((b) => b.textContent === 'Never'));
     expect(prefs.peek().areaConfirm).toBe('never');
+  });
+});
+
+describe('where the retouching lives, and its tour', () => {
+  it('has its list in the side panel, beside the film, never over the picture', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('[]', { status: 404 })));
+    const { SidePanel } = await import('../src/ui/Notes.tsx');
+    st.addRetouch('make it bigger');
+    await mount(h(SidePanel, {}));
+    expect(host.querySelector('.studio-side .side-retouch .retouch-list')).toBeTruthy();
+    expect(host.textContent).toContain('1 retouches waiting');
+  });
+
+  it('is a guided tour of the studio, offered in the menu, with the area explained', async () => {
+    const tours = await import('../src/tours/index.ts');
+    setPrefs({ view: 'studio' });
+    const found = tours.toursFor('editor').find((x) => x.id === 'retouch');
+    expect(found).toBeTruthy();
+    expect(found!.steps.length).toBeGreaterThanOrEqual(5);
+    const { t: tr } = await import('../src/i18n/index.ts');
+    expect(tr(found!.steps[2].body as string)).toContain('Settings');
   });
 });

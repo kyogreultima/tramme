@@ -14,6 +14,7 @@ import { Direction } from './Direction.tsx';
 import { LogoMark } from './Logo.tsx';
 import { Icon } from './icons.tsx';
 import { Thread } from './thread.tsx';
+import { AreaReview, RetouchList } from './Retouch.tsx';
 import { useStatusWatch } from './chat.tsx';
 import { t } from '../i18n/index.ts';
 
@@ -54,6 +55,8 @@ export function SidePanel() {
         <span class="grow" />
         <ConversationTools />
       </div>
+      {/* what is being retouched sits here, beside the film: it never covers the picture nor takes its room */}
+      <div class="side-retouch"><AreaReview /><RetouchList /></div>
       {panel === 'notes' ? <Thread empty={<Empty />} /> : <div class="side-body"><Direction /></div>}
     </aside>
   );
