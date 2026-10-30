@@ -39,7 +39,7 @@ The look takes a little from the reference screenshot the user gave (MAXS): a bi
 | `/features/` | the pillars, one page | Studio, Atelier, Assistant, Packs, Export, each with its picture, a few lines and a link to its docs |
 | `/examples/` | the gallery | the repository's examples (`examples/*/tramme.json`), each its video, its name, its length, "open in the app" |
 | `/pricing/` | the answer to "what does it cost" | free and open source (Apache-2.0); the app in the browser and on the desktop at no charge; only the AI providers' usage costs, with the visitor's own keys |
-| `/changelog/` | what changed | rendered from `CHANGELOG.md` at build time, newest first |
+| `/docs/changelog/` | what changed | `CHANGELOG.md` as one more docs page (the docs loader already makes pages from the repository's Markdown): no new rendering code; *my call*, planned in place of `/changelog/` |
 | `/about/` | the project | what it is, the licence, how to contribute, the repository, the security policy |
 | `/privacy/` | what is kept where | short and factual: projects stay in the browser (personal mode) or in the user's folder (desktop), keys in a key vault or the system keychain; what the site itself collects (nothing, if that is true: to be verified in the code before it is written) |
 | `/download/` | exists | restyled with the new top bar and footer only |
