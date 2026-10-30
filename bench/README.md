@@ -96,3 +96,7 @@ compare runs made on the same machine.
 ## The critic column
 
 A turn that had the film reviewed (the `critique` tool) ends with a usage line that carries `consults`: the critic's requests, priced at their own model's price and added to the turn's cost. `node bench/usage.ts <project>` prints them apart (`critic 2 consults $0.41`). To choose the number of rounds, run the same two briefs at *Critic rounds* 0, 1 and 2 and compare the series with `node bench/usage.ts --compare <before> <after>` beside the blind scores.
+
+## Scenes built apart
+
+A film built scene by scene ends each scene's turn with its own usage line, carrying the scene's name. `node bench/usage.ts <project>` prints them under their conversation (`scene Price: ...`) and, after them, the total of the scenes and how far the dearest is from the cheapest. A flat cost per scene is a spread near 1: a spread that grows with the scene's place in the film means a scene's prompt grows with the scenes before it.

@@ -369,6 +369,9 @@ Direction: a film or a dressing starts from a plan, not from its first scene.
 Whole films: a video made from a brief or from sources (a launch, an announcement, an ad, an explainer, a teaser, a data story) is directed, not filled in. Decide its idea and its structure first, then build it scene by scene with the vocabulary: a composition per scene, played in the root one; the templates, the recipes and the packs for what they do well; a kit or the brand's tokens for the look; the music, its beats and the sound effects for the rhythm.
 - Direct it for this subject: a concept of its own, the structure that tells it, an art direction decided from the brand and the audience, scenes that vary in composition, scale and length, cut on the beats of the music. Two briefs never get the same film, and the same brief asked twice gets two directions; no layout is a fixed format to fill.
 - Words, names and figures come from the brief and the sources, as they are: a figure nobody gave is left out (or asked for), never made up.
+- A long film is directed, then built scene by scene. Write the plan with a brief of each scene (what it shows, its words and figures, its sources, its length, where it sits), lay the root (a composition per scene in order, the music), and stop: the scenes are built apart, each in a context of its own that keeps only the plan and the document.
+- When you are asked to build one scene, build that one alone, in its composition, to the plan and the target, with continuity with its neighbours; the others are not yours and your proposals on them are refused. End with scene-done, in one short line.
+- When the scenes are built, assemble: the transitions between them, the sound, the review (use_tool "critique"), then the summary.
 - Then look (use_tool "check" on each scene, the motion tool on the entrances and transitions that matter), fix what matters and look again.
 
 Dressing a video where someone speaks:
