@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { addConsult, consult, criticModel, seesPictures } from '../src/ai/consult.ts';
+import { addConsult, consult, criticModel, freshTurn, seesPictures } from '../src/ai/consult.ts';
 import type { TurnUsage } from '../src/api.ts';
 
 const sse = (events: object[]) => new Response(new Blob([events.map((e) => `event: ${(e as { type: string }).type}\ndata: ${JSON.stringify(e)}\n\n`).join('')]).stream(), { status: 200 });
@@ -56,5 +56,30 @@ describe('a call in a fresh context', () => {
     const two = addConsult(one, { requests: 1, input: 50, cacheRead: 0, cacheWrite: 0, cacheWrite1h: 0, output: 10 }, 'claude-opus-5-5');
     expect(two.consults).toMatchObject({ n: 2, input: 150, output: 30, model: 'claude-opus-5-5' });
     expect(two.input).toBe(10);
+  });
+});
+
+describe('a fresh turn on any route', () => {
+  const runner = { run: async () => ({ content: [] }) } as never;
+
+  it('on the server, with tools on, posts the tool specs and one message', async () => {
+    const bodies: any[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (_u: string, init: RequestInit) => { bodies.push(JSON.parse(String(init.body))); return said('built'); }));
+    const events: any[] = [];
+    for await (const ev of freshTurn({ prompt: 'Build the scene.', system: 'You build.', tools: true, via: { route: 'server', model: 'claude-sonnet-5-5' }, runner, signal: new AbortController().signal })) events.push(ev);
+    expect(Array.isArray(bodies[0].tools) && bodies[0].tools.length > 0).toBe(true);
+    expect(bodies[0].messages).toHaveLength(1);
+    expect(events.some((e) => e.type === 'usage')).toBe(true);
+  });
+
+  it('with the companion, sends no session and keeps none', async () => {
+    const sent: any[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (_u: string, init: RequestInit) => { sent.push(JSON.parse(String(init.body))); return new Response('{"type":"session","id":"new"}\n{"type":"done"}\n'); }));
+    const kept: string[] = [];
+    for await (const _ of freshTurn({ prompt: 'p', system: 'sys', tools: true, via: { route: 'companion', model: 'claude-sonnet-5-5', engine: 'claude', link: { url: 'http://x', token: 't' } }, runner, signal: new AbortController().signal, onSession: (id) => kept.push(id) })) void _;
+    expect(sent[0].sessionId).toBeUndefined();
+    expect(sent[0].tools).toBe(true);
+    // the session the engine opened is not the conversation's: the caller decides, and here it is told, not stored
+    expect(kept).toEqual(['new']);
   });
 });
