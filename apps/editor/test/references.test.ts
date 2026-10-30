@@ -63,7 +63,7 @@ describe('loadReferences', () => {
       .mockResolvedValueOnce(new Response('x', { status: 500 }))
       .mockResolvedValue(new Response(JSON.stringify(refs.slice(0, 2)), { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
-    await expect(loadReferences()).rejects.toThrow('HTTP 500');
+    await expect(loadReferences()).rejects.toThrow('could not be read (HTTP 500)');
     expect(await loadReferences()).toHaveLength(2);
     await loadReferences();
     expect(fetchMock).toHaveBeenCalledTimes(2);
