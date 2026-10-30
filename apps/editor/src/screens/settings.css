@@ -98,13 +98,15 @@ html.vault:not(.compact) .set-row:not(.stack) .set-control { justify-content: fl
   .set-control { justify-content: flex-start; overflow-x: auto; }
   /* on a phone: full screen, the navigation a row of chips that scrolls above the pane */
   .modal-body.settings { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); height: calc(100dvh - 90px); }
-  .set-nav { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 4px; padding: 10px 12px; border-right: 0; border-bottom: 1px solid var(--line); }
+  .set-nav { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 6px; padding: 10px 12px; border-right: 0; border-bottom: 1px solid var(--line); max-height: 38dvh; }
   /* the search across the whole width, the reset and the sections under it */
   .set-search { flex: 1 0 100%; margin-bottom: 0; }
+  /* the reset keeps its icon only; the sections are chips in one scrolling row each, never one chip to a line */
   .set-nav > .btn { order: 1; flex: none; }
-  .set-group { order: 2; flex-direction: row; gap: 4px; flex-wrap: wrap; }
+  .set-nav > .btn span { display: none; }
+  .set-group { order: 2; flex: 1 1 100%; min-width: 0; flex-direction: row; gap: 4px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
   .set-group-title, .set-nav .grow { display: none; }
-  .set-nav-item { height: 28px; padding: 0 9px; margin: 0; white-space: nowrap; border-radius: var(--r-pill); }
+  .set-nav-item { width: auto; flex: none; height: 32px; padding: 0 11px; margin: 0; white-space: nowrap; border-radius: var(--r-pill); }
   .set-pane { padding: 12px; }
   .theme-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }

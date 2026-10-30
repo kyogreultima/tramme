@@ -30,6 +30,7 @@ import { Providers as ProviderList, type ProviderActions } from './Providers.tsx
 import { ViewSwitch } from './views.tsx';
 import { Confirm, norm, Row, Search, Section } from './SettingsRows.tsx';
 import { LocalModels } from './ModelsSettings.tsx';
+import { APP_VERSION, checkForUpdate, downloadOf, update } from '../version.ts';
 
 const MOTION: Record<Preferences['motion'], string> = {
   auto: m('settings.adaptsToTheMachine'),
@@ -485,6 +486,36 @@ function Storage() {
   );
 }
 
+// ── the version of the app, and its updates ──
+function About() {
+  const p = prefs.value, found = update.value;
+  const [state, setState] = useState<'idle' | 'looking' | 'current' | 'failed'>('idle');
+  const [why, setWhy] = useState('');
+  const look = async () => {
+    setState('looking');
+    try {
+      const latest = await checkForUpdate();
+      update.value = latest;
+      setPrefs({ lastUpdateCheck: Date.now() });
+      setState(latest ? 'idle' : 'current');
+    } catch (e) { setWhy((e as Error).message); setState('failed'); }
+  };
+  return (
+    <Section title={t('settings.about')} hint={t('settings.aboutHint')}>
+      <Row label={t('settings.version')} hint={found ? t('settings.updateIs', { version: found.version }) : state === 'current' ? t('update.upToDate') : state === 'failed' ? why : undefined}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <span class="mono">{APP_VERSION}</span>
+          {found && <a class="btn sm primary" href={downloadOf(found).href} target="_blank" rel="noopener"><Icon name="download" />{downloadOf(found).direct ? t('update.download') : t('update.release')}</a>}
+          <button class="btn sm" disabled={state === 'looking'} onClick={look}><Icon name={state === 'looking' ? 'spinner' : 'search'} />{state === 'looking' ? t('update.checking') : t('settings.checkNow')}</button>
+        </div>
+      </Row>
+      <Row label={t('settings.checkUpdates')} hint={t('settings.checkUpdatesHint')}>
+        <Toggle on={p.checkUpdates} onChange={(on) => setPrefs({ checkUpdates: on })} />
+      </Row>
+    </Section>
+  );
+}
+
 // ── the menu ─────────────────────────────────────────────────
 interface Pane { id: SettingsSection; icon: string; title: () => string; body: FunctionComponent }
 const GROUPS: { title: () => string; panes: Pane[] }[] = [
@@ -513,6 +544,7 @@ const GROUPS: { title: () => string; panes: Pane[] }[] = [
       { id: 'connection', icon: 'link', title: () => t('settings.connection'), body: Connection },
     ],
   },
+  { title: () => t('settings.about'), panes: [{ id: 'about', icon: 'help', title: () => t('settings.about'), body: About }] },
 ];
 const PANES = GROUPS.flatMap((g) => g.panes);
 

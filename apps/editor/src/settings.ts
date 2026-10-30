@@ -50,6 +50,11 @@ export interface Preferences {
   models: Partial<Record<ModelTask, string>>;
   /** installed plugins turned off on this device (their file names) */
   pluginsOff: string[];
+  /** look for a newer version on its own, every twelve hours */
+  checkUpdates: boolean;
+  /** when it looked last (ms), and the newest version the user was told of */
+  lastUpdateCheck: number;
+  updateNotified: string;
   /** the / menu's commands used last, its first lines when it opens empty (at most six) */
   recentCommands: string[];
   /** pictures made by a provider: the one by default (auto: the first connected), the quality (auto: the tool's choice), the size at most (small costs less) */
@@ -67,7 +72,7 @@ export interface Preferences {
 
 export const DEFAULT_PREFERENCES: Preferences = {
   language: 'auto', theme: 'studio', view: 'studio', motion: 'auto', still: 'display', blur: 'document', exactFrames: true, scrubAudio: true, sandboxPreview: false,
-  effectsDb: -8, musicDb: -14, duckDb: -12, varySounds: true, confirmPaid: true, paidPerTurn: 10, voiceProvider: 'auto', voice: '', voiceModel: '', previewVolume: 1, previewMuted: false, proxies: true, models: {}, pluginsOff: [], recentCommands: [],
+  effectsDb: -8, musicDb: -14, duckDb: -12, varySounds: true, confirmPaid: true, paidPerTurn: 10, voiceProvider: 'auto', voice: '', voiceModel: '', previewVolume: 1, previewMuted: false, proxies: true, models: {}, pluginsOff: [], checkUpdates: true, lastUpdateCheck: 0, updateNotified: '', recentCommands: [],
   pictureProvider: 'auto', pictureQuality: 'auto', pictureSize: 'large', styleFrames: 2,
   videoProvider: 'auto', videoSeconds: 8, dictation: 'local',
 };
@@ -150,6 +155,9 @@ function load(): Preferences {
     const models = p.models && typeof p.models === 'object' ? p.models : {};
     p.models = Object.fromEntries(MODEL_TASKS.filter((k) => typeof models[k] === 'string').map((k) => [k, models[k]]));
     p.pluginsOff = Array.isArray(p.pluginsOff) ? p.pluginsOff.filter((x) => typeof x === 'string') : [];
+    p.checkUpdates = p.checkUpdates !== false;
+    p.lastUpdateCheck = Number.isFinite(p.lastUpdateCheck) ? p.lastUpdateCheck : 0;
+    p.updateNotified = typeof p.updateNotified === 'string' ? p.updateNotified : '';
     p.recentCommands = Array.isArray(p.recentCommands) ? p.recentCommands.filter((x) => typeof x === 'string').slice(0, 6) : [];
     if (!['auto', 'openai', 'gemini', 'zai', 'hydracept'].includes(p.pictureProvider)) p.pictureProvider = DEFAULT_PREFERENCES.pictureProvider;
     if (!['auto', 'low', 'medium', 'high'].includes(p.pictureQuality)) p.pictureQuality = DEFAULT_PREFERENCES.pictureQuality;
@@ -215,7 +223,7 @@ effect(() => {
 /** the settings dialog, opened from the top bar, the home screen or Ctrl+, */
 export const settingsOpen = signal(false);
 
-export type SettingsSection = 'plugins' | 'appearance' | 'preview' | 'sound' | 'pictures' | 'videos' | 'models' | 'tours' | 'storage' | 'model' | 'providers' | 'behavior' | 'connection';
+export type SettingsSection = 'plugins' | 'appearance' | 'preview' | 'sound' | 'pictures' | 'videos' | 'models' | 'tours' | 'storage' | 'model' | 'providers' | 'behavior' | 'connection' | 'about';
 /** the section shown: the last one opened, or the one asked for */
 export const settingsSection = signal<SettingsSection>('appearance');
 export function openSettings(section?: SettingsSection) {

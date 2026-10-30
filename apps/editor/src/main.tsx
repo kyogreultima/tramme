@@ -31,6 +31,7 @@ import { startProject } from './start.ts';
 import { t } from './i18n/index.ts';
 import { boot } from './mode.ts';
 import { initDesktop } from './desktop.ts';
+import { autoCheck } from './version.ts';
 import { copiesFor, startInstalled } from './installed.ts';
 
 const root = document.getElementById('app')!;
@@ -82,6 +83,8 @@ boot().then(() => {
   startInstalled();
   // the local companion, found whenever it starts, on the home page and in the editor
   watchCompanion();
+  // a newer version of the app, looked for on its own every twelve hours
+  void autoCheck();
   if (m) {
     openProject(m[1]).catch((e) => {
       S.loadError.value = (e as Error).message;
