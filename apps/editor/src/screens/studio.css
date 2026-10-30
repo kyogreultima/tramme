@@ -251,6 +251,9 @@ button.ctx-chip:hover { background: var(--field-hover); color: var(--text); }
 .studio-stage .viewport { touch-action: none; }
 @media (max-width: 760px) { .send-all { display: none; } .retouch-list li { grid-template-columns: 28px minmax(0, 1fr); } .retouch-actions { grid-column: 1 / -1; justify-content: flex-end; } }
 
-/* the list and the area float over the film above the direction bar: they never take room from the picture */
-.foot-float { position: absolute; left: 0; right: 0; bottom: calc(100% + 8px); display: flex; flex-direction: column; gap: 8px; max-height: 55dvh; overflow: auto; }
-.foot-float:empty { display: none; }
+
+/* what is being retouched, at the top of the side panel: its own room, scrolling when long */
+.side-retouch { display: flex; flex-direction: column; gap: 8px; flex: none; max-height: 45%; overflow: auto; padding: 0 12px 8px; }
+.side-retouch:empty { display: none; }
+.side-retouch .area-review, .side-retouch .retouch-list { backdrop-filter: none; -webkit-backdrop-filter: none; background: var(--surface-2); }
+.side-retouch .retouch-list ol { max-height: none; }

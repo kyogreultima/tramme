@@ -296,6 +296,8 @@
       "forClaudeTwoPaths": "For Claude, two paths: the **local companion** (your Claude Code login, no key), or the server's key. The local models' address is set here too. The badge in the header shows which path is used.",
       "theModel": "The model",
       "claudeOpusForThe": "Claude: Opus for the most careful work, Sonnet for a good balance, Haiku to go fast. The menu also offers the **OpenAI**, **Gemini** and **OpenRouter** models the server has a key for, and **local models** (Ollama, LM Studio). You can switch models during a conversation.",
+      "tagTitle": "Tag with @",
+      "tagBody": "Type **@** in the box to tag one of the project's assets: the assistant is told which file you mean. It works in the home page's box too, for the material you added.",
       "ask": "Ask",
       "justWriteWhatYou": "Just write what you want. \"this\", \"this layer\", \"here\" refer to the **selection** and the **current time**, shown under the field.",
       "dictate": "Dictate",
@@ -383,6 +385,20 @@
       "allGuidedToursAre": "All guided tours are here, at any time. Another one awaits you the first time you open a project.",
       "describeTheFilm": "Describe the film you want, add its material (documents, pictures, footage, a whole folder), pick a format: the project opens in the studio with Tramme already at work. A blank project, a video or a file to open: **Other ways in**."
     },
+    "retouch": {
+      "title": "Retouching with pins and lists",
+      "summary": "Several pins, paths, selections, a list of retouches sent at once.",
+      "introTitle": "Retouch in one go",
+      "introBody": "Pin what you mean on the picture, say what to change, and add it to a **list**. When the list is ready, send it all: the assistant does every retouch in one turn.",
+      "toolsTitle": "Three ways to pin",
+      "toolsBody": "The **point** says \"here\". The **path** is a line you draw for the assistant to follow: \"move this along it\". The **selection** is a line or a loop drawn on layers to pick a group. Pins stack up, each numbered; press its chip to take it away.",
+      "areaTitle": "You confirm what a selection means",
+      "areaBody": "After you draw round layers, they are **proposed**, not chosen: in the side panel, drop the ones you did not mean, tap a layer on the picture to add one, then use them. You can also keep the line as a hint with no layer chosen. **Settings → Behavior** decides when this is asked: always, above three layers, or never.",
+      "listTitle": "The list of retouches",
+      "listBody": "The **+** button adds your words and your pins to the list, which waits beside the film: reorder them, take one back to change it, remove it. The picture never changes size. Enter still sends a single note at once.",
+      "voiceTitle": "By voice or by text",
+      "voiceBody": "The **microphone** writes what you say in the box: read it, then add it to the list like any other. **Send all** runs the list as one turn, each retouch with its own pins, moment and scene."
+    },
     "studio": {
       "title": "Discover the studio",
       "summary": "Direct the film in words: notes, scenes, takes.",
@@ -391,7 +407,7 @@
       "direct": "The direction bar",
       "directBody": "Say what you want, as you would to an editor: \"the intro drags\", \"a bolder title here\". **Enter** sends. **/** opens the tools and workflows.",
       "pin": "Pin a note",
-      "pinBody": "A click on the picture pins your note there: it is about what shows at that moment. The pin (**P**) does the same.",
+      "pinBody": "A click on the picture pins your note there: it is about what shows at that moment. Next to it, draw a **path** for the assistant to follow, or a **selection** round layers; pin as many as you need.",
       "storyboard": "The film, scene by scene",
       "storyboardBody": "Click a scene to put it in focus: your notes and the suggestions are about it. Drag to run through the film.",
       "notes": "Notes and takes",
@@ -517,6 +533,12 @@
     "tools.reuseTitle": "Reusing",
     "tools.reuseBody": "**/block-add** saves a dressed selection as a block of the project and **/block-use** places it again, anywhere. **/component-keep**, **/component-use**, **/instantiate** and **/detach** work with components, a piece with parameters placed as many times as needed. **/library-add** and **/library-use** keep a plugin to share between projects.",
     "tools.checkTitle": "Checking the work",
+    "tools.reviewTitle": "Reviewing",
+    "tools.reviewBody": "**/critique** has the film reviewed by a model that did not make it, against a measured list of what done means; **/compare** sets a render beside a target picture with what differs most; **/scene-takes** makes takes of a scene that failed twice and keeps the best.",
+    "tools.craftTitle": "The craft",
+    "tools.craftBody": "**/references** reads what makes a frame or a cut work, and the faults to avoid, in words, and warns when your kept films converge on one look; **/reference-keep** keeps a film you like, with why it works.",
+    "tools.screenTitle": "Interface screens",
+    "tools.screenBody": "**/screen** fills a phone or a browser frame (made by /device-screen) with rows, plan cards, a cart, rings, bars, toasts and tables, in a light or a dark theme.",
     "tools.checkBody": "**/check** runs the quality checks and gives a contact sheet of the moments that matter. **/motion** shows a strip of frames to judge a movement. The assistant runs both before it sums up."
   },
   "assistant": {

@@ -33,6 +33,11 @@ registerTour({
     },
     {
       target: 'assistant-composer', side: 'top', align: 'center',
+      title: m('tours.assistant.tagTitle'),
+      body: m('tours.assistant.tagBody'),
+    },
+    {
+      target: 'assistant-composer', side: 'top', align: 'center',
       title: m('tours.assistant.dictate'),
       body: m('tours.assistant.theMicrophoneWritesWhat'),
     },
