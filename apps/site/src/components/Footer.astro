@@ -1,5 +1,4 @@
 ---
-import Brand from './Brand.astro';
 import { FOOTER } from '../lib/nav';
 ---
 
@@ -14,21 +13,16 @@ import { FOOTER } from '../lib/nav';
       ))}
     </nav>
     <p class="legal">© 2026 Aziz Chanou. Free and open source, under the Apache-2.0 licence.</p>
-    <!-- the name, as large as the page is wide: the page already says it, so it is a picture -->
-    <div class="mark" aria-hidden="true"><div class="big"><Brand /></div></div>
   </div>
 </footer>
 
 <style>
-  .foot { margin-top: var(--section); padding-top: clamp(40px, 5vw, 64px); border-top: 1px solid var(--line); }
+  .foot { margin-top: var(--section); padding-block: clamp(40px, 5vw, 64px) 40px; border-top: 1px solid var(--line); }
   .cols { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 32px var(--gutter); }
   strong { display: block; margin-bottom: 14px; font-size: 0.875rem; font-weight: 500; color: var(--ink); }
   ul { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
   a { font-size: 0.9375rem; color: var(--ink-3); text-decoration: none; transition: color 0.2s var(--ease); }
   a:hover { color: var(--ink); }
   .legal { margin-top: clamp(40px, 5vw, 64px); font-size: 0.875rem; color: var(--ink-3); }
-  /* six times the height of the font is the logo's width: one line, edge to edge */
-  .mark { container-type: inline-size; margin-top: clamp(24px, 4vw, 48px); padding-bottom: clamp(24px, 4vw, 48px); }
-  .big { font-size: 16.6cqw; line-height: 1; --brand-ink: var(--panel); --brand-mark: var(--accent-soft); }
   @media (max-width: 820px) { .cols { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 </style>
