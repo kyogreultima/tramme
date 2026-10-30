@@ -7,10 +7,12 @@ import { Image } from 'astro:assets';
 import ArrowRight from '@phosphor-icons/core/assets/regular/arrow-right.svg';
 import Head from './Head.astro';
 import Shot from './Shot.astro';
-import { FEATURES } from '../lib/features';
+import { FEATURES, shotOf } from '../lib/features';
 
 const [lead, ...rest] = FEATURES;
-const parts = (f: typeof lead) => ('shot' in f.picture && f.picture.part ? [{ ...f.picture.part, class: 'composer' }] : []);
+// only the note box floats over the studio here
+const { shot, alt, parts } = shotOf('studio');
+const floating = parts?.filter((p) => p.class === 'composer');
 ---
 
 <section class="section" id="pillars">
@@ -22,11 +24,11 @@ const parts = (f: typeof lead) => ('shot' in f.picture && f.picture.part ? [{ ..
     <div class="text">
       <h3>{lead.name}</h3>
       <p>{lead.line}</p>
-      <a class="more" href={`/features/#${lead.id}`}>Explore the {lead.name.toLowerCase()}<ArrowRight aria-hidden="true" /></a>
+      <a class="more" href={`/features/#${lead.id}`} aria-label={`Learn more about the ${lead.name.toLowerCase()}`}>Learn more<ArrowRight aria-hidden="true" /></a>
     </div>
   </div>
   <div class="wrap-wide shot">
-    {'shot' in lead.picture && <Shot light={lead.picture.shot[0]} dark={lead.picture.shot[1]} alt={lead.picture.alt} parts={parts(lead)} />}
+    <Shot light={shot[0]} dark={shot[1]} alt={alt} parts={floating} />
   </div>
 
   <div class="wrap rows">
@@ -35,7 +37,7 @@ const parts = (f: typeof lead) => ('shot' in f.picture && f.picture.part ? [{ ..
         <div class="text">
           <h3>{f.name}</h3>
           <p>{f.line}</p>
-          <a class="more" href={`/features/#${f.id}`}>Explore the {f.name.toLowerCase()}<ArrowRight aria-hidden="true" /></a>
+          <a class="more" href={`/features/#${f.id}`} aria-label={`Learn more about the ${f.name.toLowerCase()}`}>Learn more<ArrowRight aria-hidden="true" /></a>
         </div>
         <div class="picture">
           {'shot' in f.picture
@@ -50,7 +52,6 @@ const parts = (f: typeof lead) => ('shot' in f.picture && f.picture.part ? [{ ..
 <style>
   .lead { margin-top: clamp(40px, 5vw, 64px); }
   .shot { margin-top: clamp(28px, 4vw, 48px); }
-  .shot :global(.part.composer) { width: 54%; bottom: -7%; left: -3%; }
   .rows { display: grid; gap: clamp(56px, 7vw, 104px); margin-top: clamp(72px, 9vw, 136px); }
   .row { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); align-items: center; gap: clamp(28px, 5vw, 80px); }
   .reverse .text { order: 2; }

@@ -77,6 +77,8 @@ import { BAR_LINKS, MENUS } from '../lib/nav';
   .fold summary::-webkit-details-marker { display: none; }
   .panel {
     position: absolute; top: calc(100% + 14px); right: 0; z-index: 2; display: grid; gap: 14px; width: min(86vw, 320px); padding: 16px;
+    /* a short screen (a phone on its side): the panel scrolls inside itself, the bar being fixed */
+    max-height: calc(100dvh - var(--nav) - 24px); overflow-y: auto; overscroll-behavior: contain;
     background: var(--panel); border-radius: var(--r-lg); box-shadow: var(--float);
   }
   .panel strong { display: block; margin-bottom: 4px; font-size: 0.8125rem; font-weight: 500; color: var(--ink-3); }

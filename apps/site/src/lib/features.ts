@@ -1,9 +1,13 @@
 // The five things Tramme does, as the landing page shows them (Pillars.astro)
-// and as the features page details them (its sections, with these ids).
+// and as the features page details them (its sections, with these ids). The
+// pictures of the studio and the atelier are written here once: their
+// sections read them from here too.
 
 import type { ImageMetadata } from 'astro';
 import studioLight from '../assets/studio-light.png';
 import studioDark from '../assets/studio-dark.png';
+import briefLight from '../assets/part-brief-light.png';
+import briefDark from '../assets/part-brief-dark.png';
 import composerLight from '../assets/part-composer-light.png';
 import composerDark from '../assets/part-composer-dark.png';
 import editorLight from '../assets/editor-light.png';
@@ -12,15 +16,19 @@ import assistantStill from '../videos/assistant.webp';
 import showreelStill from '../videos/showreel.webp';
 import launchStill from '../videos/launch-film.webp';
 
+/** a piece of the interface that floats off a picture of the app (Shot.astro places it by its class) */
+export interface Part { light: ImageMetadata; dark: ImageMetadata; alt: string; class: 'brief' | 'composer' }
+/** the app in the page's theme: paper on the light page, studio on the dark one */
+export interface ShotPicture { shot: [light: ImageMetadata, dark: ImageMetadata]; alt: string; parts?: Part[] }
+/** a still of a film */
+export interface StillPicture { still: ImageMetadata; alt: string }
+
 export interface Feature {
   /** the id of its section on the features page */
   id: 'studio' | 'editor' | 'assistant' | 'packs' | 'render';
   name: string;
   line: string;
-  /** the app in the page's theme (paper on the light page, studio on the dark one), or a still of a film */
-  picture:
-    | { shot: [light: ImageMetadata, dark: ImageMetadata]; alt: string; part?: { light: ImageMetadata; dark: ImageMetadata; alt: string } }
-    | { still: ImageMetadata; alt: string };
+  picture: ShotPicture | StillPicture;
 }
 
 export const FEATURES: Feature[] = [
@@ -31,14 +39,20 @@ export const FEATURES: Feature[] = [
     picture: {
       shot: [studioLight, studioDark],
       alt: 'The Tramme studio: the Showreel example in front, its storyboard below, and the Direction panel with the brief, the palette and the material.',
-      part: { light: composerLight, dark: composerDark, alt: 'The note box, with suggestions above it: review the film, more rhythm, another palette.' },
+      parts: [
+        { light: briefLight, dark: briefDark, alt: 'The brief of the film: its subject, its tone and its rules.', class: 'brief' },
+        { light: composerLight, dark: composerDark, alt: 'The note box, with suggestions above it: review the film, more rhythm, another palette.', class: 'composer' },
+      ],
     },
   },
   {
     id: 'editor',
     name: 'Atelier',
     line: 'Every layer, key and curve, one switch away from the studio, on the same film.',
-    picture: { shot: [editorLight, editorDark], alt: 'The Tramme atelier: the layers on the left, the frame in the viewport, the timeline below and the inspector on the right.' },
+    picture: {
+      shot: [editorLight, editorDark],
+      alt: 'The Tramme atelier: the layers of the Showreel example on the left, the frame in the viewport, the timeline below and the inspector on the right.',
+    },
   },
   {
     id: 'assistant',
@@ -59,3 +73,10 @@ export const FEATURES: Feature[] = [
     picture: { still: launchStill, alt: 'The launch film, cut on the beat: compositions inside compositions and a 2.5D camera.' },
   },
 ];
+
+/** the picture of a feature that is the app itself (the studio, the atelier) */
+export function shotOf(id: Feature['id']): ShotPicture {
+  const { picture } = FEATURES.find((f) => f.id === id)!;
+  if (!('shot' in picture)) throw new Error(`the ${id} feature is not shown by a picture of the app`);
+  return picture;
+}

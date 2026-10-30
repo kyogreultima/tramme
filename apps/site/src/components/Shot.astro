@@ -38,6 +38,9 @@ const pair = (l: ImageMetadata, d: ImageMetadata) => [['light', l], ['dark', d]]
 
   /* a piece of the interface, lifted off the picture */
   .part { position: absolute; z-index: 1; overflow: hidden; border-radius: var(--r); background: var(--panel); box-shadow: var(--float); }
+  /* the brief hangs off the right edge, the note box off the bottom left */
+  .part.brief { width: 31%; top: 14%; right: -5%; }
+  .part.composer { width: 54%; bottom: -7%; left: -5%; }
   /* room for the pieces that hang over the edges */
   .exploded { margin-block: 3% 5%; }
 
