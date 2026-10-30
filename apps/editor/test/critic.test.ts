@@ -428,3 +428,24 @@ describe('takes of a scene', () => {
     expect(consultsOf()?.n).toBe(1);
   });
 });
+
+describe('the faults the critic is told to name', () => {
+  it('are the titles of the catalogue\'s faults, in under 1 500 characters', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { faultTitles } = await import('../src/critic/tool.ts');
+    const refs = JSON.parse(readFileSync('apps/editor/data/references.json', 'utf8'));
+    const titles = faultTitles(refs);
+    expect(titles.length).toBeGreaterThanOrEqual(20);
+    expect(titles.join('\n- ').length).toBeLessThan(1500);
+    expect(titles).toContain('The empty scene');
+  });
+
+  it('ride in the system text of the consult', async () => {
+    let system = '';
+    resetCritic();
+    setCriticHost({ via: () => ({ route: 'server', model: 'claude-opus-5-5' }), rounds: () => 2, faults: async () => ['The empty scene'], gather: async () => ({ strips: [], target: null, plan: null, facts: '', moments: [], issues: [] }), likeness: async () => null, consult: async (req) => { system = req.system; return { text: '{"verdict":"done","fixes":[]}', usage: { requests: 1, input: 1, cacheRead: 0, cacheWrite: 0, cacheWrite1h: 0, output: 1 } }; } });
+    const doc = good();
+    await (criticTools.find((t) => t.name === 'critique')!.run({} as never, { doc, compId: 'main', time: 0, selection: [], registry, readText: async () => null, files: async () => [], assetUrl: () => '', fileUrl: () => '', signal: new AbortController().signal } as never));
+    expect(system).toContain('Faults to name when you see them:\n- The empty scene');
+  });
+});

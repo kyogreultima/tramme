@@ -6,7 +6,8 @@
 // asks for takes of a scene that fails twice.
 
 import { pointer, runChecks, likeness, type Op, type ToolContext, type ToolType } from '@tramme/core';
-import { CRITIC_SYSTEM, NO_USAGE, addUsage, parseVerdict, type Usage } from '@tramme/assistant';
+import { criticSystem, NO_USAGE, addUsage, parseVerdict, type Usage } from '@tramme/assistant';
+import { loadReferences, type Reference } from '../references/catalogue.ts';
 import { consult, seesPictures, type ConsultRequest, type Via } from '../ai/consult.ts';
 import { FILM_PLAN_PATH, parsePlan } from '../filmplan.ts';
 import { analyses } from '../perception.ts';
@@ -26,7 +27,16 @@ export interface CriticHost {
   /** how much the film looks like its target, in a line; null when there is no target */
   likeness(ctx: ToolContext, compId: string, evidence: Evidence): Promise<string | null>;
   consult(req: ConsultRequest, via: Via): Promise<{ text: string; usage: Usage }>;
+  /** the titles of the faults of the craft, for the critic to name; none when the library of references cannot be read */
+  faults(): Promise<string[]>;
 }
+
+/** the titles of the catalogue's faults */
+export const faultTitles = (refs: Reference[]): string[] => refs.filter((r) => r.kind === 'fault').map((r) => r.title);
+
+let faultsSeen: Promise<string[]> | null = null;
+/** read once per session; a failed read is tried again next time */
+const loadFaults = (): Promise<string[]> => (faultsSeen ??= loadReferences().then(faultTitles).catch(() => { faultsSeen = null; return []; }));
 
 /** the likeness of a render at the hero moment (or the first entrance, or the middle) to the target, as a line */
 async function targetLikeness(ctx: ToolContext, compId: string, evidence: Evidence): Promise<string | null> {
@@ -38,7 +48,7 @@ async function targetLikeness(ctx: ToolContext, compId: string, evidence: Eviden
   return `Likeness to the target at ${hero.toFixed(1)} s: ${like.score}/100 (palette ${like.palette}, layout ${like.layout}, light ${like.light})${like.words.length ? `; ${like.words.join('; ')}` : ''}.`;
 }
 
-let host: CriticHost = { via: () => null, rounds: () => 2, gather, likeness: targetLikeness, consult };
+let host: CriticHost = { via: () => null, rounds: () => 2, gather, likeness: targetLikeness, consult, faults: loadFaults };
 /** the assistant's turn engine hands the tool its route and its setting; tests hand it stubs */
 export function setCriticHost(next: Partial<CriticHost>) { host = { ...host, ...next }; }
 
@@ -115,7 +125,7 @@ const critique: ToolType<Input> = {
     ].filter(Boolean).join('\n\n') + takesText;
 
     let answer: { text: string; usage: Usage };
-    try { answer = await host.consult({ system: CRITIC_SYSTEM, text, images: pictures, signal: ctx.signal }, via); } catch (e) {
+    try { answer = await host.consult({ system: criticSystem(await host.faults().catch(() => [])), text, images: pictures, signal: ctx.signal }, via); } catch (e) {
       // the turn goes on, and no round is lost
       return { text: `${head}\nThe critic could not answer: ${(e as Error).message}. No round was counted; ask again, or go on.`, notice: t('critic.failed', { error: (e as Error).message }) };
     }

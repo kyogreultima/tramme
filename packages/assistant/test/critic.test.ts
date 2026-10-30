@@ -63,3 +63,13 @@ describe('the verdict', () => {
     expect(v.score).toBeNull();
   });
 });
+
+describe('the faults in the critic\'s instructions', () => {
+  it('are listed after the grid when given, one line each, and absent when none are', async () => {
+    const { criticSystem } = await import('../src/index.ts');
+    expect(criticSystem([])).toBe(CRITIC_SYSTEM);
+    const s = criticSystem(['The empty scene', 'A palette that drifts']);
+    expect(s.startsWith(CRITIC_SYSTEM)).toBe(true);
+    expect(s).toContain('Faults to name when you see them:\n- The empty scene\n- A palette that drifts');
+  });
+});

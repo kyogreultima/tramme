@@ -22,6 +22,9 @@ Answer with strict JSON and nothing else:
 { "verdict": "done" | "not yet", "score": 1-10, "fixes": [{ "scene": "<name>", "what": "<the change, concrete>", "why": "<what it gains>" }] }
 Say "done" only when you would put the film out as it is: then there is no fix. Otherwise "not yet" with at most three fixes, the most important first, each concrete enough to be done in one move. No fix about a matter of taste the brief leaves open. When takes of a scene are given, name the best one in "what" of the first fix and say why it beats the others.`;
 
+/** the critic's instructions with the faults it is to name when it sees them (their titles, one line each) */
+export const criticSystem = (faults: string[]): string => (faults.length ? `${CRITIC_SYSTEM}\n\nFaults to name when you see them:\n${faults.map((f) => `- ${f}`).join('\n')}` : CRITIC_SYSTEM);
+
 export interface Fix { scene?: string; what: string; why: string }
 export interface Verdict { verdict: 'done' | 'not yet'; score: number | null; fixes: Fix[]; raw?: string }
 
