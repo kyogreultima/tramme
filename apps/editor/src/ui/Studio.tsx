@@ -34,6 +34,8 @@ import { m, t } from '../i18n/index.ts';
 
 /** a phone: the direction bar at the bottom of the screen, the film above the notes */
 const NARROW = '(max-width: 760px)';
+/** the room kept over the box for the suggestions' row, whether it shows or not (the picture does not move when it goes) */
+const SUGGESTIONS = 44;
 
 /** a suggestion over the direction bar: sent as a note at once, or its words put in the bar to finish */
 interface Suggestion { label: string; words: string; fill?: boolean }
@@ -178,7 +180,9 @@ export function Studio() {
     const measure = () => {
       const el = area.current, box = el?.offsetHeight ?? 0;
       const tallest = el ? parseFloat(getComputedStyle(el).maxHeight) || box : 0;
-      setFootH(Math.round(foot.current!.offsetHeight + Math.max(0, tallest - box)));
+      // only the box counts, with the room of the suggestions (always kept): what floats above it (the list, the area, the hint) never changes the picture's size
+      const direct = foot.current!.querySelector('.direct') as HTMLElement | null;
+      setFootH(Math.round((direct?.offsetHeight ?? foot.current!.offsetHeight) + SUGGESTIONS + Math.max(0, tallest - box)));
     };
     const ro = new ResizeObserver(measure);
     ro.observe(foot.current!);
@@ -207,8 +211,7 @@ export function Studio() {
             {empty && <Invitation />}
             <div class="stage-top">{busy ? <WorkPill /> : pending ? <TakePill /> : null}</div>
             <div class="stage-foot" ref={foot}>
-              <AreaReview />
-              <RetouchList />
+              <div class="foot-float"><AreaReview /><RetouchList /></div>
               <Chips empty={empty} />
               <DirectBar area={area} />
             </div>
