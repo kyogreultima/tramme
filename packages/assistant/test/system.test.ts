@@ -183,3 +183,11 @@ describe('the scene-by-scene rules', () => {
     for (const word of ['scene-done', 'built apart', 'brief of each scene', 'assemble']) expect(films, word).toContain(word);
   });
 });
+
+describe('the references in the direction rules', () => {
+  it('say to read the craft before directing, never to copy an entry, and to keep a liked film with its reasons', () => {
+    const { fixed } = systemParts(REF);
+    const direction = fixed.slice(fixed.indexOf('Direction:'), fixed.indexOf('Whole films:'));
+    for (const word of ['references', 'never copy', 'reference-keep']) expect(direction, word).toContain(word);
+  });
+});
