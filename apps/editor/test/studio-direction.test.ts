@@ -85,3 +85,32 @@ describe('the direction panel', () => {
     for (const kind of PICTURE_KINDS) expect(t(`studio.kinds.${kind}`), kind).not.toBe(`studio.kinds.${kind}`);
   });
 });
+
+describe('the scenes built apart, in the notes', () => {
+  const item = (id: string, extra: object): import('../src/api.ts').ChatItem => ({ id, role: 'assistant', ...extra }) as never;
+  const usage = { requests: 1, input: 1, cacheRead: 0, cacheWrite: 0, cacheWrite1h: 0, output: 1, tools: 0, images: 0, ms: 1, model: 'm', route: 'server' as const };
+  const tool = (id: string, building: string | undefined, done: boolean) => item(id, { tool: { name: 'propose_changes', summary: 'adding', done }, building });
+
+  it('liveScene is the scene being built now, and null once its usage line came', async () => {
+    const { liveScene } = await import('../src/studio.ts');
+    expect(liveScene([tool('a', 'Price', false)])).toBe('Price');
+    expect(liveScene([tool('a', 'Price', true), item('u', { usage: { ...usage, scene: 'Price' }, building: 'Price' })])).toBeNull();
+    expect(liveScene([tool('a', undefined, false)])).toBeNull();
+    expect(liveScene([tool('a', 'Price', true), item('u', { usage: usage, building: 'Price' }), tool('b', 'Proof', false)])).toBe('Proof');
+  });
+
+  it('the thread shows a heading per scene, its name alone, in order, and the plain work as before', async () => {
+    const { Work } = await import('../src/ui/thread.tsx');
+    const work = [
+      item('t0', { text: 'The plan is written.' }),
+      tool('a', 'Price', true), item('ta', { text: 'price built', building: 'Price' }), item('ua', { usage: { ...usage, scene: 'Price' }, building: 'Price' }),
+      tool('b', 'Proof', true), item('ub', { usage: { ...usage, scene: 'Proof' }, building: 'Proof' }),
+    ];
+    await act(() => { render(h(Work, { work, live: false }), host); });
+    const heads = [...host.querySelectorAll('.scene-name')].map((e) => e.textContent);
+    expect(heads).toEqual(['Price', 'Proof']);
+    expect(host.textContent).toContain('The plan is written.');
+    await act(() => { render(h(Work, { work: [item('x', { text: 'hello' })], live: false }), host); });
+    expect(host.querySelectorAll('.scene-name')).toHaveLength(0);
+  });
+});

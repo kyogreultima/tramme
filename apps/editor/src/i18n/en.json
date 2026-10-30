@@ -1558,6 +1558,7 @@
     "showSteps": "Show the steps",
     "hideSteps": "Hide the steps",
     "allSteps": "All {n} steps",
+    "building": "Building {scene}",
     "stageNofM": "stage {n} of {total}",
     "paused": "Paused, before the next tool",
     "nSteps": "{n} steps",

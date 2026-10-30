@@ -151,6 +151,12 @@ export function stagesOf(work: ChatItem[]): Stage[] {
   return out;
 }
 
+/** the scene being built apart right now (its name), or null: its items carry `building` until its usage line closes it */
+export function liveScene(work: ChatItem[]): string | null {
+  for (let i = work.length - 1; i >= 0; i--) if (work[i].building) return work[i].usage ? null : work[i].building!;
+  return null;
+}
+
 /** the stage the assistant is at: its last item still running, or the last stage seen */
 export function liveStage(work: ChatItem[]): Stage | null {
   for (let i = work.length - 1; i >= 0; i--) {

@@ -2789,6 +2789,7 @@
     "showSteps": "Voir les étapes",
     "hideSteps": "Masquer les étapes",
     "allSteps": "Les {n} étapes",
+    "building": "Construction de {scene}",
     "stageNofM": "étape {n} sur {total}",
     "paused": "En pause, avant le prochain outil",
     "nSteps": "{n} étapes",
