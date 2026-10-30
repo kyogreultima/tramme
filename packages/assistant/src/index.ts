@@ -4,22 +4,11 @@
 // in the editor, where the document, the renderer and the files are.
 
 import { z } from 'zod';
+import { claudeModel, EFFORTS, type Effort } from './claude-models.ts';
 
-export const MODELS: [id: string, label: string][] = [
-  ['claude-opus-5-5', 'Opus 5.5'],
-  ['claude-sonnet-5-5', 'Sonnet 5.5'],
-  ['claude-haiku-5-5', 'Haiku 5.5'],
-  ['claude-haiku-4-5-20251001', 'Haiku 4.5'],
-];
-export const DEFAULT_MODEL = 'claude-opus-5-5';
-/** models that think when they need to (adaptive thinking) */
-export const ADAPTIVE = new Set(['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5']);
-/** models a request cannot ask the server to run another model for when Claude declines (no server-side fallback exists for them) */
-export const NO_FALLBACK = new Set(['claude-haiku-5-5']);
+// The Claude models are not listed here: they come from the Agent SDK or the Anthropic API, as they are now
+export * from './claude-models.ts';
 
-/** how hard a model works on a turn: thinking depth, care, checks (Opus 5.5 alone would run at medium) */
-export const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'] as const;
-export type Effort = typeof EFFORTS[number];
 /** Claude's level when none is chosen; the other models keep their own default */
 export const DEFAULT_EFFORT: Effort = 'high';
 
@@ -84,7 +73,7 @@ export function slotOf(model: string): string {
 /** the model's name for its provider */
 export const modelName = (model: string) => (providerOf(model) === 'anthropic' ? model : model.slice(slotOf(model).length + 1));
 /** a short name to show */
-export const modelLabel = (model: string) => MODELS.find(([id]) => id === model)?.[1]
+export const modelLabel = (model: string) => claudeModel(model)?.label
   ?? (engineOf(model) && modelName(model) === CLI_DEFAULT ? PROVIDER_LABEL[providerOf(model)] : modelName(model).replace(/^models\//, ''));
 
 // ── the model taken for the user ─────────────────────────────
@@ -113,8 +102,8 @@ export function pickModel(slot: string, ids: string[]): string | undefined {
 const CHAT_EFFORTS: Effort[] = ['low', 'medium', 'high'];
 
 /**
- * The effort levels a model offers, none when it has no such setting. Claude
- * Opus, Sonnet and Haiku 5.5: all five. In the chat format, the reasoning models: OpenAI's
+ * The effort levels a model offers, none when it has no such setting. A Claude
+ * model: the levels its listing says (none while it is not listed). In the chat format, the reasoning models: OpenAI's
  * o-series and GPT-5 (not their chat variants), Gemini 2.5 and later, the
  * OpenRouter models whose listing says they reason (`reasons`), gpt-oss on a
  * local server, Codex, Antigravity's default. Haiku 4.5, Z.AI and the other models: none.
@@ -122,7 +111,7 @@ const CHAT_EFFORTS: Effort[] = ['low', 'medium', 'high'];
 export function effortLevels(model: string, reasons = false): Effort[] {
   const name = modelName(model).toLowerCase().replace(/^models\//, '');
   switch (providerOf(model)) {
-    case 'anthropic': return ADAPTIVE.has(model) ? [...EFFORTS] : [];
+    case 'anthropic': return claudeModel(model)?.efforts ?? [];
     case 'openai': return /^(o\d|gpt-5)/.test(name) && !/chat/.test(name) ? CHAT_EFFORTS : [];
     case 'gemini': return /^gemini-(2\.5|[3-9])/.test(name) ? CHAT_EFFORTS : [];
     case 'openrouter': return reasons ? CHAT_EFFORTS : [];
@@ -134,7 +123,7 @@ export function effortLevels(model: string, reasons = false): Effort[] {
   }
 }
 
-/** the level a model works at: the one chosen for it, otherwise high for Claude and nothing for the others (their own default) */
+/** the level a model works at: the one chosen for it, otherwise high for Claude (when its listing gives it levels) and nothing for the others (their own default) */
 export function effortFor(model: string, chosen: Record<string, Effort | undefined>, reasons = false): Effort | undefined {
   const levels = effortLevels(model, reasons);
   if (!levels.length) return undefined;

@@ -18,8 +18,8 @@ import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
-import { COMPANION_PORT, ENGINES, MODELS, type Engine, type ToolResult } from '@tramme/assistant';
-import { antigravityModels, codexModels, engines, runEngine, serveTools, type Turn } from './agents.ts';
+import { COMPANION_PORT, ENGINES, type Engine, type ToolResult } from '@tramme/assistant';
+import { antigravityModels, claudeModelList, codexModels, engines, runEngine, serveTools, type Turn } from './agents.ts';
 
 const CONFIG = path.join(os.homedir(), '.tramme', 'companion.json');
 /** the pairing kept under the tool's former name: still valid, so the editor stays paired */
@@ -136,12 +136,13 @@ export async function startCompanion(opts: { port?: number; origins?: string[]; 
       if (req.method === 'GET' && url.pathname === '/health') {
         // the agents this computer has (each with its version), for the editor's model menu
         const found = await engines();
-        json(200, { ok: true, app: 'tramme-companion', version: 2, models: MODELS, engines: Object.fromEntries(ENGINES.map((e) => [e, !!found[e]])), versions: found });
+        json(200, { ok: true, app: 'tramme-companion', version: 3, engines: Object.fromEntries(ENGINES.map((e) => [e, !!found[e]])), versions: found });
       }
-      // the models the command lines list for their login (Codex, Antigravity): asked when the model menu opens, slower than /health
+      // the models each agent lists for its login (Claude Code, Codex, Antigravity): asked when the model menu opens, slower than /health
       else if (req.method === 'GET' && url.pathname === '/models') {
         const found = await engines();
-        json(200, { codex: found.codex ? await codexModels() : [], antigravity: found.antigravity ? await antigravityModels() : [] });
+        const [claudeModels, codex, antigravity] = await Promise.all([claudeModelList(), found.codex ? codexModels() : [], found.antigravity ? antigravityModels() : []]);
+        json(200, { claudeModels, codex, antigravity });
       }
       else if (req.method === 'POST' && url.pathname === '/turn') await runTurn(await readJson(req), res);
       else if (req.method === 'POST' && url.pathname === '/tool-result') {

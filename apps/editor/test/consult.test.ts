@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { addConsult, consult, criticModel, freshTurn, seesPictures } from '../src/ai/consult.ts';
 import type { TurnUsage } from '../src/api.ts';
+import { listClaude, unlistClaude } from './claude-listed.ts';
 
 const sse = (events: object[]) => new Response(new Blob([events.map((e) => `event: ${(e as { type: string }).type}\ndata: ${JSON.stringify(e)}\n\n`).join('')]).stream(), { status: 200 });
 const said = (text: string) => sse([
@@ -12,14 +13,20 @@ const said = (text: string) => sse([
   { type: 'message_stop' },
 ]);
 
-afterEach(() => { vi.unstubAllGlobals(); });
+afterEach(() => { vi.unstubAllGlobals(); unlistClaude(); });
 
 describe('who the critic is', () => {
-  it('is Opus 5.5 on the server and with the companion\'s Claude, the turn\'s own model elsewhere', () => {
+  it('is the strongest Claude listed on the server and with the companion\'s Claude, the turn\'s own model elsewhere', () => {
+    listClaude();
     expect(criticModel('server', 'claude-sonnet-5-5')).toBe('claude-opus-5-5');
     expect(criticModel('companion', 'claude-sonnet-5-5')).toBe('claude-opus-5-5');
     expect(criticModel('remote', 'openai:gpt-5')).toBe('openai:gpt-5');
     expect(criticModel('local', 'local:llama3.1:8b')).toBe('local:llama3.1:8b');
+  });
+
+  it('is the turn\'s own model while no Claude is listed', () => {
+    expect(criticModel('server', 'claude-sonnet-5-5')).toBe('claude-sonnet-5-5');
+    expect(criticModel('companion', 'claude-sonnet-5-5')).toBe('claude-sonnet-5-5');
   });
 
   it('sees pictures unless it is a local model that does not say so', () => {

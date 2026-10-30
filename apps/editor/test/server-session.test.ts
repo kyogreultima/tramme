@@ -1,7 +1,8 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { recallDetails, ServerSession, type Message } from '../src/ai/server.ts';
 import type { ChatItem } from '../src/api.ts';
 import type { ToolRunner } from '../src/ai/tools.ts';
+import { listClaude, unlistClaude } from './claude-listed.ts';
 
 /** a streamed Messages API response */
 function sse(events: object[]): Response {
@@ -52,7 +53,9 @@ const go = (s: ServerSession, runner: ToolRunner, prompt = 'What opacity?', mode
 /** the conversation as sent, without the cache marks (they move, the content does not) */
 const unmarked = (messages: any[]) => JSON.parse(JSON.stringify(messages, (k, v) => (k === 'cache_control' ? undefined : v)));
 
-afterEach(() => { vi.unstubAllGlobals(); });
+beforeEach(() => listClaude());
+afterEach(() => {
+  unlistClaude(); vi.unstubAllGlobals(); });
 
 describe('assistant, server path', () => {
   it('loops over tools, sends back the signed thinking, keeps the conversation', async () => {
@@ -110,17 +113,29 @@ describe('assistant, server path', () => {
     expect(repaired.content[1]).toMatchObject({ type: 'text', text: 'go on' });
   });
 
-  it('asks for no fallback for Haiku 5.5, which has none, and still thinks adaptively', async () => {
+  it('asks of a model what its listing says it has: no thinking, no effort and no fallback for one that says nothing', async () => {
     let sent = serve(second);
-    await drain(new ServerSession().turn('Hi', 'claude-haiku-5-5', 'system prompt', fakeRunner().runner, new AbortController().signal));
+    await drain(new ServerSession().turn('Hi', 'claude-haiku-4-5-20251001', 'system prompt', fakeRunner().runner, new AbortController().signal));
+    expect(sent[0].body.thinking).toBeUndefined();
     expect(sent[0].body.fallbacks).toBeUndefined();
-    expect(sent[0].headers['anthropic-beta']).not.toContain('server-side-fallback');
-    expect(sent[0].body.thinking).toMatchObject({ type: 'adaptive' });
-    expect(sent[0].body.output_config).toEqual({ effort: 'high' });
-    // the others keep theirs
+    expect(sent[0].headers['anthropic-beta'] ?? '').not.toContain('server-side-fallback');
+    // a model nobody listed is asked for nothing either
+    sent = serve(second);
+    await drain(new ServerSession().turn('Hi', 'claude-brand-new', 'system prompt', fakeRunner().runner, new AbortController().signal));
+    expect(sent[0].body.thinking).toBeUndefined();
+    // the one that says it thinks adaptively is asked to, with its fallback
     sent = serve(second);
     await drain(new ServerSession().turn('Hi', 'claude-opus-5-5', 'system prompt', fakeRunner().runner, new AbortController().signal));
+    expect(sent[0].body.thinking).toMatchObject({ type: 'adaptive' });
     expect(sent[0].body.fallbacks).toBe('default');
+  });
+
+  it('asks a model that was listed after the session began for what it has, a model released since the editor was written included', async () => {
+    listClaude([{ id: 'claude-future-9', label: 'Future 9', adaptive: true, efforts: ['low', 'high'], line: 'opus' }]);
+    const sent = serve(second);
+    await drain(new ServerSession().turn('Hi', 'claude-future-9', 'system prompt', fakeRunner().runner, new AbortController().signal, { effort: 'low' }));
+    expect(sent[0].body.thinking).toMatchObject({ type: 'adaptive' });
+    expect(sent[0].body.output_config).toEqual({ effort: 'low' });
   });
 
   it('the conversation\'s cache lasts as set', async () => {

@@ -3,7 +3,7 @@
 // (ChatGPT) or the Antigravity CLI. It streams the turn back as NDJSON; each tool
 // call is run here and its result posted back.
 
-import type { Engine } from '@tramme/assistant';
+import type { ClaudeModel, Engine } from '@tramme/assistant';
 import type { AiEvent } from '../api.ts';
 import type { ToolRunner } from './tools.ts';
 import { runCall, uid } from './calls.ts';
@@ -39,12 +39,20 @@ export async function pairCompanion(url: string): Promise<string | null> {
   } catch { return null; }
 }
 
-/** the models the command lines list for their login (Antigravity's, by name and label); none from an older companion */
-export async function companionModels(link: CompanionLink): Promise<Partial<Record<Engine, [string, string][]>>> {
+/** a Claude model as the companion lists it (a row that is not one is dropped) */
+const isClaudeModel = (m: unknown): m is ClaudeModel => typeof (m as ClaudeModel)?.id === 'string' && typeof (m as ClaudeModel).label === 'string' && Array.isArray((m as ClaudeModel).efforts);
+
+/**
+ * the models the agents list for their login: Claude Code's (named, with the effort levels and the thinking each
+ * has) and the command lines' own (Codex's and Antigravity's, by name and label); none from an older companion
+ */
+export async function companionModels(link: CompanionLink): Promise<{ claude: ClaudeModel[]; engines: Partial<Record<Engine, [string, string][]>> }> {
   try {
-    const r = await fetch(`${link.url}/models`, { headers: headers(link), signal: AbortSignal.timeout(30_000) });
-    return r.ok ? await r.json() : {};
-  } catch { return {}; }
+    const r = await fetch(`${link.url}/models`, { headers: headers(link), signal: AbortSignal.timeout(45_000) });
+    if (!r.ok) return { claude: [], engines: {} };
+    const body = await r.json() as { claudeModels?: unknown } & Partial<Record<Engine, [string, string][]>>;
+    return { claude: Array.isArray(body.claudeModels) ? body.claudeModels.filter(isClaudeModel) : [], engines: { codex: body.codex, antigravity: body.antigravity } };
+  } catch { return { claude: [], engines: {} }; }
 }
 
 export function stopCompanion(link: CompanionLink) {

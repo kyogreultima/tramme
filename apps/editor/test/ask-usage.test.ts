@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NO_USAGE } from '@tramme/assistant';
 import type { AiEvent, ChatItem } from '../src/api.ts';
+import { listClaude, unlistClaude } from './claude-listed.ts';
 
 const ai = await import('../src/ai/index.ts');
 const { ServerSession } = await import('../src/ai/server.ts');
@@ -21,11 +22,13 @@ async function turn(events: AiEvent[]): Promise<ChatItem | undefined> {
 }
 
 beforeEach(() => {
+  listClaude();
+  ai.setAiSettings({ model: 'claude-opus-5-5' });
   vi.stubGlobal('fetch', vi.fn(async () => new Response('[]', { status: 404 })));
   vi.spyOn(api, 'readText').mockResolvedValue(null);
   ai.aiStatus.value = { ...ai.aiStatus.value, server: true, companion: 'absent' };
 });
-afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); unlistClaude(); });
 
 describe('the usage line of a turn', () => {
   it('names its route', async () => {
