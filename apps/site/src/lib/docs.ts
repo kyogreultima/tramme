@@ -46,6 +46,12 @@ export const DOCS: { label: string; collapsed?: boolean; pages: DocPage[] }[] = 
     ],
   },
   {
+    label: 'Project',
+    pages: [
+      { slug: 'changelog', label: 'Changelog', file: 'CHANGELOG.md' },
+    ],
+  },
+  {
     label: 'Roadmaps',
     collapsed: true,
     pages: [

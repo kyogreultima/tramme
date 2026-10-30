@@ -3,28 +3,54 @@ import Brand from './Brand.astro';
 import AppLink from './AppLink.astro';
 import RepoLink from './RepoLink.astro';
 import ThemeToggle from './ThemeToggle.astro';
-import { docHref } from '../lib/docs';
+import Menu from './Menu.astro';
+import { BAR_LINKS, MENUS } from '../lib/nav';
 ---
 
 <header class="nav">
   <nav class="wrap row" aria-label="Main">
     <a class="home" href="/" aria-label="Tramme, home"><Brand /></a>
     <ul class="links" role="list">
-      <li><a href="#studio">Studio</a></li>
-      <li><a href="#editor">Atelier</a></li>
-      <li><a href="#made">Examples</a></li>
-      <li><a href="#assistant">Assistant</a></li>
-      <li><a href="#render">Export</a></li>
-      <li><a href={docHref('')}>Docs</a></li>
-      <li><a href="/download/">Download</a></li>
+      {MENUS.map((menu) => <li><Menu menu={menu} /></li>)}
+      {BAR_LINKS.map(({ label, href }) => <li><a href={href}>{label}</a></li>)}
     </ul>
     <div class="end">
       <ThemeToggle />
       <span class="repo"><RepoLink small ghost /></span>
-      <AppLink small />
+      <span class="app"><AppLink small /></span>
+      <!-- under 960 px, everything in one menu -->
+      <details class="fold" name="nav-menu">
+        <summary class="btn btn-ghost btn-sm">Menu</summary>
+        <div class="panel">
+          {MENUS.map((menu) => (
+            <section>
+              <strong>{menu.label}</strong>
+              <ul role="list">{menu.links.map(({ label, href }) => <li><a href={href}>{label}</a></li>)}</ul>
+            </section>
+          ))}
+          <ul role="list">{BAR_LINKS.map(({ label, href }) => <li><a href={href}>{label}</a></li>)}</ul>
+        </div>
+      </details>
     </div>
   </nav>
 </header>
+
+<script>
+  // Escape and a click outside close a menu, and so does following a link in it
+  // (an anchor of the page you are on does not reload it)
+  const open = () => document.querySelectorAll<HTMLDetailsElement>('.nav details[open]');
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    for (const d of open()) {
+      if (d.contains(document.activeElement)) d.querySelector('summary')?.focus();
+      d.open = false;
+    }
+  });
+  document.addEventListener('click', (e) => {
+    const target = e.target as Element;
+    for (const d of open()) if (!d.contains(target) || target.closest('a')) d.open = false;
+  });
+</script>
 
 <style>
   /* the app's top bar: a pill floating over the page, the page passing under it */
@@ -35,20 +61,36 @@ import { docHref } from '../lib/docs';
     background: color-mix(in srgb, var(--bg) 82%, transparent);
     -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
   }
-  .home { text-decoration: none; font-size: 1.05rem; }
+  .home { flex: none; text-decoration: none; font-size: 1.05rem; }
   .links { display: flex; gap: 4px; margin: 0 auto; padding: 0; list-style: none; }
-  .links a { display: block; padding: 7px 12px; border-radius: 999px; color: var(--ink-2); text-decoration: none; font-size: 0.875rem; transition: color 0.2s var(--ease), background-color 0.2s var(--ease); }
-  .links a:hover { color: var(--ink); background: var(--hover); }
+  .links > li > a { display: block; padding: 7px 12px; border-radius: 999px; color: var(--ink-2); text-decoration: none; font-size: 0.875rem; transition: color 0.2s var(--ease), background-color 0.2s var(--ease); }
+  .links > li > a:hover { color: var(--ink); background: var(--hover); }
   .end { display: flex; align-items: center; gap: 8px; }
   /* once the page moves under it, the bar becomes a surface */
   @supports (animation-timeline: scroll()) {
     .row { animation-name: lifted; animation-timing-function: linear; animation-fill-mode: both; animation-timeline: scroll(); animation-range: 0 64px; }
     @keyframes lifted { to { background: color-mix(in srgb, var(--panel) 88%, transparent); box-shadow: 0 0 0 1px var(--line), 0 12px 32px -20px rgba(0, 0, 0, 0.35); } }
   }
+
+  .fold { position: relative; display: none; }
+  .fold summary { list-style: none; }
+  .fold summary::-webkit-details-marker { display: none; }
+  .panel {
+    position: absolute; top: calc(100% + 14px); right: 0; z-index: 2; display: grid; gap: 14px; width: min(86vw, 320px); padding: 16px;
+    /* a short screen (a phone on its side): the panel scrolls inside itself, the bar being fixed */
+    max-height: calc(100dvh - var(--nav) - 24px); overflow-y: auto; overscroll-behavior: contain;
+    background: var(--panel); border-radius: var(--r-lg); box-shadow: var(--float);
+  }
+  .panel strong { display: block; margin-bottom: 4px; font-size: 0.8125rem; font-weight: 500; color: var(--ink-3); }
+  .panel ul { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+  .panel a { display: block; padding: 8px 10px; border-radius: 10px; color: var(--ink); text-decoration: none; font-size: 0.9375rem; }
+  .panel a:hover { background: var(--hover); }
+
   @media (max-width: 960px) {
     .links { display: none; }
     .end { margin-left: auto; }
+    .fold { display: block; }
   }
-  /* a phone: the app's way in only (the repository is further down the page) */
-  @media (max-width: 560px) { .repo { display: none; } }
+  /* a phone: the repository is further down the page, the app is first in the menu */
+  @media (max-width: 560px) { .repo, .app { display: none; } }
 </style>

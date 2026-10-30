@@ -10,19 +10,24 @@ import { FORMATS } from '../lib/formats';
 import { REPO } from '../lib/links';
 
 // counted from the code, at build time
-const STATS = [
+const release = __RELEASE__;
+const LANGUAGES = Object.keys(import.meta.glob('../../../editor/src/i18n/*.json')).length;
+const STATS: [number, string][] = [
   [NODES.length, 'layer types'],
   [EFFECTS.length, 'effects'],
   [BUILTIN_MODIFIERS.length, 'modifiers'],
   [FORMATS.length, 'export formats'],
-] as const;
+  [LANGUAGES, 'interface languages'],
+  // the systems of the latest release, left out without one
+  ...(release ? [[new Set(release.installers.map((i) => i.os)).size, 'desktop systems'] as [number, string]] : []),
+];
 const CLONE = `git clone ${REPO}`;
 ---
 
-<section class="section" id="open">
+<section class="section" id="source">
   <div class="wrap">
     <div class="panel surface">
-      <Head center title="Open source, Apache-2.0." more="Free for good. In the browser, on your desktop, or on your own server." />
+      <Head title="Source available, free to use." more="Read it, change it, run it in the browser, on your desktop or on your own server. Only a competing product is off limits." />
       <dl class="stats" data-reveal>
         {STATS.map(([n, label]) => (
           <div><dt>{label}</dt><dd>{n}</dd></div>
@@ -63,9 +68,8 @@ const CLONE = `git clone ${REPO}`;
     padding: clamp(48px, 7vw, 104px) clamp(20px, 5vw, 72px);
     border-radius: var(--r-lg);
   }
-  .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); max-width: 880px; margin: clamp(40px, 5vw, 64px) auto 0; }
+  .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 36px 0; max-width: 880px; margin: 0 auto; }
   .stats div { display: flex; flex-direction: column-reverse; align-items: center; gap: 4px; padding: 4px 12px; }
-  .stats div + div { border-left: 1px solid var(--line); }
   dd { margin: 0; font-size: clamp(2.5rem, 5vw, 4rem); font-weight: 500; letter-spacing: -0.045em; line-height: 1; font-variant-numeric: tabular-nums; }
   dt { font-size: 0.875rem; color: var(--ink-3); }
 
@@ -80,6 +84,5 @@ const CLONE = `git clone ${REPO}`;
 
   @media (max-width: 720px) {
     .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 28px; }
-    .stats div + div:nth-child(odd) { border-left: 0; }
   }
 </style>

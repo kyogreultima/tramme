@@ -1,14 +1,17 @@
 ---
-// A section's heading: a short title, carried on by a quieter sentence in
-// the same line of type
-interface Props { title: string; more?: string; center?: boolean }
-const { title, more, center = false } = Astro.props;
+// A section's heading, the same everywhere: a title, centred, and one sentence
+// under it. The space below it is the section's, so what follows never sets its own.
+interface Props { title: string; more?: string }
+const { title, more } = Astro.props;
 ---
 
-<h2 class:list={['head', { center }]} data-reveal>{title}{more && <span> {more}</span>}</h2>
+<header class="head" data-reveal>
+  <h2>{title}</h2>
+  {more && <p>{more}</p>}
+</header>
 
 <style>
-  .head { max-width: 32ch; font-size: clamp(1.625rem, 3vw, 2.5rem); line-height: 1.14; letter-spacing: -0.03em; }
-  .head span { color: var(--ink-3); }
-  .center { margin-inline: auto; text-align: center; }
+  .head { display: grid; justify-items: center; gap: 14px; margin-bottom: clamp(32px, 4vw, 56px); text-align: center; }
+  h2 { max-width: 22ch; font-size: clamp(2rem, 4vw, 3.25rem); line-height: 1.05; letter-spacing: -0.04em; }
+  p { max-width: 36rem; font-size: 1.125rem; line-height: 1.55; color: var(--ink-2); }
 </style>

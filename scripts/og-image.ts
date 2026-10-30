@@ -9,10 +9,10 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { pathToFileURL } from 'node:url';
 import sharp from 'sharp';
+import { ROOT, accent, logoOnDark } from './brand.ts';
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = path.join(ROOT, 'apps/editor/og.jpg');
 const W = 1200, H = 630;
 
@@ -24,8 +24,9 @@ const BROWSER = process.env.BROWSER ?? [
 ].find((p) => fs.existsSync(p));
 if (!BROWSER) throw new Error('no Chrome or Edge found: BROWSER=<its path> node scripts/og-image.ts');
 
-const icon = fs.readFileSync(path.join(ROOT, 'apps/editor/icon.svg'), 'utf8');
-const shot = pathToFileURL(path.join(ROOT, 'apps/site/src/assets/editor.png')).href;
+// the card is dark: the logo with white letters, its mark in the studio theme's accent
+const logo = logoOnDark(accent('studio'));
+const shot = pathToFileURL(path.join(ROOT, 'apps/site/src/assets/studio-dark.png')).href;
 
 const html = `<!doctype html><html><head><meta charset="utf-8"><style>
 @font-face { font-family: Geist; font-weight: 100 900; src: url(https://cdn.jsdelivr.net/fontsource/fonts/geist:vf@latest/latin-wght-normal.woff2) format('woff2'); }
@@ -33,11 +34,9 @@ const html = `<!doctype html><html><head><meta charset="utf-8"><style>
 * { margin: 0; box-sizing: border-box; }
 html, body { width: ${W}px; height: ${H}px; overflow: hidden; }
 body { position: relative; background: #0b0f12; color: #e8edef; font-family: Geist, 'Segoe UI', sans-serif; -webkit-font-smoothing: antialiased; }
-body::before { content: ''; position: absolute; inset: 0; background: radial-gradient(70% 90% at 100% 100%, rgba(115, 144, 255, 0.16), transparent 70%), radial-gradient(50% 60% at 0% 0%, rgba(46, 196, 182, 0.12), transparent 70%); }
 .text { position: absolute; left: 72px; top: 64px; width: 560px; display: flex; flex-direction: column; height: ${H - 128}px; }
-.brand { display: flex; align-items: center; gap: 14px; font-size: 30px; font-weight: 600; letter-spacing: -0.02em; }
-.brand svg { width: 44px; height: 44px; }
-h1 { margin-top: 64px; font-size: 76px; line-height: 0.98; letter-spacing: -0.048em; font-weight: 600; }
+.brand svg { display: block; height: 44px; width: auto; }
+h1 { margin-top: 64px; font-size: 62px; line-height: 0.98; letter-spacing: -0.048em; font-weight: 600; }
 h1 span { display: block; }
 .quiet { color: #7a8890; }
 p { margin-top: 28px; font-size: 25px; line-height: 1.4; color: #9eabb3; letter-spacing: -0.01em; }
@@ -47,10 +46,10 @@ p { margin-top: 28px; font-size: 25px; line-height: 1.4; color: #9eabb3; letter-
 .shot img { display: block; width: 100%; }
 </style></head><body>
 <div class="text">
-  <div class="brand">${icon}<span>Tramme</span></div>
-  <h1><span>Motion design,</span> <span class="quiet">written as data.</span></h1>
-  <p>An open-source engine and editor. You and the AI edit the same document.</p>
-  <div class="foot"><b>tramme.dev</b><span>Apache-2.0</span></div>
+  <div class="brand">${logo}</div>
+  <h1><span>Motion design,</span> <span class="quiet">directed in words.</span></h1>
+  <p>Leave notes on the film, keep the takes you like. Free to use, no account.</p>
+  <div class="foot"><b>tramme.dev</b><span>Source available</span></div>
 </div>
 <div class="shot"><img src="${shot}" alt=""></div>
 </body></html>`;

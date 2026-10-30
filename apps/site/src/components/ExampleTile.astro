@@ -1,0 +1,22 @@
+---
+// One of the repository's examples: its video slot and what it is, under it.
+// With `link`, the caption also leads to the example's folder, to take apart.
+import Media from './Media.astro';
+import { COPY, example, type ExampleId } from '../lib/examples';
+import { repoFile } from '../lib/links';
+
+interface Props { id: ExampleId; link?: boolean }
+const { id, link = false } = Astro.props;
+const ex = example(id);
+const { tint, text } = COPY[id];
+---
+
+<figure data-reveal>
+  <Media id={id} width={ex.width} height={ex.height} duration={ex.duration} tint={[...tint]} label={`${ex.name}, made with Tramme. ${text}`} />
+  <figcaption class="caption"><strong>{ex.name}.</strong> {text}{link && <> <a href={repoFile(`examples/${id}`)}>Take it apart.</a></>}</figcaption>
+</figure>
+
+<style>
+  figure { display: grid; gap: 14px; margin: 0; }
+  a { color: var(--accent-text); text-underline-offset: 3px; }
+</style>

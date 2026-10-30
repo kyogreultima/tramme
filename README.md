@@ -177,4 +177,4 @@ Contributions are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md) and the [code 
 
 ## License
 
-[Apache 2.0](LICENSE) © 2026 Aziz Chanou. Dependencies keep their own licenses: see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+[Functional Source License 1.1, ALv2 Future License](LICENSE) (FSL-1.1-ALv2) © 2026 Aziz Chanou, from the version after 0.16.0. The source is available: you can use it, modify it and redistribute it for any purpose except offering a competing commercial product or service, and each version becomes Apache 2.0 two years after it is released. Versions up to 0.16.0 stay under the [Apache License 2.0](LICENSE-APACHE). Dependencies keep their own licenses: see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

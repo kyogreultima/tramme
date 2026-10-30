@@ -1,16 +1,17 @@
 ---
-// the app's icon (apps/editor/icon.svg) and its name, on the landing page and
-// in the docs: the marks alone, in the theme's accent. The plate is the app
-// icon's (native apps, favicon), not the site's
-import Logo from '../../../editor/icon.svg';
+// The logo (brand/svg/logo-on-light.svg), on the landing page and in the docs,
+// inline so the theme colours it: the mark in the accent, the letters in the
+// ink, as the app's own interface (theme.css), whichever theme is chosen; a
+// parent recolours them with --brand-mark and --brand-ink.
+import Logo from '../../../../brand/svg/logo-on-light.svg';
 ---
 
-<span class="brand"><Logo aria-hidden="true" /><span>Tramme</span></span>
+<span class="brand" role="img" aria-label="Tramme"><Logo aria-hidden="true" /></span>
 
 <style>
-  .brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; letter-spacing: -0.02em; }
-  .brand :global(svg) { width: 1.5em; height: 1.5em; }
-  /* without the plate, the marks take its room */
-  .brand :global(svg > rect) { display: none; }
-  .brand :global(svg > g) { fill: var(--accent); transform: none; }
+  .brand { display: inline-flex; height: 1.5em; }
+  .brand :global(svg) { height: 100%; width: auto; }
+  /* the file's own colours are classes set in its <style>: the mark, then the letters */
+  .brand :global(.cls-1) { fill: var(--brand-mark, var(--accent)); }
+  .brand :global(.cls-2), .brand :global(.cls-3) { fill: var(--brand-ink, var(--ink)); }
 </style>

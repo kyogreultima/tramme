@@ -13,6 +13,8 @@ import { REPO } from './links';
 
 const FENCE = /^\s*(```|~~~)/;
 const LINK = /\[([^\]]*)\]\(([^)\s]+)((?:\s+"[^"]*")?)\)/g;
+/** a reference definition: `[label]: target "title"` */
+const DEFINITION = /^(\s{0,3}\[[^\]]+\]:\s*)(\S+)(.*)$/;
 
 /** each line of a Markdown file, and whether it sits in a fenced code block */
 function lines(md: string) {
@@ -82,6 +84,8 @@ function resolve(href: string, page: DocPage, root: URL): { href: string; doc?: 
   const [target, hash] = href.split('#');
   if (!target) return page.file === 'README.md' && hash ? readmeAnchor(hash, page) : { href };
   const file = path.posix.normalize(path.posix.join(path.posix.dirname(page.file), target));
+  // out of the repository's files (the changelog's ../../compare/…): where GitHub would take it from the file's own page
+  if (file.startsWith('../')) return { href: new URL(href, `${REPO}/blob/main/${page.file}`).href };
   const suffix = hash ? `#${hash}` : '';
   const doc = PAGES.find((p) => p.file === file && (file !== 'README.md' || p.slug === ''));
   if (doc) return { href: docHref(doc.slug) + suffix, doc };
@@ -90,15 +94,21 @@ function resolve(href: string, page: DocPage, root: URL): { href: string; doc?: 
   return { href: `${REPO}/${dir ? 'tree' : 'blob'}/main/${file}${suffix}` };
 }
 
-/** the page's links, outside code blocks, rewritten for the site; a link
- *  named by its own path (`[docs/document.md](docs/document.md)`) takes the page's name */
-function rewriteLinks(body: string, page: DocPage, root: URL) {
+/** the page's links, outside code blocks, rewritten for the site: the inline ones, and the
+ *  reference definitions (`[0.16.0]: ../../compare/…`); a link named by its own path
+ *  (`[docs/document.md](docs/document.md)`) takes the page's name */
+export function rewriteLinks(body: string, page: DocPage, root: URL) {
   return lines(body)
-    .map(({ text, code }) => (code ? text : text.replace(LINK, (_, label: string, href: string, title: string) => {
-      const to = resolve(href, page, root);
-      const name = to.doc && label.replace(/`/g, '') === href ? to.doc.label : label;
-      return `[${name}](${to.href}${title})`;
-    })))
+    .map(({ text, code }) => {
+      if (code) return text;
+      const definition = DEFINITION.exec(text);
+      if (definition) return `${definition[1]}${resolve(definition[2], page, root).href}${definition[3]}`;
+      return text.replace(LINK, (_, label: string, href: string, title: string) => {
+        const to = resolve(href, page, root);
+        const name = to.doc && label.replace(/`/g, '') === href ? to.doc.label : label;
+        return `[${name}](${to.href}${title})`;
+      });
+    })
     .join('\n');
 }
 
