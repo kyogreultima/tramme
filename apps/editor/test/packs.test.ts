@@ -557,7 +557,8 @@ describe('screencast', () => {
       expect(out.ops.length).toBeGreaterThan(0);
       for (const b of boxesOf(applyOps(doc, out.ops).doc)) expect(inside(b, w, h), `${w}x${h} ${JSON.stringify(b)} ${JSON.stringify(out.ops.map((o) => o.path))}`).toBe(true);
     }
-  });
+    // about a second alone, several when the whole suite shares the machine: the default of five seconds is too tight
+  }, 30_000);
 });
 
 describe('handmade', () => {
