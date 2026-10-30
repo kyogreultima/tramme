@@ -69,6 +69,10 @@ export interface FreshTurn {
   /** the tools' runner (the conversation's own); none with tools off */
   runner?: ToolRunner;
   signal: AbortSignal;
+  /** a turn that goes on after a failure: the server session it began in, and the companion engine's session id */
+  session?: ServerSession;
+  sessionId?: string;
+  cacheTtl?: '5m' | '1h';
   /** the companion engine's session of this turn, told and never the conversation's */
   onSession?: (id: string) => void;
 }
@@ -83,9 +87,9 @@ export function freshTurn(o: FreshTurn): AsyncGenerator<AiEvent> {
   if (o.via.route === 'companion') {
     const { link, engine } = o.via;
     if (!link || !engine) throw new Error('the companion is not reachable');
-    return companionTurn(link, { engine, prompt: o.prompt, system: typeof o.system === 'string' ? o.system : joinSystem(o.system), model, effort, images: o.images, tools: o.tools }, runner, o.signal, o.onSession ?? (() => {}));
+    return companionTurn(link, { engine, prompt: o.prompt, system: typeof o.system === 'string' ? o.system : joinSystem(o.system), model, effort, sessionId: o.sessionId, images: o.images, tools: o.tools }, runner, o.signal, o.onSession ?? (() => {}));
   }
-  return new ServerSession().turn(o.prompt, model, o.system, runner, o.signal, { images: o.images, target: o.via.target, effort, tools: o.tools });
+  return (o.session ?? new ServerSession()).turn(o.prompt, model, o.system, runner, o.signal, { images: o.images, target: o.via.target, effort, tools: o.tools, cacheTtl: o.cacheTtl });
 }
 
 /** what an answer said and what it cost */
