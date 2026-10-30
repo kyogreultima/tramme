@@ -89,3 +89,14 @@ img, svg, video { display: block; max-width: 100%; }
   }
 }
 @keyframes reveal { from { opacity: 0; transform: translateY(32px); } }
+
+/* the largest type, for what a page says first: the hero and the manifesto */
+.display { font-size: clamp(2.75rem, 7.4vw, 7rem); line-height: 0.96; letter-spacing: -0.05em; }
+
+/* a text page (pricing, about, privacy): one readable column */
+.prose { max-width: 68ch; display: grid; gap: 18px; }
+.prose h2 { margin-top: 28px; font-size: 1.5rem; letter-spacing: -0.025em; line-height: 1.2; }
+.prose p, .prose li { color: var(--ink-2); line-height: 1.65; }
+.prose ul { margin: 0; padding-left: 1.25em; display: grid; gap: 6px; }
+.prose a { color: var(--accent-text); text-underline-offset: 3px; }
+.prose strong { font-weight: 600; color: var(--ink); }
