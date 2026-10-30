@@ -122,6 +122,8 @@ Anyone opens the address and works at once: no account, nothing kept on the serv
 
    The personal Worker is `tramme`, the private one `tramme-private`: both can live side by side. Deploying from the Git repository (Workers Builds, on the `tramme` Worker): build command `npm run build`, deploy command `npx wrangler deploy -c apps/worker/wrangler.jsonc --env personal`, preview command (the other branches) `npx wrangler preview -c apps/worker/wrangler.jsonc --env personal`, which reads the `previews` block of `env.personal`.
 
+   The repository also deploys it by itself: [.github/workflows/app.yml](../.github/workflows/app.yml) runs the checks on every push to `main`, then `npm run deploy:personal`. It needs the repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` (the same two as the site's deploy). Do not enable Workers Builds on the same Worker as well.
+
 Any other address of this Worker (its `workers.dev` one, previews) sends to `APP_ORIGIN`. Until both addresses are set, it answers 503.
 
 ### What is kept, and where

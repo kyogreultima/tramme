@@ -1,0 +1,45 @@
+# The web app (apps/editor served by apps/worker, the "personal" deployment at
+# app.tramme.dev) deployed again on every push to main, once the checks pass.
+# Without it the app stays on the last hand-run `npm run deploy:personal`. A
+# manual run on main deploys the same way.
+
+name: Web app
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# one deploy at a time, and the last push wins: an older run never lands after a newer one
+concurrency:
+  group: app-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Checks
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    name: Deploy the app
+    needs: checks
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Cloudflare's secrets
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::error::the repository's secrets CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are missing (Settings, Secrets and variables, Actions): the app was not deployed"
+            exit 1
+          fi
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: npm ci
+      # builds the editor, then wrangler deploy --env personal
+      - run: npm run deploy:personal
