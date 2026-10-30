@@ -414,6 +414,9 @@ function Behavior() {
       <Row label={t('settings.resume')} hint={t('settings.resumeHint')}>
         <Toggle on={a.resume} onChange={(on) => setAiSettings({ resume: on })} />
       </Row>
+      <Row label={t('settings.scenesApart')} hint={t('settings.scenesApartHint')}>
+        <Seg value={a.scenesApart} options={[['auto', t('settings.scenesApartAuto')], ['off', t('settings.scenesApartOff')]]} onChange={(v) => setAiSettings({ scenesApart: v as AiSettings['scenesApart'] })} />
+      </Row>
       <Row label={t('settings.criticRounds')} hint={t('settings.criticRoundsHint')}>
         <Level value={a.criticRounds} min={0} max={4} unit="" onChange={(v) => setAiSettings({ criticRounds: v })} />
       </Row>

@@ -8,7 +8,7 @@
 
 import { installed, offIn } from '../installed.ts';
 import { computed, signal } from '@preact/signals';
-import { addUsage, CLI_DEFAULT, COMPANION_PORT, DEFAULT_MODEL, EFFORTS, effortFor, effortLevels, ENGINE_MODELS, ENGINES, engineOf, LOCAL_URL, modelLabel, modelName, MODELS, NO_USAGE, pickModel, PROVIDER_LABEL, providerOf, REMOTE, joinSystem, queuedPrompt, setTranslator, slotOf, systemParts, userPrompt, type Effort, type Engine, type TurnContext } from '@tramme/assistant';
+import { addUsage, type Usage, CLI_DEFAULT, COMPANION_PORT, DEFAULT_MODEL, EFFORTS, effortFor, effortLevels, ENGINE_MODELS, ENGINES, engineOf, LOCAL_URL, modelLabel, modelName, MODELS, NO_USAGE, pickModel, PROVIDER_LABEL, providerOf, REMOTE, joinSystem, queuedPrompt, setTranslator, slotOf, systemParts, userPrompt, type Effort, type Engine, type TurnContext } from '@tramme/assistant';
 import { CHAT, CHAT_INDEX, chatPath } from '@tramme/project';
 import type { TrammeDoc } from '@tramme/core';
 import reference from '../../../../docs/document.md';
@@ -19,7 +19,9 @@ import { passes, pause, recallDetails, ServerSession, type Message } from './ser
 import { harvestNote, realNote } from './answers.ts';
 import { realWanted } from '../stock.ts';
 import { ToolRunner } from './tools.ts';
-import { criticModel, type Via } from './consult.ts';
+import { criticModel, freshTurn, type Via } from './consult.ts';
+import { assemblyNote, runScenes } from './scenes-run.ts';
+import { todoScenes, type PlanScene } from '../filmplan.ts';
 import { consultsOf, resetCritic, setCriticHost } from '../critic/tool.ts';
 import { runCall, uid } from './calls.ts';
 import { clip } from '../model.ts';
@@ -51,11 +53,13 @@ export interface AiSettings {
   cacheTtl: '5m' | '1h';
   /** how many times a turn may have the film reviewed by the critic (a model that did not make it); 0 turns it off */
   criticRounds: number;
+  /** whether a film of 3 scenes or more is built scene by scene, each in a context of its own (auto), or in one conversation (off) */
+  scenesApart: 'auto' | 'off';
 }
 
 const KEY = 'tramme.assistant';
 function loadSettings(): AiSettings {
-  const d: AiSettings = { model: DEFAULT_MODEL, prefer: 'auto', companionUrl: `http://127.0.0.1:${COMPANION_PORT}`, token: '', localUrl: LOCAL_URL, efforts: {}, notify: true, apply: 'off', resume: true, cacheTtl: '5m', criticRounds: 2 };
+  const d: AiSettings = { model: DEFAULT_MODEL, prefer: 'auto', companionUrl: `http://127.0.0.1:${COMPANION_PORT}`, token: '', localUrl: LOCAL_URL, efforts: {}, notify: true, apply: 'off', resume: true, cacheTtl: '5m', criticRounds: 2, scenesApart: 'auto' };
   try {
     // the settings kept under the tool's former name (model, companion token) are taken over
     const s = { ...d, ...JSON.parse(localStorage.getItem(KEY) ?? localStorage.getItem('emotion.assistant') ?? '{}') } as AiSettings;
@@ -67,6 +71,7 @@ function loadSettings(): AiSettings {
     s.notify = s.notify !== false;
     s.resume = s.resume !== false;
     s.cacheTtl = s.cacheTtl === '1h' ? '1h' : '5m';
+    s.scenesApart = s.scenesApart === 'off' ? 'off' : 'auto';
     s.criticRounds = Number.isInteger(s.criticRounds) ? Math.min(4, Math.max(0, s.criticRounds)) : d.criticRounds;
     // the former boolean becomes 'turn' (applied at the end of the turn, as before)
     const old = s as AiSettings & { autoApply?: boolean };
@@ -435,8 +440,12 @@ function commandNote(c: Command, input?: Record<string, unknown>): string {
 /** where a critic's consult goes: the route the turn takes and the critic's model on it; null when the assistant has no route */
 export function criticVia(): Via | null {
   const route = aiRoute.peek();
-  if (!route) return null;
-  const turnModel = aiSettings.peek().model, model = criticModel(route, turnModel), engine = engineOf(turnModel);
+  return route ? viaFor(route, criticModel(route, aiSettings.peek().model)) : null;
+}
+
+/** where a request to this model goes on this route, with what the route needs (the chat server, the companion's engine and link) */
+function viaFor(route: Route, model: string): Via {
+  const engine = engineOf(aiSettings.peek().model);
   // a command line takes its own model name, none for its default
   const asked = route === 'companion' && engine !== 'claude' ? (modelName(model) === CLI_DEFAULT ? '' : modelName(model)) : model;
   return {
@@ -503,14 +512,61 @@ export async function* ask(p: AskPayload, signal: AbortSignal): AsyncGenerator<A
   };
   // what the turn costs, told at its end
   const started = Date.now(), calls = runner.calls;
-  let usage = NO_USAGE, seen = 0, reported = false;
+  const tally: Tally = { usage: NO_USAGE, seen: 0, reported: false };
+  yield* resuming(attempt, signal, tally);
+  // a film planned this turn with scenes to build is built scene by scene, each in a fresh context, then assembled in this one
+  if (aiSettings.peek().scenesApart === 'auto' && !signal.aborted) {
+    const projectId = S.project.peek().id;
+    const readPlan = async () => parsePlan((await api.readText(projectId, FILM_PLAN_PATH).catch(() => null))?.text);
+    const planned = await readPlan();
+    // the plan must be this turn's: an old plan does not start a run on an unrelated message
+    if (planned && Date.parse(planned.updated) >= started && todoScenes(planned, runner.liveDoc()).run.length >= 3) {
+      const sceneSystem = systemParts(reference, brief ?? undefined, mine, packLines(packs), planText(planned));
+      const via = viaFor(route, model);
+      const sceneTurn = (scenePrompt: string, scene: PlanScene) => (async function* (): AsyncGenerator<AiEvent> {
+        const own = new ServerSession(), mine2: Tally = { usage: NO_USAGE, seen: 0, reported: false };
+        let sid: string | undefined;
+        runner.scope = { comp: scene.comp!, root: S.doc.peek().root, tokens: [] };
+        try {
+          yield* resuming((again) => freshTurn({ prompt: again && (route !== 'companion' || sid) ? again : scenePrompt, system: sceneSystem, tools: true, via, runner, signal, effort, cacheTtl, session: own, sessionId: again ? sid : undefined, onSession: (id) => { sid = id; } }), signal, mine2);
+        } finally { runner.scope = null; }
+        yield { type: 'usage', usage: mine2.usage };
+      })();
+      const result = yield* runScenes({
+        plan: planned, doc: () => runner.liveDoc(), turn: sceneTurn, read: readPlan,
+        save: async (p) => { await api.write(projectId, FILM_PLAN_PATH, JSON.stringify(p, null, 1)); },
+        line: (scene, u, ms) => ({ ...u, tools: 0, images: 0, ms, model, route: USAGE_ROUTE[route], scene: scene.name }),
+        signal,
+      });
+      if (!signal.aborted) yield* resuming(attempt, signal, tally, assemblyNote(result));
+    }
+  }
+  const { usage, seen, reported } = tally;
+  const harvest = harvestNote([...runner.wrotePlugins]);
+  if (harvest) yield { type: 'item', item: { id: uid(), role: 'assistant', text: harvest } };
+  const wanted = realNote([...realWanted]);
+  if (wanted) yield { type: 'item', item: { id: uid(), role: 'assistant', text: wanted } };
+  yield { type: 'item', item: { id: uid(), role: 'assistant', usage: { ...usage, tools: runner.calls - calls, images: seen, ms: Date.now() - started, model, route: USAGE_ROUTE[route], ...(reported ? {} : { unknown: true as const }), ...(consultsOf() ? { consults: consultsOf() } : {}) } } };
+  yield { type: 'done' };
+}
+
+/** what a turn has cost so far, and the pictures it looked at */
+interface Tally { usage: Usage; seen: number; reported: boolean }
+
+/**
+ * A turn run until it ends, going on by itself after a failure that passes
+ * (a busy server, a dropped connection) with the same notes and waits. Its usage
+ * is added to `tally`; `first` is the message of the first attempt when it is not
+ * the conversation's own (the assembly after the scenes).
+ */
+async function* resuming(attempt: (again: string | null) => AsyncGenerator<AiEvent>, signal: AbortSignal, tally: Tally, first: string | null = null): AsyncGenerator<AiEvent> {
   for (let n = 0, failure = ''; ; n++) {
-    const again = n ? resumeNote(failure) : null;
+    const again = n ? resumeNote(failure) : first;
     failure = '';
     try {
       for await (const ev of attempt(again)) {
-        if (ev.type === 'usage') { usage = addUsage(usage, ev.usage); reported = true; continue; }
-        if (ev.type === 'item' && ev.item.image) seen++;
+        if (ev.type === 'usage') { tally.usage = addUsage(tally.usage, ev.usage); tally.reported = true; continue; }
+        if (ev.type === 'item' && ev.item.image) tally.seen++;
         // an error the turn will get over is held back, told below with the wait
         if (ev.type === 'error' && resumable(ev.message, n)) failure = ev.message;
         else yield ev;
@@ -524,12 +580,6 @@ export async function* ask(p: AskPayload, signal: AbortSignal): AsyncGenerator<A
     yield { type: 'item', item: { id: uid(), role: 'assistant', text: t('ai.resumeIn', { error: failure, s: wait, n: n + 1, max: RESUME_DELAYS.length }) } };
     await pause(wait * 1000, signal);
   }
-  const harvest = harvestNote([...runner.wrotePlugins]);
-  if (harvest) yield { type: 'item', item: { id: uid(), role: 'assistant', text: harvest } };
-  const wanted = realNote([...realWanted]);
-  if (wanted) yield { type: 'item', item: { id: uid(), role: 'assistant', text: wanted } };
-  yield { type: 'item', item: { id: uid(), role: 'assistant', usage: { ...usage, tools: runner.calls - calls, images: seen, ms: Date.now() - started, model, route: USAGE_ROUTE[route], ...(reported ? {} : { unknown: true as const }), ...(consultsOf() ? { consults: consultsOf() } : {}) } } };
-  yield { type: 'done' };
 }
 
 /** the route of a turn as the usage line names it, so the bench can price it: the Messages API (server), the chat-format providers (chat), the companion, a local model */

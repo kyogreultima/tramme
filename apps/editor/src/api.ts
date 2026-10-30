@@ -38,6 +38,8 @@ export interface ChatItem {
   proposal?: { id: string; label: string; count: number; status: 'pending' | 'accepted' | 'rejected'; lines: string[] };
   /** what the turn cost, at its end */
   usage?: TurnUsage;
+  /** assistant: the scene this item was made for, when it was built apart from the others */
+  building?: string;
 }
 
 /** a turn's cost: its tokens (when the path reports them: `unknown` when the route told nothing, which is not zero), the tools it ran, the pictures it looked at, its length, the route it took */
@@ -45,6 +47,8 @@ export interface TurnUsage extends Usage {
   tools: number; images: number; ms: number; model: string; route: 'server' | 'chat' | 'companion' | 'local'; unknown?: true;
   /** the critic's requests of the turn, counted apart (its own model, its own tokens) */
   consults?: Usage & { n: number; model: string };
+  /** the scene this turn built apart (its name) */
+  scene?: string;
 }
 
 /** how far a running tool is */
