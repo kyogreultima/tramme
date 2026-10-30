@@ -82,6 +82,9 @@
 .work.live { box-shadow: -2px 0 0 var(--accent); }
 .work-head { display: flex; align-items: center; gap: 8px; font: 600 var(--fs-sm)/1 var(--ui); }
 .work-head .mono { margin-left: auto; font-size: var(--fs-xs); font-weight: 400; }
+/* a scene built apart: its name alone over its stages */
+.work.scene { padding-left: 10px; border-left: 2px solid var(--line-strong); }
+.scene-name { font: 600 var(--fs-sm)/1.3 var(--ui); color: var(--text); }
 /* the stages of the work, one tag each; the one under way takes the accent */
 .pipeline { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 0; border: 0; background: none; text-align: left; cursor: pointer; }
 .pipeline .steps { display: inline-flex; align-items: center; gap: 2px; margin-left: 4px; color: var(--text-4); font-size: var(--fs-sm); }

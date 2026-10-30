@@ -11,7 +11,7 @@ import { decide, lightbox, running, stop, togglePause, turnStart } from '../ai/c
 import { paused } from '../ai/calls.ts';
 import { S, setTime } from '../state.ts';
 import { timecode } from '../model.ts';
-import { anotherTake, liveStage, notes, STAGE_LABEL, STAGES, stagesOf, studio, takes, turns, type Stage, type Turn } from '../studio.ts';
+import { anotherTake, liveScene, liveStage, notes, STAGE_LABEL, STAGES, stagesOf, studio, takes, turns, type Stage, type Turn } from '../studio.ts';
 import { Access, FileChip, Markdown, OpLines, QuestionCard, Thinking, ToolLine, UsageLine, useElapsed } from './chat.tsx';
 import type { ComponentChildren } from 'preact';
 import { memo } from 'preact/compat';
@@ -85,7 +85,7 @@ const Step = ({ it }: { it: ChatItem }) => (it.tool ? <ToolLine tool={it.tool} /
 /** the turn under way: what it does now and for how long, the model, how far through the stages, its last steps, and the way to pause or stop it */
 function Run({ work, steps, open, onToggle }: { work: ChatItem[]; steps: ChatItem[]; open: boolean; onToggle: () => void }) {
   const secs = useElapsed(turnStart.value, true), hold = paused.value;
-  const now = liveStage(work), seen = stagesOf(work);
+  const now = liveStage(work), seen = stagesOf(work), scene = liveScene(work);
   const doing = [...work].reverse().find((it) => it.tool && !it.tool.done)?.tool;
   const head = hold ? t('studio.paused') : doing?.summary ?? (now ? t(STAGE_LABEL[now]) : t('studio.working'));
   const n = now ? STAGES.indexOf(now) + 1 : 0;
@@ -98,6 +98,7 @@ function Run({ work, steps, open, onToggle }: { work: ChatItem[]; steps: ChatIte
       </div>
       <div class="run-meta">
         <span>{modelLabel(aiSettings.value.model)}</span>
+        {scene && <span>{t('studio.building', { scene })}</span>}
         {now && <span>{t(STAGE_LABEL[now])} · {t('studio.stageNofM', { n, total: STAGES.length })}</span>}
       </div>
       <div class="run-bar">{STAGES.map((s) => <i key={s} class={s === now ? 'now' : seen.includes(s) ? 'done' : ''} />)}</div>
@@ -112,8 +113,35 @@ function Run({ work, steps, open, onToggle }: { work: ChatItem[]; steps: ChatIte
   );
 }
 
-/** what the assistant did after a note */
+/** the work cut where the scene it was made for changes: plain stretches, and scenes built apart */
+function segments(work: ChatItem[]): { building?: string; items: ChatItem[] }[] {
+  const out: { building?: string; items: ChatItem[] }[] = [];
+  for (const it of work) { const last = out.at(-1); if (last && last.building === it.building) last.items.push(it); else out.push({ building: it.building, items: [it] }); }
+  return out;
+}
+
+/** one scene built apart: its name, the stages it went through, what it said and what it cost */
+function SceneWork({ name, items }: { name: string; items: ChatItem[] }) {
+  const [open, setOpen] = useState(false);
+  const stages = stagesOf(items), steps = items.filter((it) => it.tool || it.thinking), usage = items.find((it) => it.usage)?.usage;
+  return (
+    <div class="work scene">
+      <div class="scene-name">{name}</div>
+      {stages.length > 0 && <Pipeline stages={stages} open={open} steps={steps.length} onToggle={() => setOpen(!open)} />}
+      {open && <div class="work-steps">{steps.map((it) => <Step key={it.id} it={it} />)}</div>}
+      {items.map((it) => (it.text !== undefined && !it.tool && !it.thinking && it.text.trim() ? <Said key={it.id} text={it.text} /> : null))}
+      {usage && <UsageLine u={usage} />}
+    </div>
+  );
+}
+
+/** what the assistant did after a note; the scenes built apart each under their own name */
 export function Work({ work, live }: { work: ChatItem[]; live: boolean }) {
+  if (live || !work.some((it) => it.building)) return <Plain work={work} live={live} />;
+  return <>{segments(work).map((s, i) => (s.building ? <SceneWork key={i} name={s.building} items={s.items} /> : <Plain key={i} work={s.items} live={false} />))}</>;
+}
+
+function Plain({ work, live }: { work: ChatItem[]; live: boolean }) {
   const [open, setOpen] = useState(false);
   const stages = stagesOf(work);
   const steps = work.filter((it) => it.tool || it.thinking);
