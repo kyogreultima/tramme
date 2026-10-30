@@ -1,0 +1,37 @@
+---
+// The toolbox by what it is for: a name and a line, the tools as chips, and the
+// docs page that holds them. Rows of one surface, not a grid of cards.
+import Head from './Head.astro';
+import { TOOL_GROUPS } from '../lib/tools';
+import { docHref } from '../lib/docs';
+---
+
+<section class="section" id="tools">
+  <div class="wrap">
+    <Head title="The toolbox." more="What a motion designer looks for first, before any detail." />
+    <ul class="groups surface" role="list" data-reveal>
+      {TOOL_GROUPS.map(({ name, text, doc, tools }) => (
+        <li>
+          <div class="what">
+            <h3>{name}</h3>
+            <p>{text}</p>
+          </div>
+          <ul class="chips" role="list">{tools.map((tool) => <li>{tool}</li>)}</ul>
+          <a class="more" href={docHref(doc)} aria-label={`${name}, in the docs`}>Docs</a>
+        </li>
+      ))}
+    </ul>
+  </div>
+</section>
+
+<style>
+  .groups { margin: clamp(40px, 5vw, 64px) 0 0; padding: clamp(8px, 1.2vw, 16px) clamp(20px, 3vw, 40px); list-style: none; }
+  .groups > li { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 6fr) auto; align-items: center; gap: 16px clamp(24px, 4vw, 56px); padding-block: clamp(22px, 2.6vw, 32px); }
+  .groups > li + li { border-top: 1px solid var(--line); }
+  h3 { font-size: 1.25rem; font-weight: 600; letter-spacing: -0.025em; line-height: 1.2; }
+  .what p { margin-top: 6px; font-size: 0.9375rem; line-height: 1.55; color: var(--ink-3); }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
+  .chips li { display: inline-flex; align-items: center; height: 34px; padding: 0 14px; border-radius: 999px; background: var(--bg); box-shadow: inset 0 0 0 1px var(--line); font-size: 0.875rem; color: var(--ink-2); white-space: nowrap; }
+  .more { font-size: 0.875rem; color: var(--accent-text); text-underline-offset: 3px; }
+  @media (max-width: 860px) { .groups > li { grid-template-columns: minmax(0, 1fr); } }
+</style>
