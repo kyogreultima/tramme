@@ -494,7 +494,7 @@ const SHAPES = new Set(['path', 'circle', 'ellipse', 'rect', 'line', 'polyline',
 
 function attrsOf(tag: string): Record<string, string> {
   const out: Record<string, string> = {};
-  for (const m of tag.matchAll(/([a-zA-Z-:]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g)) out[m[1].toLowerCase()] = m[2] ?? m[3] ?? '';
+  for (const m of tag.matchAll(/([a-zA-Z_:][\w:.-]*)\s*=\s*(?:"([^"]*)"|'([^']*)')/g)) out[m[1].toLowerCase()] = m[2] ?? m[3] ?? '';
   return out;
 }
 
@@ -570,9 +570,11 @@ export function readSvg(text: string): SvgRead {
       if (w > 0 && h > 0) contours = xf(rectContours(x, y, w, h, Math.max(0, Math.min(rx, w / 2)), Math.max(0, Math.min(ry, h / 2))));
     } else {
       const pts: [number, number][] = [];
-      const parts = (own.points ?? '').split(/[\s,]+/).filter(Boolean);
-      for (let k = 0; k + 1 < parts.length; k += 2) pts.push([num(parts[k], 0), num(parts[k + 1], 0)]);
-      if (tag === 'line') pts.length = Math.min(pts.length, 2);
+      if (tag === 'line') pts.push([num(own.x1, 0), num(own.y1, 0)], [num(own.x2, 0), num(own.y2, 0)]);
+      else {
+        const parts = (own.points ?? '').split(/[\s,]+/).filter(Boolean);
+        for (let k = 0; k + 1 < parts.length; k += 2) pts.push([num(parts[k], 0), num(parts[k + 1], 0)]);
+      }
       if (pts.length >= 2) contours = xf([{ v: pts.map((q) => [r3(q[0]), r3(q[1])] as [number, number]), closed: tag === 'polygon' }]);
     }
     for (const p of contours) {

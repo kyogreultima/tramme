@@ -2230,3 +2230,11 @@ describe('the packs\' entries by need', () => {
     expect(lines.every((l) => !l.includes(String.fromCharCode(10)))).toBe(true);
   });
 });
+
+describe('the icons data', () => {
+  it('keeps the strokes drawn as line elements: the alert circle has its bar and its dot', () => {
+    const data = JSON.parse(readFileSync(new URL('../../../plugins/icons/lucide.json', import.meta.url), 'utf8')) as { icons: Record<string, { d: unknown[] }> };
+    expect(data.icons['circle-alert'].d).toHaveLength(3);
+    expect(data.icons['circle-check'].d).toHaveLength(2);
+  });
+});
