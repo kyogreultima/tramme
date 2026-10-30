@@ -18,7 +18,8 @@ import { kindOf } from '../sources.ts';
 import { S, toast } from '../state.ts';
 import { listCommands, type Command } from '../ai/commands.ts';
 import { packCommands, shippedPacks } from '../packs.ts';
-import { useCommandMenu } from './composer.tsx';
+import { useCommandMenu, useMentionMenu } from './composer.tsx';
+import { expandMentions } from '../mentions.ts';
 import { MicButton, writeInto } from './MicButton.tsx';
 import { Modal, longPress, openMenu, Seg } from './controls.tsx';
 import { Icon } from './icons.tsx';
@@ -196,13 +197,16 @@ export function DirectionBox({ busy, onStart }: { busy: boolean; onStart: (words
   useEffect(() => { const el = area.current; if (el) { el.style.height = 'auto'; el.style.height = `${Math.min(260, Math.max(92, el.scrollHeight))}px`; } }, [words]);
   const add = (list: Picked[]) => setMaterial((had) => [...had, ...list.filter((p) => !had.some((h) => h.path === p.path))]);
   const ready = !busy && (words.trim().length > 0 || material.length > 0);
-  const start = () => { if (!ready) return; const f = FILM_FORMATS.find(([id]) => id === format)!; onStart(words.trim(), material, [f[2], f[3]]); };
+  const start = () => { if (!ready) return; const f = FILM_FORMATS.find(([id]) => id === format)!; onStart(expandMentions(words.trim(), (tok) => { const p = material.find((x) => x.file.name.replace(/s+/g, '_') === tok); return p ? `the attached file "${p.file.name}"` : null; }), material, [f[2], f[3]]); };
   // the / menu, as in the message box: a workflow starts the project with it, a tool waits in the editor's box with its form.
   // The shipped packs' commands come from the index, so the menu offers them before a project holds any pack.
   const [packCmds, setPackCmds] = useState<Command[]>([]);
   useEffect(() => { void shippedPacks().then((p) => setPackCmds(packCommands(p))); }, []);
   const commands = useMemo(() => [...listCommands(S.registry.value), ...packCmds], [S.registry.value, packCmds]);
   const commandMenu = useCommandMenu(words, commands, (c) => { setWords(`/${c.name} `); area.current?.focus(); });
+  // the @ menu: the material added so far, tagged in the words
+  const tags = useMemo(() => material.map((p) => ({ token: p.file.name.replace(/s+/g, '_'), label: p.file.name, kind: kindOf(p.file) })), [material]);
+  const mention = useMentionMenu(area, words, setWords, tags);
   const chosen = (e: Event) => { const input = e.target as HTMLInputElement, list = pickedOf(input.files ?? []); input.value = ''; add(list); };
   return (
     <div class="hero">
@@ -213,9 +217,11 @@ export function DirectionBox({ busy, onStart }: { busy: boolean; onStart: (words
         onDrop={(e) => { if (!e.dataTransfer) return; e.preventDefault(); e.stopPropagation(); droppedOf(e.dataTransfer).then((list) => add(list.filter((p) => isSourceFile(p.file)))); }}>
         <textarea ref={area} value={words} placeholder={t('home.heroPlaceholder')} autoFocus
           role="combobox" aria-expanded={commandMenu.open} aria-autocomplete="list"
-          onInput={(e) => { setWords((e.target as HTMLTextAreaElement).value); commandMenu.typed(); }}
-          onKeyDown={(e) => { if (commandMenu.keyDown(e)) return; if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); start(); } }} />
+          onInput={(e) => { setWords((e.target as HTMLTextAreaElement).value); commandMenu.typed(); mention.sync(); }}
+          onClick={mention.sync}
+          onKeyDown={(e) => { if (commandMenu.keyDown(e) || mention.keyDown(e)) return; if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); start(); } }} />
         {commandMenu.view}
+        {mention.view}
         {material.length > 0 && (
           <div class="brief-files">
             {material.map((p) => (

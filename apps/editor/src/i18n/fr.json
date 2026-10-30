@@ -594,6 +594,7 @@
     "unavailableSlash": "Assistant indisponible : tapez / pour lancer un outil",
     "fillRequired": "Remplissez les champs requis, ou écrivez ce que vous voulez après la commande.",
     "noCommand": "Aucun outil ni workflow de ce nom.",
+    "mentions": "Mentionner avec @",
     "tools": "Outils",
     "workflows": "Workflows",
     "keysMove": "naviguer",
