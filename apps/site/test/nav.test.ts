@@ -7,7 +7,7 @@ import { PAGES, docHref } from '../src/lib/docs';
 const SRC = path.join(import.meta.dirname, '../src');
 
 /** pages the redesign adds, each removed from here by the task that makes it */
-const PENDING = ['/features/', '/pricing/', '/about/', '/privacy/'];
+const PENDING = ['/pricing/', '/about/', '/privacy/'];
 
 const links: NavLink[] = [...MENUS.flatMap((m) => m.links), ...BAR_LINKS, ...FOOTER.flatMap((m) => m.links)];
 const components = fs.readdirSync(path.join(SRC, 'components')).filter((f) => f.endsWith('.astro')).map((f) => fs.readFileSync(path.join(SRC, 'components', f), 'utf8')).join('\n');
