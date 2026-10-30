@@ -8,6 +8,8 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-10-30
+
 ### Added
 
 - **Retouching in the studio**: pin several things on the picture at once, each a point, a **path** drawn with the finger (a line for the assistant to follow or lay things along) or an **area** drawn round or across layers to select them. An area only proposes layers: you drop or add some, then confirm, use it as a hint with no layer chosen, or set it aside (the setting *Selecting layers by drawing*: always, above three layers, never). Retouches, typed or spoken, are added to a list that can be reordered, taken back to change and removed, then sent all at once as one turn, each with its own pins, moment and scene.
@@ -552,7 +554,8 @@ First public release.
 
 - Cloudflare Worker serving the editor and the API, projects stored in R2, access protected by Cloudflare Access.
 
-[Unreleased]: ../../compare/v0.15.1...HEAD
+[Unreleased]: ../../compare/v0.16.0...HEAD
+[0.16.0]: ../../compare/v0.15.1...v0.16.0
 [0.15.1]: ../../compare/v0.15.0...v0.15.1
 [0.15.0]: ../../compare/v0.14.0...v0.15.0
 [0.14.0]: ../../compare/v0.13.0...v0.14.0
