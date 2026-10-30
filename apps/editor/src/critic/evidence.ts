@@ -6,7 +6,7 @@
 import { Evaluator, runChecks, sampleAt, type QualityIssue, type Registry, type ToolContext, type TrammeDoc } from '@tramme/core';
 import { analyses } from '../perception.ts';
 import { sheetOf, stills } from '../review.ts';
-import { scenesOf, sceneAt } from '../scenes.ts';
+import { filmTime, scenesOf, sceneAt } from '../scenes.ts';
 import { FILM_PLAN_PATH, parsePlan, planText, type FilmPlan } from '../filmplan.ts';
 
 export interface Moment { t: number; why: string; scene: string }
@@ -58,8 +58,8 @@ export function momentsOf(doc: TrammeDoc, compId: string, registry: Registry, is
       const inner = s.comp ? doc.compositions[s.comp] : comp;
       const layers = Object.entries(inner.layers)
         .filter(([, l]) => l.visible !== false && !(s.comp === undefined && l.type === 'comp'))
-        .map(([id, l]) => ({ id, l, at: s.comp ? s.from + (l.in ?? 0) : l.in ?? 0 }))
-        .filter(({ at }) => at >= s.from - 1e-6 && at < s.to)
+        .map(([id, l]) => ({ id, l, at: filmTime(doc, compId, s, l.in ?? 0) }))
+        .filter((x): x is { id: string; l: typeof x.l; at: number } => x.at !== null && x.at >= s.from - 1e-6 && x.at < s.to)
         .sort((a, b) => a.at - b.at);
       const first = layers.find(({ id, at }) => big(id, at + 0.4));
       if (first) found.push({ t: +first.at.toFixed(2), why: `${first.l.name ?? first.id} enters`, scene: s.name, rank: 3 });

@@ -5,7 +5,7 @@
 // cannot be read. The critic's verdict cannot overrule these.
 
 import { staticValue, type Layer, type QualityIssue, type Registry, type TrammeDoc } from '@tramme/core';
-import { scenesOf, sceneAt, type Scene } from '../scenes.ts';
+import { filmTime, scenesOf, sceneAt, type Scene } from '../scenes.ts';
 import type { FilmPlan } from '../filmplan.ts';
 
 export interface DoneIssue { id: string; scene?: string; line: string }
@@ -91,11 +91,11 @@ export function doneIssues(doc: TrammeDoc, compId: string, registry: Registry, p
   scenes.slice(1).forEach((s, i) => {
     const before = scenes[i];
     const overlap = before.to > s.from + 0.05;
-    const nearFx = (list: [string, Layer][], offset: number) => list.some(([, l]) => (l.effects ?? []).some((e) => e.type === 'fx.transition' && e.enabled !== false) && Math.abs(offset + (l.in ?? 0) - s.from) <= NEAR_CUT);
+    const nearFx = (list: [string, Layer][], when: (l: Layer) => number | null) => list.some(([, l]) => (l.effects ?? []).some((e) => e.type === 'fx.transition' && e.enabled !== false) && Math.abs((when(l) ?? Infinity) - s.from) <= NEAR_CUT);
     const root = Object.entries(comp.layers), inner = s.comp ? Object.entries(doc.compositions[s.comp].layers) : [];
     const named = root.some(([id, l]) => /transition/i.test(l.name ?? id) && Math.abs((l.in ?? 0) - s.from) <= NEAR_CUT);
     const onBeat = beatTimes.some((b) => Math.abs(b - s.from) <= ON_BEAT);
-    if (!overlap && !nearFx(root, 0) && !nearFx(inner, s.from) && !named && !onBeat) out.push({ id: 'transitions', scene: s.name, line: `${before.name} to ${s.name} is a hard cut with no transition, overlap or beat under it: cut on a beat, overlap the two, or use a transition` });
+    if (!overlap && !nearFx(root, (l) => l.in ?? 0) && !nearFx(inner, (l) => filmTime(doc, compId, s, l.in ?? 0)) && !named && !onBeat) out.push({ id: 'transitions', scene: s.name, line: `${before.name} to ${s.name} is a hard cut with no transition, overlap or beat under it: cut on a beat, overlap the two, or use a transition` });
   });
 
   // sound: a film with no sound, or the sound checks' warnings
