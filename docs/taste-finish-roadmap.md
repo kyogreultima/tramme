@@ -60,7 +60,8 @@ On the bilal project as the run of 2026-10-28 left it (the check the assistant r
 
 ### Step 7. Scene by scene ([plan](superpowers/plans/2026-10-29-taste-and-finish-step7-scene-by-scene.md))
 
-- [ ] The direction, the kept style frame and the scene list written to the project; each scene built in a fresh context that inherits only them.
+- [x] The direction, the kept style frame and the scene list written to the project; each scene built in a fresh context that inherits only them.
+- [ ] One 60 s dev film (8 scenes or more) with *Scenes built apart* on and off: finished scenes, cost per scene and its spread, total, time. Spends quota, waits for the user's go.
 
 ### Step 8. A library of references ([plan](superpowers/plans/2026-10-29-taste-and-finish-step8-references.md))
 
