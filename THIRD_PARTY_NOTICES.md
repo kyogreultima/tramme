@@ -1,6 +1,15 @@
 # Third-party notices
 
-Tramme is released under the [Apache 2.0 license](LICENSE). It relies on the open source packages below, which keep their own licenses. None of them is copied into this repository: npm installs them from the registry.
+Tramme is released under the [Functional Source License 1.1, ALv2 Future License](LICENSE) from the version after 0.16.0, and was released under the [Apache License 2.0](LICENSE-APACHE) up to that version. It relies on the open source packages below, which keep their own licenses. None of them is copied into this repository: npm installs them from the registry.
+
+## Contributions that keep the Apache License
+
+One contributor outside the project's author, **jklappstein** (GitHub), wrote the Hydracept provider and the Veo clips between 2026-10-20 and 2026-10-27, under the Apache License 2.0, which the project then used. Those contributions stay under it, in the parts he wrote, inside a work that is otherwise distributed under the Functional Source License. They are:
+
+- the files he created: `apps/editor/src/media.ts`, `apps/editor/src/videos.ts`, `apps/editor/test/videos.test.ts`, `packages/api/src/videos.ts`;
+- his changes to `apps/editor/src/ai/index.ts`, `apps/editor/src/api.ts`, `apps/editor/src/images.ts`, `apps/editor/src/settings.ts`, `apps/editor/src/sound.ts`, `apps/editor/src/ui/Providers.tsx`, `apps/editor/src/ui/Settings.tsx`, `apps/editor/src/vault/page.tsx`, `apps/desktop/src-tauri/src/api.rs` and the two interface catalogues (`apps/editor/src/i18n/`).
+
+The repository's history (`git log --author=jklappstein`) says exactly which lines are his.
 
 ## Bundled into the editor
 

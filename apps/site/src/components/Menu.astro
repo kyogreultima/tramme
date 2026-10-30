@@ -1,0 +1,39 @@
+---
+// One menu of the top bar: its name, and under it a panel of links, each with
+// a line on where it leads. A <details>, so it opens and closes without script
+// (name="nav-menu" keeps one open at a time); Nav.astro adds Escape and a click
+// outside.
+import type { NavMenu } from '../lib/nav';
+
+interface Props { menu: NavMenu }
+const { menu } = Astro.props;
+---
+
+<details class="menu" name="nav-menu">
+  <summary>{menu.label}</summary>
+  <ul class="panel" role="list">
+    {menu.links.map(({ label, href, hint }) => (
+      <li><a href={href}><strong>{label}</strong>{hint && <span>{hint}</span>}</a></li>
+    ))}
+  </ul>
+</details>
+
+<style>
+  .menu { position: relative; }
+  summary {
+    display: flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 999px; list-style: none; cursor: pointer;
+    color: var(--ink-2); font-size: 0.875rem; transition: color 0.2s var(--ease), background-color 0.2s var(--ease);
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::after { content: ''; width: 6px; height: 6px; margin-top: -3px; border: solid currentColor; border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); transition: transform 0.2s var(--ease); }
+  summary:hover, [open] > summary { color: var(--ink); background: var(--hover); }
+  [open] > summary::after { margin-top: 3px; transform: rotate(-135deg); }
+  .panel {
+    position: absolute; top: calc(100% + 14px); left: 0; z-index: 2; min-width: 300px; margin: 0; padding: 8px; list-style: none;
+    background: var(--panel); border-radius: var(--r-lg); box-shadow: var(--float);
+  }
+  a { display: grid; gap: 2px; padding: 10px 14px; border-radius: 12px; text-decoration: none; transition: background-color 0.2s var(--ease); }
+  a:hover { background: var(--hover); }
+  strong { font-size: 0.9375rem; font-weight: 500; color: var(--ink); }
+  span { font-size: 0.8125rem; color: var(--ink-3); }
+</style>

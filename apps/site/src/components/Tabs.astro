@@ -1,0 +1,65 @@
+---
+// What Tramme does, in one frame: a row of choices (Studio, Atelier, Assistant,
+// Packs, Export) and under it the picture and the sentence of the one chosen.
+// Radio inputs and CSS, no script: the arrow keys move from one to the next,
+// and without CSS every picture simply follows the last. Only the picture
+// shown loads (the others are lazy and not displayed). The rules that tie a
+// choice to its panel are written from the list (lib/features.ts), so the list
+// can change without this file.
+import { Image } from 'astro:assets';
+import ArrowRight from '@phosphor-icons/core/assets/regular/arrow-right.svg';
+import Head from './Head.astro';
+import Shot from './Shot.astro';
+import { FEATURES } from '../lib/features';
+
+const rules = FEATURES.map(({ id }) => [
+  `.tabs > #tab-${id}:checked ~ .bar label[for='tab-${id}'] { background: var(--accent); color: var(--accent-ink); }`,
+  `.tabs > #tab-${id}:focus-visible ~ .bar label[for='tab-${id}'] { outline: 2px solid var(--accent-text); outline-offset: 2px; }`,
+  `.tabs > #tab-${id}:checked ~ .panels [data-panel='${id}'] { display: grid; }`,
+].join('\n')).join('\n');
+---
+
+<section class="section" id="product">
+  <div class="wrap">
+    <Head title="One film, all the way." more="Direct it, refine it, hand it to the assistant, extend it, export it." />
+    <div class="tabs" role="radiogroup" aria-label="What Tramme does">
+      {FEATURES.map(({ id }, i) => <input class="sr" type="radio" name="feature" id={`tab-${id}`} checked={i === 0} />)}
+      <div class="bar">
+        {FEATURES.map(({ id, name }) => <label for={`tab-${id}`}>{name}</label>)}
+      </div>
+      <div class="panels">
+        {FEATURES.map(({ id, name, line, picture }) => (
+          <div class="panel" data-panel={id}>
+            {'shot' in picture
+              ? <Shot light={picture.shot[0]} dark={picture.shot[1]} alt={picture.alt} />
+              : <Image class="still" src={picture.still} alt={picture.alt} widths={[800, 1280, 1760]} sizes="(max-width: 1280px) 100vw, 1280px" loading="lazy" decoding="async" />}
+            <div class="words">
+              <p>{line}</p>
+              <a class="more" href={`/features/#${id}`} aria-label={`Learn more about the ${name.toLowerCase()}`}>Learn more<ArrowRight aria-hidden="true" /></a>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+</section>
+
+<style is:inline set:html={rules}></style>
+
+<style>
+  .tabs { display: grid; justify-items: center; gap: 28px; }
+  .sr { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+  .bar { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; padding: 4px; border-radius: 999px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); }
+  label { display: inline-flex; align-items: center; height: 38px; padding: 0 18px; border-radius: 999px; color: var(--ink-2); font-size: 0.9375rem; font-weight: 500; cursor: pointer; transition: background-color 0.2s var(--ease), color 0.2s var(--ease); }
+  label:hover { background: var(--hover); color: var(--ink); }
+  .panels { width: 100%; }
+  .panel { display: none; gap: 24px; justify-items: center; }
+  .panel > :global(.shot), .panel > :global(.still) { width: 100%; }
+  /* the stills take the screenshots' shape, so the frame keeps its height from one choice to the next */
+  .panel :global(.still) { aspect-ratio: 16 / 10; object-fit: cover; border-radius: var(--r-lg); box-shadow: var(--lift); }
+  .words { display: grid; justify-items: center; gap: 10px; text-align: center; }
+  .words p { max-width: 34rem; font-size: 1.0625rem; line-height: 1.55; color: var(--ink-2); }
+  .more { display: inline-flex; align-items: center; gap: 6px; color: var(--accent-text); font-size: 0.9375rem; font-weight: 500; text-decoration: none; }
+  .more :global(svg) { width: 16px; height: 16px; transition: transform 0.2s var(--ease); }
+  .more:hover :global(svg) { transform: translateX(3px); }
+</style>

@@ -179,14 +179,14 @@ for (const f of fs.readdirSync(DIST)) fs.rmSync(path.join(DIST, f), { recursive:
 fs.mkdirSync(path.join(DIST, 'assets'), { recursive: true });
 fs.writeFileSync(path.join(DIST, '_headers'), HEADERS);
 // installable as an app (a phone's home screen, a computer's): opens full screen, in the editor's colours,
-// with the icons each system asks for (scripts/app-icons.ts)
+// with the icons each system asks for; the launch screen is white, the colour of the icon's tile (scripts/app-icons.ts)
 fs.writeFileSync(path.join(DIST, 'icon.svg'), ICON);
 fs.cpSync(ICONS, path.join(DIST, 'icons'), { recursive: true });
 fs.copyFileSync(OG, path.join(DIST, 'og.jpg'));
 fs.writeFileSync(path.join(DIST, 'robots.txt'), ROBOTS);
 fs.writeFileSync(path.join(DIST, 'manifest.webmanifest'), JSON.stringify({
   id: '/', name: 'Tramme', short_name: 'Tramme', description: EDITOR_ABOUT, categories: ['design', 'productivity', 'video'],
-  start_url: '/', scope: '/', display: 'standalone', background_color: '#0b0f12', theme_color: '#0b0f12',
+  start_url: '/', scope: '/', display: 'standalone', background_color: '#ffffff', theme_color: '#0b0f12',
   icons: [
     { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
     { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },

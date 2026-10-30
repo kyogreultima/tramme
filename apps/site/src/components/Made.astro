@@ -1,40 +1,22 @@
 ---
+// The examples, three in a row: each a video slot and a line, and the way to the rest
 import Head from './Head.astro';
-import Media from './Media.astro';
-import { example } from '../lib/examples';
-
-// the examples: the film across the page, then two side by side; each placeholder lit with its example's background and light
-const TILES = [
-  { id: 'launch-film', wide: true, tint: ['#0b0f12', '#2ec4b6'], text: '45 seconds cut on the beat: compositions inside compositions, a 2.5D camera, motion that follows the music.' },
-  { id: 'anime', wide: false, tint: ['#1e2a5c', '#f6a86b'], text: 'Frame-by-frame drawings on an exposure sheet, in three shots.' },
-  { id: 'showreel', wide: false, tint: ['#111316', '#ff4f7b'], text: 'Made by the assistant: kinetic type, shapes, a counter, smoke and a camera look.' },
-] as const;
+import ExampleTile from './ExampleTile.astro';
+import { IDS } from '../lib/examples';
 ---
 
 <section class="section" id="made">
   <div class="wrap">
     <Head title="Made with Tramme." more="Every example is in the repository, ready to open and take apart." />
     <div class="grid">
-      {TILES.map(({ id, wide, tint, text }) => {
-        const ex = example(id);
-        return (
-          <figure class:list={['tile', { wide }]} data-reveal>
-            <Media id={id} width={ex.width} height={ex.height} duration={ex.duration} tint={[...tint]} label={`${ex.name}, made with Tramme. ${text}`} />
-            <figcaption class="caption"><strong>{ex.name}.</strong> {text}</figcaption>
-          </figure>
-        );
-      })}
+      {IDS.map((id) => <ExampleTile id={id} />)}
     </div>
+    <p class="all"><a class="btn btn-ghost" href="/examples/">See every example</a></p>
   </div>
 </section>
 
 <style>
-  .grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 48px 20px; margin-top: clamp(40px, 5vw, 64px); }
-  .tile { margin: 0; display: grid; grid-template-rows: 1fr auto; gap: 14px; grid-column: span 6; }
-  .wide { grid-column: span 12; }
-
-  @media (max-width: 820px) {
-    .grid { grid-template-columns: minmax(0, 1fr); gap: 36px; }
-    .tile, .wide { grid-column: auto; }
-  }
+  .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px 20px; }
+  .all { display: flex; justify-content: center; margin-top: 36px; }
+  @media (max-width: 960px) { .grid { grid-template-columns: minmax(0, 1fr); gap: 32px; } }
 </style>
