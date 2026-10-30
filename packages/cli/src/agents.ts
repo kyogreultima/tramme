@@ -112,13 +112,48 @@ export function codexInstalls(opts: { home?: string; localAppData?: string; plat
   return found.filter((f) => fs.existsSync(f));
 }
 
-/** the first program of the candidates that answers `--version`, which the turns then run; its version, null when none does */
-async function locate(engine: Exclude<Engine, 'claude'>): Promise<string | null> {
-  for (const command of engine === 'codex' ? ['codex', ...codexInstalls()] : [COMMAND[engine]]) {
-    const found = await version(command);
-    if (found !== null) { COMMAND[engine] = command; return found; }
+/** a version as numbers, and its prerelease identifiers ('codex-cli 0.164.0-alpha.11.1'); null when there is none to read */
+function readVersion(v: string): { numbers: number[]; pre: string[] | null } | null {
+  const m = /(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.]+))?/.exec(v);
+  return m ? { numbers: [+m[1], +m[2], +m[3]], pre: m[4] ? m[4].split('.') : null } : null;
+}
+
+/** positive when `a` is the newer: the numbers first, a release before its own prereleases, then the prerelease identifiers as semver orders them */
+function compareVersions(a: string, b: string): number {
+  const x = readVersion(a), y = readVersion(b);
+  if (!x || !y) return x ? 1 : y ? -1 : 0;
+  for (let i = 0; i < 3; i++) if (x.numbers[i] !== y.numbers[i]) return x.numbers[i] - y.numbers[i];
+  if (!x.pre || !y.pre) return x.pre ? -1 : y.pre ? 1 : 0;
+  for (let i = 0; i < Math.max(x.pre.length, y.pre.length); i++) {
+    const p = x.pre[i], q = y.pre[i];
+    if (p === undefined || q === undefined) return p === undefined ? -1 : 1;
+    const bothNumbers = /^\d+$/.test(p) && /^\d+$/.test(q);
+    const order = bothNumbers ? Number(p) - Number(q) : p < q ? -1 : p > q ? 1 : 0;
+    if (order) return order;
   }
-  return null;
+  return 0;
+}
+
+/**
+ * Which Codex to use when several answer: the newest, since the models it offers depend on
+ * its version (the app's 0.153 lists six, the extension's 0.164 ten); the first of equals, so the one
+ * on the PATH; null when none answers.
+ */
+export function newestCodex(found: { command: string; version: string }[]): string | null {
+  let best: { command: string; version: string } | null = null;
+  for (const f of found) if (!best || compareVersions(f.version, best.version) > 0) best = f;
+  return best?.command ?? null;
+}
+
+/** the program that answers `--version` among the candidates, which the turns then run (for Codex the newest one); its version, null when none does */
+async function locate(engine: Exclude<Engine, 'claude'>): Promise<string | null> {
+  const candidates = engine === 'codex' ? ['codex', ...codexInstalls()] : [COMMAND[engine]];
+  const answers = (await Promise.all(candidates.map(async (command) => ({ command, version: await version(command) }))))
+    .filter((a): a is { command: string; version: string } => a.version !== null);
+  const command = newestCodex(answers);
+  if (!command) return null;
+  COMMAND[engine] = command;
+  return answers.find((a) => a.command === command)!.version;
 }
 
 /** what a command line prints, null when it fails or is not there */
@@ -165,6 +200,29 @@ export function antigravityModels(): Promise<[string, string][]> {
     listed = { at: Date.now(), models };
   }
   return listed.models;
+}
+
+/** the models of `codex debug models` (its catalogue as JSON): the listed ones, in the order Codex gives them, a name and a label each */
+export function parseCodexModels(out: string): [id: string, label: string][] {
+  let catalogue: { models?: unknown };
+  try { catalogue = JSON.parse(out); } catch { return []; }
+  if (!Array.isArray(catalogue?.models)) return [];
+  return (catalogue.models as { slug?: unknown; display_name?: unknown; visibility?: unknown; priority?: unknown }[])
+    .filter((m) => typeof m?.slug === 'string' && m.slug !== '' && m.visibility === 'list')
+    .sort((a, b) => (typeof a.priority === 'number' ? a.priority : Infinity) - (typeof b.priority === 'number' ? b.priority : Infinity))
+    .map((m) => [m.slug as string, typeof m.display_name === 'string' && m.display_name ? m.display_name : (m.slug as string)]);
+}
+
+/** the models Codex offers this login, for the editor's model menu; looked for again at most every ten minutes, or at once when another Codex is used */
+let codexListed: { at: number; command: string; models: Promise<[string, string][]> } | null = null;
+export function codexModels(): Promise<[string, string][]> {
+  if (!codexListed || codexListed.command !== COMMAND.codex || Date.now() - codexListed.at > 10 * 60_000) {
+    const models = output(COMMAND.codex, ['debug', 'models']).then((out) => parseCodexModels(out ?? ''));
+    // an empty listing (signed out, offline) is asked again next time
+    models.then((m) => { if (!m.length) codexListed = null; });
+    codexListed = { at: Date.now(), command: COMMAND.codex, models };
+  }
+  return codexListed.models;
 }
 
 /** a process and its children stopped (on Windows, the command line runs under cmd.exe) */

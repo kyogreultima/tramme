@@ -130,3 +130,49 @@ describe('where Codex is looked for besides the PATH', () => {
     expect(codexInstalls({ home: m.home, localAppData: m.local, platform: 'win32' })).toEqual([]);
   });
 });
+
+describe("Codex's models", () => {
+  const catalogue = JSON.stringify({ models: [
+    { slug: 'gpt-6-luna', display_name: 'GPT-6-Luna', visibility: 'list', priority: 5 },
+    { slug: 'gpt-reserve', display_name: 'GPT-Reserve', visibility: 'hide', priority: 4 },
+    { slug: 'gpt-6.1-sol', display_name: 'GPT-6.1-Sol', visibility: 'list', priority: 1 },
+    { slug: 'gpt-6-astra', display_name: 'GPT-6-Astra', visibility: 'list', priority: 2 },
+    { display_name: 'no slug', visibility: 'list', priority: 3 },
+    { slug: 'no-name', visibility: 'list', priority: 6 },
+  ] });
+
+  it('are the listed ones of `codex debug models`, by the order Codex gives them, a name and a label each', async () => {
+    const { parseCodexModels } = await import('../src/agents.ts');
+    expect(parseCodexModels(catalogue)).toEqual([
+      ['gpt-6.1-sol', 'GPT-6.1-Sol'], ['gpt-6-astra', 'GPT-6-Astra'], ['gpt-6-luna', 'GPT-6-Luna'], ['no-name', 'no-name'],
+    ]);
+  });
+
+  it('are none from something that is not a catalogue', async () => {
+    const { parseCodexModels } = await import('../src/agents.ts');
+    expect(parseCodexModels('')).toEqual([]);
+    expect(parseCodexModels('not json')).toEqual([]);
+    expect(parseCodexModels('{"models": 3}')).toEqual([]);
+    expect(parseCodexModels('[]')).toEqual([]);
+  });
+});
+
+describe('which Codex to use when several answer', () => {
+  it('is the newest version, a release before its own prereleases, whatever the order found', async () => {
+    const { newestCodex } = await import('../src/agents.ts');
+    const app = { command: 'app', version: 'codex-cli 0.153.0' };
+    const extension = { command: 'extension', version: 'codex-cli 0.164.0-alpha.11.1' };
+    const stable = { command: 'stable', version: 'codex-cli 0.164.0' };
+    const later = { command: 'later', version: 'codex-cli 0.164.0-alpha.12' };
+    expect(newestCodex([app, extension])).toBe('extension');
+    expect(newestCodex([extension, app])).toBe('extension');
+    expect(newestCodex([extension, stable, app])).toBe('stable');
+    expect(newestCodex([extension, later])).toBe('later');
+  });
+
+  it('is the first of equals (the one on the PATH), and nothing when none answers', async () => {
+    const { newestCodex } = await import('../src/agents.ts');
+    expect(newestCodex([{ command: 'path', version: 'codex-cli 0.153.0' }, { command: 'app', version: 'codex-cli 0.153.0' }])).toBe('path');
+    expect(newestCodex([])).toBeNull();
+  });
+});

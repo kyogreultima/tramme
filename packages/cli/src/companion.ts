@@ -19,7 +19,7 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { COMPANION_PORT, ENGINES, MODELS, type Engine, type ToolResult } from '@tramme/assistant';
-import { antigravityModels, engines, runEngine, serveTools, type Turn } from './agents.ts';
+import { antigravityModels, codexModels, engines, runEngine, serveTools, type Turn } from './agents.ts';
 
 const CONFIG = path.join(os.homedir(), '.tramme', 'companion.json');
 /** the pairing kept under the tool's former name: still valid, so the editor stays paired */
@@ -138,8 +138,11 @@ export async function startCompanion(opts: { port?: number; origins?: string[]; 
         const found = await engines();
         json(200, { ok: true, app: 'tramme-companion', version: 2, models: MODELS, engines: Object.fromEntries(ENGINES.map((e) => [e, !!found[e]])), versions: found });
       }
-      // the models a command line lists for its login (Antigravity; Codex has no listing): asked when the model menu opens, slower than /health
-      else if (req.method === 'GET' && url.pathname === '/models') json(200, { antigravity: (await engines()).antigravity ? await antigravityModels() : [] });
+      // the models the command lines list for their login (Codex, Antigravity): asked when the model menu opens, slower than /health
+      else if (req.method === 'GET' && url.pathname === '/models') {
+        const found = await engines();
+        json(200, { codex: found.codex ? await codexModels() : [], antigravity: found.antigravity ? await antigravityModels() : [] });
+      }
       else if (req.method === 'POST' && url.pathname === '/turn') await runTurn(await readJson(req), res);
       else if (req.method === 'POST' && url.pathname === '/tool-result') {
         const b = await readJson(req) as { callId?: string; result?: ToolResult };

@@ -19,7 +19,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Fixed
 
-- **The local companion finds Codex where its own installs put it**: Codex was offered in the model menu only when `codex` answered on the PATH, which the Codex app and the VS Code extension (`openai.chatgpt`) do not set up, so a computer with Codex signed in, but no `npm install -g @openai/codex`, did not list it. The companion now also tries the app's program (`%LOCALAPPDATA%\OpenAI\Codex\bin`, the newest build first) and the extension's, in VS Code, Insiders, Cursor and Windsurf, the newest version first, and runs the turns with the one that answered.
+- **The local companion finds Codex where its own installs put it**: Codex was offered in the model menu only when `codex` answered on the PATH, which the Codex app and the VS Code extension (`openai.chatgpt`) do not set up, so a computer with Codex signed in, but no `npm install -g @openai/codex`, did not list it. The companion now also tries the app's program (`%LOCALAPPDATA%\OpenAI\Codex\bin`, the newest build first) and the extension's, in VS Code, Insiders, Cursor and Windsurf, the newest version first, and runs the turns with the newest one that answers (the models Codex offers depend on its version). The model menu also lists Codex's own models, read from `codex debug models` (the listed ones, in Codex's order, kept ten minutes), where it offered only "its default model".
 
 ## [0.16.0] - 2026-10-30
 
