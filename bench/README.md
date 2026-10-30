@@ -92,3 +92,7 @@ npm run tramme -- load video4k --frames 30         # one case, its first second
 
 The figures depend on the machine (a real GPU or a software one, the cores):
 compare runs made on the same machine.
+
+## The critic column
+
+A turn that had the film reviewed (the `critique` tool) ends with a usage line that carries `consults`: the critic's requests, priced at their own model's price and added to the turn's cost. `node bench/usage.ts <project>` prints them apart (`critic 2 consults $0.41`). To choose the number of rounds, run the same two briefs at *Critic rounds* 0, 1 and 2 and compare the series with `node bench/usage.ts --compare <before> <after>` beside the blind scores.
