@@ -308,6 +308,12 @@ async function runCodex(t: Turn, r: TurnRequest) {
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 }
 
+/** Antigravity's agent file: its body is the system prompt; of the built-in tools, view_file alone for the images, and none for a request that asks for no tools and brings no picture (one answer, nothing to loop on) */
+export function antigravityAgent(r: TurnRequest): string {
+  const tools = r.tools === false && !r.images.length ? '[]' : '[view_file]';
+  return `---\nname: tramme\ndescription: The assistant of the Tramme editor\ntools: ${tools}\nsubagent: false\n---\n${r.system}\n`;
+}
+
 async function runAntigravity(t: Turn, r: TurnRequest) {
   const dir = turnFolder('antigravity');
   const root = path.join(WORKDIR, 'antigravity'), workspace = path.join(root, 'workspace');
@@ -325,7 +331,7 @@ async function runAntigravity(t: Turn, r: TurnRequest) {
     const agents = path.join(workspace, '.agents');
     fs.mkdirSync(path.join(agents, 'agents'), { recursive: true });
     fs.writeFileSync(path.join(agents, 'mcp_config.json'), JSON.stringify({ mcpServers: r.tools === false ? {} : { tramme: { serverUrl: r.mcpUrl } } }, null, 2));
-    fs.writeFileSync(path.join(agents, 'agents', 'tramme.md'), `---\nname: tramme\ndescription: The assistant of the Tramme editor\ntools: [view_file]\nsubagent: false\n---\n${r.system}\n`);
+    fs.writeFileSync(path.join(agents, 'agents', 'tramme.md'), antigravityAgent(r));
     // images: files of the turn, named in the message (its input takes text only)
     const images = writeImages(dir, r.images);
     const text = images.length ? `Images joined to this message (open them with view_file):\n${images.join('\n')}\n\n${r.prompt}` : r.prompt;

@@ -65,3 +65,14 @@ describe('what Claude is given for a request without tools', () => {
     expect(full.resume).toBe('old');
   });
 });
+
+describe("Antigravity's agent for a request without tools", () => {
+  it('has no tool at all when it brings no picture, view_file for the pictures, and view_file in an ordinary turn', async () => {
+    const { antigravityAgent } = await import('../src/agents.ts');
+    const base = { prompt: 'p', system: 'SYS', model: '', images: [], mcpUrl: '' };
+    expect(antigravityAgent({ ...base, tools: false })).toContain('tools: []');
+    expect(antigravityAgent({ ...base, tools: false, images: [{ mediaType: 'image/jpeg', data: 'AA' }] })).toContain('tools: [view_file]');
+    expect(antigravityAgent(base)).toContain('tools: [view_file]');
+    expect(antigravityAgent(base)).toContain('SYS');
+  });
+});
