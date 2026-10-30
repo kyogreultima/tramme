@@ -15,7 +15,7 @@ import spawn from 'cross-spawn';
 import { createSdkMcpServer, query, tool, type Options, type SDKMessage, type SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { ADAPTIVE, DEFAULT_EFFORT, EFFORTS, ENGINES, MODELS, TOOLS, UsageMeter, type Effort, type Engine, type ToolResult } from '@tramme/assistant';
+import { claudeModel, DEFAULT_EFFORT, defaultClaudeModel, EFFORTS, ENGINES, parseSdkModels, setClaudeModels, TOOLS, UsageMeter, type ClaudeModel, type Effort, type Engine, type ToolResult } from '@tramme/assistant';
 
 type Out = Record<string, unknown>;
 
@@ -234,11 +234,40 @@ function kill(child: ReturnType<typeof spawn>) {
 
 // ── Claude: the Agent SDK ────────────────────────────────────
 
-/** what Claude Code is given for a request: only Tramme's tools, run by the editor, unless the request asks for none */
-export function claudeOptions(t: Turn, r: TurnRequest, model: string, effort: Effort): Options {
+/** the models Claude Code offers this login (the SDK asks Claude Code, no model is called): what each is named, its effort levels, its thinking */
+async function askClaudeModels(): Promise<ClaudeModel[]> {
+  // a session with nothing to say: only its description of the models is read, then it is closed
+  const idle = (async function* (): AsyncGenerator<SDKUserMessage> { await new Promise<never>(() => {}); })();
+  const q = query({ prompt: idle, options: { cwd: os.tmpdir(), settingSources: [] as never[], stderr: () => {} } });
+  const timer = setTimeout(() => q.close(), 30_000);
+  try { return parseSdkModels(await q.supportedModels()); } catch { return []; } finally { clearTimeout(timer); q.close(); }
+}
+
+/** the Claude models listed now, asked again at most every ten minutes; the assistant's registry follows, so a turn knows its model's thinking */
+let claudeListed: { at: number; models: Promise<ClaudeModel[]> } | null = null;
+export function claudeModelList(): Promise<ClaudeModel[]> {
+  if (!claudeListed || Date.now() - claudeListed.at > 10 * 60_000) {
+    const models = askClaudeModels().then((list) => { if (list.length) setClaudeModels(list); return list; });
+    // an empty listing (signed out, offline) is asked again next time
+    models.then((list) => { if (!list.length) claudeListed = null; });
+    claudeListed = { at: Date.now(), models };
+  }
+  return claudeListed.models;
+}
+
+/** the model of a request for Claude Code, or none (then the SDK takes the one Claude Code recommends): an id or an alias, nothing else */
+export function claudeModelAsked(asked: string | undefined): string | undefined {
+  return typeof asked === 'string' && /^[A-Za-z][A-Za-z0-9.-]*(\[[A-Za-z0-9]+\])?$/.test(asked) ? asked : undefined;
+}
+
+/**
+ * what Claude Code is given for a request: only Tramme's tools, run by the editor, unless the request asks for none;
+ * and, for a model its listing says thinks when it needs to (`adaptive`), that thinking and the effort
+ */
+export function claudeOptions(t: Turn, r: TurnRequest, model: string | undefined, effort: Effort, adaptive = false): Options {
   const tools = r.tools !== false;
   return {
-    model,
+    ...(model ? { model } : {}),
     systemPrompt: r.system,
     // only Tramme's tools, run by the editor: no files, no shell, no settings, no account connectors
     tools: [] as string[],
@@ -256,7 +285,7 @@ export function claudeOptions(t: Turn, r: TurnRequest, model: string, effort: Ef
       ? { behavior: 'allow' as const, updatedInput: input }
       : { behavior: 'deny' as const, message: `Tool ${name} is not available in Tramme.` }),
     // thinking shown to the user as it goes (summarized)
-    ...(ADAPTIVE.has(model) ? { thinking: { type: 'adaptive' as const, display: 'summarized' as const }, effort } : {}),
+    ...(adaptive ? { thinking: { type: 'adaptive' as const, display: 'summarized' as const }, effort } : {}),
     includePartialMessages: true,
     abortController: t.abort,
     cwd: os.tmpdir(),
@@ -265,7 +294,10 @@ export function claudeOptions(t: Turn, r: TurnRequest, model: string, effort: Ef
 }
 
 async function runClaude(t: Turn, r: TurnRequest) {
-  const model = MODELS.some(([id]) => id === r.model) ? r.model : MODELS[0][0];
+  // the model asked for, or the one Claude Code recommends; what it says of itself (thinking) comes from the listing, kept ten minutes
+  const model = claudeModelAsked(r.model);
+  await claudeModelList();
+  const adaptive = claudeModel(model ?? defaultClaudeModel() ?? '')?.adaptive === true;
   const effort: Effort = EFFORTS.find((e) => e === r.effort) ?? DEFAULT_EFFORT;
   // images joined to the message: one user message of image blocks and the text
   const prompt = r.images.length
@@ -277,7 +309,7 @@ async function runClaude(t: Turn, r: TurnRequest) {
       } as SDKUserMessage;
     })()
     : r.prompt;
-  const q = query({ prompt, options: claudeOptions(t, r, model, effort) });
+  const q = query({ prompt, options: claudeOptions(t, r, model, effort, adaptive) });
   t.stop = () => { t.abort.abort(); q.interrupt().catch(() => {}); };
   let message = 0;
   const thinking = new Set<string>();

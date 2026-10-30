@@ -5,7 +5,7 @@
 // offers hundreds).
 
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { CLI_DEFAULT, ENGINE_MODELS, MODELS, modelLabel, PROVIDER_LABEL, providerOf, type Effort } from '@tramme/assistant';
+import { CLI_DEFAULT, ENGINE_MODELS, modelLabel, PROVIDER_LABEL, providerOf, type Effort } from '@tramme/assistant';
 import { aiModels, aiSettings, aiStatus, currentEffort, loadModels, modelEfforts, providerLabel, remoteProviders, setAiSettings, setEffort, type ModelOption } from '../ai/index.ts';
 import { openSettings } from '../settings.ts';
 import { Popover, Seg } from './controls.tsx';
@@ -104,7 +104,7 @@ export function ModelPicker({ wide = false }: { wide?: boolean }) {
   return (
     <>
       <button type="button" class={`model-pick${wide ? ' wide' : ''}`} data-tour={wide ? undefined : 'assistant-model'} title={[t('models.modelProvider', { provider: t(providerLabel(model)) }), effortTitle(model)].filter(Boolean).join(' · ')} onClick={(e) => setAnchor(anchor ? null : (e.currentTarget as HTMLElement))}>
-        <span>{modelLabel(model)}</span><Icon name="chevronDown" />
+        <span>{modelLabel(model) || t(PROVIDER_LABEL[providerOf(model)])}</span><Icon name="chevronDown" />
       </button>
       {anchor && (
         <Popover anchor={anchor} onClose={() => setAnchor(null)} class="models-pop" align="right">
@@ -113,7 +113,7 @@ export function ModelPicker({ wide = false }: { wide?: boolean }) {
           <EffortPicker inMenu />
           <div class="models-list">
             {typed &&<button class="model-opt" onClick={() => pick(typed)}><span>{t('models.useName', { name: typed })}</span></button>}
-            <Group title="Claude" options={MODELS.map(([id, label]) => ({ id, label }))} current={model} query={query} pick={pick} />
+            {(st.companion === 'ok' || st.server) && <Group title="Claude" options={models.claude.length ? models.claude.map(({ id, label }) => ({ id, label })) : null} current={model} query={query} pick={pick} />}
             {clis.map((c) => <Group key={c.engine} title={c.title} options={c.options} current={model} query={query} pick={pick} />)}
             {configured.map(({ slot, label }) => {
               const list = models.remote[slot];

@@ -8,7 +8,7 @@
 
 import { installed, offIn } from '../installed.ts';
 import { computed, signal } from '@preact/signals';
-import { addUsage, type Usage, CLI_DEFAULT, COMPANION_PORT, DEFAULT_MODEL, EFFORTS, effortFor, effortLevels, ENGINE_MODELS, ENGINES, engineOf, LOCAL_URL, modelLabel, modelName, MODELS, NO_USAGE, pickModel, PROVIDER_LABEL, providerOf, REMOTE, joinSystem, queuedPrompt, setTranslator, slotOf, systemParts, userPrompt, type Effort, type Engine, type TurnContext } from '@tramme/assistant';
+import { addUsage, claudeModels, defaultClaudeModel, parseApiModels, setClaudeModels, type ClaudeModel, type Usage, CLI_DEFAULT, COMPANION_PORT, EFFORTS, effortFor, effortLevels, ENGINE_MODELS, ENGINES, engineOf, LOCAL_URL, modelLabel, modelName, NO_USAGE, pickModel, PROVIDER_LABEL, providerOf, REMOTE, joinSystem, queuedPrompt, setTranslator, slotOf, systemParts, userPrompt, type Effort, type Engine, type TurnContext } from '@tramme/assistant';
 import { CHAT, CHAT_INDEX, chatPath } from '@tramme/project';
 import type { TrammeDoc } from '@tramme/core';
 import reference from '../../../../docs/document.md';
@@ -59,13 +59,14 @@ export interface AiSettings {
 
 const KEY = 'tramme.assistant';
 function loadSettings(): AiSettings {
-  const d: AiSettings = { model: DEFAULT_MODEL, prefer: 'auto', companionUrl: `http://127.0.0.1:${COMPANION_PORT}`, token: '', localUrl: LOCAL_URL, efforts: {}, notify: true, apply: 'off', resume: true, cacheTtl: '5m', criticRounds: 2, scenesApart: 'auto' };
+  // no Claude model is written here: the one nobody chose is empty until the listing says which is recommended (reconcileClaudeModel)
+  const d: AiSettings = { model: '', prefer: 'auto', companionUrl: `http://127.0.0.1:${COMPANION_PORT}`, token: '', localUrl: LOCAL_URL, efforts: {}, notify: true, apply: 'off', resume: true, cacheTtl: '5m', criticRounds: 2, scenesApart: 'auto' };
   try {
     // the settings kept under the tool's former name (model, companion token) are taken over
     const s = { ...d, ...JSON.parse(localStorage.getItem(KEY) ?? localStorage.getItem('emotion.assistant') ?? '{}') } as AiSettings;
     // the Gemini CLI, retired, gave way to Antigravity (its models have other names)
     if (typeof s.model === 'string' && s.model.startsWith('gemini-cli:')) s.model = `antigravity:${CLI_DEFAULT}`;
-    if (typeof s.model !== 'string' || (providerOf(s.model) === 'anthropic' && !MODELS.some(([id]) => id === s.model))) s.model = d.model;
+    if (typeof s.model !== 'string') s.model = d.model;
     const efforts = s.efforts && typeof s.efforts === 'object' ? s.efforts : {};
     s.efforts = Object.fromEntries(Object.entries(efforts).filter(([, e]) => EFFORTS.includes(e)));
     s.notify = s.notify !== false;
@@ -119,8 +120,8 @@ export const providerLabel = (model: string) => remoteProviders.value.find((p) =
 
 /** effort: the provider says the model reasons, so it takes an effort level (OpenRouter) */
 export interface ModelOption { id: string; label: string; effort?: boolean }
-/** models offered by each provider besides Claude, and by the companion's command lines (filled when the model menu opens) */
-export const aiModels = signal<{ remote: Record<string, ModelOption[] | { error: string }>; local: ModelOption[]; engines: Partial<Record<Engine, ModelOption[]>> }>({ remote: {}, local: [], engines: {} });
+/** models offered by Claude (listed by the companion and the key), by each other provider and by the companion's command lines (filled when the model menu opens) */
+export const aiModels = signal<{ claude: ClaudeModel[]; remote: Record<string, ModelOption[] | { error: string }>; local: ModelOption[]; engines: Partial<Record<Engine, ModelOption[]>> }>({ claude: [], remote: {}, local: [], engines: {} });
 
 /** whether OpenRouter's listing says this model reasons */
 function reasons(model: string): boolean {
@@ -198,7 +199,8 @@ async function adoptConnected() {
   if (aiRoute.peek()) { reached = true; return; }
   // a local model or a command line of this computer chosen on purpose stays chosen (it may just not be started yet)
   if (reached || providerOf(model) === 'local' || (engineOf(model) && engineOf(model) !== 'claude') || st.companion === 'checking') return;
-  let next: string | undefined = st.server || st.companion === 'ok' ? DEFAULT_MODEL : undefined;
+  let next: string | undefined;
+  if (st.server || st.companion === 'ok') { await ensureClaudeModels(); next = defaultClaudeModel(); }
   const slots = remoteProviders.peek().map((p) => p.slot).filter((s) => st.remote[s]);
   if (!next && slots.length) {
     if (!Object.keys(aiModels.peek().remote).length) aiModels.value = { ...aiModels.peek(), remote: await api.models().catch(() => ({})) as never };
@@ -219,19 +221,62 @@ export async function ensureStatus() { if (aiStatus.peek().server === null) awai
 export async function loadModels() {
   // which keys the server has, before asking it for their models
   await ensureStatus();
-  // the command lines' own models (a listing that takes a few seconds), each shown as it comes
-  if (aiStatus.peek().companion === 'ok') {
-    companionModels(link()).then((listed) => {
-      const engines = Object.fromEntries(ENGINES.map((e) => [e, (listed[e] ?? []).map(([id, label]) => ({ id: `${ENGINE_MODELS[e].provider}:${id}`, label }))]));
-      aiModels.value = { ...aiModels.peek(), engines };
-    });
-  }
+  // Claude's models and the command lines' own (listings that take a few seconds), each shown as it comes
+  loadClaudeModels().catch(() => {});
   const [remote, local] = await Promise.all([
     Object.values(aiStatus.peek().remote).some(Boolean) ? api.models().catch(() => ({})) : Promise.resolve({}),
     localModels(),
   ]);
   aiModels.value = { ...aiModels.peek(), remote: remote as never, local: local ?? [] };
   aiStatus.value = { ...aiStatus.peek(), local: local ? 'ok' : 'absent' };
+}
+
+// ── the Claude models ────────────────────────────────────────
+// Listed now, never written down: by the companion (the Claude Code login: each model's name, effort
+// levels and thinking) and by the Anthropic key (the server's or the vault's), the companion's first.
+
+const claudeSources: Record<'companion' | 'key', ClaudeModel[]> = { companion: [], key: [] };
+
+/** a listing came: the models are the companion's, then the key's that it does not have; the assistant's registry and the menu follow */
+function setClaudeSource(source: 'companion' | 'key', list: ClaudeModel[]) {
+  if (!list.length) return;
+  claudeSources[source] = list;
+  const seen = new Set(claudeSources.companion.map((m) => m.id));
+  const merged = [...claudeSources.companion, ...claudeSources.key.filter((m) => !seen.has(m.id))];
+  setClaudeModels(merged);
+  aiModels.value = { ...aiModels.peek(), claude: merged };
+  reconcileClaudeModel();
+}
+
+/** the chosen Claude model is one of those listed; none chosen, or one that is gone, gives the model the listing recommends */
+function reconcileClaudeModel() {
+  const { model } = aiSettings.peek(), list = claudeModels();
+  if (providerOf(model) !== 'anthropic' || !list.length || list.some((m) => m.id === model)) return;
+  const next = defaultClaudeModel(list);
+  if (!next) return;
+  keepSettings({ model: next });
+  if (model) toast(t('ai.modelAdopted', { model: modelLabel(next), provider: providerLabel(next) }));
+}
+
+/** the companion's listing (Claude's models, the command lines') and the key's, each used as it comes */
+async function loadClaudeModels() {
+  await ensureStatus();
+  const st = aiStatus.peek();
+  await Promise.all([
+    st.companion === 'ok' ? companionModels(link()).then(({ claude, engines: listed }) => {
+      setClaudeSource('companion', claude);
+      const engines = Object.fromEntries(ENGINES.map((e) => [e, (listed[e] ?? []).map(([id, label]) => ({ id: `${ENGINE_MODELS[e].provider}:${id}`, label }))]));
+      aiModels.value = { ...aiModels.peek(), engines };
+    }) : undefined,
+    st.server ? api.claudeModels().then((body) => setClaudeSource('key', parseApiModels(body))).catch(() => {}) : undefined,
+  ]);
+}
+
+let claudeAsked: Promise<void> | null = null;
+/** the Claude models listed before something needs them (a turn, the model taken for the user): once, then kept; the menu asks again when it opens */
+export function ensureClaudeModels(): Promise<void> {
+  if (claudeModels().length) return Promise.resolve();
+  return (claudeAsked ??= loadClaudeModels().finally(() => { claudeAsked = null; }));
 }
 
 const link = () => ({ url: aiSettings.peek().companionUrl.replace(/\/+$/, ''), token: aiSettings.peek().token });
@@ -461,6 +506,11 @@ export async function* ask(p: AskPayload, signal: AbortSignal): AsyncGenerator<A
   if (!aiRoute.peek()) await refreshStatus();
   const route = aiRoute.peek();
   if (!route) { yield { type: 'error', message: unavailableReason() }; return; }
+  // a Claude turn needs its model's listing (its thinking, its effort levels) and a model: the one nobody chose is the recommended
+  if (providerOf(aiSettings.peek().model) === 'anthropic') {
+    await ensureClaudeModels();
+    if (!aiSettings.peek().model) { yield { type: 'error', message: t('ai.noClaudeModels') }; return; }
+  }
   // a proposal neither applied nor refused is dropped at the next message
   const dropped = runner.pending && !p.decisions.some((d) => d.id === runner.pending!.id) ? runner.pending : null;
   runner.clear();

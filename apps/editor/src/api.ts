@@ -137,6 +137,8 @@ export const api = {
     const [server, vault] = await Promise.all([call<ServerConfig>('/api/config'), call<Partial<ServerConfig>>('/api/config', undefined, reach)]);
     return { ...server, ...vault };
   },
+  /** the Claude models the Anthropic key can use, as Anthropic lists them (the newest first): parsed by the assistant's parseApiModels */
+  claudeModels: () => call<unknown>('/api/claude/v1/models?limit=1000', { headers: { 'anthropic-version': '2023-06-01' } }, reach),
   /** models of the providers with a key */
   models: () => call<Record<string, { id: string; label: string; effort?: true }[] | { error: string }>>('/api/models', undefined, reach),
 

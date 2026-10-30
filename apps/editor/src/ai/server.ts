@@ -10,7 +10,7 @@
 // results are cleared by the API itself (context editing), not here.
 
 import { z } from 'zod';
-import { ADAPTIVE, DEFAULT_EFFORT, joinSystem, modelName, NO_FALLBACK, providerOf, TOOLS, UsageMeter, type Effort, type SystemParts, type ToolResult } from '@tramme/assistant';
+import { DEFAULT_EFFORT, isAdaptive, joinSystem, modelName, providerOf, TOOLS, UsageMeter, type Effort, type SystemParts, type ToolResult } from '@tramme/assistant';
 import { ChatReader, chatTools, toChat } from './compat.ts';
 import { reach, type AiEvent, type ChatItem } from '../api.ts';
 import type { ToolRunner } from './tools.ts';
@@ -410,7 +410,8 @@ export class ServerSession {
     const { fixed, variable } = typeof system === 'string' ? { fixed: system, variable: '' } : system;
     // a part is sent while the model takes it, and noted as sent
     const on = (part: Part) => this.takes(model, part) && !!parts.push(part);
-    const adaptive = ADAPTIVE.has(model);
+    // what the model says of itself in the listing: a model nobody listed is asked for none of it
+    const adaptive = isAdaptive(model);
     // the Messages API refuses fields of its own blocks it does not know (Gemini's signatures)
     const clean = (b: Block) => (b.type === 'tool_use' && 'extra_content' in b ? { type: b.type, id: b.id, name: b.name, input: b.input } : b);
     // the cache covers the tools, the system prompt and the conversation so far
@@ -426,8 +427,8 @@ export class ServerSession {
     }
     const context = on('context');
     if (context) betas.push('context-management-2025-06-27');
-    // a request Claude declines is run again by another model, on the server
-    const fallbacks = adaptive && !NO_FALLBACK.has(model) && on('fallbacks');
+    // a request Claude declines is run again by another model, on the server (a model that has none refuses it, once: it is not asked again)
+    const fallbacks = adaptive && on('fallbacks');
     if (fallbacks) betas.push('server-side-fallback-2026-07-01');
     return {
       parts,

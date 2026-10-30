@@ -3,14 +3,12 @@
 // work reads the evidence and answers once. It never touches the conversation
 // (the server's messages, the companion's session) or the tool runner.
 
-import { addUsage, engineOf, joinSystem, NO_USAGE, type Effort, type Engine, type SystemParts, type Usage } from '@tramme/assistant';
+import { addUsage, defaultClaudeModel, engineOf, joinSystem, NO_USAGE, type Effort, type Engine, type SystemParts, type Usage } from '@tramme/assistant';
 import type { AiEvent, TurnUsage } from '../api.ts';
 import { companionTurn, type CompanionLink } from './companion.ts';
 import { ServerSession, type ChatTarget } from './server.ts';
 import type { ToolRunner } from './tools.ts';
 
-/** the model that reviews on the routes that have the strongest one: the rest review with the turn's own */
-const CRITIC = 'claude-opus-5-5';
 
 export type ConsultRoute = 'companion' | 'server' | 'remote' | 'local';
 
@@ -37,9 +35,9 @@ export interface ConsultRequest {
   signal: AbortSignal;
 }
 
-/** Opus 5.5 on the server and with the companion's Claude, the turn's own model on every other route */
+/** the strongest Claude listed now (the one recommended, else the newest Opus) on the server and with the companion's Claude, the turn's own model on every other route, and when none is listed */
 export function criticModel(route: ConsultRoute, turnModel: string): string {
-  return route === 'server' || (route === 'companion' && engineOf(turnModel) === 'claude') ? CRITIC : turnModel;
+  return route === 'server' || (route === 'companion' && engineOf(turnModel) === 'claude') ? defaultClaudeModel() ?? turnModel : turnModel;
 }
 
 /** whether a model takes pictures: every one does but a local one that does not say it sees (llava, vision, vl) */

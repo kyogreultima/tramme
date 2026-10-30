@@ -1,13 +1,19 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { effortFor, effortLevels, pickModel } from '@tramme/assistant';
+import { listClaude, unlistClaude } from './claude-listed.ts';
 import { builtinRegistry } from '@tramme/nodes';
 import { harvestNote, realNote, inputIssues, vocabularyDetail, vocabularyIndex } from '../src/ai/answers.ts';
 import { REVIEW_TOOLS } from '../src/review.ts';
 
 describe('effort levels', () => {
+  // a Claude model has the levels its listing says: Opus and Sonnet five, Haiku 4.5 none, an unlisted model none
+  beforeEach(() => listClaude());
+  afterEach(() => unlistClaude());
+
   it('are offered by the models that have them, and only those', () => {
     expect(effortLevels('claude-opus-5-5')).toEqual(['low', 'medium', 'high', 'xhigh', 'max']);
     expect(effortLevels('claude-haiku-4-5-20251001')).toEqual([]);
+    expect(effortLevels('claude-not-listed')).toEqual([]);
     expect(effortLevels('openai:gpt-5')).toEqual(['low', 'medium', 'high']);
     expect(effortLevels('openai:o4-mini')).toEqual(['low', 'medium', 'high']);
     expect(effortLevels('openai:gpt-5-chat-latest')).toEqual([]);

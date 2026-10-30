@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NO_USAGE } from '@tramme/assistant';
 import type { AiEvent, ChatItem } from '../src/api.ts';
 import type { FilmPlan } from '../src/filmplan.ts';
+import { listClaude, unlistClaude } from './claude-listed.ts';
 
 const ai = await import('../src/ai/index.ts');
 const { ServerSession } = await import('../src/ai/server.ts');
@@ -38,13 +39,15 @@ function mockTurns(director: boolean) {
 }
 
 beforeEach(() => {
+  listClaude();
+  ai.setAiSettings({ model: 'claude-opus-5-5' });
   calls.length = 0; store = null;
   vi.stubGlobal('fetch', vi.fn(async () => new Response('[]', { status: 404 })));
   vi.spyOn(api, 'readText').mockImplementation(async (_p: string, path: string) => (path.endsWith('film-plan.json') && store ? { text: JSON.stringify(store) } : null) as never);
   vi.spyOn(api, 'write').mockImplementation((async (_p: string, path: string, content: string) => { if (path.endsWith('film-plan.json')) store = JSON.parse(content); }) as never);
   ai.aiStatus.value = { ...ai.aiStatus.value, server: true, companion: 'absent' };
 });
-afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); unlistClaude(); });
 
 describe('a film built scene by scene, in ask()', () => {
   it('runs three scene turns after the director, then the assembly in the director\'s conversation, each scene with its own usage line', async () => {

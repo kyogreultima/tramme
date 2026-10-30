@@ -104,6 +104,7 @@
     "editOfName": "Montage de {name}",
     "providerNotConnected": "{provider} n'est pas connecté : ajoutez sa clé dans Réglages, Fournisseurs.",
     "modelAdopted": "L'assistant utilise maintenant {model} ({provider}), l'IA connectée.",
+    "noClaudeModels": "Aucun modèle Claude n'a pu être listé : le compagnon local (Claude Code) et la clé Anthropic du serveur n'ont pas répondu. Lancez le compagnon ou connectez une clé, ou choisissez un autre modèle.",
     "cliNeedsCompanion": "{cli} tourne sur cet ordinateur à travers le compagnon local : lancez-le, il trouve {cli} tout seul.",
     "cliNotInstalled": "{cli} n'est pas installé sur cet ordinateur : installez-le, connectez-vous une fois avec votre compte, puis réessayez."
   },

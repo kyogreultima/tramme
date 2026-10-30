@@ -104,6 +104,7 @@
     "editOfName": "Edit of {name}",
     "providerNotConnected": "{provider} is not connected: add its key in Settings, Providers.",
     "modelAdopted": "The assistant now uses {model} ({provider}), the AI connected.",
+    "noClaudeModels": "No Claude model could be listed: the local companion (Claude Code) and the server's Anthropic key did not answer. Start the companion or connect a key, or choose another model.",
     "cliNeedsCompanion": "{cli} runs on this computer through the local companion: start it, it finds {cli} by itself.",
     "cliNotInstalled": "{cli} is not installed on this computer: install it, sign in once with your account, then retry."
   },
