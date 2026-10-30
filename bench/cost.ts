@@ -67,3 +67,11 @@ export function compare(before: TurnUsage[], after: TurnUsage[]): { before: Tota
     change: { dollars: a.dollars === null || b.dollars === null ? null : b.dollars - a.dollars, cacheShare: b.cacheShare - a.cacheShare, output: b.output - a.output, ms: b.ms - a.ms },
   };
 }
+
+/** the scenes built apart in these turns, each with its cost, and how far the dearest is from the cheapest (a flat cost per scene is a spread near 1); null when no scene ran apart or a price is missing */
+export function sceneSpread(turns: TurnUsage[]): { scenes: { name: string; dollars: number }[]; spread: number; total: number } | null {
+  const scenes = turns.filter((u) => u.scene).map((u) => ({ name: u.scene!, dollars: costOf(u)?.dollars ?? NaN }));
+  if (!scenes.length || scenes.some((s) => Number.isNaN(s.dollars))) return null;
+  const costs = scenes.map((s) => s.dollars);
+  return { scenes, spread: Math.max(...costs) / Math.max(1e-9, Math.min(...costs)), total: costs.reduce((a, b) => a + b, 0) };
+}

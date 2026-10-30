@@ -85,3 +85,16 @@ describe('the critic\'s consults', () => {
     expect(costOf(t)).toBeNull();
   });
 });
+
+describe('the scenes built apart', () => {
+  it('say how much each scene cost and how far apart the dearest and the cheapest are', async () => {
+    const { sceneSpread } = await import('./cost.ts');
+    const scene = (name: string, input: number) => turn({ model: 'claude-sonnet-5-5', input, scene: name });
+    const s = sceneSpread([turn({ input: 5e6 }), scene('Opening', 1e6), scene('Price', 2e6), scene('Proof', 1.5e6)])!;
+    expect(s.scenes.map((x) => x.name)).toEqual(['Opening', 'Price', 'Proof']);
+    expect(s.scenes.map((x) => x.dollars)).toEqual([2, 4, 3]);
+    expect(s.spread).toBeCloseTo(2, 6);
+    expect(s.total).toBeCloseTo(9, 6);
+    expect(sceneSpread([turn({ input: 5e6 })])).toBeNull();
+  });
+});

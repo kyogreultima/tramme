@@ -175,3 +175,11 @@ describe('the finish rules', () => {
     for (const word of ['critique', 'three things', 'scene-takes', 'rounds']) expect(finish, word).toContain(word);
   });
 });
+
+describe('the scene-by-scene rules', () => {
+  it('sit in the whole films and name the end of a scene builder, the scenes built apart, the brief of each scene and the assembly', () => {
+    const { fixed } = systemParts(REF);
+    const films = fixed.slice(fixed.indexOf('Whole films:'), fixed.indexOf('Dressing a video'));
+    for (const word of ['scene-done', 'built apart', 'brief of each scene', 'assemble']) expect(films, word).toContain(word);
+  });
+});

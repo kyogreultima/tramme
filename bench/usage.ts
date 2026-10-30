@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { CHAT_INDEX, chatPath, unpackProject } from '@tramme/project';
 import type { TurnUsage } from '../apps/editor/src/api.ts';
-import { cacheShare, compare, costOf, criticOf, lowerBound, totalsOf, type Totals } from './cost.ts';
+import { cacheShare, compare, costOf, criticOf, lowerBound, sceneSpread, totalsOf, type Totals } from './cost.ts';
 
 /** a project's text files by path, from a folder or an archive */
 async function files(target: string): Promise<(p: string) => string | null> {
@@ -70,7 +70,9 @@ async function report(target: string) {
   const all: TurnUsage[] = [];
   for (const chat of await conversations(target)) {
     console.log(`\n${chat.title}`);
-    for (const { turn, usage } of chat.turns) console.log(`  turn ${turn}: ${line(usage)}`);
+    for (const { turn, usage } of chat.turns) console.log(usage.scene ? `    scene ${usage.scene}: ${line(usage)}` : `  turn ${turn}: ${line(usage)}`);
+    const apart = sceneSpread(chat.turns.map((x) => x.usage));
+    if (apart) console.log(`  scenes built apart: ${apart.scenes.length}, $${apart.total.toFixed(2)} in all, the dearest ${apart.spread.toFixed(2)}x the cheapest`);
     if (chat.turns.length) console.log(`  conversation: ${summary(chat.turns.map((t) => t.usage))}`);
     all.push(...chat.turns.map((t) => t.usage));
   }
