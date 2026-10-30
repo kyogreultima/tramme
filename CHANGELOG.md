@@ -14,6 +14,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Changed
 
+- **A new licence, from the version after 0.16.0**: the [Functional Source License 1.1, ALv2 Future License](LICENSE) (FSL-1.1-ALv2) replaces the Apache License 2.0. The source stays available: anyone can use it, modify it and redistribute it for any purpose except offering a competing commercial product or service, and each version becomes Apache 2.0 two years after its release. Versions up to 0.16.0 stay under the Apache License ([LICENSE-APACHE](LICENSE-APACHE)), as do the contributions of the one outside contributor, listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Contributors now sign off their commits (`git commit -s`) and agree that their work is under that licence and any later one the author chooses ([CONTRIBUTING.md](CONTRIBUTING.md)). The `license` field of every package, the README, the site (it no longer says "open source") and the link preview follow.
 - **The new logo**: the mark and the name in `brand/`, on the site (the top bar, the footer, the docs) in the theme's accent and ink, and as the app's icon: the favicon, the installed app's PNGs, the desktop app's icons (`tauri icon`) and the link preview card, all drawn by `scripts/app-icons.ts` and `scripts/og-image.ts` from the brand files and the editor's theme tokens (`scripts/brand.ts`). The link preview shows the studio and the site's own words again; its screenshot path had gone stale.
 
 ## [0.16.0] - 2026-10-30

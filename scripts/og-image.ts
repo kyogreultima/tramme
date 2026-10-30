@@ -48,8 +48,8 @@ p { margin-top: 28px; font-size: 25px; line-height: 1.4; color: #9eabb3; letter-
 <div class="text">
   <div class="brand">${logo}</div>
   <h1><span>Motion design,</span> <span class="quiet">directed in words.</span></h1>
-  <p>Leave notes on the film, keep the takes you like. Free and open source.</p>
-  <div class="foot"><b>tramme.dev</b><span>Apache-2.0</span></div>
+  <p>Leave notes on the film, keep the takes you like. Free to use, no account.</p>
+  <div class="foot"><b>tramme.dev</b><span>Source available</span></div>
 </div>
 <div class="shot"><img src="${shot}" alt=""></div>
 </body></html>`;

@@ -11,7 +11,11 @@ const formats = FORMATS.map((f) => f.name).join(', ');
 export const FAQ: Question[] = [
   {
     q: 'Is Tramme free?',
-    a: 'Yes. It is open source under the Apache-2.0 licence, in the browser and on the desktop. The only thing that can cost money is the AI provider you choose for the assistant, billed by that provider to your own account.',
+    a: 'Yes, to use, in the browser and on the desktop. Its source is available under the Functional Source License: you can read it, run it and change it. The only thing that can cost money is the AI provider you choose for the assistant, billed by that provider to your own account.',
+  },
+  {
+    q: 'Can I use Tramme for client work?',
+    a: 'Yes. The films you make with Tramme are yours, and making them for clients or inside your company is a normal use. The licence reserves one thing: offering Tramme itself, or a product with substantially the same functions, to others as a commercial product or service. Each version becomes Apache-2.0 two years after its release.',
   },
   {
     q: 'Do I need an account?',

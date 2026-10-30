@@ -86,6 +86,11 @@ The desktop workflow ([.github/workflows/desktop.yml](.github/workflows/desktop.
 
 An urgent fix to the released version starts from `main` instead: a `fix/…` branch with the fix and a patch version (`node scripts/version.ts 0.11.2`), merged into `main`, which releases it the same way. A pull request from `main` into `develop` (a merge commit too) then brings it back; in the changelog, keep both sides.
 
-## License
+## License and sign-off
 
-By contributing, you agree that your contributions are licensed under the project's [Apache License 2.0](LICENSE).
+Tramme is under the [Functional Source License 1.1, ALv2 Future License](LICENSE) (FSL-1.1-ALv2). By contributing, you agree that:
+
+- your contribution is licensed under that licence, and under any later licence that the project's author chooses for the project, the same one on the same terms or another, a commercial one included;
+- you wrote it, or you have the right to submit it under those terms, as the [Developer Certificate of Origin](https://developercertificate.org/) says.
+
+Show it by signing off every commit: `git commit -s` adds a `Signed-off-by: Your Name <you@example.com>` line. Contributions made before this change, up to version 0.16.0, were made under the Apache License 2.0 and keep it: see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

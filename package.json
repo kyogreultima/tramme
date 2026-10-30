@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "description": "Motion design engine and editor: JSON document, deterministic rendering, web editor",
-  "license": "Apache-2.0",
+  "license": "FSL-1.1-ALv2",
   "author": "Aziz Chanou",
   "workspaces": [
     "packages/*",
