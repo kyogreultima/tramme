@@ -20,12 +20,9 @@ const { shot, alt } = shotOf('editor');
   <div class="wrap">
     <Head title="The atelier, for the detail." more="One switch away: the layers, the timeline, the curves and the inspector, on the same film." />
   </div>
-  <div class="wrap-wide body">
+  <div class="wrap">
     <Shot light={shot[0]} dark={shot[1]} alt={alt} />
     <Cards items={ITEMS} />
   </div>
 </section>
 
-<style>
-  .body { margin-top: clamp(40px, 5vw, 64px); }
-</style>

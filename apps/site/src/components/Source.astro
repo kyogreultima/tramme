@@ -27,7 +27,7 @@ const CLONE = `git clone ${REPO}`;
 <section class="section" id="source">
   <div class="wrap">
     <div class="panel surface">
-      <Head center title="Source available, free to use." more="Read it, change it, run it in the browser, on your desktop or on your own server. Only a competing product is off limits." />
+      <Head title="Source available, free to use." more="Read it, change it, run it in the browser, on your desktop or on your own server. Only a competing product is off limits." />
       <dl class="stats" data-reveal>
         {STATS.map(([n, label]) => (
           <div><dt>{label}</dt><dd>{n}</dd></div>
@@ -68,7 +68,7 @@ const CLONE = `git clone ${REPO}`;
     padding: clamp(48px, 7vw, 104px) clamp(20px, 5vw, 72px);
     border-radius: var(--r-lg);
   }
-  .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 36px 0; max-width: 880px; margin: clamp(40px, 5vw, 64px) auto 0; }
+  .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 36px 0; max-width: 880px; margin: 0 auto; }
   .stats div { display: flex; flex-direction: column-reverse; align-items: center; gap: 4px; padding: 4px 12px; }
   dd { margin: 0; font-size: clamp(2.5rem, 5vw, 4rem); font-weight: 500; letter-spacing: -0.045em; line-height: 1; font-variant-numeric: tabular-nums; }
   dt { font-size: 0.875rem; color: var(--ink-3); }

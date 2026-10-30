@@ -3,7 +3,7 @@
 import Base from '../layouts/Base.astro';
 import Nav from '../components/Nav.astro';
 import PageHead from '../components/PageHead.astro';
-import RepoLink from '../components/RepoLink.astro';
+import Source from '../components/Source.astro';
 import Footer from '../components/Footer.astro';
 import { docHref } from '../lib/docs';
 import { REPO, repoFile } from '../lib/links';
@@ -30,13 +30,12 @@ import { REPO, repoFile } from '../lib/links';
         <h2>A security problem</h2>
         <p>Please do not open a public issue. Report it privately through the repository's Security tab, as <a href={repoFile('SECURITY.md')}>the security policy</a> describes.</p>
       </div>
-      <div class="ctas"><RepoLink /></div>
     </section>
+    <Source />
   </main>
   <Footer />
 </Base>
 
 <style>
   .body { display: grid; gap: 32px; margin-top: clamp(40px, 5vw, 64px); }
-  .ctas { display: flex; flex-wrap: wrap; gap: 10px; }
 </style>

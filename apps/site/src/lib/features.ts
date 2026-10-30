@@ -1,4 +1,4 @@
-// The five things Tramme does, as the landing page shows them (Pillars.astro)
+// The five things Tramme does, as the landing page shows them (Tabs.astro)
 // and as the features page details them (its sections, with these ids). The
 // pictures of the studio and the atelier are written here once: their
 // sections read them from here too.
@@ -6,20 +6,14 @@
 import type { ImageMetadata } from 'astro';
 import studioLight from '../assets/studio-light.png';
 import studioDark from '../assets/studio-dark.png';
-import briefLight from '../assets/part-brief-light.png';
-import briefDark from '../assets/part-brief-dark.png';
-import composerLight from '../assets/part-composer-light.png';
-import composerDark from '../assets/part-composer-dark.png';
 import editorLight from '../assets/editor-light.png';
 import editorDark from '../assets/editor-dark.png';
 import assistantStill from '../videos/assistant.webp';
 import showreelStill from '../videos/showreel.webp';
 import launchStill from '../videos/launch-film.webp';
 
-/** a piece of the interface that floats off a picture of the app (Shot.astro places it by its class) */
-export interface Part { light: ImageMetadata; dark: ImageMetadata; alt: string; class: 'brief' | 'composer' }
 /** the app in the page's theme: paper on the light page, studio on the dark one */
-export interface ShotPicture { shot: [light: ImageMetadata, dark: ImageMetadata]; alt: string; parts?: Part[] }
+export interface ShotPicture { shot: [light: ImageMetadata, dark: ImageMetadata]; alt: string }
 /** a still of a film */
 export interface StillPicture { still: ImageMetadata; alt: string }
 
@@ -39,10 +33,6 @@ export const FEATURES: Feature[] = [
     picture: {
       shot: [studioLight, studioDark],
       alt: 'The Tramme studio: the Showreel example in front, its storyboard below, and the Direction panel with the brief, the palette and the material.',
-      parts: [
-        { light: briefLight, dark: briefDark, alt: 'The brief of the film: its subject, its tone and its rules.', class: 'brief' },
-        { light: composerLight, dark: composerDark, alt: 'The note box, with suggestions above it: review the film, more rhythm, another palette.', class: 'composer' },
-      ],
     },
   },
   {

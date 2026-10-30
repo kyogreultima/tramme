@@ -1,59 +1,24 @@
 ---
 // A picture of the app in the page's theme: its paper theme on the light
 // page, its studio theme on the dark one. Both are lazy, so only the one
-// shown loads. It comes up tilted and lies flat as it enters the screen;
-// pieces of the interface (`parts`) can float off it, drifting at their own
-// pace. Scroll-driven CSS only: without it, or with reduced motion, it all
-// simply stands there. `flat` keeps it from tilting, for a picture beside a text.
+// shown loads. Framed and flat, at the container's width.
 import { Image } from 'astro:assets';
 import type { ImageMetadata } from 'astro';
 
-interface Part { light: ImageMetadata; dark: ImageMetadata; alt: string; class: string }
-interface Props { light: ImageMetadata; dark: ImageMetadata; alt: string; parts?: Part[]; flat?: boolean }
-const { light, dark, alt, parts = [], flat = false } = Astro.props;
-const pair = (l: ImageMetadata, d: ImageMetadata) => [['light', l], ['dark', d]] as const;
+interface Props { light: ImageMetadata; dark: ImageMetadata; alt: string }
+const { light, dark, alt } = Astro.props;
+const pair = [['light', light], ['dark', dark]] as const;
 ---
 
-<div class:list={['scene', { exploded: parts.length > 0, flat }]}>
-  <div class="shot">
-    {pair(light, dark).map(([theme, src]) => (
-      <Image class={theme} src={src} alt={alt} widths={[800, 1280, 1760, 2560]} sizes="(max-width: 1440px) 100vw, 1440px" loading="lazy" decoding="async" />
-    ))}
-  </div>
-  {parts.map((p) => (
-    <div class:list={['part', p.class]}>
-      {pair(p.light, p.dark).map(([theme, src]) => (
-        <Image class={theme} src={src} alt={p.alt} widths={[480, 800, 1200]} sizes="(max-width: 960px) 50vw, 560px" loading="lazy" decoding="async" />
-      ))}
-    </div>
+<div class="shot">
+  {pair.map(([theme, src]) => (
+    <Image class={theme} src={src} alt={alt} widths={[800, 1280, 1760, 2560]} sizes="(max-width: 1280px) 100vw, 1280px" loading="lazy" decoding="async" />
   ))}
 </div>
 
 <style>
-  .scene { position: relative; perspective: 1600px; }
-  .shot { border-radius: var(--r-lg); overflow: hidden; box-shadow: var(--lift); background: var(--panel); transform-origin: 50% 100%; }
-  .scene :global(img) { width: 100%; height: auto; }
-  .scene :global(.dark), :global([data-theme='dark']) .scene :global(.light) { display: none; }
-  :global([data-theme='dark']) .scene :global(.dark) { display: block; }
-
-  /* a piece of the interface, lifted off the picture */
-  .part { position: absolute; z-index: 1; overflow: hidden; border-radius: var(--r); background: var(--panel); box-shadow: var(--float); }
-  /* the brief hangs off the right edge, the note box off the bottom left */
-  .part.brief { width: 31%; top: 14%; right: -5%; }
-  .part.composer { width: 54%; bottom: -7%; left: -5%; }
-  /* room for the pieces that hang over the edges */
-  .exploded { margin-block: 3% 5%; }
-
-  @supports (animation-timeline: view()) {
-    @media (prefers-reduced-motion: no-preference) {
-      .shot { animation-name: lay; animation-timing-function: linear; animation-fill-mode: both; animation-timeline: view(); animation-range: entry 0% cover 45%; }
-      .part { animation-name: drift; animation-timing-function: linear; animation-fill-mode: both; animation-timeline: view(); animation-range: entry 0% exit 100%; }
-    }
-  }
-  /* beside a text, it stays flat: no tilt, no scroll animation */
-  .scene.flat .shot { animation: none; box-shadow: var(--float); }
-  @keyframes lay { from { transform: rotateX(22deg) scale(0.92); opacity: 0.4; } }
-  @keyframes drift { from { translate: 0 80px; } to { translate: 0 -60px; } }
-
-  @media (max-width: 820px) { .part { display: none; } .exploded { margin-block: 0; } }
+  .shot { overflow: hidden; border-radius: var(--r-lg); box-shadow: var(--lift); background: var(--panel); }
+  .shot :global(img) { width: 100%; height: auto; }
+  .shot :global(.dark), :global([data-theme='dark']) .shot :global(.light) { display: none; }
+  :global([data-theme='dark']) .shot :global(.dark) { display: block; }
 </style>
