@@ -1,0 +1,16 @@
+---
+// The head of a page of the site: its title, and a quieter sentence under it
+interface Props { title: string; lead?: string }
+const { title, lead } = Astro.props;
+---
+
+<header class="wrap page-head">
+  <h1>{title}</h1>
+  {lead && <p>{lead}</p>}
+</header>
+
+<style>
+  .page-head { display: grid; gap: 20px; padding-top: clamp(40px, 6vw, 80px); }
+  h1 { max-width: 16ch; font-size: clamp(2.5rem, 5.6vw, 4.5rem); line-height: 1; letter-spacing: -0.045em; }
+  p { max-width: 38rem; font-size: 1.1875rem; line-height: 1.55; color: var(--ink-2); }
+</style>
