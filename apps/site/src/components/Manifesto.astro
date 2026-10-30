@@ -1,0 +1,41 @@
+---
+// What Tramme is, in one large sentence, with a still of the examples set
+// between its words. The words come to the ink as the sentence rises on the
+// screen (scroll-driven CSS: still in the ink, whole, without it or with
+// motion reduced). The stills are lazy and say nothing: the sentence reads the
+// same without them.
+import { Image } from 'astro:assets';
+import type { ImageMetadata } from 'astro';
+import anime from '../videos/anime.webp';
+import showreel from '../videos/showreel.webp';
+import launch from '../videos/launch-film.webp';
+
+const SENTENCE: (string | ImageMetadata)[] = [
+  'Describe the film.', anime, 'Pin a note where it needs one.', showreel, 'Keep the take you like,', 'and refine every keyframe', launch, 'in the atelier.',
+];
+// each word in its turn, the stills as one word
+const WORDS = SENTENCE.flatMap((part) => (typeof part === 'string' ? part.split(' ') : [part]));
+---
+
+<section class="section" aria-label="What Tramme is">
+  <div class="wrap">
+    <p class="display manifesto">
+      {WORDS.map((word, i) => (
+        typeof word === 'string'
+          ? <span class="w" style={`--i: ${i}`}>{word} </span>
+          : <Image class="still" src={word} alt="" width={360} height={200} loading="lazy" decoding="async" />
+      ))}
+    </p>
+  </div>
+</section>
+
+<style>
+  .manifesto { max-width: 18em; font-size: clamp(2.25rem, 5.6vw, 5.25rem); letter-spacing: -0.045em; text-wrap: balance; }
+  .still { display: inline-block; width: 1.5em; height: 0.82em; margin: 0 0.12em; border-radius: 0.14em; object-fit: cover; vertical-align: -0.06em; }
+  @supports (animation-timeline: view()) {
+    @media (prefers-reduced-motion: no-preference) {
+      .w { animation: lit linear both; animation-timeline: view(); animation-range: entry calc(30% + var(--i) * 2%) entry calc(60% + var(--i) * 2%); }
+    }
+  }
+  @keyframes lit { from { color: var(--ink-3); } }
+</style>

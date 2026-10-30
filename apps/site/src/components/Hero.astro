@@ -12,8 +12,8 @@ const minor = version.split('.').slice(0, 2).join('.');
 <section class="hero">
   <div class="wrap top">
     <a class="news" href="#studio"><i aria-hidden="true"></i>New in {minor}: the studio</a>
-    <h1>Motion design, <span class="quiet">directed in words.</span></h1>
-    <p>Leave notes on the film, keep the takes you like, refine every keyframe in the atelier. Free and open source.</p>
+    <h1 class="display">Motion design, <span class="quiet">directed in words.</span></h1>
+    <p>Leave notes on the film, keep the takes you like, refine every keyframe in the atelier. Free, open source, no account.</p>
     <div class="ctas">
       <AppLink />
       <DownloadLink />
@@ -30,7 +30,6 @@ const minor = version.split('.').slice(0, 2).join('.');
 <style>
   .hero { padding-top: clamp(40px, 6vw, 80px); }
   .top { display: flex; flex-direction: column; align-items: center; gap: 22px; text-align: center; }
-  h1 { font-size: clamp(2.75rem, 6.4vw, 5.75rem); line-height: 0.98; letter-spacing: -0.048em; }
   h1 .quiet { display: block; }
   .top > p { max-width: 34rem; font-size: 1.1875rem; line-height: 1.55; color: var(--ink-2); }
   .ctas { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 6px; }
