@@ -1,0 +1,42 @@
+---
+// The project: what it is, its licence, how to take part
+import Base from '../layouts/Base.astro';
+import Nav from '../components/Nav.astro';
+import PageHead from '../components/PageHead.astro';
+import RepoLink from '../components/RepoLink.astro';
+import Footer from '../components/Footer.astro';
+import { docHref } from '../lib/docs';
+import { REPO, repoFile } from '../lib/links';
+---
+
+<Base title="About Tramme" description="Tramme is a free, open-source motion design engine and editor, made by Aziz Chanou. What it is, its licence and how to take part.">
+  <Nav />
+  <main>
+    <PageHead title="About Tramme." lead="A motion design engine and editor, free and open source." />
+    <section class="wrap body">
+      <div class="prose">
+        <h2>What it is</h2>
+        <p>A film in Tramme is a document, a plain file that holds its layers, its keyframes and its sound. The editor and the assistant change that document through the same operations, so what one does the other can undo. Every frame is a pure function of time, so rendering is deterministic: the preview and the export are drawn by the same engine. <a href={docHref('document')}>The format is in the docs</a>, for anyone who wants it.</p>
+
+        <h2>Who makes it</h2>
+        <p>Tramme is made by Aziz Chanou, in the open: the code, the roadmaps and the changelog are in the <a href={REPO}>repository</a> and in the docs, and the <a href={docHref('changelog')}>changelog</a> says what changed in each version.</p>
+
+        <h2>Licence</h2>
+        <p>Apache-2.0. The licence is <a href={repoFile('LICENSE')}>in the repository</a>, with the notices of the third-party work Tramme builds on (<a href={repoFile('THIRD_PARTY_NOTICES.md')}>third-party notices</a>).</p>
+
+        <h2>Taking part</h2>
+        <p>Bug reports, ideas, documentation and code are welcome. Read <a href={repoFile('CONTRIBUTING.md')}>how to contribute</a> and the <a href={repoFile('CODE_OF_CONDUCT.md')}>code of conduct</a> first; for a larger change, open an issue to talk about it before writing it.</p>
+
+        <h2>A security problem</h2>
+        <p>Please do not open a public issue. Report it privately through the repository's Security tab, as <a href={repoFile('SECURITY.md')}>the security policy</a> describes.</p>
+      </div>
+      <div class="ctas"><RepoLink /></div>
+    </section>
+  </main>
+  <Footer />
+</Base>
+
+<style>
+  .body { display: grid; gap: 32px; margin-top: clamp(40px, 5vw, 64px); }
+  .ctas { display: flex; flex-wrap: wrap; gap: 10px; }
+</style>
