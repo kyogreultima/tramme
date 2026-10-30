@@ -169,17 +169,21 @@ export interface ComposerProps {
   context?: ComponentChildren;
   /** after a message left, or a tool ran */
   onSent?: () => void;
+  /** the studio's list of retouches: the words become an item (true when taken), what waits, and the way to send it all */
+  list?: { count: number; onAdd: (text: string, voice: boolean) => boolean; onSendAll: () => void };
   /** the box, for those who focus it from outside */
   area?: RefObject<HTMLTextAreaElement>;
   /** the tour's name for the box */
   tour?: string;
 }
 
-export function Composer({ placeholder, anchor, tools, context, onSent, area: given, tour }: ComposerProps) {
+export function Composer({ placeholder, anchor, tools, context, onSent, area: given, tour, list }: ComposerProps) {
   const [text, setText] = useState('');
   const own = useRef<HTMLTextAreaElement>(null);
   const area = given ?? own;
   const files = useRef<HTMLInputElement>(null);
+  // the words were spoken: the list notes it
+  const spoke = useRef(false);
   const busy = running.value, available = aiRoute.value !== null;
   useEffect(() => { const el = area.current; if (el) { el.style.height = 'auto'; el.style.height = `${Math.min(180, el.scrollHeight)}px`; } }, [text]);
   // words prepared for the user (a project made from sources: the analysis; a direction to complete)
@@ -247,9 +251,11 @@ export function Composer({ placeholder, anchor, tools, context, onSent, area: gi
         <div class="bar">
           <button class="icon-btn sm" title={t('assistant.attachImagesSoundsOr')} disabled={!available} onClick={() => files.current?.click()}><Icon name="attach" /></button>
           <input ref={files} type="file" multiple hidden accept={ATTACHABLE} onChange={(e) => { join((e.target as HTMLInputElement).files); (e.target as HTMLInputElement).value = ''; }} />
-          <MicButton onText={(add) => writeInto(area.current, setText, add)} />
+          <MicButton onText={(add) => { spoke.current = true; writeInto(area.current, setText, add); }} />
           {tools}
           <div class="grow">{context}</div>
+          {list && <button class="icon-btn sm add-retouch" title={t('studio.addToList')} disabled={!available} onClick={() => { if (list.onAdd(text, spoke.current)) { setText(''); spoke.current = false; } }}><Icon name="plus" /></button>}
+          {list && list.count > 0 && <button class="btn sm primary send-all" title={t('studio.sendAllHint')} onClick={() => { if (text.trim() && list.onAdd(text, spoke.current)) { setText(''); spoke.current = false; } list.onSendAll(); }}><Icon name="send" />{t('studio.sendAll', { n: list.count + (text.trim() ? 1 : 0) })}</button>}
           {busy && <button class="send stop" title={t('assistant.stop')} onClick={stop}><Icon name="stop" /></button>}
           <button class="send" title={t('assistant.sendEnter')} disabled={(!text.trim() && !pending.value.length) || attaching.value > 0 || (!available && !direct) || (busy && !!cmd)} onClick={submit}><Icon name="send" /></button>
         </div>

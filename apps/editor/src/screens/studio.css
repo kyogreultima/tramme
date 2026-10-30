@@ -219,3 +219,34 @@ button.ctx-chip:hover { background: var(--field-hover); color: var(--text); }
   .invite { bottom: 20px; }
   .invite p { display: none; }
 }
+
+/* retouching: several pins, strokes, the layers an area may mean, the list of retouches */
+.pin-tools { display: inline-flex; gap: 2px; }
+.flip { transform: rotate(180deg); }
+.strokes { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.stroke { fill: none; stroke: var(--accent); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; filter: drop-shadow(0 0 2px var(--media-scrim)); }
+.stroke.area { fill: var(--accent-soft); stroke-dasharray: 7 5; }
+.stroke.area.hint { stroke-dasharray: 2 6; }
+.stroke.review, .stroke.drawing { stroke-dasharray: 7 5; }
+.cand { position: absolute; border: 2px dashed var(--line-strong); border-radius: 4px; background: transparent; pointer-events: none; }
+.cand.on { border: 2px solid var(--accent); background: var(--accent-soft); }
+.area-review, .retouch-list {
+  display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-radius: var(--r-lg);
+  background: var(--float); backdrop-filter: blur(16px) saturate(1.4); -webkit-backdrop-filter: blur(16px) saturate(1.4); box-shadow: inset 0 0 0 1px var(--line);
+}
+.area-head { display: flex; align-items: center; gap: 6px; font-size: var(--fs-sm); }
+.area-review p { margin: 0; font-size: var(--fs-xs); }
+.area-layers, .area-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.area-layers .chip.on { background: var(--accent-soft); color: var(--text); }
+.retouch-head { display: flex; align-items: center; gap: 8px; font-size: var(--fs-sm); }
+.retouch-head .grow { flex: 1; }
+.retouch-list ol { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; max-height: 160px; overflow: auto; }
+.retouch-list li { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 4px 6px; border-radius: var(--r-md); background: var(--field); }
+.retouch-n { color: var(--accent-text); font-size: var(--fs-xs); text-align: center; }
+.retouch-text { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; min-width: 0; font-size: var(--fs-sm); }
+.retouch-text > span:first-of-type { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.retouch-text svg.i { width: 12px; height: 12px; align-self: center; }
+.retouch-actions { display: inline-flex; gap: 0; }
+.send-all { flex: none; }
+.studio-stage .viewport { touch-action: none; }
+@media (max-width: 760px) { .send-all { display: none; } .retouch-list li { grid-template-columns: 28px minmax(0, 1fr); } .retouch-actions { grid-column: 1 / -1; justify-content: flex-end; } }
