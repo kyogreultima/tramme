@@ -47,6 +47,19 @@ export function scenesOf(doc: TrammeDoc, compId: string, opening = 'Opening'): S
   return [{ id: compId, name: bare(c.name ?? compId), from: 0, to: end }];
 }
 
+/**
+ * Where a moment of a scene's own composition falls in the film: the scene
+ * starts at its layer's in point and runs its composition from `start` at
+ * `speed`. Null when the composition has not reached that moment yet (it
+ * starts later than the moment). A scene that is no composition is the film.
+ */
+export function filmTime(doc: TrammeDoc, compId: string, scene: Scene, inner: number): number | null {
+  if (!scene.comp) return inner;
+  const props = doc.compositions[compId]?.layers[scene.id]?.props;
+  const start = Number(staticValue(props?.start) ?? 0) || 0, speed = Number(staticValue(props?.speed) ?? 1) || 1;
+  return inner < start ? null : scene.from + (inner - start) / speed;
+}
+
 /** the scene playing at t (the last one starting before it, when scenes overlap in a pass) */
 export function sceneAt(scenes: Scene[], t: number): Scene | null {
   let found: Scene | null = null;

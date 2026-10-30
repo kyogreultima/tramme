@@ -449,3 +449,20 @@ describe('the faults the critic is told to name', () => {
     expect(system).toContain('Faults to name when you see them:\n- The empty scene');
   });
 });
+
+describe('a scene that does not run from its start at normal speed', () => {
+  it('has its entrances placed where they happen in the film: from its start point, at its speed', () => {
+    const doc = film([2, 0.5, 0.5]);
+    // scene 1 plays its composition from 1 s in, twice as fast: its plate (in 2 s of its own time) enters 0.5 s after the scene starts
+    (doc.compositions.main.layers.c1.props as Record<string, unknown>).start = 1;
+    (doc.compositions.main.layers.c1.props as Record<string, unknown>).speed = 2;
+    const m = momentsOf(doc, 'main', registry);
+    expect(m.find((x) => x.why === 'Plate 1 enters')?.t).toBeCloseTo(0.5, 6);
+  });
+
+  it('leaves out an entrance that comes before the scene shows its composition', () => {
+    const doc = film([0.5, 0.5, 0.5]);
+    (doc.compositions.main.layers.c1.props as Record<string, unknown>).start = 1;
+    expect(momentsOf(doc, 'main', registry).some((x) => x.why === 'Plate 1 enters')).toBe(false);
+  });
+});
