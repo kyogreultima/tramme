@@ -1,16 +1,19 @@
 ---
-// The head of a page of the site: its title, and a quieter sentence under it
+// The head of a page of the site: its title, centred, and a quieter sentence
+// under it (the `lead` prop, or the slot when it carries a link)
 interface Props { title: string; lead?: string }
 const { title, lead } = Astro.props;
+const hasLead = Boolean(lead) || Astro.slots.has('default');
 ---
 
 <header class="wrap page-head">
   <h1>{title}</h1>
-  {lead && <p>{lead}</p>}
+  {hasLead && <p>{lead}<slot /></p>}
 </header>
 
 <style>
-  .page-head { display: grid; gap: 20px; padding-top: clamp(40px, 6vw, 80px); }
-  h1 { max-width: 16ch; font-size: clamp(2.5rem, 5.6vw, 4.5rem); line-height: 1; letter-spacing: -0.045em; }
+  .page-head { display: grid; justify-items: center; gap: 20px; padding-top: clamp(40px, 6vw, 80px); text-align: center; }
+  h1 { max-width: 18ch; font-size: clamp(2.5rem, 5.6vw, 4.5rem); line-height: 1; letter-spacing: -0.045em; }
   p { max-width: 38rem; font-size: 1.1875rem; line-height: 1.55; color: var(--ink-2); }
+  p :global(a) { color: var(--accent-text); text-underline-offset: 3px; }
 </style>

@@ -10,7 +10,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Added
 
-- **The site, redesigned**: a top bar with menus (Product, Features) and a footer in columns with the logo below them, as large as the page; a landing page of a larger hero, a manifesto sentence, the five pillars (studio, atelier, assistant, packs, export), the toolbox by what it is for, the examples, the facts counted from the code and a FAQ (also told to search engines); and new pages: **Features** (every section in detail), **Examples** (the repository's films, each with a way into its folder), **Pricing** (free; only the AI provider you choose can cost money), **About**, **Privacy** (what is kept where) and the **changelog** as a docs page. All in the editor's own theme, both themes, the menus and the FAQ working without script.
+- **The site, redesigned**: one grid, one heading style, one way to show the app. A top bar with menus (Product, Features) that work without script, a footer in columns, and a landing page of five sections: the app playing, **tabs** that switch between the studio, the atelier, the assistant, the packs and the export in one frame (radio inputs and CSS, no script), the examples, the questions (also told to search engines) and the closing call. New pages: **Features** (every section in detail, with the toolbox by category), **Examples** (the repository's films, each with a way into its folder), **Pricing**, **About** (with the facts counted from the code), **Privacy** (what is kept where), and the **changelog** as a docs page. In the editor's own theme, both themes, a phone to a wide screen, the landing page no heavier than before.
 
 ### Changed
 

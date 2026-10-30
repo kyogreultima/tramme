@@ -84,3 +84,13 @@ The "web app" page of the plan is dropped: the app opens from the top bar's prim
 - Which screenshots and stills are used where; new screenshots only if a pillar has none (`apps/site/src/assets` holds the studio, the atelier and the parts).
 - The menus' mechanism (`<details>` or popover), as long as it needs no script and is accessible.
 - The order of the work inside the two phases: the shared pieces and the landing page first, the pages after.
+
+## Rework: one grid (2026-10-30, after the user's first look)
+
+The first build read as fragmented: each section had its own width, alignment and heading style, eight sections on a 10 000 px page, effects (a tilted picture, floating pieces, a sentence that lights up) that made each section a small show of its own. The user chose **piste A (a plain product page) with the tabs of piste B**.
+
+- **One axis, one width, one rhythm.** Every section: a centred heading and one sentence (`Head`), then its content at the container's width, with the same space between sections. No `wrap-wide`, no half-width headings, no cards inside cards.
+- **One picture treatment.** A picture of the app is a framed, flat picture in the page's theme. The tilt, the floating pieces, the lit-up sentence and the news pill above the title are gone.
+- **The landing page is five sections:** the hero (title, two buttons, the app playing), the **tabs** (Studio, Atelier, Assistant, Export: one frame, the picture and a sentence change, no script: radio inputs and CSS), the examples (three, in a row), the FAQ, the closing call.
+- **What left the landing page lives on another page:** the toolbox by category on `/features/`, the counted facts (layer types, effects, formats…) on `/about/`.
+- **Still true:** theme tokens only, no script for the look, lazy pictures, both themes, 360 px to wide, the weight of the landing page no higher than before.
