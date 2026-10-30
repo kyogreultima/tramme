@@ -4,17 +4,17 @@
 // shown loads. It comes up tilted and lies flat as it enters the screen;
 // pieces of the interface (`parts`) can float off it, drifting at their own
 // pace. Scroll-driven CSS only: without it, or with reduced motion, it all
-// simply stands there.
+// simply stands there. `flat` keeps it from tilting, for a picture beside a text.
 import { Image } from 'astro:assets';
 import type { ImageMetadata } from 'astro';
 
 interface Part { light: ImageMetadata; dark: ImageMetadata; alt: string; class: string }
-interface Props { light: ImageMetadata; dark: ImageMetadata; alt: string; parts?: Part[] }
-const { light, dark, alt, parts = [] } = Astro.props;
+interface Props { light: ImageMetadata; dark: ImageMetadata; alt: string; parts?: Part[]; flat?: boolean }
+const { light, dark, alt, parts = [], flat = false } = Astro.props;
 const pair = (l: ImageMetadata, d: ImageMetadata) => [['light', l], ['dark', d]] as const;
 ---
 
-<div class:list={['scene', { exploded: parts.length > 0 }]}>
+<div class:list={['scene', { exploded: parts.length > 0, flat }]}>
   <div class="shot">
     {pair(light, dark).map(([theme, src]) => (
       <Image class={theme} src={src} alt={alt} widths={[800, 1280, 1760, 2560]} sizes="(max-width: 1440px) 100vw, 1440px" loading="lazy" decoding="async" />
@@ -47,6 +47,8 @@ const pair = (l: ImageMetadata, d: ImageMetadata) => [['light', l], ['dark', d]]
       .part { animation-name: drift; animation-timing-function: linear; animation-fill-mode: both; animation-timeline: view(); animation-range: entry 0% exit 100%; }
     }
   }
+  /* beside a text, it stays flat: no tilt, no scroll animation */
+  .scene.flat .shot { animation: none; box-shadow: var(--float); }
   @keyframes lay { from { transform: rotateX(22deg) scale(0.92); opacity: 0.4; } }
   @keyframes drift { from { translate: 0 80px; } to { translate: 0 -60px; } }
 
