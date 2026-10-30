@@ -1400,6 +1400,10 @@
     "done": "Le critique dit que le film est terminé",
     "notYet": "Le critique dit pas encore : {n} point(s) à corriger"
   },
+  "references": {
+    "read": "Lu : {n} entrée(s) du métier",
+    "kept": "Film gardé comme référence : {title}"
+  },
   "blocks": {
     "saved": "Bloc « {name} » enregistré.",
     "placed": "Bloc « {name} » placé."
@@ -1944,6 +1948,19 @@
     "its id in the plan": "son identifiant dans le plan",
     "Note": "Note",
     "what the next scene or the assembly should know": "ce que la scène suivante ou l’assemblage doit savoir",
+    "What the craft says": "Ce que dit le métier",
+    "reads, in words, what makes a frame or a cut work and the faults to avoid (composition, hierarchy, type, contrast, rhythm, transitions, the link between picture and sound), and the films the user kept with their reasons; it warns when those films converge on one look": "lit, en mots, ce qui fait qu’une image ou une coupe fonctionne et les défauts à éviter (composition, hiérarchie, typographie, contraste, rythme, transitions, lien entre image et son), et les films que l’utilisateur a gardés avec leurs raisons ; il prévient quand ces films convergent vers un même look",
+    "Query": "Requête",
+    "two or three words of what is hard in this film: \"transitions between scenes\", \"talking video coverage\"": "deux ou trois mots sur ce qui est difficile dans ce film : « transitions entre scènes », « couverture d’une vidéo parlée »",
+    "principles or faults only; both by default": "les principes ou les défauts seulement ; les deux par défaut",
+    "Keep this film as a reference": "Garder ce film comme référence",
+    "keeps the film of this project in the library shared by the projects, with the reasons it works in words and the facts read from the document (palette, typefaces, kinds of picture), so the craft can draw on it": "garde le film de ce projet dans la bibliothèque partagée par les projets, avec les raisons pour lesquelles il fonctionne, en mots, et les faits lus dans le document (palette, polices, genres d’images), pour que le métier puisse s’en servir",
+    "a few words that name what the film does well": "quelques mots qui disent ce que le film fait bien",
+    "Why it works": "Pourquoi ça fonctionne",
+    "the reasons in words, at least 80 characters: the principle at work and how to see it": "les raisons en mots, 80 caractères au moins : le principe à l’œuvre et comment le voir",
+    "principle": "principe",
+    "fault": "défaut",
+    "one or more of the closed list of tags (craft: composition, hierarchy, type, rhythm, sound…; kinds of picture; kinds of film); a tag outside it is refused and the error lists them": "un ou plusieurs tags de la liste fermée (métier : composition, hiérarchie, typographie, rythme, son… ; genres d’images ; genres de films) ; un tag hors liste est refusé et l’erreur les énumère",
     "Look at a movement": "Regarder un mouvement",
     "Loop": "Boucle",
     "Loop the section": "Boucler la section",

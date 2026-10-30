@@ -140,14 +140,17 @@ function filesOf(code: string): Map<string, Uint8Array> {
   return new Map(Object.entries(o).map(([k, b]) => [k, Uint8Array.from(atob(b), (c) => c.charCodeAt(0))]));
 }
 
+/** a file of the library that is data, not a plugin: a component or a reference */
+export const isKept = (name: string) => /^(component|reference)-/.test(name);
+
 /** the installed plugins read again from their storage */
 export async function refreshInstalled(): Promise<void> {
   const list = await listFiles(), off = prefs.peek().pluginsOff;
   const names = new Set(list.map((f) => f.name));
   const out: Installed[] = [];
   for (const f of list) {
-    // the library's components (component-<name>.js) are not plugins
-    if (COMPANION.test(f.name) || f.name.startsWith('component-')) continue;
+    // what the library keeps besides plugins (components, references) is not a plugin
+    if (COMPANION.test(f.name) || isKept(f.name)) continue;
     try {
       const code = await readFile(f.name);
       const files = names.has(companionOf(f.name)) ? filesOf(await readFile(companionOf(f.name))) : new Map();
