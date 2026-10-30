@@ -69,3 +69,45 @@ describe('loadReferences', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });
+
+describe('the search of the references', () => {
+  const idsOf = (r: { found: Reference[] }) => r.found.map((x) => x.id);
+
+  it('reads a query as words: lower case, plurals folded, filler dropped', async () => {
+    const { queryWords } = await import('../src/words.ts');
+    expect(queryWords('Transitions between Scenes')).toEqual(['transition', 'scene']);
+    expect(queryWords('the Boxes of a family')).toEqual(['box', 'family']);
+    expect(queryWords('glass, class and stories')).toEqual(['glass', 'class', 'story']);
+  });
+
+  it('finds the entries tagged with what is asked first', async () => {
+    const { searchReferences } = await import('../src/references/search.ts');
+    const r = searchReferences(refs, 'transitions between scenes');
+    expect(r.closest).toBe(false);
+    expect(refs.find((x) => x.id === idsOf(r)[0])!.tags).toContain('transition');
+    expect(r.found.length).toBeLessThanOrEqual(4);
+  });
+
+  it('finds the coverage principle and the speaker-alone fault for a talking video', async () => {
+    const { searchReferences } = await import('../src/references/search.ts');
+    const ids = idsOf(searchReferences(refs, 'talking video coverage', { count: 4 }));
+    expect(ids).toContain('talking-video-covered');
+    expect(ids).toContain('speaker-alone-too-long');
+  });
+
+  it('answers a query with no match with the entries of the closest tag, and says so', async () => {
+    const { searchReferences } = await import('../src/references/search.ts');
+    const r = searchReferences(refs, 'zzz');
+    expect(r.closest).toBe(true);
+    expect(r.found.length).toBeGreaterThan(0);
+    const only = searchReferences(refs, 'the of a');
+    expect(only.closest).toBe(true);
+    expect(only.found.length).toBeGreaterThan(0);
+  });
+
+  it('keeps to faults, or to a tag, when asked', async () => {
+    const { searchReferences } = await import('../src/references/search.ts');
+    expect(searchReferences(refs, 'motion', { kind: 'fault' }).found.every((x) => x.kind === 'fault')).toBe(true);
+    expect(searchReferences(refs, 'film', { tags: ['sound'] }).found.every((x) => x.tags.includes('sound'))).toBe(true);
+  });
+});
