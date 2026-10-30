@@ -8,6 +8,10 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+### Added
+
+- **The site, redesigned**: a top bar with menus (Product, Features) and a footer in columns under the logo, as large as the page; a landing page of a larger hero, a manifesto sentence, the five pillars (studio, atelier, assistant, packs, export), the toolbox by what it is for, the examples, the facts counted from the code and a FAQ (also told to search engines); and new pages: **Features** (every section in detail), **Examples** (the repository's films, each with a way into its folder), **Pricing** (free; only the AI provider you choose can cost money), **About**, **Privacy** (what is kept where) and the **changelog** as a docs page. All in the editor's own theme, both themes, the menus and the FAQ working without script.
+
 ### Changed
 
 - **The new logo**: the mark and the name in `brand/`, on the site (the top bar, the footer, the docs) in the theme's accent and ink, and as the app's icon: the favicon, the installed app's PNGs, the desktop app's icons (`tauri icon`) and the link preview card, all drawn by `scripts/app-icons.ts` and `scripts/og-image.ts` from the brand files and the editor's theme tokens (`scripts/brand.ts`). The link preview shows the studio and the site's own words again; its screenshot path had gone stale.
