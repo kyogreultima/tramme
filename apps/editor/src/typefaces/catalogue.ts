@@ -22,20 +22,11 @@ export interface Typeface {
   note?: string;
 }
 
+import { dataLoader } from '../data.ts';
+
 export type Catalogue = { pin: string; fonts: Typeface[] };
 
 export { TAGS } from '../../../../scripts/typefaces/tags.ts';
 
-const FILE = '/typefaces/catalogue.json';
-let loaded: Promise<Catalogue> | null = null;
-
 /** the catalogue, fetched once; a failed read is not kept, so the next call tries again */
-export function loadCatalogue(): Promise<Catalogue> {
-  loaded ??= (async () => {
-    // offline or stalled: an answer naming the file, not a wait
-    const r = await fetch(FILE, { signal: AbortSignal.timeout(20000) }).catch((e: Error) => { throw new Error(`the typeface catalogue (${FILE}) could not be read: ${e.message}`); });
-    if (!r.ok) throw new Error(`the typeface catalogue could not be read (HTTP ${r.status})`);
-    return (await r.json()) as Catalogue;
-  })().catch((e) => { loaded = null; throw e; });
-  return loaded;
-}
+export const loadCatalogue = dataLoader<Catalogue>('/typefaces/catalogue.json', 'the typeface catalogue');

@@ -3,6 +3,8 @@
 // file of the editor (apps/editor/data/references.json) and loaded on first use.
 // An entry is a principle, never a look to copy, and holds no media.
 
+import { dataLoader } from '../data.ts';
+
 export const REF_TAGS = [
   // craft
   'composition', 'hierarchy', 'type', 'contrast', 'colour', 'light', 'material', 'depth', 'camera', 'rhythm', 'cut', 'transition', 'continuity', 'sound', 'density', 'ending', 'opening', 'pacing', 'legibility',
@@ -24,15 +26,5 @@ export interface Reference {
   fix?: string;
 }
 
-const FILE = '/references/catalogue.json';
-let loaded: Promise<Reference[]> | null = null;
-
 /** the catalogue, fetched once; a failed read is not kept, so the next call tries again */
-export function loadReferences(): Promise<Reference[]> {
-  loaded ??= (async () => {
-    const r = await fetch(FILE, { signal: AbortSignal.timeout(20000) }).catch((e: Error) => { throw new Error(`the reference library (${FILE}) could not be read: ${e.message}`); });
-    if (!r.ok) throw new Error(`the reference library could not be read (HTTP ${r.status})`);
-    return (await r.json()) as Reference[];
-  })().catch((e) => { loaded = null; throw e; });
-  return loaded;
-}
+export const loadReferences = dataLoader<Reference[]>('/references/catalogue.json', 'the reference library');
