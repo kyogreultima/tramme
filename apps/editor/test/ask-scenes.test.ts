@@ -27,8 +27,10 @@ async function ask(text = 'make a film') {
 /** the director's turn writes the plan (unless it is told not to); each scene's turn marks its scene built */
 function mockTurns(director: boolean) {
   let n = 0;
-  vi.spyOn(ServerSession.prototype, 'turn').mockImplementation(async function* (prompt: string, _m: string, system: unknown) {
+  vi.spyOn(ServerSession.prototype, 'turn').mockImplementation(async function* (prompt: string, _m: string, system: unknown, runner: { calls: number }) {
     calls.push({ prompt, system });
+    // a scene's turn runs two tools, the director's and the assembly's one each
+    if (/\(id s\d\)/.test(prompt)) runner.calls += 2; else runner.calls += 1;
     if (n++ === 0 && director) store = written();
     else if (store) { const id = /\(id (s\d)\)/.exec(prompt)?.[1]; if (id) store = setStatus(store, id, 'built'); }
     yield { type: 'usage', usage: { ...NO_USAGE, requests: 1, input: 10 } } as AiEvent;
@@ -54,6 +56,9 @@ describe('a film built scene by scene, in ask()', () => {
     expect(calls[4].prompt).toMatch(/assemble/);
     expect(calls[1].prompt).not.toBe(calls[2].prompt);
     expect(items.filter((i) => i.usage?.scene).map((i) => i.usage!.scene)).toEqual(['S1', 'S2', 'S3']);
+    // each scene's line counts its own tools; the director's holds its own and the assembly's, not the scenes'
+    expect(items.filter((i) => i.usage?.scene).map((i) => i.usage!.tools)).toEqual([2, 2, 2]);
+    expect(items.at(-1)?.usage?.tools).toBe(2);
     // the director's own usage line closes the turn and holds the assembly too
     expect(items.at(-1)?.usage?.scene).toBeUndefined();
     expect(items.at(-1)?.usage?.requests).toBe(2);
