@@ -32,6 +32,7 @@ import { personal } from '../mode.ts';
 import { install, installable } from '../install.ts';
 import { offerTours } from '../tours/index.ts';
 import { settingsOpen } from '../settings.ts';
+import { APP_VERSION, downloadOf, update } from '../version.ts';
 import { IDEAS } from '../ideas.ts';
 import { t } from '../i18n/index.ts';
 
@@ -387,6 +388,10 @@ export function Home() {
             </div>
           </section>
         )}
+        <footer class="home-version faint mono">
+          {t('home.version', { version: APP_VERSION })}
+          {update.value && <> · <a href={downloadOf(update.value).href} target="_blank" rel="noopener">{t('home.newVersion', { version: update.value.version })}</a></>}
+        </footer>
       </main>
       {drag && <div class="drop-hint"><Icon name="upload" /><span>{t('home.dropATrammeProject')}</span></div>}
       {busy && (

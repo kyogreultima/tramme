@@ -669,6 +669,8 @@
     "uploadingSources": "Uploading the sources ({n})",
     "blankProject": "Blank project",
     "fromSourcesFolder": "From sources (a folder)…",
+    "version": "Tramme {version}",
+    "newVersion": "Version {version} is available",
     "heroTitle": "What film are we making?",
     "heroSub": "Describe it in a few words. Tramme stages it, builds it and reviews it: you direct.",
     "heroPlaceholder": "A 30-second launch film for Nimbus, a meditation app: calm, luminous, three key benefits, the logo at the end…",
@@ -1076,6 +1078,13 @@
     "scenesApartOff": "Never",
     "criticRounds": "Critic rounds",
     "criticRoundsHint": "How many times the film is reviewed by a model that did not make it, in one turn (0 turns the critic off). Each review costs a request on the strongest model.",
+    "about": "About",
+    "aboutHint": "The version of the app and its updates.",
+    "version": "Version",
+    "checkUpdates": "Look for updates",
+    "checkUpdatesHint": "Asks GitHub for the latest release when the app starts, at most twice a day. Nothing is downloaded: you are told, and the release page has the installers.",
+    "checkNow": "Check now",
+    "updateIs": "Version {version} is available",
     "cacheTtl": "Conversation cache",
     "cacheTtlHint": "How long Claude keeps the conversation ready, through the server's key. 5 minutes is the cheapest to write; an hour costs more to write and less when you come back after more than five minutes.",
     "cacheTtl5m": "5 minutes",
@@ -1403,6 +1412,14 @@
   "references": {
     "read": "Read {n} entries of the craft",
     "kept": "Film kept as a reference: {title}"
+  },
+  "update": {
+    "available": "Version {version} of Tramme is available",
+    "unreachable": "The new versions could not be looked up ({error})",
+    "upToDate": "Tramme is up to date",
+    "checking": "Looking…",
+    "download": "Download",
+    "release": "See the release"
   },
   "blocks": {
     "saved": "Block \"{name}\" saved.",

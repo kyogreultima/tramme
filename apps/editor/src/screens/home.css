@@ -137,3 +137,5 @@ a.brand:hover { background: var(--hover); }
   .brief-bar .seg { order: 3; flex: 1 0 100%; }
   .brief-bar .seg button { flex: 1 1 0; min-width: 0; padding: 0 6px; }
 }
+.home-version { margin-top: 8px; text-align: center; font-size: var(--fs-xs); }
+.home-version a { color: var(--accent); }

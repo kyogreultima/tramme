@@ -669,6 +669,8 @@
     "uploadingSources": "Envoi des ressources ({n})",
     "blankProject": "Projet vierge",
     "fromSourcesFolder": "Depuis des sources (un dossier)…",
+    "version": "Tramme {version}",
+    "newVersion": "La version {version} est disponible",
     "heroTitle": "Quel film fait-on ?",
     "heroSub": "Décrivez-le en quelques mots. Tramme le met en scène, le fabrique et le revoit : vous dirigez.",
     "heroPlaceholder": "Un film de lancement de 30 s pour Nimbus, une app de méditation : calme, lumineux, trois bénéfices clés, le logo à la fin…",
@@ -1076,6 +1078,13 @@
     "scenesApartOff": "Jamais",
     "criticRounds": "Tours du critique",
     "criticRoundsHint": "Combien de fois le film est relu, en un tour, par un modèle qui ne l’a pas fait (0 coupe le critique). Chaque relecture coûte une requête sur le modèle le plus fort.",
+    "about": "À propos",
+    "aboutHint": "La version de l’application et ses mises à jour.",
+    "version": "Version",
+    "checkUpdates": "Chercher les mises à jour",
+    "checkUpdatesHint": "Demande à GitHub la dernière version au démarrage de l’application, deux fois par jour au plus. Rien n’est téléchargé : vous êtes prévenu, et la page de la version a les installateurs.",
+    "checkNow": "Vérifier maintenant",
+    "updateIs": "La version {version} est disponible",
     "cacheTtl": "Cache de la conversation",
     "cacheTtlHint": "Combien de temps Claude garde la conversation prête, par la clé du serveur. 5 minutes est le moins cher à écrire ; une heure coûte plus cher à écrire et moins quand vous revenez après plus de cinq minutes.",
     "cacheTtl5m": "5 minutes",
@@ -1403,6 +1412,14 @@
   "references": {
     "read": "Lu : {n} entrée(s) du métier",
     "kept": "Film gardé comme référence : {title}"
+  },
+  "update": {
+    "available": "La version {version} de Tramme est disponible",
+    "unreachable": "Les nouvelles versions n’ont pas pu être cherchées ({error})",
+    "upToDate": "Tramme est à jour",
+    "checking": "Recherche…",
+    "download": "Télécharger",
+    "release": "Voir la version"
   },
   "blocks": {
     "saved": "Bloc « {name} » enregistré.",
