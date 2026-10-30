@@ -86,6 +86,41 @@ const AGY_INSTALLED = process.platform === 'win32'
   : path.join(os.homedir(), '.local', 'bin', 'agy');
 const COMMAND: Record<Exclude<Engine, 'claude'>, string> = { codex: 'codex', antigravity: fs.existsSync(AGY_INSTALLED) ? AGY_INSTALLED : 'agy' };
 
+/**
+ * The Codex programs that Codex's own installs leave, for a machine where `codex` is not on the PATH
+ * (the app and the editors' extension do not put it there): the app's folder, its newest build first,
+ * then the extension of VS Code and of the editors made from it, the newest version first.
+ */
+export function codexInstalls(opts: { home?: string; localAppData?: string; platform?: NodeJS.Platform } = {}): string[] {
+  const home = opts.home ?? os.homedir();
+  const local = 'localAppData' in opts ? opts.localAppData : process.env.LOCALAPPDATA;
+  const exe = (opts.platform ?? process.platform) === 'win32' ? 'codex.exe' : 'codex';
+  const folders = (dir: string) => { try { return fs.readdirSync(dir, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name); } catch { return []; } };
+  const modified = (dir: string) => { try { return fs.statSync(dir).mtimeMs; } catch { return 0; } };
+  const found: string[] = [];
+  if (local) {
+    const bin = path.join(local, 'OpenAI', 'Codex', 'bin');
+    for (const build of folders(bin).sort((a, b) => modified(path.join(bin, b)) - modified(path.join(bin, a)))) found.push(path.join(bin, build, exe));
+  }
+  for (const editor of ['.vscode', '.vscode-insiders', '.cursor', '.windsurf']) {
+    const root = path.join(home, editor, 'extensions');
+    for (const extension of folders(root).filter((n) => n.startsWith('openai.chatgpt-')).sort((a, b) => b.localeCompare(a, undefined, { numeric: true }))) {
+      const bin = path.join(root, extension, 'bin');
+      for (const platform of folders(bin)) found.push(path.join(bin, platform, exe));
+    }
+  }
+  return found.filter((f) => fs.existsSync(f));
+}
+
+/** the first program of the candidates that answers `--version`, which the turns then run; its version, null when none does */
+async function locate(engine: Exclude<Engine, 'claude'>): Promise<string | null> {
+  for (const command of engine === 'codex' ? ['codex', ...codexInstalls()] : [COMMAND[engine]]) {
+    const found = await version(command);
+    if (found !== null) { COMMAND[engine] = command; return found; }
+  }
+  return null;
+}
+
 /** what a command line prints, null when it fails or is not there */
 function output(command: string, args: string[], env?: Record<string, string>): Promise<string | null> {
   return new Promise((resolve) => {
@@ -108,7 +143,7 @@ export function engines(): Promise<Record<Engine, string | null>> {
   if (!found || Date.now() - found.at > 60_000) {
     found = {
       at: Date.now(),
-      engines: Promise.all([version(COMMAND.codex), version(COMMAND.antigravity)]).then(([codex, antigravity]) => ({ claude: 'agent-sdk', codex, antigravity })),
+      engines: Promise.all([locate('codex'), locate('antigravity')]).then(([codex, antigravity]) => ({ claude: 'agent-sdk', codex, antigravity })),
     };
   }
   return found.engines;
@@ -287,7 +322,7 @@ async function runCodex(t: Turn, r: TurnRequest) {
       ? ['exec', ...common, 'resume', r.sessionId, ...images, ...config, '-']
       : ['exec', ...images, ...common, ...config, '-'];
     let n = 0;
-    await runLines(t, 'codex', args, {
+    await runLines(t, COMMAND.codex, args, {
       cwd: path.join(WORKDIR, 'codex'), input: r.prompt,
       onLine: (ev) => {
         if (ev.type === 'thread.started' && ev.thread_id) t.send({ type: 'session', id: ev.thread_id, model: r.model || 'codex' });
