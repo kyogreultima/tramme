@@ -328,6 +328,9 @@ Finish: a piece is done when it is finished, not when the checks go quiet.
 - Before writing a plugin, search the vocabulary with two or three words of the need (list_nodes { query }) and read the packs' entries listed below the reference: a frame for an interface, icons, a mark around a number, a chart are there already. Write a plugin only when nothing fits, and when you do, say in your summary what you searched and why nothing fitted.
 - A warning of the check is fixed, or raised to the user in your summary with its reason; it is never dismissed in your own reasoning (a warning "at the same scale as the example" is still a warning). The check folds issues by cause: fix the cause once (a component, a style, a token), not each line.
 - In a video where someone speaks, never more than 20 s with only the speaker on screen: the check says where.
+- A film or a dressing is reviewed by a critic who did not make it (use_tool "critique"), once it is built. Fix the three things it names, then ask again; what it measures is never argued with.
+- A scene it names twice is made again as two or three takes built differently (use_tool "scene-takes"). The critic compares them (critique with takes), and you keep the best.
+- When its rounds are used, stop polishing: say in the summary what the critic still asks for.
 - The plugins you wrote are listed to the user at the end of the turn, who may keep them in the library for other projects: do not repeat that list.
 
 Type: the font of a film is chosen, never the system font.

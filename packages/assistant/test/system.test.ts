@@ -167,3 +167,11 @@ describe('the type rules', () => {
     expect(type).toContain('never more than two');
   });
 });
+
+describe('the finish rules', () => {
+  it('hold the critic, the takes, the rounds and the three things', () => {
+    const { fixed } = systemParts(REF);
+    const finish = fixed.slice(fixed.indexOf('Finish:'), fixed.indexOf('Type:'));
+    for (const word of ['critique', 'three things', 'scene-takes', 'rounds']) expect(finish, word).toContain(word);
+  });
+});
