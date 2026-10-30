@@ -111,3 +111,45 @@ describe('the search of the references', () => {
     expect(searchReferences(refs, 'film', { tags: ['sound'] }).found.every((x) => x.tags.includes('sound'))).toBe(true);
   });
 });
+
+describe('own films and their convergence', () => {
+  const facts = (o: Partial<import('../src/references/own.ts').OwnReference['facts']> = {}) => ({ palette: ['#0A0F1E', '#0B6CFF', '#F2F5FA'], fonts: ['Inter', 'Fraunces'], kinds: ['interface', 'type', 'data'], format: '16:9', ...o });
+  const own = (n: number, f = facts(), day = n) => ({ id: `p${n}`, project: `p${n}`, kept: `2026-10-${String(10 + day).padStart(2, '0')}T10:00:00Z`, title: `Film ${n}`, why: 'x'.repeat(90), tags: ['launch'], facts: f });
+
+  it('reads the facts of a film from its document and plan, leaving out what it has not', async () => {
+    const { factsOf } = await import('../src/references/own.ts');
+    const { newProject } = await import('@tramme/project');
+    const { doc } = newProject({ name: 'F', width: 1920, height: 1080, fps: 30, duration: 10 });
+    doc.tokens = { plate: { type: 'color', value: '#101820' }, accent: { type: 'color', value: '#FF5A1F' }, speed: { type: 'number', value: 3 } } as never;
+    doc.assets.f1 = { type: 'font', src: 'a.woff2', family: 'Inter', name: 'Inter (text)' } as never;
+    const plan = { version: 1, kind: 'film-plan', updated: '', idea: '', kinds: ['interface', 'type'], directions: [], scenes: [{ id: 'a', name: 'A', kind: 'interface', idea: '' }, { id: 'b', name: 'B', kind: 'type', idea: '' }] } as never;
+    expect(factsOf(doc, plan)).toEqual({ palette: ['#101820', '#FF5A1F'], fonts: ['Inter'], kinds: ['interface', 'type'], format: '16:9' });
+    const bare = newProject({ name: 'B', width: 1080, height: 1920, fps: 30, duration: 5 }).doc;
+    bare.tokens = {} as never;
+    expect(factsOf(bare, null)).toEqual({ palette: [], fonts: [], kinds: [], format: '9:16' });
+  });
+
+  it('scores two equal films at 1, and a dark blue film against a warm paper serif film under 0.3', async () => {
+    const { similarity } = await import('../src/references/own.ts');
+    expect(similarity(facts(), facts())).toBeCloseTo(1, 6);
+    const warm = facts({ palette: ['#F4ECDD', '#B5532A', '#3B2A1E'], fonts: ['Playfair Display', 'Lora'], kinds: ['photo', 'object', 'diagram'] });
+    expect(similarity(facts(), warm)).toBeLessThan(0.3);
+  });
+
+  it('has no convergence under three films, and a high one for five alike, naming what they share', async () => {
+    const { convergence } = await import('../src/references/own.ts');
+    expect(convergence([own(1), own(2)])).toBeNull();
+    const c = convergence([1, 2, 3, 4, 5].map((n) => own(n)))!;
+    expect(c.score).toBeGreaterThan(0.8);
+    expect(c.shared.join(' ')).toMatch(/Inter/);
+    expect(c.shared.join(' ')).toMatch(/interface scenes in every film/);
+    expect(c.shared.join(' ')).toMatch(/dark plate with one blue accent/);
+  });
+
+  it('reads only the last five films, and finds none in a varied library', async () => {
+    const { convergence } = await import('../src/references/own.ts');
+    const alike = [1, 2, 3, 4, 5].map((n) => own(n, facts(), n));
+    const other = [facts({ palette: ['#F4ECDD', '#B5532A'], fonts: ['Lora'], kinds: ['photo'] }), facts({ palette: ['#00FF88', '#220044'], fonts: ['Space Mono'], kinds: ['3d', 'map'] }), facts({ palette: ['#FFD400', '#111111'], fonts: ['Anton'], kinds: ['kinetic-type'] })].map((f, i) => own(10 + i, f, 10 + i));
+    expect(convergence([...alike, ...other])!.score).toBeLessThan(0.4);
+  });
+});

@@ -81,7 +81,7 @@ export function fieldsOf(schema: JsonSchema | undefined, doc: TrammeDoc, compId:
     }
     if (p.format === 'plugin') return { ...base, kind: 'plugin', options: (doc.plugins ?? []).filter((id) => doc.assets[id]?.type === 'module').map((id) => [id, doc.assets[id].name ?? id] as [string, string]) };
     // the plugins of the library, or its components (component-….js) with format 'component-library'
-    if (p.format === 'library') return { ...base, kind: 'library', options: libraryList.value.filter((x) => !x.name.startsWith('component-')).map((x) => [x.name, x.name] as [string, string]) };
+    if (p.format === 'library') return { ...base, kind: 'library', options: libraryList.value.filter((x) => !/^(component|reference)-/.test(x.name)).map((x) => [x.name, x.name] as [string, string]) };
     if (p.format === 'component-library') return { ...base, kind: 'library', options: libraryList.value.filter((x) => x.name.startsWith('component-')).map((x) => [x.name, x.name.replace(/^component-|\.js$/g, '')] as [string, string]) };
     if (p.format === 'kit') return { ...base, kind: 'kit', options: (reg?.listKits() ?? []).map(({ kit }) => [kit.name, kit.title ?? kit.name] as [string, string]) };
     if (type === 'number' || type === 'integer') return { ...base, kind: type, ...(typeof p.minimum === 'number' ? { min: p.minimum } : {}), ...(typeof p.maximum === 'number' ? { max: p.maximum } : {}) };

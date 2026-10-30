@@ -1400,6 +1400,10 @@
     "done": "The critic says the film is done",
     "notYet": "The critic says not yet: {n} thing(s) to fix"
   },
+  "references": {
+    "read": "Read {n} entries of the craft",
+    "kept": "Film kept as a reference: {title}"
+  },
   "blocks": {
     "saved": "Block \"{name}\" saved.",
     "placed": "Block \"{name}\" placed."

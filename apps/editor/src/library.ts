@@ -8,7 +8,7 @@ import { pointer, type Op, type ToolType } from '@tramme/core';
 import { KEEP_PLUGIN } from './ai/answers.ts';
 import { api } from './api.ts';
 import { t } from './i18n/index.ts';
-import { installed, installedCode, installFile, storageKind } from './installed.ts';
+import { installed, installedCode, installFile, isKept, storageKind } from './installed.ts';
 
 const NAME = /^[a-z0-9][a-z0-9_-]{0,62}\.(js|mjs)$/;
 
@@ -18,7 +18,7 @@ export async function refreshLibrary() {
   let list: { name: string; size: number; modified: string }[] = [];
   try { list = await api.library(); } catch { /* no server: no library */ }
   // the plugins kept in a picked folder, beside the library's components
-  if (storageKind.peek() === 'folder') list = [...list.filter((f) => f.name.startsWith('component-')), ...installed.peek().map((p) => ({ name: p.file, size: p.size, modified: p.modified }))];
+  if (storageKind.peek() === 'folder') list = [...list.filter((f) => isKept(f.name)), ...installed.peek().map((p) => ({ name: p.file, size: p.size, modified: p.modified }))];
   libraryList.value = list;
 }
 
@@ -54,6 +54,7 @@ const use: ToolType<{ name: string }> = {
   async run({ name }, ctx) {
     if (!NAME.test(name)) throw new Error(`invalid name "${name}"`);
     if (name.startsWith('component-')) throw new Error(`${name} is a component, not a plugin: bring it in with component-use`);
+    if (name.startsWith('reference-')) throw new Error(`${name} is a kept film (a reference), not a plugin: the references tool reads it`);
     const code = storageKind.peek() === 'folder' ? await installedCode(name) : await api.libraryGet(name);
     const id = name.replace(/\.(js|mjs)$/, '').replace(/[^A-Za-z0-9_-]/g, '-').slice(0, 64);
     const path = await ctx.writeFile(`plugins/${name}`, code);
