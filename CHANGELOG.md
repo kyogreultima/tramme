@@ -8,6 +8,10 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+### Changed
+
+- **The new logo**: the mark and the name in `brand/`, on the site (the top bar, the footer, the docs) in the theme's accent and ink, and as the app's icon: the favicon, the installed app's PNGs, the desktop app's icons (`tauri icon`) and the link preview card, all drawn by `scripts/app-icons.ts` and `scripts/og-image.ts` from the brand files and the editor's theme tokens (`scripts/brand.ts`). The link preview shows the studio and the site's own words again; its screenshot path had gone stale.
+
 ## [0.16.0] - 2026-10-30
 
 ### Added
