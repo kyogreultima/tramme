@@ -513,6 +513,8 @@ export async function* ask(p: AskPayload, signal: AbortSignal): AsyncGenerator<A
   // what the turn costs, told at its end
   const started = Date.now(), calls = runner.calls;
   const tally: Tally = { usage: NO_USAGE, seen: 0, reported: false };
+  /** the tool calls of the scenes built apart: their own lines hold them, the director's does not */
+  let apart = 0;
   yield* resuming(attempt, signal, tally);
   // a film planned this turn with scenes to build is built scene by scene, each in a fresh context, then assembled in this one
   if (aiSettings.peek().scenesApart === 'auto' && !signal.aborted) {
@@ -523,21 +525,24 @@ export async function* ask(p: AskPayload, signal: AbortSignal): AsyncGenerator<A
     if (planned && Date.parse(planned.updated) >= started && todoScenes(planned, runner.liveDoc()).run.length >= 3) {
       const sceneSystem = systemParts(reference, brief ?? undefined, mine, packLines(packs), planText(planned));
       const via = viaFor(route, model);
+      // what each scene's turn used, for its own line and to leave out of the director's
+      const sceneUse = new Map<string, { tools: number; images: number }>();
       const sceneTurn = (scenePrompt: string, scene: PlanScene) => (async function* (): AsyncGenerator<AiEvent> {
-        const own = new ServerSession(), mine2: Tally = { usage: NO_USAGE, seen: 0, reported: false };
+        const own = new ServerSession(), mine2: Tally = { usage: NO_USAGE, seen: 0, reported: false }, before = runner.calls;
         let sid: string | undefined;
         runner.scope = { comp: scene.comp!, root: S.doc.peek().root, tokens: [] };
         try {
           yield* resuming((again) => freshTurn({ prompt: again && (route !== 'companion' || sid) ? again : scenePrompt, system: sceneSystem, tools: true, via, runner, signal, effort, cacheTtl, session: own, sessionId: again ? sid : undefined, onSession: (id) => { sid = id; } }), signal, mine2);
-        } finally { runner.scope = null; }
+        } finally { runner.scope = null; sceneUse.set(scene.id, { tools: runner.calls - before, images: mine2.seen }); }
         yield { type: 'usage', usage: mine2.usage };
       })();
       const result = yield* runScenes({
         plan: planned, doc: () => runner.liveDoc(), turn: sceneTurn, read: readPlan,
         save: async (p) => { await api.write(projectId, FILM_PLAN_PATH, JSON.stringify(p, null, 1)); },
-        line: (scene, u, ms) => ({ ...u, tools: 0, images: 0, ms, model, route: USAGE_ROUTE[route], scene: scene.name }),
+        line: (scene, u, ms) => ({ ...u, tools: sceneUse.get(scene.id)?.tools ?? 0, images: sceneUse.get(scene.id)?.images ?? 0, ms, model, route: USAGE_ROUTE[route], scene: scene.name }),
         signal,
       });
+      for (const u of sceneUse.values()) apart += u.tools;
       if (!signal.aborted) yield* resuming(attempt, signal, tally, assemblyNote(result));
     }
   }
@@ -546,7 +551,7 @@ export async function* ask(p: AskPayload, signal: AbortSignal): AsyncGenerator<A
   if (harvest) yield { type: 'item', item: { id: uid(), role: 'assistant', text: harvest } };
   const wanted = realNote([...realWanted]);
   if (wanted) yield { type: 'item', item: { id: uid(), role: 'assistant', text: wanted } };
-  yield { type: 'item', item: { id: uid(), role: 'assistant', usage: { ...usage, tools: runner.calls - calls, images: seen, ms: Date.now() - started, model, route: USAGE_ROUTE[route], ...(reported ? {} : { unknown: true as const }), ...(consultsOf() ? { consults: consultsOf() } : {}) } } };
+  yield { type: 'item', item: { id: uid(), role: 'assistant', usage: { ...usage, tools: runner.calls - calls - apart, images: seen, ms: Date.now() - started, model, route: USAGE_ROUTE[route], ...(reported ? {} : { unknown: true as const }), ...(consultsOf() ? { consults: consultsOf() } : {}) } } };
   yield { type: 'done' };
 }
 
