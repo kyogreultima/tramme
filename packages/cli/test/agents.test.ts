@@ -76,3 +76,57 @@ describe("Antigravity's agent for a request without tools", () => {
     expect(antigravityAgent(base)).toContain('SYS');
   });
 });
+
+describe('where Codex is looked for besides the PATH', () => {
+  /** a home and a local app data folder holding a program at each given path (relative to them) */
+  async function machine(files: { home?: string[]; local?: string[]; old?: string[] }) {
+    const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path');
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-'));
+    const home = path.join(root, 'home'), local = path.join(root, 'local');
+    for (const [base, list] of [[home, files.home ?? []], [local, files.local ?? []], [local, files.old ?? []]] as const) {
+      for (const f of list) {
+        const file = path.join(base, f);
+        fs.mkdirSync(path.dirname(file), { recursive: true });
+        fs.writeFileSync(file, '');
+        // the "old" ones are a day older than the rest
+        if (files.old?.includes(f)) fs.utimesSync(file, new Date(Date.now() - 86_400_000), new Date(Date.now() - 86_400_000));
+      }
+    }
+    for (const f of files.old ?? []) { const d = path.dirname(path.join(local, f)); fs.utimesSync(d, new Date(Date.now() - 86_400_000), new Date(Date.now() - 86_400_000)); }
+    return { home, local, root, path };
+  }
+
+  it('is the Codex app first, its newest build first, then the editors\' extensions, the newest version first', async () => {
+    const { codexInstalls } = await import('../src/agents.ts');
+    const m = await machine({
+      local: ['OpenAI/Codex/bin/bbb/codex.exe'],
+      old: ['OpenAI/Codex/bin/aaa/codex.exe'],
+      home: [
+        '.vscode/extensions/openai.chatgpt-26.1021.22027-win32-x64/bin/windows-x86_64/codex.exe',
+        '.vscode/extensions/openai.chatgpt-26.1100.1-win32-x64/bin/windows-x86_64/codex.exe',
+        '.cursor/extensions/openai.chatgpt-26.900.1-win32-x64/bin/windows-x86_64/codex.exe',
+      ],
+    });
+    const rel = codexInstalls({ home: m.home, localAppData: m.local, platform: 'win32' }).map((f) => m.path.relative(m.root, f).replace(/\\/g, '/'));
+    expect(rel).toEqual([
+      'local/OpenAI/Codex/bin/bbb/codex.exe',
+      'local/OpenAI/Codex/bin/aaa/codex.exe',
+      'home/.vscode/extensions/openai.chatgpt-26.1100.1-win32-x64/bin/windows-x86_64/codex.exe',
+      'home/.vscode/extensions/openai.chatgpt-26.1021.22027-win32-x64/bin/windows-x86_64/codex.exe',
+      'home/.cursor/extensions/openai.chatgpt-26.900.1-win32-x64/bin/windows-x86_64/codex.exe',
+    ]);
+  });
+
+  it('names the program without .exe off Windows, and skips a folder that holds none', async () => {
+    const { codexInstalls } = await import('../src/agents.ts');
+    const m = await machine({ home: ['.vscode/extensions/openai.chatgpt-26.1-darwin-arm64/bin/macos-aarch64/codex', '.vscode/extensions/openai.chatgpt-26.1-darwin-arm64/bin/other/README'] });
+    const found = codexInstalls({ home: m.home, localAppData: undefined, platform: 'darwin' }).map((f) => m.path.basename(f));
+    expect(found).toEqual(['codex']);
+  });
+
+  it('is nothing on a computer without any of them', async () => {
+    const { codexInstalls } = await import('../src/agents.ts');
+    const m = await machine({});
+    expect(codexInstalls({ home: m.home, localAppData: m.local, platform: 'win32' })).toEqual([]);
+  });
+});
