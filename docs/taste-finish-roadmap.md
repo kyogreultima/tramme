@@ -55,7 +55,8 @@ On the bilal project as the run of 2026-10-28 left it (the check the assistant r
 
 ### Step 6. The critic ([plan](superpowers/plans/2026-10-29-taste-and-finish-step6-critic.md))
 
-- [ ] A separate review in a fresh context, on motion rather than stills, with a definition of done and variants instead of endless fixes; the number of rounds is a setting.
+- [x] A separate review in a fresh context, on motion rather than stills, with a definition of done and variants instead of endless fixes; the number of rounds is a setting.
+- [ ] Two dev briefs at `criticRounds` 0, 1 and 2, compared on cost and blind scores (`node bench/usage.ts --compare`); the default is the user's to set from them. Spends quota, waits for the user's go.
 
 ### Step 7. Scene by scene ([plan](superpowers/plans/2026-10-29-taste-and-finish-step7-scene-by-scene.md))
 
