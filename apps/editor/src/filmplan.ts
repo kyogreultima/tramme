@@ -33,7 +33,7 @@ export const KIND_LABEL: Record<PictureKind, string> = {
 };
 
 export interface Direction { name: string; type: string; palette: string; light: string; materials: string; framing: string }
-export interface PlanScene { id: string; name: string; kind: PictureKind; idea: string; hero?: boolean; comp?: string; seconds?: number }
+export interface PlanScene { id: string; name: string; kind: PictureKind; idea: string; hero?: boolean; comp?: string; seconds?: number; status?: 'todo' | 'built' | 'failed'; brief?: string }
 export interface StyleFrame { path: string; direction: string; scene: string; provider: string; model: string }
 export interface FilmPlan {
   version: 1;
@@ -90,7 +90,7 @@ export function planText(plan: FilmPlan): string {
   const kept = plan.directions[0];
   const tail = [...(kept ? [`${plan.target ? 'Kept' : 'First'} direction: ${directionText(kept)}`] : []), ...(plan.target ? [`Target (style frame): ${plan.target}`] : [])];
   const fixed = [...head, ...tail].join('\n').length + 'Scenes:\n'.length;
-  const names = plan.scenes.map((s) => `- ${s.name}: ${s.kind}`);
+  const names = plan.scenes.map((s) => `- ${s.name}: ${s.kind}${s.status && s.status !== 'todo' ? ` [${s.status}]` : ''}`);
   const room = LIMIT - fixed - names.reduce((a, l) => a + l.length + 3, 0);
   const each = Math.max(0, Math.floor(room / Math.max(1, plan.scenes.length)));
   const lines = plan.scenes.map((s, i) => {
@@ -99,6 +99,21 @@ export function planText(plan: FilmPlan): string {
   });
   return [...head, 'Scenes:', ...lines, ...tail].join('\n').slice(0, LIMIT);
 }
+
+/** the scenes still to build (to do, or never started) whose composition exists, and the others with why they are left */
+export function todoScenes(plan: FilmPlan, doc: TrammeDoc): { run: PlanScene[]; skipped: { scene: PlanScene; why: string }[] } {
+  const run: PlanScene[] = [], skipped: { scene: PlanScene; why: string }[] = [];
+  for (const scene of plan.scenes) {
+    if (scene.status === 'built') skipped.push({ scene, why: 'already built' });
+    else if (!scene.comp) skipped.push({ scene, why: 'it has no composition' });
+    else if (!doc.compositions[scene.comp]) skipped.push({ scene, why: `its composition "${scene.comp}" does not exist` });
+    else run.push(scene);
+  }
+  return { run, skipped };
+}
+
+/** the plan with one scene's state changed */
+export const setStatus = (plan: FilmPlan, id: string, status: PlanScene['status']): FilmPlan => ({ ...plan, updated: new Date().toISOString(), scenes: plan.scenes.map((s) => (s.id === id ? { ...s, status } : s)) });
 
 /** the plan's record in the document, added or brought up to date */
 export function planOp(doc: TrammeDoc): Op {
@@ -134,6 +149,8 @@ const filmPlan: ToolType<FilmPlanInput> = {
             name: { type: 'string', description: 'a short name' }, kind: kindProp, idea: { type: 'string', description: 'what the scene shows and does, in a sentence' },
             hero: { type: 'boolean', description: 'the scene the film is remembered for: its style frame is drawn first' },
             seconds: { type: 'number', description: 'how long it lasts, when known' },
+            comp: { type: 'string', description: 'the id of the composition the scene is built in (the root plays it)' },
+            brief: { type: 'string', description: 'what the builder of this scene needs beyond the plan: the words, names and figures it shows, the sources it uses, its length and where it sits in the root' },
           },
           required: ['name', 'kind', 'idea'],
         },
@@ -167,7 +184,7 @@ const filmPlan: ToolType<FilmPlanInput> = {
     const ids = sceneIds(input.scenes.map((s) => s.name));
     const written: FilmPlan = {
       version: 1, kind: 'film-plan', updated: new Date().toISOString(), idea: input.idea, kinds: input.kinds,
-      scenes: input.scenes.map((s, i) => ({ ...s, id: ids[i] })), directions: input.directions,
+      scenes: input.scenes.map((s, i) => { const had = prev?.scenes.find((p) => p.id === ids[i]); return { ...(had?.status ? { status: had.status } : {}), ...(had?.comp ? { comp: had.comp } : {}), ...(had?.brief ? { brief: had.brief } : {}), ...s, id: ids[i] }; }), directions: input.directions,
       ...(input.example ? { example: input.example } : {}),
       ...(prev?.frames?.length ? { frames: prev.frames } : {}), ...(prev?.target ? { target: prev.target } : {}),
     };
@@ -180,4 +197,18 @@ const filmPlan: ToolType<FilmPlanInput> = {
   },
 };
 
-export const FILM_PLAN_TOOLS: ToolType[] = [filmPlan as unknown as ToolType];
+const sceneDone: ToolType<{ scene: string; note?: string }> = {
+  name: 'scene-done', title: 'Scene built',
+  description: 'marks a scene of the film plan as built: the end of a scene builder’s turn',
+  input: { type: 'object', properties: { scene: { type: 'string', title: 'Scene', description: 'its id in the plan' }, note: { type: 'string', title: 'Note', description: 'what the next scene or the assembly should know' } }, required: ['scene'] },
+  ai: { when: 'the scene you were asked to build is built and checked: call it once, then stop without a summary', avoid: 'calling it for a scene that is not finished, or for another scene' },
+  async run({ scene, note }, ctx) {
+    const plan = parsePlan(await ctx.readText(FILM_PLAN_PATH).catch(() => null));
+    if (!plan) throw new Error('there is no film plan: write it first (use_tool "film-plan")');
+    if (!plan.scenes.some((s) => s.id === scene)) throw new Error(`${scene}: no such scene (the plan's scenes: ${plan.scenes.map((s) => s.id).join(', ')})`);
+    await ctx.writeFile(FILM_PLAN_PATH, JSON.stringify(setStatus(plan, scene, 'built'), null, 1));
+    return { ops: [planOp(ctx.doc)], label: `${scene} built`, text: `${scene} is marked built${note ? ` (${note})` : ''}. Stop here: do not summarise.` };
+  },
+};
+
+export const FILM_PLAN_TOOLS: ToolType[] = [filmPlan as unknown as ToolType, sceneDone as unknown as ToolType];

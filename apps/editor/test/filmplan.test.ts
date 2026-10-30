@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { builtinRegistry } from '@tramme/nodes';
 import { applyOps, validate, type ToolContext, type ToolOutput, type TrammeDoc } from '@tramme/core';
 import { newProject } from '@tramme/project';
-import { FILM_PLAN_PATH, FILM_PLAN_TOOLS, PICTURE_KINDS, KIND_LINE, parsePlan, planIssues, planText, type Direction, type FilmPlan, type PictureKind } from '../src/filmplan.ts';
+import { FILM_PLAN_PATH, FILM_PLAN_TOOLS, PICTURE_KINDS, KIND_LINE, parsePlan, planIssues, planText, setStatus, todoScenes, type Direction, type FilmPlan, type PictureKind } from '../src/filmplan.ts';
 
 const tool = FILM_PLAN_TOOLS[0];
 const run = (input: unknown, ctx: ToolContext) => tool.run(input as never, ctx) as Promise<ToolOutput>;
@@ -136,5 +136,51 @@ describe('the plan as the model reads it', () => {
     for (const s of many) expect(text).toContain(s.name);
     expect(text).toContain('assets/frames/a.jpg');
     expect(text).toContain('Ink and paper');
+  });
+});
+
+describe('the scenes of a plan, one by one', () => {
+  const plan = (): FilmPlan => ({
+    version: 1, kind: 'film-plan', updated: '', idea: 'x', kinds: ['type', 'object'], directions: [],
+    scenes: [
+      { id: 'a', name: 'A', kind: 'type', idea: 'a', comp: 'a' },
+      { id: 'b', name: 'B', kind: 'object', idea: 'b', comp: 'b', status: 'built' },
+      { id: 'c', name: 'C', kind: 'type', idea: 'c', comp: 'ghost', status: 'todo' },
+      { id: 'd', name: 'D', kind: 'object', idea: 'd' },
+    ],
+  });
+  const withComps = () => { const d = doc(); for (const c of ['a', 'b']) d.compositions[c] = { name: c, width: 1920, height: 1080, fps: 30, duration: 4, layers: {}, order: [] } as never; return d; };
+
+  it('runs the scenes to do whose composition exists, and says why it leaves the others', () => {
+    const r = todoScenes(plan(), withComps());
+    expect(r.run.map((s) => s.id)).toEqual(['a']);
+    expect(r.skipped.map((s) => [s.scene.id, s.why])).toEqual([['b', 'already built'], ['c', 'its composition "ghost" does not exist'], ['d', 'it has no composition']]);
+  });
+
+  it('sets the status of one scene, leaving the plan\'s others', () => {
+    const next = setStatus(plan(), 'a', 'built');
+    expect(next.scenes.map((s) => s.status)).toEqual(['built', 'built', 'todo', undefined]);
+    expect(plan().scenes[0].status).toBeUndefined();
+  });
+
+  it('scene-done writes the plan with the scene built and returns the plan\'s operation', async () => {
+    const written = new Map<string, string>(), read = new Map([[FILM_PLAN_PATH, JSON.stringify(plan())]]);
+    const done = FILM_PLAN_TOOLS.find((t) => t.name === 'scene-done')!;
+    const out = await done.run({ scene: 'a' } as never, ctxOf(withComps(), written, read)) as ToolOutput;
+    expect(parsePlan(written.get(FILM_PLAN_PATH))!.scenes[0].status).toBe('built');
+    expect(out.ops?.[0]).toMatchObject({ op: 'add', path: '/assets/film-plan' });
+    await expect(done.run({ scene: 'zzz' } as never, ctxOf(withComps(), written, read))).rejects.toThrow(/a, b, c, d/);
+  });
+
+  it('shows built beside a built scene in the plan text', () => {
+    expect(planText(plan())).toContain('- B: object [built]');
+  });
+
+  it('keeps a scene\'s status, composition and brief when the plan is written again with its name', async () => {
+    const written = new Map<string, string>(), read = new Map([[FILM_PLAN_PATH, JSON.stringify(plan())]]);
+    await run({ idea: 'x', kinds: ['type', 'object'], scenes: [{ name: 'A', kind: 'type', idea: 'a2' }, { name: 'B', kind: 'object', idea: 'b2', brief: 'new brief' }], directions: [direction()] }, ctxOf(withComps(), written, read));
+    const next = parsePlan(written.get(FILM_PLAN_PATH))!;
+    expect(next.scenes[1]).toMatchObject({ id: 'b', status: 'built', comp: 'b', brief: 'new brief' });
+    expect(next.scenes[0]).toMatchObject({ id: 'a', comp: 'a', idea: 'a2' });
   });
 });
