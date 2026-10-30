@@ -27,10 +27,41 @@ const TEXT_FILE = /\.(js|mjs|json|svg|md|markdown)$/i;
 /** a file read in parts of this many characters (about 15k tokens) */
 const READ_PART = 50_000;
 
+/** what a scene builder may change: its own composition (and its takes), under a root it must leave alone; `tokens` are the existing tokens it may change */
+export interface Scope { comp: string; root: string; tokens: string[] }
+
+/** a path as its parts, the ~0 and ~1 of a pointer undone */
+const partsOf = (path: string) => path.split('/').filter(Boolean).map((p) => p.replace(/~1/g, '/').replace(/~0/g, '~'));
+
+/**
+ * Why an operation is not a scene builder's to make, or null when it is: the
+ * scene's composition and its takes, new assets and tokens of its own, the
+ * plan's record, plugins added. Another composition, the root, and an existing
+ * asset or token are refused.
+ */
+export function outOfScope(op: Op, scope: Scope, doc: TrammeDoc): string | null {
+  const [section, id] = partsOf(op.path);
+  if (section === 'compositions') {
+    if (id === scope.comp || (id !== undefined && id.startsWith(`${scope.comp}~take`))) return null;
+    if (id === scope.root) return `the root composition "${id}" is not yours: scenes are laid by the director, build only "${scope.comp}"`;
+    return id === undefined ? 'the compositions as a whole are not yours' : `the composition "${id}" belongs to another scene: build only "${scope.comp}"`;
+  }
+  if (section === 'assets' || section === 'tokens') {
+    if (id === undefined) return `all the ${section} at once are not yours`;
+    if (section === 'assets' && id === 'film-plan') return null;
+    const had = (doc as unknown as Record<string, Record<string, unknown> | undefined>)[section]?.[id] !== undefined;
+    return had && !(section === 'tokens' && scope.tokens.includes(id)) ? `the ${section.slice(0, -1)} "${id}" existed before this scene: add one of your own instead` : null;
+  }
+  if (section === 'plugins' && op.op === 'add') return null;
+  return `"${op.path}" is not part of a scene`;
+}
+
 interface Pending { id: string; label: string; ops: Op[]; steps: string[] }
 
 export class ToolRunner {
   pending: Pending | null = null;
+  /** set while a scene is built apart: the proposals are kept to it */
+  scope: Scope | null = null;
   /** the turn's signal, handed to the plugins' tools */
   private signal: AbortSignal = new AbortController().signal;
   /** the last plugin tool's message for the user */
@@ -326,6 +357,10 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
 
   private async propose(label: string, ops: Op[]): Promise<ToolResult> {
     if (!Array.isArray(ops) || !ops.length) return text('no operations', true);
+    if (this.scope) {
+      const live = this.liveDoc();
+      for (const op of ops) { const why = outOfScope(op, this.scope, live); if (why) return text(`operation refused, nothing is proposed: ${why}`, true); }
+    }
     const merged = [...(this.pending?.ops ?? []), ...ops];
     let next: TrammeDoc;
     try { next = applyOps(S.doc.peek(), merged).doc; } catch (e) { return text(`operations refused: ${(e as Error).message}`, true); }
