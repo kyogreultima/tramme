@@ -3,7 +3,7 @@
 // work reads the evidence and answers once. It never touches the conversation
 // (the server's messages, the companion's session) or the tool runner.
 
-import { addUsage, engineOf, NO_USAGE, type Effort, type Engine, type Usage } from '@tramme/assistant';
+import { addUsage, engineOf, joinSystem, NO_USAGE, type Effort, type Engine, type SystemParts, type Usage } from '@tramme/assistant';
 import type { AiEvent, TurnUsage } from '../api.ts';
 import { companionTurn, type CompanionLink } from './companion.ts';
 import { ServerSession, type ChatTarget } from './server.ts';
@@ -56,6 +56,38 @@ export function addConsult(usage: TurnUsage, u: Usage, model: string): TurnUsage
 /** a runner that has no tools: a request in a fresh context offers none, and a model that calls one anyway is answered by an error */
 const NO_TOOLS = { run: async () => { throw new Error('no tools in a consult'); } } as unknown as ToolRunner;
 
+export interface FreshTurn {
+  prompt: string;
+  system: string | SystemParts;
+  /** false: no tools, one answer */
+  tools: boolean;
+  images?: { mediaType: string; data: string }[];
+  via: Via;
+  /** instead of the route's model */
+  model?: string;
+  effort?: Effort;
+  /** the tools' runner (the conversation's own); none with tools off */
+  runner?: ToolRunner;
+  signal: AbortSignal;
+  /** the companion engine's session of this turn, told and never the conversation's */
+  onSession?: (id: string) => void;
+}
+
+/**
+ * One turn with no history, on the route the conversation takes: a new
+ * server session, or a companion turn with no session to resume. The critic's
+ * consults and the scenes built apart run on it.
+ */
+export function freshTurn(o: FreshTurn): AsyncGenerator<AiEvent> {
+  const model = o.model ?? o.via.model, effort = o.effort ?? o.via.effort, runner = o.tools ? o.runner ?? NO_TOOLS : NO_TOOLS;
+  if (o.via.route === 'companion') {
+    const { link, engine } = o.via;
+    if (!link || !engine) throw new Error('the companion is not reachable');
+    return companionTurn(link, { engine, prompt: o.prompt, system: typeof o.system === 'string' ? o.system : joinSystem(o.system), model, effort, images: o.images, tools: o.tools }, runner, o.signal, o.onSession ?? (() => {}));
+  }
+  return new ServerSession().turn(o.prompt, model, o.system, runner, o.signal, { images: o.images, target: o.via.target, effort, tools: o.tools });
+}
+
 /** what an answer said and what it cost */
 async function collect(events: AsyncGenerator<AiEvent>): Promise<{ text: string; usage: Usage }> {
   const texts = new Map<string, string>();
@@ -71,10 +103,5 @@ async function collect(events: AsyncGenerator<AiEvent>): Promise<{ text: string;
 
 /** one request, one answer; throws with the route's message when it fails */
 export function consult(req: ConsultRequest, via: Via): Promise<{ text: string; usage: Usage }> {
-  const model = req.model ?? via.model, effort = req.effort ?? via.effort;
-  if (via.route === 'companion') {
-    if (!via.link || !via.engine) throw new Error('the companion is not reachable');
-    return collect(companionTurn(via.link, { engine: via.engine, prompt: req.text, system: req.system, model, effort, images: req.images, tools: false }, NO_TOOLS, req.signal, () => {}));
-  }
-  return collect(new ServerSession().turn(req.text, model, req.system, NO_TOOLS, req.signal, { images: req.images, target: via.target, effort, tools: false }));
+  return collect(freshTurn({ prompt: req.text, system: req.system, tools: false, images: req.images, via, model: req.model, effort: req.effort, signal: req.signal }));
 }
