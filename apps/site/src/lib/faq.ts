@@ -27,7 +27,7 @@ export const FAQ: Question[] = [
   },
   {
     q: 'Which formats can I export?',
-    a: `${formats}. The preview and the export are drawn by the same engine, so what you see is what you get. MOV comes from the desktop tools.`,
+    a: `${formats}. The preview and the export are drawn by the same engine, so what you see is what you get. MOV comes from the command line.`,
   },
   {
     q: 'Which AI does the assistant use?',

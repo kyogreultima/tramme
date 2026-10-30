@@ -91,7 +91,7 @@ img, svg, video { display: block; max-width: 100%; }
 @keyframes reveal { from { opacity: 0; transform: translateY(32px); } }
 
 /* the largest type, for what a page says first: the hero and the manifesto */
-.display { font-size: clamp(2.75rem, 7.4vw, 7rem); line-height: 0.96; letter-spacing: -0.05em; }
+.display { font-size: clamp(2.75rem, 7.4vw, 7rem); font-weight: 600; line-height: 0.96; letter-spacing: -0.05em; }
 
 /* a text page (pricing, about, privacy): one readable column */
 .prose { max-width: 68ch; display: grid; gap: 18px; }

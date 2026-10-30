@@ -22,10 +22,10 @@ import { docHref } from '../lib/docs';
         <p>The keys of the AI providers you connect stay on your side: in a key vault the editor cannot read, in the browser app, and in the system keychain, on the desktop.</p>
 
         <h2>What the assistant sends</h2>
-        <p>When you ask the assistant for something, your words, and the frames or files it needs to answer, go to the AI provider you chose, with your key, and are handled under that provider's terms. In the browser app your browser calls the provider itself; on the desktop, the app does. No Tramme server sits in between. Nothing is sent to a provider until you use the assistant or a tool that needs one. <a href={docHref('assistant')}>How the assistant works</a>.</p>
+        <p>When you ask the assistant for something, your words, and the frames or files it needs to answer, go to the AI provider you chose, with your key, and are handled under that provider's terms. Anthropic, OpenAI, Gemini, OpenRouter and ElevenLabs are called by your browser itself in the browser app, and by the app on the desktop. Z.AI and custom providers cannot be called from a page: in the browser app their requests pass through a small relay of the app's server, which keeps nothing and logs nothing. Nothing is sent to a provider until you use the assistant or a tool that needs one. <a href={docHref('assistant')}>How the assistant works</a>.</p>
 
         <h2>This site</h2>
-        <p>It is a static site: it sets no cookies, runs no analytics code and loads no third-party script or font. It remembers one thing, whether you chose the light or the dark theme, in your browser's local storage; that choice never leaves your browser. The site is delivered by Cloudflare, which, like any host, handles the requests it receives.</p>
+        <p>It is a static site: it sets no cookies, runs no analytics code and loads no third-party script or font. It remembers your choice of the light or the dark theme, and in the docs the state of the sidebar, in your browser's storage; none of it leaves your browser. The site is delivered by Cloudflare, which, like any host, handles the requests it receives.</p>
       </div>
     </section>
   </main>

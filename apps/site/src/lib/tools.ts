@@ -7,19 +7,19 @@ export const TOOL_GROUPS: ToolGroup[] = [
   {
     name: 'Motion',
     text: 'Set a key, shape its ease, let the usual behaviours do the rest.',
-    doc: 'document',
+    doc: 'editor',
     tools: ['Keyframes', 'Graph editor', 'Wiggle, loop, spring', 'Time displacement', 'Frame-by-frame drawing'],
   },
   {
     name: 'Building',
     text: 'Films inside films, parts reused, shapes that draw themselves.',
-    doc: 'document',
+    doc: 'editor',
     tools: ['Precompositions', 'Components', 'Masks and mattes', 'Self-drawing strokes'],
   },
   {
     name: 'The picture',
     text: 'A camera with depth, the look of the frame, effects that stay the same on every render.',
-    doc: 'document',
+    doc: 'editor',
     tools: ['2.5D camera', 'Motion blur', 'Colour grading', 'Chroma key', 'Shaders', 'Particles', 'Transitions'],
   },
   {
@@ -31,7 +31,7 @@ export const TOOL_GROUPS: ToolGroup[] = [
   {
     name: 'Delivery',
     text: 'The film in the format it is going to.',
-    doc: 'cli',
+    doc: 'editor',
     tools: ['Transparent video', 'Lottie'],
   },
 ];
