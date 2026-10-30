@@ -4,6 +4,7 @@
 
 import { TAGS, type Catalogue, type Typeface } from './catalogue.ts';
 import { slugOf } from './files.ts';
+import { distance, FILLER as WORDS_FILLER, pluralForms } from '../words.ts';
 
 // ── the script of a text ─────────────────────────────────────
 type Range = [number, number];
@@ -102,7 +103,7 @@ word(['kanji', 'kana'], { script: 'japanese' });
 WORDS['serifed'] = { tags: ['serif'] };
 
 /** words that say nothing about the character */
-const FILLER = new Set(['a', 'an', 'the', 'for', 'of', 'with', 'and', 'or', 'in', 'to', 'on', 'my', 'some', 'that', 'is', 'it', 'its', 'look', 'looks', 'looking', 'like', 'font', 'typeface', 'type', 'family', 'face', 'letter', 'lettering', 'very', 'quite', 'more', 'but', 'not', 'no', 'good', 'nice', 'great', 'best', 'film', 'video', 'project', 'we', 'i', 'need', 'want', 'use', 'used', 'from', 'by', 'as', 'at', 'be', 'this', 'something', 'one']);
+const FILLER = new Set([...WORDS_FILLER, 'look', 'looks', 'looking', 'like', 'font', 'typeface', 'type', 'family', 'face', 'letter', 'lettering', 'good', 'nice', 'great', 'best', 'film', 'video', 'project']);
 
 /** structural tags: what the face is made of, not how it feels; a query that asks for one gets only faces that have it */
 const STRUCTURAL = new Set(['condensed', 'wide', 'serif', 'slab', 'mono', 'rounded', 'handwritten']);
@@ -110,9 +111,7 @@ const STRUCTURAL = new Set(['condensed', 'wide', 'serif', 'slab', 'mono', 'round
 function meaningOf(raw: string): Meaning | undefined {
   if (WORDS[raw]) return WORDS[raw];
   // plurals: titles, grotesques, families
-  if (raw.endsWith('ies') && WORDS[raw.slice(0, -3) + 'y']) return WORDS[raw.slice(0, -3) + 'y'];
-  if (raw.endsWith('s') && !raw.endsWith('ss') && WORDS[raw.slice(0, -1)]) return WORDS[raw.slice(0, -1)];
-  if (raw.endsWith('es') && WORDS[raw.slice(0, -2)]) return WORDS[raw.slice(0, -2)];
+  for (const form of pluralForms(raw)) if (WORDS[form]) return WORDS[form];
   return undefined;
 }
 
@@ -194,17 +193,6 @@ export function searchTypefaces(catalogue: Catalogue, query: string, opts: { tex
   const kind = [...kinds.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
   const fallback = covering.filter((f) => described(f) && (!kind || f.category === kind)).sort((a, b) => b.weights.length - a.weights.length || (a.family < b.family ? -1 : 1));
   return result((fallback.length ? fallback : covering).map((font) => ({ font, score: 0, why: [] })), true);
-}
-
-/** the number of single-letter edits between two short words */
-function distance(a: string, b: string): number {
-  let row = Array.from({ length: b.length + 1 }, (_, j) => j);
-  for (let i = 1; i <= a.length; i++) {
-    const next = [i];
-    for (let j = 1; j <= b.length; j++) next[j] = Math.min(row[j] + 1, next[j - 1] + 1, row[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
-    row = next;
-  }
-  return row[b.length];
 }
 
 /** the family a name points to (its id or its name, whatever the case or the spacing), else the three ids nearest to the name */
