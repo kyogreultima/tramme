@@ -594,6 +594,7 @@
     "unavailableSlash": "Assistant unavailable: type / to run a tool",
     "fillRequired": "Fill in the required fields, or write what you want after the command.",
     "noCommand": "No tool or workflow by that name.",
+    "mentions": "Tag with @",
     "tools": "Tools",
     "workflows": "Workflows",
     "keysMove": "move",

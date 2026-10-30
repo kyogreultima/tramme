@@ -10,6 +10,7 @@ import { aiRoute } from '../ai/index.ts';
 import { running, runCommand, send, stop, type Anchor } from '../ai/conversation.ts';
 import { fieldsOf, inputOf, listCommands, matchCommands, parseCommand, ranked, ready, type Command, type Field } from '../ai/commands.ts';
 import { refreshLibrary } from '../library.ts';
+import { applyMention, assetMentions, describeAsset, expandMentions, matchMentions, mentionQuery, type Mentionable } from '../mentions.ts';
 import { attachFiles, attaching, draft, pending, removePending } from '../attachments.ts';
 import { commandUsed, prefs } from '../settings.ts';
 import { S, toast } from '../state.ts';
@@ -52,6 +53,49 @@ export function useCommandMenu(text: string, commands: Command[], onPick: (c: Co
   const typed = () => { setOff(false); setHi(0); };
   const view = open ? <CommandMenu list={matches} hi={at} onHover={setHi} onPick={pick} /> : null;
   return { open, view, keyDown, typed };
+}
+
+/**
+ * The @ menu of a box: the things that can be tagged (the project's assets,
+ * the files of a new film) matching what follows an @ at the caret. `keyDown`
+ * says whether the key was the menu's; `sync` reads the caret again after the
+ * user typed or moved it.
+ */
+export function useMentionMenu(area: RefObject<HTMLTextAreaElement>, text: string, setText: (v: string) => void, list: Mentionable[]) {
+  const [q, setQ] = useState<{ from: number; query: string } | null>(null);
+  const [hi, setHi] = useState(0);
+  const sync = () => { const el = area.current; setQ(el ? mentionQuery(el.value, el.selectionStart ?? el.value.length) : null); setHi(0); };
+  const matches = q ? matchMentions(list, q.query).slice(0, 30) : [];
+  const open = matches.length > 0, at = Math.min(hi, matches.length - 1);
+  const pick = (m: Mentionable) => {
+    if (!q) return;
+    const r = applyMention(text, q, m.token);
+    setText(r.text); setQ(null);
+    requestAnimationFrame(() => { const el = area.current; if (el) { el.focus(); el.setSelectionRange(r.caret, r.caret); } });
+  };
+  const keyDown = (e: KeyboardEvent) => {
+    if (!open) return false;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') setHi((i) => (i + (e.key === 'ArrowDown' ? 1 : matches.length - 1)) % matches.length);
+    else if ((e.key === 'Enter' && !e.shiftKey) || e.key === 'Tab') pick(matches[at]);
+    else if (e.key === 'Escape') setQ(null);
+    else return false;
+    e.preventDefault();
+    return true;
+  };
+  const view = open ? (
+    <div class="command-menu mention-menu">
+      <div class="command-list" role="listbox">
+        <div class="command-section">{t('assistant.mentions')}</div>
+        {matches.map((m, i) => (
+          <button key={m.token} role="option" aria-selected={i === at} class={`command-row${i === at ? ' on' : ''}`} onMouseDown={(e) => { e.preventDefault(); pick(m); }} onMouseEnter={() => setHi(i)}>
+            <span class="command-icon"><Icon name={m.kind === 'image' ? 'image' : m.kind === 'video' ? 'film' : m.kind === 'audio' ? 'audio' : 'doc'} /></span>
+            <span class="command-text"><span class="command-line"><span class="command-title">{m.label}</span><span class="command-name">@{m.token}</span></span></span>
+          </button>
+        ))}
+      </div>
+    </div>
+  ) : null;
+  return { open, view, keyDown, sync };
 }
 
 /** the commands matching what follows the /, tools first then workflows (the order the keys move in) */
@@ -147,6 +191,10 @@ export function Composer({ placeholder, anchor, tools, context, onSent, area: gi
   const [form, setForm] = useState<{ name: string; values: Record<string, unknown> }>({ name: '', values: {} });
   const pick = (c: Command) => { setText(`/${c.name} `); setForm({ name: c.name, values: {} }); area.current?.focus(); };
   const commandMenu = useCommandMenu(text, commands, pick), menu = commandMenu.open;
+  // the @ menu: the project's assets, tagged in the words
+  const assets = S.doc.value;
+  const mentionList = useMemo(() => assetMentions(assets), [assets]);
+  const mention = useMentionMenu(area, text, setText, mentionList);
   // the library's plugins, fresh for its pickers whenever the menu opens
   useEffect(() => { if (menu) refreshLibrary(); }, [menu]);
   const parsed = menu ? null : parseCommand(text, commands);
@@ -168,16 +216,17 @@ export function Composer({ placeholder, anchor, tools, context, onSent, area: gi
     setText('');
     // a command typed whole and sent counts as used, as one picked from the menu
     if (cmd) commandUsed(cmd.name);
-    send(v, { command: cmd ? { cmd, input } : undefined, anchor: anchor?.() });
+    send(expandMentions(v, describeAsset(S.doc.peek())), { command: cmd ? { cmd, input } : undefined, anchor: anchor?.() });
     onSent?.();
   };
   const keyDown = (e: KeyboardEvent) => {
-    if (commandMenu.keyDown(e)) return;
+    if (commandMenu.keyDown(e) || mention.keyDown(e)) return;
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); }
   };
   return (
     <div class="composer-wrap">
       {commandMenu.view}
+      {mention.view}
       <QueueList />
       <div class="composer" data-tour={tour}>
         {cmd && <CommandCard cmd={cmd} fields={fields} values={values} busy={busy} canRun={direct} onRun={run}
@@ -192,7 +241,8 @@ export function Composer({ placeholder, anchor, tools, context, onSent, area: gi
           onPaste={(e) => { const imgs = Array.from(e.clipboardData?.files ?? []).filter((f) => f.type.startsWith('image/')); if (imgs.length) { e.preventDefault(); join(imgs); } }}
           placeholder={available ? placeholder : t('assistant.unavailableSlash')}
           role="combobox" aria-expanded={menu} aria-autocomplete="list"
-          onInput={(e) => { setText((e.target as HTMLTextAreaElement).value); commandMenu.typed(); }}
+          onInput={(e) => { setText((e.target as HTMLTextAreaElement).value); commandMenu.typed(); mention.sync(); }}
+          onClick={mention.sync}
           onKeyDown={keyDown} />
         <div class="bar">
           <button class="icon-btn sm" title={t('assistant.attachImagesSoundsOr')} disabled={!available} onClick={() => files.current?.click()}><Icon name="attach" /></button>
