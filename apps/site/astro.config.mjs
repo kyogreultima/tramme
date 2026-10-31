@@ -6,6 +6,7 @@
 
 import { defineConfig, fontProviders } from 'astro/config';
 import starlight from '@astrojs/starlight';
+import cloudflare from '@astrojs/cloudflare';
 import { sidebar } from './src/lib/docs.ts';
 import { latestRelease } from './src/lib/download.ts';
 import { REPO } from './src/lib/links.ts';
@@ -17,6 +18,9 @@ const release = await latestRelease(console.log);
 export default defineConfig({
   // the public address, for the canonical links, the sitemap and the preview image
   site: process.env.SITE_URL ?? SITE.url,
+  // every page is prerendered today; the adapter lets /explore/ and /p/<id>/ switch to
+  // server rendering (export const prerender = false) once the gallery API exists
+  adapter: cloudflare({ imageService: 'compile', prerenderEnvironment: 'node' }),
   // the gallery moved from /examples/ to /explore/
   redirects: { '/examples': '/explore/', '/fr/examples': '/fr/explore/' },
   vite: { define: { __RELEASE__: JSON.stringify(release) } },
