@@ -6,6 +6,7 @@
 import { effect, signal } from '@preact/signals';
 import { MODEL_TASKS, resolveModel, type ModelEntry, type ModelTask } from './models.ts';
 import type { DictationSource } from './speech.ts';
+import { FORMER_PREFERENCES_KEY, PREFERENCES_KEY, savedTheme, showTheme, VIEWS, type ThemeId, type View } from './theme/pref.ts';
 
 export interface Preferences {
   /** interface language: the browser's (French or English), or chosen */
@@ -80,14 +81,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
 };
 
 // ── themes and views ─────────────────────────────────────────
-/** a theme is one palette; all are dark but the three lights, and system follows the computer */
-export type ThemeId = 'system' | 'studio' | 'obsidian' | 'carbon' | 'dusk' | 'paper' | 'linen' | 'porcelain';
-/** the studio: the film in front, directed by notes the assistant carries out; the atelier: the layers, the timeline and the inspector, for the detail */
-export type View = 'studio' | 'atelier';
-const THEME_IDS: ThemeId[] = ['system', 'studio', 'obsidian', 'carbon', 'dusk', 'paper', 'linen', 'porcelain'];
-const DARK_LEGACY: string[] = ['studio', 'obsidian', 'carbon', 'dusk'], LIGHT_LEGACY: string[] = ['paper', 'linen', 'porcelain'];
-/** the themes the meta colour-scheme and the system mode resolve to */
-const LIGHT_THEMES: ThemeId[] = ['paper', 'linen', 'porcelain'];
+export { VIEWS, type ThemeId, type View };
 
 /** a theme as the picker shows it: its id and the colours that draw its preview (its name's key lives beside the picker) */
 export interface ThemeInfo { id: ThemeId; bg: string; surface: string; text: string; accent: string }
@@ -101,16 +95,10 @@ export const THEMES: ThemeInfo[] = [
   { id: 'porcelain', bg: '#eef2f6', surface: '#ffffff', text: '#151a21', accent: '#0b7f95' },
   { id: 'system', bg: '#090f13', surface: '#12181c', text: '#e8eef1', accent: '#2ec4b6' },
 ];
-/** the window bar's colour, per theme (system resolves to one of the two) */
-const BAR: Record<string, string> = { studio: '#090f13', obsidian: '#050708', carbon: '#101010', dusk: '#150f0a', paper: '#f0f4f7', linen: '#f7f3ec', porcelain: '#eef2f6' };
-/** the views, in the order they are offered */
-export const VIEWS: View[] = ['studio', 'atelier'];
 const VOICE_PROVIDERS = ['auto', 'elevenlabs', 'openai', 'gemini', 'hydracept'] as const;
 
 /** a number kept within its range, the default when it is not one */
 const within = (v: unknown, d: number, lo: number, hi: number) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d);
-
-const KEY = 'tramme.preferences';
 
 // what this browser kept under the tool's former name (trame.*) is carried over once
 try {
@@ -121,7 +109,7 @@ try {
 function load(): Preferences {
   try {
     // the preferences kept under the tool's former name are taken over
-    const saved = JSON.parse(localStorage.getItem(KEY) ?? localStorage.getItem('emotion.preferences') ?? '{}') as Partial<Preferences>;
+    const saved = JSON.parse(localStorage.getItem(PREFERENCES_KEY) ?? localStorage.getItem(FORMER_PREFERENCES_KEY) ?? '{}') as Partial<Preferences>;
     const p = { ...DEFAULT_PREFERENCES, ...saved };
     if (!['auto', 'full', 'half', 'quarter'].includes(p.motion)) p.motion = DEFAULT_PREFERENCES.motion;
     if (!['display', 'full'].includes(p.still)) p.still = DEFAULT_PREFERENCES.still;
@@ -130,13 +118,7 @@ function load(): Preferences {
     p.scrubAudio = p.scrubAudio !== false;
     p.sandboxPreview = p.sandboxPreview === true;
     // the theme preference: the former mode + per-mode themes collapse into one theme
-    const legacyTheme = (saved as { theme?: unknown }).theme, legacyMode = (saved as { mode?: unknown }).mode;
-    if (typeof legacyTheme === 'string' && THEME_IDS.includes(legacyTheme as ThemeId)) p.theme = legacyTheme as ThemeId;
-    else if (legacyMode === 'light') p.theme = LIGHT_LEGACY.includes(String((saved as { lightTheme?: unknown }).lightTheme)) ? (saved as { lightTheme: ThemeId }).lightTheme : 'paper';
-    else if (legacyMode === 'dark') p.theme = DARK_LEGACY.includes(String((saved as { darkTheme?: unknown }).darkTheme)) ? (saved as { darkTheme: ThemeId }).darkTheme : 'studio';
-    else if (legacyTheme === 'dark') p.theme = 'studio';
-    else if (legacyTheme === 'light') p.theme = 'paper';
-    if (!THEME_IDS.includes(p.theme)) p.theme = DEFAULT_PREFERENCES.theme;
+    p.theme = savedTheme(saved);
     // the former display modes (editor, cinema, conversation) gave way to the views: the studio first
     delete (p as Partial<Preferences> & { display?: unknown }).display;
     if (!VIEWS.includes(p.view)) p.view = DEFAULT_PREFERENCES.view;
@@ -181,7 +163,7 @@ export const prefs = signal<Preferences>(load());
 
 export function setPrefs(patch: Partial<Preferences>) {
   prefs.value = { ...prefs.peek(), ...patch };
-  try { localStorage.setItem(KEY, JSON.stringify(prefs.peek())); } catch { /* private mode: for this session only */ }
+  try { localStorage.setItem(PREFERENCES_KEY, JSON.stringify(prefs.peek())); } catch { /* private mode: for this session only */ }
 }
 
 /** the model a local tool runs for a task on this computer */
@@ -213,11 +195,7 @@ let lastView = '';
 effect(() => {
   if (typeof document === 'undefined') return;
   const p = prefs.value;
-  const theme = p.theme === 'system' ? (systemLight.value ? 'paper' : 'studio') : p.theme;
-  document.documentElement.dataset.theme = theme;
-  document.documentElement.dataset.view = p.view;
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', BAR[theme] ?? BAR.studio);
-  document.querySelector('meta[name="color-scheme"]')?.setAttribute('content', LIGHT_THEMES.includes(theme) ? 'light' : 'dark');
+  showTheme(document, p.theme, p.view, systemLight.value);
   // another view changes the size of the stage without a window resize: the viewport re-measures on this
   if (lastView && lastView !== p.view) window.dispatchEvent(new Event('resize'));
   lastView = p.view;

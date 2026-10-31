@@ -19,6 +19,7 @@ import { Icon } from './icons.tsx';
 import { m, t } from '../i18n/index.ts';
 import { picking, pixelAt } from '../dropper.ts';
 import { grading, Scopes } from './Scopes.tsx';
+import { Loader } from './Logo.tsx';
 
 /** a finger rather than a mouse: bigger handles */
 const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
@@ -572,7 +573,7 @@ export function Viewport({ bare = false, inset = INSET, overlay, intercept }: Vi
         </svg>
         {overlay}
       </div>
-      {!preview.renderer && !S.renderError.value && <div class="loading">{t('viewport.loadingAssets')}</div>}
+      {!preview.renderer && !S.renderError.value && <div class="loading" role="status"><Loader /><span>{t('viewport.loadingAssets')}</span></div>}
       {S.renderError.value && <div class="error">{S.renderError.value}</div>}
       {pending && !bare && (
         <div class="banner ai">

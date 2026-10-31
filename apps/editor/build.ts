@@ -15,6 +15,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as esbuild from 'esbuild';
 import { checkProject, MANIFEST, packProject } from '@tramme/project';
+import { mark } from '../../scripts/brand.ts';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '../..');
@@ -29,14 +30,21 @@ const ICON = fs.readFileSync(path.join(HERE, 'icon.svg'), 'utf8').trim();
 const OG = path.join(HERE, 'og.jpg');
 const ICONS = path.join(HERE, 'icons');
 
+/** the saved theme put on the page before it paints (src/theme/boot.ts), so the cover and the first paint are in the editor's colours */
+const THEME_BOOT = esbuild.buildSync({ entryPoints: [path.join(HERE, 'src/theme/boot.ts')], bundle: true, minify: true, format: 'iife', target: 'chrome120', write: false, logLevel: 'warning' }).outputFiles[0].text.trim();
+
 /** the cover of a page that is loading (nav.ts): the theme's ground and the mark, there from the page's first paint */
-const COVER = `<div id="boot" aria-hidden="true"><img src="data:image/svg+xml,${encodeURIComponent(ICON)}" alt=""></div>`;
+const COVER = (() => {
+  const { paths, width, height } = mark();
+  return `<div id="boot" aria-hidden="true"><svg viewBox="0 0 ${width} ${height}">${paths.map((d) => `<path d="${d}"/>`).join('')}</svg></div>`;
+})();
 
 /** a page of the build: its bundle and stylesheet, its title, what its head adds, and whether it has the cover */
 const page = (js: string, css: string | undefined, title: string, head: string, cover: boolean) => `<!doctype html>
 <html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="dark">${head}
-<title>${title}</title>
+${cover ? `<script>${THEME_BOOT}</script>
+` : ''}<title>${title}</title>
 <link rel="icon" href="data:image/svg+xml,${encodeURIComponent(ICON)}">
 ${css ? `<link rel="stylesheet" href="/${css}">` : ''}</head>
 <body><div id="app"></div>${cover ? COVER : ''}<script type="module" src="/${js}"></script></body></html>

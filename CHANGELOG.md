@@ -11,6 +11,8 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 ### Changed
 
 - **The new logo everywhere in the app**: the top bars of the editor and the home screen showed the old T of frames and the name in the interface font; they now draw the logo from `brand/svg`, mark and name, the mark alone on a narrow bar. The assistant's and the view switch's marks are the new one too.
+- **Going from the projects to a project and back no longer shows an empty page**: a cover in the theme's colours and the mark is on the page from its first paint and closes before the next one is asked for. The saved theme is put on the page before it paints, so a light theme never starts dark. The assets' loading shows the mark's two shapes coming in one after the other, in place of a line of text.
+- **Models are called by one name everywhere**: the model button, the menu and the usage lines show the name the listing gave (Codex's, OpenRouter's), or, for a model listed by its key only, the key written out ("GPT-5.1 Codex Max" for `gpt-5.1-codex-max`). The steps of a turn open above their button, and the conversation follows its end as the steps come, unless you scrolled up to read.
 - **The app's icons stand on no ground**: the favicon, the installed app's icons and the desktop icon are the mark alone, in the studio's accent, as a program's icon is, not on a white tile. The two icons the systems fill (maskable, Apple's) sit on the studio's dark ground, and the desktop app's own sizes were drawn again.
 
 ## [0.17.0] - 2026-10-31

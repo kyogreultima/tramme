@@ -14,6 +14,7 @@ const box = (svg: string): string => /viewBox="([\d. ]+)"/.exec(svg)?.[1] ?? '';
 // the brand files paint the mark with cls-1 and the name with the others
 export const MARK_BOX = box(mark);
 export const MARK_PATHS = pathsOf(mark, 'cls-1', true);
+const MARK_SHAPES = MARK_PATHS.split('/>').filter(Boolean).map((p) => `${p}/>`);
 const LOGO_BOX = box(logo);
 const LOGO_PATHS = `<g style="fill:var(--accent)">${pathsOf(logo, 'cls-1', true)}</g>${pathsOf(logo, 'cls-1', false)}`;
 
@@ -30,4 +31,9 @@ export function LogoFull({ size = 18 }: { size?: number }) {
 /** the top bars' brand: the logo, only its mark where the bar is narrow (atelier.css) */
 export function Brand({ size = 18 }: { size?: number }) {
   return <><LogoFull size={size} /><LogoMark size={size} /></>;
+}
+
+/** the mark's two shapes coming in one after the other, again and again: what shows while something loads (atelier.css) */
+export function Loader({ size = 44 }: { size?: number }) {
+  return <svg class="loader" width={size} height={size} viewBox={MARK_BOX} aria-hidden="true" dangerouslySetInnerHTML={{ __html: MARK_SHAPES.join('') }} />;
 }
