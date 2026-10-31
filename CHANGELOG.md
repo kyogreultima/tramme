@@ -8,6 +8,8 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-10-31
+
 ### Added
 
 - **The site, redesigned**: one grid, one heading style, one way to show the app. A top bar with menus (Product, Features) that work without script, a footer in columns, and a landing page of five sections: the app playing, **tabs** that switch between the studio, the atelier, the assistant, the packs and the export in one frame (radio inputs and CSS, no script), the examples, the questions (also told to search engines) and the closing call. New pages: **Features** (every section in detail, with the toolbox by category), **Examples** (the repository's films, each with a way into its folder), **Pricing**, **About** (with the facts counted from the code), **Privacy** (what is kept where), and the **changelog** as a docs page. In the editor's own theme, both themes, a phone to a wide screen, the landing page no heavier than before.
@@ -569,7 +571,8 @@ First public release.
 
 - Cloudflare Worker serving the editor and the API, projects stored in R2, access protected by Cloudflare Access.
 
-[Unreleased]: ../../compare/v0.16.0...HEAD
+[Unreleased]: ../../compare/v0.17.0...HEAD
+[0.17.0]: ../../compare/v0.16.0...v0.17.0
 [0.16.0]: ../../compare/v0.15.1...v0.16.0
 [0.15.1]: ../../compare/v0.15.0...v0.15.1
 [0.15.0]: ../../compare/v0.14.0...v0.15.0
