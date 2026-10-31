@@ -6,15 +6,19 @@ import Platform from '../components/Platform.astro';
 import SiteHead from '../components/SiteHead.astro';
 import SocialImage from '../components/SocialImage.astro';
 import { SITE } from '../lib/site';
+import { LOCALES, localeOf, pathFor } from '../lib/i18n';
 import '../styles/global.css';
 
 interface Props { title: string; description: string }
 const { title, description } = Astro.props;
+// the page's language, and the same page in each language (hreflang)
+const locale = localeOf(Astro.url.pathname);
+const alternates = LOCALES.map((l) => ({ l, href: new URL(pathFor(l, Astro.url.pathname), Astro.site).href }));
 const canonical = new URL(Astro.url.pathname, Astro.site).href;
 ---
 
 <!doctype html>
-<html lang="en">
+<html lang={locale}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -22,9 +26,11 @@ const canonical = new URL(Astro.url.pathname, Astro.site).href;
     <meta name="description" content={description} />
     <link rel="canonical" href={canonical} />
     <meta name="theme-color" content="#f5f7f8" />
+    {alternates.map(({ l, href }) => <link rel="alternate" hreflang={l} href={href} />)}
+    <link rel="alternate" hreflang="x-default" href={alternates[0].href} />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content={SITE.name} />
-    <meta property="og:locale" content="en_US" />
+    <meta property="og:locale" content={locale === 'fr' ? 'fr_FR' : 'en_US'} />
     <meta property="og:url" content={canonical} />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
