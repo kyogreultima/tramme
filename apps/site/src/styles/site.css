@@ -15,30 +15,32 @@
   --section: clamp(88px, 11vw, 168px);
   --max: 1440px;
   --gutter: clamp(20px, 4vw, 64px);
-  --bg: #f2f2f0;
-  --panel: #ffffff;
-  --panel-2: #f7f7f5;
-  --field: #e8e8e5;
-  --ink: #0a0a0a;
-  --ink-2: #3f3f3f;
-  --ink-3: #595959;
+  /* the films are black and teal: the paper is a pale teal-grey, the ink its own deep green-black */
+  --bg: #e5eeec;
+  --panel: #f6faf9;
+  --panel-2: #edf4f2;
+  --field: #d6e2df;
+  --ink: #051211;
+  --ink-2: #2b4140;
+  --ink-3: #46605d;
   --accent: #0a7c71;
   --accent-2: #086a61;
-  --accent-text: #076b61;
-  --screen: #060606;
-  --on-screen: #f2f2f0;
+  --accent-text: #066358;
+  --screen: #040a0a;
+  --on-screen: #e8f3f1;
+  --signal: #f2b24a;
 }
 :root[data-theme='dark'] {
-  --bg: #0a0a0a;
-  --panel: #151515;
-  --panel-2: #1b1b1b;
-  --field: #232323;
-  --ink: #f2f2f0;
-  --ink-2: #bcbcba;
-  --ink-3: #8f8f8d;
-  --accent: #2ec4b6;
-  --accent-2: #4fd3c6;
-  --accent-text: #2ec4b6;
+  --bg: #060d0d;
+  --panel: #0e1817;
+  --panel-2: #142120;
+  --field: #1b2b29;
+  --ink: #e8f3f1;
+  --ink-2: #b3c7c4;
+  --ink-3: #8aa19d;
+  --accent: #34d6c3;
+  --accent-2: #5ee3d3;
+  --accent-text: #34d6c3;
 }
 
 h1, h2, h3, .display { font-family: var(--font-head); }
@@ -48,19 +50,19 @@ h1, h2, .display { font-weight: 700; letter-spacing: -0.035em; }
 /* a section that is always dark, whatever the theme: the films' own ground */
 .screen {
   --bg: var(--screen);
-  --panel: #131313;
-  --panel-2: #1a1a1a;
-  --field: #222;
+  --panel: #0c1615;
+  --panel-2: #121f1e;
+  --field: #1a2a28;
   --ink: var(--on-screen);
-  --ink-2: #c4c4c2;
-  --ink-3: #96968f;
-  --line: rgba(242, 242, 240, 0.12);
-  --line-2: rgba(242, 242, 240, 0.22);
-  --hover: rgba(242, 242, 240, 0.08);
-  --accent: #2ec4b6;
-  --accent-2: #4fd3c6;
-  --accent-ink: #021a17;
-  --accent-text: #2ec4b6;
+  --ink-2: #b9cecb;
+  --ink-3: #8fa8a4;
+  --line: rgba(232, 243, 241, 0.12);
+  --line-2: rgba(232, 243, 241, 0.24);
+  --hover: rgba(232, 243, 241, 0.08);
+  --accent: #34d6c3;
+  --accent-2: #5ee3d3;
+  --accent-ink: #021412;
+  --accent-text: #34d6c3;
   color-scheme: dark;
   background: var(--bg);
   color: var(--ink);
@@ -68,16 +70,30 @@ h1, h2, .display { font-weight: 700; letter-spacing: -0.035em; }
 
 /* a section filled with the accent: its text is the ink of the page */
 .filled {
-  --bg: #2ec4b6;
-  --ink: #04201d;
-  --ink-2: #0b3a35;
-  --ink-3: #0b3a35;
-  --line-2: rgba(4, 32, 29, 0.35);
-  --hover: rgba(4, 32, 29, 0.08);
-  --accent: #04201d;
+  --bg: #3be0cb;
+  --ink: #021412;
+  --ink-2: #06312d;
+  --ink-3: #06312d;
+  --line-2: rgba(2, 20, 18, 0.4);
+  --hover: rgba(2, 20, 18, 0.08);
+  --accent: #021412;
   --accent-2: #000;
-  --accent-ink: #f2f2f0;
-  --accent-text: #04201d;
+  --accent-ink: #e8f3f1;
+  --accent-text: #021412;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+/* a second ground, the amber of the films' own palette (the assistant's circles) */
+.signal {
+  --bg: var(--signal);
+  --ink: #1b1100;
+  --ink-2: #3a2700;
+  --ink-3: #3a2700;
+  --line-2: rgba(27, 17, 0, 0.4);
+  --accent: #1b1100;
+  --accent-ink: #fff6e3;
+  --accent-text: #1b1100;
   background: var(--bg);
   color: var(--ink);
 }

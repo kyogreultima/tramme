@@ -2,7 +2,7 @@
 // The first screen: what Tramme is, then a field to describe a film. The field
 // is a plain form sending the text to the app's sign-up address, whose welcome
 // credit makes the first film; each idea is a link to the same address with
-// its sentence filled in. No script. The app's demo video comes under it.
+// its sentence filled in. No script. The app's demo video, framed, comes under it.
 import PaperPlane from '@phosphor-icons/core/assets/regular/paper-plane-right.svg';
 import Media from './Media.astro';
 import { signUp } from '../lib/links';
@@ -16,9 +16,6 @@ const action = signUp();
 ---
 
 <section class="hero screen">
-  <div class="bg">
-    <Media id="tramme" width={1920} height={1080} duration={10} tint={['#0b0f12', '#2ec4b6']} label={`Tramme. ${t(locale, 'landing.hero.demo')}`} />
-  </div>
   <div class="bleed content">
     <h1 class="display">{t(locale, 'landing.hero.title')} {t(locale, 'landing.hero.quiet')}</h1>
     <div class="lower">
@@ -37,27 +34,27 @@ const action = signUp();
       <p class="first">{t(locale, 'landing.hero.firstFilm')}</p>
     </div>
   </div>
+  <div class="bleed stage">
+    <Media id="tramme" width={1920} height={1080} duration={10} tint={['#050c0c', '#34d6c3']} label={`Tramme. ${t(locale, 'landing.hero.demo')}`} />
+  </div>
 </section>
 
 <style>
-  /* the film plays behind everything, edge to edge; a flat veil keeps the words legible */
-  .hero { position: relative; display: grid; align-items: end; min-height: calc(100svh - var(--nav)); overflow: hidden; }
-  .bg { position: absolute; inset: 0; }
-  .bg :global(.media) { position: absolute; inset: 0; aspect-ratio: auto; border-radius: 0; }
-  .bg::after { content: ''; position: absolute; inset: 0; background: rgba(6, 6, 6, 0.55); pointer-events: none; }
-  .content { position: relative; z-index: 1; display: grid; gap: clamp(28px, 4vw, 56px); padding-block: clamp(48px, 7vw, 96px) clamp(32px, 4vw, 56px); }
+  /* the words first, on the films' black; the film itself, large and framed, right under them */
+  .hero { padding-block: clamp(56px, 8vw, 120px) clamp(48px, 6vw, 96px); }
+  .content { display: grid; gap: clamp(28px, 4vw, 56px); padding-bottom: clamp(48px, 6vw, 96px); }
+  .stage :global(.media) { border-radius: var(--r-lg); box-shadow: inset 0 0 0 1px var(--line-2); }
   h1 { max-width: 11ch; font-size: clamp(3.25rem, 9.2vw, 10.5rem); }
   .lower { display: grid; gap: 18px; max-width: 46rem; }
   .lead { font-size: clamp(1.125rem, 1.6vw, 1.375rem); line-height: 1.45; color: var(--ink); }
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
-  .ask { display: flex; gap: 6px; padding: 6px; border-radius: 999px; background: rgba(6, 6, 6, 0.72); box-shadow: inset 0 0 0 1px var(--line-2); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); }
+  .ask { display: flex; gap: 6px; padding: 6px; border-radius: 999px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line-2); }
   .ask input[type='text'] { flex: 1; min-width: 0; padding: 0 22px; border: 0; background: transparent; color: var(--ink); font: inherit; font-size: 1.0625rem; }
   .ask input[type='text']::placeholder { color: var(--ink-3); }
   .ask input[type='text']:focus-visible { outline: none; }
   .ask:focus-within { box-shadow: 0 0 0 2px var(--accent); }
   .ideas { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
-  .ideas .btn { background: rgba(6, 6, 6, 0.5); }
   .first { font-size: 0.9375rem; color: var(--ink-2); }
 
   @media (max-width: 560px) { .ask { flex-direction: column; border-radius: var(--r-lg); } .ask input[type='text'] { height: 48px; } }
