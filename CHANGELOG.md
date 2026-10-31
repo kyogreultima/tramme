@@ -8,6 +8,11 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+### Changed
+
+- **The new logo everywhere in the app**: the top bars of the editor and the home screen showed the old T of frames and the name in the interface font; they now draw the logo from `brand/svg`, mark and name, the mark alone on a narrow bar. The assistant's and the view switch's marks are the new one too.
+- **The app's icons stand on no ground**: the favicon, the installed app's icons and the desktop icon are the mark alone, in the studio's accent, as a program's icon is, not on a white tile. The two icons the systems fill (maskable, Apple's) sit on the studio's dark ground, and the desktop app's own sizes were drawn again.
+
 ## [0.17.0] - 2026-10-31
 
 ### Added

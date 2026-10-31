@@ -1,9 +1,33 @@
-// The Tramme mark: a T whose bar is whole and whose stem is three frames, each
-// a little further along and fainter, like images going by. Drawn in the
-// accent colour of the theme.
+// The Tramme logo, drawn from the brand files (brand/svg, the one place it is
+// drawn): the mark alone, or the mark and the name. The mark takes the accent of
+// the theme, the name the colour of the text around it.
 
-export const LOGO_PATHS = `<rect x="2.5" y="2.6" width="19" height="5" rx="1.8"/><rect x="8.8" y="8.7" width="6.4" height="3.9" rx="1.2"/><rect x="9.9" y="13.7" width="6.4" height="3.9" rx="1.2" opacity=".66"/><rect x="11" y="18.7" width="6.4" height="3.9" rx="1.2" opacity=".36"/>`;
+import mark from '../../../../brand/svg/mark-teal.svg';
+import logo from '../../../../brand/svg/logo-on-light.svg';
+
+/** the paths of an SVG file, of the class given (the mark) or of every other (the name) */
+const pathsOf = (svg: string, cls: string, same: boolean): string =>
+  [...svg.matchAll(/<path\b[^>]*?class="([^"]+)"[^>]*?d="([^"]+)"/g)].filter((m) => (m[1] === cls) === same).map((m) => `<path d="${m[2]}"/>`).join('');
+
+const box = (svg: string): string => /viewBox="([\d. ]+)"/.exec(svg)?.[1] ?? '';
+
+// the brand files paint the mark with cls-1 and the name with the others
+export const MARK_BOX = box(mark);
+export const MARK_PATHS = pathsOf(mark, 'cls-1', true);
+const LOGO_BOX = box(logo);
+const LOGO_PATHS = `<g style="fill:var(--accent)">${pathsOf(logo, 'cls-1', true)}</g>${pathsOf(logo, 'cls-1', false)}`;
 
 export function LogoMark({ size = 18 }: { size?: number }) {
-  return <svg class="brand-mark" width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" dangerouslySetInnerHTML={{ __html: LOGO_PATHS }} />;
+  return <svg class="brand-mark" width={size} height={size} viewBox={MARK_BOX} fill="currentColor" aria-hidden="true" dangerouslySetInnerHTML={{ __html: MARK_PATHS }} />;
+}
+
+/** the mark and the name, `size` tall; the name is in the text colour, the mark in the accent */
+export function LogoFull({ size = 18 }: { size?: number }) {
+  const [, , w, h] = LOGO_BOX.split(' ').map(Number);
+  return <svg class="brand-logo" width={size * w / h} height={size} viewBox={LOGO_BOX} fill="currentColor" role="img" aria-label="Tramme" dangerouslySetInnerHTML={{ __html: LOGO_PATHS }} />;
+}
+
+/** the top bars' brand: the logo, only its mark where the bar is narrow (atelier.css) */
+export function Brand({ size = 18 }: { size?: number }) {
+  return <><LogoFull size={size} /><LogoMark size={size} /></>;
 }

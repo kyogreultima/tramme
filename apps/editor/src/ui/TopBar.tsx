@@ -19,7 +19,7 @@ import { exportQueue } from '../export-queue.ts';
 import { exportRangeOf, frameSpan } from '../exportspan.ts';
 import { VIDEO, WEB_FORMATS, type WebFormat } from '../formats.ts';
 import { Icon } from './icons.tsx';
-import { LogoMark } from './Logo.tsx';
+import { Brand } from './Logo.tsx';
 import { settingsOpen, prefs, VIEWS } from '../settings.ts';
 import { setView, VIEW_LABEL, ViewSwitch } from './views.tsx';
 import { HelpButton, helpMenu } from './Help.tsx';
@@ -326,7 +326,7 @@ export function TopBar() {
   const choice: FormatChoice = { fmt, fps: c.fps, setFormat, setFps: (n) => commit(t('common.frameRate'), [{ op: 'replace', path: `${cp}/fps`, value: n }]), comps: comps.length > 1 ? comps.map(([id, x]) => [id, x.name] as [string, string]) : [] };
   return (
     <header class={`topbar${studio ? ' in-studio' : ''}`} {...windowBar}>
-      <a class="brand" href="/" title={t('topbar.allProjects')} onClick={leave}><LogoMark /><span>Tramme</span></a>
+      <a class="brand" href="/" title={t('topbar.allProjects')} onClick={leave}><Brand /></a>
       <span class="sep" />
       <div class="project" data-tour="project">
         <input class="title" value={project.name} spellcheck={false} aria-label={t('topbar.projectName')}

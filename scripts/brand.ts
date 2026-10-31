@@ -22,6 +22,13 @@ export function accent(theme: 'studio' | 'paper'): string {
   return hex;
 }
 
+/** the background of one of the editor's themes ('studio' is dark, 'paper' light) */
+export function ground(theme: 'studio' | 'paper' = 'studio'): string {
+  const hex = new RegExp(`\\[data-theme="${theme}"\\]\\s*\\{[^}]*?--bg:\\s*(#[0-9a-f]{6})`, 'i').exec(tokens)?.[1];
+  if (!hex) throw new Error(`no --bg for the ${theme} theme in apps/editor/src/theme/tokens.css`);
+  return hex;
+}
+
 /** the mark alone: its paths, and the box they are drawn in */
 export function mark(): { paths: string[]; width: number; height: number } {
   const svg = brand('mark-teal.svg');

@@ -23,7 +23,7 @@ import { expandMentions } from '../mentions.ts';
 import { MicButton, writeInto } from './MicButton.tsx';
 import { Modal, longPress, openMenu, Seg } from './controls.tsx';
 import { Icon } from './icons.tsx';
-import { LogoMark } from './Logo.tsx';
+import { Brand } from './Logo.tsx';
 import { ModelPicker } from './ModelPicker.tsx';
 import { Overlays } from './shell.tsx';
 import { HelpButton } from './Help.tsx';
@@ -336,7 +336,7 @@ export function Home() {
       onDragLeave={(e) => { if (e.target === e.currentTarget) setDrag(false); }}
       onDrop={(e) => { e.preventDefault(); setDrag(false); if (e.dataTransfer) droppedOf(e.dataTransfer).then(openFiles).catch((x) => setDialog({ kind: 'failure', error: x as Error })); }}>
       <header class="home-top" {...windowBar}>
-        <div class="brand"><LogoMark /><span>Tramme</span></div>
+        <div class="brand"><Brand size={20} /></div>
         <span class="grow" />
         {installable.value && <button class="btn outline sm" title={t('home.installAppHint')} onClick={install}><Icon name="download" /><span class="label">{t('home.installApp')}</span></button>}
         <HelpButton page="home" />

@@ -1,6 +1,6 @@
 // Line icons on a 16 px grid, 1.6 stroke: one family for the whole editor.
 
-import { LOGO_PATHS } from './Logo.tsx';
+import { MARK_BOX, MARK_PATHS } from './Logo.tsx';
 
 const P: Record<string, string> = {
   play: 'M5 3.5v9l7.5-4.5z',
@@ -100,7 +100,7 @@ export type IconName = keyof typeof P | string;
 export function Icon({ name, class: cls = '', size }: { name: IconName; class?: string; size?: number }) {
   // the Tramme mark, where a line icon would not do (the view switch, the assistant)
   if (name === 'mark') {
-    return <svg class={`i ${cls}`} viewBox="0 0 24 24" width={size} height={size} aria-hidden="true" style={{ fill: 'currentColor', stroke: 'none' }} dangerouslySetInnerHTML={{ __html: LOGO_PATHS }} />;
+    return <svg class={`i ${cls}`} viewBox={MARK_BOX} width={size} height={size} aria-hidden="true" style={{ fill: 'currentColor', stroke: 'none' }} dangerouslySetInnerHTML={{ __html: MARK_PATHS }} />;
   }
   const d = P[name] ?? P.box;
   const filled = name === 'play' || name === 'diamond' || name === 'stop' || name === 'keyframe';

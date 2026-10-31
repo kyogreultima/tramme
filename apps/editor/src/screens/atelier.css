@@ -31,8 +31,11 @@
   display: flex; align-items: center; gap: 10px; padding: 0 10px 0 14px; min-width: 0;
   background: transparent;
 }
-.brand { display: flex; align-items: center; gap: 8px; font: 600 14px/1 var(--ui); letter-spacing: -0.02em; color: var(--text); }
+.brand { display: flex; align-items: center; gap: 8px; color: var(--text); }
 .brand-mark { flex: none; color: var(--accent); }
+/* the logo carries its name; the mark alone stands in where the bar is narrow */
+.brand > .brand-logo { flex: none; }
+.brand > .brand-logo + .brand-mark { display: none; }
 .topbar .sep { width: 1px; height: 18px; background: var(--line-strong); flex: none; }
 .project { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .project input.title {
@@ -498,7 +501,8 @@ svg.i.flip { transform: rotate(180deg); }
 .mobile-tabs { display: none; }
 @media (max-width: 900px) {
   /* the composition and the format leave the bar: the ⋯ menu carries them (TopBar.tsx) */
-  .topbar .hide-sm, .topbar .project .save-state span, .topbar .brand > span:not(.brand-mark) { display: none; }
+  .topbar .hide-sm, .topbar .project .save-state span, .topbar .brand > .brand-logo { display: none; }
+  .topbar .brand > .brand-logo + .brand-mark { display: block; }
   .topbar .more-btn { display: grid; place-items: center; }
   .topbar { gap: 8px; }
 }

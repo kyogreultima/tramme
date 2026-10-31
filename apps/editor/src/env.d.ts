@@ -17,6 +17,11 @@ declare module '*.md' {
   export default text;
 }
 
+declare module '*.svg' {
+  const text: string;
+  export default text;
+}
+
 /** RNNoise compiled to WebAssembly (the denoise tool): a factory of its Emscripten module */
 declare module '@jitsi/rnnoise-wasm/dist/rnnoise-sync.js' {
   const create: () => unknown;
