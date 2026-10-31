@@ -1,16 +1,20 @@
 ---
 // The questions people ask first (lib/faq.ts), one <details> each: they open
 // and close without script, and the page tells the search engines the same
-// questions (lib/site.ts).
+// questions (lib/site.ts). The landing shows the general ones, the pricing
+// page the questions about the plans.
 import Head from './Head.astro';
-import { FAQ } from '../lib/faq';
----
+import { faq, type Topic } from '../lib/faq';
+import { t, type Locale } from '../lib/i18n';
 
+interface Props { locale: Locale; topics?: Topic[] }
+const { locale, topics } = Astro.props;
+---
 <section class="section" id="faq">
   <div class="wrap">
-    <Head title="Questions, answered." more="The things people ask before they start." />
+    <Head title={t(locale, 'faq.title')} more={t(locale, 'faq.more')} />
     <div class="list" data-reveal>
-      {FAQ.map(({ q, a }) => (
+      {faq(locale, topics).map(({ q, a }) => (
         <details class="surface">
           <summary>{q}</summary>
           <p>{a}</p>

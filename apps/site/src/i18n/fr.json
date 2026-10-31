@@ -42,6 +42,10 @@
     "language": "Langue",
     "theme": "Thème"
   },
+  "faq": {
+    "title": "Vos questions, nos réponses.",
+    "more": "Ce qu'on demande avant de commencer."
+  },
   "common": {
     "logIn": "Se connecter",
     "startFree": "Commencer gratuitement",

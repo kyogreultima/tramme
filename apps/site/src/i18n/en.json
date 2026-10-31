@@ -42,6 +42,10 @@
     "language": "Language",
     "theme": "Theme"
   },
+  "faq": {
+    "title": "Questions, answered.",
+    "more": "The things people ask before they start."
+  },
   "common": {
     "logIn": "Log in",
     "startFree": "Start for free",

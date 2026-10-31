@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { PAGES, docHref } from '../src/lib/docs';
 import { TOOL_GROUPS } from '../src/lib/tools';
 import { SRC, idsOf, read, sourcesOf } from './sources';
+import { APP, appProject, logIn, signUp, space } from '../src/lib/links';
 
 const pages = fs.readdirSync(path.join(SRC, 'pages')).filter((f) => f.endsWith('.astro'));
 const slugs = new Set(PAGES.map((p) => p.slug));
@@ -34,5 +35,19 @@ describe('the links written in the site\'s pages and components', () => {
     const paths = [...read('pages/llms.txt.ts').matchAll(/\['(\/[\w-]+\/)'/g)].map((m) => m[1]);
     expect(paths.length).toBeGreaterThan(0);
     for (const p of paths) expect(fs.existsSync(path.join(SRC, 'pages', `${p.replace(/\//g, '')}.astro`)), `${p} has no page`).toBe(true);
+  });
+});
+
+describe('the addresses of the app', () => {
+  it('carry the prompt and the language to sign-up', () => {
+    expect(signUp({ prompt: 'a launch film', lang: 'fr' })).toBe(`${APP}/signup?prompt=a%20launch%20film&lang=fr`);
+    expect(signUp()).toBe(`${APP}/signup`);
+    expect(signUp({ prompt: '  ', lang: 'en' })).toBe(`${APP}/signup?lang=en`);
+  });
+
+  it('open a public project for reuse', () => {
+    expect(appProject('anime', 'fr')).toBe(`${APP}/p/anime?lang=fr`);
+    expect(logIn()).toBe(`${APP}/login`);
+    expect(space('en')).toBe(`${APP}/space?lang=en`);
   });
 });

@@ -2,7 +2,7 @@
 // link previews, the search engines' structured data, robots.txt, llms.txt.
 
 import { APP, REPO, repoFile } from './links';
-import { FAQ } from './faq';
+import { faq } from './faq';
 
 export const SITE = {
   /** the public address (SITE_URL overrides it, for a deployment elsewhere) */
@@ -41,7 +41,7 @@ export function landingData(site: URL, preview: string, systems: string[]) {
       {
         '@type': 'FAQPage',
         '@id': `${home}#faq`,
-        mainEntity: FAQ.map(({ q, a }) => ({ '@type': 'Question', name: q, acceptedAnswer: { '@type': 'Answer', text: a } })),
+        mainEntity: faq('en').map(({ q, a }) => ({ '@type': 'Question', name: q, acceptedAnswer: { '@type': 'Answer', text: a } })),
       },
       {
         '@type': 'SoftwareSourceCode',
