@@ -1,6 +1,5 @@
 ---
 // The last word before the footer: the call once more, and a quiet line to the plans
-import Head from './Head.astro';
 import { signUp } from '../lib/links';
 import { pathIn, t, type Locale } from '../lib/i18n';
 
@@ -8,22 +7,24 @@ interface Props { locale: Locale }
 const { locale } = Astro.props;
 ---
 
-<section class="section" aria-label={t(locale, 'landing.closing.label')}>
-  <div class="wrap">
-    <div class="band surface">
-      <Head title={t(locale, 'landing.closing.title')} more={t(locale, 'landing.closing.more')} />
-      <div class="ctas">
-        <a class="btn btn-accent" href={signUp({ lang: locale })}>{t(locale, 'common.startFree')}</a>
-      </div>
+<section class="filled" aria-label={t(locale, 'landing.closing.label')}>
+  <div class="bleed band">
+    <h2 class="display">{t(locale, 'landing.closing.title')}</h2>
+    <div class="side">
+      <p class="more">{t(locale, 'landing.closing.more')}</p>
+      <a class="btn btn-accent" href={signUp({ lang: locale })}>{t(locale, 'common.startFree')}</a>
       <p class="plans">{t(locale, 'landing.closing.basic')} <a href={pathIn(locale, '/pricing/')}>{t(locale, 'landing.closing.plans')}</a></p>
     </div>
   </div>
 </section>
 
 <style>
-  .band { padding: clamp(48px, 7vw, 96px) clamp(20px, 5vw, 72px); }
-  .band :global(.head) { margin-bottom: 28px; }
-  .ctas { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
-  .plans { margin-top: 20px; text-align: center; font-size: 0.9375rem; color: var(--ink-3); }
-  .plans a { color: var(--accent-text); text-underline-offset: 3px; }
+  /* the page's last word, filled with the accent */
+  section { margin-top: var(--section); }
+  .band { display: grid; gap: clamp(32px, 5vw, 72px); padding-block: clamp(64px, 9vw, 140px); }
+  h2 { max-width: 12ch; font-size: clamp(3rem, 9.4vw, 10rem); line-height: 0.92; letter-spacing: -0.04em; }
+  .side { display: grid; justify-items: start; gap: 20px; max-width: 30rem; }
+  .more { font-size: clamp(1.125rem, 1.6vw, 1.375rem); line-height: 1.45; }
+  .plans { font-size: 0.9375rem; color: var(--ink-2); }
+  .plans a { color: var(--ink); text-underline-offset: 3px; }
 </style>

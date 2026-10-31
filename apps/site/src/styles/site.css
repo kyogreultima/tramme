@@ -1,0 +1,94 @@
+/* The site's own identity, over the shared tokens (theme.css): loaded by the
+   site's pages only (layouts/Base.astro), never by the docs.
+
+   The page is a cinema and a desk. "Screen" sections are always dark and run
+   edge to edge: the films are what you look at there. "Paper" sections follow
+   the visitor's theme. Headlines are left-aligned, very large and tight, in a
+   display face of their own; the accent is the brand's teal, and one block
+   (the closing call) is filled with it. No gradient, no glow. */
+
+:root {
+  --font-head: var(--font-display), var(--font-sans), system-ui, sans-serif;
+  --r: 18px;
+  --r-lg: 32px;
+  --nav: 72px;
+  --section: clamp(88px, 11vw, 168px);
+  --max: 1440px;
+  --gutter: clamp(20px, 4vw, 64px);
+  --bg: #f2f2f0;
+  --panel: #ffffff;
+  --panel-2: #f7f7f5;
+  --field: #e8e8e5;
+  --ink: #0a0a0a;
+  --ink-2: #3f3f3f;
+  --ink-3: #595959;
+  --accent: #0a7c71;
+  --accent-2: #086a61;
+  --accent-text: #076b61;
+  --screen: #060606;
+  --on-screen: #f2f2f0;
+}
+:root[data-theme='dark'] {
+  --bg: #0a0a0a;
+  --panel: #151515;
+  --panel-2: #1b1b1b;
+  --field: #232323;
+  --ink: #f2f2f0;
+  --ink-2: #bcbcba;
+  --ink-3: #8f8f8d;
+  --accent: #2ec4b6;
+  --accent-2: #4fd3c6;
+  --accent-text: #2ec4b6;
+}
+
+h1, h2, h3, .display { font-family: var(--font-head); }
+h1, h2, .display { font-weight: 700; letter-spacing: -0.035em; }
+.display { font-size: clamp(3.25rem, 11.5vw, 12rem); line-height: 0.9; letter-spacing: -0.04em; }
+
+/* a section that is always dark, whatever the theme: the films' own ground */
+.screen {
+  --bg: var(--screen);
+  --panel: #131313;
+  --panel-2: #1a1a1a;
+  --field: #222;
+  --ink: var(--on-screen);
+  --ink-2: #c4c4c2;
+  --ink-3: #96968f;
+  --line: rgba(242, 242, 240, 0.12);
+  --line-2: rgba(242, 242, 240, 0.22);
+  --hover: rgba(242, 242, 240, 0.08);
+  --accent: #2ec4b6;
+  --accent-2: #4fd3c6;
+  --accent-ink: #021a17;
+  --accent-text: #2ec4b6;
+  color-scheme: dark;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+/* a section filled with the accent: its text is the ink of the page */
+.filled {
+  --bg: #2ec4b6;
+  --ink: #04201d;
+  --ink-2: #0b3a35;
+  --ink-3: #0b3a35;
+  --line-2: rgba(4, 32, 29, 0.35);
+  --hover: rgba(4, 32, 29, 0.08);
+  --accent: #04201d;
+  --accent-2: #000;
+  --accent-ink: #f2f2f0;
+  --accent-text: #04201d;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+/* full width: the container's gutter, nothing more */
+.bleed { width: 100%; padding-inline: var(--gutter); }
+.wrap { max-width: var(--max); }
+
+.btn { height: 52px; padding: 0 26px; font-size: 1rem; }
+.btn-sm { height: 40px; padding: 0 18px; font-size: 0.9375rem; }
+
+/* the page ends on a block of its own (the closing call, the footer): no gap between */
+main { padding-bottom: var(--section); }
+main:has(> :last-child.filled) { padding-bottom: 0; }

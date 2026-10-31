@@ -26,6 +26,7 @@ export default defineConfig({
   vite: { define: { __RELEASE__: JSON.stringify(release) } },
   fonts: [
     { provider: fontProviders.fontsource(), name: 'Geist', cssVariable: '--font-sans', weights: ['300 700'], styles: ['normal'] },
+    { provider: fontProviders.fontsource(), name: 'Bricolage Grotesque', cssVariable: '--font-display', weights: ['300 800'], styles: ['normal'] },
     { provider: fontProviders.fontsource(), name: 'Geist Mono', cssVariable: '--font-mono', weights: ['400 500'], styles: ['normal'] },
   ],
   integrations: [

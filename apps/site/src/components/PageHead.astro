@@ -12,8 +12,8 @@ const hasLead = Boolean(lead) || Astro.slots.has('default');
 </header>
 
 <style>
-  .page-head { display: grid; justify-items: center; gap: 20px; padding-top: clamp(40px, 6vw, 80px); text-align: center; }
-  h1 { max-width: 18ch; font-size: clamp(2.5rem, 5.6vw, 4.5rem); line-height: 1; letter-spacing: -0.045em; }
-  p { max-width: 38rem; font-size: 1.1875rem; line-height: 1.55; color: var(--ink-2); }
+  .page-head { display: grid; justify-items: start; gap: 24px; padding-top: clamp(48px, 8vw, 120px); text-align: left; max-width: var(--max); }
+  h1 { max-width: 16ch; font-size: clamp(3rem, 8.6vw, 9rem); line-height: 0.9; letter-spacing: -0.04em; }
+  p { max-width: 38rem; font-size: clamp(1.125rem, 1.6vw, 1.375rem); line-height: 1.5; color: var(--ink-2); }
   p :global(a) { color: var(--accent-text); text-underline-offset: 3px; }
 </style>

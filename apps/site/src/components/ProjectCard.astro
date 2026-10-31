@@ -50,16 +50,19 @@ const { id, title, author, poster, video, width, height } = project;
 </script>
 
 <style>
-  .card { position: relative; display: grid; gap: 12px; }
-  .frame { position: relative; aspect-ratio: 16 / 10; overflow: hidden; border-radius: var(--r); background: var(--field); }
+  /* the film fills the card; its title and author sit over its lower edge on a flat veil */
+  .card { position: relative; display: block; height: 100%; overflow: hidden; border-radius: var(--r); background: var(--field); }
+  .frame { position: relative; aspect-ratio: 16 / 10; height: 100%; width: 100%; transition: transform 0.6s var(--ease); }
   .frame :global(img), .frame :global(video) { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-  .card:hover .frame, .card:focus-within .frame { box-shadow: 0 0 0 2px var(--accent); }
-  .by { display: grid; grid-template-columns: auto 1fr; grid-template-areas: 'avatar title' 'avatar name'; column-gap: 10px; align-items: center; }
-  .avatar { grid-area: avatar; display: grid; place-items: center; width: 32px; height: 32px; overflow: hidden; border-radius: 999px; background: var(--accent-soft); color: var(--accent-text); font-size: 0.875rem; font-weight: 600; }
+  .card:hover .frame, .card:focus-within .frame { transform: scale(1.04); }
+  .card:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .by { position: absolute; inset: auto 0 0 0; display: grid; grid-template-columns: auto 1fr; grid-template-areas: 'avatar title' 'avatar name'; column-gap: 12px; align-items: center; padding: 14px 16px; background: rgba(6, 6, 6, 0.62); color: var(--on-screen); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+  .avatar { grid-area: avatar; display: grid; place-items: center; width: 34px; height: 34px; overflow: hidden; border-radius: 999px; background: rgba(242, 242, 240, 0.18); font-size: 0.875rem; font-weight: 600; }
   .avatar img { width: 100%; height: 100%; object-fit: cover; }
-  h3 { grid-area: title; font-size: 1rem; letter-spacing: -0.015em; line-height: 1.25; }
+  h3 { grid-area: title; font-family: var(--font-sans); font-size: 1rem; font-weight: 600; letter-spacing: -0.015em; line-height: 1.2; }
   /* the whole card is the link */
-  h3 a { color: var(--ink); text-decoration: none; }
-  h3 a::after { content: ''; position: absolute; inset: 0; border-radius: var(--r); }
-  .name { grid-area: name; font-size: 0.875rem; color: var(--ink-3); }
+  h3 a { color: inherit; text-decoration: none; }
+  h3 a::after { content: ''; position: absolute; inset: 0; }
+  .name { grid-area: name; font-size: 0.875rem; color: rgba(242, 242, 240, 0.72); }
+  @media (prefers-reduced-motion: reduce) { .frame { transition: none; } }
 </style>

@@ -60,25 +60,14 @@ const { logIn, start } = barButtons(locale);
 </script>
 
 <style>
-  /* the app's top bar: a pill floating over the page, the page passing under it */
-  .nav { position: sticky; top: 0; z-index: 10; padding: 10px var(--gutter) 0; }
-  .row {
-    display: flex; align-items: center; gap: 28px; height: calc(var(--nav) - 10px);
-    max-width: calc(var(--max) - 2 * var(--gutter)); padding-inline: 18px 8px; border-radius: 999px;
-    background: color-mix(in srgb, var(--bg) 82%, transparent);
-    -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
-  }
-  .home { flex: none; text-decoration: none; font-size: 1.05rem; }
+  /* a flat bar, edge to edge: the page passes under it, blurred */
+  .nav { position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--bg) 78%, transparent); -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); }
+  .row { display: flex; align-items: center; gap: 28px; height: var(--nav); max-width: none; }
+  .home { flex: none; text-decoration: none; font-size: 1.15rem; }
   .links { display: flex; gap: 4px; margin: 0 auto; padding: 0; list-style: none; }
   .links > li > a { display: block; padding: 7px 12px; border-radius: 999px; color: var(--ink-2); text-decoration: none; font-size: 0.875rem; transition: color 0.2s var(--ease), background-color 0.2s var(--ease); }
   .links > li > a:hover { color: var(--ink); background: var(--hover); }
   .end { display: flex; align-items: center; gap: 8px; }
-  /* once the page moves under it, the bar becomes a surface */
-  @supports (animation-timeline: scroll()) {
-    .row { animation-name: lifted; animation-timing-function: linear; animation-fill-mode: both; animation-timeline: scroll(); animation-range: 0 64px; }
-    @keyframes lifted { to { background: color-mix(in srgb, var(--panel) 88%, transparent); box-shadow: 0 0 0 1px var(--line), 0 12px 32px -20px rgba(0, 0, 0, 0.35); } }
-  }
-
   .fold { position: relative; display: none; }
   .fold summary { list-style: none; }
   .fold summary::-webkit-details-marker { display: none; }

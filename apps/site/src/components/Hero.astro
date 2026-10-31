@@ -15,53 +15,56 @@ const IDEAS = ['launch', 'explainer', 'social', 'titles'];
 const action = signUp();
 ---
 
-<section class="hero">
-  <div class="wrap top">
-    <h1 class="display">{t(locale, 'landing.hero.title')} <span class="quiet">{t(locale, 'landing.hero.quiet')}</span></h1>
-    <p>{t(locale, 'landing.hero.more')}</p>
-    <form class="ask" method="get" action={action}>
-      <label class="sr" for="prompt">{t(locale, 'landing.hero.field')}</label>
-      <input id="prompt" name="prompt" type="text" required autocomplete="off" placeholder={t(locale, 'landing.hero.placeholder')} />
-      <input type="hidden" name="lang" value={locale} />
-      <button class="btn btn-accent" type="submit">{t(locale, 'landing.hero.send')}<PaperPlane aria-hidden="true" /></button>
-    </form>
-    <ul class="ideas" role="list" aria-label={t(locale, 'landing.hero.ideas')}>
-      {IDEAS.map((id) => (
-        <li><a class="btn btn-ghost btn-sm" href={signUp({ prompt: t(locale, `landing.hero.idea.${id}.prompt`), lang: locale })}>{t(locale, `landing.hero.idea.${id}.label`)}</a></li>
-      ))}
-    </ul>
-    <p class="first">{t(locale, 'landing.hero.firstFilm')}</p>
-  </div>
-
-  <div class="wrap stage">
+<section class="hero screen">
+  <div class="bg">
     <Media id="tramme" width={1920} height={1080} duration={10} tint={['#0b0f12', '#2ec4b6']} label={`Tramme. ${t(locale, 'landing.hero.demo')}`} />
+  </div>
+  <div class="bleed content">
+    <h1 class="display">{t(locale, 'landing.hero.title')} {t(locale, 'landing.hero.quiet')}</h1>
+    <div class="lower">
+      <p class="lead">{t(locale, 'landing.hero.more')}</p>
+      <form class="ask" method="get" action={action}>
+        <label class="sr" for="prompt">{t(locale, 'landing.hero.field')}</label>
+        <input id="prompt" name="prompt" type="text" required autocomplete="off" placeholder={t(locale, 'landing.hero.placeholder')} />
+        <input type="hidden" name="lang" value={locale} />
+        <button class="btn btn-accent" type="submit">{t(locale, 'landing.hero.send')}<PaperPlane aria-hidden="true" /></button>
+      </form>
+      <ul class="ideas" role="list" aria-label={t(locale, 'landing.hero.ideas')}>
+        {IDEAS.map((id) => (
+          <li><a class="btn btn-ghost btn-sm" href={signUp({ prompt: t(locale, `landing.hero.idea.${id}.prompt`), lang: locale })}>{t(locale, `landing.hero.idea.${id}.label`)}</a></li>
+        ))}
+      </ul>
+      <p class="first">{t(locale, 'landing.hero.firstFilm')}</p>
+    </div>
   </div>
 </section>
 
 <style>
-  .hero { padding-top: clamp(40px, 6vw, 80px); }
-  .top { display: flex; flex-direction: column; align-items: center; gap: 22px; text-align: center; }
-  h1 { max-width: 14ch; }
-  h1 .quiet { display: block; color: var(--ink-3); }
-  .top > p { max-width: 34rem; font-size: 1.1875rem; line-height: 1.55; color: var(--ink-2); }
+  /* the film plays behind everything, edge to edge; a flat veil keeps the words legible */
+  .hero { position: relative; display: grid; align-items: end; min-height: calc(100svh - var(--nav)); overflow: hidden; }
+  .bg { position: absolute; inset: 0; }
+  .bg :global(.media) { position: absolute; inset: 0; aspect-ratio: auto; border-radius: 0; }
+  .bg::after { content: ''; position: absolute; inset: 0; background: rgba(6, 6, 6, 0.55); pointer-events: none; }
+  .content { position: relative; z-index: 1; display: grid; gap: clamp(28px, 4vw, 56px); padding-block: clamp(48px, 7vw, 96px) clamp(32px, 4vw, 56px); }
+  h1 { max-width: 11ch; font-size: clamp(3.25rem, 9.2vw, 10.5rem); }
+  .lower { display: grid; gap: 18px; max-width: 46rem; }
+  .lead { font-size: clamp(1.125rem, 1.6vw, 1.375rem); line-height: 1.45; color: var(--ink); }
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
-  .ask { display: flex; width: min(100%, 40rem); gap: 6px; padding: 6px; border-radius: 999px; background: var(--panel); box-shadow: var(--lift); }
-  .ask input[type='text'] { flex: 1; min-width: 0; padding: 0 18px; border: 0; background: transparent; color: var(--ink); font: inherit; font-size: 1rem; }
+  .ask { display: flex; gap: 6px; padding: 6px; border-radius: 999px; background: rgba(6, 6, 6, 0.72); box-shadow: inset 0 0 0 1px var(--line-2); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); }
+  .ask input[type='text'] { flex: 1; min-width: 0; padding: 0 22px; border: 0; background: transparent; color: var(--ink); font: inherit; font-size: 1.0625rem; }
   .ask input[type='text']::placeholder { color: var(--ink-3); }
   .ask input[type='text']:focus-visible { outline: none; }
   .ask:focus-within { box-shadow: 0 0 0 2px var(--accent); }
-  .ideas { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 0; padding: 0; list-style: none; }
-  .top > .first { font-size: 0.9375rem; color: var(--ink-3); }
+  .ideas { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
+  .ideas .btn { background: rgba(6, 6, 6, 0.5); }
+  .first { font-size: 0.9375rem; color: var(--ink-2); }
 
-  .stage { margin-top: clamp(40px, 5vw, 72px); }
-  .stage :global(.media) { box-shadow: var(--lift); border-radius: var(--r-lg); }
-
-  @media (max-width: 560px) { .ask { flex-direction: column; border-radius: var(--r-lg); } .ask input[type='text'] { height: 44px; } }
+  @media (max-width: 560px) { .ask { flex-direction: column; border-radius: var(--r-lg); } .ask input[type='text'] { height: 48px; } }
+  /* the one moment of motion on the page: the title comes up once, as the page opens */
   @media (prefers-reduced-motion: no-preference) {
-    h1, .top > p, .ask, .ideas, .stage { animation: enter 0.9s var(--ease) both; }
-    .top > p, .ask { animation-delay: 100ms; }
-    .ideas, .stage { animation-delay: 200ms; }
+    h1 { animation: enter 1s var(--ease) both; }
+    .lower { animation: enter 1s 150ms var(--ease) both; }
   }
-  @keyframes enter { from { opacity: 0; transform: translateY(20px); } }
+  @keyframes enter { from { opacity: 0; transform: translateY(24px); } }
 </style>

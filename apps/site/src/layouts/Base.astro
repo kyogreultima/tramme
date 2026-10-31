@@ -7,7 +7,9 @@ import SiteHead from '../components/SiteHead.astro';
 import SocialImage from '../components/SocialImage.astro';
 import { SITE } from '../lib/site';
 import { LOCALES, localeOf, pathFor } from '../lib/i18n';
+import { Font } from 'astro:assets';
 import '../styles/global.css';
+import '../styles/site.css';
 
 interface Props { title: string; description: string }
 const { title, description } = Astro.props;
@@ -41,6 +43,7 @@ const canonical = new URL(Astro.url.pathname, Astro.site).href;
     <ThemeProvider />
     <Platform />
     <SiteHead />
+    <Font cssVariable="--font-display" preload />
     <slot name="head" />
   </head>
   <body>

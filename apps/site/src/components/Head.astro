@@ -1,6 +1,6 @@
 ---
-// A section's heading, the same everywhere: a title, centred, and one sentence
-// under it. The space below it is the section's, so what follows never sets its own.
+// A section's heading, the same everywhere: a large title, left-aligned, and one
+// sentence under it. The space below it is the section's, so what follows never sets its own.
 interface Props { title: string; more?: string }
 const { title, more } = Astro.props;
 ---
@@ -11,7 +11,8 @@ const { title, more } = Astro.props;
 </header>
 
 <style>
-  .head { display: grid; justify-items: center; gap: 14px; margin-bottom: clamp(32px, 4vw, 56px); text-align: center; }
-  h2 { max-width: 22ch; font-size: clamp(2rem, 4vw, 3.25rem); line-height: 1.05; letter-spacing: -0.04em; }
-  p { max-width: 36rem; font-size: 1.125rem; line-height: 1.55; color: var(--ink-2); }
+  /* left-aligned and large: a section opens like a title card */
+  .head { display: grid; justify-items: start; gap: 18px; margin-bottom: clamp(36px, 5vw, 72px); text-align: left; }
+  h2 { max-width: 14ch; font-size: clamp(2.5rem, 6.4vw, 6.5rem); line-height: 0.95; }
+  p { max-width: 34rem; font-size: clamp(1.0625rem, 1.5vw, 1.3125rem); line-height: 1.5; color: var(--ink-2); }
 </style>

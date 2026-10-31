@@ -23,8 +23,8 @@ describe('the landing page', () => {
     expect(read('components/Tabs.astro')).not.toContain('<script');
   });
 
-  it('has one heading style: every section but the hero takes its heading from Head', () => {
-    for (const file of ['Tabs', 'Community', 'Bento', 'Closing']) expect(read(`components/${file}.astro`), file).toContain("import Head from './Head.astro'");
+  it('has one heading style: every section with a title card takes it from Head (the hero and the closing call set their own display type)', () => {
+    for (const file of ['Tabs', 'Community', 'Bento']) expect(read(`components/${file}.astro`), file).toContain("import Head from './Head.astro'");
   });
 
   it('sends the hero field to the sign-up address, without script', () => {

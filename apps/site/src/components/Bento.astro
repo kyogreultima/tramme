@@ -11,25 +11,27 @@ import { pathIn, t, type Locale } from '../lib/i18n';
 
 interface Props { locale: Locale }
 const { locale } = Astro.props;
-// the columns each tile spans, out of six
+// the columns each tile spans, out of six, and its ground: the films' dark, the paper, or the accent
 const TILES = [
-  { id: 'devices', Icon: Devices, span: 4 },
-  { id: 'visibility', Icon: LockSimple, span: 2 },
-  { id: 'export', Icon: CloudArrowUp, span: 2 },
-  { id: 'subtitles', Icon: ClosedCaptioning, span: 2 },
-  { id: 'packs', Icon: Shapes, span: 2 },
+  { id: 'devices', Icon: Devices, span: 4, tone: 'screen' },
+  { id: 'visibility', Icon: LockSimple, span: 2, tone: 'surface' },
+  { id: 'export', Icon: CloudArrowUp, span: 2, tone: 'filled' },
+  { id: 'subtitles', Icon: ClosedCaptioning, span: 2, tone: 'surface' },
+  { id: 'packs', Icon: Shapes, span: 2, tone: 'screen' },
 ];
 ---
 
 <section class="section" id="platform">
-  <div class="wrap">
+  <div class="bleed">
     <Head title={t(locale, 'landing.platform.title')} more={t(locale, 'landing.platform.more')} />
     <ul class="bento" role="list" data-reveal>
-      {TILES.map(({ id, Icon, span }) => (
-        <li class="surface" style={`--span: ${span}`}>
+      {TILES.map(({ id, Icon, span, tone }) => (
+        <li class={tone} style={`--span: ${span}`}>
           <span class="icon"><Icon aria-hidden="true" /></span>
-          <h3><a href={pathIn(locale, '/features/#cloud')}>{t(locale, `landing.platform.${id}.title`)}</a></h3>
-          <p>{t(locale, `landing.platform.${id}.text`)}</p>
+          <div>
+            <h3><a href={pathIn(locale, '/features/#cloud')}>{t(locale, `landing.platform.${id}.title`)}</a></h3>
+            <p>{t(locale, `landing.platform.${id}.text`)}</p>
+          </div>
         </li>
       ))}
     </ul>
@@ -37,13 +39,14 @@ const TILES = [
 </section>
 
 <style>
-  .bento { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: var(--gap); margin: 0; padding: 0; list-style: none; }
-  li { position: relative; grid-column: span var(--span); display: grid; align-content: space-between; gap: 8px; min-height: clamp(180px, 18vw, 240px); padding: clamp(20px, 2.4vw, 32px); }
-  .icon { display: grid; place-items: center; width: 36px; height: 36px; margin-bottom: 24px; border-radius: 10px; background: var(--accent-soft); color: var(--accent-text); }
-  .icon :global(svg) { width: 18px; height: 18px; }
-  h3 { font-size: 1.25rem; letter-spacing: -0.025em; line-height: 1.2; }
-  h3 a { color: var(--ink); text-decoration: none; }
+  .bento { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
+  li { position: relative; grid-column: span var(--span); display: grid; align-content: space-between; gap: 48px; min-height: clamp(260px, 26vw, 400px); padding: clamp(24px, 3vw, 44px); border-radius: var(--r-lg); background: var(--panel); color: var(--ink); }
+  li.screen, li.filled { background: var(--bg); }
+  .icon { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 999px; box-shadow: inset 0 0 0 1px var(--line-2); }
+  .icon :global(svg) { width: 22px; height: 22px; }
+  h3 { max-width: 16ch; font-size: clamp(1.75rem, 3.2vw, 3.25rem); line-height: 1; letter-spacing: -0.045em; }
+  h3 a { color: inherit; text-decoration: none; }
   h3 a::after { content: ''; position: absolute; inset: 0; border-radius: var(--r-lg); }
-  p { max-width: 32rem; font-size: 0.9375rem; line-height: 1.55; color: var(--ink-3); }
+  p { max-width: 28rem; margin-top: 14px; font-size: 1rem; line-height: 1.5; color: var(--ink-2); }
   @media (max-width: 860px) { .bento { grid-template-columns: minmax(0, 1fr); } li { grid-column: auto; min-height: 0; } }
 </style>
