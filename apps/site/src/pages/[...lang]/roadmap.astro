@@ -1,0 +1,40 @@
+---
+// What is coming, grouped by horizon, from lib/roadmap.ts
+import Page from '../../components/Page.astro';
+import PageHead from '../../components/PageHead.astro';
+import Head from '../../components/Head.astro';
+import { HORIZONS, ROADMAP } from '../../lib/roadmap';
+import { localeOf, localePaths, pick, t } from '../../lib/i18n';
+
+export const getStaticPaths = localePaths;
+
+const locale = localeOf(Astro.url.pathname);
+const groups = HORIZONS.map((horizon) => ({ horizon, items: ROADMAP.filter((i) => i.horizon === horizon) })).filter((g) => g.items.length > 0);
+---
+
+<Page title={t(locale, 'roadmap.metaTitle')} description={t(locale, 'roadmap.metaDescription')}>
+  <PageHead title={t(locale, 'roadmap.title')} lead={t(locale, 'roadmap.lead')} />
+  {groups.map(({ horizon, items }) => (
+    <section class="section" id={horizon}>
+      <div class="wrap">
+        <Head title={t(locale, `roadmap.${horizon}`)} more={t(locale, `roadmap.${horizon}More`)} />
+        <ul class="items" role="list">
+          {items.map((item) => (
+            <li class="surface" id={item.id}>
+              <h3>{pick(locale, item.title)}</h3>
+              <p>{pick(locale, item.text)}</p>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  ))}
+</Page>
+
+<style>
+  .items { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--gap); margin: 0; padding: 0; list-style: none; }
+  li { display: grid; align-content: start; gap: 10px; padding: clamp(20px, 2.4vw, 32px); }
+  h3 { font-size: 1.25rem; letter-spacing: -0.025em; line-height: 1.2; }
+  p { font-size: 0.9375rem; line-height: 1.55; color: var(--ink-3); }
+  @media (max-width: 960px) { .items { grid-template-columns: minmax(0, 1fr); } }
+</style>

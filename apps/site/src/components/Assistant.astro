@@ -6,23 +6,48 @@ import HandPalm from '@phosphor-icons/core/assets/regular/hand-palm.svg';
 import Head from './Head.astro';
 import Media from './Media.astro';
 import Cards from './Cards.astro';
+import { pick, type Locale, type Localised } from '../lib/i18n';
 
-const ITEMS = [
-  { Icon: Scissors, title: 'Dresses a video', text: "Once you transcribe it: cuts the silences and the hesitations, then adds captions, keywords and titles in the project's colours." },
-  { Icon: Waveform, title: 'Sound on the cut', text: 'Cleans the voice, places whooshes and hits on the cuts and the entrances, and fits the music under it.' },
-  { Icon: PuzzlePiece, title: 'Builds what is missing', text: 'Needs an effect or a layer that does not exist yet? It makes one for your project.' },
-  { Icon: HandPalm, title: 'Asks first', text: 'A transcription or anything that costs money waits for your yes. Works with Claude or the model of your choice.' },
-];
+interface Props { locale: Locale }
+const { locale } = Astro.props;
+
+const COPY: Localised<{ title: string; more: string; label: string; items: [string, string][] }> = {
+  en: {
+    title: 'The AI edits with your tools.',
+    more: 'It looks at your frames, checks its own work, then shows you a take to keep or set aside.',
+    label: 'The assistant proposing a change in the Tramme editor, previewed before it is applied.',
+    items: [
+      ['Dresses a video', "Once you transcribe it: cuts the silences and the hesitations, then adds captions, keywords and titles in the project's colours."],
+      ['Sound on the cut', 'Cleans the voice, places whooshes and hits on the cuts and the entrances, and fits the music under it.'],
+      ['Builds what is missing', 'Needs an effect or a layer that does not exist yet? It makes one for your project.'],
+      ['Asks first', 'A transcription or anything that costs money waits for your yes. Works with Claude or the model of your choice, with your own key or with credits.'],
+    ],
+  },
+  fr: {
+    title: 'L\'IA monte avec vos outils.',
+    more: 'Elle regarde vos images, vérifie son propre travail, puis vous montre une prise à garder ou à écarter.',
+    label: 'L\'assistant propose un changement dans l\'éditeur Tramme, prévisualisé avant d\'être appliqué.',
+    items: [
+      ['Habille une vidéo', 'Une fois transcrite : coupe les silences et les hésitations, puis ajoute sous-titres, mots-clés et titres aux couleurs du projet.'],
+      ['Du son sur la coupe', 'Nettoie la voix, place des whooshes et des impacts sur les coupes et les entrées, et cale la musique dessous.'],
+      ['Construit ce qui manque', 'Il vous faut un effet ou un calque qui n\'existe pas encore ? Il en fait un pour votre projet.'],
+      ['Demande d\'abord', 'Une transcription ou tout ce qui coûte de l\'argent attend votre accord. Fonctionne avec Claude ou le modèle de votre choix, avec votre propre clé ou avec des crédits.'],
+    ],
+  },
+};
+const c = pick(locale, COPY);
+const ICONS = [Scissors, Waveform, PuzzlePiece, HandPalm];
+const items = c.items.map(([title, text], i) => ({ Icon: ICONS[i], title, text }));
 ---
 
 <section class="section" id="assistant">
   <div class="wrap">
-    <Head title="The AI edits with your tools." more="It looks at your frames, checks its own work, then shows you a take to keep or set aside." />
+    <Head title={c.title} more={c.more} />
     <div class="grid">
       <div class="frame" data-reveal>
-        <Media id="assistant" width={1600} height={1000} tint={['#090f13', '#2ec4b6']} label="The assistant proposing a change in the Tramme editor, previewed before it is applied." />
+        <Media id="assistant" width={1600} height={1000} tint={['#090f13', '#2ec4b6']} label={c.label} />
       </div>
-      <Cards items={ITEMS} columns={2} />
+      <Cards items={items} columns={2} />
     </div>
   </div>
 </section>

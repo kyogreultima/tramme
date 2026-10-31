@@ -17,6 +17,8 @@ const release = await latestRelease(console.log);
 export default defineConfig({
   // the public address, for the canonical links, the sitemap and the preview image
   site: process.env.SITE_URL ?? SITE.url,
+  // the gallery moved from /examples/ to /explore/
+  redirects: { '/examples': '/explore/', '/fr/examples': '/fr/explore/' },
   vite: { define: { __RELEASE__: JSON.stringify(release) } },
   fonts: [
     { provider: fontProviders.fontsource(), name: 'Geist', cssVariable: '--font-sans', weights: ['300 700'], styles: ['normal'] },

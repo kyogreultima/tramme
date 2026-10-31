@@ -2,18 +2,37 @@
 import Head from './Head.astro';
 import { FORMATS } from '../lib/formats';
 import { docHref } from '../lib/docs';
+import { pick, type Locale, type Localised } from '../lib/i18n';
 
+interface Props { locale: Locale }
+const { locale } = Astro.props;
+
+const COPY: Localised<{ title: string; more: string; cli: string; docs: string }> = {
+  en: {
+    title: 'What you see is what you export.',
+    more: 'The preview and the export are drawn by the same engine, frame for frame.',
+    cli: 'Batch renders from a terminal too, for studios that automate:',
+    docs: 'see the docs',
+  },
+  fr: {
+    title: 'Ce que vous voyez est ce que vous exportez.',
+    more: 'L\'aperçu et l\'export sont dessinés par le même moteur, image par image.',
+    cli: 'Des rendus par lots depuis un terminal aussi, pour les studios qui automatisent :',
+    docs: 'voir la documentation',
+  },
+};
+const c = pick(locale, COPY);
 ---
 
 <section class="section" id="render">
   <div class="wrap">
-    <Head title="What you see is what you export." more="The preview and the export are drawn by the same engine, frame for frame." />
+    <Head title={c.title} more={c.more} />
     <ul class="formats" role="list" data-reveal>
       {FORMATS.map(({ name, what }) => (
-        <li class="surface"><strong>{name}</strong><span>{what}</span></li>
+        <li class="surface"><strong>{name}</strong><span>{pick(locale, what)}</span></li>
       ))}
     </ul>
-    <p class="cli" data-reveal>Batch renders from a terminal too, for studios that automate: <a href={docHref('')}>see the docs</a>.</p>
+    <p class="cli" data-reveal>{c.cli} <a href={docHref('')}>{c.docs}</a>.</p>
   </div>
 </section>
 

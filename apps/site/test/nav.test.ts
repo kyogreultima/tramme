@@ -1,16 +1,17 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { BAR_LINKS, FOOTER, MENUS, type NavLink } from '../src/lib/nav';
+import { barLinks, footerColumns, menus, type NavLink } from '../src/lib/nav';
 import { PAGES, docHref } from '../src/lib/docs';
-import { SRC, idsOf, pageFile } from './sources';
+import { LOCALES } from '../src/lib/i18n';
+import { SRC, idsOf, pageFile, read } from './sources';
 
-const links: NavLink[] = [...MENUS.flatMap((m) => m.links), ...BAR_LINKS, ...FOOTER.flatMap((m) => m.links)];
+const linksOf = (locale: (typeof LOCALES)[number]): NavLink[] => [...menus(locale).flatMap((m) => m.links), ...barLinks(locale), ...footerColumns(locale).flatMap((m) => m.links)];
 
-describe('the site map', () => {
+describe.each(LOCALES)('the site map (%s)', (locale) => {
   it('every internal link leads to a page that exists, and its anchor to an id that page has', () => {
     const docs = new Set(PAGES.map((p) => docHref(p.slug)));
-    for (const { href } of links.filter((l) => !l.href.startsWith('https://'))) {
+    for (const { href } of linksOf(locale).filter((l) => !l.href.startsWith('https://'))) {
       const [page, fragment] = href.split('#');
       const isDocs = docs.has(page);
       expect(isDocs || fs.existsSync(path.join(SRC, pageFile(page))), `${href} leads nowhere`).toBe(true);
@@ -18,10 +19,37 @@ describe('the site map', () => {
     }
   });
 
+  it('keeps French pages in French', () => {
+    const docs = new Set(PAGES.map((p) => docHref(p.slug)));
+    for (const { href } of linksOf(locale).filter((l) => l.href.startsWith('/') && !docs.has(l.href.split('#')[0]))) {
+      expect(href.startsWith('/fr/') || href === '/fr', `${href}`).toBe(locale === 'fr');
+    }
+  });
+
   it('has no two links of one menu to the same place', () => {
-    for (const menu of [...MENUS, ...FOOTER]) {
+    for (const menu of [...menus(locale), ...footerColumns(locale)]) {
       const hrefs = menu.links.map((l) => l.href);
       expect(new Set(hrefs).size, `${menu.id} repeats a link`).toBe(hrefs.length);
     }
+  });
+});
+
+describe('the choices of the footer', () => {
+  it('offers exactly light and dark, with no "system"', () => {
+    const source = read('components/ThemeChoice.astro');
+    expect([...source.matchAll(/data-theme-option="(\w+)"/g)].map((m) => m[1])).toEqual(['light', 'dark']);
+    expect(source).not.toMatch(/system/i);
+  });
+
+  it('changes language with plain links, without script', () => {
+    const source = read('components/LanguageChoice.astro');
+    expect(source).not.toContain('<script');
+    expect(source).toContain('pathFor');
+  });
+
+  it('opens the menus without script: they are <details>', () => {
+    expect(read('components/Menu.astro')).toContain('<details');
+    expect(read('components/Nav.astro')).toContain('<details');
+    expect(read('components/Faq.astro')).toContain('<details');
   });
 });

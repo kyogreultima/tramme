@@ -11,23 +11,52 @@ import Atom from '@phosphor-icons/core/assets/regular/atom.svg';
 import Head from './Head.astro';
 import Cards from './Cards.astro';
 import { docHref } from '../lib/docs';
+import { pick, type Locale, type Localised } from '../lib/i18n';
 
-const ITEMS = [
-  { Icon: Shapes, title: 'Icons that draw themselves', text: 'Over two thousand Lucide icons, found by a word or two, laid in a row, a grid or beside a list, in the colours of the film.' },
-  { Icon: TreeStructure, title: 'Diagrams from a few lines', text: 'Write a flow as text, the Mermaid way. Tramme lays it out, draws it on box after box, and can light one route through it.' },
-  { Icon: PersonSimpleWalk, title: 'Stick figures', text: 'Pivot-style characters posed joint by joint, reaching for a point, or already walking.' },
-  { Icon: ChartBar, title: 'Charts', text: 'Bars, lines and donuts from a data set, animated, and checked for readability.' },
-  { Icon: TextAa, title: 'Kinetic type', text: 'Letters that type, wave, scatter, drop or rise from a mask.' },
-  { Icon: Atom, title: 'Physics', text: 'Confetti, bouncing balls, a rope, letters that fall and settle: the same on every render.' },
-];
+interface Props { locale: Locale }
+const { locale } = Astro.props;
+
+const COPY: Localised<{ title: string; more: string; items: [string, string][]; also: string; next: string }> = {
+  en: {
+    title: 'Packs for what comes up often.',
+    more: 'Added to a project in a click, and the assistant reaches for them on its own.',
+    items: [
+      ['Icons that draw themselves', 'Over two thousand Lucide icons, found by a word or two, laid in a row, a grid or beside a list, in the colours of the film.'],
+      ['Diagrams from a few lines', 'Write a flow as text, the Mermaid way. Tramme lays it out, draws it on box after box, and can light one route through it.'],
+      ['Stick figures', 'Pivot-style characters posed joint by joint, reaching for a point, or already walking.'],
+      ['Charts', 'Bars, lines and donuts from a data set, animated, and checked for readability.'],
+      ['Kinetic type', 'Letters that type, wave, scatter, drop or rise from a mask.'],
+      ['Physics', 'Confetti, bouncing balls, a rope, letters that fall and settle: the same on every render.'],
+    ],
+    also: 'Also a UI walkthrough, accessibility checks and localization. Any SVG turns into paths whose strokes draw themselves.',
+    next: 'See what comes next',
+  },
+  fr: {
+    title: 'Des packs pour ce qui revient souvent.',
+    more: 'Ajoutés à un projet en un clic, et l\'assistant y a recours de lui-même.',
+    items: [
+      ['Des icônes qui se dessinent', 'Plus de deux mille icônes Lucide, trouvées en un mot ou deux, disposées en ligne, en grille ou à côté d\'une liste, aux couleurs du film.'],
+      ['Des schémas en quelques lignes', 'Écrivez un flux en texte, à la manière de Mermaid. Tramme le met en page, le dessine boîte après boîte, et peut éclairer un chemin à travers.'],
+      ['Des bonshommes', 'Des personnages façon pivot, posés articulation par articulation, qui tendent la main vers un point, ou marchent déjà.'],
+      ['Des graphiques', 'Barres, courbes et anneaux depuis un jeu de données, animés, et vérifiés pour la lisibilité.'],
+      ['De la typographie animée', 'Des lettres qui s\'écrivent, ondulent, se dispersent, tombent ou montent depuis un masque.'],
+      ['De la physique', 'Confettis, balles qui rebondissent, une corde, des lettres qui tombent et se posent : pareil à chaque rendu.'],
+    ],
+    also: 'Aussi un pas à pas d\'interface, des contrôles d\'accessibilité et la localisation. Tout SVG devient des tracés qui se dessinent seuls.',
+    next: 'Voir la suite',
+  },
+};
+const c = pick(locale, COPY);
+const ICONS = [Shapes, TreeStructure, PersonSimpleWalk, ChartBar, TextAa, Atom];
+const items = c.items.map(([title, text], i) => ({ Icon: ICONS[i], title, text }));
 ---
 
 <section class="section" id="packs">
   <div class="wrap">
-    <Head title="Packs for what comes up often." more="Added to a project in a click, and the assistant reaches for them on its own." />
+    <Head title={c.title} more={c.more} />
     <div class="body">
-      <Cards items={ITEMS} />
-      <p class="more" data-reveal>Also a UI walkthrough, accessibility checks and localization. Any SVG turns into paths whose strokes draw themselves. <a href={docHref('roadmaps/packs')}>See what comes next</a>.</p>
+      <Cards items={items} />
+      <p class="more" data-reveal>{c.also} <a href={docHref('roadmaps/packs')}>{c.next}</a>.</p>
     </div>
   </div>
 </section>

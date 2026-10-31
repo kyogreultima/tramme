@@ -1,0 +1,97 @@
+---
+// Terms of use and of sale. Drafted from the platform's facts (the plans, the
+// watermark, public projects, the licence), with marked placeholders for what
+// is not decided yet: the seller's identity and the merchant of record. It
+// must be reviewed legally before launch, and says so.
+import Page from '../../components/Page.astro';
+import PageHead from '../../components/PageHead.astro';
+import { localeOf, localePaths, pathIn } from '../../lib/i18n';
+import { repoFile } from '../../lib/links';
+import { PLANS, formatPrice } from '../../lib/plans';
+
+export const getStaticPaths = localePaths;
+
+const locale = localeOf(Astro.url.pathname);
+const fr = locale === 'fr';
+const price = (id: 'plus' | 'pro') => PLANS.find((p) => p.id === id)!.price;
+---
+
+<Page
+  title={fr ? 'Conditions d\'utilisation et de vente' : 'Terms of use and sale'}
+  description={fr ? 'Les conditions d\'utilisation du service Tramme et de vente de ses offres.' : 'The terms for using the Tramme service and for buying its plans.'}
+>
+  <PageHead title={fr ? 'Conditions d\'utilisation et de vente.' : 'Terms of use and sale.'} lead={fr ? 'Ce que vous pouvez attendre du service, et ce que nous attendons de vous.' : 'What you can expect from the service, and what we expect from you.'} />
+  <section class="wrap body">
+    <p class="review" role="note">{fr ? 'Projet de texte, à relire juridiquement avant le lancement. Les passages entre crochets restent à compléter.' : 'Draft text, to be reviewed legally before launch. Passages in brackets are still to be completed.'}</p>
+    {fr ? (
+      <div class="prose">
+        <h2>Qui nous sommes</h2>
+        <p>Le service Tramme est proposé par [IDENTITÉ DU VENDEUR : nom, forme juridique, adresse, contact].</p>
+
+        <h2>Le service</h2>
+        <p>Tramme est un éditeur de motion design en ligne et sur le bureau, et une plateforme : un compte, un espace personnel, des projets publics ou privés, une galerie de la communauté, et des services que nous faisons tourner (stockage, hébergement, IA prête à l'emploi, export cloud). Les applications, le moteur et l'atelier sont disponibles sans compte, avec les règles de l'offre Basic.</p>
+
+        <h2>Les offres et le paiement</h2>
+        <p>Basic est gratuit. Plus coûte {formatPrice(locale, price('plus').month)} par mois ou {formatPrice(locale, price('plus').year)} par mois facturé à l'année ; Pro coûte {formatPrice(locale, price('pro').month)} par mois ou {formatPrice(locale, price('pro').year)} par mois facturé à l'année. Les prix sont en euros. Le contenu de chaque offre est celui de la <a href={pathIn(locale, '/pricing/')}>page des tarifs</a>. Le paiement est traité par [REVENDEUR DE RÉFÉRENCE : Paddle ou Lemon Squeezy, à décider], qui vend l'offre en son nom ou au nôtre selon le cas [À PRÉCISER].</p>
+
+        <h2>Les crédits</h2>
+        <p>Les crédits inclus dans une offre se renouvellent chaque mois et paient l'IA que nous faisons tourner pour vous. [Report des crédits non utilisés : À PRÉCISER.] Vous pouvez aussi brancher votre propre clé de fournisseur, dans toutes les offres : le fournisseur vous facture alors directement.</p>
+
+        <h2>Résilier et rembourser</h2>
+        <p>Vous pouvez résilier à tout moment depuis votre espace ; l'offre court jusqu'à la fin de la période payée. [Droit de rétractation et remboursements : À PRÉCISER selon le droit applicable et le revendeur de référence.]</p>
+
+        <h2>Ce que vous publiez</h2>
+        <p>Vos projets sont à vous. En publiant un projet, vous nous autorisez à l'afficher publiquement, avec sa vidéo, sur le site et dans la galerie, et, si vous le permettez, à ce que d'autres le copient pour s'en servir. Vous pouvez dépublier un projet à tout moment. Ne publiez rien que vous n'avez pas le droit de publier. Nous pouvons retirer un projet public qui enfreint ces conditions ou la loi.</p>
+
+        <h2>Le filigrane</h2>
+        <p>Les films exportés portent le logo Tramme dans un coin : toujours avec Basic, par défaut avec Plus et Pro qui peuvent le retirer dans les réglages. Sans compte, ainsi que dans l'application de bureau et la CLI tant qu'elles ne peuvent pas se connecter à un compte, les règles de Basic s'appliquent.</p>
+
+        <h2>Usages interdits</h2>
+        <p>N'utilisez pas le service pour du contenu illégal, pour porter atteinte à autrui, pour attaquer ou surcharger le service, ni pour contourner les limites de votre offre.</p>
+
+        <h2>Le logiciel</h2>
+        <p>Le code de Tramme est sous <a href={repoFile('LICENSE')}>Functional Source License</a>, distincte de ces conditions : elle gouverne l'usage du code, ces conditions gouvernent l'usage du service que nous hébergeons.</p>
+
+        <h2>Responsabilité et modifications</h2>
+        <p>[Limites de responsabilité, disponibilité du service, modification des conditions et des prix, droit applicable et juridiction compétente : À PRÉCISER.]</p>
+      </div>
+    ) : (
+      <div class="prose">
+        <h2>Who we are</h2>
+        <p>The Tramme service is provided by [SELLER IDENTITY: name, legal form, address, contact].</p>
+
+        <h2>The service</h2>
+        <p>Tramme is a motion design editor, online and on the desktop, and a platform: an account, a personal space, public or private projects, a community gallery, and services we run for you (storage, hosting, AI ready to use, cloud export). The apps, the engine and the atelier are available without an account, under the Basic plan's rules.</p>
+
+        <h2>Plans and payment</h2>
+        <p>Basic is free. Plus costs {formatPrice(locale, price('plus').month)} a month, or {formatPrice(locale, price('plus').year)} a month billed yearly; Pro costs {formatPrice(locale, price('pro').month)} a month, or {formatPrice(locale, price('pro').year)} a month billed yearly. Prices are in euros. What each plan contains is what the <a href={pathIn(locale, '/pricing/')}>pricing page</a> says. Payment is handled by [MERCHANT OF RECORD: Paddle or Lemon Squeezy, to be decided], which sells the plan in its own name or in ours as the case may be [TO BE SPECIFIED].</p>
+
+        <h2>Credits</h2>
+        <p>The credits included in a plan renew each month and pay for the AI we run for you. [Carrying over unused credits: TO BE SPECIFIED.] You can also connect your own provider key, in every plan: the provider then bills you directly.</p>
+
+        <h2>Cancelling and refunds</h2>
+        <p>You can cancel at any time from your space; the plan runs until the end of the period you paid for. [Right of withdrawal and refunds: TO BE SPECIFIED according to the applicable law and the merchant of record.]</p>
+
+        <h2>What you publish</h2>
+        <p>Your projects are yours. By publishing a project, you allow us to display it publicly, with its video, on the site and in the gallery, and, if you allow it, others to copy it to build on. You can unpublish a project at any time. Do not publish anything you have no right to publish. We may remove a public project that breaks these terms or the law.</p>
+
+        <h2>The watermark</h2>
+        <p>Exported films carry the Tramme logo in a corner: always on Basic, by default on Plus and Pro, which can turn it off in the settings. Without an account, and in the desktop app and the CLI until they can sign in to an account, the Basic rules apply.</p>
+
+        <h2>What is not allowed</h2>
+        <p>Do not use the service for illegal content, to harm others, to attack or overload the service, or to get around the limits of your plan.</p>
+
+        <h2>The software</h2>
+        <p>Tramme's code is under the <a href={repoFile('LICENSE')}>Functional Source License</a>, separate from these terms: it governs the use of the code, these terms govern the use of the service we host.</p>
+
+        <h2>Liability and changes</h2>
+        <p>[Limits of liability, availability of the service, changes to the terms and prices, governing law and jurisdiction: TO BE SPECIFIED.]</p>
+      </div>
+    )}
+  </section>
+</Page>
+
+<style>
+  .body { display: grid; gap: 24px; margin-top: clamp(40px, 5vw, 64px); }
+  .review { max-width: 68ch; margin-inline: auto; padding: 14px 18px; border-radius: var(--r); background: var(--accent-soft); color: var(--ink); font-size: 0.9375rem; }
+</style>

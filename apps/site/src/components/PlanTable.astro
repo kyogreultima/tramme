@@ -1,0 +1,55 @@
+---
+// Every row of the comparison, from lib/plans.ts. On a narrow screen the
+// table scrolls inside its own frame, so the page itself never does.
+import Check from '@phosphor-icons/core/assets/bold/check-bold.svg';
+import { IN_ALL, PLAN_IDS, ROWS } from '../lib/plans';
+import { pick, t, type Locale } from '../lib/i18n';
+
+interface Props { locale: Locale }
+const { locale } = Astro.props;
+---
+
+<div class="frame surface" tabindex="0" role="region" aria-label={t(locale, 'plans.tableLabel')}>
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">{t(locale, 'plans.feature')}</th>
+        {PLAN_IDS.map((id) => <th scope="col">{t(locale, `plans.name.${id}`)}</th>)}
+      </tr>
+    </thead>
+    <tbody>
+      {ROWS.map((row) => (
+        <tr>
+          <th scope="row">{pick(locale, row.label)}</th>
+          {PLAN_IDS.map((id) => {
+            const cell = row.values[id];
+            return (
+              <td>
+                {cell === true && <><Check aria-hidden="true" /><span class="sr">{t(locale, 'plans.included')}</span></>}
+                {cell === false && <span class="sr">{t(locale, 'plans.notIncluded')}</span>}
+                {typeof cell === 'object' && pick(locale, cell)}
+              </td>
+            );
+          })}
+        </tr>
+      ))}
+      <tr class="all">
+        <th scope="row">{t(locale, 'plans.inAll')}</th>
+        <td colspan={PLAN_IDS.length}>{pick(locale, IN_ALL)}</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<style>
+  /* positioned, so the screen-reader-only texts inside it scroll with it and not with the page */
+  .frame { position: relative; overflow-x: auto; }
+  table { width: 100%; min-width: 640px; border-collapse: collapse; font-size: 0.9375rem; }
+  th, td { padding: 14px clamp(14px, 1.6vw, 24px); text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
+  thead th { font-size: 1rem; font-weight: 600; color: var(--ink); }
+  tbody th { width: 34%; font-weight: 400; color: var(--ink-2); }
+  td { color: var(--ink); }
+  tr:last-child > * { border-bottom: 0; }
+  td svg { width: 16px; height: 16px; color: var(--accent-text); }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+</style>

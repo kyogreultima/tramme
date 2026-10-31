@@ -1,0 +1,63 @@
+---
+// The services the platform runs for you: storage, hosting, review, export
+// and voice. What each plan gets of them is on the pricing page.
+import Devices from '@phosphor-icons/core/assets/regular/devices.svg';
+import LockSimple from '@phosphor-icons/core/assets/regular/lock-simple.svg';
+import ClockCounterClockwise from '@phosphor-icons/core/assets/regular/clock-counter-clockwise.svg';
+import ShareNetwork from '@phosphor-icons/core/assets/regular/share-network.svg';
+import CloudArrowUp from '@phosphor-icons/core/assets/regular/cloud-arrow-up.svg';
+import Microphone from '@phosphor-icons/core/assets/regular/microphone.svg';
+import Head from './Head.astro';
+import Cards from './Cards.astro';
+import { pathIn, pick, type Locale, type Localised } from '../lib/i18n';
+
+interface Props { locale: Locale }
+const { locale } = Astro.props;
+
+const COPY: Localised<{ title: string; more: string; items: [string, string][]; plans: string }> = {
+  en: {
+    title: 'A platform around the film.',
+    more: 'The services we run for you, from one account.',
+    items: [
+      ['Projects on every device', 'Start in the browser and pick the film up anywhere. Basic keeps three projects in the cloud, Plus and Pro as many as you like.'],
+      ['Public or private', 'Share a project with the community, or keep it to yourself: private projects come with Plus and Pro.'],
+      ['Version history', 'Go back to an earlier version of a film: seven days on Basic, thirty on Plus, without limit on Pro.'],
+      ['Share and review', 'A page to share a film, and review links where a client comments on the picture. The Tramme badge comes off on Plus and Pro.'],
+      ['Cloud export', 'Export without tying up your computer: 1080p on every plan, 4K and batches on Pro, by API or CLI too.'],
+      ['Voice and subtitles', 'Transcription, automatic subtitles, voice-over and dubbing, paid in credits.'],
+    ],
+    plans: 'See what each plan includes',
+  },
+  fr: {
+    title: 'Une plateforme autour du film.',
+    more: 'Les services que nous faisons tourner pour vous, depuis un seul compte.',
+    items: [
+      ['Vos projets sur tous vos appareils', 'Commencez dans le navigateur et reprenez le film n\'importe où. Basic garde trois projets dans le cloud, Plus et Pro autant que vous voulez.'],
+      ['Publics ou privés', 'Partagez un projet avec la communauté, ou gardez-le pour vous : les projets privés viennent avec Plus et Pro.'],
+      ['Historique des versions', 'Revenez à une version précédente d\'un film : sept jours avec Basic, trente avec Plus, sans limite avec Pro.'],
+      ['Partager et relire', 'Une page pour partager un film, et des liens de relecture où un client commente l\'image. Le badge Tramme se retire avec Plus et Pro.'],
+      ['Export cloud', 'Exportez sans bloquer votre ordinateur : 1080p dans toutes les offres, 4K et lots avec Pro, par API ou CLI aussi.'],
+      ['Voix et sous-titres', 'Transcription, sous-titres automatiques, voix off et doublage, payés en crédits.'],
+    ],
+    plans: 'Voir ce que contient chaque offre',
+  },
+};
+const c = pick(locale, COPY);
+const ICONS = [Devices, LockSimple, ClockCounterClockwise, ShareNetwork, CloudArrowUp, Microphone];
+const items = c.items.map(([title, text], i) => ({ Icon: ICONS[i], title, text }));
+---
+
+<section class="section" id="cloud">
+  <div class="wrap">
+    <Head title={c.title} more={c.more} />
+    <div class="body">
+      <Cards items={items} />
+      <p class="more" data-reveal><a href={pathIn(locale, '/pricing/')}>{c.plans}</a></p>
+    </div>
+  </div>
+</section>
+
+<style>
+  .more { margin-top: 20px; text-align: center; font-size: 0.9375rem; }
+  .more a { color: var(--accent-text); text-underline-offset: 3px; }
+</style>

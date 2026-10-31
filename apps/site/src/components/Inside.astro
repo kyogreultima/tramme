@@ -9,21 +9,50 @@ import Palette from '@phosphor-icons/core/assets/regular/palette.svg';
 import Head from './Head.astro';
 import Cards from './Cards.astro';
 import { docHref } from '../lib/docs';
+import { pick, type Locale, type Localised } from '../lib/i18n';
 
-const ITEMS = [
-  { Icon: BezierCurve, title: 'Keyframes and curves', text: 'Set a key, shape its ease in the graph editor, nudge it on the timeline. The way you already animate.' },
-  { Icon: Waves, title: 'Wiggle, loop, spring', text: 'The usual behaviours sit on any property, one click away: wiggle, loop, spring, stagger, react to the beat.' },
-  { Icon: LinkSimple, title: 'Properties that follow', text: 'Tie a property to another layer, or write a small expression if you like that. Never required.' },
-  { Icon: Palette, title: 'A style named once', text: 'Colours, eases and sizes kept as a palette: change one, the whole film follows.' },
-];
+interface Props { locale: Locale }
+const { locale } = Astro.props;
+
+const COPY: Localised<{ title: string; more: string; items: [string, string][]; under: string; format: string; curious: string }> = {
+  en: {
+    title: 'Everything can move.',
+    more: 'With the tools you know, and a few you will not want to give up.',
+    items: [
+      ['Keyframes and curves', 'Set a key, shape its ease in the graph editor, nudge it on the timeline. The way you already animate.'],
+      ['Wiggle, loop, spring', 'The usual behaviours sit on any property, one click away: wiggle, loop, spring, stagger, react to the beat.'],
+      ['Properties that follow', 'Tie a property to another layer, or write a small expression if you like that. Never required.'],
+      ['A style named once', 'Colours, eases and sizes kept as a palette: change one, the whole film follows.'],
+    ],
+    under: 'Under the hood, a project is a readable file that versions like code.',
+    format: 'See the format',
+    curious: ', if you are curious.',
+  },
+  fr: {
+    title: 'Tout peut bouger.',
+    more: 'Avec les outils que vous connaissez, et quelques-uns dont vous ne voudrez plus vous passer.',
+    items: [
+      ['Images clés et courbes', 'Posez une clé, façonnez son accélération dans l\'éditeur de courbes, décalez-la sur la timeline. Comme vous animez déjà.'],
+      ['Wiggle, boucle, ressort', 'Les comportements usuels se posent sur n\'importe quelle propriété, en un clic : wiggle, boucle, ressort, décalage, réaction au rythme.'],
+      ['Des propriétés qui suivent', 'Liez une propriété à un autre calque, ou écrivez une petite expression si vous aimez ça. Jamais obligatoire.'],
+      ['Un style nommé une fois', 'Couleurs, accélérations et tailles gardées en palette : changez-en une, tout le film suit.'],
+    ],
+    under: 'Sous le capot, un projet est un fichier lisible qui se versionne comme du code.',
+    format: 'Voir le format',
+    curious: ', si vous êtes curieux.',
+  },
+};
+const c = pick(locale, COPY);
+const ICONS = [BezierCurve, Waves, LinkSimple, Palette];
+const items = c.items.map(([title, text], i) => ({ Icon: ICONS[i], title, text }));
 ---
 
 <section class="section" id="inside">
   <div class="wrap">
-    <Head title="Everything can move." more="With the tools you know, and a few you will not want to give up." />
+    <Head title={c.title} more={c.more} />
     <div class="body">
-      <Cards items={ITEMS} columns={2} />
-      <p class="more" data-reveal>Under the hood, a project is a readable file that versions like code. <a href={docHref('document')}>See the format</a>, if you are curious.</p>
+      <Cards items={items} columns={2} />
+      <p class="more" data-reveal>{c.under} <a href={docHref('document')}>{c.format}</a>{c.curious}</p>
     </div>
   </div>
 </section>

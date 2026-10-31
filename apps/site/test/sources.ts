@@ -12,7 +12,7 @@ export function sourcesOf(file: string, seen = new Set<string>()): string[] {
   if (seen.has(file)) return [];
   seen.add(file);
   const source = read(file);
-  const next = [...source.matchAll(/from '(\.\.?\/(?:components\/)?[\w-]+\.astro)'/g)]
+  const next = [...source.matchAll(/from '((?:\.\.?\/)+(?:components\/)?[\w-]+\.astro)'/g)]
     .map((m) => path.posix.normalize(path.posix.join(path.posix.dirname(file), m[1])));
   return [source, ...next.flatMap((f) => sourcesOf(f, seen))];
 }
@@ -20,5 +20,10 @@ export function sourcesOf(file: string, seen = new Set<string>()): string[] {
 /** the ids a page has */
 export const idsOf = (file: string) => new Set([...sourcesOf(file).join('\n').matchAll(/\bid="([\w-]+)"/g)].map((m) => m[1]));
 
-/** the source file of a page of the site, from its address ('/features/' → pages/features.astro) */
-export const pageFile = (address: string) => `pages/${address === '/' ? 'index' : address.replace(/\//g, '')}.astro`;
+/** the source file of a page of the site, from its address ('/features/' → pages/[...lang]/features.astro; '/fr/features/' too) */
+export function pageFile(address: string): string {
+  const bare = address.replace(/^\/fr(?=\/|$)/, '') || '/';
+  const name = bare === '/' ? 'index' : bare.replace(/\//g, '');
+  const shared = `pages/[...lang]/${name}.astro`;
+  return fs.existsSync(path.join(SRC, shared)) ? shared : `pages/${name}.astro`;
+}

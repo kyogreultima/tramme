@@ -1,25 +1,40 @@
 ---
+// The first screen: what Tramme is, then a field to describe a film. The field
+// is a plain form sending the text to the app's sign-up address, whose welcome
+// credit makes the first film; each idea is a link to the same address with
+// its sentence filled in. No script. The app's demo video comes under it.
+import PaperPlane from '@phosphor-icons/core/assets/regular/paper-plane-right.svg';
 import Media from './Media.astro';
-import AppLink from './AppLink.astro';
-import DownloadLink from './DownloadLink.astro';
-import { docHref } from '../lib/docs';
+import { signUp } from '../lib/links';
+import { t, type Locale } from '../lib/i18n';
 
-const about = 'The editor at work: a film directed in words, and every layer of it in the atelier.';
+interface Props { locale: Locale }
+const { locale } = Astro.props;
+const IDEAS = ['launch', 'explainer', 'social', 'titles'];
+// the form leads to sign-up's address; the browser adds ?prompt=… and ?lang=…
+const action = signUp();
 ---
 
 <section class="hero">
   <div class="wrap top">
-    <h1 class="display">Motion design, <span class="quiet">directed in words.</span></h1>
-    <p>Leave notes on the film, keep the takes you like, refine every keyframe in the atelier. Free to use, no account.</p>
-    <div class="ctas">
-      <AppLink />
-      <DownloadLink />
-      <a class="btn btn-ghost" href={docHref('')}>Read the docs</a>
-    </div>
+    <h1 class="display">{t(locale, 'landing.hero.title')} <span class="quiet">{t(locale, 'landing.hero.quiet')}</span></h1>
+    <p>{t(locale, 'landing.hero.more')}</p>
+    <form class="ask" method="get" action={action}>
+      <label class="sr" for="prompt">{t(locale, 'landing.hero.field')}</label>
+      <input id="prompt" name="prompt" type="text" required autocomplete="off" placeholder={t(locale, 'landing.hero.placeholder')} />
+      <input type="hidden" name="lang" value={locale} />
+      <button class="btn btn-accent" type="submit">{t(locale, 'landing.hero.send')}<PaperPlane aria-hidden="true" /></button>
+    </form>
+    <ul class="ideas" role="list" aria-label={t(locale, 'landing.hero.ideas')}>
+      {IDEAS.map((id) => (
+        <li><a class="btn btn-ghost btn-sm" href={signUp({ prompt: t(locale, `landing.hero.idea.${id}.prompt`), lang: locale })}>{t(locale, `landing.hero.idea.${id}.label`)}</a></li>
+      ))}
+    </ul>
+    <p class="first">{t(locale, 'landing.hero.firstFilm')}</p>
   </div>
 
   <div class="wrap stage">
-    <Media id="tramme" width={1920} height={1080} duration={10} tint={['#0b0f12', '#2ec4b6']} label={`Tramme. ${about}`} />
+    <Media id="tramme" width={1920} height={1080} duration={10} tint={['#0b0f12', '#2ec4b6']} label={`Tramme. ${t(locale, 'landing.hero.demo')}`} />
   </div>
 </section>
 
@@ -29,15 +44,24 @@ const about = 'The editor at work: a film directed in words, and every layer of 
   h1 { max-width: 14ch; }
   h1 .quiet { display: block; color: var(--ink-3); }
   .top > p { max-width: 34rem; font-size: 1.1875rem; line-height: 1.55; color: var(--ink-2); }
-  .ctas { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 6px; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+  .ask { display: flex; width: min(100%, 40rem); gap: 6px; padding: 6px; border-radius: 999px; background: var(--panel); box-shadow: var(--lift); }
+  .ask input[type='text'] { flex: 1; min-width: 0; padding: 0 18px; border: 0; background: transparent; color: var(--ink); font: inherit; font-size: 1rem; }
+  .ask input[type='text']::placeholder { color: var(--ink-3); }
+  .ask input[type='text']:focus-visible { outline: none; }
+  .ask:focus-within { box-shadow: 0 0 0 2px var(--accent); }
+  .ideas { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 0; padding: 0; list-style: none; }
+  .top > .first { font-size: 0.9375rem; color: var(--ink-3); }
 
   .stage { margin-top: clamp(40px, 5vw, 72px); }
   .stage :global(.media) { box-shadow: var(--lift); border-radius: var(--r-lg); }
 
+  @media (max-width: 560px) { .ask { flex-direction: column; border-radius: var(--r-lg); } .ask input[type='text'] { height: 44px; } }
   @media (prefers-reduced-motion: no-preference) {
-    h1, .top > p, .ctas, .stage { animation: enter 0.9s var(--ease) both; }
-    .top > p, .ctas { animation-delay: 100ms; }
-    .stage { animation-delay: 200ms; }
+    h1, .top > p, .ask, .ideas, .stage { animation: enter 0.9s var(--ease) both; }
+    .top > p, .ask { animation-delay: 100ms; }
+    .ideas, .stage { animation-delay: 200ms; }
   }
   @keyframes enter { from { opacity: 0; transform: translateY(20px); } }
 </style>

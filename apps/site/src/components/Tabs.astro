@@ -10,9 +10,15 @@ import { Image } from 'astro:assets';
 import ArrowRight from '@phosphor-icons/core/assets/regular/arrow-right.svg';
 import Head from './Head.astro';
 import Shot from './Shot.astro';
-import { FEATURES } from '../lib/features';
+import { FEATURES, PILLARS, wordsOf } from '../lib/features';
+import { pathIn, t, type Locale } from '../lib/i18n';
 
-const rules = FEATURES.map(({ id }) => [
+interface Props { locale: Locale }
+const { locale } = Astro.props;
+// the landing shows the four pillars; the features page details them all
+const pillars = PILLARS.map((id) => FEATURES.find((f) => f.id === id)!);
+
+const rules = pillars.map(({ id }) => [
   `.tabs > #tab-${id}:checked ~ .bar label[for='tab-${id}'] { background: var(--accent); color: var(--accent-ink); }`,
   `.tabs > #tab-${id}:focus-visible ~ .bar label[for='tab-${id}'] { outline: 2px solid var(--accent-text); outline-offset: 2px; }`,
   `.tabs > #tab-${id}:checked ~ .panels [data-panel='${id}'] { display: grid; }`,
@@ -21,24 +27,28 @@ const rules = FEATURES.map(({ id }) => [
 
 <section class="section" id="product">
   <div class="wrap">
-    <Head title="One film, all the way." more="Direct it, refine it, hand it to the assistant, extend it, export it." />
-    <div class="tabs" role="radiogroup" aria-label="What Tramme does">
-      {FEATURES.map(({ id }, i) => <input class="sr" type="radio" name="feature" id={`tab-${id}`} checked={i === 0} />)}
+    <Head title={t(locale, 'landing.pillars.title')} more={t(locale, 'landing.pillars.more')} />
+    <div class="tabs" role="radiogroup" aria-label={t(locale, 'landing.pillars.label')}>
+      {pillars.map(({ id }, i) => <input class="sr" type="radio" name="feature" id={`tab-${id}`} checked={i === 0} />)}
       <div class="bar">
-        {FEATURES.map(({ id, name }) => <label for={`tab-${id}`}>{name}</label>)}
+        {pillars.map((f) => <label for={`tab-${f.id}`}>{wordsOf(f, locale).name}</label>)}
       </div>
       <div class="panels">
-        {FEATURES.map(({ id, name, line, picture }) => (
+        {pillars.map((f) => {
+          const { name, line, alt } = wordsOf(f, locale);
+          const { id, picture } = f;
+          return (
           <div class="panel" data-panel={id}>
             {'shot' in picture
-              ? <Shot light={picture.shot[0]} dark={picture.shot[1]} alt={picture.alt} />
-              : <Image class="still" src={picture.still} alt={picture.alt} widths={[800, 1280, 1760]} sizes="(max-width: 1280px) 100vw, 1280px" loading="lazy" decoding="async" />}
+              ? <Shot light={picture.shot[0]} dark={picture.shot[1]} alt={alt} />
+              : <Image class="still" src={picture.still} alt={alt} widths={[800, 1280, 1760]} sizes="(max-width: 1280px) 100vw, 1280px" loading="lazy" decoding="async" />}
             <div class="words">
               <p>{line}</p>
-              <a class="more" href={`/features/#${id}`} aria-label={`Learn more about the ${name.toLowerCase()}`}>Learn more<ArrowRight aria-hidden="true" /></a>
+              <a class="more" href={pathIn(locale, `/features/#${id}`)} aria-label={t(locale, 'landing.pillars.moreAbout', { name })}>{t(locale, 'landing.pillars.learn')}<ArrowRight aria-hidden="true" /></a>
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   </div>

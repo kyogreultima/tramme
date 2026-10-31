@@ -1,0 +1,31 @@
+---
+// "Explore the inside of every project": the community's latest public
+// projects, as cards, and the way to all of them. As many as there are, up to
+// eight; none, and only the link remains.
+import Head from './Head.astro';
+import ProjectCard from './ProjectCard.astro';
+import { listProjects } from '../lib/gallery';
+import { pathIn, t, type Locale } from '../lib/i18n';
+
+interface Props { locale: Locale }
+const { locale } = Astro.props;
+const projects = await listProjects({ limit: 8 });
+---
+
+<section class="section" id="community">
+  <div class="wrap">
+    <Head title={t(locale, 'landing.community.title')} more={t(locale, 'landing.community.more')} />
+    {projects.length > 0
+      ? <div class="grid" data-reveal>{projects.map((project) => <ProjectCard project={project} locale={locale} />)}</div>
+      : <p class="none">{t(locale, 'card.empty')}</p>}
+    <p class="all"><a class="btn btn-ghost" href={pathIn(locale, '/explore/')}>{t(locale, 'landing.community.all')}</a></p>
+  </div>
+</section>
+
+<style>
+  .grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 28px 20px; }
+  .none { text-align: center; color: var(--ink-3); }
+  .all { display: flex; justify-content: center; margin-top: 36px; }
+  @media (max-width: 1100px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 560px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+</style>

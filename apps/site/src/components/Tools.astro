@@ -4,20 +4,30 @@
 import Head from './Head.astro';
 import { TOOL_GROUPS } from '../lib/tools';
 import { docHref } from '../lib/docs';
+import { pick, type Locale, type Localised } from '../lib/i18n';
+
+interface Props { locale: Locale }
+const { locale } = Astro.props;
+
+const COPY: Localised<{ title: string; more: string; docs: string; inDocs: string }> = {
+  en: { title: 'The toolbox.', more: 'What a motion designer looks for first, before any detail.', docs: 'Docs', inDocs: 'in the docs' },
+  fr: { title: 'La boîte à outils.', more: "Ce qu'un motion designer cherche d'abord, avant tout détail.", docs: 'Docs', inDocs: 'dans la documentation' },
+};
+const c = pick(locale, COPY);
 ---
 
 <section class="section" id="tools">
   <div class="wrap">
-    <Head title="The toolbox." more="What a motion designer looks for first, before any detail." />
+    <Head title={c.title} more={c.more} />
     <ul class="groups surface" role="list" data-reveal>
       {TOOL_GROUPS.map(({ name, text, doc, tools }) => (
         <li>
           <div class="what">
-            <h3>{name}</h3>
-            <p>{text}</p>
+            <h3>{pick(locale, name)}</h3>
+            <p>{pick(locale, text)}</p>
           </div>
-          <ul class="chips" role="list">{tools.map((tool) => <li>{tool}</li>)}</ul>
-          <a class="more" href={docHref(doc)} aria-label={`${name}, in the docs`}>Docs</a>
+          <ul class="chips" role="list">{pick(locale, tools).map((tool) => <li>{tool}</li>)}</ul>
+          <a class="more" href={docHref(doc)} aria-label={`${pick(locale, name)}, ${c.inDocs}`}>{c.docs}</a>
         </li>
       ))}
     </ul>

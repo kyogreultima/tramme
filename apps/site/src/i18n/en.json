@@ -55,5 +55,156 @@
     "french": "Français",
     "free": "Free",
     "perMonth": "per month"
+  },
+  "plans": {
+    "name": {
+      "basic": "Basic",
+      "plus": "Plus",
+      "pro": "Pro"
+    },
+    "monthly": "Monthly",
+    "yearly": "Yearly",
+    "period": "Billing period",
+    "perMonth": "a month",
+    "billedYearly": "billed yearly",
+    "forever": "with no time limit",
+    "cta": {
+      "basic": "Start for free",
+      "plus": "Choose Plus",
+      "pro": "Choose Pro"
+    },
+    "included": "Included",
+    "notIncluded": "Not included",
+    "feature": "Feature",
+    "compare": "Compare the plans",
+    "inAll": "In all three plans",
+    "tableLabel": "What each plan includes"
+  },
+  "card": {
+    "by": "by {name}",
+    "open": "Open {title}",
+    "empty": "No project is public yet."
+  },
+  "landing": {
+    "metaTitle": "Tramme, motion design directed in words",
+    "metaDescription": "Describe your film and Tramme makes it. Direct it in words in the studio, refine every keyframe in the atelier, export what you see. Free to start.",
+    "hero": {
+      "title": "Motion design,",
+      "quiet": "directed in words.",
+      "more": "Describe your film, keep the takes you like, refine every keyframe in the atelier.",
+      "field": "Describe your film",
+      "placeholder": "Describe your film…",
+      "send": "Make my film",
+      "firstFilm": "Your first film is on us: sign up and it starts from your sentence.",
+      "ideas": "Ideas to start from",
+      "demo": "The editor at work: a film directed in words, and every layer of it in the atelier.",
+      "idea": {
+        "launch": {
+          "label": "Product launch",
+          "prompt": "A 30-second launch film for a new app, with kinetic type and a clean palette"
+        },
+        "explainer": {
+          "label": "Explainer",
+          "prompt": "A one-minute explainer of how a heat pump works, with simple diagrams"
+        },
+        "social": {
+          "label": "Social clip",
+          "prompt": "A vertical 15-second clip announcing a weekend sale"
+        },
+        "titles": {
+          "label": "Title sequence",
+          "prompt": "A calm title sequence for a documentary about the sea"
+        }
+      }
+    },
+    "pillars": {
+      "title": "One film, all the way.",
+      "more": "Direct it, refine it, hand it to the assistant, export it.",
+      "label": "What Tramme does",
+      "learn": "Learn more",
+      "moreAbout": "Learn more about {name}"
+    },
+    "community": {
+      "title": "Explore the inside of every project.",
+      "more": "Open a film made with Tramme and see how it is built, layer by layer.",
+      "all": "Explore the community"
+    },
+    "platform": {
+      "title": "A platform around the film.",
+      "more": "Your projects, your exports and the services that run in the cloud, from one account.",
+      "devices": {
+        "title": "Your projects on every device",
+        "text": "Start in the browser and pick the film up anywhere, with your account."
+      },
+      "visibility": {
+        "title": "Public or private",
+        "text": "Share a project with the community, or keep it to yourself on Plus and Pro."
+      },
+      "export": {
+        "title": "Cloud export, up to 4K",
+        "text": "Export without tying up your computer: 1080p on every plan, 4K on Pro."
+      },
+      "subtitles": {
+        "title": "Transcription, subtitles and voice-over",
+        "text": "Automatic subtitles and a voice for the film, in another language if you like, paid in credits."
+      },
+      "packs": {
+        "title": "Packs",
+        "text": "Icons, diagrams, charts, type and physics, added to a project in a click."
+      }
+    },
+    "closing": {
+      "title": "Your next film starts with a sentence.",
+      "more": "Describe it, and Tramme makes the first cut.",
+      "basic": "Basic is free.",
+      "plans": "See the plans",
+      "label": "Get started"
+    }
+  },
+  "pricing": {
+    "metaTitle": "Pricing, Tramme plans",
+    "metaDescription": "Basic is free. Plus and Pro add cloud projects, AI ready to use, cloud export and more. Prices in euros, monthly or yearly.",
+    "title": "Start free, grow when you need to.",
+    "lead": "Basic is free with no time limit. Plus and Pro sell the services we run for you.",
+    "key": "Your own AI provider key works in every plan.",
+    "compareMore": "Every row, side by side.",
+    "faqTitle": "About the plans",
+    "faqMore": "Billing, credits, the watermark and what happens to your projects."
+  },
+  "explore": {
+    "metaTitle": "Explore, films made with Tramme",
+    "metaDescription": "The community's public projects: open a film made with Tramme and see how it is built.",
+    "title": "Explore what is made with Tramme.",
+    "lead": "Every public project, with its layers and its timeline to look at.",
+    "recent": "Most recent",
+    "sort": "Order"
+  },
+  "project": {
+    "open": "Open in Tramme",
+    "openHint": "Copies the project into your space, to change as you like.",
+    "videoOnly": "This project is shared as a video only.",
+    "published": "Published {date}",
+    "duration": "{seconds} s",
+    "others": "More from {name}",
+    "back": "All projects",
+    "videoLabel": "{title}, a film made with Tramme."
+  },
+  "roadmap": {
+    "metaTitle": "Roadmap, what is coming to Tramme",
+    "metaDescription": "What is coming to Tramme, grouped by horizon: now, next and later.",
+    "title": "What is coming.",
+    "lead": "Only what is still ahead. What ships before launch is simply part of the product.",
+    "now": "Now",
+    "next": "Next",
+    "later": "Later",
+    "nowMore": "Being built.",
+    "nextMore": "Decided, waiting its turn.",
+    "laterMore": "Wanted, not planned yet."
+  },
+  "features": {
+    "metaTitle": "Features, what Tramme does",
+    "metaDescription": "The studio, the atelier, the assistant, the packs, the export and the cloud services: everything Tramme does, one film all the way.",
+    "title": "Everything Tramme does.",
+    "lead": "Direct the film in the studio, refine it in the atelier, let the assistant work with your tools, export what you see, and let the platform keep it all."
   }
 }

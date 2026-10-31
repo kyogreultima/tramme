@@ -3,6 +3,8 @@
 
 import { APP, REPO, repoFile } from './links';
 import { faq } from './faq';
+import { plan } from './plans';
+import type { Locale } from './i18n';
 
 export const SITE = {
   /** the public address (SITE_URL overrides it, for a deployment elsewhere) */
@@ -17,12 +19,12 @@ export const SITE = {
 
 /** the structured data of the landing page (schema.org): the site, its questions, and the app it presents, on the
  *  web and on the systems of its latest release (lib/download.ts) */
-export function landingData(site: URL, preview: string, systems: string[]) {
+export function landingData(site: URL, preview: string, systems: string[], locale: Locale = 'en') {
   const home = site.href;
   return {
     '@context': 'https://schema.org',
     '@graph': [
-      { '@type': 'WebSite', '@id': `${home}#site`, url: home, name: SITE.name, description: SITE.description, inLanguage: 'en' },
+      { '@type': 'WebSite', '@id': `${home}#site`, url: home, name: SITE.name, description: SITE.description, inLanguage: locale },
       {
         '@type': 'SoftwareApplication',
         '@id': `${home}#app`,
@@ -33,7 +35,7 @@ export function landingData(site: URL, preview: string, systems: string[]) {
         applicationCategory: 'MultimediaApplication',
         applicationSubCategory: 'Motion design',
         operatingSystem: ['Web browser', ...systems].join(', '),
-        offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+        offers: (['basic', 'plus', 'pro'] as const).map((id) => ({ '@type': 'Offer', name: id[0].toUpperCase() + id.slice(1), price: String(plan(id).price.month), priceCurrency: 'EUR' })),
         license: repoFile('LICENSE'),
         sameAs: [REPO],
         author: { '@type': 'Person', name: 'Aziz Chanou' },
@@ -41,7 +43,7 @@ export function landingData(site: URL, preview: string, systems: string[]) {
       {
         '@type': 'FAQPage',
         '@id': `${home}#faq`,
-        mainEntity: faq('en').map(({ q, a }) => ({ '@type': 'Question', name: q, acceptedAnswer: { '@type': 'Answer', text: a } })),
+        mainEntity: faq(locale).map(({ q, a }) => ({ '@type': 'Question', name: q, acceptedAnswer: { '@type': 'Answer', text: a } })),
       },
       {
         '@type': 'SoftwareSourceCode',

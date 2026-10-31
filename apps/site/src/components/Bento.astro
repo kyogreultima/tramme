@@ -1,0 +1,49 @@
+---
+// The platform's cloud services as a bento grid: each tile a short sentence,
+// all leading to the features page.
+import Devices from '@phosphor-icons/core/assets/regular/devices.svg';
+import LockSimple from '@phosphor-icons/core/assets/regular/lock-simple.svg';
+import CloudArrowUp from '@phosphor-icons/core/assets/regular/cloud-arrow-up.svg';
+import ClosedCaptioning from '@phosphor-icons/core/assets/regular/closed-captioning.svg';
+import Shapes from '@phosphor-icons/core/assets/regular/shapes.svg';
+import Head from './Head.astro';
+import { pathIn, t, type Locale } from '../lib/i18n';
+
+interface Props { locale: Locale }
+const { locale } = Astro.props;
+// the columns each tile spans, out of six
+const TILES = [
+  { id: 'devices', Icon: Devices, span: 4 },
+  { id: 'visibility', Icon: LockSimple, span: 2 },
+  { id: 'export', Icon: CloudArrowUp, span: 2 },
+  { id: 'subtitles', Icon: ClosedCaptioning, span: 2 },
+  { id: 'packs', Icon: Shapes, span: 2 },
+];
+---
+
+<section class="section" id="platform">
+  <div class="wrap">
+    <Head title={t(locale, 'landing.platform.title')} more={t(locale, 'landing.platform.more')} />
+    <ul class="bento" role="list" data-reveal>
+      {TILES.map(({ id, Icon, span }) => (
+        <li class="surface" style={`--span: ${span}`}>
+          <span class="icon"><Icon aria-hidden="true" /></span>
+          <h3><a href={pathIn(locale, '/features/#cloud')}>{t(locale, `landing.platform.${id}.title`)}</a></h3>
+          <p>{t(locale, `landing.platform.${id}.text`)}</p>
+        </li>
+      ))}
+    </ul>
+  </div>
+</section>
+
+<style>
+  .bento { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: var(--gap); margin: 0; padding: 0; list-style: none; }
+  li { position: relative; grid-column: span var(--span); display: grid; align-content: space-between; gap: 8px; min-height: clamp(180px, 18vw, 240px); padding: clamp(20px, 2.4vw, 32px); }
+  .icon { display: grid; place-items: center; width: 36px; height: 36px; margin-bottom: 24px; border-radius: 10px; background: var(--accent-soft); color: var(--accent-text); }
+  .icon :global(svg) { width: 18px; height: 18px; }
+  h3 { font-size: 1.25rem; letter-spacing: -0.025em; line-height: 1.2; }
+  h3 a { color: var(--ink); text-decoration: none; }
+  h3 a::after { content: ''; position: absolute; inset: 0; border-radius: var(--r-lg); }
+  p { max-width: 32rem; font-size: 0.9375rem; line-height: 1.55; color: var(--ink-3); }
+  @media (max-width: 860px) { .bento { grid-template-columns: minmax(0, 1fr); } li { grid-column: auto; min-height: 0; } }
+</style>

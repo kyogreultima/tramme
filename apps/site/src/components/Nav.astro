@@ -1,34 +1,40 @@
 ---
 import Brand from './Brand.astro';
-import AppLink from './AppLink.astro';
-import RepoLink from './RepoLink.astro';
-import ThemeToggle from './ThemeToggle.astro';
 import Menu from './Menu.astro';
-import { BAR_LINKS, MENUS } from '../lib/nav';
+import { barButtons, barLinks, menus } from '../lib/nav';
+import { localeOf, pathIn, t } from '../lib/i18n';
+
+const locale = localeOf(Astro.url.pathname);
+const bar = menus(locale);
+const links = barLinks(locale);
+const { logIn, start } = barButtons(locale);
 ---
 
 <header class="nav">
-  <nav class="wrap row" aria-label="Main">
-    <a class="home" href="/" aria-label="Tramme, home"><Brand /></a>
+  <nav class="wrap row" aria-label={t(locale, 'nav.main')}>
+    <a class="home" href={pathIn(locale, '/')} aria-label={t(locale, 'nav.home')}><Brand /></a>
     <ul class="links" role="list">
-      {MENUS.map((menu) => <li><Menu menu={menu} /></li>)}
-      {BAR_LINKS.map(({ label, href }) => <li><a href={href}>{label}</a></li>)}
+      {bar.map((menu) => <li><Menu menu={menu} /></li>)}
+      {links.map(({ label, href }) => <li><a href={href}>{label}</a></li>)}
     </ul>
     <div class="end">
-      <ThemeToggle />
-      <span class="repo"><RepoLink small ghost /></span>
-      <span class="app"><AppLink small /></span>
-      <!-- under 960 px, everything in one menu -->
+      <a class="btn btn-ghost btn-sm login" href={logIn.href}>{logIn.label}</a>
+      <a class="btn btn-accent btn-sm start" href={start.href}>{start.label}</a>
+      <!-- under 960 px, everything in one menu, the two buttons included -->
       <details class="fold" name="nav-menu">
-        <summary class="btn btn-ghost btn-sm">Menu</summary>
+        <summary class="btn btn-ghost btn-sm">{t(locale, 'nav.menu')}</summary>
         <div class="panel">
-          {MENUS.map((menu) => (
+          {bar.map((menu) => (
             <section>
               <strong>{menu.label}</strong>
               <ul role="list">{menu.links.map(({ label, href }) => <li><a href={href}>{label}</a></li>)}</ul>
             </section>
           ))}
-          <ul role="list">{BAR_LINKS.map(({ label, href }) => <li><a href={href}>{label}</a></li>)}</ul>
+          <ul role="list">{links.map(({ label, href }) => <li><a href={href}>{label}</a></li>)}</ul>
+          <div class="buttons">
+            <a class="btn btn-ghost" href={logIn.href}>{logIn.label}</a>
+            <a class="btn btn-accent" href={start.href}>{start.label}</a>
+          </div>
         </div>
       </details>
     </div>
@@ -36,7 +42,8 @@ import { BAR_LINKS, MENUS } from '../lib/nav';
 </header>
 
 <script>
-  // Escape and a click outside close a menu, and so does following a link in it
+  // The menus are <details>: they open without script. This only adds Escape and a
+  // click outside to close one, and closes it when a link in it is followed
   // (an anchor of the page you are on does not reload it)
   const open = () => document.querySelectorAll<HTMLDetailsElement>('.nav details[open]');
   document.addEventListener('keydown', (e) => {
@@ -86,11 +93,13 @@ import { BAR_LINKS, MENUS } from '../lib/nav';
   .panel a { display: block; padding: 8px 10px; border-radius: 10px; color: var(--ink); text-decoration: none; font-size: 0.9375rem; }
   .panel a:hover { background: var(--hover); }
 
+  .buttons { display: grid; gap: 8px; padding-top: 6px; }
+
   @media (max-width: 960px) {
-    .links { display: none; }
+    .links, .login { display: none; }
     .end { margin-left: auto; }
     .fold { display: block; }
   }
-  /* a phone: the repository is further down the page, the app is first in the menu */
-  @media (max-width: 560px) { .repo, .app { display: none; } }
+  /* a phone: both buttons are in the menu */
+  @media (max-width: 560px) { .start { display: none; } }
 </style>

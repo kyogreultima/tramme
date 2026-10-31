@@ -55,5 +55,156 @@
     "french": "Français",
     "free": "Gratuit",
     "perMonth": "par mois"
+  },
+  "plans": {
+    "name": {
+      "basic": "Basic",
+      "plus": "Plus",
+      "pro": "Pro"
+    },
+    "monthly": "Mensuel",
+    "yearly": "Annuel",
+    "period": "Période de facturation",
+    "perMonth": "par mois",
+    "billedYearly": "facturé à l'année",
+    "forever": "sans limite de durée",
+    "cta": {
+      "basic": "Commencer gratuitement",
+      "plus": "Choisir Plus",
+      "pro": "Choisir Pro"
+    },
+    "included": "Inclus",
+    "notIncluded": "Non inclus",
+    "feature": "Fonctionnalité",
+    "compare": "Comparer les offres",
+    "inAll": "Dans les trois offres",
+    "tableLabel": "Ce que contient chaque offre"
+  },
+  "card": {
+    "by": "par {name}",
+    "open": "Ouvrir {title}",
+    "empty": "Aucun projet n'est encore public."
+  },
+  "landing": {
+    "metaTitle": "Tramme, le motion design dirigé avec des mots",
+    "metaDescription": "Décrivez votre film et Tramme le fabrique. Dirigez-le avec des mots dans le studio, affinez chaque image clé dans l'atelier, exportez ce que vous voyez. Gratuit pour commencer.",
+    "hero": {
+      "title": "Le motion design,",
+      "quiet": "dirigé avec des mots.",
+      "more": "Décrivez votre film, gardez les prises qui vous plaisent, affinez chaque image clé dans l'atelier.",
+      "field": "Décrivez votre film",
+      "placeholder": "Décrivez votre film…",
+      "send": "Faire mon film",
+      "firstFilm": "Votre premier film est offert : créez un compte et il part de votre phrase.",
+      "ideas": "Des idées pour commencer",
+      "demo": "L'éditeur au travail : un film dirigé avec des mots, et chacun de ses calques dans l'atelier.",
+      "idea": {
+        "launch": {
+          "label": "Lancement de produit",
+          "prompt": "Un film de lancement de 30 secondes pour une nouvelle application, avec de la typographie animée et une palette sobre"
+        },
+        "explainer": {
+          "label": "Explicatif",
+          "prompt": "Une explication d'une minute du fonctionnement d'une pompe à chaleur, avec des schémas simples"
+        },
+        "social": {
+          "label": "Clip social",
+          "prompt": "Un clip vertical de 15 secondes qui annonce des soldes ce week-end"
+        },
+        "titles": {
+          "label": "Générique",
+          "prompt": "Un générique calme pour un documentaire sur la mer"
+        }
+      }
+    },
+    "pillars": {
+      "title": "Un film, du début à la fin.",
+      "more": "Dirigez-le, affinez-le, confiez-le à l'assistant, exportez-le.",
+      "label": "Ce que fait Tramme",
+      "learn": "En savoir plus",
+      "moreAbout": "En savoir plus sur {name}"
+    },
+    "community": {
+      "title": "Explorez l'intérieur de chaque projet.",
+      "more": "Ouvrez un film fait avec Tramme et voyez comment il est construit, calque par calque.",
+      "all": "Explorer la communauté"
+    },
+    "platform": {
+      "title": "Une plateforme autour du film.",
+      "more": "Vos projets, vos exports et les services qui tournent dans le cloud, depuis un seul compte.",
+      "devices": {
+        "title": "Vos projets sur tous vos appareils",
+        "text": "Commencez dans le navigateur et reprenez le film n'importe où, avec votre compte."
+      },
+      "visibility": {
+        "title": "Publics ou privés",
+        "text": "Partagez un projet avec la communauté, ou gardez-le pour vous avec Plus et Pro."
+      },
+      "export": {
+        "title": "Export cloud, jusqu'en 4K",
+        "text": "Exportez sans bloquer votre ordinateur : 1080p dans toutes les offres, 4K avec Pro."
+      },
+      "subtitles": {
+        "title": "Transcription, sous-titres et voix off",
+        "text": "Des sous-titres automatiques et une voix pour le film, dans une autre langue si vous voulez, payés en crédits."
+      },
+      "packs": {
+        "title": "Packs",
+        "text": "Icônes, schémas, graphiques, typographie et physique, ajoutés à un projet en un clic."
+      }
+    },
+    "closing": {
+      "title": "Votre prochain film commence par une phrase.",
+      "more": "Décrivez-le, et Tramme fait le premier montage.",
+      "basic": "Basic est gratuit.",
+      "plans": "Voir les offres",
+      "label": "Commencer"
+    }
+  },
+  "pricing": {
+    "metaTitle": "Tarifs, les offres de Tramme",
+    "metaDescription": "Basic est gratuit. Plus et Pro ajoutent des projets dans le cloud, de l'IA prête à l'emploi, l'export cloud et plus encore. Prix en euros, au mois ou à l'année.",
+    "title": "Commencez gratuitement, évoluez quand il le faut.",
+    "lead": "Basic est gratuit, sans limite de durée. Plus et Pro vendent les services que nous faisons tourner pour vous.",
+    "key": "Votre propre clé de fournisseur d'IA fonctionne dans toutes les offres.",
+    "compareMore": "Chaque ligne, côte à côte.",
+    "faqTitle": "À propos des offres",
+    "faqMore": "Facturation, crédits, filigrane et ce que deviennent vos projets."
+  },
+  "explore": {
+    "metaTitle": "Explorer, les films faits avec Tramme",
+    "metaDescription": "Les projets publics de la communauté : ouvrez un film fait avec Tramme et voyez comment il est construit.",
+    "title": "Explorez ce qui se fait avec Tramme.",
+    "lead": "Chaque projet public, avec ses calques et sa timeline à regarder.",
+    "recent": "Les plus récents",
+    "sort": "Ordre"
+  },
+  "project": {
+    "open": "Ouvrir dans Tramme",
+    "openHint": "Copie le projet dans votre espace, pour le modifier comme vous voulez.",
+    "videoOnly": "Ce projet est partagé en vidéo uniquement.",
+    "published": "Publié le {date}",
+    "duration": "{seconds} s",
+    "others": "Plus de {name}",
+    "back": "Tous les projets",
+    "videoLabel": "{title}, un film fait avec Tramme."
+  },
+  "roadmap": {
+    "metaTitle": "Feuille de route, ce qui arrive dans Tramme",
+    "metaDescription": "Ce qui arrive dans Tramme, par horizon : maintenant, ensuite et plus tard.",
+    "title": "Ce qui arrive.",
+    "lead": "Seulement ce qui reste à venir. Ce qui sort avant le lancement fait simplement partie du produit.",
+    "now": "Maintenant",
+    "next": "Ensuite",
+    "later": "Plus tard",
+    "nowMore": "En cours de construction.",
+    "nextMore": "Décidé, en attente de son tour.",
+    "laterMore": "Souhaité, pas encore planifié."
+  },
+  "features": {
+    "metaTitle": "Fonctionnalités, ce que fait Tramme",
+    "metaDescription": "Le studio, l'atelier, l'assistant, les packs, l'export et les services cloud : tout ce que fait Tramme, un film du début à la fin.",
+    "title": "Tout ce que fait Tramme.",
+    "lead": "Dirigez le film dans le studio, affinez-le dans l'atelier, laissez l'assistant travailler avec vos outils, exportez ce que vous voyez, et laissez la plateforme tout garder."
   }
 }

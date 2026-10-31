@@ -1,0 +1,20 @@
+---
+// A page of the site: the head, the top bar, the page itself, the footer. The
+// language is the address's (lib/i18n.ts); a page puts its structured data in
+// the "head" slot.
+import Base from '../layouts/Base.astro';
+import Nav from './Nav.astro';
+import Footer from './Footer.astro';
+
+interface Props { title: string; description: string }
+const { title, description } = Astro.props;
+---
+
+<Base title={title} description={description}>
+  <slot name="head" slot="head" />
+  <Nav />
+  <main>
+    <slot />
+  </main>
+  <Footer />
+</Base>

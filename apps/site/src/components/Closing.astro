@@ -1,18 +1,21 @@
 ---
-// The last word before the footer: the way in, once more
+// The last word before the footer: the call once more, and a quiet line to the plans
 import Head from './Head.astro';
-import AppLink from './AppLink.astro';
-import DownloadLink from './DownloadLink.astro';
+import { signUp } from '../lib/links';
+import { pathIn, t, type Locale } from '../lib/i18n';
+
+interface Props { locale: Locale }
+const { locale } = Astro.props;
 ---
 
-<section class="section" aria-label="Get started">
+<section class="section" aria-label={t(locale, 'landing.closing.label')}>
   <div class="wrap">
     <div class="band surface">
-      <Head title="Your next film starts with a sentence." more="Open the app in your browser, nothing to install. Or take the desktop app, it works offline." />
+      <Head title={t(locale, 'landing.closing.title')} more={t(locale, 'landing.closing.more')} />
       <div class="ctas">
-        <AppLink />
-        <DownloadLink />
+        <a class="btn btn-accent" href={signUp({ lang: locale })}>{t(locale, 'common.startFree')}</a>
       </div>
+      <p class="plans">{t(locale, 'landing.closing.basic')} <a href={pathIn(locale, '/pricing/')}>{t(locale, 'landing.closing.plans')}</a></p>
     </div>
   </div>
 </section>
@@ -21,4 +24,6 @@ import DownloadLink from './DownloadLink.astro';
   .band { padding: clamp(48px, 7vw, 96px) clamp(20px, 5vw, 72px); }
   .band :global(.head) { margin-bottom: 28px; }
   .ctas { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+  .plans { margin-top: 20px; text-align: center; font-size: 0.9375rem; color: var(--ink-3); }
+  .plans a { color: var(--accent-text); text-underline-offset: 3px; }
 </style>

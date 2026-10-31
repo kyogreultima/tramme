@@ -1,0 +1,39 @@
+---
+// The three plans, side by side, the full comparison, and the questions about
+// them. Everything is read from lib/plans.ts and lib/faq.ts: the page holds no
+// price of its own.
+import Page from '../../components/Page.astro';
+import PageHead from '../../components/PageHead.astro';
+import Head from '../../components/Head.astro';
+import Plans from '../../components/Plans.astro';
+import PlanTable from '../../components/PlanTable.astro';
+import Faq from '../../components/Faq.astro';
+import Closing from '../../components/Closing.astro';
+import { PRICING_TOPICS } from '../../lib/faq';
+import { localeOf, localePaths, t } from '../../lib/i18n';
+
+export const getStaticPaths = localePaths;
+
+const locale = localeOf(Astro.url.pathname);
+---
+
+<Page title={t(locale, 'pricing.metaTitle')} description={t(locale, 'pricing.metaDescription')}>
+  <PageHead title={t(locale, 'pricing.title')} lead={t(locale, 'pricing.lead')} />
+  <section class="wrap plans">
+    <Plans locale={locale} />
+    <p class="key">{t(locale, 'pricing.key')}</p>
+  </section>
+  <section class="section" id="compare">
+    <div class="wrap">
+      <Head title={t(locale, 'plans.compare')} more={t(locale, 'pricing.compareMore')} />
+      <PlanTable locale={locale} />
+    </div>
+  </section>
+  <Faq locale={locale} topics={PRICING_TOPICS} title={t(locale, 'pricing.faqTitle')} more={t(locale, 'pricing.faqMore')} />
+  <Closing locale={locale} />
+</Page>
+
+<style>
+  .plans { margin-top: clamp(40px, 5vw, 64px); }
+  .key { margin-top: 20px; text-align: center; font-size: 0.9375rem; color: var(--ink-3); }
+</style>

@@ -7,12 +7,12 @@ import Head from './Head.astro';
 import { faq, type Topic } from '../lib/faq';
 import { t, type Locale } from '../lib/i18n';
 
-interface Props { locale: Locale; topics?: Topic[] }
-const { locale, topics } = Astro.props;
+interface Props { locale: Locale; topics?: Topic[]; title?: string; more?: string }
+const { locale, topics, title = t(locale, 'faq.title'), more = t(locale, 'faq.more') } = Astro.props;
 ---
 <section class="section" id="faq">
   <div class="wrap">
-    <Head title={t(locale, 'faq.title')} more={t(locale, 'faq.more')} />
+    <Head title={title} more={more} />
     <div class="list" data-reveal>
       {faq(locale, topics).map(({ q, a }) => (
         <details class="surface">

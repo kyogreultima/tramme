@@ -18,16 +18,18 @@ interface Props {
   duration?: number;
   /** the placeholder's ground and light, from the clip's own colors */
   tint?: [string, string];
+  /** files of a clip that is not in src/videos (a public project's): its video and poster addresses */
+  source?: { webm?: string; mp4?: string; poster?: string };
   class?: string;
 }
 
-const { id, width, height, label, duration, tint = ['#11171b', '#2ec4b6'], class: cls } = Astro.props;
+const { id, width, height, label, duration, tint = ['#11171b', '#2ec4b6'], source, class: cls } = Astro.props;
 
 const files = import.meta.glob<string>('../videos/*.{webm,mp4,webp,jpg}', { eager: true, query: '?url', import: 'default' });
 const file = (ext: string): string | undefined => files[`../videos/${id}.${ext}`];
-const webm = file('webm');
-const mp4 = file('mp4');
-const poster = file('webp') ?? file('jpg');
+const webm = source ? source.webm : file('webm');
+const mp4 = source ? source.mp4 : file('mp4');
+const poster = source ? source.poster : (file('webp') ?? file('jpg'));
 
 const gcd = (a: number, b: number): number => (b ? gcd(b, a % b) : a);
 const reduced = `${width / gcd(width, height)}:${height / gcd(width, height)}`;

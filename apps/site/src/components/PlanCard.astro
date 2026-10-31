@@ -1,0 +1,62 @@
+---
+// One plan: its name, its price in both periods (Plans.astro shows the one
+// chosen, in CSS), a few of its rows, and the way in. Prices, credits and rows
+// come from lib/plans.ts, so a card never says what the table does not.
+import Check from '@phosphor-icons/core/assets/bold/check-bold.svg';
+import { signUp } from '../lib/links';
+import { pick, t, type Locale } from '../lib/i18n';
+import { ROWS, formatPrice, plan, type PlanId } from '../lib/plans';
+
+interface Props { planId: PlanId; locale: Locale; featured?: boolean }
+const { planId, locale, featured = false } = Astro.props;
+const p = plan(planId);
+// the rows a card shows; the table has them all
+const SHOWN = ['ai', 'cloud', 'private', 'watermark', 'export', 'support'];
+const rows = ROWS.filter((r) => SHOWN.includes(r.id)).map((r) => ({ label: pick(locale, r.label), value: r.values[planId] })).filter((r) => r.value);
+---
+
+<article class:list={['plan surface', { featured }]}>
+  <h3>{t(locale, `plans.name.${planId}`)}</h3>
+  <p class="line">{pick(locale, p.line)}</p>
+  <p class="price">
+    {p.price.month === 0
+      ? <strong>{t(locale, 'common.free')}</strong>
+      : (
+        <>
+          <strong class="m">{formatPrice(locale, p.price.month)}</strong>
+          <strong class="y">{formatPrice(locale, p.price.year)}</strong>
+          <span>{t(locale, 'plans.perMonth')}<span class="y">, {t(locale, 'plans.billedYearly')}</span></span>
+        </>
+      )}
+    {p.price.month === 0 && <span>{t(locale, 'plans.forever')}</span>}
+  </p>
+  <a class:list={['btn', featured ? 'btn-accent' : 'btn-ghost']} href={signUp({ lang: locale })}>{t(locale, `plans.cta.${planId}`)}</a>
+  <ul role="list">
+    {rows.map(({ label, value }) => (
+      <li>
+        <Check aria-hidden="true" />
+        <span>{typeof value === 'object' ? <><b>{label}</b> {pick(locale, value)}</> : label}</span>
+      </li>
+    ))}
+  </ul>
+</article>
+
+<style>
+  .plan { display: grid; align-content: start; gap: 14px; padding: clamp(24px, 2.6vw, 36px); }
+  .featured { box-shadow: 0 0 0 2px var(--accent); }
+  :global(:root[data-theme='dark']) .featured { box-shadow: 0 0 0 2px var(--accent); }
+  h3 { font-size: 1.5rem; letter-spacing: -0.03em; }
+  .line { color: var(--ink-2); min-height: 3.2em; }
+  .price { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; }
+  .price strong { font-size: 2.5rem; font-weight: 600; letter-spacing: -0.04em; line-height: 1; }
+  .price span { font-size: 0.9375rem; color: var(--ink-3); }
+  .btn { justify-content: center; }
+  ul { display: grid; gap: 10px; margin: 8px 0 0; padding: 18px 0 0; border-top: 1px solid var(--line); list-style: none; }
+  li { display: grid; grid-template-columns: 18px 1fr; gap: 10px; font-size: 0.9375rem; color: var(--ink-2); }
+  li svg { width: 16px; height: 16px; margin-top: 4px; color: var(--accent-text); }
+  li b { font-weight: 500; color: var(--ink); }
+  /* the period chosen in Plans.astro */
+  .y { display: none; }
+  :global(.plans:has(#period-year:checked)) .y { display: inline; }
+  :global(.plans:has(#period-year:checked)) .m { display: none; }
+</style>

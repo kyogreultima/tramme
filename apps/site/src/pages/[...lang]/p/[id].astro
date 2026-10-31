@@ -1,0 +1,67 @@
+---
+// One public project: its video large, its title, its author, its words, the
+// author's other projects, and the way to open it in the app when it can be
+// reused. (With the gallery API, set `prerender = false` and read the id from
+// Astro.params.)
+import Page from '../../../components/Page.astro';
+import Media from '../../../components/Media.astro';
+import ProjectCard from '../../../components/ProjectCard.astro';
+import Head from '../../../components/Head.astro';
+import Closing from '../../../components/Closing.astro';
+import { getProject, listProjects } from '../../../lib/gallery';
+import { appProject } from '../../../lib/links';
+import { LOCALES, DEFAULT_LOCALE, localeOf, pathIn, t } from '../../../lib/i18n';
+
+export async function getStaticPaths() {
+  const projects = await listProjects();
+  return projects.flatMap(({ id }) => LOCALES.map((l) => ({ params: { lang: l === DEFAULT_LOCALE ? undefined : l, id } })));
+}
+
+const locale = localeOf(Astro.url.pathname);
+const project = (await getProject(Astro.params.id!))!;
+const others = (await listProjects()).filter((p) => p.author.handle === project.author.handle && p.id !== project.id);
+const published = new Intl.DateTimeFormat(locale === 'fr' ? 'fr-FR' : 'en-GB', { dateStyle: 'long' }).format(new Date(project.publishedAt));
+---
+
+<Page title={`${project.title}, ${project.author.name}`} description={project.description}>
+  <article class="wrap project">
+    <p class="back"><a href={pathIn(locale, '/explore/')}>{t(locale, 'project.back')}</a></p>
+    <Media
+      id={project.id}
+      width={project.width}
+      height={project.height}
+      duration={project.duration}
+      source={{ ...project.video, poster: project.poster }}
+      label={t(locale, 'project.videoLabel', { title: project.title })}
+    />
+    <div class="words">
+      <h1>{project.title}</h1>
+      <p class="by">{t(locale, 'card.by', { name: project.author.name })}. {t(locale, 'project.published', { date: published })}. {t(locale, 'project.duration', { seconds: project.duration })}</p>
+      <p class="description">{project.description}</p>
+      {project.reusable
+        ? <p><a class="btn btn-accent" href={appProject(project.id, locale)}>{t(locale, 'project.open')}</a> <span class="hint">{t(locale, 'project.openHint')}</span></p>
+        : <p class="hint">{t(locale, 'project.videoOnly')}</p>}
+    </div>
+  </article>
+  {others.length > 0 && (
+    <section class="section">
+      <div class="wrap">
+        <Head title={t(locale, 'project.others', { name: project.author.name })} />
+        <div class="grid">{others.map((p) => <ProjectCard project={p} locale={locale} />)}</div>
+      </div>
+    </section>
+  )}
+  <Closing locale={locale} />
+</Page>
+
+<style>
+  .project { display: grid; gap: 28px; margin-top: clamp(24px, 3vw, 40px); }
+  .back a { font-size: 0.9375rem; color: var(--accent-text); text-underline-offset: 3px; }
+  .project :global(.media) { border-radius: var(--r-lg); box-shadow: var(--lift); }
+  .words { display: grid; gap: 14px; max-width: 44rem; }
+  h1 { font-size: clamp(2rem, 4vw, 3rem); letter-spacing: -0.04em; }
+  .by, .hint { font-size: 0.9375rem; color: var(--ink-3); }
+  .description { font-size: 1.125rem; line-height: 1.55; color: var(--ink-2); }
+  .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px 20px; }
+  @media (max-width: 860px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+</style>

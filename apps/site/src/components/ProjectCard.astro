@@ -1,0 +1,65 @@
+---
+// One public project, as a card: its still, its title, its author. Shared by
+// the landing's community section, /explore/ and a project's own page. The
+// whole card leads to the project; on hover or focus its video plays in
+// place of the still (a few lines of script, and only then does the video
+// load); without script the still stays.
+import { pathIn, t, type Locale } from '../lib/i18n';
+import type { PublicProject } from '../lib/gallery';
+
+interface Props { project: PublicProject; locale: Locale }
+const { project, locale } = Astro.props;
+const { id, title, author, poster, video, width, height } = project;
+---
+
+<article class="card" data-project-card data-webm={video.webm} data-mp4={video.mp4}>
+  <div class="frame" style={`--ratio: ${width} / ${height}`}>
+    {poster && <img src={poster} alt="" loading="lazy" decoding="async" width={width} height={height} />}
+  </div>
+  <div class="by">
+    <span class="avatar" aria-hidden="true">{author.avatar ? <img src={author.avatar} alt="" loading="lazy" /> : author.name.slice(0, 1)}</span>
+    <h3><a href={pathIn(locale, `/p/${id}/`)} aria-label={t(locale, 'card.open', { title })}>{title}</a></h3>
+    <span class="name">{t(locale, 'card.by', { name: author.name })}</span>
+  </div>
+</article>
+
+<script>
+  // the video comes only when the card is pointed at or focused, and goes when it is left
+  const cards = document.querySelectorAll<HTMLElement>('[data-project-card]');
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+  for (const card of cards) {
+    const frame = card.querySelector<HTMLElement>('.frame')!;
+    const start = () => {
+      if (reduced.matches || frame.querySelector('video')) return;
+      const v = document.createElement('video');
+      v.muted = true; v.loop = true; v.playsInline = true; v.autoplay = true;
+      for (const [src, type] of [[card.dataset.webm, 'video/webm'], [card.dataset.mp4, 'video/mp4']]) {
+        if (!src) continue;
+        const s = document.createElement('source');
+        s.src = src; s.type = type;
+        v.append(s);
+      }
+      if (v.childElementCount) frame.append(v);
+    };
+    const stop = () => frame.querySelector('video')?.remove();
+    card.addEventListener('pointerenter', start);
+    card.addEventListener('pointerleave', stop);
+    card.addEventListener('focusin', start);
+    card.addEventListener('focusout', stop);
+  }
+</script>
+
+<style>
+  .card { position: relative; display: grid; gap: 12px; }
+  .frame { position: relative; aspect-ratio: 16 / 10; overflow: hidden; border-radius: var(--r); background: var(--field); }
+  .frame :global(img), .frame :global(video) { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .card:hover .frame, .card:focus-within .frame { box-shadow: 0 0 0 2px var(--accent); }
+  .by { display: grid; grid-template-columns: auto 1fr; grid-template-areas: 'avatar title' 'avatar name'; column-gap: 10px; align-items: center; }
+  .avatar { grid-area: avatar; display: grid; place-items: center; width: 32px; height: 32px; overflow: hidden; border-radius: 999px; background: var(--accent-soft); color: var(--accent-text); font-size: 0.875rem; font-weight: 600; }
+  .avatar img { width: 100%; height: 100%; object-fit: cover; }
+  h3 { grid-area: title; font-size: 1rem; letter-spacing: -0.015em; line-height: 1.25; }
+  /* the whole card is the link */
+  h3 a { color: var(--ink); text-decoration: none; }
+  h3 a::after { content: ''; position: absolute; inset: 0; border-radius: var(--r); }
+  .name { grid-area: name; font-size: 0.875rem; color: var(--ink-3); }
+</style>

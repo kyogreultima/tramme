@@ -7,22 +7,43 @@ import Head from './Head.astro';
 import Shot from './Shot.astro';
 import Cards from './Cards.astro';
 import { shotOf } from '../lib/features';
+import { pick, type Locale, type Localised } from '../lib/i18n';
 
-const ITEMS = [
-  { Icon: Scissors, title: 'A timeline with its own menus', text: 'Split a clip at the playhead, trim it, bring it there; drop a marker; snap every edge. A video is cut in its file.' },
-  { Icon: BezierCurve, title: 'Curves', text: 'A graph editor to shape every ease, saved once and reused across the film.' },
-  { Icon: Sliders, title: 'An inspector for each layer', text: 'Every setting of the selected layer, ready to animate, and the speech of a video, transcribed when you ask.' },
-];
+interface Props { locale: Locale }
+const { locale } = Astro.props;
+
+const COPY: Localised<{ title: string; more: string; items: [string, string][] }> = {
+  en: {
+    title: 'The atelier, for the detail.',
+    more: 'One switch away: the layers, the timeline, the curves and the inspector, on the same film.',
+    items: [
+      ['A timeline with its own menus', 'Split a clip at the playhead, trim it, bring it there; drop a marker; snap every edge. A video is cut in its file.'],
+      ['Curves', 'A graph editor to shape every ease, saved once and reused across the film.'],
+      ['An inspector for each layer', 'Every setting of the selected layer, ready to animate, and the speech of a video, transcribed when you ask.'],
+    ],
+  },
+  fr: {
+    title: 'L\'atelier, pour le détail.',
+    more: 'À un bouton : les calques, la timeline, les courbes et l\'inspecteur, sur le même film.',
+    items: [
+      ['Une timeline avec ses propres menus', 'Coupez un clip à la tête de lecture, rognez-le, amenez-le là ; posez un repère ; aimantez chaque bord. Une vidéo se coupe dans son fichier.'],
+      ['Des courbes', 'Un éditeur de courbes pour façonner chaque accélération, enregistrée une fois et réutilisée dans tout le film.'],
+      ['Un inspecteur pour chaque calque', 'Tous les réglages du calque sélectionné, prêts à animer, et la parole d\'une vidéo, transcrite quand vous le demandez.'],
+    ],
+  },
+};
+const c = pick(locale, COPY);
+const ICONS = [Scissors, BezierCurve, Sliders];
+const items = c.items.map(([title, text], i) => ({ Icon: ICONS[i], title, text }));
 const { shot, alt } = shotOf('editor');
 ---
 
 <section class="section" id="editor">
   <div class="wrap">
-    <Head title="The atelier, for the detail." more="One switch away: the layers, the timeline, the curves and the inspector, on the same film." />
+    <Head title={c.title} more={c.more} />
   </div>
   <div class="wrap">
-    <Shot light={shot[0]} dark={shot[1]} alt={alt} />
-    <Cards items={ITEMS} />
+    <Shot light={shot[0]} dark={shot[1]} alt={pick(locale, alt)} />
+    <Cards items={items} />
   </div>
 </section>
-

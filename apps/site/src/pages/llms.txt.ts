@@ -9,11 +9,13 @@ import { SITE } from '../lib/site';
 
 // the site's own pages, besides the docs
 const PAGES = [
-  ['/features/', 'Features', 'The studio, the atelier, the assistant, the packs and the export'],
-  ['/examples/', 'Examples', 'Films made with Tramme, each one in the repository'],
-  ['/pricing/', 'Pricing', 'Free to use; only the AI provider you choose can cost money'],
+  ['/features/', 'Features', 'The studio, the atelier, the assistant, the packs, the export and the cloud services'],
+  ['/explore/', 'Explore', 'Public projects made with Tramme by the community'],
+  ['/pricing/', 'Pricing', 'Basic is free; Plus and Pro add cloud projects, AI ready to use and cloud export; prices in euros'],
+  ['/roadmap/', 'Roadmap', 'What is coming to Tramme'],
   ['/download/', 'Download', 'The desktop app for Windows, macOS and Linux'],
   ['/about/', 'About', 'What Tramme is, its licence, how to take part'],
+  ['/terms/', 'Terms', 'Terms of use and sale'],
   ['/privacy/', 'Privacy', 'What is kept where'],
 ];
 
@@ -27,6 +29,6 @@ export const GET: APIRoute = async ({ site }) => {
     return `## ${group.label}\n\n${lines.join('\n')}`;
   }));
   const pages = PAGES.map(([path, name, about]) => `- [${name}](${new URL(path, site)}): ${about}`).join('\n');
-  const text = `# ${SITE.name}\n\n> ${SITE.description}\n\n- [The editor, online](${APP}): projects and keys stay in the browser\n- [Source code](${REPO}): Functional Source License, Apache-2.0 after two years\n${pages}\n\n${sections.join('\n\n')}\n`;
+  const text = `# ${SITE.name}\n\n> ${SITE.description}\n\n- [The editor, online](${APP}): in the browser, with or without an account\n- [Source code](${REPO}): Functional Source License, Apache-2.0 after two years\n${pages}\n\n${sections.join('\n\n')}\n`;
   return new Response(text, { headers: { 'content-type': 'text/plain; charset=utf-8' } });
 };
