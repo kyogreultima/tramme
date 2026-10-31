@@ -5,6 +5,7 @@
 
 import { importFile } from './importer.ts';
 import { frame, tauri } from './tauri.ts';
+import { go } from './nav.ts';
 
 export function initDesktop(): void {
   const app = tauri;
@@ -27,7 +28,7 @@ export function initDesktop(): void {
     if (!data.length) return;
     // the import makes a new project: it opens, like a file dropped on the home
     importFile(new File([data], name))
-      .then((m) => { location.assign(`/p/${m.id}`); })
+      .then((m) => { go(`/p/${m.id}`); })
       .catch((e) => console.warn('[tramme] desktop open:', (e as Error).message));
   };
   // the listener first, so an open arriving during the read is not lost

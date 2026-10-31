@@ -33,6 +33,11 @@ kbd { display: inline-grid; place-items: center; min-width: 18px; height: 18px; 
 @keyframes spin { to { transform: rotate(360deg); } }
 svg.i.spin { animation: spin 1s linear infinite; }
 
+/* the cover of a page that loads (nav.ts): the ground and the mark from the first paint, lifted once the page stands, closed again before another is asked for */
+#boot { position: fixed; inset: 0; z-index: 2147483000; display: grid; place-items: center; background: var(--bg); transition: opacity 0.2s var(--ease); }
+#boot img { width: 44px; height: 44px; animation: fade 0.4s 0.15s backwards; }
+#boot.done { opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 0.2s var(--ease), visibility 0s 0.2s; }
+
 /* the reduced-motion preference: the decorations stop, the work stays readable */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }

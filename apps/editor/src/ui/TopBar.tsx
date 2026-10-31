@@ -25,6 +25,7 @@ import { setView, VIEW_LABEL, ViewSwitch } from './views.tsx';
 import { HelpButton, helpMenu } from './Help.tsx';
 import { WindowControls, windowBar } from './WindowControls.tsx';
 import { locale, t } from '../i18n/index.ts';
+import { go } from '../nav.ts';
 
 const FORMATS: [string, string, number, number][] = [
   ['9x16', '9:16 · 1080×1920', 1080, 1920],
@@ -268,7 +269,7 @@ function ExportPop({ anchor, onClose }: { anchor: HTMLElement; onClose: () => vo
 /** back to the projects, once the last changes are saved */
 async function leave(e: MouseEvent) {
   e.preventDefault();
-  try { await saveNow(); location.assign('/'); } catch (x) { toast(t('common.couldNotSaveError', { error: (x as Error).message }), 'error'); }
+  try { await saveNow(); go('/'); } catch (x) { toast(t('common.couldNotSaveError', { error: (x as Error).message }), 'error'); }
 }
 
 async function rename(value: string) {

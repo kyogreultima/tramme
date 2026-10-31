@@ -5,9 +5,11 @@
 
 import { z } from 'zod';
 import { claudeModel, EFFORTS, type Effort } from './claude-models.ts';
+import { listedLabel, readableModel } from './model-names.ts';
 
 // The Claude models are not listed here: they come from the Agent SDK or the Anthropic API, as they are now
 export * from './claude-models.ts';
+export { readableModel, setModelLabels } from './model-names.ts';
 
 /** Claude's level when none is chosen; the other models keep their own default */
 export const DEFAULT_EFFORT: Effort = 'high';
@@ -72,9 +74,11 @@ export function slotOf(model: string): string {
 }
 /** the model's name for its provider */
 export const modelName = (model: string) => (providerOf(model) === 'anthropic' ? model : model.slice(slotOf(model).length + 1));
-/** a short name to show */
+/** a short name to show: the name its listing gave, else the key written out (a Claude model not listed and a local model's tag stay as they are) */
 export const modelLabel = (model: string) => claudeModel(model)?.label
-  ?? (engineOf(model) && modelName(model) === CLI_DEFAULT ? PROVIDER_LABEL[providerOf(model)] : modelName(model).replace(/^models\//, ''));
+  ?? listedLabel(model)
+  ?? (engineOf(model) && modelName(model) === CLI_DEFAULT ? PROVIDER_LABEL[providerOf(model)]
+    : ['anthropic', 'local'].includes(providerOf(model)) ? modelName(model).replace(/^models\//, '') : readableModel(modelName(model)));
 
 // ── the model taken for the user ─────────────────────────────
 // Someone who connected OpenAI or Gemini and not Claude should not have to

@@ -122,6 +122,6 @@ describe('what the registry of Claude models tells the rest of the assistant', (
 
   it('does not touch the other providers', () => {
     expect(effortLevels('openai:gpt-5')).toEqual(['low', 'medium', 'high']);
-    expect(modelLabel('openai:gpt-5')).toBe('gpt-5');
+    expect(modelLabel('openai:gpt-5')).toBe('GPT-5');
   });
 });

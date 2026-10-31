@@ -29,14 +29,17 @@ const ICON = fs.readFileSync(path.join(HERE, 'icon.svg'), 'utf8').trim();
 const OG = path.join(HERE, 'og.jpg');
 const ICONS = path.join(HERE, 'icons');
 
-/** a page of the build: its bundle and stylesheet, its title, and what its head adds */
-const page = (js: string, css: string | undefined, title: string, head: string) => `<!doctype html>
+/** the cover of a page that is loading (nav.ts): the theme's ground and the mark, there from the page's first paint */
+const COVER = `<div id="boot" aria-hidden="true"><img src="data:image/svg+xml,${encodeURIComponent(ICON)}" alt=""></div>`;
+
+/** a page of the build: its bundle and stylesheet, its title, what its head adds, and whether it has the cover */
+const page = (js: string, css: string | undefined, title: string, head: string, cover: boolean) => `<!doctype html>
 <html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="dark">${head}
 <title>${title}</title>
 <link rel="icon" href="data:image/svg+xml,${encodeURIComponent(ICON)}">
 ${css ? `<link rel="stylesheet" href="/${css}">` : ''}</head>
-<body><div id="app"></div><script type="module" src="/${js}"></script></body></html>
+<body><div id="app"></div>${cover ? COVER : ''}<script type="module" src="/${js}"></script></body></html>
 `;
 
 const EDITOR_TITLE = 'Tramme, the open-source motion design editor';
@@ -83,10 +86,10 @@ function writePage(meta: esbuild.Metafile) {
   const outs = Object.keys(meta.outputs).map((p) => path.relative(DIST, path.resolve(ROOT, p)).split(path.sep).join('/'));
   // in dev, a new address at each rebuild, so no browser keeps an older bundle
   const v = dev ? `?v=${Date.now().toString(36)}` : '';
-  for (const [entry, file, title, head] of [['main', 'index.html', EDITOR_TITLE, EDITOR_HEAD], ['vault', 'vault.html', 'Tramme', VAULT_HEAD]]) {
+  for (const [entry, file, title, head, cover] of [['main', 'index.html', EDITOR_TITLE, EDITOR_HEAD, true], ['vault', 'vault.html', 'Tramme', VAULT_HEAD, false]] as const) {
     const js = outs.find((p) => new RegExp(`^assets/${entry}(-[^/]+)?\\.js$`).test(p))!;
     const css = outs.find((p) => new RegExp(`^assets/${entry}(-[^/]+)?\\.css$`).test(p));
-    fs.writeFileSync(path.join(DIST, file), page(`${js}${v}`, css && `${css}${v}`, title, head));
+    fs.writeFileSync(path.join(DIST, file), page(`${js}${v}`, css && `${css}${v}`, title, head, cover));
   }
   // drop the bundles of previous builds
   const keep = new Set(outs.flatMap((p) => [p, `${p}.LEGAL.txt`]));

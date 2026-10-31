@@ -8,7 +8,7 @@
 
 import { installed, offIn } from '../installed.ts';
 import { computed, signal } from '@preact/signals';
-import { addUsage, claudeModels, defaultClaudeModel, parseApiModels, setClaudeModels, type ClaudeModel, type Usage, CLI_DEFAULT, COMPANION_PORT, EFFORTS, effortFor, effortLevels, ENGINE_MODELS, ENGINES, engineOf, LOCAL_URL, modelLabel, modelName, NO_USAGE, pickModel, PROVIDER_LABEL, providerOf, REMOTE, joinSystem, queuedPrompt, setTranslator, slotOf, systemParts, userPrompt, type Effort, type Engine, type TurnContext } from '@tramme/assistant';
+import { addUsage, claudeModels, defaultClaudeModel, parseApiModels, setClaudeModels, type ClaudeModel, type Usage, CLI_DEFAULT, COMPANION_PORT, EFFORTS, effortFor, effortLevels, ENGINE_MODELS, ENGINES, engineOf, LOCAL_URL, modelLabel, modelName, NO_USAGE, pickModel, PROVIDER_LABEL, providerOf, readableModel, REMOTE, setModelLabels, joinSystem, queuedPrompt, setTranslator, slotOf, systemParts, userPrompt, type Effort, type Engine, type TurnContext } from '@tramme/assistant';
 import { CHAT, CHAT_INDEX, chatPath } from '@tramme/project';
 import type { TrammeDoc } from '@tramme/core';
 import reference from '../../../../docs/document.md';
@@ -174,6 +174,19 @@ export function routeLabel(route: Route, model: string): string {
   return providerLabel(model);
 }
 
+/**
+ * The options of a listing, each with a name to read: its own when the listing gave one (Codex's, OpenRouter's),
+ * else its key written out (`gpt-5.1-codex-max` is "GPT-5.1 Codex Max"). The names are kept for the model
+ * button and the usage lines, so a model is called the same everywhere. `prefix` is what stands before a key
+ * (`codex:`), `prefixed` whether the options' ids carry it already.
+ */
+function named<T extends ModelOption>(prefix: string, list: T[], prefixed: boolean): T[] {
+  const bare = (o: T) => (prefixed ? o.id.slice(prefix.length) : o.id);
+  const out = list.map((o) => (o.label === bare(o) ? { ...o, label: readableModel(bare(o)) } : o));
+  setModelLabels(out.map((o) => [`${prefix}${bare(o)}`, o.label]));
+  return out;
+}
+
 const localBase = () => aiSettings.peek().localUrl.replace(/\/+$/, '');
 
 /** the models a local server offers (OpenAI format), or null when none answers */
@@ -227,7 +240,8 @@ export async function loadModels() {
     Object.values(aiStatus.peek().remote).some(Boolean) ? api.models().catch(() => ({})) : Promise.resolve({}),
     localModels(),
   ]);
-  aiModels.value = { ...aiModels.peek(), remote: remote as never, local: local ?? [] };
+  const listings = Object.fromEntries(Object.entries(remote as Record<string, ModelOption[] | { error: string }>).map(([slot, list]) => [slot, Array.isArray(list) ? named(`${slot}:`, list, false) : list]));
+  aiModels.value = { ...aiModels.peek(), remote: listings, local: local ?? [] };
   aiStatus.value = { ...aiStatus.peek(), local: local ? 'ok' : 'absent' };
 }
 
@@ -265,7 +279,7 @@ async function loadClaudeModels() {
   await Promise.all([
     st.companion === 'ok' ? companionModels(link()).then(({ claude, engines: listed }) => {
       setClaudeSource('companion', claude);
-      const engines = Object.fromEntries(ENGINES.map((e) => [e, (listed[e] ?? []).map(([id, label]) => ({ id: `${ENGINE_MODELS[e].provider}:${id}`, label }))]));
+      const engines = Object.fromEntries(ENGINES.map((e) => [e, named(`${ENGINE_MODELS[e].provider}:`, (listed[e] ?? []).map(([id, label]) => ({ id: `${ENGINE_MODELS[e].provider}:${id}`, label })), true)]));
       aiModels.value = { ...aiModels.peek(), engines };
     }) : undefined,
     st.server ? api.claudeModels().then((body) => setClaudeSource('key', parseApiModels(body))).catch(() => {}) : undefined,

@@ -58,7 +58,7 @@ export function TakeCard({ p }: { p: NonNullable<ChatItem['proposal']> }) {
   );
 }
 
-/** the stages of the work, in the order they came */
+/** the stages of the work, in the order they came; under the steps it opens, so it stays beside the newest ones */
 function Pipeline({ stages, open, steps, onToggle }: { stages: Stage[]; open: boolean; steps: number; onToggle: () => void }) {
   return (
     <button class={`pipeline${open ? ' open' : ''}`} onClick={onToggle} title={open ? t('studio.hideSteps') : t('studio.showSteps')}>
@@ -127,8 +127,8 @@ function SceneWork({ name, items }: { name: string; items: ChatItem[] }) {
   return (
     <div class="work scene">
       <div class="scene-name">{name}</div>
-      {stages.length > 0 && <Pipeline stages={stages} open={open} steps={steps.length} onToggle={() => setOpen(!open)} />}
       {open && <div class="work-steps">{steps.map((it) => <Step key={it.id} it={it} />)}</div>}
+      {stages.length > 0 && <Pipeline stages={stages} open={open} steps={steps.length} onToggle={() => setOpen(!open)} />}
       {items.map((it) => (it.text !== undefined && !it.tool && !it.thinking && it.text.trim() ? <Said key={it.id} text={it.text} /> : null))}
       {usage && <UsageLine u={usage} />}
     </div>
@@ -155,8 +155,8 @@ function Plain({ work, live }: { work: ChatItem[]; live: boolean }) {
             <span class="mark"><LogoMark /></span>
             <b>Tramme</b>
           </div>
-          {stages.length > 0 && <Pipeline stages={stages} open={open} steps={steps.length} onToggle={() => setOpen(!open)} />}
           {open && <div class="work-steps">{steps.map((it) => <Step key={it.id} it={it} />)}</div>}
+          {stages.length > 0 && <Pipeline stages={stages} open={open} steps={steps.length} onToggle={() => setOpen(!open)} />}
         </>
       )}
       {shots.length > 0 && (
@@ -204,7 +204,7 @@ export function Thread({ empty }: { empty?: ComponentChildren }) {
   const list = turns.value, busy = running.value, available = aiRoute.value !== null;
   const scroller = useRef<HTMLDivElement>(null);
   const items = chat.value;
-  useLayoutEffect(() => { const el = scroller.current; if (el) el.scrollTop = el.scrollHeight; }, [items.length, items.at(-1)?.text]);
+  useFollowEnd(scroller, `${items[0]?.id}:${items.at(-1)?.role === 'user' ? items.length : 0}`);
   // a note asked from the storyboard or a pin: brought into view, lit for a moment
   const flash = studio.flash.value;
   useFlash(flash, scroller);
@@ -216,6 +216,31 @@ export function Thread({ empty }: { empty?: ComponentChildren }) {
       <QuestionCard />
     </div>
   );
+}
+
+/** how far from the end still counts as being at the end */
+const AT_END = 120;
+
+/**
+ * Keeps the thread at its end while its content grows (a step that finishes, a
+ * thought that lengthens, the steps opened), as long as the reader has not
+ * scrolled up to read; scrolling back down gives the end back. `bring` changes
+ * with the conversation shown and with each note the user writes: those bring the end.
+ */
+function useFollowEnd(scroller: { current: HTMLDivElement | null }, bring: string) {
+  const atEnd = useRef(true);
+  const toEnd = () => { const el = scroller.current; if (el) el.scrollTop = el.scrollHeight; };
+  useLayoutEffect(() => {
+    const el = scroller.current;
+    if (!el) return;
+    const onScroll = () => { atEnd.current = el.scrollHeight - el.scrollTop - el.clientHeight < AT_END; };
+    const grew = new MutationObserver(() => { if (atEnd.current) toEnd(); });
+    grew.observe(el, { childList: true, subtree: true, characterData: true });
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => { grew.disconnect(); el.removeEventListener('scroll', onScroll); };
+  }, []);
+  // a conversation opened, a note just written: the end, whatever was read before
+  useLayoutEffect(() => { atEnd.current = true; toEnd(); }, [bring]);
 }
 
 /** a note asked from elsewhere: brought into view, lit for a moment */

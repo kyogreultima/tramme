@@ -35,6 +35,7 @@ import { settingsOpen } from '../settings.ts';
 import { APP_VERSION, downloadOf, update } from '../version.ts';
 import { IDEAS } from '../ideas.ts';
 import { t } from '../i18n/index.ts';
+import { go } from '../nav.ts';
 
 interface Example { file: string; name: string; description: string; width: number; height: number; duration: number; thumbnail?: string }
 
@@ -49,7 +50,7 @@ const PRESETS: [string, string, number, number][] = [
 const FILM_FORMATS = PRESETS.filter(([id]) => id !== '4k');
 
 
-const open = (id: string) => location.assign(`/p/${encodeURIComponent(id)}`);
+const open = (id: string) => go(`/p/${encodeURIComponent(id)}`);
 
 const dims = (m: { width?: number; height?: number; duration?: number }) =>
   [m.width && m.height ? `${m.width}×${m.height}` : null, m.duration ? `${+m.duration.toFixed(2)} s` : null].filter(Boolean).join(' · ');

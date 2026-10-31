@@ -31,6 +31,7 @@ import { ViewSwitch } from './views.tsx';
 import { Confirm, norm, Row, Search, Section } from './SettingsRows.tsx';
 import { LocalModels } from './ModelsSettings.tsx';
 import { APP_VERSION, checkForUpdate, downloadOf, update } from '../version.ts';
+import { go } from '../nav.ts';
 
 const MOTION: Record<Preferences['motion'], string> = {
   auto: m('settings.adaptsToTheMachine'),
@@ -472,7 +473,7 @@ function Storage() {
       const state = await tauri!.core.invoke('desktop_set_home', { home: next }) as { home: string };
       setHome(state.home);
       // the lists answer from the new folder from now on: back to the projects
-      if (location.pathname !== '/') location.assign('/');
+      if (location.pathname !== '/') go('/');
     } catch (e) {
       toast((e as Error).message, 'error');
     }

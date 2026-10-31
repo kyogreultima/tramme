@@ -33,12 +33,14 @@ import { boot } from './mode.ts';
 import { initDesktop } from './desktop.ts';
 import { autoCheck } from './version.ts';
 import { copiesFor, startInstalled } from './installed.ts';
+import { lift } from './nav.ts';
 
 const root = document.getElementById('app')!;
 
 function fail(title: string, message: string) {
   const esc = (s: string) => s.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
   root.innerHTML = `<div class="empty" style="height:100vh"><b>${esc(title)}</b><div class="mono">${esc(message)}</div><a class="btn" href="/">${esc(t('app.backToProjects'))}</a></div>`;
+  lift();
 }
 
 /** the home screen's picture of the project, refreshed at most every 20 s after a save */
@@ -64,6 +66,7 @@ async function openProject(id: string) {
   load(upgradeDoc(JSON.parse(doc.text)) as TrammeDoc, info.manifest, api.fileUrl(id, DOCUMENT), doc.etag);
   document.title = `${info.manifest.name} · Tramme`;
   render(<App />, root);
+  lift();
   loadChats(info.files).catch((e) => console.warn('[tramme] conversations :', (e as Error).message)).finally(startProject);
   await preview.start();
   // the editor's tour, the first time a project opens
@@ -93,5 +96,6 @@ boot().then(() => {
   } else {
     if (location.pathname !== '/') history.replaceState(null, '', '/');
     render(<Home />, root);
+    lift();
   }
 }, (e) => fail(t('personal.cannotStart'), (e as Error).message));
