@@ -123,6 +123,8 @@ jobs:
   site:
     name: Deploy the site
     needs: release
+    # the site is deployed at launch only: set the repository variable SITE_DEPLOY=on then
+    if: vars.SITE_DEPLOY == 'on'
     runs-on: ubuntu-latest
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
