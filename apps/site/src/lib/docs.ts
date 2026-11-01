@@ -55,6 +55,7 @@ export const DOCS: { label: string; collapsed?: boolean; pages: DocPage[] }[] = 
     label: 'Roadmaps',
     collapsed: true,
     pages: [
+      { slug: 'roadmaps/safe-projects', label: 'Safe projects', file: 'docs/safe-projects-roadmap.md' },
       { slug: 'roadmaps/plugins', label: 'Plugins', file: 'docs/plugins-roadmap.md' },
       { slug: 'roadmaps/installed-plugins', label: 'Installed plugins', file: 'docs/installed-plugins-roadmap.md' },
       { slug: 'roadmaps/packs', label: 'Packs', file: 'docs/packs-roadmap.md' },

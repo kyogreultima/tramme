@@ -1,0 +1,73 @@
+# Safe projects roadmap
+
+Priority: **now**, before removing the code-execution question or accepting projects from unknown sources without it.
+
+Status: **planned, not implemented**. The existing worker and experimental whole-frame renderer are a foundation, not completion of this roadmap. All acceptance boxes below remain open.
+
+## Goal
+
+A user opens, plays, edits and exports a `.tramme` project without granting its scripts the editor's rights. Ordinary animation code needs no general execution permission. Extra capabilities, such as sending a media file to an external service, require a specific, understandable permission.
+
+This work extends [plugin isolation](plugin-isolation.md) and [the evaluator in the sandbox](evaluator-sandbox.md). It closes the isolation item in [the plugins roadmap](plugins-roadmap.md#step-10-ecosystem); enabling `sandboxPreview` alone does not close it.
+
+## What exists, and what is missing
+
+- `apps/editor/src/importer.ts` inventories plugins and expressions and asks before running imported code. Keep this question until the release gate below passes.
+- `apps/editor/src/plugins/` runs tools, checks and drawing in a per-project worker. Whole-frame evaluation and rendering also exist, behind a setting that is off by default.
+- The worker is created on the editor's origin. Its `guardRealm` limits `fetch` to that origin and removes `WebSocket`; the published CSP also permits same-origin requests. This does not deny access to the editor's authenticated API or same-origin storage.
+- Expressions use `new Function` with selected global names shadowed. A blocked-name list is not a security boundary. Expressions must be covered even when a project has no plugins, including any mirror evaluator used by the interface.
+- Import validation, thumbnails, stills, vector exports, browser exports, the desktop app and the CLI must obey the same boundary. A sandboxed preview does not make an earlier native or page-side import safe.
+
+The platform distinction matters: [workers can use network and storage APIs](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Using_web_workers). An [opaque-origin sandbox](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy/sandbox) or a dedicated origin without the editor's credentials provides a boundary the host can enforce. Merely replacing globals does not.
+
+## Step 1. Establish the enforced boundary
+
+- [ ] Choose and prove the runtime boundary on the supported browsers and desktop webviews: an opaque-origin sandbox or a dedicated, credential-free origin, with a worker for computation and rendering. Preserve OffscreenCanvas/WebGL where supported; document compatibility before committing to the transport.
+- [ ] Deny direct access to the editor's DOM, cookies, IndexedDB, caches, other projects, account data, provider routes and keys. On desktop, expose no Tauri IPC, native commands or filesystem rights to project code. On the CLI, execute no untrusted plugin in the native Node process.
+- [ ] Deny direct network requests and remote module loading by platform policy, including alternative transports and nested execution contexts. Transfer approved code, media, fonts and model resources through the host; do not pass authenticated editor URLs as a substitute for isolation.
+
+Done when: code running at module initialization cannot read the editor's data or call its API, before any drawing or tool call occurs. Test the actual deployed headers and native protocol, not only mocked globals.
+
+## Step 2. Cover every execution path
+
+- [ ] Move all imported plugins, expressions, modifiers, effects, simulations, checks and tools behind the boundary, including expression-only projects and the interface's mirror evaluation.
+- [ ] Use that boundary during archive validation, import, project opening, thumbnails, playback, scrubbing, stills, raster/vector exports and CLI rendering. Pass data and finished pictures across it, never executable plugin callbacks.
+- [ ] Make isolated execution the default after validation. A missing capability, failed worker or unsupported platform must stop the affected operation with a clear explanation; never fall back silently to the editor's or Node's full rights.
+
+Done when: a project cannot select an unprotected path through its contents, saved preferences, a query parameter or a failed isolated render.
+
+## Step 3. Give scripts only the capabilities they need
+
+- [ ] Limit the host API to explicit operations on the current project: read approved assets, receive document data, draw, and propose validated, undoable edits. Expose neither arbitrary API forwarding nor unrestricted file paths.
+- [ ] Validate message kinds, payloads, paths, sizes, call lifetime and results on the host. Establish the caller's project and permissions on the host; do not trust an identity claimed in a message.
+- [ ] Keep different permission sets separate. One plugin must not impersonate a plugin with approved network access, reuse its active call, or inherit its grants merely because both run in one project worker.
+- [ ] Keep provider keys on the trusted side. An approved external action names the service, operation and data; scripts never receive the key itself.
+
+Done when: malformed, forged or replayed messages cannot access another project, broaden a capability or bypass the normal proposal validation.
+
+## Step 4. Bound failure and resource use
+
+- [ ] Add deadlines to loading, checks, tool calls and rendering. The host can terminate and recreate a non-responsive worker; cancellation must not depend on the script cooperating.
+- [ ] Bound input sizes, archive expansion, messages, pending requests, canvas dimensions and graphics allocations. Enforce the resource limits available on each platform and state any limits the platform cannot enforce, rather than promising a hard memory cap it does not provide.
+- [ ] Preserve the user's saved project and unsaved editor work after a script crashes, loops forever or exceeds a budget. Explain which operation stopped and offer a safe retry or opening without that extension.
+
+Done when: a faulty project cannot freeze the editor's main thread or trigger unbounded host-side work through its bridge.
+
+## Step 5. Replace general consent with specific permissions
+
+- [ ] After all other gates pass, remove the general “Run this project's code?” question for ordinary isolated opening, playback and export. Do not describe this documentation release as having removed it.
+- [ ] Ask only for extra capabilities: a named external destination, files outside the project, or a paid provider action. Say what will happen, for example “Send this image to this service?”, rather than asking for JavaScript execution.
+- [ ] Scope remembered grants to the relevant project/plugin and capability; show and revoke them in settings. New destinations or broader permissions need a new decision. An old general trust answer must not become unrestricted access in the new model.
+
+Done when: ordinary projects open without a code question, while an ungranted external or privileged action remains blocked and understandable.
+
+## Step 6. Prove the result before shipping
+
+- [ ] Run adversarial tests for module-load side effects, expression escapes, cross-project reads/writes, authenticated requests, storage access, remote imports, alternate network APIs, Tauri/Node access, forged messages, permission confusion, infinite loops and oversized inputs. Verify rejection without an unprotected fallback.
+- [ ] Run the real import → reopen → preview → still → export paths on the web, Windows/WebView2, macOS/WKWebView, Linux and the CLI where supported. Cover private/personal storage modes and cloud mode when it exists; mark unsupported paths explicitly.
+- [ ] Compare preview and export against representative projects: video, transparency, 3D, simulations, expressions, modifiers, effects, installed plugins and vector output. Record understood pixel differences and measure frame time, memory and responsiveness on real hardware.
+- [ ] Obtain an independent security review of the boundary, bridge and native integration, fix its material findings, and record the tested versions/platforms and residual limitations.
+
+## Release gate
+
+The general permission disappears only after the enforced boundary, complete path coverage, capability checks, failure handling and adversarial/device tests pass. Until then, keep the existing warning and mark this work as unfinished. A worker, a signature, a blocklist or a default-setting change alone is not sufficient.

@@ -1,5 +1,7 @@
 # The evaluator in the sandbox
 
+Status: the migration series below is implemented behind an experimental flag. It does not yet satisfy the [safe projects release gate](safe-projects-roadmap.md#release-gate): origin/credential isolation, expression-only projects, every import/export path, scoped permissions and adversarial tests still need validation before the code-execution question can be removed. The rationale below records why whole-frame rendering was moved; it is not a claim that the same-origin worker is a complete security boundary.
+
 The last page-side pieces of plugin code are the modifiers, the Canvas2D effects, the stepping of simulations and — because they need those — the module's load itself. They all live where the **Evaluator** and the effect pipeline live: the page. This note prices the ways to move them, and the series this repo follows. It complements [plugin-isolation.md](plugin-isolation.md), whose stage 2 ends at exactly this decision.
 
 ## Why the plain fixes do not exist

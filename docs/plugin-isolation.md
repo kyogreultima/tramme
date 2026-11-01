@@ -2,6 +2,8 @@
 
 How to run plugins from projects of unknown sources without handing them the editor. This note prices the options and proposes a staged path; the author picked the staged path, and it is under way: stages 0 and 1 below are shipped, and stage 2 is shipped for drawing (its tail is listed there).
 
+Current priority and acceptance criteria: [safe-projects-roadmap.md](safe-projects-roadmap.md). The whole-frame worker is implemented behind an experimental flag, but ordinary projects must keep the code question until the stronger boundary and all execution paths are validated. The comparisons below describe architecture options, not a claim that today's worker isolates credentials or storage.
+
 Today a plugin is arbitrary JavaScript with the page's full power. The import asks before running an archive's code (the code question, `apps/editor/src/importer.ts`), the Code section shows what a project runs, and the shared library vouches for what it ships — but once the answer is yes, the module runs in the editor's page: it can rewrite the document, read and write every project file, reach the provider routes with the keys the user connected, and do anything else the page can do. That is the right deal for projects you wrote and plugins you read. It is not an answer for "projects from unknown sources", which is what the roadmap asks for.
 
 ## What a plugin is made of
@@ -36,7 +38,7 @@ Everything stays in the main thread. Isolation is the code question, the Code se
 
 Plugin modules are imported in a Dedicated Worker, one per project. Registration sends the declarations back as data (schemas, kits, presets, prompts, tours, GLSL sources, the tool list that `list_nodes` reads — the assistant's surface does not change at all). Tools and checks run there against a proxied `ToolContext`: `readText`, `files`, `fileUrl`, `assetUrl` answered by the host; `writeFile` ships the bytes back; `renderStill` and `transcript` render on the main thread and ship the result; `signal` becomes a message. Render-time code draws in the worker: the engine ships each frame's evaluated props for the plugin's layers, the worker draws them (Canvas2D, or its own WebGL2 on an `OffscreenCanvas` — `gpu.ts` already prefers `OffscreenCanvas`, so the GL service moves nearly as-is) and returns one transferable `ImageBitmap` per plugin layer; the main thread composites. GLSL effects need not move: their code is data, run by the host's own pipeline.
 
-- **Isolation:** strong. No DOM, no origin, no storage; only what the proxy exposes. A hung worker stops answering instead of freezing the tab, and a crashed one reloads like a lost GL context.
+- **Isolation:** no editor DOM and a separate execution thread, but not a credential or storage boundary by itself. A same-origin worker can use network and storage APIs. The host proxy becomes the only reach only after a separate/opaque origin and platform policy enforce it; see [safe projects](safe-projects-roadmap.md). A hung worker can be terminated by its host, once deadlines and failure recovery cover its calls.
 - **What the plugin loses or pays:**
   - `host.asset(id)` hands out copies (cached bitmaps) instead of live elements; module namespaces are imported on the worker's side.
   - `path()` returns an SVG path string instead of a `Path2D`; the engine rebuilds it.

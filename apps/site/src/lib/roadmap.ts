@@ -15,6 +15,15 @@ export interface RoadmapItem {
 
 export const ROADMAP: RoadmapItem[] = [
   {
+    id: 'safe-projects',
+    horizon: 'now',
+    title: { en: 'Open projects with confidence', fr: 'Ouvrir les projets sereinement' },
+    text: {
+      en: 'An isolated environment for opening, playing and exporting projects, including their animations and plugins, without a general code-execution question. Extra access, such as sending media to an external service, will require a specific permission. The current question stays until these protections are validated.',
+      fr: 'Un environnement isolé pour ouvrir, lire et exporter les projets, animations et plugins compris, sans autorisation générale d’exécuter du code. Un accès supplémentaire, comme envoyer un média à un service externe, demandera une permission précise. La question actuelle reste en place jusqu’à la validation de ces protections.',
+    },
+  },
+  {
     id: 'desktop-account',
     horizon: 'now',
     title: { en: 'The desktop app, signed in', fr: 'L\'application de bureau, connectée' },

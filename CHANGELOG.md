@@ -8,6 +8,20 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-11-02
+
+### Added
+
+- **Liquid Glass**, an optional interface theme in Appearance: neutral translucent controls, soft reflections and pointer-reactive lighting, with reduced-motion, reduced-transparency and contrast preferences respected.
+
+### Changed
+
+- **Safe projects are an immediate roadmap priority**: the [safe projects roadmap](docs/safe-projects-roadmap.md) defines the isolation, scoped permissions, failure handling and adversarial tests required before ordinary projects can open without a code-execution question. The public roadmap and documentation list this work as upcoming; the execution permission remains in place, and this isolation hardening is planned, not shipped.
+
+### Fixed
+
+- **Windows refreshes file icons after installing, updating or uninstalling Tramme**: Explorer is notified of the changed associations so `.tramme` files use the current transparent logo rather than an older icon with a white background.
+
 ## [0.17.1] - 2026-11-01
 
 ### Changed
@@ -580,7 +594,8 @@ First public release.
 
 - Cloudflare Worker serving the editor and the API, projects stored in R2, access protected by Cloudflare Access.
 
-[Unreleased]: ../../compare/v0.17.1...HEAD
+[Unreleased]: ../../compare/v0.18.0...HEAD
+[0.18.0]: ../../compare/v0.17.1...v0.18.0
 [0.17.1]: ../../compare/v0.17.0...v0.17.1
 [0.17.0]: ../../compare/v0.16.0...v0.17.0
 [0.16.0]: ../../compare/v0.15.1...v0.16.0
