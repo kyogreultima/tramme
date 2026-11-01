@@ -1,6 +1,6 @@
 {
   "name": "@tramme/assistant",
-  "version": "0.17.0",
+  "version": "0.17.1",
   "license": "FSL-1.1-ALv2",
   "private": true,
   "type": "module",

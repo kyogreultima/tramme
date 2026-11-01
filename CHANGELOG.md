@@ -8,6 +8,8 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+## [0.17.1] - 2026-11-01
+
 ### Changed
 
 - **The new logo everywhere in the app**: the top bars of the editor and the home screen showed the old T of frames and the name in the interface font; they now draw the logo from `brand/svg`, mark and name, the mark alone on a narrow bar. The assistant's and the view switch's marks are the new one too.
@@ -578,7 +580,8 @@ First public release.
 
 - Cloudflare Worker serving the editor and the API, projects stored in R2, access protected by Cloudflare Access.
 
-[Unreleased]: ../../compare/v0.17.0...HEAD
+[Unreleased]: ../../compare/v0.17.1...HEAD
+[0.17.1]: ../../compare/v0.17.0...v0.17.1
 [0.17.0]: ../../compare/v0.16.0...v0.17.0
 [0.16.0]: ../../compare/v0.15.1...v0.16.0
 [0.15.1]: ../../compare/v0.15.0...v0.15.1
