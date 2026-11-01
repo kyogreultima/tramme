@@ -149,7 +149,8 @@ export class AssetStore {
         return import(/* @vite-ignore */ this.version ? `${url}${url.includes('?') ? '&' : '?'}v=${this.version}` : url);
       case 'video': {
         const proxy = this.proxyOf(a);
-        return VideoFrames.open(proxy ? this.url(proxy) : url);
+        const cache = this.useProxies && (!!proxy || Object.values(this.doc.assets).some((asset) => asset.type === 'video' && asset.proxy === id));
+        return VideoFrames.open(proxy ? this.url(proxy) : url, { cache });
       }
       case 'json': {
         const r = await fetch(url);

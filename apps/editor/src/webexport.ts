@@ -116,12 +116,13 @@ export async function exportInBrowser(doc: TrammeDoc, base: string, format: WebF
       const pic = await sandboxHost().renderFrame({ compId: r.compId, t: time, scale: 1, width: c.width, height: c.height, videos });
       if (pic.err) throw new Error(pic.err);
       if (!pic.bitmap) throw new Error(t('export.frameNeverReady', { frame: f, time: time.toFixed(2), s: SETTLE_LIMIT / 1000 }));
-      return pic.bitmap as OffscreenCanvas;
+      return pic.bitmap as ImageBitmap;
     };
     const readFrame = async (f: number) => {
       if (sandboxed) {
         const bmp = await sandboxFrame(f);
-        readCtx.drawImage(bmp, 0, 0, W, H);
+        try { readCtx.drawImage(bmp, 0, 0, W, H); }
+        finally { bmp.close(); }
         rgba.set(readCtx.getImageData(0, 0, W, H).data);
         return rgba;
       }

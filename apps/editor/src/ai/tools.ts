@@ -348,7 +348,7 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
     if (out.ops?.length) {
       const r = await this.propose(out.label ?? tool.title ?? name, out.ops);
       const said = r.content[0]?.type === 'text' ? r.content[0].text : '';
-      if (r.isError) return text([...lines, said].join('\n'), true);
+      if (r.isError) return text([said, ...lines].join('\n'), true);
       lines.push(said);
     }
     content.unshift({ type: 'text', text: lines.join('\n') || `${name}: done.` });

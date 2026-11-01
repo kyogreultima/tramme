@@ -573,7 +573,7 @@ export function Viewport({ bare = false, inset = INSET, overlay, intercept }: Vi
         </svg>
         {overlay}
       </div>
-      {!preview.renderer && !S.renderError.value && <div class="loading" role="status"><Loader /><span>{t('viewport.loadingAssets')}</span></div>}
+      {!preview.renderer && !S.renderError.value && <div class="loading" role="status" style={{ left, top, width: sw, height: sh }}><Loader /><span>{t('viewport.loadingAssets')}</span></div>}
       {S.renderError.value && <div class="error">{S.renderError.value}</div>}
       {pending && !bare && (
         <div class="banner ai">

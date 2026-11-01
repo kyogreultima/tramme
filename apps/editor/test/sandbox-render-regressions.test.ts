@@ -1,0 +1,173 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { newProject } from '@tramme/project';
+import type { PluginModule } from '@tramme/core';
+import { blitSandboxFrame, ensureSandboxDoc, resetSandbox, sandboxVideoFrames } from '../src/plugins/sandbox-draw.ts';
+import type { Renderer } from '@tramme/render';
+import { makeSandboxDraw } from '../src/plugins/worker-draw.ts';
+import type { PluginHost } from '../src/plugins/host.ts';
+
+// Exercise the real evaluator and Canvas2D nodes; only the GPU and browser
+// surfaces are replaced so their draw calls can be inspected in Node.
+const gpu = vi.hoisted(() => ({ contexts: 0, samples: 0 }));
+vi.mock('@tramme/render/src/compositor.ts', () => ({
+  Compositor: class {
+    constructor() { gpu.contexts++; }
+    begin() {} add() { gpu.samples++; } finish() {} resize() {}
+  },
+}));
+
+const draws: unknown[][] = [];
+class Surface {
+  width: number;
+  height: number;
+  constructor(width: number, height: number) { this.width = width; this.height = height; }
+  getContext() {
+    return {
+      canvas: this, globalAlpha: 1,
+      setTransform() {}, clearRect() {}, save() {}, restore() {}, transform() {},
+      translate() {}, beginPath() {}, rect() {}, clip() {}, fillRect() {},
+      drawImage: (...args: unknown[]) => draws.push(args),
+    };
+  }
+}
+
+beforeEach(() => {
+  resetSandbox();
+  draws.length = 0;
+  gpu.contexts = 0;
+  gpu.samples = 0;
+  vi.stubGlobal('self', { fonts: { add() {} } });
+  vi.stubGlobal('OffscreenCanvas', Surface);
+  vi.stubGlobal('DOMMatrix', class {
+    a: number; b: number; c: number; d: number; e: number; f: number;
+    constructor(m: number[]) { [this.a, this.b, this.c, this.d, this.e, this.f] = m; }
+  });
+  vi.stubGlobal('createImageBitmap', async (source: unknown) => ({ source }));
+});
+afterEach(() => vi.unstubAllGlobals());
+
+const project = () => newProject({ name: 'Video regression', width: 1920, height: 1080, fps: 24, duration: 30 }).doc;
+
+describe('sandbox document assets', () => {
+  const picture = { width: 200, height: 100 };
+  const pictureNode: PluginModule = { nodes: [{
+    type: 'test.picture', title: 'Picture', category: 'Test', props: {},
+    render: { canvas2d: (ctx, _props, host) => ctx.drawImage(host.asset('reference'), 0, 0) },
+  }] };
+
+  const drawPicture = async (side: ReturnType<typeof makeSandboxDraw>) => {
+    const result = await side.draw({ frame: 0, comp: { width: 1920, height: 1080, fps: 24, duration: 30 }, layers: [], items: [{ id: 'picture', type: 'test.picture', props: {}, t: 0, frame: 0 }] });
+    expect(result.results[0]).toMatchObject({ ok: true });
+    expect(draws.at(-1)?.[0]).toBe(picture);
+  };
+  const setup = () => {
+    const doc = project();
+    doc.assets.reference = { type: 'image', src: 'assets/reference.png' };
+    const side = makeSandboxDraw(new Map([['pictures', pictureNode]]));
+    const host = { setDoc: (d) => side.setDoc(d) } as PluginHost;
+    return { doc, side, host };
+  };
+
+  it('keeps an unchanged image available after a document edit', async () => {
+    const { doc, side, host } = setup();
+    ensureSandboxDoc(host, { doc, docUrl: 'https://tramme.test/doc.json', loaded: () => picture });
+    ensureSandboxDoc(host, { doc: { ...doc, meta: { ...doc.meta, title: 'Edited' } }, docUrl: 'https://tramme.test/doc.json', loaded: () => picture });
+    await drawPicture(side);
+  });
+
+  it('retries assets that finish loading without a document edit', async () => {
+    const { doc, side, host } = setup();
+    ensureSandboxDoc(host, { doc, docUrl: 'https://tramme.test/doc.json', loaded: () => null });
+    ensureSandboxDoc(host, { doc, docUrl: 'https://tramme.test/doc.json', loaded: () => picture });
+    await drawPicture(side);
+  });
+
+  it('ships shared assets again after a project reset', async () => {
+    const { doc, side, host } = setup();
+    ensureSandboxDoc(host, { doc, docUrl: 'https://tramme.test/doc.json', loaded: () => picture });
+    resetSandbox();
+    ensureSandboxDoc(host, { doc, docUrl: 'https://tramme.test/doc.json', loaded: () => picture });
+    await drawPicture(side);
+  });
+
+  it('initializes a new host even when it receives the same document', async () => {
+    const { doc, host } = setup();
+    ensureSandboxDoc(host, { doc, docUrl: 'https://tramme.test/doc.json', loaded: () => picture });
+    const side = makeSandboxDraw(new Map([['pictures', pictureNode]]));
+    ensureSandboxDoc({ setDoc: (d) => side.setDoc(d) } as PluginHost, { doc, docUrl: 'https://tramme.test/doc.json', loaded: () => picture });
+    await drawPicture(side);
+  });
+});
+
+describe('sandbox video rendering', () => {
+  it('keeps video frames available to plugin nodes that compute an asset id', async () => {
+    const doc = project();
+    doc.assets.clip = { type: 'video', src: 'clip.mp4' };
+    doc.compositions[doc.root].layers.custom = { type: 'plugin.video', props: { data: 'lookup' } };
+    const renderer = { assets: { get: () => ({ request: async () => {}, frameAt: () => ({ image: { width: 960, height: 540 } }) }) } } as unknown as Renderer;
+    expect(Object.keys(await sandboxVideoFrames(renderer, doc, 1))).toEqual(['clip']);
+  });
+
+  it('decodes a shared proxy once and supplies frames under both asset ids', async () => {
+    const doc = project();
+    doc.assets.clip = { type: 'video', src: 'clip.mp4', proxy: 'proxy' };
+    doc.assets.proxy = { type: 'video', src: 'proxy.mp4' };
+    doc.compositions[doc.root].layers.video = { type: 'video', props: { video: 'clip' } };
+    const decoded: string[] = [];
+    const renderer = { assets: { useProxies: true, url: (id: string) => doc.assets[id].src, get: (id: string) => ({ request: async () => { decoded.push(id); }, frameAt: () => ({ image: { width: 960, height: 540 } }) }) } } as unknown as Renderer;
+    const pictures = await sandboxVideoFrames(renderer, doc, 1);
+    expect(decoded).toEqual(['clip']);
+    expect(Object.keys(pictures)).toEqual(['clip', 'proxy']);
+  });
+
+  it('uses one subframe for playback even when the document requests motion blur', async () => {
+    const doc = project();
+    doc.compositions[doc.root].motionBlur = { samples: 8, shutter: 0.5 };
+    const side = makeSandboxDraw(new Map());
+    side.setDoc({ doc, docUrl: 'https://tramme.test/doc.json', images: {}, json: {}, fonts: [] });
+    const result = await side.renderFrame({ compId: doc.root, t: 1, scale: 0.25, width: 1920, height: 1080, samples: 1 } as Parameters<typeof side.renderFrame>[0]);
+    expect(result.err).toBeUndefined();
+    expect(gpu.samples).toBe(1);
+  });
+
+  it('releases decoded frames after the worker has used them', async () => {
+    const doc = project();
+    const side = makeSandboxDraw(new Map());
+    side.setDoc({ doc, docUrl: 'https://tramme.test/doc.json', images: {}, json: {}, fonts: [] });
+    const close = vi.fn();
+    await side.renderFrame({ compId: doc.root, t: 0, scale: 0.25, width: 1920, height: 1080, videos: { unused: { width: 1920, height: 1080, close } } });
+    expect(close).toHaveBeenCalledOnce();
+  });
+
+  it('releases the output bitmap after presenting it', () => {
+    const close = vi.fn();
+    const r = { compositor: { begin() {}, add() {}, finish() {} }, scale: 1 } as unknown as Renderer;
+    blitSandboxFrame(r, { close }, 0, true);
+    expect(close).toHaveBeenCalledOnce();
+  });
+
+  it('reuses the GPU context across repeated frames and size changes', async () => {
+    const doc = project();
+    const side = makeSandboxDraw(new Map());
+    side.setDoc({ doc, docUrl: 'https://tramme.test/doc.json', images: {}, json: {}, fonts: [] });
+    for (let frame = 0; frame < 20; frame++) {
+      const result = await side.renderFrame({ compId: doc.root, t: frame / 24, scale: frame < 10 ? 0.25 : 0.5, width: 1920, height: 1080 });
+      expect(result.err).toBeUndefined();
+      expect((result.bitmap as { source: Surface }).source).toMatchObject(frame < 10 ? { width: 480, height: 270 } : { width: 960, height: 540 });
+    }
+    expect(gpu.contexts).toBe(1);
+  });
+
+  it('draws a shipped frame through the built-in video node', async () => {
+    const doc = project();
+    doc.assets.footage = { type: 'video', src: 'assets/footage.mp4' };
+    doc.compositions[doc.root].layers.video = { type: 'video', props: { video: 'footage', size: [1920, 1080], fit: 'cover' } };
+    doc.compositions[doc.root].order = ['video'];
+    const side = makeSandboxDraw(new Map());
+    side.setDoc({ doc, docUrl: 'https://tramme.test/doc.json', images: {}, json: {}, fonts: [] });
+    const frame = { width: 1920, height: 1080 };
+    const result = await side.renderFrame({ compId: doc.root, t: 2, scale: 0.25, width: 1920, height: 1080, videos: { footage: frame } });
+    expect(result.err).toBeUndefined();
+    expect(draws.find(([image]) => image === frame)).toEqual([frame, -960, -540, 1920, 1080]);
+  });
+});

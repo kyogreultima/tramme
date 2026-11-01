@@ -44,6 +44,9 @@ interface DocSide {
 export function makeSandboxDraw(modules: Map<string, PluginModule>): SandboxDrawSide {
   const side: DocSide = { doc: null, docUrl: '', images: new Map(), json: new Map(), fonts: new Set() };
   const self_ = self as unknown as { fonts: { add(f: unknown): void } };
+  const pool = new WorkerPool();
+  let output: OffscreenCanvas | null = null;
+  let compositor: Compositor | null = null;
 
   const nodeOf = (type: string): NodeType | null => {
     for (const mod of modules.values()) {
@@ -99,8 +102,8 @@ export function makeSandboxDraw(modules: Map<string, PluginModule>): SandboxDraw
     if (a.type === 'font') return a.family ?? id;
     if (a.type === 'video') {
       // the page decodes the frame this render asks for and ships it with the request
-      const frame = videos.get(id) ?? null;
-      return { width: Number(a.width ?? 0) || 2, height: Number(a.height ?? 0) || 2, duration: Number(a.duration ?? 0), frameAt: () => frame, request: () => {} };
+      const frame = videos.get(id) as ImageBitmap | undefined;
+      return { width: frame?.width ?? 0, height: frame?.height ?? 0, duration: Number(a.duration ?? 0), frameAt: () => ({ image: frame ?? null, exact: true }), request: () => {} };
     }
     if (a.type === 'module') throw new Error('host.asset: module namespaces do not cross the sandbox');
     throw new Error(`host.asset: the asset "${id}" (${String(a.type)}) is not in the sandbox`);
@@ -163,15 +166,22 @@ export function makeSandboxDraw(modules: Map<string, PluginModule>): SandboxDraw
       sims.set(key, s);
       return s.state;
     };
-    let pool: WorkerPool, scaleX = 1, scaleY = 1;
+    let scaleX = 1, scaleY = 1;
     try {
       const w = Math.max(8, Math.round(comp.width * p.scale / 8) * 8), h = Math.max(2, Math.round(comp.height * p.scale / 2) * 2);
       scaleX = w / comp.width; scaleY = h / comp.height;
-      pool = new WorkerPool();
-      const out = new OffscreenCanvas(w, h);
-      const compositor = new Compositor(out, w, h, { preserve: false });
+      // One GPU context per sandbox: a context per frame exhausts Chrome's
+      // context limit during playback and leaves subsequent pictures black.
+      if (!output || !compositor) {
+        output = new OffscreenCanvas(w, h);
+        compositor = new Compositor(output, w, h, { preserve: false });
+      } else if (output.width !== w || output.height !== h) {
+        output.width = w; output.height = h;
+        compositor.resize(w, h);
+      }
       const frame0 = evaluator.frame(p.t, p.compId);
-      const times = subTimes(p.t, frame0.motionBlur.samples, frame0.motionBlur.shutter, comp);
+      const samples = Math.max(1, Math.min(frame0.motionBlur.samples, p.samples ?? frame0.motionBlur.samples));
+      const times = subTimes(p.t, samples, frame0.motionBlur.shutter, comp);
       compositor.begin();
       for (const ts of times) {
         const frame = evaluator.frame(ts, p.compId);
@@ -188,7 +198,7 @@ export function makeSandboxDraw(modules: Map<string, PluginModule>): SandboxDraw
         return type?.stage === 'finish' && type.gl ? [{ code: type.gl.code, schema: type.props, props: e.props }] : [];
       });
       compositor.finish(fx, { bg: bg ? [toLin(bg[0] / 255), toLin(bg[1] / 255), toLin(bg[2] / 255)] : null, checker: false }, seed, { passes, t: frame.t, scale: (scaleX + scaleY) / 2, onError: (e: Error) => { throw e; } });
-      const bitmap = await createImageBitmap(out);
+      const bitmap = await createImageBitmap(output);
       return { bitmap, transfer: [bitmap as unknown as Transferable] };
     } catch (e) {
       return { err: (e as Error).message };
@@ -196,10 +206,17 @@ export function makeSandboxDraw(modules: Map<string, PluginModule>): SandboxDraw
   };
 
   return {
-    renderFrame,
+    async renderFrame(p) {
+      try { return await renderFrame(p); }
+      finally {
+        // These are the worker's copies; the page closes its own copies.
+        for (const frame of Object.values(p.videos ?? {})) (frame as { close?(): void }).close?.();
+      }
+    },
     setDoc(d: SandboxDoc) {
       side.doc = d.doc as Record<string, unknown>;
       side.docUrl = d.docUrl;
+      for (const [id, image] of side.images) if (image !== d.images[id]) (image as { close?(): void }).close?.();
       side.images = new Map(Object.entries(d.images ?? {}));
       side.json = new Map(Object.entries(d.json ?? {}));
       for (const f of d.fonts ?? []) {

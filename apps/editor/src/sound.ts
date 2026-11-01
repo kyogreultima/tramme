@@ -534,6 +534,7 @@ const duck: ToolType<{ layers?: unknown; under?: string; depth?: number; attack?
       }
     }
     spans.sort((a, b) => a[0] - b[0]);
+    if (!spans.length) throw new Error('no speech from this transcript in the current composition: place the voice here or choose the composition that contains it before ducking');
     const voiceLayers = new Set((Object.entries(c.layers) as [string, Layer][]).filter(([, l]) => source && staticValue(l.props?.[l.type]) === source).map(([id]) => id));
     const targets = listOf(layers).length ? listOf(layers) : (Object.entries(c.layers) as [string, Layer][]).filter(([id, l]) => l.type === 'audio' && !voiceLayers.has(id)).map(([id]) => id);
     if (!targets.length) throw new Error('no sound to duck: give its layers');

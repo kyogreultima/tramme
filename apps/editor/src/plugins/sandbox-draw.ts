@@ -175,30 +175,33 @@ async function request(host: Host, type: string, props: unknown, previousFrame?:
 }
 
 /** the document's side, sent when the document (or an asset) changed */
-let lastDoc: TrammeDoc | null = null;
-const shipped = new WeakSet<object>();
+let documents = new WeakMap<PluginHost, SandboxDoc>();
 /** make sure the sandbox holds the document and its assets (idempotent) */
 export function ensureSandboxDoc(host: PluginHost, doc: SandboxContext) {
-  if (doc.doc === lastDoc) return;
-  lastDoc = doc.doc;
   const images: Record<string, unknown> = {}, json: Record<string, unknown> = {};
   const fonts: SandboxDoc['fonts'] = [];
   for (const [id, a] of Object.entries(doc.doc.assets)) {
-    if (shipped.has(a)) continue;
-    shipped.add(a);
     if (a.type === 'image' || a.type === 'json') {
       const v = doc.loaded(id);
-      if (v !== null) (a.type === 'image' ? images : json)[id] = v;
+      if (v != null) (a.type === 'image' ? images : json)[id] = v;
     } else if (a.type === 'font') {
       fonts.push({ url: new URL(a.src, doc.docUrl).href, family: a.family ?? id, weight: a.weight });
     }
   }
-  host.setDoc({ doc: doc.doc, docUrl: doc.docUrl, images, json, fonts });
+  // setDoc replaces the worker's asset maps: every update is a complete
+  // snapshot. Loaded values can change without the document changing (a
+  // reload or a decode finishing), and each worker needs its own snapshot.
+  const previous = documents.get(host);
+  const same = (a: Record<string, unknown>, b: Record<string, unknown>) => Object.keys(a).length === Object.keys(b).length && Object.keys(a).every((id) => a[id] === b[id]);
+  if (previous?.doc === doc.doc && previous.docUrl === doc.docUrl && same(previous.images, images) && same(previous.json, json)) return;
+  const snapshot = { doc: doc.doc, docUrl: doc.docUrl, images, json, fonts };
+  host.setDoc(snapshot);
+  documents.set(host, snapshot);
 }
 
 /** a project change invalidates what crossed (the previews rebind) */
 export function resetSandbox() {
-  lastDoc = null;
+  documents = new WeakMap();
   for (const [, p] of pending) p.catch(() => {});
   pending.clear();
   for (const [, pic] of ready) (pic.bitmap as { close?(): void } | undefined)?.close?.();
@@ -222,13 +225,21 @@ export function pluginItemsOf(doc: TrammeDoc, docUrl: string): { id: string; url
  */
 export async function sandboxVideoFrames(r: Renderer, doc: TrammeDoc, t: number): Promise<Record<string, unknown>> {
   const videos: Record<string, unknown> = {};
+  const decoded = new Map<string, { image: CanvasImageSource | null } | null>();
   for (const [id, a] of Object.entries(doc.assets)) {
     if (a.type !== 'video') continue;
     try {
-      const va = r.assets.get<{ request?(x: number): Promise<void>; frameAt(x: number): { image: CanvasImageSource | null } | null } | null>(id);
-      if (!va) continue;
-      await va.request?.(t);
-      const fr = va.frameAt(t);
+      const source = r.assets.useProxies && a.proxy && doc.assets[a.proxy]?.type === 'video' ? a.proxy : id;
+      const key = r.assets.url?.(source) ?? source;
+      // Keep every asset id available to plugins, while decoding a shared
+      // proxy/file once. Each id still owns a separate transferable bitmap.
+      if (!decoded.has(key)) {
+        const va = r.assets.get<{ request?(x: number): Promise<void>; frameAt(x: number): { image: CanvasImageSource | null } | null } | null>(id);
+        if (!va) continue;
+        await va.request?.(t);
+        decoded.set(key, va.frameAt(t));
+      }
+      const fr = decoded.get(key);
       if (fr?.image) videos[id] = await createImageBitmap(fr.image);
     } catch { /* not decodable: the node's draw says so */ }
   }
@@ -237,9 +248,11 @@ export async function sandboxVideoFrames(r: Renderer, doc: TrammeDoc, t: number)
 
 /** the sandbox's finished picture, shown through the renderer's own compositor (its canvas is WebGL) */
 export function blitSandboxFrame(r: Renderer, bitmap: unknown, t: number, checker: boolean) {
-  r.compositor.begin();
-  r.compositor.add(bitmap as OffscreenCanvas, 1);
-  r.compositor.finish({ bloom: 0, bloomThreshold: 0.85, vignette: 0, grain: 0, exposure: 1 }, { bg: null, checker }, 1, { t, scale: r.scale, onError: (e: Error) => { throw e; } });
+  try {
+    r.compositor.begin();
+    r.compositor.add(bitmap as OffscreenCanvas, 1);
+    r.compositor.finish({ bloom: 0, bloomThreshold: 0.85, vignette: 0, grain: 0, exposure: 1 }, { bg: null, checker }, 1, { t, scale: r.scale, onError: (e: Error) => { throw e; } });
+  } finally { (bitmap as { close?(): void }).close?.(); }
 }
 
 /**

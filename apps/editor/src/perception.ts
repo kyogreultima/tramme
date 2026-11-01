@@ -305,7 +305,7 @@ const subjects: ToolType<{ asset?: string; every?: number }> = {
         width = track.displayWidth; height = track.displayHeight;
         const duration = await input.computeDuration(), step = Math.max(every, duration / 240);
         const times = Array.from({ length: Math.max(1, Math.floor(duration / step)) }, (_, i) => +(i * step).toFixed(3));
-        const sink = new CanvasSink(track, { width: Math.round(width * Math.min(1, 512 / Math.max(width, height))), height: Math.round(height * Math.min(1, 512 / Math.max(width, height))), poolSize: 2 });
+        const sink = new CanvasSink(track, { width: Math.round(width * Math.min(1, 512 / Math.max(width, height))), height: Math.round(height * Math.min(1, 512 / Math.max(width, height))), fit: 'fill', poolSize: 2 });
         let i = 0;
         for await (const f of sink.canvasesAtTimestamps(times)) {
           if (ctx.signal.aborted) throw new Error('stopped');

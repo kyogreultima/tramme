@@ -24,14 +24,18 @@ export class Stills {
   async rendererFor(doc: TrammeDoc, compId?: string): Promise<Renderer> {
     const id = compId ?? doc.root;
     const base = new URL(S.docUrl.peek(), location.href).href;
+    const proxies = prefs.peek().proxies;
     if (!this.renderer) {
       // the flag: the sandbox owns the plugins' modules, the registry takes its declarations
       const sandboxed = sandboxedDoc(doc);
       if (sandboxed) await ensureDeclared(pluginHost(base), pluginItemsOf(doc, base));
-      this.renderer = await Renderer.open(doc, editorRegistry(), base, this.canvas, { compId: id, raster: 'gpu', pluginModule: sandboxed ? undefined : filterModule, sandboxModules: sandboxed, sandboxDeclarations: sandboxed ? (pid) => declarationsModule(sandboxDeclaration(pid)!, pid) : undefined });
+      this.renderer = await Renderer.open(doc, editorRegistry(), base, this.canvas, { compId: id, raster: 'gpu', proxies, pluginModule: sandboxed ? undefined : filterModule, sandboxModules: sandboxed, sandboxDeclarations: sandboxed ? (pid) => declarationsModule(sandboxDeclaration(pid)!, pid) : undefined });
     }
     // the same version again: its simulations stay computed
-    else if (doc !== this.doc || id !== this.compId) await this.renderer.setDoc(doc, { compId: id, trusted: true });
+    else if (doc !== this.doc || id !== this.compId || this.renderer.assets.useProxies !== proxies) {
+      this.renderer.assets.useProxies = proxies;
+      await this.renderer.setDoc(doc, { compId: id, trusted: true });
+    }
     this.doc = doc; this.compId = id;
     // a proposal may add a plugin: its tools join as sandbox-backed entries
     if ((doc.plugins ?? []).length) await attachIsolated(this.renderer.registry, pluginHost(base), doc, (pid) => this.renderer!.assets.url(pid)).catch((e) => console.error('[plugins]', (e as Error).message));
@@ -52,7 +56,8 @@ export class Stills {
       if (pic.err || !pic.bitmap) throw new Error(pic.err ?? 'no picture from the sandbox');
       const small = document.createElement('canvas');
       small.width = Math.round(c.width * k); small.height = Math.round(c.height * k);
-      small.getContext('2d')!.drawImage(pic.bitmap as OffscreenCanvas, 0, 0, small.width, small.height);
+      try { small.getContext('2d')!.drawImage(pic.bitmap as OffscreenCanvas, 0, 0, small.width, small.height); }
+      finally { (pic.bitmap as ImageBitmap).close(); }
       return small.toDataURL('image/jpeg', quality);
     }
     r.setScale(k);

@@ -68,6 +68,7 @@ class Preview {
   private bust = 0;
   /** one sandbox frame in flight (the flag's draw path) */
   private sandboxBusy = false;
+  private sandboxAgain = false;
   /** the sharp frame being drawn in steps, cancelled by any change */
   private job: (() => EvaluatedFrame | null) | null = null;
   /** frame of the composition last drawn during playback (exact frames) */
@@ -351,19 +352,30 @@ class Preview {
     const moving = playing || S.draft.peek() !== null;
     const still = this.stillScale();
     const scrubbing = !playing && performance.now() - this.scrubAt < 250;
-    this.setScale(r, moving || scrubbing ? this.motionScale(still) : still, still);
+    const scale = moving || scrubbing ? this.motionScale(still) : still;
+    const sandboxed = prefs.peek().sandboxPreview || r.sandboxModules;
+    // Resizing clears the displayed canvas. The sandbox replaces it only
+    // after asynchronous decoding: keep the old picture until then.
+    if (!sandboxed) this.setScale(r, scale, still);
     const t0 = performance.now();
     try {
-      if (prefs.peek().sandboxPreview || r.sandboxModules) {
+      if (sandboxed) {
         // the whole picture comes from the sandbox (docs/evaluator-sandbox.md): modifiers, effects and simulations never run here
         if (!this.sandboxBusy) {
           this.sandboxBusy = true;
-          void this.drawSandboxFrame(t).catch((e) => { S.renderError.value = `sandbox: ${(e as Error).message}`; }).finally(() => {
+          this.sandboxAgain = false;
+          const blur = prefs.peek().blur;
+          const samples = moving || scrubbing || blur === 'off' ? 1 : blur === 'limited' ? 4 : undefined;
+          void this.drawSandboxFrame(t, samples, scale).catch((e) => { S.renderError.value = `sandbox: ${(e as Error).message}`; }).finally(() => {
             this.sandboxBusy = false;
-            // still: the fresh picture replaces the one drawn meanwhile
-            if (!S.playing.peek()) this.invalidate();
+            // Only another invalidation needs another frame. An unconditional
+            // redraw here keeps decoding and drawing forever while paused.
+            if (this.sandboxAgain && !S.playing.peek()) this.invalidate();
+            else if (scrubbing && !moving && !S.playing.peek()) {
+              this.refineTimer = setTimeout(() => { this.refineTimer = null; this.invalidate(); }, Math.max(0, 250 - (performance.now() - this.scrubAt)));
+            }
           });
-        }
+        } else this.sandboxAgain = true;
       } else {
         const frame = r.render(t, { samples: 1, checker: true });
         this.docSamples = frame.motionBlur.samples;
@@ -395,7 +407,7 @@ class Preview {
    * transparency as anywhere. Video frames are still decoded here and travel
    * with the request.
    */
-  private async drawSandboxFrame(t: number) {
+  private async drawSandboxFrame(t: number, samples?: number, scale = this.renderer!.scale) {
     const r = this.renderer!;
     const doc = this.applied ?? S.doc.peek();
     const c = doc.compositions[r.compId];
@@ -407,9 +419,10 @@ class Preview {
     };
     ensureSandboxDoc(pluginHost(docUrl), ctx);
     const videos = await sandboxVideoFrames(r, doc, t);
-    const pic = await pluginHost(docUrl).renderFrame({ compId: r.compId, t, scale: r.scale, width: c.width, height: c.height, videos });
+    const pic = await pluginHost(docUrl).renderFrame({ compId: r.compId, t, scale, samples, width: c.width, height: c.height, videos });
     if (pic.err) { S.renderError.value = `sandbox: ${pic.err}`; return; }
     if (!pic.bitmap) return;
+    this.setScale(r, scale, this.stillScale());
     blitSandboxFrame(r, pic.bitmap, t, true);
     if (S.renderError.peek()?.startsWith('sandbox')) S.renderError.value = null;
   }
@@ -582,10 +595,17 @@ class Preview {
 
   /** the loudness gain of the master for this mix: measured once per mix (in the background the first time), then set on the level */
   private levelOf(doc: TrammeDoc, compId: string) {
-    const r = this.renderer!, key = JSON.stringify([soundMix(doc.compositions[compId]), audioClips(doc, compId)]);
+    const r = this.renderer!, clips = audioClips(doc, compId);
+    const key = JSON.stringify([soundMix(doc.compositions[compId]), clips]);
     let p = this.levels.get(key);
     if (!p) {
-      p = masterGainDb(doc, compId, (id) => r.assets.url(id)).catch(() => 0);
+      // Video audio streams during playback. Measuring its complete mix here
+      // would fetch and decode the whole film in the background, starving the
+      // preview's range reads. Keep unity gain and the live limiter for these
+      // mixes; exports still measure and master the complete original.
+      p = clips.some((clip) => doc.assets[clip.asset]?.type === 'video')
+        ? Promise.resolve(0)
+        : masterGainDb(doc, compId, (id) => r.assets.url(id)).catch(() => 0);
       this.levels.set(key, p);
     }
     p.then((db) => { if (this.level && this.audio) this.level.gain.setTargetAtTime(Math.pow(10, db / 20), this.audio.currentTime, 0.05); });

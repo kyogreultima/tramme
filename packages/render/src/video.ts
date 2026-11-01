@@ -7,6 +7,27 @@
 import { ALL_FORMATS, BlobSource, CanvasSink, Input, UrlSource, type InputVideoTrack, type WrappedCanvas } from 'mediabunny';
 import type { VideoAsset } from '@tramme/core';
 import { KEEP, ReaderPool } from './video-pool.ts';
+import { previewVideoBlob } from './video-cache.ts';
+
+/** Finish small range responses so paused decoders do not hold HTTP connections. */
+export const fetchVideoRange: typeof fetch = async (input, init) => {
+  const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
+  const range = /^bytes=(\d+)-$/.exec(headers.get('range') ?? '');
+  if (!range) return fetch(input, init);
+  const start = Number(range[1]);
+  headers.set('range', `bytes=${start}-${start + 256 * 1024 - 1}`);
+  const response = await fetch(input, { ...init, headers });
+  if (response.status !== 206) return response;
+  // Without the total size a shortened response could look like the whole
+  // file to UrlSource (for example, when CORS hides Content-Range).
+  if (!/^bytes \d+-\d+\/\d+$/.test(response.headers.get('content-range') ?? '')) {
+    await response.body?.cancel();
+    return fetch(input, init);
+  }
+  const copy = new Response(await response.arrayBuffer(), { status: response.status, statusText: response.statusText, headers: response.headers });
+  Object.defineProperties(copy, { url: { value: response.url }, redirected: { value: response.redirected }, type: { value: response.type } });
+  return copy;
+};
 
 export class VideoFrames implements VideoAsset {
   width = 0;
@@ -19,12 +40,12 @@ export class VideoFrames implements VideoAsset {
   /** times asked for and not found (past the end, a gap): not asked again */
   private missed = new Set<number>();
 
-  private constructor(url: string) {
-    this.input = new Input({ source: new UrlSource(url), formats: ALL_FORMATS });
+  private constructor(url: string, blob: Blob | null = null) {
+    this.input = new Input({ source: blob ? new BlobSource(blob) : new UrlSource(url, { fetchFn: fetchVideoRange }), formats: ALL_FORMATS });
   }
 
-  static async open(url: string): Promise<VideoFrames> {
-    const v = new VideoFrames(url);
+  static async open(url: string, options: { cache?: boolean } = {}): Promise<VideoFrames> {
+    const v = new VideoFrames(url, options.cache ? await previewVideoBlob(url) : null);
     const track = await v.input.getPrimaryVideoTrack();
     if (!track) throw new Error('no video track');
     if (!(await track.canDecode())) throw new Error(`video codec not supported by this browser (${track.codec ?? 'unknown'})`);

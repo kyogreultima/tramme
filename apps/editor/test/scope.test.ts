@@ -21,6 +21,22 @@ function film() {
 const why = (op: Op) => outOfScope(op, SCOPE, film().doc);
 
 describe('what a scene builder may change', () => {
+  it('shows the rejection reason before a plugin claims its changes succeeded', async () => {
+    const { doc, project } = film();
+    load(doc, project.manifest, 'http://localhost/api/projects/p/files/document.tramme.json', '');
+    S.registry.peek().use({ tools: [{
+      name: 'rejected-device', description: 'Regression fixture',
+      run: async () => ({ text: 'Device built successfully. ' + 'Details. '.repeat(40), ops: [{ op: 'replace', path: '/compositions/main/order', value: [] }] }),
+    }] }, 'test');
+    const runner = new ToolRunner();
+    runner.scope = SCOPE;
+    const out = await runner.run('use_tool', { name: 'rejected-device', input: {} });
+    expect(out.isError).toBe(true);
+    expect(out.content[0]).toMatchObject({ type: 'text', text: expect.stringMatching(/^operation refused/) });
+    expect(runner.pending).toBeNull();
+    runner.dispose();
+  });
+
   it('its own composition and its takes, with all that is under them', () => {
     expect(why({ op: 'add', path: '/compositions/price/layers/title', value: {} })).toBeNull();
     expect(why({ op: 'add', path: '/compositions/price~0take2', value: {} })).toBeNull();

@@ -270,6 +270,12 @@ describe('the sfx tool', () => {
 });
 
 describe('the duck tool', () => {
+  it('refuses to claim ducking when the transcript has no speech in the composition', async () => {
+    const transcript: Transcript = { version: 1, source: 'unplaced-video', duration: 10, words: [{ w: 'Hello', s: 1, e: 2 }] };
+    const { ctx } = context(project(), { transcript: async () => transcript });
+    await expect(tool('duck').run({ under: 'transcription-clip', layers: ['bed'] }, ctx)).rejects.toThrow(/no speech.*composition/i);
+  });
+
   it('lowers the music under each stretch of speech and brings it back between them', async () => {
     // the clip speaks at 1–2 s and 2.3–3 s of its file (one stretch), then at 6–7 s (in v2, played from 5 s: composition 4–5 s)
     const words: Transcript['words'] = [{ w: 'Hello', s: 1, e: 1.5 }, { w: 'there', s: 1.6, e: 2 }, { w: 'friend', s: 2.3, e: 3 }, { w: 'Later', s: 6, e: 7 }];
