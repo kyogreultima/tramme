@@ -194,8 +194,13 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string): 
       return (r ?? {}) as { svg?: string; lottie?: unknown; err?: string };
     },
     async renderFrame(payload) {
-      const r = await run({ kind: 'render', call: ++call, payload });
-      return (r ?? {}) as { bitmap?: unknown; err?: string };
+      try {
+        const r = await run({ kind: 'render', call: ++call, payload });
+        return (r ?? {}) as { bitmap?: unknown; err?: string };
+      } finally {
+        // the frames shipped were copied by the message: the page's bitmaps are done with
+        for (const v of Object.values(payload.videos ?? {})) (v as { close?(): void }).close?.();
+      }
     },
     dispose(reason) {
       closed = true;

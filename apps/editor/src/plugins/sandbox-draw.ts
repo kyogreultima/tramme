@@ -215,7 +215,10 @@ export function pluginItemsOf(doc: TrammeDoc, docUrl: string): { id: string; url
 
 /**
  * Every video asset's exact frame at t, decoded on the page (the sandbox
- * does not decode): shipped with the sandbox's render request.
+ * does not decode): shipped with the sandbox's render request. A frame is a
+ * canvas as often as a bitmap, and a canvas element does not cross
+ * postMessage: each one travels as an ImageBitmap (closed by the host once
+ * the request is answered).
  */
 export async function sandboxVideoFrames(r: Renderer, doc: TrammeDoc, t: number): Promise<Record<string, unknown>> {
   const videos: Record<string, unknown> = {};
@@ -226,7 +229,7 @@ export async function sandboxVideoFrames(r: Renderer, doc: TrammeDoc, t: number)
       if (!va) continue;
       await va.request?.(t);
       const fr = va.frameAt(t);
-      if (fr?.image) videos[id] = fr.image;
+      if (fr?.image) videos[id] = await createImageBitmap(fr.image);
     } catch { /* not decodable: the node's draw says so */ }
   }
   return videos;

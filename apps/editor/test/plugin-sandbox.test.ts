@@ -321,6 +321,10 @@ describe('the sandboxed drawing', () => {
     const p = frames[0] as { compId: string; t: number; videos: Record<string, unknown> };
     expect(p.compId).toBe('root');
     expect(p.videos.clip).toEqual({});
+    // the video frames shipped are bitmaps the page closes once the picture is back (a canvas element would not cross postMessage)
+    let closed = 0;
+    await host.renderFrame({ compId: 'root', t: 0, scale: 1, width: 192, height: 96, videos: { clip: { close: () => { closed++; } } } });
+    expect(closed).toBe(1);
     // without the sandbox: a clear error
     const bare = pair(new Map());
     await expect(bare.host.renderFrame({ compId: 'root', t: 0, scale: 1, width: 100, height: 100 })).rejects.toThrow(/cannot render/);

@@ -68,6 +68,18 @@ function Pipeline({ stages, open, steps, onToggle }: { stages: Stage[]; open: bo
   );
 }
 
+/** the summary of a finished turn's work, at the very bottom of its message: the steps it opens above the stages */
+function Summary({ steps, stages }: { steps: ChatItem[]; stages: Stage[] }) {
+  const [open, setOpen] = useState(false);
+  if (!stages.length) return null;
+  return (
+    <>
+      {open && <div class="work-steps">{steps.map((it) => <Step key={it.id} it={it} />)}</div>}
+      <Pipeline stages={stages} open={open} steps={steps.length} onToggle={() => setOpen(!open)} />
+    </>
+  );
+}
+
 /** what the assistant says; a long report (a tool's findings) folded to its first lines */
 function Said({ text }: { text: string }) {
   const long = text.length > 700 || text.split('\n').length > 12;
@@ -122,15 +134,13 @@ function segments(work: ChatItem[]): { building?: string; items: ChatItem[] }[] 
 
 /** one scene built apart: its name, the stages it went through, what it said and what it cost */
 function SceneWork({ name, items }: { name: string; items: ChatItem[] }) {
-  const [open, setOpen] = useState(false);
-  const stages = stagesOf(items), steps = items.filter((it) => it.tool || it.thinking), usage = items.find((it) => it.usage)?.usage;
+  const steps = items.filter((it) => it.tool || it.thinking), usage = items.find((it) => it.usage)?.usage;
   return (
     <div class="work scene">
       <div class="scene-name">{name}</div>
-      {open && <div class="work-steps">{steps.map((it) => <Step key={it.id} it={it} />)}</div>}
-      {stages.length > 0 && <Pipeline stages={stages} open={open} steps={steps.length} onToggle={() => setOpen(!open)} />}
       {items.map((it) => (it.text !== undefined && !it.tool && !it.thinking && it.text.trim() ? <Said key={it.id} text={it.text} /> : null))}
       {usage && <UsageLine u={usage} />}
+      <Summary steps={steps} stages={stagesOf(items)} />
     </div>
   );
 }
@@ -143,21 +153,16 @@ export function Work({ work, live }: { work: ChatItem[]; live: boolean }) {
 
 function Plain({ work, live }: { work: ChatItem[]; live: boolean }) {
   const [open, setOpen] = useState(false);
-  const stages = stagesOf(work);
   const steps = work.filter((it) => it.tool || it.thinking);
   const shots = work.filter((it) => it.image);
   const usage = work.find((it) => it.usage)?.usage;
   return (
     <div class={`work${live ? ' live' : ''}`}>
       {live ? <Run work={work} steps={steps} open={open} onToggle={() => setOpen(!open)} /> : (
-        <>
-          <div class="work-head">
-            <span class="mark"><LogoMark /></span>
-            <b>Tramme</b>
-          </div>
-          {open && <div class="work-steps">{steps.map((it) => <Step key={it.id} it={it} />)}</div>}
-          {stages.length > 0 && <Pipeline stages={stages} open={open} steps={steps.length} onToggle={() => setOpen(!open)} />}
-        </>
+        <div class="work-head">
+          <span class="mark"><LogoMark /></span>
+          <b>Tramme</b>
+        </div>
       )}
       {shots.length > 0 && (
         <div class="work-shots">
@@ -167,6 +172,7 @@ function Plain({ work, live }: { work: ChatItem[]; live: boolean }) {
       {work.map((it) => (it.text !== undefined && !it.tool && !it.thinking && it.text.trim() ? <Said key={it.id} text={it.text} /> : null))}
       {work.map((it) => (it.proposal ? <TakeCard key={it.id} p={it.proposal} /> : null))}
       {usage && <UsageLine u={usage} />}
+      {!live && <Summary steps={steps} stages={stagesOf(work)} />}
     </div>
   );
 }
