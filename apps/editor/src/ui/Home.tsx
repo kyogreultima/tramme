@@ -31,7 +31,7 @@ import { WindowControls, windowBar } from './WindowControls.tsx';
 import { personal } from '../mode.ts';
 import { install, installable } from '../install.ts';
 import { offerTours } from '../tours/index.ts';
-import { settingsOpen } from '../settings.ts';
+import { prefs, settingsOpen } from '../settings.ts';
 import { APP_VERSION, downloadOf, update } from '../version.ts';
 import { IDEAS } from '../ideas.ts';
 import { t } from '../i18n/index.ts';
@@ -267,6 +267,13 @@ export function Home() {
   const input = useRef<HTMLInputElement>(null);
   const video = useRef<HTMLInputElement>(null);
 
+  // liquid glass needs light and colour to bend: the most recent film's picture, well
+  // blurred, stands in for a wallpaper behind the home screen. No film yet, no picture: the
+  // theme's plain gradient carries on alone.
+  const withThumb = useMemo(() => projects?.find((m) => m.thumbnail), [projects]);
+  const wallpaper = prefs.value.theme === 'liquid-glass' && withThumb
+    ? `${api.fileUrl(withThumb.id, withThumb.thumbnail!)}?v=${encodeURIComponent(withThumb.modified)}` : null;
+
   const refresh = () => api.list().then(setProjects).catch((e) => setLoadError((e as Error).message));
   // the home tour, the first time, once the page has its content
   useEffect(() => { if (projects !== null) { const timer = setTimeout(() => offerTours('home'), 500); return () => clearTimeout(timer); } }, [projects !== null]);
@@ -336,6 +343,7 @@ export function Home() {
       onDragOver={(e) => { if (e.dataTransfer?.types.includes('Files')) { e.preventDefault(); setDrag(true); } }}
       onDragLeave={(e) => { if (e.target === e.currentTarget) setDrag(false); }}
       onDrop={(e) => { e.preventDefault(); setDrag(false); if (e.dataTransfer) droppedOf(e.dataTransfer).then(openFiles).catch((x) => setDialog({ kind: 'failure', error: x as Error })); }}>
+      <div class="home-wallpaper" aria-hidden="true" style={wallpaper ? { '--photo': `url("${wallpaper}")` } : undefined} />
       <header class="home-top" {...windowBar}>
         <div class="brand"><Brand size={20} /></div>
         <span class="grow" />

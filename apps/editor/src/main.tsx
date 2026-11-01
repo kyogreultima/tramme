@@ -26,6 +26,7 @@ import './screens/settings.css';
 import './screens/conversation.css';
 import './screens/studio.css';
 import './screens/atelier.css';
+import './theme/liquid-glass.css';
 import { offerTours } from './tours/index.ts';
 import { startProject } from './start.ts';
 import { t } from './i18n/index.ts';

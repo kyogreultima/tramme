@@ -990,6 +990,7 @@
       "paper": "Papier",
       "linen": "Lin",
       "porcelain": "Porcelaine",
+      "liquidGlass": "Liquid Glass (expérimental)",
       "system": "Système"
     },
     "settingsForThisComputer": "Réglages de cet ordinateur, gardés dans ce navigateur. Les exports sont toujours rendus en pleine qualité, quoi qu'il soit choisi ici.",

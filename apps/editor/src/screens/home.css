@@ -5,6 +5,14 @@
 a.brand { text-decoration: none; border-radius: var(--r-sm); padding: 2px 4px; margin: -2px -4px; }
 a.brand:hover { background: var(--hover); }
 .home { position: relative; height: 100vh; height: 100dvh; overflow: auto; background: var(--bg); }
+/* An ambient backdrop, fixed behind the scrolling content. Plain themes leave it off;
+   liquid glass turns it on in its own stylesheet, where it has something to bend. */
+.home-wallpaper { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; opacity: 0; }
+.home-wallpaper::before {
+  content: ''; position: absolute; inset: -10%;
+  background-image: var(--photo, none); background-size: cover; background-position: center;
+  transform: scale(1.1); opacity: 0;
+}
 .home-top {
   position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 8px;
   height: 56px; padding: 0 24px; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);

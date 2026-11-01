@@ -64,6 +64,7 @@ const THEME_NAME: Record<string, string> = {
   paper: m('settings.themes.paper'),
   linen: m('settings.themes.linen'),
   porcelain: m('settings.themes.porcelain'),
+  'liquid-glass': m('settings.themes.liquidGlass'),
 };
 
 function ThemeCards({ value, onPick }: { value: Preferences['theme']; onPick: (id: Preferences['theme']) => void }) {
@@ -72,8 +73,8 @@ function ThemeCards({ value, onPick }: { value: Preferences['theme']; onPick: (i
   return (
     <div class="theme-cards">
       {THEMES.map((th: ThemeInfo) => (
-        <button key={th.id} class={`theme-card${value === th.id ? ' on' : ''}`} onClick={() => onPick(th.id)}>
-          <span class="prev" style={th.id === 'system' ? { background: `linear-gradient(90deg, ${th.bg} 50%, ${paper.bg} 50%)` } : { background: th.bg }}>
+        <button key={th.id} class={`theme-card${value === th.id ? ' on' : ''}`} data-theme-preview={th.id} aria-pressed={value === th.id} onClick={() => onPick(th.id)}>
+          <span class="prev" aria-hidden="true" style={th.id === 'system' ? { background: `linear-gradient(90deg, ${th.bg} 50%, ${paper.bg} 50%)` } : { background: th.bg }}>
             <span class="s" style={{ background: th.surface }} />
             <span class="l" style={{ background: th.text }} />
             <span class="a" style={{ background: th.accent }} />

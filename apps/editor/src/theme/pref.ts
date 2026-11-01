@@ -3,19 +3,19 @@
 // the page runs before it paints, so a light theme never starts dark. No import
 // but types: boot.ts carries what this file does.
 
-/** a theme is one palette; all are dark but the three lights, and system follows the computer */
-export type ThemeId = 'system' | 'studio' | 'obsidian' | 'carbon' | 'dusk' | 'paper' | 'linen' | 'porcelain';
+/** a theme is one palette; system follows the computer */
+export type ThemeId = 'system' | 'studio' | 'obsidian' | 'carbon' | 'dusk' | 'paper' | 'linen' | 'porcelain' | 'liquid-glass';
 /** the studio: the film in front, directed by notes the assistant carries out; the atelier: the layers, the timeline and the inspector, for the detail */
 export type View = 'studio' | 'atelier';
 
-export const THEME_IDS: ThemeId[] = ['system', 'studio', 'obsidian', 'carbon', 'dusk', 'paper', 'linen', 'porcelain'];
+export const THEME_IDS: ThemeId[] = ['system', 'studio', 'obsidian', 'carbon', 'dusk', 'paper', 'linen', 'porcelain', 'liquid-glass'];
 /** the views, in the order they are offered */
 export const VIEWS: View[] = ['studio', 'atelier'];
 const DARK_LEGACY: string[] = ['studio', 'obsidian', 'carbon', 'dusk'], LIGHT_LEGACY: string[] = ['paper', 'linen', 'porcelain'];
 /** the themes the meta colour-scheme and the system mode resolve to */
-export const LIGHT_THEMES: ThemeId[] = ['paper', 'linen', 'porcelain'];
+export const LIGHT_THEMES: ThemeId[] = ['paper', 'linen', 'porcelain', 'liquid-glass'];
 /** the window bar's colour, per theme (system resolves to one of the two) */
-export const BAR: Record<string, string> = { studio: '#090f13', obsidian: '#050708', carbon: '#101010', dusk: '#150f0a', paper: '#f0f4f7', linen: '#f7f3ec', porcelain: '#eef2f6' };
+export const BAR: Record<string, string> = { studio: '#090f13', obsidian: '#050708', carbon: '#101010', dusk: '#150f0a', paper: '#f0f4f7', linen: '#f7f3ec', porcelain: '#eef2f6', 'liquid-glass': '#ededee' };
 
 /** where the preferences are kept in the browser */
 export const PREFERENCES_KEY = 'tramme.preferences';

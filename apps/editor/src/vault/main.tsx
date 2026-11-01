@@ -15,6 +15,7 @@ import '../theme/tokens.css';
 import '../theme/base.css';
 import '../theme/components.css';
 import '../screens/settings.css';
+import '../theme/liquid-glass.css';
 
 // the page, after the editor's language and theme are kept: imported
 // statically, the preferences and the texts (in a chunk shared with the

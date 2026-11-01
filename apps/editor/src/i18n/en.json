@@ -990,6 +990,7 @@
       "paper": "Paper",
       "linen": "Linen",
       "porcelain": "Porcelain",
+      "liquidGlass": "Liquid Glass (experimental)",
       "system": "System"
     },
     "settingsForThisComputer": "Settings for this computer, kept in this browser. Exports always render at full quality, whatever is chosen here.",

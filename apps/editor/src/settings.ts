@@ -7,11 +7,12 @@ import { effect, signal } from '@preact/signals';
 import { MODEL_TASKS, resolveModel, type ModelEntry, type ModelTask } from './models.ts';
 import type { DictationSource } from './speech.ts';
 import { FORMER_PREFERENCES_KEY, PREFERENCES_KEY, savedTheme, showTheme, VIEWS, type ThemeId, type View } from './theme/pref.ts';
+import { installGlassLight } from './theme/liquid-glass.ts';
 
 export interface Preferences {
   /** interface language: the browser's (French or English), or chosen */
   language: 'auto' | 'fr' | 'en';
-  /** the theme: one palette (all are dark but paper, linen and porcelain), or as the system says */
+  /** the theme: one palette, or as the system says */
   theme: ThemeId;
   /** how the interface works: the studio (the film directed in notes) or the atelier (layers, timeline, inspector) */
   view: View;
@@ -93,6 +94,7 @@ export const THEMES: ThemeInfo[] = [
   { id: 'paper', bg: '#f0f4f7', surface: '#ffffff', text: '#181f24', accent: '#0b8075' },
   { id: 'linen', bg: '#f7f3ec', surface: '#fffdf8', text: '#221d14', accent: '#0c7f6b' },
   { id: 'porcelain', bg: '#eef2f6', surface: '#ffffff', text: '#151a21', accent: '#0b7f95' },
+  { id: 'liquid-glass', bg: '#ededee', surface: 'rgba(255, 255, 255, 0.62)', text: '#202023', accent: '#29292c' },
   { id: 'system', bg: '#090f13', surface: '#12181c', text: '#e8eef1', accent: '#2ec4b6' },
 ];
 const VOICE_PROVIDERS = ['auto', 'elevenlabs', 'openai', 'gemini', 'hydracept'] as const;
@@ -199,6 +201,11 @@ effect(() => {
   // another view changes the size of the stage without a window resize: the viewport re-measures on this
   if (lastView && lastView !== p.view) window.dispatchEvent(new Event('resize'));
   lastView = p.view;
+});
+
+/** Dispose lighting listeners as soon as this theme is no longer selected. */
+effect(() => {
+  if (typeof document !== 'undefined' && prefs.value.theme === 'liquid-glass') return installGlassLight(document);
 });
 
 /** the settings dialog, opened from the top bar, the home screen or Ctrl+, */
