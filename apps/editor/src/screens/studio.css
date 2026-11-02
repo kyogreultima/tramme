@@ -6,7 +6,7 @@
 
 /* ── frame ─────────────────────────────────────────────────── */
 .studio { display: grid; grid-template-rows: 52px minmax(0, 1fr); height: 100vh; height: 100dvh; background: var(--bg); }
-.studio-body { display: grid; grid-template-columns: minmax(0, 1fr) var(--gutter) var(--side-w, 384px); gap: 0; padding: 0 var(--gutter) var(--gutter); min-height: 0; }
+.studio-body { display: grid; grid-template-columns: minmax(0, 1fr) var(--gutter) var(--side-w, 384px); gap: 0; padding: var(--gutter); min-height: 0; }
 .studio-main { display: flex; flex-direction: column; gap: var(--gutter); min-width: 0; min-height: 0; }
 .studio .toasts { bottom: auto; top: 64px; }
 

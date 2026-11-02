@@ -4,7 +4,7 @@
 
 /* ── app frame ─────────────────────────────────────────────── */
 .app { display: grid; grid-template-rows: 52px minmax(0, 1fr); height: 100vh; height: 100dvh; }
-.workspace { display: grid; min-height: 0; gap: 0 var(--gutter); padding: 0 var(--gutter) var(--gutter); background: var(--bg); }
+.workspace { display: grid; min-height: 0; gap: 0 var(--gutter); padding: var(--gutter); background: var(--bg); }
 .col { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .col.right { gap: var(--gutter); }
 /* what changes while playing stays in its own box: a change there repaints only that box, never the whole page */
@@ -349,7 +349,8 @@
 .publish-ok { display: flex; align-items: center; gap: 6px; font-size: var(--fs-xs); color: var(--ok); }
 .publish-chapters { display: flex; align-items: center; gap: 8px; font-size: var(--fs-xs); }
 .publish-chapters .faint { flex: 1; }
-.export-go { display: flex; gap: 6px; justify-content: flex-end; }
+.export-go { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 4px; padding-top: 12px; border-top: 1px solid var(--line); }
+.export-go > .btn { width: 100%; min-width: 0; height: auto; min-height: 40px; padding: 10px 12px; white-space: normal; line-height: 1.3; }
 .export-queue { display: flex; flex-direction: column; gap: 4px; padding-top: 6px; border-top: 1px solid var(--line-soft); font-size: var(--fs-xs); }
 .export-queue-head { display: flex; align-items: center; justify-content: space-between; color: var(--text-3); }
 .export-job { display: flex; align-items: center; gap: 8px; color: var(--text-2); }
@@ -499,7 +500,10 @@ svg.i.flip { transform: rotate(180deg); }
 .export-warn { margin: 0; padding-left: 16px; color: var(--key); font-size: var(--fs-sm); display: flex; flex-direction: column; gap: 2px; max-height: 120px; overflow: auto; }
 .export-trim { display: flex; flex-direction: column; gap: 6px; color: var(--key); font-size: var(--fs-sm); }
 .export-trim .btn { height: auto; min-height: var(--h-md); padding: 5px 10px; white-space: normal; text-align: center; }
-.export-pop { width: 320px; display: flex; flex-direction: column; gap: 10px; }
+.export-pop { width: min(400px, calc(100vw - 16px)); display: flex; flex-direction: column; gap: 10px; overflow: hidden; }
+.export-options { display: flex; flex-direction: column; gap: 10px; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 4px; }
+.export-options .export-formats { margin-inline: 0; }
+.export-pop > .export-go, .export-pop > .btn { flex: none; }
 .export-pop .row { display: grid; grid-template-columns: 90px 1fr; gap: 8px; align-items: center; }
 
 /* ── narrow screens: tabs in a bar along the bottom, above the safe area ── */

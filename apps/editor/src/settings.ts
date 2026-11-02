@@ -87,15 +87,15 @@ export { VIEWS, type ThemeId, type View };
 /** a theme as the picker shows it: its id and the colours that draw its preview (its name's key lives beside the picker) */
 export interface ThemeInfo { id: ThemeId; bg: string; surface: string; text: string; accent: string }
 export const THEMES: ThemeInfo[] = [
-  { id: 'studio', bg: '#090f13', surface: '#12181c', text: '#e8eef1', accent: '#2ec4b6' },
-  { id: 'obsidian', bg: '#050708', surface: '#0c0f10', text: '#e9eef0', accent: '#2ec4b6' },
-  { id: 'carbon', bg: '#101010', surface: '#191919', text: '#ededed', accent: '#2ec4b6' },
-  { id: 'dusk', bg: '#150f0a', surface: '#1e1812', text: '#f4ebe2', accent: '#2ec4b6' },
-  { id: 'paper', bg: '#f0f4f7', surface: '#ffffff', text: '#181f24', accent: '#0b8075' },
+  { id: 'studio', bg: 'var(--tramme-dark-bg)', surface: 'var(--tramme-dark-surface)', text: 'var(--tramme-dark-text)', accent: 'var(--tramme-dark-accent)' },
+  { id: 'obsidian', bg: '#050708', surface: '#0c0f10', text: '#e9eef0', accent: 'var(--tramme-dark-accent)' },
+  { id: 'carbon', bg: '#101010', surface: '#191919', text: '#ededed', accent: 'var(--tramme-dark-accent)' },
+  { id: 'dusk', bg: '#150f0a', surface: '#1e1812', text: '#f4ebe2', accent: 'var(--tramme-dark-accent)' },
+  { id: 'paper', bg: 'var(--tramme-light-bg)', surface: 'var(--tramme-light-surface)', text: 'var(--tramme-light-text)', accent: 'var(--tramme-light-accent)' },
   { id: 'linen', bg: '#f7f3ec', surface: '#fffdf8', text: '#221d14', accent: '#0c7f6b' },
   { id: 'porcelain', bg: '#eef2f6', surface: '#ffffff', text: '#151a21', accent: '#0b7f95' },
   { id: 'liquid-glass', bg: '#ededee', surface: 'rgba(255, 255, 255, 0.62)', text: '#202023', accent: '#29292c' },
-  { id: 'system', bg: '#090f13', surface: '#12181c', text: '#e8eef1', accent: '#2ec4b6' },
+  { id: 'system', bg: 'var(--tramme-dark-bg)', surface: 'var(--tramme-dark-surface)', text: 'var(--tramme-dark-text)', accent: 'var(--tramme-dark-accent)' },
 ];
 const VOICE_PROVIDERS = ['auto', 'elevenlabs', 'openai', 'gemini', 'hydracept'] as const;
 

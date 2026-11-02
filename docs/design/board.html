@@ -22,193 +22,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300..700&family=Geist+Mono:wght@400..600&display=swap" rel="stylesheet">
 <style>
-/* ═══════════════════════════════════════════════════════════════
-   1. TOKENS
-   ═══════════════════════════════════════════════════════════════ */
-
-/* les échelles : les mêmes pour tous les thèmes */
-:root {
-  /* l'application embarque @fontsource-variable/geist et geist-mono : leurs familles s'appellent « … Variable » */
-  --ui: 'Geist Variable', 'Geist', 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, sans-serif;
-  --mono: 'Geist Mono Variable', 'Geist Mono', 'Cascadia Mono', 'SF Mono', ui-monospace, Consolas, monospace;
-
-  --fs-xs: 11px;      /* méta, légendes, étiquettes de règle */
-  --fs-sm: 12px;      /* texte secondaire, petits boutons */
-  --fs-md: 13px;      /* la base de l'interface */
-  --fs-lg: 15px;      /* titres de carte, nom du calque */
-  --fs-xl: 18px;      /* titres de section, de dialogue */
-  --fs-2xl: 24px;
-  --fs-hero: clamp(32px, 4.6vw, 48px);
-  --lh-ui: 1.45;
-  --lh-text: 1.6;
-
-  --r-xs: 4px;        /* repères minuscules : images clés, marques */
-  --r-sm: 8px;        /* champs, lignes de liste, étiquettes, boutons icône */
-  --r-md: 12px;       /* menus, cartes internes, vignettes */
-  --r-lg: 14px;       /* panneaux, cartes, médias, popovers (comme le site) */
-  --r-xl: 20px;       /* dialogues, boîte de direction de l'accueil */
-  --r-pill: 999px;    /* boutons texte, contrôles segmentés, puces, pastilles */
-
-  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 20px; --sp-6: 24px; --sp-8: 32px; --sp-10: 40px;
-  --gutter: 8px;      /* entre les panneaux de l'atelier et du studio */
-
-  --h-xs: 22px; --h-sm: 26px; --h-md: 30px; --h-lg: 36px;
-  --row: 28px;        /* une ligne de liste (calques, timeline) */
-
-  --ease: cubic-bezier(0.16, 1, 0.3, 1);
-  --t-fast: 120ms; --t-med: 180ms; --t-slow: 260ms;
-
-  /* ce qui se pose sur une image, quel que soit le thème */
-  --on-media: #ffffff;
-  --media-scrim: rgba(0, 0, 0, 0.6);
-
-  --focus: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent-line);
-}
-
-/* studio : le thème par défaut, un gris-bleu nuit */
-:root, :root[data-theme="studio"] {
-  color-scheme: dark;
-  --bg: #090f13; --surface: #12181c; --surface-2: #181e22; --raised: #1c2327;
-  --field: #21272c; --field-hover: #282f33; --field-active: #30363b; --stage: #060b0e;
-  --text: #e8eef1; --text-2: #b1b7ba; --text-3: #858a8d; --text-4: #575c5f;
-  --line: rgba(232, 238, 241, 0.07); --line-strong: rgba(232, 238, 241, 0.13); --line-soft: rgba(232, 238, 241, 0.045);
-  --hover: rgba(232, 238, 241, 0.05); --press: rgba(232, 238, 241, 0.09);
-  --accent: #2ec4b6; --accent-hover: #4fd3c6; --accent-soft: rgba(46, 196, 182, 0.14); --accent-line: rgba(46, 196, 182, 0.5); --accent-text: #2ec4b6; --on-accent: #03211e;
-  --ok: #46c28a; --danger: #f2665c; --key: #f4b860; --expr: #7cb7ff; --link: #9bd770; --on-danger: #2a0b09;
-  --ok-soft: rgba(70, 194, 138, 0.14); --danger-soft: rgba(242, 102, 92, 0.14); --key-soft: rgba(244, 184, 96, 0.14); --expr-soft: rgba(124, 183, 255, 0.12); --link-soft: rgba(155, 215, 112, 0.12);
-  --t-shape: #5b9bf0; --t-text: #e8a55a; --t-image: #6cc08b; --t-group: #8a949c; --t-code: #7cb7ff; --t-audio: #e07a8e;
-  --float: rgba(28, 35, 39, 0.86); --scrim: rgba(3, 6, 8, 0.62);
-  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.28), 0 0 0 1px var(--line);
-  --shadow-2: 0 12px 32px rgba(0, 0, 0, 0.42), 0 0 0 1px var(--line-strong);
-  --shadow-3: 0 28px 80px rgba(0, 0, 0, 0.55), 0 0 0 1px var(--line-strong);
-  --picture-shadow: 0 0 0 1px var(--line), 0 24px 70px rgba(0, 0, 0, 0.5);
-  --checker-a: #151b1f; --checker-b: #11171b;
-  --scroll: rgba(232, 238, 241, 0.12); --scroll-hover: rgba(232, 238, 241, 0.2);
-  --code: #bfe3ff;
-  /* technique : ce qui se dessine sur l'image et dans la timeline, la visite guidée, l'erreur de rendu */
-  --grid: rgba(255, 255, 255, 0.12); --handle: #ffffff; --handle-line: rgba(255, 255, 255, 0.35);
-  --mark: #ffffff; --mark-ring: rgba(0, 0, 0, 0.6); --out-range: rgba(0, 0, 0, 0.35);
-  --error-bg: rgba(60, 20, 22, 0.92); --error-text: #ffd0d0;
-  --tour-overlay: #000000; --tour-overlay-opacity: 0.62;
-}
-
-/* obsidienne : presque noir, la pièce s'éteint autour de l'image */
-:root[data-theme="obsidian"] {
-  --bg: #050708; --surface: #0c0f10; --surface-2: #111416; --raised: #15191a;
-  --field: #1a1e1f; --field-hover: #212526; --field-active: #282c2e; --stage: #030405;
-  --text: #e9eef0; --text-2: #b2b7b9; --text-3: #858a8c; --text-4: #575c5d;
-  --line: rgba(233, 238, 240, 0.07); --line-strong: rgba(233, 238, 240, 0.12); --line-soft: rgba(233, 238, 240, 0.04);
-  --hover: rgba(233, 238, 240, 0.045); --press: rgba(233, 238, 240, 0.08);
-  --float: rgba(21, 25, 26, 0.86); --scrim: rgba(0, 0, 0, 0.68);
-  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.45), 0 0 0 1px var(--line);
-  --shadow-2: 0 12px 32px rgba(0, 0, 0, 0.6), 0 0 0 1px var(--line-strong);
-  --shadow-3: 0 28px 80px rgba(0, 0, 0, 0.7), 0 0 0 1px var(--line-strong);
-  --picture-shadow: 0 0 0 1px var(--line), 0 24px 70px rgba(0, 0, 0, 0.7);
-  --checker-a: #0f1314; --checker-b: #0b0e0f;
-  --scroll: rgba(233, 238, 240, 0.1); --scroll-hover: rgba(233, 238, 240, 0.18);
-}
-
-/* carbone : graphite pur, aucune teinte */
-:root[data-theme="carbon"] {
-  --bg: #101010; --surface: #191919; --surface-2: #1f1f1f; --raised: #242424;
-  --field: #292929; --field-hover: #303030; --field-active: #383838; --stage: #0c0c0c;
-  --text: #ededed; --text-2: #b6b6b6; --text-3: #898989; --text-4: #5b5b5b;
-  --line: rgba(237, 237, 237, 0.07); --line-strong: rgba(237, 237, 237, 0.13); --line-soft: rgba(237, 237, 237, 0.045);
-  --hover: rgba(237, 237, 237, 0.05); --press: rgba(237, 237, 237, 0.09);
-  --float: rgba(36, 36, 36, 0.86); --scrim: rgba(5, 5, 5, 0.62);
-  --checker-a: #1c1c1c; --checker-b: #171717;
-  --scroll: rgba(237, 237, 237, 0.12); --scroll-hover: rgba(237, 237, 237, 0.2);
-}
-
-/* crépuscule : un sombre chaud, pour les longues séances */
-:root[data-theme="dusk"] {
-  --bg: #150f0a; --surface: #1e1812; --surface-2: #241e18; --raised: #29231d;
-  --field: #2d2821; --field-hover: #352f29; --field-active: #3d3730; --stage: #100b06;
-  --text: #f4ebe2; --text-2: #bdb4ab; --text-3: #90887f; --text-4: #615951;
-  --line: rgba(244, 235, 226, 0.07); --line-strong: rgba(244, 235, 226, 0.13); --line-soft: rgba(244, 235, 226, 0.045);
-  --hover: rgba(244, 235, 226, 0.05); --press: rgba(244, 235, 226, 0.09);
-  --float: rgba(41, 35, 29, 0.86); --scrim: rgba(8, 6, 3, 0.62);
-  --checker-a: #221c16; --checker-b: #1c1711;
-  --scroll: rgba(244, 235, 226, 0.12); --scroll-hover: rgba(244, 235, 226, 0.2);
-}
-
-/* papier : le clair, celui du site ; les surfaces au-dessus du fond */
-:root[data-theme="paper"] {
-  color-scheme: light;
-  --bg: #f0f4f7; --surface: #ffffff; --surface-2: #f3f7fa; --raised: #ffffff;
-  --field: #ebeff2; --field-hover: #e3e7ea; --field-active: #dadfe1; --stage: #e7ecef;
-  --text: #181f24; --text-2: #495156; --text-3: #59616a; --text-4: #909aa0;
-  --line: rgba(24, 31, 36, 0.08); --line-strong: rgba(24, 31, 36, 0.14); --line-soft: rgba(24, 31, 36, 0.05);
-  --hover: rgba(24, 31, 36, 0.045); --press: rgba(24, 31, 36, 0.08);
-  --accent: #0b8075; --accent-hover: #096b62; --accent-soft: rgba(11, 128, 117, 0.12); --accent-line: rgba(11, 128, 117, 0.45); --accent-text: #08746a; --on-accent: #ffffff;
-  --ok: #187548; --danger: #c23535; --key: #8f5d10; --expr: #2a64b8; --link: #337320; --on-danger: #ffffff;
-  --ok-soft: rgba(24, 117, 72, 0.12); --danger-soft: rgba(194, 53, 53, 0.1); --key-soft: rgba(143, 93, 16, 0.12); --expr-soft: rgba(42, 100, 184, 0.1); --link-soft: rgba(51, 115, 32, 0.1);
-  --t-shape: #3f7fd8; --t-text: #b8772c; --t-image: #3a9a5c; --t-group: #6f7a82; --t-code: #3d7fd6; --t-audio: #c0506a;
-  --float: rgba(255, 255, 255, 0.88); --scrim: rgba(24, 31, 36, 0.28);
-  --shadow-1: 0 1px 2px rgba(16, 24, 32, 0.06), 0 0 0 1px var(--line);
-  --shadow-2: 0 12px 32px rgba(16, 24, 32, 0.12), 0 0 0 1px var(--line);
-  --shadow-3: 0 28px 80px rgba(16, 24, 32, 0.18), 0 0 0 1px var(--line);
-  --picture-shadow: 0 0 0 1px var(--line), 0 24px 60px rgba(16, 24, 32, 0.18);
-  --checker-a: #e6ebee; --checker-b: #dde3e7;
-  --scroll: rgba(24, 31, 36, 0.16); --scroll-hover: rgba(24, 31, 36, 0.26);
-  --code: #1f5fa8;
-  --grid: rgba(255, 255, 255, 0.35); --handle: #3a3f48; --handle-line: rgba(0, 0, 0, 0.35);
-  --mark: #ffffff; --mark-ring: rgba(0, 0, 0, 0.45); --out-range: rgba(0, 0, 0, 0.08);
-  --error-bg: rgba(250, 226, 226, 0.96); --error-text: #9b2424;
-  --tour-overlay: #1c2328; --tour-overlay-opacity: 0.34;
-}
-
-/* lin : un clair chaud, crème ; les mêmes rôles que papier, teintés de chaud */
-:root[data-theme="linen"] {
-  color-scheme: light;
-  --bg: #f7f3ec; --surface: #fffdf8; --surface-2: #f5f0e7; --raised: #fffdf8;
-  --field: #efe9de; --field-hover: #e7e0d3; --field-active: #ded6c7; --stage: #eee8dd;
-  --text: #221d14; --text-2: #57503f; --text-3: #615a49; --text-4: #999189;
-  --line: rgba(34, 29, 20, 0.08); --line-strong: rgba(34, 29, 20, 0.14); --line-soft: rgba(34, 29, 20, 0.05);
-  --hover: rgba(34, 29, 20, 0.045); --press: rgba(34, 29, 20, 0.08);
-  --accent: #0c7f6b; --accent-hover: #0a6a5a; --accent-soft: rgba(12, 127, 107, 0.12); --accent-line: rgba(12, 127, 107, 0.45); --accent-text: #086f5d; --on-accent: #ffffff;
-  --ok: #187548; --danger: #c23535; --key: #8f5d10; --expr: #2a64b8; --link: #337320; --on-danger: #ffffff;
-  --ok-soft: rgba(24, 117, 72, 0.12); --danger-soft: rgba(194, 53, 53, 0.1); --key-soft: rgba(143, 93, 16, 0.12); --expr-soft: rgba(42, 100, 184, 0.1); --link-soft: rgba(51, 115, 32, 0.1);
-  --t-shape: #3f7fd8; --t-text: #b8772c; --t-image: #3a9a5c; --t-group: #6f7a82; --t-code: #3d7fd6; --t-audio: #c0506a;
-  --float: rgba(255, 253, 248, 0.9); --scrim: rgba(34, 29, 20, 0.28);
-  --shadow-1: 0 1px 2px rgba(72, 58, 32, 0.07), 0 0 0 1px var(--line);
-  --shadow-2: 0 12px 32px rgba(72, 58, 32, 0.13), 0 0 0 1px var(--line);
-  --shadow-3: 0 28px 80px rgba(72, 58, 32, 0.19), 0 0 0 1px var(--line);
-  --picture-shadow: 0 0 0 1px var(--line), 0 24px 60px rgba(72, 58, 32, 0.2);
-  --checker-a: #ebe5d8; --checker-b: #e2dbcc;
-  --scroll: rgba(34, 29, 20, 0.16); --scroll-hover: rgba(34, 29, 20, 0.26);
-  --code: #1f5fa8;
-  --grid: rgba(255, 255, 255, 0.35); --handle: #453e30; --handle-line: rgba(0, 0, 0, 0.35);
-  --mark: #ffffff; --mark-ring: rgba(0, 0, 0, 0.45); --out-range: rgba(0, 0, 0, 0.08);
-  --error-bg: rgba(250, 234, 226, 0.96); --error-text: #9b2424;
-  --tour-overlay: #2a241a; --tour-overlay-opacity: 0.34;
-}
-
-/* porcelaine : un clair froid, presque blanc bleuté ; les mêmes rôles que papier, teintés de froid */
-:root[data-theme="porcelain"] {
-  color-scheme: light;
-  --bg: #eef2f6; --surface: #ffffff; --surface-2: #f0f5f9; --raised: #ffffff;
-  --field: #e5ebf1; --field-hover: #dce3eb; --field-active: #d2dae3; --stage: #e3eaf0;
-  --text: #151a21; --text-2: #454e59; --text-3: #555e68; --text-4: #8d97a2;
-  --line: rgba(21, 26, 33, 0.08); --line-strong: rgba(21, 26, 33, 0.15); --line-soft: rgba(21, 26, 33, 0.05);
-  --hover: rgba(21, 26, 33, 0.045); --press: rgba(21, 26, 33, 0.08);
-  --accent: #0b7f95; --accent-hover: #096a7d; --accent-soft: rgba(11, 127, 149, 0.12); --accent-line: rgba(11, 127, 149, 0.45); --accent-text: #087083; --on-accent: #ffffff;
-  --ok: #187548; --danger: #c23535; --key: #8f5d10; --expr: #2a64b8; --link: #337320; --on-danger: #ffffff;
-  --ok-soft: rgba(24, 117, 72, 0.12); --danger-soft: rgba(194, 53, 53, 0.1); --key-soft: rgba(143, 93, 16, 0.12); --expr-soft: rgba(42, 100, 184, 0.1); --link-soft: rgba(51, 115, 32, 0.1);
-  --t-shape: #3f7fd8; --t-text: #b8772c; --t-image: #3a9a5c; --t-group: #6f7a82; --t-code: #3d7fd6; --t-audio: #c0506a;
-  --float: rgba(255, 255, 255, 0.9); --scrim: rgba(21, 26, 33, 0.28);
-  --shadow-1: 0 1px 2px rgba(16, 24, 32, 0.07), 0 0 0 1px var(--line);
-  --shadow-2: 0 12px 32px rgba(16, 24, 32, 0.13), 0 0 0 1px var(--line);
-  --shadow-3: 0 28px 80px rgba(16, 24, 32, 0.19), 0 0 0 1px var(--line);
-  --picture-shadow: 0 0 0 1px var(--line), 0 24px 60px rgba(16, 24, 32, 0.2);
-  --checker-a: #e1e8ee; --checker-b: #d7dfe7;
-  --scroll: rgba(21, 26, 33, 0.16); --scroll-hover: rgba(21, 26, 33, 0.26);
-  --code: #1f5fa8;
-  --grid: rgba(255, 255, 255, 0.35); --handle: #343b44; --handle-line: rgba(0, 0, 0, 0.35);
-  --mark: #ffffff; --mark-ring: rgba(0, 0, 0, 0.45); --out-range: rgba(0, 0, 0, 0.08);
-  --error-bg: rgba(226, 236, 250, 0.96); --error-text: #9b2424;
-  --tour-overlay: #1a2128; --tour-overlay-opacity: 0.34;
-}
+@import '../../apps/editor/src/theme/tokens.css';
 
 /* ═══════════════════════════════════════════════════════════════
    2. COMPOSANTS
@@ -231,7 +45,7 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 /* boutons : texte en pilule, icône en carré arrondi */
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: var(--h-md); padding: 0 14px;
-  border: 0; border-radius: var(--r-pill); background: var(--field); color: var(--text);
+  border: 0; border-radius: var(--r-control); background: var(--field); color: var(--text);
   font: 500 var(--fs-md)/1 var(--ui); letter-spacing: -0.005em; white-space: nowrap;
   transition: background-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease), transform var(--t-fast) var(--ease);
 }
@@ -280,10 +94,10 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .select svg.i { width: 14px; height: 14px; }
 
 /* le contrôle segmenté : un seul, pour les vues, les onglets, les formats, avant/après */
-.seg { display: inline-flex; gap: 2px; padding: 3px; border-radius: var(--r-pill); background: var(--field); flex: none; }
+.seg { display: inline-flex; gap: 2px; padding: 3px; border-radius: var(--r-md); background: var(--field); flex: none; }
 .seg button {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 24px; padding: 0 12px; border: 0;
-  border-radius: var(--r-pill); background: transparent; color: var(--text-3); font: 500 12.5px/1 var(--ui); white-space: nowrap;
+  border-radius: var(--r-control); background: transparent; color: var(--text-3); font: 500 12.5px/1 var(--ui); white-space: nowrap;
   transition: background-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
 }
 .seg button:hover { color: var(--text-2); }
@@ -309,7 +123,7 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .tag.danger { background: var(--danger-soft); color: var(--danger); }
 .tag.key { background: var(--key-soft); color: var(--key); }
 .chip {
-  display: inline-flex; align-items: center; gap: 6px; height: var(--h-md); padding: 0 13px; border: 0; border-radius: var(--r-pill);
+  display: inline-flex; align-items: center; gap: 6px; height: var(--h-md); padding: 0 13px; border: 0; border-radius: var(--r-control);
   background: transparent; box-shadow: inset 0 0 0 1px var(--line-strong); color: var(--text-2); font: 500 var(--fs-md)/1 var(--ui); white-space: nowrap;
   transition: background-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
 }

@@ -1,57 +1,18 @@
-/* The hero stays dark; the reference composition is shared by all site pages. */
-body.landing {
-  color-scheme: dark;
-  --bg: #151914;
-  --screen: #151914;
-  --panel: #1d221c;
-  --panel-2: #242a22;
-  --field: #2a3028;
-  --ink: #f0f1e9;
-  --on-screen: #f0f1e9;
-  --ink-2: #bdc1b5;
-  --ink-3: #9ca493;
-  --line: #ffffff14;
-  --line-2: #ffffff30;
-  --hover: #ffffff0a;
-  --accent: #ff650b;
-  --accent-2: #e85200;
-  --accent-ink: #141810;
-  --accent-text: #ff954f;
-  --hero-muted: #c6ded9;
-  --hero-shade: #071d1a99;
-  --hero-strip: #07493d99;
-  --paper: #ffffff;
-  --paper-ink: #23291f;
-  --paper-muted: #596252;
-  --paper-line: #23291f2b;
-  --paper-hover: #23291f0a;
-  --paper-card: #f5f6f2;
-  --brand-mark: currentColor;
-  --brand-ink: currentColor;
-  --font-head: var(--font-sans), sans-serif;
-  --r: 6px;
-  --r-lg: 8px;
-  --nav: 76px;
-  --section: clamp(64px, 8vw, 112px);
-  --gutter: clamp(20px, 2.7vw, 48px);
-  --max: 1600px;
-  background: var(--bg);
-  color: var(--ink);
-}
+/* Editorial composition on the shared product foundation. */
 body.site h1, body.site h2, body.site h3 { font-weight: 400; letter-spacing: -0.045em; }
 body.site h2 { line-height: 1.08; }
-body.site .btn { height: 38px; padding-inline: 15px; border-radius: 4px; font-size: 0.8125rem; font-weight: 500; }
+body.site .btn { height: 38px; padding-inline: 15px; border-radius: var(--tramme-radius-control); font-size: 0.8125rem; font-weight: 500; }
 body.site .btn-sm { height: 32px; padding-inline: 12px; font-size: 0.75rem; }
 body.site .btn-accent { color: var(--accent-ink); }
 body.site .wrap, body.site .bleed { max-width: var(--max); margin-inline: auto; }
 body.landing main { padding-bottom: 0; }
 body.site [data-reveal] { animation: none; }
 body.site .nav-reference {
-  position: sticky; top: 12px; height: 52px; margin: 12px 12px -64px;
-  border-radius: 6px; background: #f8f9f3; color: #20271e;
-  --bg: #f8f9f3; --panel: #f8f9f3; --ink: #20271e; --ink-2: #30392c;
-  --ink-3: #5c6656; --line-2: #20271e40; --hover: #20271e0a;
-  --brand-mark: #20271e; --brand-ink: #20271e;
+  position: sticky; top: 12px; height: 52px;
+  width: calc(100% - 24px); max-width: var(--max); margin: 12px auto -64px; flex: none;
+  border-radius: var(--tramme-radius-menu); background: var(--panel); color: var(--ink);
+  border: 0; box-shadow: inset 0 0 0 1px var(--line-2);
+  --brand-mark: var(--accent); --brand-ink: var(--ink);
   backdrop-filter: none;
 }
 body.site .nav-reference .row { height: 52px; padding-inline: 16px; gap: 22px; }
@@ -59,10 +20,10 @@ body.site .nav-reference .home { font-size: 1.1rem; }
 body.site .nav-reference .links { margin-left: 12px; margin-right: auto; }
 body.site .nav-reference .links > li > a,
 body.site .nav-reference .menu > summary { font-size: 0.75rem; padding-inline: 10px; }
-body.site .nav-reference .panel { border-radius: 6px; }
+body.site .nav-reference .panel { border-radius: var(--tramme-radius-menu); }
 body.site .nav-reference .login { border-color: transparent; }
 body.site .nav-reference a[aria-current='page'] { text-decoration: underline; text-underline-offset: 5px; }
-body.site .choices .choice, body.site .choices .choice button { border-radius: 4px; }
+body.site .choices .choice, body.site .choices .choice button { border-radius: var(--tramme-radius-control); }
 body.site .head { gap: 16px; margin-bottom: 36px; align-content: start; align-self: start; }
 body.site .head h2 { max-width: 19ch; font-size: clamp(1.8rem, 3.3vw, 3.4rem); }
 body.site .head p { max-width: 39ch; font-size: 0.9375rem; color: var(--ink-2); }
@@ -76,7 +37,7 @@ body.site .foot-reference .legal { max-width: 46ch; font-size: 0.6875rem; }
 @media (max-width: 960px) { body.site .nav-reference .row { padding-inline: 12px; } }
 @media (max-width: 560px) {
   body.site { --nav: 64px; }
-  body.site .nav-reference { top: 8px; height: 44px; margin: 8px 8px -52px; }
+  body.site .nav-reference { top: 8px; height: 44px; width: calc(100% - 16px); margin: 8px auto -52px; }
   body.site .nav-reference .row { height: 44px; }
   body.site .nav-reference .home { font-size: 0.95rem; }
 }

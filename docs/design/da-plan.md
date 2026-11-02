@@ -1,5 +1,10 @@
 # Refonte de la direction artistique : un seul design pour toute l'application
 
+> Plan historique. La fondation actuelle est partagée avec le site dans
+> `brand/theme.css`, puis adaptée dans les tokens de chaque interface.
+> Voir [shared-identity.md](shared-identity.md) pour les règles et la validation
+> sur les vrais écrans. La planche importe désormais les tokens de l'app.
+
 Plan d'implémentation. La référence visuelle et la source des valeurs est la planche [board.html](board.html), à ouvrir dans un navigateur (le sélecteur en haut change de thème). Ce plan dit quoi changer, où et dans quel ordre ; la planche dit à quoi ça ressemble.
 
 ## 0. Contexte

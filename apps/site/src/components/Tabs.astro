@@ -34,10 +34,12 @@ const { locale } = Astro.props;
         <div class="panels">
           {FEATURES.map((f) => {
             const { name, line, alt } = wordsOf(f, locale);
-            const src = 'shot' in f.picture ? f.picture.shot[1] : f.picture.still;
+            const pictures = 'shot' in f.picture
+              ? f.picture.shot.map((src, i) => ({ src, theme: i === 0 ? 'light' : 'dark' }))
+              : [{ src: f.picture.still, theme: 'still' }];
             return <article class="panel" id={`film-${f.id}`} data-panel={f.id} aria-labelledby={`film-title-${f.id}`}>
               <div class:list={['picture', `picture-${f.id}`]}>
-                <Image src={src} alt={alt} widths={[640, 960, 1440, 1920]} sizes="(max-width: 800px) 92vw, 66vw" loading="lazy" decoding="async" />
+                {pictures.map(({ src, theme }) => <Image class={`app-${theme}`} src={src} alt={alt} widths={[640, 960, 1440, 1920]} sizes="(max-width: 800px) 92vw, 66vw" loading="lazy" decoding="async" />)}
               </div>
               <div class="caption">
                 <div><h3 id={`film-title-${f.id}`}>{name}</h3><p>{line}</p></div>
@@ -93,6 +95,9 @@ const { locale } = Astro.props;
   .panel[hidden] { display: none; }
   .picture { display: grid; align-items: center; aspect-ratio: 1.35; padding: 28px; background: var(--panel); border-radius: var(--r); overflow: hidden; }
   .picture :global(img) { width: 100%; height: auto; border-radius: 4px; }
+  .picture :global(.app-light) { display: none; }
+  :global([data-theme='light']) .picture :global(.app-dark) { display: none; }
+  :global([data-theme='light']) .picture :global(.app-light) { display: block; }
   .picture-assistant, .picture-packs, .picture-render { padding: 0; }
   .picture-assistant :global(img), .picture-packs :global(img), .picture-render :global(img) { height: 100%; object-fit: cover; }
   .caption { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-top: 18px; }

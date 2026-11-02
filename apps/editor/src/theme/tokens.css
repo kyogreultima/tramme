@@ -1,7 +1,9 @@
+@import '../../../../brand/theme.css';
+
 /* Tramme editor: the themes, defined as tokens. The default (studio) sits on
    :root and the others override it by their data-theme. This file is the copy
-   of the reference board's TOKENS block (docs/design/board.html): the board is
-   the source of these values. Interface colours stay neutral so the picture is
+   of the shared foundation (brand/theme.css). The reference board imports
+   these same tokens. Interface colours stay neutral so the picture is
    the only colourful thing on screen; colour in the UI carries meaning
    (selection, keyframes, expressions, links); the teal accent is the only
    chrome colour. */
@@ -22,11 +24,12 @@
   --lh-ui: 1.45;
   --lh-text: 1.6;
 
-  --r-xs: 4px;        /* repères minuscules : images clés, marques */
-  --r-sm: 8px;        /* champs, lignes de liste, étiquettes, boutons icône */
-  --r-md: 12px;       /* menus, cartes internes, vignettes */
-  --r-lg: 14px;       /* panneaux, cartes, médias, popovers (comme le site) */
-  --r-xl: 20px;       /* dialogues, boîte de direction de l'accueil */
+  --r-xs: var(--tramme-radius-detail);
+  --r-sm: var(--tramme-radius-control);
+  --r-md: var(--tramme-radius-menu);
+  --r-lg: var(--tramme-radius-panel);
+  --r-xl: var(--tramme-radius-dialog);
+  --r-control: var(--tramme-radius-control);
   --r-pill: 999px;    /* boutons texte, contrôles segmentés, puces, pastilles */
 
   --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 20px; --sp-6: 24px; --sp-8: 32px; --sp-10: 40px;
@@ -35,8 +38,8 @@
   --h-xs: 22px; --h-sm: 26px; --h-md: 30px; --h-lg: 36px;
   --row: 28px;        /* une ligne de liste (calques, timeline) */
 
-  --ease: cubic-bezier(0.16, 1, 0.3, 1);
-  --t-fast: 120ms; --t-med: 180ms; --t-slow: 260ms;
+  --ease: var(--tramme-ease);
+  --t-fast: var(--tramme-duration-fast); --t-med: var(--tramme-duration-normal); --t-slow: var(--tramme-duration-slow);
 
   /* ce qui se pose sur une image, quel que soit le thème */
   --on-media: #ffffff;
@@ -50,24 +53,24 @@
   --focus: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent-line);
 }
 
-/* studio : le thème par défaut, un gris-bleu nuit */
+/* Studio: the original application's cool dark palette, shared with the site. */
 :root, :root[data-theme="studio"] {
   color-scheme: dark;
-  --bg: #090f13; --surface: #12181c; --surface-2: #181e22; --raised: #1c2327;
-  --field: #21272c; --field-hover: #282f33; --field-active: #30363b; --stage: #060b0e;
-  --text: #e8eef1; --text-2: #b1b7ba; --text-3: #858a8d; --text-4: #575c5f;
-  --line: rgba(232, 238, 241, 0.07); --line-strong: rgba(232, 238, 241, 0.13); --line-soft: rgba(232, 238, 241, 0.045);
-  --hover: rgba(232, 238, 241, 0.05); --press: rgba(232, 238, 241, 0.09);
-  --accent: #2ec4b6; --accent-hover: #4fd3c6; --accent-soft: rgba(46, 196, 182, 0.14); --accent-line: rgba(46, 196, 182, 0.5); --accent-text: #2ec4b6; --on-accent: #03211e;
+  --bg: var(--tramme-dark-bg); --surface: var(--tramme-dark-surface); --surface-2: var(--tramme-dark-surface-2); --raised: var(--tramme-dark-raised);
+  --field: var(--tramme-dark-field); --field-hover: var(--tramme-dark-field-hover); --field-active: var(--tramme-dark-field-active); --stage: var(--tramme-dark-stage);
+  --text: var(--tramme-dark-text); --text-2: var(--tramme-dark-text-2); --text-3: var(--tramme-dark-text-3); --text-4: var(--tramme-dark-text-4);
+  --line: var(--tramme-dark-line); --line-strong: var(--tramme-dark-line-strong); --line-soft: var(--tramme-dark-line-soft);
+  --hover: var(--tramme-dark-hover); --press: var(--tramme-dark-press);
+  --accent: var(--tramme-accent); --accent-hover: var(--tramme-accent-hover); --accent-soft: var(--tramme-accent-soft); --accent-line: var(--tramme-dark-focus); --accent-text: var(--tramme-dark-accent-text); --on-accent: var(--tramme-on-accent);
   --ok: #46c28a; --danger: #f2665c; --key: #f4b860; --expr: #7cb7ff; --link: #9bd770; --on-danger: #2a0b09;
   --ok-soft: rgba(70, 194, 138, 0.14); --danger-soft: rgba(242, 102, 92, 0.14); --key-soft: rgba(244, 184, 96, 0.14); --expr-soft: rgba(124, 183, 255, 0.12); --link-soft: rgba(155, 215, 112, 0.12);
   --t-shape: #5b9bf0; --t-text: #e8a55a; --t-image: #6cc08b; --t-group: #8a949c; --t-code: #7cb7ff; --t-audio: #e07a8e;
-  --float: rgba(28, 35, 39, 0.86); --scrim: rgba(3, 6, 8, 0.62);
+  --float: color-mix(in srgb, var(--raised) 86%, transparent); --scrim: rgba(3, 6, 8, 0.62);
   --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.28), 0 0 0 1px var(--line);
   --shadow-2: 0 12px 32px rgba(0, 0, 0, 0.42), 0 0 0 1px var(--line-strong);
   --shadow-3: 0 28px 80px rgba(0, 0, 0, 0.55), 0 0 0 1px var(--line-strong);
   --picture-shadow: 0 0 0 1px var(--line), 0 24px 70px rgba(0, 0, 0, 0.5);
-  --checker-a: #151b1f; --checker-b: #11171b;
+  --checker-a: var(--tramme-dark-surface); --checker-b: var(--tramme-dark-bg);
   --scroll: rgba(232, 238, 241, 0.12); --scroll-hover: rgba(232, 238, 241, 0.2);
   --code: #bfe3ff;
   /* technique : ce qui se dessine sur l'image et dans la timeline, la visite guidée, l'erreur de rendu */
@@ -120,12 +123,12 @@
 /* papier : le clair, celui du site ; les surfaces au-dessus du fond */
 :root[data-theme="paper"] {
   color-scheme: light;
-  --bg: #f0f4f7; --surface: #ffffff; --surface-2: #f3f7fa; --raised: #ffffff;
-  --field: #ebeff2; --field-hover: #e3e7ea; --field-active: #dadfe1; --stage: #e7ecef;
-  --text: #181f24; --text-2: #495156; --text-3: #59616a; --text-4: #909aa0;
-  --line: rgba(24, 31, 36, 0.08); --line-strong: rgba(24, 31, 36, 0.14); --line-soft: rgba(24, 31, 36, 0.05);
-  --hover: rgba(24, 31, 36, 0.045); --press: rgba(24, 31, 36, 0.08);
-  --accent: #0b8075; --accent-hover: #096b62; --accent-soft: rgba(11, 128, 117, 0.12); --accent-line: rgba(11, 128, 117, 0.45); --accent-text: #08746a; --on-accent: #ffffff;
+  --bg: var(--tramme-light-bg); --surface: var(--tramme-light-surface); --surface-2: var(--tramme-light-surface-2); --raised: var(--tramme-light-raised);
+  --field: var(--tramme-light-field); --field-hover: var(--tramme-light-field-hover); --field-active: var(--tramme-light-field-active); --stage: var(--tramme-light-stage);
+  --text: var(--tramme-light-text); --text-2: var(--tramme-light-text-2); --text-3: var(--tramme-light-text-3); --text-4: var(--tramme-light-text-4);
+  --line: var(--tramme-light-line); --line-strong: var(--tramme-light-line-strong); --line-soft: var(--tramme-light-line-soft);
+  --hover: var(--tramme-light-hover); --press: var(--tramme-light-press);
+  --accent: var(--tramme-accent); --accent-hover: var(--tramme-accent-hover); --accent-soft: var(--tramme-accent-soft); --accent-line: var(--tramme-light-focus); --accent-text: var(--tramme-light-accent-text); --on-accent: var(--tramme-on-accent);
   --ok: #187548; --danger: #c23535; --key: #8f5d10; --expr: #2a64b8; --link: #337320; --on-danger: #ffffff;
   --ok-soft: rgba(24, 117, 72, 0.12); --danger-soft: rgba(194, 53, 53, 0.1); --key-soft: rgba(143, 93, 16, 0.12); --expr-soft: rgba(42, 100, 184, 0.1); --link-soft: rgba(51, 115, 32, 0.1);
   --t-shape: #3f7fd8; --t-text: #b8772c; --t-image: #3a9a5c; --t-group: #6f7a82; --t-code: #3d7fd6; --t-audio: #c0506a;

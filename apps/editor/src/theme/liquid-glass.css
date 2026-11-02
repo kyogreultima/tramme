@@ -1,4 +1,4 @@
-/* Liquid Glass: colourless material, a rounded optical edge and floating
+/* Liquid Glass: colourless material, the shared control geometry and floating
    controls. The picture supplies colour. Content stays quiet and legible;
    glass belongs to navigation and transient controls, not every nested row. */
 :root[data-theme="liquid-glass"] {
@@ -13,6 +13,7 @@
   --ok-soft: rgba(22, 112, 68, .11); --danger-soft: rgba(190, 48, 59, .1); --key-soft: rgba(135, 86, 20, .12); --expr-soft: rgba(40, 95, 176, .1); --link-soft: rgba(50, 111, 38, .1);
   --t-shape: #356fc2; --t-text: #9a6526; --t-image: #297c4d; --t-group: #727279; --t-code: #356fc2; --t-audio: #ae4564;
   --float: rgba(255, 255, 255, .72); --scrim: rgba(25, 25, 28, .2);
+  --glass-popover-fill: rgba(242, 242, 246, .64);
   --shadow-1: 0 1px 2px rgba(20, 20, 24, .035), 0 4px 14px rgba(20, 20, 24, .045), 0 0 0 1px var(--line);
   --shadow-2: 0 4px 8px rgba(20, 20, 24, .04), 0 16px 40px rgba(20, 20, 24, .12), 0 0 0 1px rgba(255, 255, 255, .65);
   --shadow-3: 0 8px 16px rgba(20, 20, 24, .06), 0 32px 88px rgba(20, 20, 24, .2), 0 0 0 1px rgba(255, 255, 255, .7);
@@ -24,7 +25,6 @@
   --mark: #ffffff; --mark-ring: rgba(0, 0, 0, .5); --out-range: rgba(20, 20, 24, .08);
   --error-bg: rgba(255, 242, 244, .97); --error-text: #9c2431;
   --tour-overlay: #202023; --tour-overlay-opacity: .34;
-  --r-md: 14px; --r-lg: 20px; --r-xl: 28px;
   --glass-blur: blur(20px) saturate(1.35);
   --glass-regular-blur: blur(36px) saturate(1.15);
   --glass-rim: inset 0 1px 1px rgba(255, 255, 255, .98), inset 1px 0 1px rgba(255, 255, 255, .62),
@@ -80,23 +80,26 @@
   backdrop-filter: var(--glass-regular-blur);
 }
 :root[data-theme="liquid-glass"] .modal { box-shadow: var(--glass-rim), var(--shadow-3); }
+/* The export overlays a pale inspector: a lighter veil makes the same frosted
+   material visible there. Darker labels keep the thinner glass readable. */
+:root[data-theme="liquid-glass"] .export-pop {
+  --text-2: #303036; --text-3: #34343a;
+  background: var(--glass-sheen), var(--glass-popover-fill);
+}
 :root[data-theme="liquid-glass"] .toast.error { box-shadow: var(--shadow-2), inset 0 0 0 1px var(--danger); }
 :root[data-theme="liquid-glass"] .modal-back { -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
 :root[data-theme="liquid-glass"] :is(.home-top, .topbar) {
   --text-2: #3e3e44; --text-3: #44444b;
-  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, .72);
+  /* Share the page's backdrop; only the controls carry a glass surface. */
+  background: none;
+  box-shadow: none;
   -webkit-backdrop-filter: var(--glass-regular-blur);
   backdrop-filter: var(--glass-regular-blur);
 }
-/* The editor's own topbar has no picture of its own behind it, so it still needs
-   paint to read as material. The home's blurs the wallpaper directly: no fill of
-   its own, just the blur bending what is already there. */
-:root[data-theme="liquid-glass"] .topbar { background: rgba(255, 255, 255, .76); }
 
 /* Settings: one regular material, with quiet inset groups. */
 :root[data-theme="liquid-glass"] .set-nav { background: rgba(118, 118, 128, .035); }
 :root[data-theme="liquid-glass"] .set-group-card { background: rgba(255, 255, 255, .48); }
-:root[data-theme="liquid-glass"] .set-nav-item { border-radius: var(--r-pill); }
 :root[data-theme="liquid-glass"] .set-nav-item.on { background: rgba(255, 255, 255, .8); box-shadow: 0 1px 3px rgba(20, 20, 24, .09); }
 :root[data-theme="liquid-glass"] .modal-head { padding-top: 20px; padding-bottom: 12px; }
 
@@ -130,16 +133,15 @@
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .85), 0 1px 3px rgba(20, 20, 24, .24);
 }
 :root[data-theme="liquid-glass"] .toggle:active:not(:disabled)::after { scale: 1.06 1; }
-:root[data-theme="liquid-glass"] :is(.menu-item:hover, .menu-item.active, .menu button:not(.menu-item):hover) { background: rgba(38, 38, 42, .07); border-radius: 10px; }
+:root[data-theme="liquid-glass"] :is(.menu-item:hover, .menu-item.active, .menu button:not(.menu-item):hover) { background: rgba(38, 38, 42, .07); }
 html.vault[data-theme="liquid-glass"], html.vault[data-theme="liquid-glass"] body { background: var(--raised); }
 
-/* The preview uses the same colourless lens and floating pill. */
+/* The preview keeps the colourless lens with the shared component shapes. */
 .theme-card[data-theme-preview="liquid-glass"] .prev {
   background-image: radial-gradient(ellipse at 10% 10%, #ffffff, transparent 70%), linear-gradient(140deg, #e8e8ea, #b8b8bf) !important;
 }
 .theme-card[data-theme-preview="liquid-glass"] .prev .s {
   border: 1px solid rgba(255, 255, 255, .85);
-  border-radius: 9px 9px 0 0;
   box-shadow: inset 0 1px 0 #ffffff, 0 5px 12px rgba(20, 20, 24, .1);
   -webkit-backdrop-filter: blur(5px);
   backdrop-filter: blur(5px);
@@ -153,16 +155,16 @@ html.vault[data-theme="liquid-glass"], html.vault[data-theme="liquid-glass"] bod
 
 /* Opaque fallbacks share the same shapes and interaction affordances. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  :root[data-theme="liquid-glass"] { --surface: #fafafa; --float: #f8f8f9; --glass-glint-opacity: 0; --glass-sheen: none; }
-  :root[data-theme="liquid-glass"] :is(.home-top, .topbar, .btn:where(:not(.primary, .danger, .danger-solid, .ghost, .outline))) { background-color: var(--raised); }
+  :root[data-theme="liquid-glass"] { --surface: #fafafa; --float: #f8f8f9; --glass-popover-fill: #f8f8f9; --glass-glint-opacity: 0; --glass-sheen: none; }
+  :root[data-theme="liquid-glass"] .btn:where(:not(.primary, .danger, .danger-solid, .ghost, .outline)) { background-color: var(--raised); }
 }
 @media (prefers-reduced-transparency: reduce) {
   :root[data-theme="liquid-glass"] {
-    --surface: #fafafa; --surface-2: #f0f0f2; --float: #f8f8f9;
+    --surface: #fafafa; --surface-2: #f0f0f2; --float: #f8f8f9; --glass-popover-fill: #f8f8f9;
     --glass-glint-opacity: 0; --glass-sheen: none; --glass-wallpaper: none;
     --glass-blur: none; --glass-regular-blur: none;
   }
-  :root[data-theme="liquid-glass"] :is(.home-top, .topbar, .card, .home-empty, .set-nav, .set-group-card, .btn:where(:not(.primary, .danger, .danger-solid, .ghost, .outline))) { background-color: var(--raised); }
+  :root[data-theme="liquid-glass"] :is(.card, .home-empty, .set-nav, .set-group-card, .btn:where(:not(.primary, .danger, .danger-solid, .ghost, .outline))) { background-color: var(--raised); }
   :root[data-theme="liquid-glass"] .home-wallpaper { opacity: 0; }
   .theme-card[data-theme-preview="liquid-glass"] .prev .s,
   .theme-card[data-theme-preview="liquid-glass"] .prev .a { background: #fafafa !important; -webkit-backdrop-filter: none; backdrop-filter: none; }
@@ -173,7 +175,7 @@ html.vault[data-theme="liquid-glass"], html.vault[data-theme="liquid-glass"] bod
 }
 @media (prefers-contrast: more) {
   :root[data-theme="liquid-glass"] {
-    --surface: #ffffff; --float: #fafafa; --text-2: #303034; --text-3: #47474d;
+    --surface: #ffffff; --float: #fafafa; --glass-popover-fill: #fafafa; --text-2: #303034; --text-3: #47474d;
     --line: rgba(38, 38, 42, .3); --line-strong: rgba(38, 38, 42, .5);
     --glass-glint-opacity: 0; --glass-sheen: none;
   }

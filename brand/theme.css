@@ -1,0 +1,71 @@
+/* Shared visual foundation. App and website map these values onto their
+   own semantic roles; neither imports the other's component styles. */
+:root {
+  --tramme-dark-accent: #2ec4b6;
+  --tramme-dark-accent-hover: #4fd3c6;
+  --tramme-dark-on-accent: #03211e;
+  --tramme-dark-accent-soft: #2ec4b624;
+  --tramme-light-accent: #0b8075;
+  --tramme-light-accent-hover: #096b62;
+  --tramme-light-on-accent: #ffffff;
+  --tramme-light-accent-soft: #0b80751f;
+  --tramme-accent: var(--tramme-dark-accent);
+  --tramme-accent-hover: var(--tramme-dark-accent-hover);
+  --tramme-on-accent: var(--tramme-dark-on-accent);
+  --tramme-accent-soft: var(--tramme-dark-accent-soft);
+  --tramme-dark-bg: #090f13;
+  --tramme-dark-surface: #12181c;
+  --tramme-dark-surface-2: #181e22;
+  --tramme-dark-raised: #1c2327;
+  --tramme-dark-field: #21272c;
+  --tramme-dark-field-hover: #282f33;
+  --tramme-dark-field-active: #30363b;
+  --tramme-dark-stage: #060b0e;
+  --tramme-dark-text: #e8eef1;
+  --tramme-dark-text-2: #b1b7ba;
+  --tramme-dark-text-3: #959da3;
+  --tramme-dark-text-4: #575c5f;
+  --tramme-dark-line: #e8eef112;
+  --tramme-dark-line-strong: #e8eef121;
+  --tramme-dark-line-soft: #e8eef10b;
+  --tramme-dark-hover: #e8eef10d;
+  --tramme-dark-press: #e8eef117;
+  --tramme-dark-accent-text: #2ec4b6;
+  --tramme-dark-focus: #2ec4b6;
+  --tramme-light-bg: #f0f4f7;
+  --tramme-light-surface: #ffffff;
+  --tramme-light-surface-2: #f3f7fa;
+  --tramme-light-raised: #ffffff;
+  --tramme-light-field: #ebeff2;
+  --tramme-light-field-hover: #e3e7ea;
+  --tramme-light-field-active: #dadfe1;
+  --tramme-light-stage: #e7ecef;
+  --tramme-light-text: #181f24;
+  --tramme-light-text-2: #495156;
+  --tramme-light-text-3: #59616a;
+  --tramme-light-text-4: #909aa0;
+  --tramme-light-line: #181f2414;
+  --tramme-light-line-strong: #181f2424;
+  --tramme-light-line-soft: #181f240d;
+  --tramme-light-hover: #181f240b;
+  --tramme-light-press: #181f2414;
+  --tramme-light-accent-text: #08746a;
+  --tramme-light-focus: #0b8075;
+  --tramme-inverse-bg: #ffffff;
+  --tramme-radius-detail: 3px;
+  --tramme-radius-control: 6px;
+  --tramme-radius-menu: 8px;
+  --tramme-radius-panel: 10px;
+  --tramme-radius-dialog: 14px;
+  --tramme-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --tramme-duration-fast: 120ms;
+  --tramme-duration-normal: 180ms;
+  --tramme-duration-slow: 260ms;
+}
+
+:root:is([data-theme='light'], [data-theme='paper']) {
+  --tramme-accent: var(--tramme-light-accent);
+  --tramme-accent-hover: var(--tramme-light-accent-hover);
+  --tramme-on-accent: var(--tramme-light-on-accent);
+  --tramme-accent-soft: var(--tramme-light-accent-soft);
+}

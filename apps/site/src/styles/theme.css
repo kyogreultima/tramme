@@ -1,56 +1,55 @@
-/* Shared reference palette for the website and documentation. */
+@import '../../../../brand/theme.css';
+
+/* Website semantics mapped to the same foundation as Studio/Paper. */
 :root {
   color-scheme: dark;
-  --bg: #151914;
-  --panel: #1d221c;
-  --panel-2: #242a22;
-  --field: #2a3028;
-  --stage: #10150f;
-  --ink: #f0f1e9;
-  --ink-2: #bdc1b5;
-  --ink-3: #a4ab9c;
-  --line: #ffffff14;
-  --line-2: #ffffff30;
-  --hover: #ffffff0a;
-  --accent: #ff650b;
-  --accent-2: #e85200;
-  --accent-ink: #141810;
-  --accent-text: #ff954f;
-  --accent-soft: #ff650b16;
-  --screen: #151914;
-  --on-screen: #f0f1e9;
-  --on-media: #f0f1e9;
+  --bg: var(--tramme-dark-bg);
+  --panel: var(--tramme-dark-surface);
+  --panel-2: var(--tramme-dark-surface-2);
+  --field: var(--tramme-dark-field);
+  --stage: var(--tramme-dark-stage);
+  --ink: var(--tramme-dark-text);
+  --ink-2: var(--tramme-dark-text-2);
+  --ink-3: var(--tramme-dark-text-3);
+  --line: var(--tramme-dark-line);
+  --line-2: var(--tramme-dark-line-strong);
+  --hover: var(--tramme-dark-hover);
+  --accent: var(--tramme-accent);
+  --accent-2: var(--tramme-accent-hover);
+  --accent-ink: var(--tramme-on-accent);
+  --accent-text: var(--tramme-dark-accent-text);
+  --accent-soft: var(--tramme-accent-soft);
+  --screen: var(--tramme-dark-bg);
+  --on-screen: var(--tramme-dark-text);
+  --on-media: var(--tramme-dark-text);
   --scrim: #10150fb8;
-  --paper: #ffffff;
-  --paper-ink: #23291f;
-  --paper-muted: #596252;
-  --paper-line: #23291f2b;
-  --paper-card: #f5f6f2;
-  --paper-hover: #23291f0a;
+  --paper: var(--tramme-light-surface);
+  --paper-ink: var(--tramme-light-text);
+  --paper-muted: var(--tramme-light-text-3);
+  --paper-line: var(--tramme-light-line-strong);
+  --paper-card: var(--tramme-light-surface-2);
+  --paper-hover: var(--tramme-light-hover);
   --lift: 0 1px 0 var(--line-2);
   --float: 0 18px 48px #05090333;
-  --brand-mark: currentColor;
+  --brand-mark: var(--tramme-accent);
   --brand-ink: currentColor;
-}
-/* Explicit brand tokens also feed the generated favicons (lib/logo.ts). */
-:root[data-theme='dark'] {
-  --bg: #151914;
-  --accent: #ff650b;
+  --hero-muted: #c9efea;
+  --hero-shade: #060b0eb3;
+  --hero-strip: #060b0ebf;
 }
 :root[data-theme='light'] {
   color-scheme: light;
-  --bg: #f7f8f3;
-  --panel: #ffffff;
-  --panel-2: #edf0e8;
-  --field: #e6eadd;
-  --stage: #e6eadd;
-  --ink: #23291f;
-  --ink-2: #505a47;
-  --ink-3: #5e6856;
-  --line: #23291f14;
-  --line-2: #23291f30;
-  --hover: #23291f08;
-  --accent-text: #a63b00;
-  --accent-soft: #ff650b12;
+  --bg: var(--tramme-light-bg);
+  --panel: var(--tramme-light-surface);
+  --panel-2: var(--tramme-light-surface-2);
+  --field: var(--tramme-light-field);
+  --stage: var(--tramme-light-stage);
+  --ink: var(--tramme-light-text);
+  --ink-2: var(--tramme-light-text-2);
+  --ink-3: var(--tramme-light-text-3);
+  --line: var(--tramme-light-line);
+  --line-2: var(--tramme-light-line-strong);
+  --hover: var(--tramme-light-hover);
+  --accent-text: var(--tramme-light-accent-text);
   --float: 0 18px 48px #20291a1f;
 }

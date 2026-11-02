@@ -1,10 +1,9 @@
-/* Reference-led website: fine rules, editorial type, orange actions and
-   the white navigation. Component layouts adapt to their actual content. */
+/* Shared Studio/Paper palette, editorial scale and application control roles. */
 :root {
   --font-head: var(--font-sans), system-ui, sans-serif;
-  --r: 6px;
-  --r-lg: 8px;
-  --r-sm: 4px;
+  --r: var(--tramme-radius-menu);
+  --r-lg: var(--tramme-radius-panel);
+  --r-sm: var(--tramme-radius-control);
   --nav: 76px;
   --section: clamp(64px, 8vw, 112px);
   --gutter: clamp(20px, 2.7vw, 48px);
@@ -16,16 +15,18 @@ h1, h2, .display { line-height: 1.08; }
 .display { font-size: clamp(3rem, 6vw, 6.5rem); }
 .screen {
   color-scheme: dark;
-  --bg: #151914; --panel: #1d221c; --panel-2: #242a22; --field: #2a3028;
-  --ink: #f0f1e9; --ink-2: #bdc1b5; --ink-3: #a4ab9c;
-  --line: #ffffff14; --line-2: #ffffff30; --hover: #ffffff0a;
-  --accent-text: #ff954f;
+  --bg: var(--tramme-dark-bg); --panel: var(--tramme-dark-surface); --panel-2: var(--tramme-dark-surface-2); --field: var(--tramme-dark-field);
+  --ink: var(--tramme-dark-text); --ink-2: var(--tramme-dark-text-2); --ink-3: var(--tramme-dark-text-3);
+  --line: var(--tramme-dark-line); --line-2: var(--tramme-dark-line-strong); --hover: var(--tramme-dark-hover);
+  --accent-text: var(--tramme-dark-accent-text);
+  --accent: var(--tramme-dark-accent); --accent-2: var(--tramme-dark-accent-hover);
+  --accent-ink: var(--tramme-dark-on-accent); --accent-soft: var(--tramme-dark-accent-soft);
   background: var(--bg); color: var(--ink);
 }
 .filled, .signal { background: var(--panel-2); color: var(--ink); }
 .bleed { width: 100%; max-width: var(--max); margin-inline: auto; padding-inline: var(--gutter); }
 .wrap { max-width: var(--max); }
-.btn { height: 40px; padding-inline: 16px; border-radius: 4px; font-size: 0.875rem; font-weight: 500; }
+.btn { height: 40px; padding-inline: 16px; border-radius: var(--tramme-radius-control); font-size: 0.875rem; font-weight: 500; }
 .btn-sm { height: 32px; padding-inline: 12px; font-size: 0.75rem; }
 .surface { border-radius: var(--r); box-shadow: none; }
 :root[data-theme='dark'] .surface { box-shadow: none; }
@@ -64,17 +65,19 @@ body.site #tools .chips li { border-radius: 4px; background: var(--panel-2); }
 body.site .formats { gap: 0 28px; }
 body.site .formats > li { min-height: 152px; padding-inline: 0; border-top: 1px solid var(--line-2); border-radius: 0; background: transparent; }
 
-/* Pricing: a quiet paper panel and a single orange emphasis. */
+/* Pricing uses the same Paper action roles as the light application. */
 body[data-page='pricing'] .pricing-sheet {
   --bg: var(--paper); --panel: var(--paper-card); --ink: var(--paper-ink);
   --ink-2: var(--paper-muted); --ink-3: var(--paper-muted);
   --line: var(--paper-line); --line-2: var(--paper-line); --hover: var(--paper-hover);
-  --accent-text: #a63b00;
+  --accent-text: var(--tramme-light-accent-text);
+  --accent: var(--tramme-light-accent); --accent-2: var(--tramme-light-accent-hover);
+  --accent-ink: var(--tramme-light-on-accent); --accent-soft: var(--tramme-light-accent-soft);
   background: var(--paper); color: var(--ink); padding-block: 44px 56px; margin-top: 40px;
 }
 body[data-page='pricing'] .pricing-sheet .plans { margin-top: 0; }
-body.site .plans > .switch { justify-self: start; border-radius: 4px; box-shadow: inset 0 0 0 1px var(--line-2); }
-body.site .switch label { border-radius: 3px; }
+body.site .plans > .switch { justify-self: start; border-radius: var(--tramme-radius-menu); box-shadow: inset 0 0 0 1px var(--line-2); }
+body.site .switch label { border-radius: var(--tramme-radius-control); }
 body.site .plan { grid-template-rows: auto 3.2em 90px 40px 1fr; gap: 18px; border: 1px solid var(--line-2); background: transparent; }
 body.site .plan.featured { box-shadow: none; border-color: var(--accent); background: var(--accent-soft); }
 body.site .plan h3 { font-size: 1.5rem; }

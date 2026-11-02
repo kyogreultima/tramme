@@ -6,6 +6,7 @@ import Platform from '../components/Platform.astro';
 import SiteHead from '../components/SiteHead.astro';
 import SocialImage from '../components/SocialImage.astro';
 import { SITE } from '../lib/site';
+import { ground } from '../lib/logo';
 import { LOCALES, localeOf, pathFor } from '../lib/i18n';
 import { Font } from 'astro:assets';
 import '../styles/global.css';
@@ -30,7 +31,7 @@ const page = segment === 'p' ? 'project' : segment;
     <title>{title}</title>
     <meta name="description" content={description} />
     <link rel="canonical" href={canonical} />
-    <meta name="theme-color" content="#151914" />
+    <meta name="theme-color" content={ground} />
     {alternates.map(({ l, href }) => <link rel="alternate" hreflang={l} href={href} />)}
     <link rel="alternate" hreflang="x-default" href={alternates[0].href} />
     <meta property="og:type" content="website" />

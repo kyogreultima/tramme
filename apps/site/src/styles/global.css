@@ -1,11 +1,5 @@
-/* The landing page: the editor's themes (theme.css, from
-   apps/editor/src/styles.css), so the page and the product look like one
-   thing. One family in two cuts (Geist, Geist Mono), the editor's teal as the
-   only accent.
-   Shapes, as in the app: surfaces 20px set on the ground with gutters
-   instead of hairlines, media 14px, small chips 8px, every button a pill.
-   No glow, no gradient: the accent is a colour, used sparingly.
-   No script for the look: reveals are scroll-driven CSS, still without it. */
+/* Site foundations. Shared product values live in brand/theme.css; page
+   typography and spacing adapt the same identity to an editorial scale. */
 
 @import './theme.css';
 
@@ -18,7 +12,7 @@
   --max: 1280px;
   --nav: 64px;
   --section: clamp(72px, 8vw, 120px);
-  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease: var(--tramme-ease);
 }
 @media (max-width: 820px) { :root { --r: 10px; } }
 

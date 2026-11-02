@@ -213,6 +213,7 @@ function ExportPop({ anchor, onClose }: { anchor: HTMLElement; onClose: () => vo
   return (
     <Popover anchor={anchor} onClose={running() ? () => {} : onClose} class="export-pop" align="right">
       <div style={{ fontWeight: 600 }}>{t('common.export')}</div>
+      <div class="export-options">
       <PublishPanel c={c} compId={S.compId.value} disabled={running()} onFormat={setFormat} />
       <div class="export-formats">
         {WEB_FORMATS.map(([id, label, hint]) => (
@@ -259,9 +260,13 @@ function ExportPop({ anchor, onClose }: { anchor: HTMLElement; onClose: () => vo
       </div>}
       {state && 'error' in state && <div class="prop-note err">{state.error}</div>}
       <ExportQueueList />
+      </div>
       {running()
         ? <button class="btn" onClick={() => expAbort.current?.abort()}><Icon name="stop" />{t('topbar.cancelExport')}</button>
-        : <div class="export-go"><button class="btn" title={t('topbar.addToQueue')} onClick={enqueue}><Icon name="plus" />{t('topbar.addToQueue')}</button><button class="btn primary" onClick={run}><Icon name="download" />{t('common.export')}</button></div>}
+        : <div class="export-go">
+            <button class="btn outline" title={t('topbar.addToQueue')} onClick={enqueue}><Icon name="plus" />{t('topbar.addToQueue')}</button>
+            <button class="btn primary" onClick={run}><Icon name="download" />{t('common.export')}</button>
+          </div>}
     </Popover>
   );
 }
