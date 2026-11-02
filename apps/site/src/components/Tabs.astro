@@ -19,10 +19,15 @@ const { locale } = Astro.props;
           <span class="section-label">{t(locale, 'nav.product')}</span>
           <Head title={t(locale, 'landing.pillars.title')} />
           <a class="btn btn-ghost overview" href={pathIn(locale, '/features/')}>{t(locale, 'landing.pillars.learn')}<ArrowRight aria-hidden="true" /></a>
+          <div class="reel" aria-hidden="true">
+            <span class="reel-position" data-position>01</span>
+            <span class="reel-track"><span></span></span>
+            <span class="reel-total">{String(FEATURES.length).padStart(2, '0')}</span>
+          </div>
           <nav class="steps" aria-label={t(locale, 'landing.pillars.label')}>
             {FEATURES.map((f, i) => <a class="step" data-step={f.id} href={`#film-${f.id}`}>
               <span class="step-name"><span class="step-number">{String(i + 1).padStart(2, '0')}</span>{wordsOf(f, locale).name}</span>
-              <span class="step-line">{wordsOf(f, locale).line}</span>
+              <span class="step-line"><span>{wordsOf(f, locale).line}</span></span>
             </a>)}
           </nav>
         </div>
@@ -51,7 +56,10 @@ const { locale } = Astro.props;
 
 <script>
   import { setupJourney } from '../lib/journey';
-  for (const root of document.querySelectorAll<HTMLElement>('[data-journey]')) setupJourney(root);
+  for (const root of document.querySelectorAll<HTMLElement>('[data-journey]')) {
+    const cleanup = setupJourney(root);
+    document.addEventListener('astro:before-swap', cleanup, { once: true });
+  }
 </script>
 
 <style>
@@ -63,13 +71,23 @@ const { locale } = Astro.props;
   .direction :global(.head) { margin-bottom: 24px; }
   .direction :global(.head h2) { max-width: 13ch; font-size: clamp(1.75rem, 2.7vw, 3rem); }
   .overview { margin-bottom: 36px; }
+  .reel { display: none; align-items: center; gap: 14px; margin-bottom: 24px; font-size: 0.6875rem; font-variant-numeric: tabular-nums; }
+  .reel-position { color: var(--accent-text); }
+  .reel-total { color: var(--ink-3); }
+  .reel-track { flex: 1; height: 2px; background: var(--line-2); overflow: hidden; }
+  .reel-track > span { display: block; height: 100%; background: var(--accent); transform: scaleX(var(--journey-progress, 0)); transform-origin: left; }
+  .is-enhanced .reel { display: flex; }
   .steps { display: grid; }
   .step { display: block; padding-block: 13px; border-top: 1px solid var(--line); color: var(--ink-3); text-decoration: none; }
-  .step-name { display: flex; align-items: center; gap: 12px; font-size: 0.9375rem; }
-  .step-number { width: 18px; font-size: 0.625rem; opacity: 0.6; }
-  .step-line { display: none; max-width: 31ch; margin-top: 12px; font-size: 0.8125rem; line-height: 1.5; color: var(--ink-2); }
+  .step-name { display: flex; align-items: center; gap: 12px; font-size: 0.9375rem; transition: transform 450ms cubic-bezier(0.16, 1, 0.3, 1); }
+  .step-number { width: 18px; font-size: 0.625rem; opacity: 0.6; transition: color 300ms, opacity 300ms; }
+  .step-line { display: grid; grid-template-rows: 0fr; max-width: 31ch; opacity: 0; font-size: 0.8125rem; line-height: 1.5; color: var(--ink-2); transition: grid-template-rows 450ms cubic-bezier(0.16, 1, 0.3, 1), opacity 300ms; }
+  .step-line > span { overflow: hidden; }
+  .step-line > span::before { content: ''; display: block; height: 12px; }
   .step:hover, .step[aria-current] { color: var(--ink); }
-  .step[aria-current] .step-line { display: block; }
+  .step[aria-current] .step-line { grid-template-rows: 1fr; opacity: 1; }
+  .step[aria-current] .step-name { transform: translateX(5px); }
+  .step[aria-current] .step-number { color: var(--accent-text); opacity: 1; }
   .panels { min-width: 0; display: grid; gap: 48px; }
   .panel { scroll-margin-top: 100px; }
   .panel[hidden] { display: none; }
@@ -87,16 +105,19 @@ const { locale } = Astro.props;
   .is-enhanced .sticky { position: sticky; top: var(--nav); align-items: center; min-height: calc(100svh - var(--nav)); padding-block: 24px; }
   .is-enhanced .waypoints { position: absolute; inset: 0; z-index: -1; display: grid; grid-template-rows: repeat(var(--steps), 1fr); pointer-events: none; }
   .is-enhanced .picture { max-height: calc(100svh - var(--nav) - 135px); }
+  .is-enhanced .picture :global(img) { transform: translate3d(0, calc((0.5 - var(--shot-progress, 0.5)) * 16px), 0) scale(calc(1.06 - var(--shot-progress, 0.5) * 0.04)); }
   @media (max-width: 800px) {
     .sticky { grid-template-columns: minmax(0, 1fr); gap: 24px; }
     .section-label { margin-bottom: 18px; }
     .direction :global(.head h2) { max-width: 24ch; font-size: 2rem; }
     .direction :global(.head) { margin-bottom: 16px; }
     .overview { display: none; }
+    .reel { margin-bottom: 12px; gap: 10px; }
     .steps { display: flex; flex-wrap: wrap; gap: 4px 20px; }
     .step { padding-block: 8px; border-top: 0; }
     .step-name { font-size: 0.8125rem; gap: 6px; }
     .step-number { display: none; }
+    .step[aria-current] .step-name { transform: none; }
     .step-line, .step[aria-current] .step-line { display: none; }
     .step[aria-current] { box-shadow: 0 1px 0 currentColor; }
     .picture { aspect-ratio: 1.4; padding: 12px; }

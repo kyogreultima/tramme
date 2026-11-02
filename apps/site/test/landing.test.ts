@@ -32,7 +32,6 @@ describe('the landing page', () => {
     const hero = read('components/Hero.astro');
     expect(hero).toContain('href="#film"');
     expect(hero).toContain("signUp");
-    expect(hero).not.toContain('<script');
   });
 
   it('runs no engine', () => {

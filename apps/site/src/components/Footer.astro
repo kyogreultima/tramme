@@ -1,7 +1,6 @@
 ---
 import LanguageChoice from './LanguageChoice.astro';
 import ThemeChoice from './ThemeChoice.astro';
-import Brand from './Brand.astro';
 import { footerColumns } from '../lib/nav';
 import { localeOf, t } from '../lib/i18n';
 
@@ -20,7 +19,6 @@ const { landing = false } = Astro.props;
         </section>
       ))}
     </nav>
-    <div class="signature"><Brand /></div>
     <div class="bottom">
       <p class="legal">{t(locale, 'footer.copyright')}</p>
       <div class="choices">

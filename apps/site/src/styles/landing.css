@@ -71,9 +71,6 @@ body.site .foot-reference .cols { border-top: 1px solid var(--line); padding-top
 body.site .foot-reference strong { font-size: 0.8125rem; font-weight: 400; color: var(--ink-3); }
 body.site .foot-reference ul { gap: 8px; }
 body.site .foot-reference a { font-size: 0.8125rem; color: var(--ink-2); }
-body.site .signature { margin-top: 80px; color: var(--ink); line-height: 0; }
-body.site .signature .brand { display: block; width: 100%; height: auto; }
-body.site .signature svg { width: 100%; height: auto; }
 body.site .foot-reference .bottom { margin-top: 44px; padding-top: 20px; border-top: 1px solid var(--line); }
 body.site .foot-reference .legal { max-width: 46ch; font-size: 0.6875rem; }
 @media (max-width: 960px) { body.site .nav-reference .row { padding-inline: 12px; } }
@@ -82,7 +79,6 @@ body.site .foot-reference .legal { max-width: 46ch; font-size: 0.6875rem; }
   body.site .nav-reference { top: 8px; height: 44px; margin: 8px 8px -52px; }
   body.site .nav-reference .row { height: 44px; }
   body.site .nav-reference .home { font-size: 0.95rem; }
-  body.site .signature { margin-top: 56px; }
 }
 @media (prefers-reduced-motion: reduce) {
   body.site *, body.site *::before, body.site *::after { animation: none !important; transition: none !important; }

@@ -7,22 +7,70 @@ export function setupJourney(root: HTMLElement): () => void {
   // A short viewport needs the normal document flow to keep all content reachable.
   const short = matchMedia('(max-height: 620px)');
   let observer: IntersectionObserver | undefined;
+  let frame = 0;
+  let animations: Animation[] = [];
+  let initialized = false;
   let current = panels[0]?.dataset.panel;
+  const cancel = () => { for (const animation of animations) animation.cancel(); animations = []; };
+  const progress = () => {
+    frame = 0;
+    if (!observer) return;
+    const track = root.querySelector<HTMLElement>('[data-track]');
+    const waypoint = waypoints.find((point) => point.dataset.waypoint === current);
+    if (!track || !waypoint) return;
+    const bounds = track.getBoundingClientRect();
+    const point = waypoint.getBoundingClientRect();
+    const clamp = (value: number) => Math.max(0, Math.min(1, value));
+    root.style.setProperty('--journey-progress', String(clamp((innerHeight * .5 - bounds.top) / bounds.height)));
+    root.style.setProperty('--shot-progress', String(clamp((innerHeight * .5 - point.top) / point.height)));
+  };
+  const scroll = () => { if (observer && !frame) frame = requestAnimationFrame(progress); };
   const activate = (id: string) => {
     if (!panels.some((panel) => panel.dataset.panel === id)) return;
+    const previous = panels.findIndex((panel) => panel.dataset.panel === current);
+    const index = panels.findIndex((panel) => panel.dataset.panel === id);
+    const changed = id !== current;
+    if (initialized && !changed) return;
+    cancel();
     current = id;
     for (const panel of panels) panel.hidden = panel.dataset.panel !== id;
     for (const link of links) {
       if (link.dataset.step === id) link.setAttribute('aria-current', 'step');
       else link.removeAttribute('aria-current');
     }
+    const position = root.querySelector('[data-position]');
+    if (position) position.textContent = String(index + 1).padStart(2, '0');
+    // The picture opens like the next frame on a reel. Reverse scrolling
+    // reverses the entrance; repeated observer callbacks never restart it.
+    if (initialized && changed && !reduced.matches) {
+      const panel = panels[index];
+      const direction = index > previous ? 1 : -1;
+      const picture = panel.querySelector<HTMLElement>('.picture');
+      const caption = panel.querySelector<HTMLElement>('.caption');
+      if (picture?.animate) animations.push(picture.animate([
+        { clipPath: direction > 0 ? 'inset(0 0 18% 0 round 6px)' : 'inset(18% 0 0 0 round 6px)', transform: `translateY(${direction * 32}px) scale(.975)`, opacity: .35 },
+        { clipPath: 'inset(0 0 0 0 round 6px)', transform: 'translateY(0) scale(1)', opacity: 1 },
+      ], { duration: 760, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' }));
+      if (caption?.animate) animations.push(caption.animate([
+        { opacity: 0, transform: `translateY(${direction * 16}px)` },
+        { opacity: 1, transform: 'translateY(0)' },
+      ], { duration: 540, delay: 100, fill: 'backwards', easing: 'cubic-bezier(0.16, 1, 0.3, 1)' }));
+    }
+    initialized = true;
+    scroll();
   };
   const reset = () => {
+    cancel();
+    cancelAnimationFrame(frame);
+    frame = 0;
+    initialized = false;
     observer?.disconnect();
     observer = undefined;
     root.classList.remove('is-enhanced');
     for (const panel of panels) panel.hidden = false;
     for (const link of links) link.removeAttribute('aria-current');
+    root.style.removeProperty('--journey-progress');
+    root.style.removeProperty('--shot-progress');
   };
   const sync = () => {
     reset();
@@ -38,6 +86,7 @@ export function setupJourney(root: HTMLElement): () => void {
       }
     }, { rootMargin: `-${inset}px 0px -${inset}px 0px`, threshold: 0 });
     for (const waypoint of waypoints) observer.observe(waypoint);
+    scroll();
   };
   const select = (event: MouseEvent) => {
     if (!observer || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
@@ -56,6 +105,7 @@ export function setupJourney(root: HTMLElement): () => void {
   reduced.addEventListener('change', sync);
   short.addEventListener('change', sync);
   window.addEventListener('resize', sync);
+  window.addEventListener('scroll', scroll, { passive: true });
   sync();
   // A direct URL to a feature should work after the enhancement hides its panel.
   const fromHash = () => {
@@ -76,5 +126,6 @@ export function setupJourney(root: HTMLElement): () => void {
     reduced.removeEventListener('change', sync);
     short.removeEventListener('change', sync);
     window.removeEventListener('resize', sync);
+    window.removeEventListener('scroll', scroll);
   };
 }
