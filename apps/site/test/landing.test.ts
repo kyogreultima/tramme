@@ -7,8 +7,8 @@ const landing = read(PAGE);
 const sections = [...(/<Page [^>]*>([\s\S]*?)<\/Page>/.exec(landing)?.[1] ?? '').matchAll(/<([A-Z]\w+) locale=\{locale\} \/>/g)].map((m) => m[1]);
 
 describe('the landing page', () => {
-  it('has five sections: hero, pillars, community, platform, closing', () => {
-    expect(sections).toEqual(['Hero', 'Tabs', 'Community', 'Bento', 'Closing']);
+  it('follows the reference composition with the film journey after the hero', () => {
+    expect(sections).toEqual(['Hero', 'Tabs', 'Showcase', 'Materials', 'Bento', 'Community', 'LandingClosing']);
   });
 
   it('is served in both languages', () => {
@@ -19,19 +19,18 @@ describe('the landing page', () => {
     expect(sourcesOf(PAGE).join('\n')).not.toContain('wrap-wide');
   });
 
-  it('changes tab without script', () => {
-    expect(read('components/Tabs.astro')).not.toContain('<script');
+  it('progressively enhances the film journey with a scroll controller', () => {
+    expect(read('components/Tabs.astro')).toContain('setupJourney');
+    expect(read('components/Tabs.astro')).not.toMatch(/<article[^>]*\shidden[=>\s]/);
   });
 
   it('has one heading style: every section with a title card takes it from Head (the hero and the closing call set their own display type)', () => {
     for (const file of ['Tabs', 'Community', 'Bento']) expect(read(`components/${file}.astro`), file).toContain("import Head from './Head.astro'");
   });
 
-  it('sends the hero field to the sign-up address, without script', () => {
+  it('links directly to sign-up and the demonstration, without script', () => {
     const hero = read('components/Hero.astro');
-    expect(hero).toContain('<form');
-    expect(hero).toContain('method="get"');
-    expect(hero).toContain('name="prompt"');
+    expect(hero).toContain('href="#film"');
     expect(hero).toContain("signUp");
     expect(hero).not.toContain('<script');
   });

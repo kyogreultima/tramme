@@ -1,82 +1,109 @@
 ---
-// What Tramme does, in one frame: a row of choices (Studio, Atelier, Assistant,
-// Packs, Export) and under it the picture and the sentence of the one chosen.
-// Radio inputs and CSS, no script: the arrow keys move from one to the next,
-// and without CSS every picture simply follows the last. Only the picture
-// shown loads (the others are lazy and not displayed). The rules that tie a
-// choice to its panel are written from the list (lib/features.ts), so the list
-// can change without this file.
+// The initial HTML is a readable sequence. The small journey controller adds
+// a sticky picture and advances it as each waypoint crosses the viewport.
 import { Image } from 'astro:assets';
 import ArrowRight from '@phosphor-icons/core/assets/regular/arrow-right.svg';
 import Head from './Head.astro';
-import Shot from './Shot.astro';
-import { FEATURES, PILLARS, wordsOf } from '../lib/features';
+import { FEATURES, wordsOf } from '../lib/features';
 import { pathIn, t, type Locale } from '../lib/i18n';
 
 interface Props { locale: Locale }
 const { locale } = Astro.props;
-// the landing shows the four pillars; the features page details them all
-const pillars = PILLARS.map((id) => FEATURES.find((f) => f.id === id)!);
-
-const rules = pillars.map(({ id }) => [
-  `.tabs > #tab-${id}:checked ~ .bar label[for='tab-${id}'] { color: var(--ink); }`,
-  `.tabs > #tab-${id}:focus-visible ~ .bar label[for='tab-${id}'] { outline: 2px solid var(--accent-text); outline-offset: 2px; }`,
-  `.tabs > #tab-${id}:checked ~ .panels [data-panel='${id}'] { display: grid; }`,
-].join('\n')).join('\n');
 ---
 
-<section class="section" id="product">
+<section class="journey" id="product" data-journey>
   <div class="wrap">
-    <Head title={t(locale, 'landing.pillars.title')} more={t(locale, 'landing.pillars.more')} />
-    <div class="tabs" role="radiogroup" aria-label={t(locale, 'landing.pillars.label')}>
-      {pillars.map(({ id }, i) => <input class="sr" type="radio" name="feature" id={`tab-${id}`} checked={i === 0} />)}
-      <div class="bar">
-        {pillars.map((f) => <label for={`tab-${f.id}`}>{wordsOf(f, locale).name}</label>)}
+    <div class="track" data-track style={`--steps: ${FEATURES.length}`}>
+      <div class="sticky" data-sticky>
+        <div class="direction">
+          <span class="section-label">{t(locale, 'nav.product')}</span>
+          <Head title={t(locale, 'landing.pillars.title')} />
+          <a class="btn btn-ghost overview" href={pathIn(locale, '/features/')}>{t(locale, 'landing.pillars.learn')}<ArrowRight aria-hidden="true" /></a>
+          <nav class="steps" aria-label={t(locale, 'landing.pillars.label')}>
+            {FEATURES.map((f, i) => <a class="step" data-step={f.id} href={`#film-${f.id}`}>
+              <span class="step-name"><span class="step-number">{String(i + 1).padStart(2, '0')}</span>{wordsOf(f, locale).name}</span>
+              <span class="step-line">{wordsOf(f, locale).line}</span>
+            </a>)}
+          </nav>
+        </div>
+        <div class="panels">
+          {FEATURES.map((f) => {
+            const { name, line, alt } = wordsOf(f, locale);
+            const src = 'shot' in f.picture ? f.picture.shot[1] : f.picture.still;
+            return <article class="panel" id={`film-${f.id}`} data-panel={f.id} aria-labelledby={`film-title-${f.id}`}>
+              <div class:list={['picture', `picture-${f.id}`]}>
+                <Image src={src} alt={alt} widths={[640, 960, 1440, 1920]} sizes="(max-width: 800px) 92vw, 66vw" loading="lazy" decoding="async" />
+              </div>
+              <div class="caption">
+                <div><h3 id={`film-title-${f.id}`}>{name}</h3><p>{line}</p></div>
+                <a href={pathIn(locale, `/features/#${f.id}`)} aria-label={t(locale, 'landing.pillars.moreAbout', { name })}><ArrowRight aria-hidden="true" /></a>
+              </div>
+            </article>;
+          })}
+        </div>
       </div>
-      <div class="panels">
-        {pillars.map((f) => {
-          const { name, line, alt } = wordsOf(f, locale);
-          const { id, picture } = f;
-          return (
-          <div class="panel" data-panel={id}>
-            {'shot' in picture
-              ? <Shot light={picture.shot[0]} dark={picture.shot[1]} alt={alt} />
-              : <Image class="still" src={picture.still} alt={alt} widths={[800, 1280, 1760]} sizes="(max-width: 1280px) 100vw, 1280px" loading="lazy" decoding="async" />}
-            <div class="words">
-              <p>{line}</p>
-              <a class="more" href={pathIn(locale, `/features/#${id}`)} aria-label={t(locale, 'landing.pillars.moreAbout', { name })}>{t(locale, 'landing.pillars.learn')}<ArrowRight aria-hidden="true" /></a>
-            </div>
-          </div>
-          );
-        })}
+      <div class="waypoints" data-waypoints aria-hidden="true">
+        {FEATURES.map((f) => <div data-waypoint={f.id}></div>)}
       </div>
     </div>
   </div>
 </section>
 
-<style is:inline set:html={rules}></style>
+<script>
+  import { setupJourney } from '../lib/journey';
+  for (const root of document.querySelectorAll<HTMLElement>('[data-journey]')) setupJourney(root);
+</script>
 
 <style>
-  /* the names are the controls: large type on the left, the picture they choose on the right */
-  .tabs { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 8fr); gap: clamp(24px, 4vw, 72px); align-items: start; }
-  .sr { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
-  .bar { display: grid; gap: 4px; position: sticky; top: calc(var(--nav) + 24px); }
-  label { display: block; padding-block: 2px; font-family: var(--font-head); font-size: clamp(2.5rem, 5.6vw, 5.5rem); font-weight: 700; line-height: 1; letter-spacing: -0.035em; color: var(--ink-3); cursor: pointer; transition: color 0.25s var(--ease); }
-  label:hover { color: var(--ink-2); }
-  .panels { min-width: 0; }
-  .panel { display: none; gap: 24px; }
-  .panel > :global(.shot), .panel > :global(.still) { width: 100%; }
-  /* the stills take the screenshots' shape, so the frame keeps its height from one choice to the next */
-  .panel :global(.still) { aspect-ratio: 16 / 10; object-fit: cover; border-radius: var(--r-lg); box-shadow: var(--lift); }
-  .panel :global(.shot) { border-radius: var(--r-lg); }
-  .words { display: grid; justify-items: start; gap: 12px; }
-  .words p { max-width: 34rem; font-size: clamp(1.0625rem, 1.5vw, 1.3125rem); line-height: 1.5; color: var(--ink-2); }
-  .more { display: inline-flex; align-items: center; gap: 6px; color: var(--accent-text); font-size: 1rem; font-weight: 500; text-decoration: none; }
-  .more :global(svg) { width: 16px; height: 16px; transition: transform 0.2s var(--ease); }
-  .more:hover :global(svg) { transform: translateX(3px); }
-  @media (max-width: 960px) {
-    .tabs { grid-template-columns: minmax(0, 1fr); }
-    .bar { position: static; display: flex; flex-wrap: wrap; gap: 4px 20px; }
-    label { font-size: clamp(2rem, 9vw, 3rem); }
+  .journey { padding-top: 32px; }
+  .track { position: relative; border-top: 1px solid var(--line); }
+  .sticky { display: grid; grid-template-columns: minmax(0, 0.85fr) minmax(0, 2fr); gap: clamp(32px, 5vw, 80px); padding-block: 40px; }
+  .direction { padding-top: 4px; }
+  .section-label { display: block; margin-bottom: 28px; font-size: 0.6875rem; color: var(--ink-2); }
+  .direction :global(.head) { margin-bottom: 24px; }
+  .direction :global(.head h2) { max-width: 13ch; font-size: clamp(1.75rem, 2.7vw, 3rem); }
+  .overview { margin-bottom: 36px; }
+  .steps { display: grid; }
+  .step { display: block; padding-block: 13px; border-top: 1px solid var(--line); color: var(--ink-3); text-decoration: none; }
+  .step-name { display: flex; align-items: center; gap: 12px; font-size: 0.9375rem; }
+  .step-number { width: 18px; font-size: 0.625rem; opacity: 0.6; }
+  .step-line { display: none; max-width: 31ch; margin-top: 12px; font-size: 0.8125rem; line-height: 1.5; color: var(--ink-2); }
+  .step:hover, .step[aria-current] { color: var(--ink); }
+  .step[aria-current] .step-line { display: block; }
+  .panels { min-width: 0; display: grid; gap: 48px; }
+  .panel { scroll-margin-top: 100px; }
+  .panel[hidden] { display: none; }
+  .picture { display: grid; align-items: center; aspect-ratio: 1.35; padding: 28px; background: var(--panel); border-radius: var(--r); overflow: hidden; }
+  .picture :global(img) { width: 100%; height: auto; border-radius: 4px; }
+  .picture-assistant, .picture-packs, .picture-render { padding: 0; }
+  .picture-assistant :global(img), .picture-packs :global(img), .picture-render :global(img) { height: 100%; object-fit: cover; }
+  .caption { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-top: 18px; }
+  .caption h3 { font-size: 1rem; }
+  .caption p { max-width: 55ch; margin-top: 6px; font-size: 0.8125rem; color: var(--ink-2); }
+  .caption a { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border: 1px solid var(--line-2); border-radius: 50%; }
+  .caption :global(svg) { width: 16px; height: 16px; }
+  .waypoints { display: none; }
+  .is-enhanced .track { min-height: calc(var(--steps) * 95svh); }
+  .is-enhanced .sticky { position: sticky; top: var(--nav); align-items: center; min-height: calc(100svh - var(--nav)); padding-block: 24px; }
+  .is-enhanced .waypoints { position: absolute; inset: 0; z-index: -1; display: grid; grid-template-rows: repeat(var(--steps), 1fr); pointer-events: none; }
+  .is-enhanced .picture { max-height: calc(100svh - var(--nav) - 135px); }
+  @media (max-width: 800px) {
+    .sticky { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+    .section-label { margin-bottom: 18px; }
+    .direction :global(.head h2) { max-width: 24ch; font-size: 2rem; }
+    .direction :global(.head) { margin-bottom: 16px; }
+    .overview { display: none; }
+    .steps { display: flex; flex-wrap: wrap; gap: 4px 20px; }
+    .step { padding-block: 8px; border-top: 0; }
+    .step-name { font-size: 0.8125rem; gap: 6px; }
+    .step-number { display: none; }
+    .step-line, .step[aria-current] .step-line { display: none; }
+    .step[aria-current] { box-shadow: 0 1px 0 currentColor; }
+    .picture { aspect-ratio: 1.4; padding: 12px; }
+    .picture-assistant, .picture-packs, .picture-render { padding: 0; }
+    .is-enhanced .sticky { align-content: center; gap: 20px; }
+    .is-enhanced .picture { max-height: calc(100svh - var(--nav) - 290px); }
+    .caption { margin-top: 12px; }
+    .caption p { font-size: 0.75rem; }
   }
 </style>

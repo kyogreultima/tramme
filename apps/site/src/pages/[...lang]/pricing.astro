@@ -19,10 +19,12 @@ const locale = localeOf(Astro.url.pathname);
 
 <Page title={t(locale, 'pricing.metaTitle')} description={t(locale, 'pricing.metaDescription')}>
   <PageHead title={t(locale, 'pricing.title')} lead={t(locale, 'pricing.lead')} />
+  <div class="pricing-sheet">
   <section class="wrap plans">
     <Plans locale={locale} />
     <p class="key">{t(locale, 'pricing.key')}</p>
   </section>
+  </div>
   <section class="section" id="compare">
     <div class="wrap">
       <Head title={t(locale, 'plans.compare')} more={t(locale, 'pricing.compareMore')} />

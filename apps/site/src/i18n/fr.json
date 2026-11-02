@@ -47,6 +47,10 @@
     "more": "Ce qu'on demande avant de commencer."
   },
   "common": {
+    "skip": "Aller au contenu",
+    "viewRepo": "Voir sur GitHub",
+    "downloadApp": "Télécharger l’application",
+    "downloadFor": "Télécharger pour {system}",
     "logIn": "Se connecter",
     "startFree": "Commencer gratuitement",
     "light": "Clair",
@@ -55,6 +59,25 @@
     "french": "Français",
     "free": "Gratuit",
     "perMonth": "par mois"
+  },
+  "notFound": {
+    "title": "Cette page est sortie du cadre.",
+    "more": "L’adresse a peut-être changé. Reprenez votre film depuis l’accueil ou explorez la communauté.",
+    "home": "Retour à l’accueil",
+    "explore": "Explorer les films"
+  },
+  "source": {
+    "title": "Code disponible, utilisation gratuite.",
+    "more": "Lisez-le, modifiez-le, lancez-le dans le navigateur, sur votre ordinateur ou votre propre serveur. Seul un produit concurrent est exclu.",
+    "layers": "types de calques",
+    "effects": "effets",
+    "modifiers": "modificateurs",
+    "formats": "formats d’export",
+    "languages": "langues d’interface",
+    "systems": "systèmes de bureau",
+    "copy": "Copier la commande",
+    "copied": "Copié",
+    "failed": "Échec de la copie : sélectionnez le texte"
   },
   "plans": {
     "name": {
@@ -91,7 +114,8 @@
     "hero": {
       "title": "Le motion design,",
       "quiet": "dirigé avec des mots.",
-      "more": "Décrivez votre film, gardez les prises qui vous plaisent, affinez chaque image clé dans l'atelier.",
+      "more": "Décrivez votre film. Dirigez chaque prise. Affinez chaque image.",
+      "watch": "Voir Tramme en action",
       "field": "Décrivez votre film",
       "placeholder": "Décrivez votre film…",
       "send": "Faire mon film",
@@ -124,10 +148,24 @@
       "learn": "En savoir plus",
       "moreAbout": "En savoir plus sur {name}"
     },
+    "showcase": {
+      "label": "Fait avec Tramme",
+      "title": "Des premiers mots à la dernière image.",
+      "more": "Le film prend forme dans le studio. Chaque détail reste entre vos mains dans l'atelier.",
+      "directionTitle": "Une indication. Une nouvelle prise.",
+      "direction": "Décrivez le rythme, l'ambiance, le moment que vous avez en tête. Laissez une note sur l'image et gardez les prises qui vous plaisent.",
+      "controlTitle": "Votre film, jusqu'à la dernière image clé.",
+      "control": "Passez du studio à l'atelier sur le même projet. Ajustez un calque, façonnez une courbe, changez le rythme. Votre travail vous suit."
+    },
+    "materials": {
+      "title": "Les outils de votre film. Un seul endroit pour le créer."
+    },
     "community": {
       "title": "Explorez l'intérieur de chaque projet.",
       "more": "Ouvrez un film fait avec Tramme et voyez comment il est construit, calque par calque.",
-      "all": "Explorer la communauté"
+      "all": "Explorer la communauté",
+      "invite": "Pour celles et ceux qui font bouger les choses.",
+      "inviteMore": "Tramme réunit la réalisation et l'animation dans un même projet. Partez d'une idée, explorez un film et faites-en le vôtre."
     },
     "platform": {
       "title": "Une plateforme autour du film.",

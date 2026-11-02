@@ -1,12 +1,14 @@
 ---
-// The landing page, in both languages: the hero with its field, the pillars,
-// the community, the platform, the closing call.
+// The reference-led landing, in both languages: textile hero, scroll journey,
+// demonstration, tools, platform, community and closing call.
 import Page from '../../components/Page.astro';
 import Hero from '../../components/Hero.astro';
 import Tabs from '../../components/Tabs.astro';
+import Showcase from '../../components/Showcase.astro';
+import Materials from '../../components/Materials.astro';
 import Community from '../../components/Community.astro';
 import Bento from '../../components/Bento.astro';
-import Closing from '../../components/Closing.astro';
+import LandingClosing from '../../components/LandingClosing.astro';
 import { landingData } from '../../lib/site';
 import { previewUrl } from '../../lib/preview';
 import { localeOf, localePaths, t } from '../../lib/i18n';
@@ -20,11 +22,13 @@ const systems = [...new Set(__RELEASE__?.installers.map((i) => SYSTEMS[i.os]))];
 const data = landingData(Astro.site!, previewUrl(Astro.site), systems, locale);
 ---
 
-<Page title={t(locale, 'landing.metaTitle')} description={t(locale, 'landing.metaDescription')}>
+<Page landing title={t(locale, 'landing.metaTitle')} description={t(locale, 'landing.metaDescription')}>
   <script is:inline slot="head" type="application/ld+json" set:html={JSON.stringify(data)} />
   <Hero locale={locale} />
   <Tabs locale={locale} />
-  <Community locale={locale} />
+  <Showcase locale={locale} />
+  <Materials locale={locale} />
   <Bento locale={locale} />
-  <Closing locale={locale} />
+  <Community locale={locale} />
+  <LandingClosing locale={locale} />
 </Page>

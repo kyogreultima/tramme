@@ -1,0 +1,39 @@
+---
+import { Image } from 'astro:assets';
+import { FEATURES, wordsOf } from '../lib/features';
+import { pathIn, t, type Locale } from '../lib/i18n';
+interface Props { locale: Locale }
+const { locale } = Astro.props;
+---
+<section class="materials wrap">
+  <div class="intro">
+    <span class="section-label">{t(locale, 'nav.features')}</span>
+    <h2>{t(locale, 'landing.materials.title')}</h2>
+    <p>{t(locale, 'landing.pillars.more')}</p>
+    <a class="btn btn-ghost" href={pathIn(locale, '/features/')}>{t(locale, 'landing.pillars.learn')}</a>
+  </div>
+  <ul class="collection" role="list">
+    {FEATURES.map((f) => <li>
+      <a href={pathIn(locale, `/features/#${f.id}`)}>
+        <div class={`tile tile-${f.id}`}><Image src={'shot' in f.picture ? f.picture.shot[1] : f.picture.still} alt="" widths={[320, 640]} sizes="(max-width: 600px) 55vw, 20vw" loading="lazy" /></div>
+        <span class="name">{wordsOf(f, locale).name}</span>
+      </a>
+    </li>)}
+  </ul>
+</section>
+<style>
+  .materials { padding-top: 36px; padding-bottom: var(--section); }
+  .intro { border-top: 1px solid var(--line); padding-top: 28px; }
+  .section-label { font-size: 0.6875rem; color: var(--ink-2); }
+  h2 { max-width: 19ch; margin-top: 32px; font-size: clamp(2rem, 3.6vw, 3.7rem); }
+  .intro p { max-width: 36ch; margin-top: 20px; font-size: 0.875rem; color: var(--ink-2); }
+  .intro > a { margin-top: 24px; }
+  .collection { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; margin: 64px 0 0; padding: 0; list-style: none; }
+  .collection a { text-decoration: none; }
+  .tile { aspect-ratio: 0.83; overflow: hidden; border-radius: var(--r); background: var(--panel); }
+  .tile :global(img) { width: 100%; height: 100%; object-fit: cover; transition: transform 0.5s var(--ease); }
+  .tile-studio :global(img), .tile-editor :global(img) { object-position: 54% center; }
+  a:hover .tile :global(img) { transform: scale(1.04); }
+  .name { display: block; margin-top: 14px; font-size: 0.8125rem; color: var(--ink-2); }
+  @media (max-width: 600px) { .collection { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 16px; margin-top: 36px; scroll-snap-type: x mandatory; } .collection li { flex: 0 0 55%; scroll-snap-align: start; } }
+</style>

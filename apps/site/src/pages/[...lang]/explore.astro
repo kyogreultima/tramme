@@ -19,7 +19,7 @@ const projects = await listProjects({ sort: 'recent' });
   <PageHead title={t(locale, 'explore.title')} lead={t(locale, 'explore.lead')} />
   <section class="wrap list">
     {projects.length > 0
-      ? <div class="grid">{projects.map((project) => <ProjectCard project={project} locale={locale} />)}</div>
+      ? <div class="grid gallery">{projects.map((project) => <ProjectCard project={project} locale={locale} />)}</div>
       : <p class="none">{t(locale, 'card.empty')}</p>}
   </section>
   <Closing locale={locale} />

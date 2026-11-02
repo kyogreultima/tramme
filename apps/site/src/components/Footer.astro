@@ -1,13 +1,16 @@
 ---
 import LanguageChoice from './LanguageChoice.astro';
 import ThemeChoice from './ThemeChoice.astro';
+import Brand from './Brand.astro';
 import { footerColumns } from '../lib/nav';
 import { localeOf, t } from '../lib/i18n';
 
 const locale = localeOf(Astro.url.pathname);
+interface Props { landing?: boolean }
+const { landing = false } = Astro.props;
 ---
 
-<footer class="foot screen">
+<footer class="foot screen foot-reference">
   <div class="bleed">
     <nav class="cols" aria-label={t(locale, 'footer.label')}>
       {footerColumns(locale).map((menu) => (
@@ -17,11 +20,12 @@ const locale = localeOf(Astro.url.pathname);
         </section>
       ))}
     </nav>
+    <div class="signature"><Brand /></div>
     <div class="bottom">
       <p class="legal">{t(locale, 'footer.copyright')}</p>
       <div class="choices">
         <LanguageChoice />
-        <ThemeChoice />
+        {!landing && <ThemeChoice />}
       </div>
     </div>
   </div>

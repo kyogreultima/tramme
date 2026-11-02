@@ -47,6 +47,10 @@
     "more": "The things people ask before they start."
   },
   "common": {
+    "skip": "Skip to content",
+    "viewRepo": "View on GitHub",
+    "downloadApp": "Download the app",
+    "downloadFor": "Download for {system}",
     "logIn": "Log in",
     "startFree": "Start for free",
     "light": "Light",
@@ -55,6 +59,25 @@
     "french": "Français",
     "free": "Free",
     "perMonth": "per month"
+  },
+  "notFound": {
+    "title": "This page has left the frame.",
+    "more": "The address may have changed. Pick up your film from the home page or explore the community.",
+    "home": "Back to home",
+    "explore": "Explore the films"
+  },
+  "source": {
+    "title": "Source available, free to use.",
+    "more": "Read it, change it, run it in the browser, on your desktop or on your own server. Only a competing product is off limits.",
+    "layers": "layer types",
+    "effects": "effects",
+    "modifiers": "modifiers",
+    "formats": "export formats",
+    "languages": "interface languages",
+    "systems": "desktop systems",
+    "copy": "Copy the command",
+    "copied": "Copied",
+    "failed": "Copy failed: select the text instead"
   },
   "plans": {
     "name": {
@@ -91,7 +114,8 @@
     "hero": {
       "title": "Motion design,",
       "quiet": "directed in words.",
-      "more": "Describe your film, keep the takes you like, refine every keyframe in the atelier.",
+      "more": "Describe your film. Direct every take. Refine every frame.",
+      "watch": "Watch Tramme in action",
       "field": "Describe your film",
       "placeholder": "Describe your film…",
       "send": "Make my film",
@@ -124,10 +148,24 @@
       "learn": "Learn more",
       "moreAbout": "Learn more about {name}"
     },
+    "showcase": {
+      "label": "Made with Tramme",
+      "title": "From the first words to the final frame.",
+      "more": "A film takes shape in the studio. Every detail stays yours to change in the atelier.",
+      "directionTitle": "A little direction. A new take.",
+      "direction": "Describe the rhythm, the mood, the moment you have in mind. Leave a note on the picture and keep the takes that feel right.",
+      "controlTitle": "Your film, down to the last keyframe.",
+      "control": "Move between the studio and the atelier on the same project. Adjust a layer, shape a curve, change the timing. Your work follows you."
+    },
+    "materials": {
+      "title": "The tools your film needs. One place to make it."
+    },
     "community": {
       "title": "Explore the inside of every project.",
       "more": "Open a film made with Tramme and see how it is built, layer by layer.",
-      "all": "Explore the community"
+      "all": "Explore the community",
+      "invite": "Built for the people who make things move.",
+      "inviteMore": "Tramme brings direction and animation into the same project. Start with an idea, look inside a film, and make it your own."
     },
     "platform": {
       "title": "A platform around the film.",

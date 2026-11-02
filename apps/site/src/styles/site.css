@@ -1,110 +1,162 @@
-/* The site's own identity, over the shared tokens (theme.css): loaded by the
-   site's pages only (layouts/Base.astro), never by the docs.
-
-   The page is a cinema and a desk. "Screen" sections are always dark and run
-   edge to edge: the films are what you look at there. "Paper" sections follow
-   the visitor's theme. Headlines are left-aligned, very large and tight, in a
-   display face of their own; the accent is the brand's teal, and one block
-   (the closing call) is filled with it. No gradient, no glow. */
-
+/* Reference-led website: fine rules, editorial type, orange actions and
+   the white navigation. Component layouts adapt to their actual content. */
 :root {
-  --font-head: var(--font-display), var(--font-sans), system-ui, sans-serif;
-  --r: 18px;
-  --r-lg: 32px;
-  --nav: 72px;
-  --section: clamp(88px, 11vw, 168px);
-  --max: 1440px;
-  --gutter: clamp(20px, 4vw, 64px);
-  /* the films are black and teal: the paper is a pale teal-grey, the ink its own deep green-black */
-  --bg: #e5eeec;
-  --panel: #f6faf9;
-  --panel-2: #edf4f2;
-  --field: #d6e2df;
-  --ink: #051211;
-  --ink-2: #2b4140;
-  --ink-3: #46605d;
-  --accent: #0a7c71;
-  --accent-2: #086a61;
-  --accent-text: #066358;
-  --screen: #040a0a;
-  --on-screen: #e8f3f1;
-  --signal: #f2b24a;
+  --font-head: var(--font-sans), system-ui, sans-serif;
+  --r: 6px;
+  --r-lg: 8px;
+  --r-sm: 4px;
+  --nav: 76px;
+  --section: clamp(64px, 8vw, 112px);
+  --gutter: clamp(20px, 2.7vw, 48px);
+  --max: 1600px;
+  --gap: 20px;
 }
-:root[data-theme='dark'] {
-  --bg: #060d0d;
-  --panel: #0e1817;
-  --panel-2: #142120;
-  --field: #1b2b29;
-  --ink: #e8f3f1;
-  --ink-2: #b3c7c4;
-  --ink-3: #8aa19d;
-  --accent: #34d6c3;
-  --accent-2: #5ee3d3;
-  --accent-text: #34d6c3;
-}
-
-h1, h2, h3, .display { font-family: var(--font-head); }
-h1, h2, .display { font-weight: 700; letter-spacing: -0.035em; }
-.display { font-size: clamp(3.25rem, 11.5vw, 12rem); line-height: 0.9; letter-spacing: -0.04em; }
-
-/* a section that is always dark, whatever the theme: the films' own ground */
+h1, h2, h3, .display { font-family: var(--font-head); font-weight: 400; letter-spacing: -0.045em; }
+h1, h2, .display { line-height: 1.08; }
+.display { font-size: clamp(3rem, 6vw, 6.5rem); }
 .screen {
-  --bg: var(--screen);
-  --panel: #0c1615;
-  --panel-2: #121f1e;
-  --field: #1a2a28;
-  --ink: var(--on-screen);
-  --ink-2: #b9cecb;
-  --ink-3: #8fa8a4;
-  --line: rgba(232, 243, 241, 0.12);
-  --line-2: rgba(232, 243, 241, 0.24);
-  --hover: rgba(232, 243, 241, 0.08);
-  --accent: #34d6c3;
-  --accent-2: #5ee3d3;
-  --accent-ink: #021412;
-  --accent-text: #34d6c3;
   color-scheme: dark;
-  background: var(--bg);
-  color: var(--ink);
+  --bg: #151914; --panel: #1d221c; --panel-2: #242a22; --field: #2a3028;
+  --ink: #f0f1e9; --ink-2: #bdc1b5; --ink-3: #a4ab9c;
+  --line: #ffffff14; --line-2: #ffffff30; --hover: #ffffff0a;
+  --accent-text: #ff954f;
+  background: var(--bg); color: var(--ink);
 }
-
-/* a section filled with the accent: its text is the ink of the page */
-.filled {
-  --bg: #3be0cb;
-  --ink: #021412;
-  --ink-2: #06312d;
-  --ink-3: #06312d;
-  --line-2: rgba(2, 20, 18, 0.4);
-  --hover: rgba(2, 20, 18, 0.08);
-  --accent: #021412;
-  --accent-2: #000;
-  --accent-ink: #e8f3f1;
-  --accent-text: #021412;
-  background: var(--bg);
-  color: var(--ink);
-}
-
-/* a second ground, the amber of the films' own palette (the assistant's circles) */
-.signal {
-  --bg: var(--signal);
-  --ink: #1b1100;
-  --ink-2: #3a2700;
-  --ink-3: #3a2700;
-  --line-2: rgba(27, 17, 0, 0.4);
-  --accent: #1b1100;
-  --accent-ink: #fff6e3;
-  --accent-text: #1b1100;
-  background: var(--bg);
-  color: var(--ink);
-}
-
-/* full width: the container's gutter, nothing more */
-.bleed { width: 100%; padding-inline: var(--gutter); }
+.filled, .signal { background: var(--panel-2); color: var(--ink); }
+.bleed { width: 100%; max-width: var(--max); margin-inline: auto; padding-inline: var(--gutter); }
 .wrap { max-width: var(--max); }
-
-.btn { height: 52px; padding: 0 26px; font-size: 1rem; }
-.btn-sm { height: 40px; padding: 0 18px; font-size: 0.9375rem; }
-
-/* the page ends on a block of its own (the closing call, the footer): no gap between */
+.btn { height: 40px; padding-inline: 16px; border-radius: 4px; font-size: 0.875rem; font-weight: 500; }
+.btn-sm { height: 32px; padding-inline: 12px; font-size: 0.75rem; }
+.surface { border-radius: var(--r); box-shadow: none; }
+:root[data-theme='dark'] .surface { box-shadow: none; }
 main { padding-bottom: var(--section); }
-main:has(> :last-child.filled) { padding-bottom: 0; }
+main:has(> :last-child.closing) { padding-bottom: 0; }
+body.site:not(.landing) main { padding-top: 64px; }
+section[id], article[id] { scroll-margin-top: calc(var(--nav) + 24px); }
+.skip { position: fixed; top: 12px; left: 24px; z-index: 30; transform: translateY(-160%); padding: 10px 18px; background: var(--accent); color: var(--accent-ink); border-radius: var(--r); }
+.skip:focus { transform: none; }
+
+/* The page introduction gives interior pages the same editorial hierarchy. */
+body.site .page-head { position: relative; padding-top: clamp(56px, 7vw, 96px); padding-bottom: clamp(40px, 5vw, 64px); }
+body.site .page-head::after { content: ''; position: absolute; bottom: 0; left: var(--gutter); right: var(--gutter); height: 1px; background: var(--line-2); }
+body.site .page-head h1 { max-width: 20ch; font-size: clamp(2.75rem, 5.8vw, 6.2rem); line-height: 1.05; }
+body.site .page-head p { max-width: 52ch; font-size: clamp(1rem, 1.35vw, 1.125rem); line-height: 1.6; }
+body.site .page-head .eyebrow { color: var(--ink-3); font-size: 0.75rem; letter-spacing: 0; }
+body.site:not(.landing) .head h2 { max-width: 23ch; font-size: clamp(1.8rem, 3.2vw, 3.25rem); line-height: 1.1; }
+body.site:not(.landing) .head p { max-width: 50ch; font-size: 1rem; }
+body.site:not(.landing) .head { gap: 16px; margin-bottom: 32px; }
+
+/* Product: one continuous film with numbered, clearly separated chapters. */
+body[data-page='features'] .feature-index { display: flex; gap: 12px 28px; flex-wrap: wrap; padding-block: 24px; }
+.feature-index a { color: var(--ink-2); text-decoration: none; font-size: 0.875rem; }
+.feature-index a:hover { color: var(--accent-text); }
+body[data-page='features'] main > .section { padding-top: var(--section); }
+body[data-page='features'] main > .section > .wrap:first-child { border-top: 1px solid var(--line-2); padding-top: 28px; }
+body[data-page='features'] #studio .shot, body[data-page='features'] #editor .shot { padding: clamp(12px, 3vw, 44px); background: var(--panel-2); }
+body.site .cards { gap: 0 32px; }
+body.site .cards > li { padding: 28px 0; border-top: 1px solid var(--line-2); border-radius: 0; background: transparent; }
+body.site .cards .icon { background: transparent; width: 28px; height: 28px; margin-bottom: 12px; color: var(--accent-text); }
+body.site .cards strong { font-weight: 500; }
+body.site .cards p { max-width: 45ch; color: var(--ink-2); }
+body.site #packs .more, body.site #inside .more, body.site #cloud .more { text-align: left; }
+body.site #tools .groups { border-radius: 0; background: transparent; padding-inline: 0; }
+body.site #tools .chips li { border-radius: 4px; background: var(--panel-2); }
+body.site .formats { gap: 0 28px; }
+body.site .formats > li { min-height: 152px; padding-inline: 0; border-top: 1px solid var(--line-2); border-radius: 0; background: transparent; }
+
+/* Pricing: a quiet paper panel and a single orange emphasis. */
+body[data-page='pricing'] .pricing-sheet {
+  --bg: var(--paper); --panel: var(--paper-card); --ink: var(--paper-ink);
+  --ink-2: var(--paper-muted); --ink-3: var(--paper-muted);
+  --line: var(--paper-line); --line-2: var(--paper-line); --hover: var(--paper-hover);
+  --accent-text: #a63b00;
+  background: var(--paper); color: var(--ink); padding-block: 44px 56px; margin-top: 40px;
+}
+body[data-page='pricing'] .pricing-sheet .plans { margin-top: 0; }
+body.site .plans > .switch { justify-self: start; border-radius: 4px; box-shadow: inset 0 0 0 1px var(--line-2); }
+body.site .switch label { border-radius: 3px; }
+body.site .plan { grid-template-rows: auto 3.2em 90px 40px 1fr; gap: 18px; border: 1px solid var(--line-2); background: transparent; }
+body.site .plan.featured { box-shadow: none; border-color: var(--accent); background: var(--accent-soft); }
+body.site .plan h3 { font-size: 1.5rem; }
+body.site .plan .price { align-content: center; }
+body.site .plan .price strong { font-size: clamp(2.8rem, 4vw, 4rem); font-weight: 400; }
+body.site .plan li { font-size: 0.875rem; }
+body.site #compare .frame { background: transparent; border-top: 1px solid var(--line-2); border-radius: 0; }
+body.site #compare thead { background: var(--panel-2); }
+body.site #faq > .wrap { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.5fr); gap: 48px; border-top: 1px solid var(--line-2); padding-top: 32px; }
+body.site #faq .list { max-width: none; width: 100%; margin: 0; gap: 0; }
+body.site #faq details { background: transparent; border-radius: 0; border-bottom: 1px solid var(--line-2); }
+body.site #faq summary { padding-inline: 0; font-weight: 400; }
+body.site #faq details p { padding-inline: 0; }
+
+/* Public films become editorial cards, with a clearly separate caption. */
+body.site:not(.landing) .card { height: auto; border-radius: var(--r); background: var(--panel); }
+body.site:not(.landing) .card .frame { height: auto; aspect-ratio: 16 / 10; overflow: hidden; }
+body.site:not(.landing) .card .by { position: static; background: transparent; backdrop-filter: none; color: var(--ink); min-height: 94px; }
+body.site:not(.landing) .card .name { color: var(--ink-3); }
+body.site:not(.landing) .card .avatar { background: var(--panel-2); }
+body.site:not(.landing) .card h3 { font-weight: 400; font-size: 1.125rem; }
+body[data-page='explore'] .gallery { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; }
+body[data-page='explore'] .gallery > .card:first-of-type { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); }
+body[data-page='explore'] .gallery > .card:first-of-type .by { align-content: center; padding: 32px; }
+body[data-page='explore'] .gallery > .card:first-of-type h3 { font-size: clamp(1.5rem, 2.6vw, 2.75rem); }
+body[data-page='project'] .project { padding-top: 48px; display: grid; grid-template-columns: minmax(0, 1.8fr) minmax(0, 1fr); align-items: start; gap: 24px 44px; }
+body[data-page='project'] .project .back { grid-column: 1 / -1; }
+body[data-page='project'] .project .words { padding-top: 8px; gap: 20px; }
+body[data-page='project'] .project .hint { display: block; margin-top: 16px; }
+body[data-page='project'] .project h1 { font-size: clamp(2.5rem, 3.8vw, 4rem); }
+body[data-page='project'] .project .description { font-size: 1rem; }
+
+/* Reading pages use an editorial column rather than large empty cards. */
+body:is([data-page='about'], [data-page='privacy'], [data-page='terms']) .prose { display: grid; grid-template-columns: minmax(0, 0.65fr) minmax(0, 1.4fr); max-width: 1120px; gap: 32px 64px; margin: 0; }
+body:is([data-page='about'], [data-page='privacy'], [data-page='terms']) .prose h2 { margin: 0; padding-top: 4px; font-size: 1.375rem; line-height: 1.3; }
+body:is([data-page='about'], [data-page='privacy'], [data-page='terms']) .prose p { grid-column: 2; max-width: 68ch; font-size: 1rem; line-height: 1.75; }
+body.site .review { border-radius: 4px; border-left: 2px solid var(--accent); background: var(--accent-soft); max-width: 1120px; margin: 0 0 32px; }
+body[data-page='about'] #source .panel { padding: 36px 0 0; border-top: 1px solid var(--line-2); border-radius: 0; background: transparent; }
+body[data-page='about'] #source .stats { margin: 0; max-width: none; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 28px; }
+body[data-page='about'] #source .stats div { align-items: start; padding: 0; }
+body[data-page='about'] #source .actions { justify-content: start; }
+body.site .clone { border-radius: 4px; }
+body[data-page='roadmap'] main > .section > .wrap { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.6fr); gap: 56px; border-top: 1px solid var(--line-2); padding-top: 28px; }
+body[data-page='roadmap'] .items { grid-template-columns: 1fr; gap: 0; }
+body[data-page='roadmap'] .items > li { padding: 24px 0; border-radius: 0; background: transparent; }
+body[data-page='roadmap'] .items > li + li { border-top: 1px solid var(--line); }
+body[data-page='roadmap'] .items h3 { font-size: 1.25rem; }
+
+/* Download keeps the real installer and release states next to the product. */
+body[data-page='download'] .download-preview { display: grid; grid-template-columns: minmax(0, 1.8fr) minmax(0, 1fr); align-items: center; gap: clamp(24px, 5vw, 80px); padding-top: 40px; }
+body[data-page='download'] .download-preview .shot { padding: 20px; background: var(--panel-2); }
+body[data-page='download'] .download-intro h2 { max-width: 18ch; font-size: clamp(1.8rem, 2.8vw, 3rem); }
+body[data-page='download'] .download-intro p { max-width: 42ch; margin-top: 18px; color: var(--ink-2); }
+body[data-page='download'] .download-intro a { margin-top: 24px; }
+body[data-page='download'] .systems { gap: 20px; }
+body[data-page='download'] .system { background: transparent; border-radius: 0; border: 0; border-top: 1px solid var(--line-2); padding-inline: 0; }
+body[data-page='download'] .system .yours { border-radius: 4px; }
+body[data-page='download'] .none { max-width: 64ch; padding: 24px; border-radius: var(--r); }
+body[data-page='404'] .not-found { padding-block: 40px 64px; display: flex; flex-wrap: wrap; gap: 12px; }
+body[data-page='404'] .page-head h1 { max-width: none; font-variant-numeric: tabular-nums; }
+
+/* Motion belongs to the film journey; reading pages stay still. */
+body.site:not(.landing) [data-reveal] { animation: none; }
+@media (max-width: 960px) {
+  body.site #faq > .wrap, body[data-page='roadmap'] main > .section > .wrap { grid-template-columns: 1fr; gap: 16px; }
+  body.site .plans .cards { max-width: none; }
+  body.site .plan { grid-template-rows: auto auto auto auto auto; }
+  body[data-page='project'] .project, body[data-page='download'] .download-preview { grid-template-columns: 1fr; }
+  body[data-page='project'] .project .words { max-width: 48rem; }
+  body[data-page='about'] #source .stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  body.site .page-head h1 { font-size: clamp(2.5rem, 10vw, 4rem); }
+  body.site .page-head p { font-size: 1rem; }
+  body.site .page-head { padding-top: 44px; gap: 20px; }
+  body:is([data-page='about'], [data-page='privacy'], [data-page='terms']) .prose { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  body:is([data-page='about'], [data-page='privacy'], [data-page='terms']) .prose h2 { margin-top: 24px; }
+  body:is([data-page='about'], [data-page='privacy'], [data-page='terms']) .prose p { grid-column: 1; }
+  body[data-page='explore'] .gallery { grid-template-columns: 1fr; }
+  body[data-page='explore'] .gallery > .card:first-of-type { display: block; }
+  body[data-page='explore'] .gallery > .card:first-of-type .by { padding: 16px; }
+  body[data-page='project'] .grid { grid-template-columns: 1fr; }
+  body[data-page='about'] #source .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) { :root { --nav: 64px; } body.site:not(.landing) main { padding-top: 52px; } }

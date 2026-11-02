@@ -1,8 +1,6 @@
 ---
-// Light or dark, chosen in the footer: two options only, because the
-// site is light first even for a visitor whose computer is dark. The choice is
-// kept under Starlight's 'starlight-theme' key (read by ThemeProvider.astro),
-// so it holds in the docs too. The only script of the footer.
+// Light or dark, chosen in the footer and remembered under the same key as
+// the documentation. The reference defaults to dark before a choice is made.
 import { localeOf, t } from '../lib/i18n';
 
 const locale = localeOf(Astro.url.pathname);

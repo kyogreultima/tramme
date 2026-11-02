@@ -1,0 +1,15 @@
+---
+import Page from '../../components/Page.astro';
+import PageHead from '../../components/PageHead.astro';
+import { localeOf, localePaths, pathIn, t } from '../../lib/i18n';
+export const getStaticPaths = localePaths;
+const locale = localeOf(Astro.url.pathname);
+---
+<Page title={`404 · ${t(locale, 'notFound.title')}`} description={t(locale, 'notFound.more')}>
+  <meta slot="head" name="robots" content="noindex" />
+  <PageHead title={`404. ${t(locale, 'notFound.title')}`} lead={t(locale, 'notFound.more')} />
+  <div class="wrap not-found">
+    <a class="btn btn-accent" href={pathIn(locale, '/')}>{t(locale, 'notFound.home')}</a>
+    <a class="btn btn-ghost" href={pathIn(locale, '/explore/')}>{t(locale, 'notFound.explore')}</a>
+  </div>
+</Page>

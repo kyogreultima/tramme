@@ -6,4 +6,7 @@ import Brand from '../Brand.astro';
 const { siteTitleHref } = Astro.locals.starlightRoute;
 ---
 
-<a href={siteTitleHref} class="site-title" aria-label="Tramme, docs home"><Brand /></a>
+<div class="docs-brand">
+  <a href="/" class="site-title" aria-label="Tramme, home"><Brand /></a>
+  <a href={siteTitleHref} class="docs-label">Docs</a>
+</div>

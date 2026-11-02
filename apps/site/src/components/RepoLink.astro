@@ -2,9 +2,11 @@
 // The repository, the same wherever it shows: a call to action, or quieter beside the app's
 import GithubLogo from '@phosphor-icons/core/assets/fill/github-logo-fill.svg';
 import { REPO } from '../lib/links';
+import { localeOf, t } from '../lib/i18n';
+const locale = localeOf(Astro.url.pathname);
 
 interface Props { small?: boolean; ghost?: boolean }
 const { small = false, ghost = false } = Astro.props;
 ---
 
-<a class:list={['btn', ghost ? 'btn-ghost' : 'btn-accent', { 'btn-sm': small }]} href={REPO}><GithubLogo aria-hidden="true" />View on GitHub</a>
+<a class:list={['btn', ghost ? 'btn-ghost' : 'btn-accent', { 'btn-sm': small }]} href={REPO}><GithubLogo aria-hidden="true" />{t(locale, 'common.viewRepo')}</a>

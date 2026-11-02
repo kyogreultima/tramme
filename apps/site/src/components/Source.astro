@@ -8,18 +8,20 @@ import DownloadLink from './DownloadLink.astro';
 import RepoLink from './RepoLink.astro';
 import { FORMATS } from '../lib/formats';
 import { REPO } from '../lib/links';
+import { localeOf, t } from '../lib/i18n';
+const locale = localeOf(Astro.url.pathname);
 
 // counted from the code, at build time
 const release = __RELEASE__;
 const LANGUAGES = Object.keys(import.meta.glob('../../../editor/src/i18n/*.json')).length;
 const STATS: [number, string][] = [
-  [NODES.length, 'layer types'],
-  [EFFECTS.length, 'effects'],
-  [BUILTIN_MODIFIERS.length, 'modifiers'],
-  [FORMATS.length, 'export formats'],
-  [LANGUAGES, 'interface languages'],
+  [NODES.length, t(locale, 'source.layers')],
+  [EFFECTS.length, t(locale, 'source.effects')],
+  [BUILTIN_MODIFIERS.length, t(locale, 'source.modifiers')],
+  [FORMATS.length, t(locale, 'source.formats')],
+  [LANGUAGES, t(locale, 'source.languages')],
   // the systems of the latest release, left out without one
-  ...(release ? [[new Set(release.installers.map((i) => i.os)).size, 'desktop systems'] as [number, string]] : []),
+  ...(release ? [[new Set(release.installers.map((i) => i.os)).size, t(locale, 'source.systems')] as [number, string]] : []),
 ];
 const CLONE = `git clone ${REPO}`;
 ---
@@ -27,7 +29,7 @@ const CLONE = `git clone ${REPO}`;
 <section class="section" id="source">
   <div class="wrap">
     <div class="panel surface">
-      <Head title="Source available, free to use." more="Read it, change it, run it in the browser, on your desktop or on your own server. Only a competing product is off limits." />
+      <Head title={t(locale, 'source.title')} more={t(locale, 'source.more')} />
       <dl class="stats" data-reveal>
         {STATS.map(([n, label]) => (
           <div><dt>{label}</dt><dd>{n}</dd></div>
@@ -36,7 +38,7 @@ const CLONE = `git clone ${REPO}`;
       <div class="actions" data-reveal>
         <div class="clone">
           <code>{CLONE}</code>
-          <button type="button" class="copy" data-copy={CLONE} aria-label="Copy the command">
+          <button type="button" class="copy" data-copy={CLONE} data-copy-label={t(locale, 'source.copy')} data-copied-label={t(locale, 'source.copied')} data-failed-label={t(locale, 'source.failed')} aria-label={t(locale, 'source.copy')}>
             <Copy class="i-copy" aria-hidden="true" />
             <Check class="i-check" aria-hidden="true" />
           </button>
@@ -54,10 +56,10 @@ const CLONE = `git clone ${REPO}`;
       try {
         await navigator.clipboard.writeText(b.dataset.copy!);
         b.dataset.done = '';
-        b.setAttribute('aria-label', 'Copied');
-        setTimeout(() => { delete b.dataset.done; b.setAttribute('aria-label', 'Copy the command'); }, 1600);
+        b.setAttribute('aria-label', b.dataset.copiedLabel!);
+        setTimeout(() => { delete b.dataset.done; b.setAttribute('aria-label', b.dataset.copyLabel!); }, 1600);
       } catch {
-        b.setAttribute('aria-label', 'Copy failed: select the text instead');
+        b.setAttribute('aria-label', b.dataset.failedLabel!);
       }
     });
   }

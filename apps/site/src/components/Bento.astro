@@ -1,52 +1,34 @@
 ---
-// The platform's cloud services as a bento grid: each tile a short sentence,
-// all leading to the features page.
-import Devices from '@phosphor-icons/core/assets/regular/devices.svg';
-import LockSimple from '@phosphor-icons/core/assets/regular/lock-simple.svg';
-import CloudArrowUp from '@phosphor-icons/core/assets/regular/cloud-arrow-up.svg';
-import ClosedCaptioning from '@phosphor-icons/core/assets/regular/closed-captioning.svg';
-import Shapes from '@phosphor-icons/core/assets/regular/shapes.svg';
+import { Image } from 'astro:assets';
 import Head from './Head.astro';
+import editor from '../assets/editor-dark.png';
+import textile from '../assets/hero-textile.png';
 import { pathIn, t, type Locale } from '../lib/i18n';
-
 interface Props { locale: Locale }
 const { locale } = Astro.props;
-// the columns each tile spans, out of six, and its ground: the films' dark, the paper, the amber, or the teal
-const TILES = [
-  { id: 'devices', Icon: Devices, span: 4, tone: 'screen' },
-  { id: 'visibility', Icon: LockSimple, span: 2, tone: 'signal' },
-  { id: 'export', Icon: CloudArrowUp, span: 2, tone: 'filled' },
-  { id: 'subtitles', Icon: ClosedCaptioning, span: 2, tone: 'surface' },
-  { id: 'packs', Icon: Shapes, span: 2, tone: 'screen' },
-];
+const items = ['devices', 'visibility', 'export'];
 ---
-
-<section class="section" id="platform">
-  <div class="bleed">
-    <Head title={t(locale, 'landing.platform.title')} more={t(locale, 'landing.platform.more')} />
-    <ul class="bento" role="list" data-reveal>
-      {TILES.map(({ id, Icon, span, tone }) => (
-        <li class={tone} style={`--span: ${span}`}>
-          <span class="icon"><Icon aria-hidden="true" /></span>
-          <div>
-            <h3><a href={pathIn(locale, '/features/#cloud')}>{t(locale, `landing.platform.${id}.title`)}</a></h3>
-            <p>{t(locale, `landing.platform.${id}.text`)}</p>
-          </div>
-        </li>
-      ))}
-    </ul>
+<section class="platform wrap" id="platform">
+  <span class="section-label">{t(locale, 'nav.cloud')}</span>
+  <Head title={t(locale, 'landing.platform.title')} more={t(locale, 'landing.platform.more')} />
+  <div class="desktop">
+    <Image class="backdrop" src={textile} alt="" widths={[800, 1600]} sizes="100vw" loading="lazy" />
+    <Image class="editor" src={editor} alt={t(locale, 'landing.hero.demo')} widths={[800, 1440, 1920]} sizes="(max-width: 800px) 85vw, 75vw" loading="lazy" />
   </div>
+  <ul class="details" role="list">
+    {items.map((id) => <li><h3>{t(locale, `landing.platform.${id}.title`)}</h3><p>{t(locale, `landing.platform.${id}.text`)}</p><a href={pathIn(locale, '/features/#cloud')}>{t(locale, 'landing.pillars.learn')}</a></li>)}
+  </ul>
 </section>
-
 <style>
-  .bento { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
-  li { position: relative; grid-column: span var(--span); display: grid; align-content: space-between; gap: 48px; min-height: clamp(260px, 26vw, 400px); padding: clamp(24px, 3vw, 44px); border-radius: var(--r-lg); background: var(--panel); color: var(--ink); }
-  li.screen, li.filled, li.signal { background: var(--bg); }
-  .icon { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 999px; box-shadow: inset 0 0 0 1px var(--line-2); }
-  .icon :global(svg) { width: 22px; height: 22px; }
-  h3 { max-width: 16ch; font-size: clamp(1.75rem, 3.2vw, 3.25rem); line-height: 1; letter-spacing: -0.045em; }
-  h3 a { color: inherit; text-decoration: none; }
-  h3 a::after { content: ''; position: absolute; inset: 0; border-radius: var(--r-lg); }
-  p { max-width: 28rem; margin-top: 14px; font-size: 1rem; line-height: 1.5; color: var(--ink-2); }
-  @media (max-width: 860px) { .bento { grid-template-columns: minmax(0, 1fr); } li { grid-column: auto; min-height: 0; } }
+  .platform { padding-top: 28px; padding-bottom: var(--section); border-top: 1px solid var(--line); }
+  .section-label { display: block; margin-bottom: 32px; font-size: 0.6875rem; color: var(--ink-2); }
+  .platform :global(.head p) { max-width: 42ch; }
+  .desktop { position: relative; display: grid; place-items: center; isolation: isolate; overflow: hidden; padding: clamp(24px, 6vw, 90px) clamp(20px, 8vw, 120px); border-radius: var(--r); }
+  .backdrop { position: absolute; inset: 0; z-index: -1; width: 100%; height: 100%; object-fit: cover; }
+  .editor { width: 100%; height: auto; border-radius: var(--r); box-shadow: var(--lift); }
+  .details { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 40px; list-style: none; margin: 32px 0 0; padding: 0; }
+  h3 { font-size: 0.9375rem; line-height: 1.3; }
+  .details p { max-width: 38ch; margin-top: 12px; font-size: 0.8125rem; color: var(--ink-2); }
+  .details a { display: inline-block; margin-top: 18px; color: var(--ink-2); font-size: 0.6875rem; text-underline-offset: 4px; }
+  @media (max-width: 600px) { .details { grid-template-columns: 1fr; gap: 28px; } .desktop { padding: 24px 12px; } }
 </style>

@@ -1,51 +1,88 @@
-/* The docs (Starlight) in the site's colors and fonts: Starlight's scale of
-   grays and its accent, drawn from theme.css. Starlight's own styles sit in
-   cascade layers, so these win without fighting over specificity. */
-
+/* The same visual family as the reference-led website, in a reading layout.
+   Starlight keeps its search, outline, mobile navigation and theme controls. */
 @import './theme.css';
 
 :root {
-  --sl-font: var(--font-sans);
-  --sl-font-mono: var(--font-mono);
-
-  --sl-color-accent-low: #0c3330;
+  --sl-font: var(--font-sans), sans-serif;
+  --sl-font-mono: var(--font-mono), monospace;
+  --sl-color-accent-low: #ff650b18;
   --sl-color-accent: var(--accent);
-  --sl-color-accent-high: #8ae6dc;
-
-  --sl-color-white: #f6f9fa;
+  --sl-color-accent-high: #ffc09a;
+  --sl-color-white: var(--ink);
   --sl-color-gray-1: var(--ink);
-  --sl-color-gray-2: #c4ced3;
+  --sl-color-gray-2: #cdd2c4;
   --sl-color-gray-3: var(--ink-2);
   --sl-color-gray-4: var(--ink-3);
-  --sl-color-gray-5: #263037;
+  --sl-color-gray-5: #3b4434;
   --sl-color-gray-6: var(--panel-2);
   --sl-color-black: var(--bg);
-
-  /* flat, like the landing page: the bars on the page's ground, hairlines between */
-  --sl-color-bg-nav: var(--bg);
+  --sl-color-bg-nav: #f8f9f3;
   --sl-color-bg-sidebar: var(--bg);
+  --sl-color-hairline: var(--line-2);
+  --sl-color-hairline-light: var(--line);
+  --sl-color-hairline-shade: var(--line-2);
+  --sl-content-width: 52rem;
+  --sl-sidebar-width: 17rem;
+  --sl-nav-height: 4.5rem;
+  --sl-text-h1: clamp(2.5rem, 4vw, 4.5rem);
 }
-
 :root[data-theme='light'] {
-  --sl-color-accent-low: #cdeee9;
-  --sl-color-accent-high: #065a52;
-
+  --sl-color-accent-low: #ff650b12;
+  --sl-color-accent-high: #a63b00;
   --sl-color-white: var(--ink);
-  --sl-color-gray-1: #1f2a30;
-  --sl-color-gray-2: #34424a;
+  --sl-color-gray-1: #303929;
+  --sl-color-gray-2: #48533f;
   --sl-color-gray-3: var(--ink-2);
-  --sl-color-gray-4: #84929a;
-  --sl-color-gray-5: #c9d2d7;
-  --sl-color-gray-6: #e4e9ec;
-  --sl-color-gray-7: var(--panel-2);
+  --sl-color-gray-4: #727e67;
+  --sl-color-gray-5: #c4cdba;
+  --sl-color-gray-6: var(--panel-2);
+  --sl-color-gray-7: var(--panel);
 }
-
 ::selection { background: var(--accent-soft); }
-
-/* the brand as on the landing page (Brand.astro, in components/docs/SiteTitle.astro) */
-.site-title { display: flex; align-items: center; font-size: 1.05rem; color: var(--ink); text-decoration: none; }
-
-/* the page you are on: a quiet tint, not a solid block */
+body { background: var(--bg); }
+header.header {
+  top: 10px; left: 10px; right: 10px; height: 52px; width: auto;
+  padding-block: 8px; padding-inline: 18px; border: 0; border-radius: 6px;
+  background: var(--sl-color-bg-nav); color: #20271e;
+  --brand-mark: #20271e; --brand-ink: #20271e;
+  --ink: #20271e; --ink-2: #30392c; --ink-3: #5c6656; --line-2: #20271e30; --hover: #20271e0a;
+}
+header.header .site-title { color: #20271e; font-size: 1rem; text-decoration: none; }
+header.header .social-icons a { color: #30392c; }
+header.header button[data-open-modal] { background: #eef0e8; color: #49523f; border: 1px solid #20271e26; border-radius: 4px; box-shadow: none; }
+header.header kbd { background: #ffffff; color: #49523f; border: 1px solid #20271e26; border-radius: 3px; }
+.sl-menu-button { color: #20271e; background: #f8f9f3; border-radius: 4px; box-shadow: none; top: 14px; }
+.sl-menu-button:has(~ :popover-open) { background: #e6eadd; }
+.site-title { display: flex; align-items: center; }
+.docs-brand { display: flex; align-items: center; gap: 16px; }
+.docs-label { color: #596252; font-size: 0.75rem; text-decoration: none; border-left: 1px solid #20271e30; padding-left: 16px; }
+h1, h2, h3, h4 { font-weight: 400; letter-spacing: -0.035em; }
+.content-panel { border-top-color: var(--line); }
+.content-panel:first-of-type { padding-top: 48px; padding-bottom: 32px; }
+.sl-markdown-content { line-height: 1.75; }
+.sl-markdown-content :is(h2, h3, h4) { line-height: 1.2; }
+.sl-markdown-content h2 { margin-top: 2.5rem; padding-top: 1.5rem; border-top: 1px solid var(--line-2); }
+.sl-markdown-content a:not(.not-content *) { text-underline-offset: 4px; }
+.sl-markdown-content :not(pre) > code { background: var(--panel-2); border-radius: 3px; padding: 0.15em 0.35em; }
+.expressive-code .frame { border-radius: 6px; box-shadow: none; }
+.sl-markdown-content table { font-size: 0.875rem; }
+.sl-markdown-content th { background: var(--panel-2); font-weight: 500; }
+.sl-markdown-content :is(th, td) { border-color: var(--line-2); padding: 12px 16px; }
+.sidebar-content { padding-top: 24px; }
+.sidebar-content a { border-radius: 4px; font-size: 0.8125rem; }
 .sidebar-content a[aria-current='page'],
 .sidebar-content a[aria-current='page']:hover,
 .sidebar-content a[aria-current='page']:focus { color: var(--accent-text); background-color: var(--accent-soft); }
+.sidebar-content summary { font-weight: 500; }
+.right-sidebar a { font-size: 0.75rem; }
+.right-sidebar a[aria-current='true'] { color: var(--accent-text); }
+mobile-starlight-toc nav { background: var(--bg); border-top-color: var(--line-2); }
+mobile-starlight-toc .toggle { border-radius: 4px; background: var(--panel-2); }
+.pagination-links a { border-radius: 6px; border-color: var(--line-2); box-shadow: none; }
+.pagination-links .link-title { font-weight: 400; }
+starlight-theme-select button, .theme { border-radius: 4px; }
+@media (max-width: 799px) {
+  header.header { top: 8px; left: 8px; right: 8px; height: 48px; padding-inline: 12px 64px; }
+  .content-panel:first-of-type { padding-top: 28px; }
+}
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }

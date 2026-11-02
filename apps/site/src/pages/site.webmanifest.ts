@@ -10,8 +10,8 @@ export const GET: APIRoute = () => Response.json({
   description: SITE.description,
   start_url: '/',
   display: 'browser',
-  background_color: '#0b0f12',
-  theme_color: '#0b0f12',
+  background_color: '#151914',
+  theme_color: '#151914',
   icons: [
     { src: '/icon.svg', sizes: 'any', type: 'image/svg+xml' },
     { src: '/icons/192.png', sizes: '192x192', type: 'image/png' },

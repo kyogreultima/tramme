@@ -10,12 +10,12 @@ const links = barLinks(locale);
 const { logIn, start } = barButtons(locale);
 ---
 
-<header class="nav">
+<header class="nav nav-reference">
   <nav class="wrap row" aria-label={t(locale, 'nav.main')}>
     <a class="home" href={pathIn(locale, '/')} aria-label={t(locale, 'nav.home')}><Brand /></a>
     <ul class="links" role="list">
       {bar.map((menu) => <li><Menu menu={menu} /></li>)}
-      {links.map(({ label, href }) => <li><a href={href}>{label}</a></li>)}
+      {links.map(({ label, href }) => <li><a href={href} aria-current={Astro.url.pathname.replace(/\/$/, '') === href.replace(/\/$/, '') ? 'page' : undefined}>{label}</a></li>)}
     </ul>
     <div class="end">
       <a class="btn btn-ghost btn-sm login" href={logIn.href}>{logIn.label}</a>

@@ -72,8 +72,5 @@ export function shotOf(id: Feature['id']): ShotPicture {
   return picture;
 }
 
-/** the four things the landing’s tabs show; the features page details all five */
-export const PILLARS: Feature['id'][] = ['studio', 'editor', 'assistant', 'render'];
-
 /** a feature’s words in a language */
 export const wordsOf = (f: Feature, locale: Locale) => ({ name: pick(locale, f.name), line: pick(locale, f.line), alt: pick(locale, f.picture.alt) });

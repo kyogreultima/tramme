@@ -10,13 +10,16 @@ import { LOCALES, localeOf, pathFor } from '../lib/i18n';
 import { Font } from 'astro:assets';
 import '../styles/global.css';
 import '../styles/site.css';
+import '../styles/landing.css';
 
-interface Props { title: string; description: string }
-const { title, description } = Astro.props;
+interface Props { title: string; description: string; landing?: boolean }
+const { title, description, landing = false } = Astro.props;
 // the page's language, and the same page in each language (hreflang)
 const locale = localeOf(Astro.url.pathname);
 const alternates = LOCALES.map((l) => ({ l, href: new URL(pathFor(l, Astro.url.pathname), Astro.site).href }));
 const canonical = new URL(Astro.url.pathname, Astro.site).href;
+const segment = Astro.url.pathname.replace(/^\/fr(?=\/|$)/, '').split('/')[1] || 'home';
+const page = segment === 'p' ? 'project' : segment;
 ---
 
 <!doctype html>
@@ -27,7 +30,7 @@ const canonical = new URL(Astro.url.pathname, Astro.site).href;
     <title>{title}</title>
     <meta name="description" content={description} />
     <link rel="canonical" href={canonical} />
-    <meta name="theme-color" content="#f5f7f8" />
+    <meta name="theme-color" content="#151914" />
     {alternates.map(({ l, href }) => <link rel="alternate" hreflang={l} href={href} />)}
     <link rel="alternate" hreflang="x-default" href={alternates[0].href} />
     <meta property="og:type" content="website" />
@@ -46,7 +49,7 @@ const canonical = new URL(Astro.url.pathname, Astro.site).href;
     <Font cssVariable="--font-display" preload />
     <slot name="head" />
   </head>
-  <body>
+  <body class:list={['site', { landing }]} data-page={page}>
     <slot />
   </body>
 </html>

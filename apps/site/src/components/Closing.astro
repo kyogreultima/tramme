@@ -1,30 +1,27 @@
 ---
-// The last word before the footer: the call once more, and a quiet line to the plans
+import { Image } from 'astro:assets';
+import ArrowRight from '@phosphor-icons/core/assets/regular/arrow-right.svg';
+import textile from '../assets/hero-textile.png';
 import { signUp } from '../lib/links';
 import { pathIn, t, type Locale } from '../lib/i18n';
-
 interface Props { locale: Locale }
 const { locale } = Astro.props;
 ---
-
-<section class="filled" aria-label={t(locale, 'landing.closing.label')}>
-  <div class="bleed band">
-    <h2 class="display">{t(locale, 'landing.closing.title')}</h2>
-    <div class="side">
-      <p class="more">{t(locale, 'landing.closing.more')}</p>
-      <a class="btn btn-accent" href={signUp({ lang: locale })}>{t(locale, 'common.startFree')}</a>
-      <p class="plans">{t(locale, 'landing.closing.basic')} <a href={pathIn(locale, '/pricing/')}>{t(locale, 'landing.closing.plans')}</a></p>
-    </div>
+<section class="closing" aria-label={t(locale, 'landing.closing.label')}>
+  <div class="wrap">
+    <h2>{t(locale, 'landing.closing.title')}</h2>
+    <a class="btn btn-accent" href={signUp({ lang: locale })}>{t(locale, 'common.startFree')}<ArrowRight aria-hidden="true" /></a>
+    <p>{t(locale, 'landing.closing.basic')} <a href={pathIn(locale, '/pricing/')}>{t(locale, 'landing.closing.plans')}</a></p>
+    <div class="lens"><Image src={textile} alt="" widths={[640, 1280]} sizes="(max-width: 800px) 90vw, 70vw" loading="lazy" /></div>
   </div>
 </section>
-
 <style>
-  /* the page's last word, filled with the accent */
-  section { margin-top: var(--section); }
-  .band { display: grid; gap: clamp(32px, 5vw, 72px); padding-block: clamp(64px, 9vw, 140px); }
-  h2 { max-width: 12ch; font-size: clamp(3rem, 9.4vw, 10rem); line-height: 0.92; letter-spacing: -0.04em; }
-  .side { display: grid; justify-items: start; gap: 20px; max-width: 30rem; }
-  .more { font-size: clamp(1.125rem, 1.6vw, 1.375rem); line-height: 1.45; }
-  .plans { font-size: 0.9375rem; color: var(--ink-2); }
-  .plans a { color: var(--ink); text-underline-offset: 3px; }
+  .closing { padding-block: clamp(72px, 10vw, 144px) 0; text-align: center; }
+  h2 { max-width: 17ch; margin-inline: auto; font-size: clamp(2.5rem, 4.9vw, 5rem); }
+  .closing .btn { margin-top: 28px; }
+  p { margin-top: 20px; font-size: 0.75rem; color: var(--ink-3); }
+  p a { color: var(--ink-2); text-underline-offset: 4px; }
+  .lens { width: 78%; aspect-ratio: 3.2; margin: 64px auto 0; border-radius: 50%; overflow: hidden; mask-image: radial-gradient(ellipse closest-side, black 55%, transparent 100%); }
+  .lens :global(img) { width: 100%; height: 100%; object-fit: cover; }
+  @media (max-width: 560px) { .lens { width: 100%; margin-top: 48px; aspect-ratio: 2.5; } }
 </style>

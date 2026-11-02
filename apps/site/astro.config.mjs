@@ -5,6 +5,7 @@
 // site's address, Starlight writes the sitemap of every page.
 
 import { defineConfig, fontProviders } from 'astro/config';
+import { copyFile } from 'node:fs/promises';
 import starlight from '@astrojs/starlight';
 import cloudflare from '@astrojs/cloudflare';
 import { sidebar } from './src/lib/docs.ts';
@@ -30,8 +31,19 @@ export default defineConfig({
     { provider: fontProviders.fontsource(), name: 'Geist Mono', cssVariable: '--font-mono', weights: ['400 500'], styles: ['normal'] },
   ],
   integrations: [
+    {
+      name: 'tramme-localized-not-found',
+      hooks: {
+        // Cloudflare resolves the nearest 404.html for an unknown asset path.
+        'astro:build:done': async ({ dir }) => {
+          await copyFile(new URL('fr/404/index.html', dir), new URL('fr/404.html', dir));
+        },
+      },
+    },
     starlight({
       title: 'Tramme',
+      // The bilingual website owns the branded 404 page.
+      disable404Route: true,
       description: SITE.docs,
       social: [{ icon: 'github', label: 'GitHub', href: REPO }],
       sidebar,

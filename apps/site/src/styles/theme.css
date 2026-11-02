@@ -1,57 +1,56 @@
-/* The site's two themes, shared by the landing page (global.css) and the
-   docs (docs.css): the editor's own paper theme by default, its studio theme
-   beside it (apps/editor/src/theme/tokens.css), so page and product are one.
-   The choice is the visitor's: data-theme on <html>, set before the first
-   paint from localStorage 'starlight-theme' (components/ThemeProvider.astro),
-   so the landing page and the docs always agree. */
-
+/* Shared reference palette for the website and documentation. */
 :root {
-  color-scheme: light;
-  --bg: #f0f4f7;
-  --panel: #ffffff;
-  --panel-2: #f3f7fa;
-  --field: #ebeff2;
-  --stage: #e7ecef;
-  --line: rgba(24, 31, 36, 0.08);
-  --line-2: rgba(24, 31, 36, 0.14);
-  --hover: rgba(24, 31, 36, 0.05);
-  --ink: #181f24;
-  --ink-2: #495156;
-  --ink-3: #59616a;
-  /* the accent as a fill (buttons), the text on it, and the accent as text */
-  --accent: #0b8075;
-  --accent-2: #096b62;
-  --accent-ink: #ffffff;
-  --accent-text: #08746a;
-  --accent-soft: rgba(11, 128, 117, 0.12);
-  /* a large picture lifted off the page */
-  --lift: 0 0 0 1px var(--line), 0 40px 100px -50px rgba(17, 24, 28, 0.4);
-  /* a piece of the interface floating over a picture */
-  --float: 0 0 0 1px var(--line), 0 30px 60px -24px rgba(17, 24, 28, 0.35);
-  /* text over a film still, and the shade under it */
-  --on-media: #f2f6f8;
-  --scrim: rgba(6, 11, 14, 0.58);
-}
-
-:root[data-theme='dark'] {
   color-scheme: dark;
-  --bg: #090f13;
-  --panel: #12181c;
-  --panel-2: #181e22;
-  --field: #21272c;
-  --stage: #060b0e;
-  --line: rgba(232, 238, 241, 0.07);
-  --line-2: rgba(232, 238, 241, 0.13);
-  --hover: rgba(232, 238, 241, 0.06);
-  --ink: #e8eef1;
-  --ink-2: #b1b7ba;
-  --ink-3: #858a8d;
-  --accent: #2ec4b6;
-  --accent-2: #4fd3c6;
-  --accent-ink: #03211e;
-  --accent-text: #2ec4b6;
-  --accent-soft: rgba(46, 196, 182, 0.14);
-  --lift: 0 0 0 1px var(--line-2), 0 60px 140px -60px rgba(0, 0, 0, 0.9);
-  --float: 0 0 0 1px var(--line-2), 0 30px 70px -20px rgba(0, 0, 0, 0.85);
-  --scrim: rgba(6, 11, 14, 0.66);
+  --bg: #151914;
+  --panel: #1d221c;
+  --panel-2: #242a22;
+  --field: #2a3028;
+  --stage: #10150f;
+  --ink: #f0f1e9;
+  --ink-2: #bdc1b5;
+  --ink-3: #a4ab9c;
+  --line: #ffffff14;
+  --line-2: #ffffff30;
+  --hover: #ffffff0a;
+  --accent: #ff650b;
+  --accent-2: #e85200;
+  --accent-ink: #141810;
+  --accent-text: #ff954f;
+  --accent-soft: #ff650b16;
+  --screen: #151914;
+  --on-screen: #f0f1e9;
+  --on-media: #f0f1e9;
+  --scrim: #10150fb8;
+  --paper: #ffffff;
+  --paper-ink: #23291f;
+  --paper-muted: #596252;
+  --paper-line: #23291f2b;
+  --paper-card: #f5f6f2;
+  --paper-hover: #23291f0a;
+  --lift: 0 1px 0 var(--line-2);
+  --float: 0 18px 48px #05090333;
+  --brand-mark: currentColor;
+  --brand-ink: currentColor;
+}
+/* Explicit brand tokens also feed the generated favicons (lib/logo.ts). */
+:root[data-theme='dark'] {
+  --bg: #151914;
+  --accent: #ff650b;
+}
+:root[data-theme='light'] {
+  color-scheme: light;
+  --bg: #f7f8f3;
+  --panel: #ffffff;
+  --panel-2: #edf0e8;
+  --field: #e6eadd;
+  --stage: #e6eadd;
+  --ink: #23291f;
+  --ink-2: #505a47;
+  --ink-3: #5e6856;
+  --line: #23291f14;
+  --line-2: #23291f30;
+  --hover: #23291f08;
+  --accent-text: #a63b00;
+  --accent-soft: #ff650b12;
+  --float: 0 18px 48px #20291a1f;
 }

@@ -1,34 +1,44 @@
 ---
-// "Explore the inside of every project": the community's latest public
-// projects, as cards, and the way to all of them. As many as there are, up to
-// eight; none, and only the link remains.
 import Head from './Head.astro';
 import ProjectCard from './ProjectCard.astro';
 import { listProjects } from '../lib/gallery';
 import { pathIn, t, type Locale } from '../lib/i18n';
-
 interface Props { locale: Locale }
 const { locale } = Astro.props;
 const projects = await listProjects({ limit: 8 });
 ---
-
-<section class="section screen" id="community">
-  <div class="bleed">
+<section class="community" id="community">
+  <div class="wrap">
+    <span class="section-label">{t(locale, 'footer.community')}</span>
     <Head title={t(locale, 'landing.community.title')} more={t(locale, 'landing.community.more')} />
     {projects.length > 0
       ? <div class="grid">{projects.map((project) => <ProjectCard project={project} locale={locale} />)}</div>
       : <p class="none">{t(locale, 'card.empty')}</p>}
-    <p class="all"><a class="btn btn-ghost" href={pathIn(locale, '/explore/')}>{t(locale, 'landing.community.all')}</a></p>
+    <a class="btn btn-ghost all" href={pathIn(locale, '/explore/')}>{t(locale, 'landing.community.all')}</a>
+    <div class="invitation">
+      <h2>{t(locale, 'landing.community.invite')}</h2>
+      <div><p>{t(locale, 'landing.community.inviteMore')}</p><a class="btn btn-ghost" href={pathIn(locale, '/about/')}>{t(locale, 'footer.about')}</a></div>
+    </div>
   </div>
 </section>
-
 <style>
-  .section { padding-bottom: var(--section); }
-  /* edge to edge, tightly set: the first film is the large one */
-  .grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: clamp(180px, 19vw, 300px); grid-auto-flow: dense; gap: 12px; }
-  .grid > :global(*):first-child { grid-column: span 2; grid-row: span 2; }
-  .none { color: var(--ink-3); }
-  .all { display: flex; margin-top: 40px; }
-  @media (max-width: 1100px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-  @media (max-width: 560px) { .grid { grid-template-columns: minmax(0, 1fr); } .grid > :global(*):first-child { grid-column: auto; grid-row: auto; } }
+  .community { padding-block: var(--section) 64px; background: var(--paper); color: var(--paper-ink); --ink: var(--paper-ink); --ink-2: var(--paper-muted); --line-2: var(--paper-line); --hover: var(--paper-hover); --accent-text: var(--paper-ink); }
+  .section-label { display: block; margin-bottom: 36px; font-size: 0.6875rem; color: var(--ink-2); }
+  .community :global(.head h2) { max-width: 22ch; }
+  .grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); grid-auto-rows: 320px; gap: 20px; margin-top: 56px; }
+  .grid > :global(.card) { grid-column: span 2; }
+  .grid > :global(.card:nth-of-type(-n + 2)) { grid-column: span 3; }
+  .grid :global(.card) { border-radius: var(--r); height: 100%; background: var(--paper-card); color: var(--paper-ink); }
+  .grid :global(.frame) { height: 72%; aspect-ratio: auto; }
+  .grid :global(.by) { position: static; height: 28%; display: flex; padding: 16px; background: transparent; color: var(--paper-ink); backdrop-filter: none; }
+  .grid :global(.by .avatar), .grid :global(.by .name) { display: none; }
+  .grid :global(.by h3) { font-size: 1rem; font-weight: 400; }
+  .none { color: var(--ink-2); }
+  .all { margin-top: 32px; }
+  .invitation { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: start; border-top: 1px solid var(--paper-line); margin-top: 80px; padding-top: 36px; }
+  .invitation h2 { max-width: 19ch; font-size: clamp(2rem, 3.2vw, 3.3rem); }
+  .invitation p { max-width: 46ch; font-size: 0.875rem; line-height: 1.55; color: var(--ink-2); }
+  .invitation a { margin-top: 24px; }
+  @media (max-width: 800px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .grid > :global(.card), .grid > :global(.card:nth-of-type(-n + 2)) { grid-column: auto; } .invitation { gap: 32px; } }
+  @media (max-width: 560px) { .grid { grid-template-columns: 1fr; grid-auto-rows: 300px; margin-top: 36px; } .invitation { grid-template-columns: 1fr; margin-top: 56px; } }
 </style>

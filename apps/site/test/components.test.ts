@@ -11,7 +11,7 @@ const everything = [...walk('components'), ...walk('pages'), ...walk('layouts')]
 const withoutScript = (source: string) => source.replace(/<script[\s\S]*?<\/script>/g, '');
 
 describe('the components', () => {
-  it.each(['Plans', 'PlanCard', 'PlanTable', 'Faq', 'Tabs', 'Menu', 'LanguageChoice'])('%s works without script', (name) => {
+  it.each(['Plans', 'PlanCard', 'PlanTable', 'Faq', 'Menu', 'LanguageChoice'])('%s works without script', (name) => {
     expect(read(`components/${name}.astro`)).not.toContain('<script');
   });
 
@@ -34,7 +34,7 @@ describe('the components', () => {
 
   it('keep the scripts to the few that a behaviour needs', () => {
     const withScript = components.filter((f) => /<script/.test(read(f))).map((f) => path.basename(f, '.astro')).sort();
-    expect(withScript).toEqual(['Media', 'Nav', 'Platform', 'ProjectCard', 'Source', 'ThemeChoice', 'ThemeProvider', 'ThemeToggle'].sort());
+    expect(withScript).toEqual(['Media', 'Nav', 'Platform', 'ProjectCard', 'Source', 'Tabs', 'ThemeChoice', 'ThemeProvider', 'ThemeToggle'].sort());
     expect(withoutScript(read('components/Nav.astro'))).toContain('<details');
   });
 });
