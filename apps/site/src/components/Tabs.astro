@@ -94,16 +94,15 @@ const { locale } = Astro.props;
   .panel { scroll-margin-top: 100px; }
   .panel[hidden] { display: none; }
   .picture { display: grid; align-items: center; aspect-ratio: 1.35; padding: 28px; background: var(--panel); border-radius: var(--r); overflow: hidden; }
-  .picture :global(img) { width: 100%; height: auto; border-radius: 4px; }
-  .picture :global(.app-light) { display: none; }
-  :global([data-theme='light']) .picture :global(.app-dark) { display: none; }
-  :global([data-theme='light']) .picture :global(.app-light) { display: block; }
-  .picture-assistant, .picture-packs, .picture-render { padding: 0; }
-  .picture-assistant :global(img), .picture-packs :global(img), .picture-render :global(img) { height: 100%; object-fit: cover; }
+  .picture :global(img) { width: 100%; height: auto; border-radius: var(--tramme-radius-detail); }
+  .picture :global(.app-light) { display: var(--app-shot-light); }
+  .picture :global(.app-dark) { display: var(--app-shot-dark); }
+  .picture-packs, .picture-render { padding: 0; }
+  .picture-packs :global(img), .picture-render :global(img) { height: 100%; object-fit: cover; }
   .caption { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-top: 18px; }
   .caption h3 { font-size: 1rem; }
   .caption p { max-width: 55ch; margin-top: 6px; font-size: 0.8125rem; color: var(--ink-2); }
-  .caption a { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border: 1px solid var(--line-2); border-radius: 50%; }
+  .caption a { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border: 1px solid var(--line-2); border-radius: var(--tramme-radius-control); }
   .caption :global(svg) { width: 16px; height: 16px; }
   .waypoints { display: none; }
   .is-enhanced .track { min-height: calc(var(--steps) * 95svh); }
@@ -126,7 +125,7 @@ const { locale } = Astro.props;
     .step-line, .step[aria-current] .step-line { display: none; }
     .step[aria-current] { box-shadow: 0 1px 0 currentColor; }
     .picture { aspect-ratio: 1.4; padding: 12px; }
-    .picture-assistant, .picture-packs, .picture-render { padding: 0; }
+    .picture-packs, .picture-render { padding: 0; }
     .is-enhanced .sticky { align-content: center; gap: 20px; }
     .is-enhanced .picture { max-height: calc(100svh - var(--nav) - 290px); }
     .caption { margin-top: 12px; }

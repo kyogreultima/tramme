@@ -28,9 +28,9 @@ const locale = localeOf(Astro.url.pathname);
 </script>
 
 <style>
-  .choice { display: inline-flex; padding: 3px; border: 1px solid var(--line-2); border-radius: 999px; }
+  .choice { display: inline-flex; padding: 3px; border: 1px solid var(--line-2); border-radius: var(--tramme-radius-control); }
   button {
-    padding: 5px 14px; border: 0; border-radius: 999px; background: transparent; color: var(--ink-3); font: inherit; font-size: 0.875rem; cursor: pointer;
+    padding: 5px 14px; border: 0; border-radius: var(--tramme-radius-control); background: transparent; color: var(--ink-3); font: inherit; font-size: 0.875rem; cursor: pointer;
     transition: background-color 0.2s var(--ease), color 0.2s var(--ease);
   }
   button:hover { color: var(--ink); }

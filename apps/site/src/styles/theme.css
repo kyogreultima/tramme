@@ -3,6 +3,8 @@
 /* Website semantics mapped to the same foundation as Studio/Paper. */
 :root {
   color-scheme: dark;
+  --app-shot-light: none;
+  --app-shot-dark: block;
   --bg: var(--tramme-dark-bg);
   --panel: var(--tramme-dark-surface);
   --panel-2: var(--tramme-dark-surface-2);
@@ -39,6 +41,8 @@
 }
 :root[data-theme='light'] {
   color-scheme: light;
+  --app-shot-light: block;
+  --app-shot-dark: none;
   --bg: var(--tramme-light-bg);
   --panel: var(--tramme-light-surface);
   --panel-2: var(--tramme-light-surface-2);
@@ -52,4 +56,14 @@
   --hover: var(--tramme-light-hover);
   --accent-text: var(--tramme-light-accent-text);
   --float: 0 18px 48px #20291a1f;
+}
+
+/* Screenshot variants inherit the section's theme, including fixed surfaces. */
+.screen, [data-app-theme='dark'] {
+  --app-shot-light: none;
+  --app-shot-dark: block;
+}
+.community, [data-app-theme='light'] {
+  --app-shot-light: block;
+  --app-shot-dark: none;
 }

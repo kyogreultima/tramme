@@ -21,7 +21,7 @@ const { menu } = Astro.props;
 <style>
   .menu { position: relative; }
   summary {
-    display: flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 999px; list-style: none; cursor: pointer;
+    display: flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: var(--tramme-radius-control); list-style: none; cursor: pointer;
     color: var(--ink-2); font-size: 0.875rem; transition: color 0.2s var(--ease), background-color 0.2s var(--ease);
   }
   summary::-webkit-details-marker { display: none; }
@@ -30,9 +30,9 @@ const { menu } = Astro.props;
   [open] > summary::after { margin-top: 3px; transform: rotate(-135deg); }
   .panel {
     position: absolute; top: calc(100% + 14px); left: 0; z-index: 2; min-width: 300px; margin: 0; padding: 8px; list-style: none;
-    background: var(--panel); border-radius: var(--r-lg); box-shadow: var(--float);
+    background: var(--panel); border-radius: var(--tramme-radius-menu); box-shadow: var(--float);
   }
-  a { display: grid; gap: 2px; padding: 10px 14px; border-radius: 12px; text-decoration: none; transition: background-color 0.2s var(--ease); }
+  a { display: grid; gap: 2px; padding: 10px 14px; border-radius: var(--tramme-radius-control); text-decoration: none; transition: background-color 0.2s var(--ease); }
   a:hover { background: var(--hover); }
   strong { font-size: 0.9375rem; font-weight: 500; color: var(--ink); }
   span { font-size: 0.8125rem; color: var(--ink-3); }

@@ -1,7 +1,5 @@
 ---
-// A picture of the app in the page's theme: its paper theme on the light
-// page, its studio theme on the dark one. Both are lazy, so only the one
-// shown loads. Framed and flat, at the container's width.
+// The section supplies the theme, inherited from the page by default.
 import { Image } from 'astro:assets';
 import type { ImageMetadata } from 'astro';
 
@@ -19,6 +17,6 @@ const pair = [['light', light], ['dark', dark]] as const;
 <style>
   .shot { overflow: hidden; border-radius: var(--r-lg); box-shadow: var(--lift); background: var(--panel); }
   .shot :global(img) { width: 100%; height: auto; }
-  .shot :global(.dark), :global([data-theme='dark']) .shot :global(.light) { display: none; }
-  :global([data-theme='dark']) .shot :global(.dark) { display: block; }
+  .shot :global(.light) { display: var(--app-shot-light); }
+  .shot :global(.dark) { display: var(--app-shot-dark); }
 </style>

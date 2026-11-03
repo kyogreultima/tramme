@@ -9,11 +9,10 @@ import studioLight from '../assets/studio-light.png';
 import studioDark from '../assets/studio-dark.png';
 import editorLight from '../assets/editor-light.png';
 import editorDark from '../assets/editor-dark.png';
-import assistantStill from '../videos/assistant.webp';
 import showreelStill from '../videos/showreel.webp';
 import launchStill from '../videos/launch-film.webp';
 
-/** the app in the page’s theme: paper on the light page, studio on the dark one */
+/** The app follows its containing section: Paper on light, Studio on dark. */
 export interface ShotPicture { shot: [light: ImageMetadata, dark: ImageMetadata]; alt: Localised<string> }
 /** a still of a film */
 export interface StillPicture { still: ImageMetadata; alt: Localised<string> }
@@ -33,7 +32,7 @@ export const FEATURES: Feature[] = [
     line: { en: 'Direct the film in words. Leave a note, get a take back on the picture, keep the ones you like.', fr: 'Dirigez le film avec des mots. Laissez une note, recevez une prise sur l’image, gardez celles qui vous plaisent.' },
     picture: {
       shot: [studioLight, studioDark],
-      alt: { en: 'The Tramme studio: the Showreel example in front, its storyboard below, and the Direction panel with the brief, the palette and the material.', fr: 'Le studio de Tramme : l’exemple Showreel au premier plan, son storyboard dessous, et le panneau Direction avec le brief, la palette et la matière.' },
+      alt: { en: 'The Tramme studio: the Showreel example in front, its storyboard below, and the notes panel beside the film.', fr: 'Le studio de Tramme : l’exemple Showreel au premier plan, son storyboard dessous et le panneau de notes à côté du film.' },
     },
   },
   {
@@ -49,7 +48,10 @@ export const FEATURES: Feature[] = [
     id: 'assistant',
     name: { en: 'Assistant', fr: 'Assistant' },
     line: { en: 'The AI edits with your tools: it looks at its own frames, shows a take, and asks before it spends.', fr: 'L’IA monte avec vos outils : elle regarde ses propres images, montre une prise et demande avant de dépenser.' },
-    picture: { still: assistantStill, alt: { en: 'A film the assistant made from a few lines of direction.', fr: 'Un film que l’assistant a fait à partir de quelques lignes de direction.' } },
+    picture: {
+      shot: [editorLight, editorDark],
+      alt: { en: 'The assistant beside the Showreel example in the Tramme atelier, with its tools and direction field.', fr: 'L’assistant à côté de l’exemple Showreel dans l’atelier Tramme, avec ses outils et son champ de direction.' },
+    },
   },
   {
     id: 'packs',

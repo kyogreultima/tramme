@@ -65,7 +65,7 @@ const { logIn, start } = barButtons(locale);
   .row { display: flex; align-items: center; gap: 28px; height: var(--nav); max-width: none; }
   .home { flex: none; text-decoration: none; font-size: 1.15rem; }
   .links { display: flex; gap: 4px; margin: 0 auto; padding: 0; list-style: none; }
-  .links > li > a { display: block; padding: 7px 12px; border-radius: 999px; color: var(--ink-2); text-decoration: none; font-size: 0.875rem; transition: color 0.2s var(--ease), background-color 0.2s var(--ease); }
+  .links > li > a { display: block; padding: 7px 12px; border-radius: var(--tramme-radius-control); color: var(--ink-2); text-decoration: none; font-size: 0.875rem; transition: color 0.2s var(--ease), background-color 0.2s var(--ease); }
   .links > li > a:hover { color: var(--ink); background: var(--hover); }
   .end { display: flex; align-items: center; gap: 8px; }
   .fold { position: relative; display: none; }
@@ -75,11 +75,11 @@ const { logIn, start } = barButtons(locale);
     position: absolute; top: calc(100% + 14px); right: 0; z-index: 2; display: grid; gap: 14px; width: min(86vw, 320px); padding: 16px;
     /* a short screen (a phone on its side): the panel scrolls inside itself, the bar being fixed */
     max-height: calc(100dvh - var(--nav) - 24px); overflow-y: auto; overscroll-behavior: contain;
-    background: var(--panel); border-radius: var(--r-lg); box-shadow: var(--float);
+    background: var(--panel); border-radius: var(--tramme-radius-menu); box-shadow: var(--float);
   }
   .panel strong { display: block; margin-bottom: 4px; font-size: 0.8125rem; font-weight: 500; color: var(--ink-3); }
   .panel ul { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
-  .panel a { display: block; padding: 8px 10px; border-radius: 10px; color: var(--ink); text-decoration: none; font-size: 0.9375rem; }
+  .panel a { display: block; padding: 8px 10px; border-radius: var(--tramme-radius-control); color: var(--ink); text-decoration: none; font-size: 0.9375rem; }
   .panel a:hover { background: var(--hover); }
 
   .buttons { display: grid; gap: 8px; padding-top: 6px; }

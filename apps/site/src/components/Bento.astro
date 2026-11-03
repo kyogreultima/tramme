@@ -1,19 +1,21 @@
 ---
 import { Image } from 'astro:assets';
 import Head from './Head.astro';
-import editor from '../assets/editor-dark.png';
+import Shot from './Shot.astro';
+import { shotOf } from '../lib/features';
 import textile from '../assets/hero-textile.png';
 import { pathIn, t, type Locale } from '../lib/i18n';
 interface Props { locale: Locale }
 const { locale } = Astro.props;
 const items = ['devices', 'visibility', 'export'];
+const { shot } = shotOf('editor');
 ---
 <section class="platform wrap" id="platform">
   <span class="section-label">{t(locale, 'nav.cloud')}</span>
   <Head title={t(locale, 'landing.platform.title')} more={t(locale, 'landing.platform.more')} />
   <div class="desktop">
     <Image class="backdrop" src={textile} alt="" widths={[800, 1600]} sizes="100vw" loading="lazy" />
-    <Image class="editor" src={editor} alt={t(locale, 'landing.hero.demo')} widths={[800, 1440, 1920]} sizes="(max-width: 800px) 85vw, 75vw" loading="lazy" />
+    <Shot light={shot[0]} dark={shot[1]} alt={t(locale, 'landing.hero.demo')} />
   </div>
   <ul class="details" role="list">
     {items.map((id) => <li><h3>{t(locale, `landing.platform.${id}.title`)}</h3><p>{t(locale, `landing.platform.${id}.text`)}</p><a href={pathIn(locale, '/features/#cloud')}>{t(locale, 'landing.pillars.learn')}</a></li>)}
@@ -25,7 +27,7 @@ const items = ['devices', 'visibility', 'export'];
   .platform :global(.head p) { max-width: 42ch; }
   .desktop { position: relative; display: grid; place-items: center; isolation: isolate; overflow: hidden; padding: clamp(24px, 6vw, 90px) clamp(20px, 8vw, 120px); border-radius: var(--r); }
   .backdrop { position: absolute; inset: 0; z-index: -1; width: 100%; height: 100%; object-fit: cover; }
-  .editor { width: 100%; height: auto; border-radius: var(--r); box-shadow: var(--lift); }
+  .desktop :global(.shot) { width: 100%; border-radius: var(--r); }
   .details { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 40px; list-style: none; margin: 32px 0 0; padding: 0; }
   h3 { font-size: 0.9375rem; line-height: 1.3; }
   .details p { max-width: 38ch; margin-top: 12px; font-size: 0.8125rem; color: var(--ink-2); }

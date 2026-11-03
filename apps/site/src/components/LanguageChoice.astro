@@ -14,9 +14,9 @@ const locale = localeOf(Astro.url.pathname);
 </nav>
 
 <style>
-  .choice { display: inline-flex; padding: 3px; border: 1px solid var(--line-2); border-radius: 999px; }
+  .choice { display: inline-flex; padding: 3px; border: 1px solid var(--line-2); border-radius: var(--tramme-radius-control); }
   a {
-    padding: 5px 14px; border-radius: 999px; color: var(--ink-3); font-size: 0.875rem; text-decoration: none;
+    padding: 5px 14px; border-radius: var(--tramme-radius-control); color: var(--ink-3); font-size: 0.875rem; text-decoration: none;
     transition: background-color 0.2s var(--ease), color 0.2s var(--ease);
   }
   a:hover { color: var(--ink); }

@@ -25,8 +25,8 @@ const { locale } = Astro.props;
 <style>
   .plans { display: grid; justify-items: center; gap: 32px; }
   .sr { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
-  .switch { display: inline-flex; gap: 4px; padding: 4px; border-radius: 999px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); }
-  label { display: inline-flex; align-items: center; height: 38px; padding: 0 20px; border-radius: 999px; color: var(--ink-2); font-size: 0.9375rem; font-weight: 500; cursor: pointer; transition: background-color 0.2s var(--ease), color 0.2s var(--ease); }
+  .switch { display: inline-flex; gap: 4px; padding: 4px; border-radius: var(--tramme-radius-menu); background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); }
+  label { display: inline-flex; align-items: center; height: 38px; padding: 0 20px; border-radius: var(--tramme-radius-control); color: var(--ink-2); font-size: 0.9375rem; font-weight: 500; cursor: pointer; transition: background-color 0.2s var(--ease), color 0.2s var(--ease); }
   label:hover { background: var(--hover); color: var(--ink); }
   #period-month:checked ~ label[for='period-month'], #period-year:checked ~ label[for='period-year'] { background: var(--accent); color: var(--accent-ink); }
   #period-month:focus-visible ~ label[for='period-month'], #period-year:focus-visible ~ label[for='period-year'] { outline: 2px solid var(--accent-text); outline-offset: 2px; }

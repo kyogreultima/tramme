@@ -76,9 +76,9 @@ const CLONE = `git clone ${REPO}`;
   dt { font-size: 0.875rem; color: var(--ink-3); }
 
   .actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: clamp(40px, 5vw, 56px); }
-  .clone { display: flex; align-items: center; gap: 12px; height: 44px; min-width: 0; max-width: 100%; padding: 0 6px 0 18px; border: 1px solid var(--line-2); border-radius: 999px; background: var(--bg); }
+  .clone { display: flex; align-items: center; gap: 12px; height: 44px; min-width: 0; max-width: 100%; padding: 0 6px 0 18px; border: 1px solid var(--line-2); border-radius: var(--tramme-radius-control); background: var(--bg); }
   .clone code { overflow: hidden; font-size: 0.8125rem; color: var(--ink-2); white-space: nowrap; text-overflow: ellipsis; }
-  .copy { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border: 0; border-radius: 999px; background: transparent; color: var(--ink-3); cursor: pointer; }
+  .copy { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border: 0; border-radius: var(--tramme-radius-control); background: transparent; color: var(--ink-3); cursor: pointer; }
   .copy:hover { background: var(--hover); color: var(--ink); }
   .copy svg { width: 16px; height: 16px; }
   .i-check, [data-done] .i-copy { display: none; }
