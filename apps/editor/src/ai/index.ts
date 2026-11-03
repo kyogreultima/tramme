@@ -324,6 +324,8 @@ export async function refreshStatus(quiet = false) {
   if (quiet && JSON.stringify(next) === JSON.stringify(aiStatus.peek())) return;
   aiStatus.value = next;
   await adoptConnected();
+  // a Claude model with a way to it: its listing asked once, in the background, so the model button and the turn's lines say its name ("Opus 5.5"), not its id, before the menu is ever opened
+  if (providerOf(aiSettings.peek().model) === 'anthropic' && (next.companion === 'ok' || next.server)) ensureClaudeModels().catch(() => {});
   // an OpenRouter model: its listing says whether it takes an effort level
   if (providerOf(aiSettings.peek().model) === 'openrouter' && next.remote.openrouter && !aiModels.peek().remote.openrouter) loadModels().catch(() => {});
 }

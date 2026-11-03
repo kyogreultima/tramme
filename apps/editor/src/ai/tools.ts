@@ -60,8 +60,20 @@ interface Pending { id: string; label: string; ops: Op[]; steps: string[] }
 
 export class ToolRunner {
   pending: Pending | null = null;
-  /** set while a scene is built apart: the proposals are kept to it */
-  scope: Scope | null = null;
+  private scoped: Scope | null = null;
+  /** the proposal as it stood when the scene began: all a discard in the scene goes back to */
+  private before: Pending | null = null;
+  /** set while a scene is built apart: the proposals are kept to it, and its tools work on its composition */
+  get scope(): Scope | null { return this.scoped; }
+  set scope(s: Scope | null) {
+    this.scoped = s;
+    this.before = s && this.pending ? { ...this.pending, ops: [...this.pending.ops], steps: [...this.pending.steps] } : null;
+  }
+  /** the composition the tools work on by default: the scene's while one is built apart, else the one on screen, else the root */
+  private compOf(doc: TrammeDoc): string {
+    if (this.scoped && doc.compositions[this.scoped.comp]) return this.scoped.comp;
+    return doc.compositions[S.compId.peek()] ? S.compId.peek() : doc.root;
+  }
   /** the turn's signal, handed to the plugins' tools */
   private signal: AbortSignal = new AbortController().signal;
   /** the last plugin tool's message for the user */
@@ -93,8 +105,8 @@ export class ToolRunner {
     return same ? S.registry.peek() : (await this.stills.rendererFor(doc)).registry;
   }
 
-  /** the user applied or refused the proposal, or wrote a new message without deciding */
-  clear() { this.pending = null; }
+  /** the user applied or refused the proposal, or wrote a new message without deciding (what a scene's discard went back to is gone with it) */
+  clear() { this.pending = null; this.before = null; }
 
   dispose() { this.stills.dispose(); for (const v of this.videos.values()) v.then((x) => x.dispose()).catch(() => {}); this.videos.clear(); }
 
@@ -242,11 +254,17 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
           const doc = this.liveDoc(), reg = await this.registry(doc);
           // the analyses and event lists reach the expressions that read them
           const data = await analyses(this.toolContext(doc, reg));
-          return text(JSON.stringify(new Evaluator(doc, reg, { data }).value(String(input.address), Number(input.t), input.compId)));
+          return text(JSON.stringify(new Evaluator(doc, reg, { data }).value(String(input.address), Number(input.t), input.compId ?? (this.scoped ? this.compOf(doc) : undefined))));
         }
         case 'render_still': return await this.still(Number(input.t), input.compId, input.caption);
         case 'propose_changes': return await this.propose(String(input.label ?? 'Change'), input.ops as Op[]);
         case 'discard_proposal': {
+          // a scene builder drops its own changes: the director's root and the scenes built before it stay proposed
+          if (this.scoped && this.before) {
+            this.pending = { ...this.before, ops: [...this.before.ops], steps: [...this.before.steps] };
+            this.events.push({ type: 'proposal', id: this.pending.id, label: this.pending.label, ops: this.pending.ops });
+            return text('Your changes to this scene are dropped; the rest of the film (the root and the other scenes) is kept as proposed.');
+          }
           if (this.pending) this.events.push({ type: 'proposal-clear', id: this.pending.id });
           this.pending = null;
           return text('Proposal dropped.');
@@ -264,7 +282,7 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
         case 'apply_template': {
           const tpl = TEMPLATES[String(input.template)];
           if (!tpl) return text(`unknown template: ${input.template} (${Object.keys(TEMPLATES).join(', ')})`, true);
-          const doc = this.liveDoc(), compId = input.compId && doc.compositions[input.compId] ? input.compId : S.compId.peek() in doc.compositions ? S.compId.peek() : doc.root;
+          const doc = this.liveDoc(), compId = input.compId && doc.compositions[input.compId] ? input.compId : this.compOf(doc);
           const { label, ops } = placeTemplate(doc, compId, String(input.template), { at: Number(input.at ?? 0), duration: input.duration, text: input.text, subtitle: input.subtitle, transcript: input.transcript, place: input.place });
           return await this.propose(label, ops);
         }
@@ -278,7 +296,7 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
   /** a still of the live document, as a JPEG data URL */
   private stillUrl(t: number, compId?: string): Promise<string> {
     const doc = this.liveDoc();
-    return this.stills.still(doc, t, compId && doc.compositions[compId] ? compId : doc.root, STILL_WIDTH);
+    return this.stills.still(doc, t, compId && doc.compositions[compId] ? compId : this.scoped ? this.compOf(doc) : doc.root, STILL_WIDTH);
   }
 
   private async still(t: number, compId: string | undefined, caption?: string): Promise<ToolResult> {
@@ -289,7 +307,7 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
 
   // ── tools brought by the project's plugins ───────────────────
   private toolContext(doc: TrammeDoc, registry: Registry): ToolContext {
-    const compId = doc.compositions[S.compId.peek()] ? S.compId.peek() : doc.root;
+    const compId = this.compOf(doc);
     return {
       doc, compId, registry,
       time: S.time.peek(),

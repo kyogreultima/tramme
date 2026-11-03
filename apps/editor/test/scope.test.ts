@@ -82,4 +82,52 @@ describe('what a scene builder may change', () => {
     expect(ok.isError, JSON.stringify(ok.content)).toBeFalsy();
     expect(S.doc.peek().compositions.price).toBeTruthy();
   });
+
+  it("a scene builder's discard drops its own changes only: the director's root and the scenes built before stay proposed", async () => {
+    const { doc, project } = film();
+    load(doc, project.manifest, 'http://localhost/api/projects/test/files/document.json', '');
+    const runner = new ToolRunner();
+    // the director lays the root (changes not applied yet: they wait in the proposal), and an earlier scene is built
+    const root = await runner.run('propose_changes', { label: 'root', ops: [{ op: 'add', path: '/compositions/main/layers/s1', value: { type: 'comp', props: { comp: 'price' } } }, { op: 'add', path: '/compositions/main/order/-', value: 's1' }] });
+    expect(root.isError, JSON.stringify(root.content)).toBeFalsy();
+    runner.scope = { comp: 'intro', root: 'main', tokens: [] };
+    await runner.run('propose_changes', { label: 'intro', ops: [{ op: 'add', path: '/compositions/intro/layers/a', value: { type: 'shape.rect' } }, { op: 'add', path: '/compositions/intro/order/-', value: 'a' }] });
+    runner.scope = SCOPE;
+    await runner.run('propose_changes', { label: 'price', ops: [{ op: 'add', path: '/compositions/price/layers/b', value: { type: 'shape.rect' } }, { op: 'add', path: '/compositions/price/order/-', value: 'b' }] });
+    const out = await runner.run('discard_proposal', {});
+    expect(out.isError).toBeFalsy();
+    const live = runner.liveDoc();
+    expect(live.compositions.main.layers.s1).toBeTruthy();
+    expect(live.compositions.intro.layers.a).toBeTruthy();
+    expect(live.compositions.price.layers.b).toBeUndefined();
+    // and the user's decision (applied or set aside) ends what a later discard could go back to
+    runner.clear();
+    runner.scope = SCOPE;
+    await runner.run('propose_changes', { label: 'price', ops: [{ op: 'add', path: '/compositions/price/layers/c', value: { type: 'shape.rect' } }, { op: 'add', path: '/compositions/price/order/-', value: 'c' }] });
+    await runner.run('discard_proposal', {});
+    expect(runner.pending).toBeNull();
+    runner.dispose();
+  });
+
+  it("a scene builder's tools work on its composition: a tool's layers land there, and values are read there", async () => {
+    const { doc, project } = film();
+    doc.compositions.price.layers.dot = { type: 'shape.ellipse', transform: { position: { $k: [{ t: 0, v: [0, 0] }, { t: 1, v: [100, 0] }] } } } as never;
+    doc.compositions.price.order = ['dot'];
+    load(doc, project.manifest, 'http://localhost/api/projects/p/files/document.tramme.json', '');
+    const seen: string[] = [];
+    S.registry.peek().use({ tools: [{
+      name: 'place-here', description: 'Regression fixture: places a layer in the composition it is given',
+      run: async (_input: unknown, ctx: { compId: string }) => { seen.push(ctx.compId); return { text: 'placed', ops: [{ op: 'add', path: `/compositions/${ctx.compId}/layers/placed`, value: { type: 'shape.rect' } }, { op: 'add', path: `/compositions/${ctx.compId}/order/-`, value: 'placed' }] }; },
+    }] }, 'test');
+    const runner = new ToolRunner();
+    runner.scope = SCOPE;
+    const out = await runner.run('use_tool', { name: 'place-here', input: {} });
+    expect(out.isError, JSON.stringify(out.content)).toBeFalsy();
+    expect(seen).toEqual(['price']);
+    expect(runner.liveDoc().compositions.price.layers.placed).toBeTruthy();
+    const value = await runner.run('evaluate', { address: 'dot.transform.position', t: 1 });
+    expect(value.isError, JSON.stringify(value.content)).toBeFalsy();
+    expect(JSON.parse((value.content[0] as { text: string }).text)).toEqual([100, 0]);
+    runner.dispose();
+  });
 });

@@ -68,6 +68,32 @@ describe('watchCompanion', () => {
   });
 });
 
+describe('the model button', () => {
+  it('names the Claude model chosen once the companion answers, before the model menu is ever opened', async () => {
+    const { aiModels, aiSettings, setAiSettings } = await import('../src/ai/index.ts');
+    const { modelLabel, setClaudeModels } = await import('@tramme/assistant');
+    setClaudeModels([]);
+    aiModels.value = { ...aiModels.value, claude: [] };
+    setAiSettings({ model: 'claude-opus-5-5', prefer: 'auto' });
+    const listing = vi.fn(async (url: string): Promise<Response> => {
+      if (url.endsWith('/health')) return new Response(JSON.stringify({ engines: { claude: true } }), { status: 200 });
+      if (url.endsWith('/models')) return new Response(JSON.stringify({ claudeModels: [{ id: 'claude-opus-5-5', label: 'Opus 5.5', adaptive: true, efforts: ['high'] }] }), { status: 200 });
+      return new Response('{}', { status: 404 });
+    });
+    vi.stubGlobal('fetch', listing);
+    aiStatus.value = { ...aiStatus.value, server: false, companion: 'absent' };
+    expect(modelLabel(aiSettings.value.model)).toBe('claude-opus-5-5');
+    const stop = watchCompanion();
+    await vi.advanceTimersByTimeAsync(4000);
+    expect(aiStatus.value.companion).toBe('ok');
+    expect(listing.mock.calls.some(([u]) => String(u).endsWith('/models'))).toBe(true);
+    expect(aiModels.value.claude.map((m) => m.id)).toEqual(['claude-opus-5-5']);
+    expect(modelLabel(aiSettings.value.model)).toBe('Opus 5.5');
+    stop();
+    setClaudeModels([]);
+  });
+});
+
 describe('the model chosen', () => {
   it('stays chosen when the companion misses one look after it answered', async () => {
     const { aiModels, aiSettings, setAiSettings } = await import('../src/ai/index.ts');

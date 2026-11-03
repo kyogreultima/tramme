@@ -24,7 +24,8 @@ export function scenePrompt(plan: FilmPlan, scene: PlanScene, doc: TrammeDoc): s
     after ? `"${after.name}" follows it: leave it something to start from.` : 'It closes the film.',
     plan.target ? `Build to the kept style frame (${plan.target}) and the direction in the plan: its level of finish, its type, its palette, its light.` : 'Build to the direction in the plan.',
     `The other scenes are built apart by others: change nothing outside "${scene.comp}" (a proposal that does is refused). You may add assets, tokens and files of your own.`,
-    `Propose your changes, look at the result (use_tool "check" on your composition, and look at stills), fix what matters, then call scene-done with scene "${scene.id}" and answer in one short line, with no summary for the user.`,
+    `Your tools work on "${scene.comp}" unless you name another composition: the check, the motion tool, the stills, the values, and the packs' tools place their layers there. A discard drops only your own changes.`,
+    `Propose your changes, look at the result (use_tool "check" and "motion", and stills), fix what matters, then call scene-done with scene "${scene.id}" and answer in one short line, with no summary for the user.`,
   ].join('\n');
 }
 
