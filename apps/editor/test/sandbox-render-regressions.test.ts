@@ -17,6 +17,7 @@ vi.mock('@tramme/render/src/compositor.ts', () => ({
 }));
 
 const draws: unknown[][] = [];
+const paint: { canvas: Surface; op: string; args: number[] }[] = [];
 class Surface {
   width: number;
   height: number;
@@ -24,8 +25,11 @@ class Surface {
   getContext() {
     return {
       canvas: this, globalAlpha: 1,
-      setTransform() {}, clearRect() {}, save() {}, restore() {}, transform() {},
-      translate() {}, beginPath() {}, rect() {}, clip() {}, fillRect() {},
+      setTransform: (...args: number[]) => paint.push({ canvas: this, op: 'transform', args }),
+      clearRect: (...args: number[]) => paint.push({ canvas: this, op: 'clear', args }),
+      save() {}, restore() {}, transform() {},
+      translate() {}, beginPath() {}, rect() {}, clip() {},
+      fillRect: (...args: number[]) => paint.push({ canvas: this, op: 'fill', args }),
       drawImage: (...args: unknown[]) => draws.push(args),
     };
   }
@@ -34,6 +38,7 @@ class Surface {
 beforeEach(() => {
   resetSandbox();
   draws.length = 0;
+  paint.length = 0;
   gpu.contexts = 0;
   gpu.samples = 0;
   vi.stubGlobal('self', { fonts: { add() {} } });
@@ -100,6 +105,26 @@ describe('sandbox document assets', () => {
 });
 
 describe('sandbox video rendering', () => {
+  it('draws a transparent nested composition over the existing picture without clearing or resetting its transform', async () => {
+    const doc = project();
+    const main = doc.compositions[doc.root];
+    main.motionBlur = { samples: 1, shutter: 0.5 };
+    main.layers.hero = { type: 'test.paint', props: { size: 80 } };
+    main.layers.hud = { type: 'comp', props: { comp: 'hud' }, transform: { position: [500, 300] } };
+    main.order = ['hero', 'hud'];
+    doc.compositions.hud = { name: 'Transparent HUD', width: 320, height: 180, fps: 24, duration: 30, background: null, layers: { label: { type: 'test.paint', props: { size: 20 } } }, order: ['label'] };
+    const mod: PluginModule = { nodes: [{ type: 'test.paint', title: 'Paint', category: 'Test', props: { size: { type: 'number', default: 80 } }, render: { canvas2d: (ctx, p) => ctx.fillRect(10, 10, p.size, p.size) } }] };
+    const side = makeSandboxDraw(new Map([['paint', mod]]));
+    side.setDoc({ doc, docUrl: 'https://tramme.test/doc.json', images: {}, json: {}, fonts: [] });
+    const result = await side.renderFrame({ compId: doc.root, t: 1, scale: 0.5, width: 1920, height: 1080 });
+    expect(result.err).toBeUndefined();
+    const hero = paint.findIndex((p) => p.op === 'fill' && p.args[2] === 80);
+    const label = paint.findIndex((p) => p.op === 'fill' && p.args[2] === 20);
+    expect(hero).toBeGreaterThanOrEqual(0);
+    expect(label).toBeGreaterThan(hero);
+    expect(paint.slice(hero + 1, label).filter((p) => p.canvas === paint[hero].canvas && (p.op === 'clear' || p.op === 'transform'))).toEqual([]);
+  });
+
   it('keeps video frames available to plugin nodes that compute an asset id', async () => {
     const doc = project();
     doc.assets.clip = { type: 'video', src: 'clip.mp4' };

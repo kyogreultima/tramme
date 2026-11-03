@@ -6,6 +6,7 @@ import type { AiEvent } from '../src/api.ts';
 const asked: { text: string; queued?: { text: string; context: { selection?: { id: string }[] } }[]; attachments?: unknown[] }[] = [];
 let release: (() => void) | null = null;
 let fail = '';
+let take: { id: string; label: string; ops: import('@tramme/core').Op[] } | null = null;
 const ai = await import('../src/ai/index.ts');
 const { chat, chatId, aiSettings, openChat } = ai;
 const { api } = await import('../src/api.ts');
@@ -20,10 +21,12 @@ const endTurn = async () => { release!(); release = null; await new Promise((r) 
 const settle = () => new Promise((r) => setTimeout(r, 0));
 const texts = (i: number) => asked[i].queued?.map((m) => m.text);
 
-// a project with one layer to select
+// a project with one title layer to select
 const project = newProject({ name: 'Test', width: 1920, height: 1080, fps: 30, duration: 5 });
 load(project.doc, project.manifest, '', '');
-(S.doc.peek().compositions[S.compId.peek()].layers as Record<string, unknown>).l1 = { type: 'text', name: 'Title' };
+const main = S.doc.peek().compositions[S.compId.peek()];
+(main.layers as Record<string, unknown>).l1 = { type: 'text', name: 'Title', props: {} };
+main.order.push('l1');
 
 // the project's files, in memory
 const files = new Map<string, string>();
@@ -33,13 +36,14 @@ beforeEach(async () => {
   vi.spyOn(ai, 'ask').mockImplementation(async function* (p: unknown): AsyncGenerator<AiEvent> {
     asked.push(p as (typeof asked)[number]);
     await new Promise<void>((r) => { release = r; });
+    if (take) yield { type: 'proposal', ...take };
     if (fail) yield { type: 'error', message: fail };
     yield { type: 'done' };
   });
   vi.spyOn(api, 'write').mockImplementation(async (_id: string, path: string, body: unknown) => { files.set(path, String(body)); return undefined as never; });
   vi.spyOn(api, 'readText').mockImplementation(async (_id: string, path: string) => (files.has(path) ? { text: files.get(path)!, etag: '' } as never : null));
   if (running.value) { stop(); release?.(); await vi.waitFor(() => expect(running.value).toBe(false)); }
-  asked.length = 0; release = null; fail = '';
+  asked.length = 0; release = null; fail = ''; take = null;
   queue.value = []; chat.value = []; pending.value = []; S.proposal.value = null; S.selection.value = [];
   aiSettings.value = { ...aiSettings.value, apply: 'off' };
 });
@@ -166,5 +170,25 @@ describe('the message queue', () => {
     expect(queue.value.map((q) => q.text)).toEqual(['b']);
     // read back from a file, it does not leave by itself
     expect(queueWaits.value).toBe('stopped');
+  });
+
+  it('a take still waiting is kept with the conversation, even after a failed turn', async () => {
+    take = { id: 'p9', label: 'Sound', ops: [{ op: 'add', path: '/tokens/pulse', value: { type: 'color', value: '#000000' } }] };
+    fail = 'usage limit';
+    await begin();
+    await endTurn();
+    const id = chatId.value!;
+    const saved = () => JSON.parse(files.get(`.tramme/chats/${id}.json`) ?? '{}').items.find((it: { proposal?: { id: string } }) => it.proposal?.id === 'p9').proposal;
+    await vi.waitFor(() => expect(saved().ops).toHaveLength(1));
+    // the page is left and opened again: the take comes back, ready to keep
+    S.proposal.value = null; chat.value = [];
+    await openChat(id);
+    expect(S.proposal.value).toMatchObject({ id: 'p9', status: 'pending', ops: take.ops });
+    const ok = decide(true);
+    expect(ok).toBe(true);
+    expect(S.doc.peek().tokens?.pulse).toBeTruthy();
+    // decided, its changes no longer weigh on the file
+    await vi.waitFor(() => expect(saved()).toMatchObject({ status: 'accepted' }));
+    expect(saved().ops).toBeUndefined();
   });
 });

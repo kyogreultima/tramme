@@ -618,7 +618,7 @@ const cues: ToolType<{ layers?: unknown }> = {
       text: [
         `${list.length} cues (${heroes} hero) over ${c.duration} s, read from the animation:`,
         ...list.map((x) => `- ${x.t.toFixed(2)} s ${x.weight === 'hero' ? 'HERO ' : ''}${x.kind}: ${name(x.layer)} (strength ${x.strength})`),
-        'What fits: ' + (Object.entries(FITS) as [SoundVisual, string][]).map(([k, v]) => `${k}: ${v}`).join('; ') + '. A hero: a stack (sfx sound "boom+hit" hard, "thump+tap" soft) with stop, a riser or reverse peaking on the same frame.',
+        'What fits: ' + (Object.entries(FITS) as [SoundVisual, string][]).map(([k, v]) => `${k}: ${v}`).join('; ') + '. A hero: a stack (sfx sound "boom+hit" hard, "thump+tap" soft) with stop. No riser or long whoosh swelling into the reveal unless the brief or the music asks for one: it is the stock sound of machine-made films.',
       ].join('\n'),
       notice: t('sound.cuesN', { n: list.length, heroes }),
     };

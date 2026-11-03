@@ -71,15 +71,18 @@ export async function startCompanion(opts: { port?: number; origins?: string[]; 
   async function runTurn(body: { engine?: string; prompt?: string; system?: string; model?: string; effort?: string; sessionId?: string; images?: { mediaType: string; data: string }[]; tools?: boolean }, res: http.ServerResponse) {
     if (typeof body.prompt !== 'string' || typeof body.system !== 'string') throw new Error('prompt and system expected');
     const engine: Engine = ENGINES.find((e) => e === body.engine) ?? 'claude';
-    // one conversation at a time: a new message stops the previous one
-    stopTurn();
+    // A fresh, tool-free consultation (the critic, for example) may run
+    // while the authoring turn waits for its result. Only a new user turn
+    // replaces that conversation and owns its MCP/tool-result address.
+    const consult = body.tools === false;
+    if (!consult) stopTurn();
     res.writeHead(200, { 'content-type': 'application/x-ndjson; charset=utf-8', 'cache-control': 'no-store' });
     const t: Turn = {
       send: (ev) => { if (!res.writableEnded) res.write(JSON.stringify(ev) + '\n'); },
       pending: new Map(), abort: new AbortController(), key: crypto.randomBytes(24).toString('hex'),
       stop: () => t.abort.abort(),
     };
-    turn = t;
+    if (!consult) turn = t;
     res.on('close', () => { if (!res.writableFinished) t.stop(); });
     try {
       await runEngine(engine, t, {

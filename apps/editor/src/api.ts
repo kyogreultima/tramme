@@ -36,8 +36,8 @@ export interface ChatItem {
   image?: { url: string; caption: string };
   /** what the assistant thinks before answering (summary streamed by the API); start and duration in ms */
   thinking?: { text: string; done?: boolean; start?: number; ms?: number };
-  /** a proposal of changes (its ops live in the state while pending) */
-  proposal?: { id: string; label: string; count: number; status: 'pending' | 'accepted' | 'rejected'; lines: string[] };
+  /** a proposal of changes (its ops live in the state while pending; the saved conversation keeps them too, so a reload does not lose the take) */
+  proposal?: { id: string; label: string; count: number; status: 'pending' | 'accepted' | 'rejected'; lines: string[]; ops?: import('@tramme/core').Op[] };
   /** what the turn cost, at its end */
   usage?: TurnUsage;
   /** assistant: the scene this item was made for, when it was built apart from the others */

@@ -13,7 +13,7 @@ import { CHAT, CHAT_INDEX, chatPath } from '@tramme/project';
 import type { TrammeDoc } from '@tramme/core';
 import reference from '../../../../docs/document.md';
 import { api, type AiEvent, type ChatItem, type KeyedProvider, type KeyStatus, type TurnUsage } from '../api.ts';
-import { S, toast } from '../state.ts';
+import { propose, S, toast } from '../state.ts';
 import { companionModels, companionTurn, NO_ENGINES, pairCompanion, probeCompanion, stopCompanion, type CompanionState, type Engines } from './companion.ts';
 import { passes, pause, recallDetails, ServerSession, type Message } from './server.ts';
 import { harvestNote, realNote } from './answers.ts';
@@ -427,6 +427,9 @@ export async function openChat(id: string) {
   held.value = c.queue.length > 0;
   // a conversation saved before its calls kept their line: read back from the history
   chat.value = recallDetails(c.items, c.server);
+  // the take left waiting (a reload, a turn cut by an error) is offered again
+  const waiting = c.items.findLast((it) => it.proposal)?.proposal;
+  if (waiting?.status === 'pending' && waiting.ops?.length) propose({ id: waiting.id, label: waiting.label, ops: waiting.ops });
 }
 
 /** a fresh conversation; the previous one stays in the history */
@@ -447,10 +450,12 @@ export async function deleteChat(id: string) {
   if (chatId.peek() === id) newChat();
 }
 
-/** the last few stills keep their picture; older ones keep their caption */
+/** the last few stills keep their picture; older ones keep their caption; the take waiting for a decision keeps its changes */
 function lighter(items: ChatItem[]): ChatItem[] {
   let images = 0;
+  const p = S.proposal.peek(), waiting = p?.status === 'pending' ? p : null;
   return [...items].reverse().map((it) => {
+    if (it.proposal) return { ...it, proposal: { ...it.proposal, ops: it.proposal.id === waiting?.id ? waiting.ops : undefined } };
     if (!it.image) return it;
     if (++images <= 12) return it;
     return { id: it.id, role: it.role, text: `(image : ${it.image.caption})` };
