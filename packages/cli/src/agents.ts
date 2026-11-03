@@ -12,6 +12,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type http from 'node:http';
 import spawn from 'cross-spawn';
+import { codexOnPath } from './codex-command.ts';
 import { createSdkMcpServer, query, tool, type Options, type SDKMessage, type SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
@@ -147,7 +148,7 @@ export function newestCodex(found: { command: string; version: string }[]): stri
 
 /** the program that answers `--version` among the candidates, which the turns then run (for Codex the newest one); its version, null when none does */
 async function locate(engine: Exclude<Engine, 'claude'>): Promise<string | null> {
-  const candidates = engine === 'codex' ? ['codex', ...codexInstalls()] : [COMMAND[engine]];
+  const candidates = engine === 'codex' ? [codexOnPath(), ...codexInstalls()] : [COMMAND[engine]];
   const answers = (await Promise.all(candidates.map(async (command) => ({ command, version: await version(command) }))))
     .filter((a): a is { command: string; version: string } => a.version !== null);
   const command = newestCodex(answers);
