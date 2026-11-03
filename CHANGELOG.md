@@ -8,6 +8,25 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-11-03
+
+### Added
+
+- **Timed motion direction** in `film-plan`: each scene can name its moving subjects, actions, start and end times, easing, settling and sound cues. Invalid timing is rejected before saving, and scene builders receive the complete choreography. Plans can identify a seamless loop; existing plans remain valid.
+- **Motion loops pack**: `/motion-loop` adds an editable orbit, flowing ribbons or travelling grid behind the composition, with colors, density, dimensions and period in the inspector. Drawing is deterministic, including when frames are requested out of order.
+- **Encoded video checks**: local MP4, MOV and WebM renders are decoded after encoding and adding chapters, including parallel exports, to verify dimensions, frame rate, frame count and duration. `tramme check-media` checks an existing file, with optional expectations and JSON output; failed checks return a nonzero exit code. GIF and PNG sequences explicitly skip this video check.
+- **ARC product-loop example**: an editable six-second product study, with a timed film plan and a packaging script that produces a self-contained `.tramme` archive. The [motion production guide](docs/motion-production.md) documents the direction, review, delivery checks and native loops.
+
+### Changed
+
+- **The critic respects the brief**: flat graphics, long holds, silence, hard cuts and rich palettes are artistic choices rather than automatic completion failures. Craft suggestions are separated from blocking technical defects, and corrections name the observed frame or timestamp, subject and concrete change.
+- **Visual review covers the whole film**: overview rows span the beginning, middle and end, followed by selected cuts, entrances and directed movement, within the existing image budget. Labels identify the actual frames and times; long films no longer spend the whole review budget on their earliest cuts.
+- **A single-shot film can use one picture kind**, without being asked to introduce unrelated imagery for variety.
+
+### Fixed
+
+- **Local exports of projects with plugins use the current rendered image**: the sandbox drew to the preview canvas while the encoder read a different framebuffer, which could produce a frozen or empty video despite a correct preview. The capture path now writes the sandbox picture into the framebuffer read by the encoder; a browser regression verifies movement in the decoded MP4.
+
 ## [0.18.0] - 2026-11-02
 
 ### Added
@@ -594,7 +613,8 @@ First public release.
 
 - Cloudflare Worker serving the editor and the API, projects stored in R2, access protected by Cloudflare Access.
 
-[Unreleased]: ../../compare/v0.18.0...HEAD
+[Unreleased]: ../../compare/v0.19.0...HEAD
+[0.19.0]: ../../compare/v0.18.0...v0.19.0
 [0.18.0]: ../../compare/v0.17.1...v0.18.0
 [0.17.1]: ../../compare/v0.17.0...v0.17.1
 [0.17.0]: ../../compare/v0.16.0...v0.17.0
