@@ -129,7 +129,7 @@ const api = {
     let inflight: Promise<void> | null = null;
     for (let f = f0; f < f1; f++) {
       if (await sandboxReady()) {
-        blitSandboxFrame(renderer, await sandboxFrame(f), f / fps, false);
+        blitSandboxFrame(renderer, await sandboxFrame(f), f / fps, false, true);
       } else {
         await renderer.renderComplete(f / fps, { ...opts, toFbo: true });
         // a frame whose pictures never came (see SETTLE_LIMIT): the export stops rather than carry a wrong picture

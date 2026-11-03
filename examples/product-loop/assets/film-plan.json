@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "kind": "film-plan",
+  "updated": "2026-11-03T00:00:00.000Z",
+  "idea": "A quiet six-second study of a pocket speaker: one object, readable type, a seamless return to the opening.",
+  "kinds": ["3d"],
+  "loop": true,
+  "scenes": [{
+    "id": "arc", "name": "ARC", "kind": "3d", "idea": "The speaker rocks gently while the copy holds still.", "comp": "main", "seconds": 6, "hero": true,
+    "motion": [
+      { "subject": "Speaker and dial", "start": 0, "end": 6, "action": "One periodic yaw from 25 to 43 to 7 and back to 25 degrees; a 12 px vertical bob, same phase.", "easing": "sinusoidal, one cycle over six seconds", "settle": 6 },
+      { "subject": "Title", "start": 0, "end": 6, "action": "Hold still for the whole loop so the product carries the movement.", "easing": "hold", "settle": 6 }
+    ]
+  }],
+  "directions": [{ "name": "Copper and deep teal", "type": "Large plain sans serif, left aligned with quiet supporting copy", "palette": "Deep blue-black background, pale warm type, a copper accent", "light": "A cool overhead studio reflection on the metal body", "materials": "Brushed green metal with a copper ring", "framing": "Type on the left, product large on the right; stable camera" }]
+}

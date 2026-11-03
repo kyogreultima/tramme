@@ -50,7 +50,7 @@ describe('the variety of a film plan', () => {
 
   it('names a scene whose kind the plan does not list, and a list of kinds out of range', () => {
     expect(issues(['interface', 'type'], ['interface', 'data'])).toHaveLength(1);
-    expect(issues(['interface'], ['interface'])).toHaveLength(1);
+    expect(issues(['interface'], ['interface', 'interface']).some((l) => /Name 2 to 5/.test(l))).toBe(true);
     const six: PictureKind[] = ['interface', 'type', 'data', 'object', 'diagram', 'photo'];
     expect(issues(six, ['interface', 'type'])).toHaveLength(1);
   });

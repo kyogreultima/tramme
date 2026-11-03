@@ -1565,6 +1565,8 @@
     "issue.loudness": "Le volume visé est {from}, ce format veut {to} LUFS"
   },
   "content": {
+    "ARC · product loop": "ARC · boucle produit",
+    "A six-second pocket-speaker loop with editable type, product and background.": "Une boucle de six secondes pour une enceinte de poche, avec texte, produit et fond modifiables.",
     "Typefaces": "Polices",
     "looks for open typefaces by character (\"condensed grotesque, heavy, for titles\"), lists the families found and shows them on a specimen sheet set in their own letters": "cherche des polices libres par caractère (\"grotesque condensée, grasse, pour des titres\"), liste les familles trouvées et les montre sur une planche composée dans leurs propres lettres",
     "Use a typeface": "Utiliser une police",

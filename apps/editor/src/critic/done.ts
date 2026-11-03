@@ -1,14 +1,12 @@
-// What "done" means, measured before any opinion: a film is not done while a
-// scene is a flat plate, the type has no hierarchy, a talking video has a long
-// bare stretch, nothing is the hero, the ending is thin, scenes meet with no
-// transition, the sound is missing, something is provisional or the text
-// cannot be read. The critic's verdict cannot overrule these.
+// Technical completion defects and craft suggestions, kept distinct. The
+// brief decides material, hierarchy, coverage, endings, cuts and silence;
+// provisional content and measured readability/audio defects block delivery.
 
 import { staticValue, type Layer, type QualityIssue, type Registry, type TrammeDoc } from '@tramme/core';
 import { filmTime, scenesOf, sceneAt, type Scene } from '../scenes.ts';
 import type { FilmPlan } from '../filmplan.ts';
 
-export interface DoneIssue { id: string; scene?: string; line: string }
+export interface DoneIssue { id: string; scene?: string; line: string; /** A technical defect, rather than a direction suggestion. */ blocking?: boolean }
 
 /** what the beats of the project say, when it has them */
 export interface BeatData { data: (id: string) => unknown; analysisIds: string[] }
@@ -101,7 +99,7 @@ export function doneIssues(doc: TrammeDoc, compId: string, registry: Registry, p
   // sound: a film with no sound, or the sound checks' warnings
   const sounded = Object.values(doc.compositions).some((c) => Object.values(c.layers).some((l) => (l.type === 'audio' || l.type === 'video') && l.visible !== false));
   if (!sounded) out.push({ id: 'sound', line: 'the film has no sound: add music, and sound effects on the moments that matter' });
-  for (const i of issues.filter((x) => x.check === 'sound' && x.severity === 'warning').slice(0, 3)) out.push({ id: 'sound', scene: where(i.t), line: i.message });
+  for (const i of issues.filter((x) => x.check === 'sound' && x.severity === 'warning').slice(0, 3)) out.push({ id: 'sound', scene: where(i.t), line: i.message, blocking: true });
 
   // provisional: what is not finished
   for (const [cid, c] of Object.entries(doc.compositions)) {
@@ -116,5 +114,5 @@ export function doneIssues(doc: TrammeDoc, compId: string, registry: Registry, p
 
   // readable: the checks' warnings on text
   for (const i of issues.filter((x) => (x.check === 'text-size' || x.check === 'text-time') && x.severity === 'warning').slice(0, 3)) out.push({ id: 'readable', scene: where(i.t), line: i.message });
-  return out;
+  return out.map((i) => i.id === 'provisional' || i.id === 'readable' ? { ...i, blocking: true } : i);
 }

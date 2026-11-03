@@ -99,8 +99,13 @@ const critique: ToolType<Input> = {
     const plan = parsePlan(await ctx.readText(FILM_PLAN_PATH).catch(() => null));
     const issues = await runChecks(ctx.doc, ctx.registry, id, { data: await analyses(ctx) });
     const beats = { data: await analyses(ctx), analysisIds: Object.keys(ctx.doc.assets).filter((a) => /^analysis-/.test(a)) };
-    const measured = doneIssues(ctx.doc, id, ctx.registry, plan, issues, beats);
-    const head = measured.length ? `Measured, not to be argued with (${measured.length}):\n${measuredLines(measured).join('\n')}` : 'Measured: nothing missing (material, hierarchy, coverage, a hero, an ending, transitions, sound, nothing provisional, readable).';
+    const found = doneIssues(ctx.doc, id, ctx.registry, plan, issues, beats);
+    const measured = found.filter((i) => i.blocking);
+    const advice = found.filter((i) => !i.blocking);
+    const head = [
+      measured.length ? `Measured defects (${measured.length}):\n${measuredLines(measured).join('\n')}` : 'Measured: no blocking technical defect in the checks that ran.',
+      ...(advice.length ? [`Direction suggestions (not defects; apply only when they serve the brief):\n${measuredLines(advice).join('\n')}`] : []),
+    ].join('\n');
     const measuredOnly = (why: string) => ({
       text: `${head}\n${why}`,
       notice: measured.length ? t('critic.measured', { n: measured.length }) : t('critic.nothingMeasured'),
@@ -119,9 +124,10 @@ const critique: ToolType<Input> = {
     const takesText = takes?.length ? `\n\nThese are takes of one scene, built differently (their strips follow, in this order): ${takes.join(', ')}. Name the best in the "what" of your first fix and say why it beats the others.` : '';
     const text = [
       evidence.facts,
+      head,
       evidence.plan ? `Plan:\n${evidence.plan}` : '',
       evidence.target ? 'The first picture is the target frame the film was made towards: reach its level of finish, not its content.' : '',
-      `Moments (each strip is four frames over 0.6 s, left to right, three strips to a picture):\n${evidence.strips.map((s) => s.caption).join('\n')}`,
+      `Visual samples (four labelled frames per row, left to right, three rows per picture): overview rows cover the whole film; detail rows cover events and directed movement. Read each row's frame labels: spacing varies. Samples cannot prove smoothness between them. No audio was supplied; do not claim to have heard or verified the soundtrack.\n${evidence.strips.map((s) => s.caption).join('\n')}`,
     ].filter(Boolean).join('\n\n') + takesText;
 
     let answer: { text: string; usage: Usage };

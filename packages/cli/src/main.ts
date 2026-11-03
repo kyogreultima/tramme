@@ -11,6 +11,7 @@
 //   tramme bench    <editor url> [--layer id] [--t s]                  how the editor holds up: playback, drag, hover
 //   tramme load     [case...] [--frames n] [--out folder] [--json file] [--before file]   the load cases of bench/load: where a frame's time goes
 //   tramme check-export <doc> --format lottie|svg --t 0.5,1.5 [--out dir]   an export played back (lottie-web, Chrome) vs Tramme
+//   tramme check-media <file> [--width n --height n --fps n --frames n --duration s] [--json] [--timeout ms]
 //   tramme compare  <ref> <test> [--diff dir] [--threshold 16]     files, or folders paired by time
 //   tramme schema   [--out schema/tramme-1.schema.json]
 //   tramme agent    [--origin https://app.example] [--port 4317] [--renew]   the local companion of the editor's assistant (Claude Code, Codex or the Antigravity CLI of this computer)
@@ -46,7 +47,7 @@ const asDoc = (p?: string) => {
   // a folder of a former name (document.trame.json, document.emotion.json) is read as well
   return [DOCUMENT, ...LEGACIES.map((l) => l.document)].map((d) => path.join(p, d)).find((f) => fs.existsSync(f)) ?? p;
 };
-if (!['compare', 'import', 'pack', 'unpack', 'bench', 'load', 'agent'].includes(cmd)) pos[0] = asDoc(pos[0])!;
+if (!['compare', 'import', 'pack', 'unpack', 'bench', 'load', 'agent', 'check-media'].includes(cmd)) pos[0] = asDoc(pos[0])!;
 const num = (k: string) => (flags[k] === undefined ? undefined : Number(flags[k]));
 const str = (k: string) => (typeof flags[k] === 'string' ? (flags[k] as string) : undefined);
 
@@ -119,6 +120,7 @@ async function cmdRender(file: string) {
     });
     console.log(`${r.frames} frames in ${r.seconds.toFixed(1)} s (${r.msPerFrame.toFixed(0)} ms/frame${'pages' in r ? `, ${r.pages} pages` : ''})${r.audio ? ', with sound' : ''} -> ${path.relative(process.cwd(), out)}`);
     console.log(`  per frame: ${formatParts(r.parts)}`);
+    console.log(r.verification ? '  Delivery checked: decoded dimensions, cadence, frame count and duration match the render.' : '  Delivery check skipped: GIF and PNG sequences use different timing rules.');
   } finally { await s.close(); }
 }
 
@@ -290,12 +292,23 @@ const COMMANDS: Record<string, () => Promise<void> | void> = {
     const { checkExport } = await import('./check-export.ts');
     await checkExport(pos[0], format, String(flags.t ?? '0').split(',').map(Number), path.resolve(str('out') ?? `out/check-${format}`), str('comp'));
   },
+  'check-media': async () => {
+    if (!pos[0]) throw new Error('check-media: supply an MP4, MOV or WebM file');
+    const { mediaReport, verifyMedia } = await import('./verify-media.ts');
+    const expected = Object.fromEntries(['width', 'height', 'fps', 'frames', 'duration'].filter((key) => flags[key] !== undefined).map((key) => {
+      if (flags[key] === true) throw new Error(`check-media: --${key} needs a value`);
+      return [key, num(key)];
+    }));
+    const result = await verifyMedia(pos[0], expected, num('timeout'));
+    console.log(flags.json ? JSON.stringify(result, null, 2) : mediaReport(result));
+    if (!result.ok) process.exitCode = 1;
+  },
   agent: async () => { const { startCompanion } = await import('./companion.ts'); await startCompanion({ port: num('port'), origins: str('origin')?.split(',').filter(Boolean), renew: !!flags.renew }); },
 };
 
 const run = COMMANDS[cmd];
 if (!run) {
-  console.log('usage: tramme <validate|check|still|render|export|import|pack|unpack|nodes|compare|schema|bench|load|agent> ... (see the header of packages/cli/src/main.ts)');
+  console.log('usage: tramme <validate|check|still|render|export|import|pack|unpack|nodes|compare|schema|bench|load|check-media|agent> ... (see the header of packages/cli/src/main.ts)');
   process.exit(cmd ? 1 : 0);
 }
 try {

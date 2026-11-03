@@ -1,0 +1,46 @@
+{
+  "schema": "tramme/1",
+  "meta": { "title": "ARC · product loop", "description": "A six-second pocket-speaker loop with editable type, product and background.", "thumbnailTime": 2 },
+  "tokens": {
+    "ink": { "type": "color", "value": "#101923" },
+    "paper": { "type": "color", "value": "#F2EDE4" },
+    "accent": { "type": "color", "value": "#F19A67" }
+  },
+  "assets": { "motion-loops": { "type": "module", "src": "/plugins/motion-loops.js" } },
+  "plugins": ["motion-loops"],
+  "root": "main",
+  "compositions": {
+    "main": {
+      "name": "ARC", "width": 960, "height": 540, "fps": 30, "duration": 6, "background": "#101923",
+      "motionBlur": { "samples": 4, "shutter": 0.5 },
+      "markers": [{ "id": "hero", "kind": "hero", "t": 2.5, "label": "The product" }],
+      "order": ["pattern", "halo", "product", "dial", "brand", "title", "caption", "edition"],
+      "layers": {
+        "pattern": {
+          "type": "motion.loop", "name": "Periodic ribbons",
+          "props": { "kind": "ribbons", "size": [960, 540], "period": 6, "count": 6, "background": "#101923", "color": "#1D2C39", "accent": "#263C49" },
+          "transform": { "position": [480, 270] }
+        },
+        "halo": {
+          "type": "shape.ellipse", "name": "Orbit",
+          "props": { "size": [410, 410], "fill": "#172B37", "stroke": "#34505A", "strokeWidth": 1 },
+          "transform": { "position": [630, 268], "scale": { "$expr": "const a = t * Math.PI / 3; return [1 + Math.sin(a) * 0.025, 1 + Math.sin(a) * 0.025];" } }
+        },
+        "product": {
+          "type": "solid.3d", "name": "ARC pocket speaker",
+          "props": { "shape": "slab", "size": [250, 170, 85], "radius": 28, "material": "metal", "color": "#759994", "roughness": 0.3, "height": 410, "pitch": 12, "yaw": { "$expr": "25 + 18 * Math.sin(t * Math.PI / 3)" } },
+          "transform": { "position": { "$expr": "return [630, 268 - 12 * Math.sin(t * Math.PI / 3)];" }, "rotation": -8 }
+        },
+        "dial": {
+          "type": "solid.3d", "name": "Copper dial",
+          "props": { "shape": "torus", "size": [62, 62, 20], "material": "metal", "color": "#F19A67", "roughness": 0.2, "height": 120, "pitch": 12, "yaw": { "$expr": "25 + 18 * Math.sin(t * Math.PI / 3)" } },
+          "transform": { "position": { "$expr": "return [697, 266 - 12 * Math.sin(t * Math.PI / 3)];" }, "rotation": -8 }
+        },
+        "brand": { "type": "text", "name": "Brand", "props": { "text": "ARC /", "size": 22, "color": "@accent", "weight": 600 }, "transform": { "position": [64, 68] } },
+        "title": { "type": "text", "name": "Title", "props": { "text": "Sound\nin motion.", "size": 66, "color": "@paper", "weight": 600 }, "transform": { "position": [64, 198] } },
+        "caption": { "type": "text", "name": "Caption", "props": { "text": "Pocket audio. Full presence.", "size": 18, "color": "#A8B8B9" }, "transform": { "position": [66, 390] } },
+        "edition": { "type": "text", "name": "Edition", "props": { "text": "PRODUCT STUDY   /   006", "size": 12, "color": "#A8B8B9" }, "transform": { "position": [66, 486] } }
+      }
+    }
+  }
+}

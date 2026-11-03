@@ -275,12 +275,12 @@ describe('the critique tool', () => {
 
   it('says not yet while something is missing by measure, whatever the critic says, the measured line first', async () => {
     const doc = good();
-    delete doc.compositions.main.layers.music;
+    doc.compositions.s1.layers.title.props = { text: 'TODO', size: 96 };
     const out = await run(doc);
     expect(out.text).toContain('Verdict: not yet');
-    expect(out.text!.indexOf('the film has no sound')).toBeGreaterThan(-1);
-    expect(out.text!.indexOf('the film has no sound')).toBeLessThan(out.text!.indexOf('Verdict'));
-    expect(out.text).toMatch(/not to be argued with/i);
+    expect(out.text!.indexOf('provisional text')).toBeGreaterThan(-1);
+    expect(out.text!.indexOf('provisional text')).toBeLessThan(out.text!.indexOf('Verdict'));
+    expect(out.text).toContain('Measured defects');
   });
 
   it('lists the three fixes the critic gives, with their scene, what and why', async () => {

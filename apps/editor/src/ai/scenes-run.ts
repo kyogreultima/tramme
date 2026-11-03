@@ -6,7 +6,7 @@
 import type { Usage } from '@tramme/assistant';
 import type { TrammeDoc } from '@tramme/core';
 import type { AiEvent, TurnUsage } from '../api.ts';
-import { setStatus, todoScenes, type FilmPlan, type PlanScene } from '../filmplan.ts';
+import { motionText, setStatus, todoScenes, type FilmPlan, type PlanScene } from '../filmplan.ts';
 
 /** what a scene builder is told: its scene, its composition, its brief and its neighbours' names, nothing of the other scenes */
 export function scenePrompt(plan: FilmPlan, scene: PlanScene, doc: TrammeDoc): string {
@@ -17,6 +17,8 @@ export function scenePrompt(plan: FilmPlan, scene: PlanScene, doc: TrammeDoc): s
     `Build one scene of the film, apart from the others: "${scene.name}" (id ${scene.id}), a scene of kind ${scene.kind}.`,
     `Its idea: ${scene.idea}`,
     `Its brief: ${scene.brief?.trim() || 'nothing beyond the plan'}.`,
+    ...(scene.motion?.length ? [`Timed motion (scene-local seconds):\n${motionText(scene)}\nBuild these beats, then inspect their starts, peaks and settled holds with the motion tool.`] : []),
+    ...(plan.loop ? ['This film is a seamless loop: preserve motion and visual continuity through its end and beginning.'] : []),
     `Build it in the composition "${scene.comp}"${comp ? ` (${+comp.duration.toFixed(2)} s, ${comp.width} x ${comp.height})` : ''}: it exists already, the root plays it.`,
     before ? `It follows "${before.name}": take up what that scene leaves (a colour, a shape, a movement).` : 'It opens the film.',
     after ? `"${after.name}" follows it: leave it something to start from.` : 'It closes the film.',

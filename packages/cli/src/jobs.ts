@@ -9,6 +9,7 @@ import type { FrameParts } from '@tramme/render/src/timing.ts';
 import { openDoc, type DocInfo } from './browser.ts';
 import { addChapters, encoder, frameKind, joinSegments, type VideoFormat } from './media.ts';
 import type { Server } from './server.ts';
+import { mediaReport, verifyMedia } from './verify-media.ts';
 
 export interface VideoJob {
   /** URL path of the document on the server: /project/film.tramme.json */
@@ -68,7 +69,10 @@ export async function renderVideo(server: Server, page: Page, job: VideoJob, onP
   // the chapters of the span rendered, written into the file
   const from = (job.from ?? 0), seconds = r.frames / r.info.fps;
   await addChapters(job.format ?? 'mp4', job.out, chaptersOf(r.info.markers, from, from + seconds), seconds);
-  return r;
+  const verification = ['mp4', 'mov', 'webm'].includes(job.format ?? 'mp4')
+    ? await verifyMedia(job.out, { width: r.info.width, height: r.info.height, fps: r.info.fps, frames: r.frames, duration: seconds }) : undefined;
+  if (verification && !verification.ok) throw new Error(`Export verification failed:\n${mediaReport(verification)}`);
+  return { ...r, verification };
 }
 
 async function renderFilm(server: Server, page: Page, job: VideoJob, onProgress?: (done: number, total: number) => void) {

@@ -1,5 +1,34 @@
 [
   {
+    "file": "motion-loops.js",
+    "name": "Motion loops",
+    "description": "Editable seamless orbits, ribbons and grids in the project palette",
+    "version": "1.0.0",
+    "commands": [
+      {
+        "name": "motion-loop",
+        "title": "Add a motion loop",
+        "description": "adds an editable seamless orbit, ribbons or grid behind the composition; its palette and period stay in the inspector"
+      }
+    ],
+    "entries": [
+      {
+        "name": "motion.loop",
+        "kind": "node",
+        "line": "an editable looping backdrop, bumper or brand pattern"
+      },
+      {
+        "name": "motion-loop",
+        "kind": "tool",
+        "line": "a seamless code-drawn backdrop, bumper or branded pattern"
+      }
+    ],
+    "fr": {
+      "Add a motion loop": "Ajouter une boucle animée",
+      "adds an editable seamless orbit, ribbons or grid behind the composition; its palette and period stay in the inspector": "ajoute une orbite, des rubans ou une grille en boucle derrière la composition ; ses couleurs et sa période restent dans l’inspecteur"
+    }
+  },
+  {
     "file": "charts.js",
     "name": "Charts",
     "description": "Bar, line and donut charts from a data set, animated, with a layout tool and a readability check",

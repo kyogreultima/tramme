@@ -1,15 +1,49 @@
-// What the critic is shown: the film in motion around its cuts and entrances
-// (strips of four frames over 0.6 s), the style frame it was made towards, the
-// plan, and a few facts. The critic never sees the film being made: this is all
-// it has, so it is chosen to show what a review of motion asks for.
+// Bounded visual evidence: an overview across the whole film, details around
+// selected events and directed beats, the target, plan and measured facts.
 
 import { Evaluator, runChecks, sampleAt, type QualityIssue, type Registry, type ToolContext, type TrammeDoc } from '@tramme/core';
 import { analyses } from '../perception.ts';
 import { sheetOf, stills } from '../review.ts';
 import { filmTime, scenesOf, sceneAt } from '../scenes.ts';
-import { FILM_PLAN_PATH, parsePlan, planText, type FilmPlan } from '../filmplan.ts';
+import { FILM_PLAN_PATH, motionText, parsePlan, planText, type FilmPlan } from '../filmplan.ts';
 
 export interface Moment { t: number; why: string; scene: string }
+export interface ReviewSample { times: number[]; caption: string }
+
+/** Planned beats use scene-local time, unlike ordinary root-layer keyframes. */
+export function directedMoments(doc: TrammeDoc, compId: string, plan: FilmPlan | null): (Moment & { end: number })[] {
+  return scenesOf(doc, compId).flatMap((s) => {
+    const planned = plan?.scenes.find((p) => p.id === s.id || p.name === s.name || (!!s.comp && p.comp === s.comp));
+    const at = (local: number) => s.comp ? filmTime(doc, compId, s, local) : s.from + local;
+    return (planned?.motion ?? []).flatMap((b) => {
+      const t = at(b.start), end = at(b.settle ?? b.end);
+      return t === null || end === null || t >= s.to || end < s.from ? [] : [{ t: Math.max(s.from, t), end: Math.min(s.to, end), why: `${b.subject}: ${b.action}`, scene: s.name }];
+    });
+  });
+}
+
+/** Keep both ends when there are more events than the visual budget can show. */
+function spread<T>(items: T[], n: number): T[] {
+  if (n <= 0) return [];
+  if (items.length <= n) return items;
+  if (n === 1) return [items[Math.floor(items.length / 2)]];
+  return Array.from({ length: n }, (_, i) => items[Math.round(i * (items.length - 1) / (n - 1))]);
+}
+
+/** Three overview rows, then up to nine details, still at most 48 frames. */
+export function reviewSamples(duration: number, fps: number, moments: Moment[], directed: (Moment & { end: number })[] = []): ReviewSample[] {
+  if (!Number.isFinite(duration) || duration <= 0 || !Number.isFinite(fps) || fps <= 0) return [];
+  const last = Math.max(0, (Math.ceil(duration * fps) - 1) / fps);
+  const snap = (t: number) => Math.max(0, Math.min(last, Math.round(t * fps) / fps));
+  const overview = Array.from({ length: 12 }, (_, i) => i === 11 ? last : snap(i * duration / 12));
+  const rows: ReviewSample[] = Array.from({ length: 3 }, (_, i) => ({ times: overview.slice(i * 4, i * 4 + 4), caption: `Overview ${i + 1}/3, across the whole film` }));
+  const beats = spread(directed.filter((m) => Number.isFinite(m.t) && Number.isFinite(m.end)).sort((a, b) => a.t - b.t), 6);
+  const details = [
+    ...beats.map((m) => ({ times: [m.t - 1 / fps, m.t + (m.end - m.t) / 3, m.t + 2 * (m.end - m.t) / 3, m.end + 1 / fps].map(snap), caption: `${m.scene}: ${m.why} (directed ${m.t.toFixed(3)}–${m.end.toFixed(3)} s)` })),
+    ...spread(moments, 9 - beats.length).map((m) => ({ times: AROUND.map((o) => snap(m.t + o)), caption: `${m.scene}: ${m.why} (${m.t.toFixed(3)} s)` })),
+  ];
+  return [...rows, ...details].slice(0, 12);
+}
 
 /** a layer must cover this much of the frame to count as an entrance (a small mark is not one) */
 const BIG = 0.05;
@@ -69,7 +103,9 @@ export function momentsOf(doc: TrammeDoc, compId: string, registry: Registry, is
   // the more important kept first when two are near, then the first MOST by importance and the rest spread
   const kept: typeof found = [];
   for (const m of [...found].sort((a, b) => a.rank - b.rank || a.t - b.t)) if (!kept.some((k) => Math.abs(k.t - m.t) < MERGE)) kept.push(m);
-  const out = kept.length > MOST ? [...kept.filter((m) => m.rank === 0), ...kept.filter((m) => m.rank !== 0).sort((a, b) => a.rank - b.rank || a.t - b.t)].slice(0, MOST) : kept;
+  const cuts = kept.filter((m) => m.rank === 0).sort((a, b) => a.t - b.t);
+  const others = kept.filter((m) => m.rank !== 0).sort((a, b) => a.t - b.t);
+  const out = kept.length > MOST ? [...spread(cuts, MOST), ...spread(others, MOST - Math.min(cuts.length, MOST))] : kept;
   return out.sort((a, b) => a.t - b.t).map(({ t, why, scene }) => ({ t, why, scene }));
 }
 
@@ -115,14 +151,16 @@ export async function gather(ctx: ToolContext, compId: string, checked?: Quality
   const plan = parsePlan(await ctx.readText(FILM_PLAN_PATH).catch(() => null));
   const issues = checked ?? await runChecks(doc, ctx.registry, compId, { data: await analyses(ctx) });
   const moments = momentsOf(doc, compId, ctx.registry, issues);
-  const shown = moments.slice(0, PER_PICTURE * PICTURES);
-  const times = shown.map((m) => AROUND.map((o) => +Math.min(Math.max(0, m.t + o), Math.max(0, comp.duration - 0.01)).toFixed(3)));
+  const directed = directedMoments(doc, compId, plan);
+  const samples = reviewSamples(comp.duration, comp.fps, moments, directed);
+  const times = samples.map((s) => s.times);
   const images = await stills(ctx, times.flat(), compId);
   const h = Math.round((CELL * comp.height) / comp.width);
-  const strips = stripPictures(shown.map((_, i) => i)).map((group) => ({
-    url: sheetOf(group.flatMap((i) => times[i].map((t, k) => ({ image: images[i * AROUND.length + k], label: `${t.toFixed(2)} s` }))), CELL, h, AROUND.length),
-    caption: `Strips ${group.map((i) => `${i + 1}. ${shown[i].why} (${shown[i].t.toFixed(1)} s)`).join('; ')}`,
+  const strips = stripPictures(samples.map((_, i) => i)).map((group) => ({
+    url: sheetOf(group.flatMap((i) => times[i].map((t, k) => ({ image: images[i * AROUND.length + k], label: `f${Math.round(t * comp.fps)} / ${t.toFixed(3)} s` }))), CELL, h, AROUND.length),
+    caption: `Rows ${group.map((i) => `${i + 1}. ${samples[i].caption}; frames ${times[i].map((t) => Math.round(t * comp.fps)).join(', ')}`).join('; ')}`,
   }));
   const target = plan?.target ? await dataUrl(ctx, plan.target) : null;
-  return { strips, target, plan: plan ? planText(plan) : null, facts: factsOf(doc, compId, plan), moments: shown, issues };
+  const choreography = plan?.scenes.filter((s) => s.motion?.length).map((s) => `${s.name} (scene-local seconds):\n${motionText(s)}`).join('\n');
+  return { strips, target, plan: plan ? `${planText(plan)}${choreography ? `\nTimed direction:\n${choreography}` : ''}` : null, facts: factsOf(doc, compId, plan), moments, issues };
 }

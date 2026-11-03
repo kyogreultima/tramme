@@ -65,6 +65,7 @@ tramme nodes    [<doc>]                               the available vocabulary
 tramme agent    [--origin https://…] [--port 4317]    the assistant's local companion
 tramme compare  <ref> <test> [--diff folder]          PSNR and an image of the differences
 tramme check-export <doc> --format lottie|svg --t …   export read back (lottie-web, Chrome) against Tramme
+tramme check-media <file> [--width n --height n --fps n --frames n --duration s] [--json]   decode and verify MP4, MOV or WebM delivery
 tramme bench    <url of an open project>              how the editor holds up: playback, drag, hover
 tramme load     [case…] [--json file] [--before file] the load cases of bench/load: where a frame's time goes
 tramme schema                                         regenerates the JSON schema

@@ -11,8 +11,11 @@ describe('the critic\'s instructions', () => {
     expect(CRITIC_SYSTEM).toContain('at most three');
   });
 
-  it('hold the grid: one idea per shot, the subject close, light, restrained type, continuity, palette, density, an ending, and the craft of motion', () => {
-    for (const word of ['one idea per shot', 'up close', 'light', 'restrained', 'continuity', 'palette', 'density', 'ending', 'eased', 'staggered']) expect(CRITIC_SYSTEM.toLowerCase(), word).toContain(word);
+  it('defers to the brief and describes the limits of sampled evidence', () => {
+    expect(CRITIC_SYSTEM).toContain('The brief and kept direction define success');
+    expect(CRITIC_SYSTEM).toContain('Flat graphics and empty space are valid');
+    expect(CRITIC_SYSTEM).toContain('Sound is optional');
+    expect(CRITIC_SYSTEM).toContain('Do not claim to see motion between samples');
   });
 
   it('say the target frame is a level of finish to reach, not content to copy, and ask for strict JSON', () => {

@@ -33,7 +33,9 @@ export const KIND_LABEL: Record<PictureKind, string> = {
 };
 
 export interface Direction { name: string; type: string; palette: string; light: string; materials: string; framing: string }
-export interface PlanScene { id: string; name: string; kind: PictureKind; idea: string; hero?: boolean; comp?: string; seconds?: number; status?: 'todo' | 'built' | 'failed'; brief?: string }
+/** Scene-local seconds. The action names measurable travel, anticipation or overshoot. */
+export interface MotionBeat { subject: string; start: number; end: number; action: string; easing?: string; settle?: number; soundAt?: number }
+export interface PlanScene { id: string; name: string; kind: PictureKind; idea: string; hero?: boolean; comp?: string; seconds?: number; status?: 'todo' | 'built' | 'failed'; brief?: string; motion?: MotionBeat[] }
 export interface StyleFrame { path: string; direction: string; scene: string; provider: string; model: string }
 export interface FilmPlan {
   version: 1;
@@ -48,6 +50,8 @@ export interface FilmPlan {
   frames?: StyleFrame[];
   /** the path of the kept style frame */
   target?: string;
+  /** The ending returns to the opening rather than asking for a closing card. */
+  loop?: boolean;
 }
 export const isPlan = (x: unknown): x is FilmPlan => !!x && typeof x === 'object' && (x as FilmPlan).kind === 'film-plan';
 
@@ -61,15 +65,40 @@ const FIELDS = ['type', 'palette', 'light', 'materials', 'framing'] as const;
 /** what is wrong with the variety of a plan: empty when the scenes alternate enough */
 export function planIssues(plan: Pick<FilmPlan, 'kinds' | 'scenes' | 'example'>): string[] {
   const { kinds, scenes, example } = plan, n = scenes.length, out: string[] = [];
-  if (kinds.length < 2 || kinds.length > 5) out.push(`Name 2 to 5 kinds of picture (there are ${kinds.length}).`);
+  const least = n === 1 ? 1 : 2;
+  if (kinds.length < least || kinds.length > 5) out.push(`Name ${least} to 5 kinds of picture (there are ${kinds.length}).`);
   for (const s of scenes) if (!kinds.includes(s.kind)) out.push(`The scene "${s.name}" is a ${s.kind}, which the plan's kinds do not list.`);
   for (let i = 1; i < n; i++) if (scenes[i].kind === scenes[i - 1].kind) out.push(`"${scenes[i - 1].name}" and "${scenes[i].name}" are both ${scenes[i].kind}: change the kind of one.`);
   const used = new Set(scenes.map((s) => s.kind)).size, want = Math.min(3, n - 1);
   if (n >= 3 && used < want) out.push(`The film alternates ${used} kinds over ${n} scenes: use at least ${want} kinds.`);
   const count = (k: PictureKind) => scenes.filter((s) => s.kind === k).length;
   if (n >= 4) for (const k of new Set(scenes.map((s) => s.kind))) if (count(k) > Math.ceil(n / 2)) out.push(`${k} covers more than half the ${n} scenes (${count(k)}): give some of them another kind.`);
-  if (example && count(example.kind) > Math.ceil(n / 3)) out.push(`The example (${example.what}) is one kind among the others: ${example.kind} is on ${count(example.kind)} scenes, at most ${Math.ceil(n / 3)} here.`);
+  if (n > 1 && example && count(example.kind) > Math.ceil(n / 3)) out.push(`The example (${example.what}) is one kind among the others: ${example.kind} is on ${count(example.kind)} scenes, at most ${Math.ceil(n / 3)} here.`);
   return out;
+}
+
+/** Invalid motion cannot be faithfully built or reviewed. Validate before saving. */
+export function motionIssues(scenes: Pick<PlanScene, 'name' | 'seconds' | 'motion'>[]): string[] {
+  const issues: string[] = [];
+  for (const s of scenes) {
+    if (!s.motion) continue;
+    if (!Array.isArray(s.motion) || s.motion.length > 16) { issues.push(`${s.name}: motion needs at most 16 beats.`); continue; }
+    if (s.seconds !== undefined && (!Number.isFinite(s.seconds) || s.seconds <= 0)) issues.push(`${s.name}: motion needs a positive scene duration.`);
+    for (const b of s.motion) {
+      const label = `${s.name}, ${b?.subject || 'motion'}`;
+      if (!b || !b.subject?.trim() || !b.action?.trim()) { issues.push(`${label}: name the subject and action.`); continue; }
+      if (!Number.isFinite(b.start) || !Number.isFinite(b.end) || b.start < 0 || b.end <= b.start) issues.push(`${label}: motion start/end must be finite, non-negative and increasing.`);
+      if (s.seconds !== undefined && (b.start > s.seconds || b.end > s.seconds)) issues.push(`${label}: motion must fit the ${s.seconds} s scene.`);
+      if (b.settle !== undefined && (!Number.isFinite(b.settle) || b.settle < b.end || (s.seconds !== undefined && b.settle > s.seconds))) issues.push(`${label}: settle must be at or after the movement end, within the scene.`);
+      if (b.soundAt !== undefined && (!Number.isFinite(b.soundAt) || b.soundAt < 0 || (s.seconds !== undefined && b.soundAt > s.seconds))) issues.push(`${label}: soundAt must be a finite time within the scene.`);
+    }
+  }
+  return issues;
+}
+
+/** Not clipped: a scene builder must receive the whole choreography. */
+export function motionText(scene: Pick<PlanScene, 'motion'>): string {
+  return (scene.motion ?? []).map((b) => `- ${b.start}–${b.end} s: ${b.subject}: ${b.action}${b.easing ? `; easing ${b.easing}` : ''}${b.settle !== undefined ? `; settled by ${b.settle} s` : ''}${b.soundAt !== undefined ? `; sound cue at ${b.soundAt} s` : ''}`).join('\n');
 }
 
 /** what is wrong with the directions: one to three, each of its five fields written precisely */
@@ -86,6 +115,8 @@ const directionText = (d: Direction) => `${d.name}: ${FIELDS.map((f) => `${f} ${
 /** the plan as the model reads it in the system prompt, at most 2 500 characters, the scenes' ideas clipped first */
 export function planText(plan: FilmPlan): string {
   const head = [`Idea: ${plan.idea}`, `Kinds: ${plan.kinds.join(', ')}.`];
+  if (plan.loop) head.push('Seamless loop: the ending returns to the opening; no closing card unless the brief asks for one.');
+  if (plan.scenes.some((s) => s.motion?.length)) head.push(`Timed motion beats are in ${FILM_PLAN_PATH}; read each scene's motion before building it.`);
   if (plan.example) head.push(`Example from the user (${plan.example.kind}, one kind among the others): ${plan.example.what}`);
   const kept = plan.directions[0];
   const tail = [...(kept ? [`${plan.target ? 'Kept' : 'First'} direction: ${directionText(kept)}`] : []), ...(plan.target ? [`Target (style frame): ${plan.target}`] : [])];
@@ -131,7 +162,7 @@ function sceneIds(names: string[]): string[] {
   });
 }
 
-interface FilmPlanInput { idea: string; kinds: PictureKind[]; scenes: Omit<PlanScene, 'id'>[]; directions: Direction[]; example?: { kind: PictureKind; what: string } }
+interface FilmPlanInput { idea: string; kinds: PictureKind[]; scenes: Omit<PlanScene, 'id'>[]; directions: Direction[]; example?: { kind: PictureKind; what: string }; loop?: boolean }
 
 const kindProp = { type: 'string', enum: PICTURE_KINDS };
 const filmPlan: ToolType<FilmPlanInput> = {
@@ -140,7 +171,8 @@ const filmPlan: ToolType<FilmPlanInput> = {
     type: 'object',
     properties: {
       idea: { type: 'string', title: 'Idea', description: 'the idea of the film in two or three sentences: the story it tells and why it is worth watching' },
-      kinds: { type: 'array', items: kindProp, title: 'Kinds', description: 'the 2 to 5 kinds of picture the film alternates' },
+      kinds: { type: 'array', items: kindProp, title: 'Kinds', description: 'the 2 to 5 kinds of picture the film alternates; one kind is enough for a single shot' },
+      loop: { type: 'boolean', title: 'Loop', description: 'a seamless loop: the last moment continues into the first' },
       scenes: {
         type: 'array', title: 'Scenes', description: 'the scenes in order, each with the kind of picture it is and what happens in it; no kind twice in a row, none on more than half the scenes',
         items: {
@@ -151,6 +183,18 @@ const filmPlan: ToolType<FilmPlanInput> = {
             seconds: { type: 'number', description: 'how long it lasts, when known' },
             comp: { type: 'string', description: 'the id of the composition the scene is built in (the root plays it)' },
             brief: { type: 'string', description: 'what the builder of this scene needs beyond the plan: the words, names and figures it shows, the sources it uses, its length and where it sits in the root' },
+            motion: {
+              type: 'array', description: 'up to 16 measurable motion beats, in scene-local seconds; include camera moves and a hold for reading',
+              items: { type: 'object', properties: {
+                subject: { type: 'string', description: 'the subject or camera that moves' },
+                start: { type: 'number', description: 'motion starts, seconds from the scene start' },
+                end: { type: 'number', description: 'motion reaches its destination, scene-local seconds' },
+                action: { type: 'string', description: 'travel, destination, anticipation and overshoot in measurable terms, e.g. rise 120 px, overshoot 7%' },
+                easing: { type: 'string', description: 'curve or spring parameters; linear when intentionally mechanical' },
+                settle: { type: 'number', description: 'time by which motion has settled, at or after end' },
+                soundAt: { type: 'number', description: 'optional sound cue time in scene-local seconds' },
+              }, required: ['subject', 'start', 'end', 'action'] },
+            },
           },
           required: ['name', 'kind', 'idea'],
         },
@@ -184,10 +228,13 @@ const filmPlan: ToolType<FilmPlanInput> = {
     const ids = sceneIds(input.scenes.map((s) => s.name));
     const written: FilmPlan = {
       version: 1, kind: 'film-plan', updated: new Date().toISOString(), idea: input.idea, kinds: input.kinds,
-      scenes: input.scenes.map((s, i) => { const had = prev?.scenes.find((p) => p.id === ids[i]); return { ...(had?.status ? { status: had.status } : {}), ...(had?.comp ? { comp: had.comp } : {}), ...(had?.brief ? { brief: had.brief } : {}), ...s, id: ids[i] }; }), directions: input.directions,
+      scenes: input.scenes.map((s, i) => { const had = prev?.scenes.find((p) => p.id === ids[i]); return { ...(had?.status ? { status: had.status } : {}), ...(had?.comp ? { comp: had.comp } : {}), ...(had?.brief ? { brief: had.brief } : {}), ...(had?.seconds !== undefined ? { seconds: had.seconds } : {}), ...(had?.motion ? { motion: had.motion } : {}), ...s, id: ids[i] }; }), directions: input.directions,
+      ...((input.loop ?? prev?.loop) !== undefined ? { loop: input.loop ?? prev?.loop } : {}),
       ...(input.example ? { example: input.example } : {}),
       ...(prev?.frames?.length ? { frames: prev.frames } : {}), ...(prev?.target ? { target: prev.target } : {}),
     };
+    const invalid = motionIssues(written.scenes.map((s) => ({ ...s, seconds: s.seconds ?? ctx.doc.compositions[s.comp ?? '']?.duration })));
+    if (invalid.length) throw new Error(`Invalid motion direction:\n${invalid.join('\n')}`);
     const path = await ctx.writeFile(FILM_PLAN_PATH, JSON.stringify(written, null, 1));
     const issues = [...planIssues(written), ...directionIssues(written.directions)];
     return {
