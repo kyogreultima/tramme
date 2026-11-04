@@ -52,7 +52,9 @@ header.header .site-title { color: var(--ink); font-size: 1rem; text-decoration:
 header.header :focus-visible { outline: 2px solid var(--accent-text); outline-offset: 3px; }
 header.header .social-icons a { color: var(--ink-2); }
 header.header button[data-open-modal] { background: var(--field); color: var(--ink-2); border: 1px solid var(--line-2); border-radius: var(--tramme-radius-control); box-shadow: none; }
-header.header kbd { background: var(--panel-2); color: var(--ink-2); border: 1px solid var(--line-2); border-radius: var(--tramme-radius-detail); }
+/* Starlight nests the keys (<kbd><kbd>Ctrl</kbd><kbd>K</kbd></kbd>): only the inner ones are drawn as keys */
+header.header button[data-open-modal] > kbd { gap: 4px; padding: 0; border: 0; background: none; box-shadow: none; }
+header.header button[data-open-modal] kbd kbd { padding: 2px 6px; background: var(--panel-2); color: var(--ink-2); border: 1px solid var(--line-2); border-radius: var(--tramme-radius-detail); font-size: 0.75rem; line-height: 1.3; }
 .sl-menu-button { color: var(--ink); background: var(--panel); border-radius: var(--tramme-radius-control); box-shadow: none; top: 14px; }
 .sl-menu-button:has(~ :popover-open) { background: var(--field); }
 .site-title { display: flex; align-items: center; }

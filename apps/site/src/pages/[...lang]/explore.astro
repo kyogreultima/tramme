@@ -18,9 +18,12 @@ const projects = await listProjects({ sort: 'recent' });
 <Page title={t(locale, 'explore.metaTitle')} description={t(locale, 'explore.metaDescription')}>
   <PageHead title={t(locale, 'explore.title')} lead={t(locale, 'explore.lead')} />
   <section class="wrap list">
+    {/* paused until Tramme's own visuals are good enough: reopen by restoring this block
     {projects.length > 0
       ? <div class="grid gallery">{projects.map((project) => <ProjectCard project={project} locale={locale} />)}</div>
       : <p class="none">{t(locale, 'card.empty')}</p>}
+    */}
+    <p class="none">{t(locale, 'card.empty')}</p>
   </section>
   <Closing locale={locale} />
 </Page>

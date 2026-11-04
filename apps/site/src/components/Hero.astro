@@ -4,7 +4,7 @@ import ArrowRight from '@phosphor-icons/core/assets/regular/arrow-right.svg';
 import hero from '../assets/hero-textile.png';
 import { signUp } from '../lib/links';
 import { FEATURES, wordsOf } from '../lib/features';
-import { t, type Locale } from '../lib/i18n';
+import { pathIn, t, type Locale } from '../lib/i18n';
 
 interface Props { locale: Locale }
 const { locale } = Astro.props;
@@ -19,12 +19,14 @@ const { locale } = Astro.props;
       <p>{t(locale, 'landing.hero.more')}</p>
       <div class="actions">
         <a class="btn btn-accent" href={signUp({ lang: locale })}>{t(locale, 'common.startFree')}<ArrowRight aria-hidden="true" /></a>
+        {/* paused until Tramme's own visuals are good enough: reopen by restoring this block (it leads to the film section)
         <a class="btn btn-ghost" href="#film">{t(locale, 'landing.hero.watch')}</a>
+        */}
       </div>
     </div>
   </div>
   <nav class="film-tools" aria-label={t(locale, 'landing.pillars.label')}>
-    <div class="bleed tools">{FEATURES.map((f) => <a href={`#film-${f.id}`}>{wordsOf(f, locale).name}</a>)}</div>
+    <div class="bleed tools">{FEATURES.map((f) => <a href={pathIn(locale, `/features/#${f.id}`)}>{wordsOf(f, locale).name}</a>)}</div>
   </nav>
 </section>
 

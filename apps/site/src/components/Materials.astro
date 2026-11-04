@@ -1,5 +1,4 @@
 ---
-import { Image } from 'astro:assets';
 import { FEATURES, wordsOf } from '../lib/features';
 import { pathIn, t, type Locale } from '../lib/i18n';
 interface Props { locale: Locale }
@@ -15,8 +14,8 @@ const { locale } = Astro.props;
   <ul class="collection" role="list">
     {FEATURES.map((f) => <li>
       <a href={pathIn(locale, `/features/#${f.id}`)}>
-        <div class={`tile tile-${f.id}`}><Image src={'shot' in f.picture ? f.picture.shot : f.picture.still} alt="" widths={[320, 640]} sizes="(max-width: 600px) 55vw, 20vw" loading="lazy" /></div>
         <span class="name">{wordsOf(f, locale).name}</span>
+        <span class="line">{wordsOf(f, locale).line}</span>
       </a>
     </li>)}
   </ul>
@@ -29,11 +28,9 @@ const { locale } = Astro.props;
   .intro p { max-width: 36ch; margin-top: 20px; font-size: 0.875rem; color: var(--ink-2); }
   .intro > a { margin-top: 24px; }
   .collection { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; margin: 64px 0 0; padding: 0; list-style: none; }
-  .collection a { text-decoration: none; }
-  .tile { aspect-ratio: 0.83; overflow: hidden; border-radius: var(--r); background: var(--panel); }
-  .tile :global(img) { width: 100%; height: 100%; object-fit: cover; transition: transform 0.5s var(--ease); }
-  .tile-studio :global(img), .tile-editor :global(img) { object-position: 54% center; }
-  a:hover .tile :global(img) { transform: scale(1.04); }
-  .name { display: block; margin-top: 14px; font-size: 0.8125rem; color: var(--ink-2); }
+  .collection a { display: block; height: 100%; padding: 20px 0 0; border-top: 1px solid var(--line-2); }
+  .name { display: block; font-size: 1rem; color: var(--ink); }
+  .line { display: block; margin-top: 10px; font-size: 0.8125rem; line-height: 1.5; color: var(--ink-2); }
+  a:hover .name { color: var(--accent-text); }
   @media (max-width: 600px) { .collection { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 16px; margin-top: 36px; scroll-snap-type: x mandatory; } .collection li { flex: 0 0 55%; scroll-snap-align: start; } }
 </style>

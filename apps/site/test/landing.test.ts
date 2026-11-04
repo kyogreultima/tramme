@@ -4,11 +4,13 @@ import { read, sourcesOf } from './sources';
 
 const PAGE = 'pages/[...lang]/index.astro';
 const landing = read(PAGE);
-const sections = [...(/<Page [^>]*>([\s\S]*?)<\/Page>/.exec(landing)?.[1] ?? '').matchAll(/<([A-Z]\w+) locale=\{locale\} \/>/g)].map((m) => m[1]);
+// the sections in use: what is commented out (paused) is not one
+const used = (/<Page [^>]*>([\s\S]*?)<\/Page>/.exec(landing)?.[1] ?? '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '');
+const sections = [...used.matchAll(/<([A-Z]\w+) (?:locale=\{locale\} )?\/>/g)].map((m) => m[1]);
 
 describe('the landing page', () => {
-  it('follows the reference composition with the film journey after the hero', () => {
-    expect(sections).toEqual(['Hero', 'Tabs', 'Showcase', 'Materials', 'Bento', 'Community', 'LandingClosing']);
+  it('is made of text and figures after the hero: no picture of the app, no video', () => {
+    expect(sections).toEqual(['Hero', 'Materials', 'Inside', 'Tools', 'Render', 'Bento', 'LandingClosing']);
   });
 
   it('is served in both languages', () => {
@@ -19,18 +21,13 @@ describe('the landing page', () => {
     expect(sourcesOf(PAGE).join('\n')).not.toContain('wrap-wide');
   });
 
-  it('progressively enhances the film journey with a scroll controller', () => {
-    expect(read('components/Tabs.astro')).toContain('setupJourney');
-    expect(read('components/Tabs.astro')).not.toMatch(/<article[^>]*\shidden[=>\s]/);
-  });
-
   it('has one heading style: every section with a title card takes it from Head (the hero and the closing call set their own display type)', () => {
-    for (const file of ['Tabs', 'Community', 'Bento']) expect(read(`components/${file}.astro`), file).toContain("import Head from './Head.astro'");
+    for (const file of ['Inside', 'Tools', 'Render', 'Bento']) expect(read(`components/${file}.astro`), file).toContain("import Head from './Head.astro'");
   });
 
-  it('links directly to sign-up and the demonstration, without script', () => {
+  it('links directly to sign-up, without script (the demonstration link is paused with the video sections)', () => {
     const hero = read('components/Hero.astro');
-    expect(hero).toContain('href="#film"');
+    expect(hero.replace(/\{\/\*[\s\S]*?\*\/\}/g, '')).not.toContain('href="#film"');
     expect(hero).toContain("signUp");
   });
 

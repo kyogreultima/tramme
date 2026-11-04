@@ -8,8 +8,6 @@ import ArrowUpRight from '@phosphor-icons/core/assets/regular/arrow-up-right.svg
 import Page from '../../components/Page.astro';
 import PageHead from '../../components/PageHead.astro';
 import SystemIcon from '../../components/SystemIcon.astro';
-import Shot from '../../components/Shot.astro';
-import { shotOf } from '../../lib/features';
 import { SYSTEMS, type Os } from '../../../../desktop/downloads.ts';
 import { APP, REPO } from '../../lib/links';
 import { localeOf, localePaths, pick, type Localised } from '../../lib/i18n';
@@ -17,7 +15,6 @@ import { localeOf, localePaths, pick, type Localised } from '../../lib/i18n';
 export const getStaticPaths = localePaths;
 
 const locale = localeOf(Astro.url.pathname);
-const studio = shotOf('studio');
 
 const release = __RELEASE__;
 const RELEASES = `${REPO}/releases`;
@@ -55,7 +52,6 @@ const mb = (bytes: number) => `${Math.round(bytes / 1e6)} MB`;
       {w.or}{' '}<a href={APP}>{w.browser}</a>, {w.nothing}.
     </PageHead>
     <section class="wrap download-preview">
-      <Shot src={studio.shot} alt={pick(locale, studio.alt)} />
       <div class="download-intro">
         <h2>{locale === 'fr' ? 'Votre studio, sur votre ordinateur.' : 'Your studio, on your computer.'}</h2>
         <p>{w.lead}</p>

@@ -4,9 +4,7 @@ import PushPin from '@phosphor-icons/core/assets/regular/push-pin.svg';
 import FilmSlate from '@phosphor-icons/core/assets/regular/film-slate.svg';
 import Compass from '@phosphor-icons/core/assets/regular/compass.svg';
 import Head from './Head.astro';
-import Shot from './Shot.astro';
 import Cards from './Cards.astro';
-import { shotOf } from '../lib/features';
 import { pick, type Locale, type Localised } from '../lib/i18n';
 
 interface Props { locale: Locale }
@@ -35,7 +33,6 @@ const COPY: Localised<{ title: string; more: string; items: [string, string][] }
 const c = pick(locale, COPY);
 const ICONS = [PushPin, FilmSlate, Compass];
 const items = c.items.map(([title, text], i) => ({ Icon: ICONS[i], title, text }));
-const { shot, alt } = shotOf('studio');
 ---
 
 <section class="section" id="studio">
@@ -43,7 +40,6 @@ const { shot, alt } = shotOf('studio');
     <Head title={c.title} more={c.more} />
   </div>
   <div class="wrap">
-    <Shot src={shot} alt={pick(locale, alt)} />
     <Cards items={items} />
   </div>
 </section>

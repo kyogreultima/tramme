@@ -44,16 +44,18 @@ const items = c.items.map(([title, text], i) => ({ Icon: ICONS[i], title, text }
   <div class="wrap">
     <Head title={c.title} more={c.more} />
     <div class="grid">
+      {/* paused until Tramme's own visuals are good enough: reopen by restoring this block
       <div class="frame" data-reveal>
         <Media id="assistant" width={1600} height={1000} tint={['#090f13', '#2ec4b6']} label={c.label} />
       </div>
+      */}
       <Cards items={items} columns={2} />
     </div>
   </div>
 </section>
 
 <style>
-  .grid { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 6fr); gap: var(--gap); align-items: stretch; }
+  .grid { display: grid; grid-template-columns: minmax(0, 1fr); /* with the video: minmax(0, 7fr) minmax(0, 6fr) */ gap: var(--gap); align-items: stretch; }
   .grid :global(.cards) { margin: 0; }
   .frame { display: grid; align-items: center; padding: clamp(12px, 1.6vw, 20px); border-radius: var(--r-lg); background: var(--stage); }
   @media (max-width: 1100px) { .grid { grid-template-columns: minmax(0, 1fr); } }

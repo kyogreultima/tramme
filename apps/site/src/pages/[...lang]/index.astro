@@ -1,11 +1,14 @@
 ---
-// The reference-led landing, in both languages: textile hero, scroll journey,
-// demonstration, tools, platform, community and closing call.
+// The reference-led landing, in both languages: hero, the features, motion, the toolbox, the
+// formats, the platform and the closing call. (The pictures of the app, the
+// film and the community's projects are paused.)
 import Page from '../../components/Page.astro';
 import Hero from '../../components/Hero.astro';
-import Tabs from '../../components/Tabs.astro';
 import Showcase from '../../components/Showcase.astro';
 import Materials from '../../components/Materials.astro';
+import Inside from '../../components/Inside.astro';
+import Tools from '../../components/Tools.astro';
+import Render from '../../components/Render.astro';
 import Community from '../../components/Community.astro';
 import Bento from '../../components/Bento.astro';
 import LandingClosing from '../../components/LandingClosing.astro';
@@ -25,10 +28,16 @@ const data = landingData(Astro.site!, previewUrl(Astro.site), systems, locale);
 <Page landing title={t(locale, 'landing.metaTitle')} description={t(locale, 'landing.metaDescription')}>
   <script is:inline slot="head" type="application/ld+json" set:html={JSON.stringify(data)} />
   <Hero locale={locale} />
-  <Tabs locale={locale} />
+  {/* paused until Tramme's own visuals are good enough: reopen by restoring this block
   <Showcase locale={locale} />
+  */}
   <Materials locale={locale} />
+  <Inside locale={locale} />
+  <Tools locale={locale} />
+  <Render locale={locale} />
   <Bento locale={locale} />
+  {/* paused until Tramme's own visuals are good enough: reopen by restoring this block
   <Community locale={locale} />
+  */}
   <LandingClosing locale={locale} />
 </Page>

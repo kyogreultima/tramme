@@ -34,7 +34,7 @@ describe('the components', () => {
 
   it('keep the scripts to the few that a behaviour needs', () => {
     const withScript = components.filter((f) => /<script/.test(read(f))).map((f) => path.basename(f, '.astro')).sort();
-    expect(withScript).toEqual(['Hero', 'Media', 'Nav', 'Platform', 'ProjectCard', 'Source', 'Tabs', 'ThemeProvider', 'ThemeToggle'].sort());
+    expect(withScript).toEqual(['Hero', 'Media', 'Nav', 'Platform', 'ProjectCard', 'Source', 'ThemeProvider', 'ThemeToggle'].sort());
     expect(withoutScript(read('components/Nav.astro'))).toContain('<details');
   });
 });

@@ -53,7 +53,6 @@ body[data-page='features'] .feature-index { display: flex; gap: 12px 28px; flex-
 .feature-index a:hover { color: var(--accent-text); }
 body[data-page='features'] main > .section { padding-top: var(--section); }
 body[data-page='features'] main > .section > .wrap:first-child { border-top: 1px solid var(--line-2); padding-top: 28px; }
-body[data-page='features'] #studio .shot, body[data-page='features'] #editor .shot { padding: clamp(12px, 3vw, 44px); background: var(--panel-2); }
 body.site .cards { gap: 0 32px; }
 body.site .cards > li { padding: 28px 0; border-top: 1px solid var(--line-2); border-radius: 0; background: transparent; }
 body.site .cards .icon { background: transparent; width: 28px; height: 28px; margin-bottom: 12px; color: var(--accent-text); }
@@ -127,8 +126,7 @@ body[data-page='roadmap'] .items > li + li { border-top: 1px solid var(--line); 
 body[data-page='roadmap'] .items h3 { font-size: 1.25rem; }
 
 /* Download keeps the real installer and release states next to the product. */
-body[data-page='download'] .download-preview { display: grid; grid-template-columns: minmax(0, 1.8fr) minmax(0, 1fr); align-items: center; gap: clamp(24px, 5vw, 80px); padding-top: 40px; }
-body[data-page='download'] .download-preview .shot { padding: 20px; background: var(--panel-2); }
+body[data-page='download'] .download-preview { padding-top: 40px; }
 body[data-page='download'] .download-intro h2 { max-width: 18ch; font-size: clamp(1.8rem, 2.8vw, 3rem); }
 body[data-page='download'] .download-intro p { max-width: 42ch; margin-top: 18px; color: var(--ink-2); }
 body[data-page='download'] .download-intro a { margin-top: 24px; }

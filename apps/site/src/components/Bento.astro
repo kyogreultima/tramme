@@ -1,19 +1,13 @@
 ---
 import Head from './Head.astro';
-import Shot from './Shot.astro';
-import { shotOf } from '../lib/features';
 import { pathIn, t, type Locale } from '../lib/i18n';
 interface Props { locale: Locale }
 const { locale } = Astro.props;
 const items = ['devices', 'visibility', 'export'];
-const { shot } = shotOf('editor');
 ---
 <section class="platform wrap" id="platform">
   <span class="section-label">{t(locale, 'nav.cloud')}</span>
   <Head title={t(locale, 'landing.platform.title')} more={t(locale, 'landing.platform.more')} />
-  <div class="desktop">
-    <Shot src={shot} alt={t(locale, 'landing.hero.demo')} />
-  </div>
   <ul class="details" role="list">
     {items.map((id) => <li><h3>{t(locale, `landing.platform.${id}.title`)}</h3><p>{t(locale, `landing.platform.${id}.text`)}</p><a href={pathIn(locale, '/features/#cloud')}>{t(locale, 'landing.pillars.learn')}</a></li>)}
   </ul>
@@ -22,11 +16,9 @@ const { shot } = shotOf('editor');
   .platform { padding-top: 28px; padding-bottom: var(--section); border-top: 1px solid var(--line); }
   .section-label { display: block; margin-bottom: 32px; font-size: 0.6875rem; color: var(--ink-2); }
   .platform :global(.head p) { max-width: 42ch; }
-  .desktop { position: relative; display: grid; place-items: center; isolation: isolate; overflow: hidden; padding: clamp(24px, 6vw, 90px) clamp(20px, 8vw, 120px); border-radius: var(--r); background: var(--panel-2); }
-  .desktop :global(.shot) { width: 100%; border-radius: var(--r); }
   .details { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 40px; list-style: none; margin: 32px 0 0; padding: 0; }
   h3 { font-size: 0.9375rem; line-height: 1.3; }
   .details p { max-width: 38ch; margin-top: 12px; font-size: 0.8125rem; color: var(--ink-2); }
   .details a { display: inline-block; margin-top: 18px; color: var(--ink-2); font-size: 0.6875rem; text-underline-offset: 4px; }
-  @media (max-width: 600px) { .details { grid-template-columns: 1fr; gap: 28px; } .desktop { padding: 24px 12px; } }
+  @media (max-width: 600px) { .details { grid-template-columns: 1fr; gap: 28px; } }
 </style>

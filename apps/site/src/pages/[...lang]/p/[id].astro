@@ -26,6 +26,7 @@ const published = new Intl.DateTimeFormat(locale === 'fr' ? 'fr-FR' : 'en-GB', {
 <Page title={`${project.title}, ${project.author.name}`} description={project.description}>
   <article class="wrap project">
     <p class="back"><a href={pathIn(locale, '/explore/')}>{t(locale, 'project.back')}</a></p>
+    {/* paused until Tramme's own visuals are good enough: reopen by restoring this block
     <Media
       id={project.id}
       width={project.width}
@@ -34,6 +35,7 @@ const published = new Intl.DateTimeFormat(locale === 'fr' ? 'fr-FR' : 'en-GB', {
       source={{ ...project.video, poster: project.poster }}
       label={t(locale, 'project.videoLabel', { title: project.title })}
     />
+    */}
     <div class="words">
       <h1>{project.title}</h1>
       <p class="by">{t(locale, 'card.by', { name: project.author.name })}. {t(locale, 'project.published', { date: published })}. {t(locale, 'project.duration', { seconds: project.duration })}</p>
@@ -43,7 +45,8 @@ const published = new Intl.DateTimeFormat(locale === 'fr' ? 'fr-FR' : 'en-GB', {
         : <p class="hint">{t(locale, 'project.videoOnly')}</p>}
     </div>
   </article>
-  {others.length > 0 && (
+  {/* paused until Tramme's own visuals are good enough: reopen by restoring this block */}
+  {false && others.length > 0 && (
     <section class="section">
       <div class="wrap">
         <Head title={t(locale, 'project.others', { name: project.author.name })} />
