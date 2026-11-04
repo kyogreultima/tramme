@@ -25,3 +25,7 @@ ELEVENLABS_API_KEY=
 HYDRACEPT_API_KEY=
 HYDRACEPT_PROJECT=
 # HYDRACEPT_ENVIRONMENT=development
+
+# Accounts: the backend (npm run server:dev) that answers /api/auth, /api/account and /api/billing.
+# Leave empty for no accounts. The editor then shows no sign-in.
+ACCOUNTS_URL=

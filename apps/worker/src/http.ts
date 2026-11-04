@@ -30,6 +30,8 @@ export interface Env {
   ACCESS_AUD?: string;
   /** '1' only from `wrangler dev` on this machine: no Access check */
   DEV_OPEN?: string;
+  /** accounts: the address of the backend (apps/server) that answers /api/auth, /api/account and /api/billing; none: no accounts */
+  ACCOUNTS_URL?: string;
   /** personal mode: the editor's address and the key vault's, another origin of the same site (https://tramme.app, https://cles.tramme.app) */
   APP_ORIGIN?: string;
   VAULT_ORIGIN?: string;

@@ -9,10 +9,12 @@
 // Private routes, besides those of @tramme/api (storage.ts, providers.ts, keys.ts):
 //   GET    /api/config                          what this server offers, the providers connected
 //   PUT    /api/keys/:provider, /custom/:id     connect a provider from the settings (DELETE: disconnect)
+//   /api/auth, /api/account, /api/billing      the accounts backend's (accounts.ts), when ACCOUNTS_URL is set
 //   POST   /api/transcribe                      {audio: WAV base64, language?} -> words with their timing (Whisper on Workers AI, else the OpenAI key)
 
 import { failure, HttpError, json, keysRoute, PROVIDER_ROUTES, providerRoute, providersConfig, storageRoute } from '@tramme/api';
 import { LIMITS, PROJECT_FORMAT } from '@tramme/project';
+import { accountRoute } from './accounts.ts';
 import { guard } from './access.ts';
 import type { Env } from './http.ts';
 import { bucket, keyStore, workerKeys } from './keys.ts';
@@ -44,6 +46,9 @@ export default {
     const url = new URL(req.url);
     if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(req);
     try {
+      // sign-in comes before the guard: a visitor has no session yet
+      const account = await accountRoute(req, env);
+      if (account) return account;
       return (await guard(req, env)) ?? (await route(req, env, url));
     } catch (e) { return failure(e); }
   },
