@@ -11,7 +11,7 @@ const { locale } = Astro.props;
       <span class="section-label">{t(locale, 'landing.showcase.label')}</span>
       <h2>{t(locale, 'landing.showcase.title')}</h2>
       <p>{t(locale, 'landing.showcase.more')}</p>
-      <a class="btn btn-ghost" href={signUp({ lang: locale })}>{t(locale, 'landing.hero.send')}</a>
+      <a class="btn btn-ghost" href={signUp({ lang: locale })} target="_blank" rel="noopener">{t(locale, 'landing.hero.send')}</a>
     </div>
     <Media id="tramme" width={1920} height={1080} label={t(locale, 'landing.hero.demo')} />
   </div>

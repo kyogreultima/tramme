@@ -12,7 +12,7 @@ const locale = localeOf(Astro.url.pathname);
       {footerColumns(locale).map((menu) => (
         <section>
           <strong>{menu.label}</strong>
-          <ul role="list">{menu.links.map(({ label, href }) => <li><a href={href}>{label}</a></li>)}</ul>
+          <ul role="list">{menu.links.map(({ label, href, app }) => <li><a href={href} target={app ? '_blank' : undefined} rel={app ? 'noopener' : undefined}>{label}</a></li>)}</ul>
         </section>
       ))}
     </nav>

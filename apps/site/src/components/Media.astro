@@ -70,17 +70,20 @@ const ratio = reduced === '8:5' ? '16:10' : reduced;
     }
   }, { rootMargin: '160px 0px' });
 
-  for (const v of document.querySelectorAll<HTMLVideoElement>('[data-video]')) {
-    const b = v.parentElement!.querySelector<HTMLButtonElement>('[data-video-toggle]')!;
-    v.addEventListener('play', () => { b.dataset.playing = ''; b.setAttribute('aria-label', 'Pause'); });
-    v.addEventListener('pause', () => { delete b.dataset.playing; b.setAttribute('aria-label', 'Play'); });
-    b.addEventListener('click', () => {
-      v.dataset.want = v.paused ? 'on' : 'off';
-      if (v.paused) v.play().catch(() => {});
-      else v.pause();
-    });
-    io.observe(v);
-  }
+  // at each page (the router loads this script once)
+  document.addEventListener('astro:page-load', () => {
+    for (const v of document.querySelectorAll<HTMLVideoElement>('[data-video]')) {
+      const b = v.parentElement!.querySelector<HTMLButtonElement>('[data-video-toggle]')!;
+      v.addEventListener('play', () => { b.dataset.playing = ''; b.setAttribute('aria-label', 'Pause'); });
+      v.addEventListener('pause', () => { delete b.dataset.playing; b.setAttribute('aria-label', 'Play'); });
+      b.addEventListener('click', () => {
+        v.dataset.want = v.paused ? 'on' : 'off';
+        if (v.paused) v.play().catch(() => {});
+        else v.pause();
+      });
+      io.observe(v);
+    }
+  });
 </script>
 
 <style>

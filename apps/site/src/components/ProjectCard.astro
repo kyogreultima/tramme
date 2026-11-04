@@ -25,9 +25,10 @@ const { id, title, author, poster, video, width, height } = project;
 
 <script>
   // the video comes only when the card is pointed at or focused, and goes when it is left
-  const cards = document.querySelectorAll<HTMLElement>('[data-project-card]');
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
-  for (const card of cards) {
+  // at each page (the router loads this script once)
+  document.addEventListener('astro:page-load', () => {
+  for (const card of document.querySelectorAll<HTMLElement>('[data-project-card]')) {
     const frame = card.querySelector<HTMLElement>('.frame')!;
     const start = () => {
       if (reduced.matches || frame.querySelector('video')) return;
@@ -47,6 +48,7 @@ const { id, title, author, poster, video, width, height } = project;
     card.addEventListener('focusin', start);
     card.addEventListener('focusout', stop);
   }
+  });
 </script>
 
 <style>

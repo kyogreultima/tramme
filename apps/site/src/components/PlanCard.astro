@@ -30,7 +30,7 @@ const rows = ROWS.filter((r) => SHOWN.includes(r.id)).map((r) => ({ label: pick(
       )}
     {p.price.month === 0 && <span>{t(locale, 'plans.forever')}</span>}
   </p>
-  <a class:list={['btn', featured ? 'btn-accent' : 'btn-ghost']} href={signUp({ lang: locale })}>{t(locale, `plans.cta.${planId}`)}</a>
+  <a class:list={['btn', featured ? 'btn-accent' : 'btn-ghost']} href={signUp({ lang: locale })} target="_blank" rel="noopener">{t(locale, `plans.cta.${planId}`)}</a>
   <ul role="list">
     {rows.map(({ label, value }) => (
       <li>

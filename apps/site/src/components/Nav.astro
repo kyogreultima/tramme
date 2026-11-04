@@ -18,8 +18,8 @@ const { logIn, start } = barButtons(locale);
       {links.map(({ label, href }) => <li><a href={href} aria-current={Astro.url.pathname.replace(/\/$/, '') === href.replace(/\/$/, '') ? 'page' : undefined}>{label}</a></li>)}
     </ul>
     <div class="end">
-      <a class="btn btn-ghost btn-sm login" href={logIn.href}>{logIn.label}</a>
-      <a class="btn btn-accent btn-sm start" href={start.href}>{start.label}</a>
+      <a class="btn btn-ghost btn-sm login" href={logIn.href} target="_blank" rel="noopener">{logIn.label}</a>
+      <a class="btn btn-accent btn-sm start" href={start.href} target="_blank" rel="noopener">{start.label}</a>
       <!-- under 960 px, everything in one menu, the two buttons included -->
       <details class="fold" name="nav-menu">
         <summary class="btn btn-ghost btn-sm">{t(locale, 'nav.menu')}</summary>
@@ -27,13 +27,13 @@ const { logIn, start } = barButtons(locale);
           {bar.map((menu) => (
             <section>
               <strong>{menu.label}</strong>
-              <ul role="list">{menu.links.map(({ label, href }) => <li><a href={href}>{label}</a></li>)}</ul>
+              <ul role="list">{menu.links.map(({ label, href, app }) => <li><a href={href} target={app ? '_blank' : undefined} rel={app ? 'noopener' : undefined}>{label}</a></li>)}</ul>
             </section>
           ))}
           <ul role="list">{links.map(({ label, href }) => <li><a href={href}>{label}</a></li>)}</ul>
           <div class="buttons">
-            <a class="btn btn-ghost" href={logIn.href}>{logIn.label}</a>
-            <a class="btn btn-accent" href={start.href}>{start.label}</a>
+            <a class="btn btn-ghost" href={logIn.href} target="_blank" rel="noopener">{logIn.label}</a>
+            <a class="btn btn-accent" href={start.href} target="_blank" rel="noopener">{start.label}</a>
           </div>
         </div>
       </details>

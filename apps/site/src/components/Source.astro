@@ -51,6 +51,8 @@ const CLONE = `git clone ${REPO}`;
 </section>
 
 <script>
+  // at each page (the router loads this script once)
+  document.addEventListener('astro:page-load', () => {
   for (const b of document.querySelectorAll<HTMLButtonElement>('[data-copy]')) {
     b.addEventListener('click', async () => {
       try {
@@ -63,6 +65,7 @@ const CLONE = `git clone ${REPO}`;
       }
     });
   }
+  });
 </script>
 
 <style>

@@ -18,7 +18,7 @@ const { locale } = Astro.props;
     <div class="lower">
       <p>{t(locale, 'landing.hero.more')}</p>
       <div class="actions">
-        <a class="btn btn-accent" href={signUp({ lang: locale })}>{t(locale, 'common.startFree')}<ArrowRight aria-hidden="true" /></a>
+        <a class="btn btn-accent" href={signUp({ lang: locale })} target="_blank" rel="noopener">{t(locale, 'common.startFree')}<ArrowRight aria-hidden="true" /></a>
         {/* paused until Tramme's own visuals are good enough: reopen by restoring this block (it leads to the film section)
         <a class="btn btn-ghost" href="#film">{t(locale, 'landing.hero.watch')}</a>
         */}
@@ -32,10 +32,13 @@ const { locale } = Astro.props;
 
 <script>
   import { setupHeroWave } from '../lib/hero-wave';
-  for (const root of document.querySelectorAll<HTMLElement>('[data-wave-hero]')) {
-    const cleanup = setupHeroWave(root);
-    document.addEventListener('astro:before-swap', cleanup, { once: true });
-  }
+  // at each page (the router loads this script once): the wave of the hero, stopped when the page is left
+  document.addEventListener('astro:page-load', () => {
+    for (const root of document.querySelectorAll<HTMLElement>('[data-wave-hero]')) {
+      const cleanup = setupHeroWave(root);
+      document.addEventListener('astro:before-swap', cleanup, { once: true });
+    }
+  });
 </script>
 
 <style>

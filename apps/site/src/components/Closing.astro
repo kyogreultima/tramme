@@ -10,7 +10,7 @@ const { locale } = Astro.props;
 <section class="closing" aria-label={t(locale, 'landing.closing.label')}>
   <div class="wrap">
     <h2>{t(locale, 'landing.closing.title')}</h2>
-    <a class="btn btn-accent" href={signUp({ lang: locale })}>{t(locale, 'common.startFree')}<ArrowRight aria-hidden="true" /></a>
+    <a class="btn btn-accent" href={signUp({ lang: locale })} target="_blank" rel="noopener">{t(locale, 'common.startFree')}<ArrowRight aria-hidden="true" /></a>
     <p>{t(locale, 'landing.closing.basic')} <a href={pathIn(locale, '/pricing/')}>{t(locale, 'landing.closing.plans')}</a></p>
     <div class="lens"><Image src={textile} alt="" widths={[640, 1280]} sizes="(max-width: 800px) 90vw, 70vw" loading="lazy" /></div>
   </div>

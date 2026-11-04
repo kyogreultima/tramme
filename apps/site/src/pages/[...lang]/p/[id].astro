@@ -41,7 +41,7 @@ const published = new Intl.DateTimeFormat(locale === 'fr' ? 'fr-FR' : 'en-GB', {
       <p class="by">{t(locale, 'card.by', { name: project.author.name })}. {t(locale, 'project.published', { date: published })}. {t(locale, 'project.duration', { seconds: project.duration })}</p>
       <p class="description">{project.description}</p>
       {project.reusable
-        ? <p><a class="btn btn-accent" href={appProject(project.id, locale)}>{t(locale, 'project.open')}</a> <span class="hint">{t(locale, 'project.openHint')}</span></p>
+        ? <p><a class="btn btn-accent" href={appProject(project.id, locale)} target="_blank" rel="noopener">{t(locale, 'project.open')}</a> <span class="hint">{t(locale, 'project.openHint')}</span></p>
         : <p class="hint">{t(locale, 'project.videoOnly')}</p>}
     </div>
   </article>

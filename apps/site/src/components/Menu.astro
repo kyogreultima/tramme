@@ -12,8 +12,8 @@ const { menu } = Astro.props;
 <details class="menu" name="nav-menu">
   <summary>{menu.label}</summary>
   <ul class="panel" role="list">
-    {menu.links.map(({ label, href, hint }) => (
-      <li><a href={href}><strong>{label}</strong>{hint && <span>{hint}</span>}</a></li>
+    {menu.links.map(({ label, href, hint, app }) => (
+      <li><a href={href} target={app ? '_blank' : undefined} rel={app ? 'noopener' : undefined}><strong>{label}</strong>{hint && <span>{hint}</span>}</a></li>
     ))}
   </ul>
 </details>

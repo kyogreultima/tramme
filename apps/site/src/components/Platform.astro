@@ -7,10 +7,15 @@
 
 <script is:inline>
   (() => {
-    const n = navigator, ua = n.userAgent, p = (n.userAgentData && n.userAgentData.platform) || n.platform || '';
-    // an iPad says it is a Mac, but has a touch screen
-    if (/android|iphone|ipad|ipod|cros/i.test(ua) || (/mac/i.test(p) && n.maxTouchPoints > 1)) return;
-    const os = /win/i.test(p) ? 'windows' : /mac/i.test(p) ? 'mac' : /linux|x11/i.test(p) ? 'linux' : '';
-    if (os) document.documentElement.dataset.os = os;
+    const set = () => {
+      const n = navigator, ua = n.userAgent, p = (n.userAgentData && n.userAgentData.platform) || n.platform || '';
+      // an iPad says it is a Mac, but has a touch screen
+      if (/android|iphone|ipad|ipod|cros/i.test(ua) || (/mac/i.test(p) && n.maxTouchPoints > 1)) return;
+      const os = /win/i.test(p) ? 'windows' : /mac/i.test(p) ? 'mac' : /linux|x11/i.test(p) ? 'linux' : '';
+      if (os) document.documentElement.dataset.os = os;
+    };
+    set();
+    // the router swaps <html>'s attributes at each page
+    document.addEventListener('astro:after-swap', set);
   })();
 </script>

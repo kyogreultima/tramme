@@ -7,6 +7,7 @@ import { SITE } from '../lib/site';
 import { ground } from '../lib/logo';
 import { LOCALES, localeOf, pathFor } from '../lib/i18n';
 import { Font } from 'astro:assets';
+import { ClientRouter } from 'astro:transitions';
 import '../styles/global.css';
 import '../styles/site.css';
 import '../styles/landing.css';
@@ -42,7 +43,19 @@ const page = segment === 'p' ? 'project' : segment;
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
     <SocialImage />
-    <script is:inline>document.documentElement.dataset.theme = 'dark';</script>
+    <!-- pages change without a reload (Astro's router); the documentation is another layout, with its own scripts: a full load -->
+    <ClientRouter />
+    <script is:inline>
+      // the site is dark only; the router swaps <html>'s attributes at each page, so it is put back after each swap
+      const dark = () => { document.documentElement.dataset.theme = 'dark'; };
+      dark();
+      document.addEventListener('astro:after-swap', dark);
+      // a link to the documentation leaves the router (it is not one of its pages)
+      document.addEventListener('click', (e) => {
+        const a = e.target instanceof Element ? e.target.closest('a[href]') : null;
+        if (a && /^(\/fr)?\/docs(\/|$)/.test(new URL(a.href, location.href).pathname)) a.setAttribute('data-astro-reload', '');
+      }, true);
+    </script>
     <Platform />
     <SiteHead />
     <Font cssVariable="--font-display" preload />
