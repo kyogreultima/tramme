@@ -16,7 +16,10 @@ interface Tauri {
     invoke: (cmd: string, args?: Record<string, unknown>) => Promise<unknown>;
     Channel: new <T>() => Channel<T>;
   };
-  event: { listen: (name: string, handler: () => void) => Promise<unknown> };
+  event: {
+    listen: (name: string, handler: (event: { payload: unknown }) => void) => Promise<() => void>;
+    emit: (name: string, payload?: unknown) => Promise<void>;
+  };
   window: { getCurrentWindow: () => NativeWindow };
 }
 
@@ -27,6 +30,8 @@ export interface NativeWindow {
   isMaximized: () => Promise<boolean>;
   isFullscreen: () => Promise<boolean>;
   onResized: (handler: () => void) => Promise<() => void>;
+  /** the window follows the pointer until it is released (the quick bubble's drag) */
+  startDragging: () => Promise<void>;
   /** the window manager's attention: 1 critical (Windows, Linux), 2 informational (a bounce of the Dock on macOS), null to stop */
   requestUserAttention: (kind: 1 | 2 | null) => Promise<void>;
 }

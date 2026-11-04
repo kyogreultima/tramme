@@ -22,6 +22,7 @@ import { normalize, route, SPA_PATHS, startRouter } from './router.ts';
 import { useEffect } from 'preact/hooks';
 import { AuthPage, type AuthMode } from './ui/AuthPage.tsx';
 import { SpacePage } from './ui/Space.tsx';
+import { Quick } from './ui/Quick.tsx';
 import { messageFor, refreshAccount, verifyEmail } from './accounts.ts';
 import { toast } from './state.ts';
 import './theme/tokens.css';
@@ -33,6 +34,7 @@ import './screens/account.css';
 import './screens/conversation.css';
 import './screens/studio.css';
 import './screens/atelier.css';
+import './screens/quick.css';
 import './theme/frost.css';
 import './theme/liquid-glass.css';
 import { offerTours } from './tours/index.ts';
@@ -117,6 +119,13 @@ async function answerNotices(q: URLSearchParams) {
 
 const m = location.pathname.match(/^\/p\/([a-z0-9][a-z0-9-]{2,63})\/?$/);
 boot().then(() => {
+  // the quick bubble's own window: the bubble alone, none of the app around it
+  if (location.pathname === '/quick') {
+    document.documentElement.dataset.quick = '';
+    render(<Quick />, root);
+    lift();
+    return;
+  }
   // the native app: a .tramme handed by the system imports like a dropped one
   initDesktop();
   // the plugins installed on this device, read once from where they are kept

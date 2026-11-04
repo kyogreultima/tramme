@@ -1,0 +1,51 @@
+/* The quick bubble's own window (ui/Quick.tsx). The window is transparent
+   (src-tauri/src/lib.rs): everything here draws its own rounded shape, and the
+   page, the boot cover and the app around stay clear, or the corners of the
+   window show as a square. The colours are the theme's: the bubble follows it. */
+:root[data-quick], :root[data-quick] body, :root[data-quick] #app, :root[data-quick] #boot { background: transparent !important; }
+:root[data-quick] body { overflow: hidden; }
+
+.quick-bubble {
+  position: relative; display: grid; place-items: center; width: 100vw; height: 100vh; padding: 0; border: 0; border-radius: 50%; cursor: grab;
+  background: var(--raised); color: var(--accent); box-shadow: inset 0 0 0 1px var(--line-strong);
+  transition: background-color var(--t-fast) var(--ease), scale var(--t-med) var(--ease);
+  -webkit-user-select: none; user-select: none; touch-action: none;
+}
+.quick-bubble:hover { background: var(--surface); }
+.quick-bubble:active { scale: .96; cursor: grabbing; }
+
+/* the playback, a ring filling around the bubble; it shows only while the film plays */
+.quick-ring { position: absolute; inset: 0; width: 100%; height: 100%; rotate: -90deg; pointer-events: none; opacity: 0; transition: opacity var(--t-med) var(--ease); }
+.quick-ring.on { opacity: 1; }
+.quick-ring circle { fill: none; stroke-width: 3; }
+.quick-track { stroke: var(--line); }
+.quick-fill { stroke: var(--accent); stroke-linecap: round; }
+
+.quick-panel {
+  box-sizing: border-box; display: flex; flex-direction: column; gap: 14px; width: 100vw; height: 100vh; padding: 10px 14px 12px; overflow: hidden;
+  border-radius: var(--r-xl); background: var(--raised); box-shadow: inset 0 0 0 1px var(--line-strong); color: var(--text);
+  transition: box-shadow var(--t-fast) var(--ease);
+}
+.quick-panel.over { box-shadow: inset 0 0 0 1px var(--accent-line); }
+.quick-head { display: flex; align-items: center; gap: 8px; height: 28px; color: var(--accent); }
+.quick-mark { position: relative; display: grid; place-items: center; width: 24px; height: 24px; flex: none; }
+.quick-mark .quick-ring { inset: 0; }
+.quick-mark .quick-ring circle { stroke-width: 4; }
+.quick-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); font-weight: 600; }
+.quick-head .grow { flex: 1; }
+.quick-ask { display: flex; gap: 6px; }
+.quick-ask input { flex: 1; min-width: 0; height: var(--h-md); padding: 0 10px; border: 0; border-radius: var(--r-md); outline: none; background: var(--field); color: var(--text); font: var(--fs-md) var(--ui); }
+.quick-ask input:focus { box-shadow: 0 0 0 1px var(--accent-line); }
+.quick-drop {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; min-height: 110px; padding: 14px; text-align: center;
+  border-radius: var(--r-lg); background: var(--field); color: var(--text-2); box-shadow: inset 0 0 0 1px var(--line);
+  transition: box-shadow var(--t-fast) var(--ease), background-color var(--t-fast) var(--ease);
+}
+.quick-panel.over .quick-drop { background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent-line); color: var(--text); }
+.quick-group { display: flex; flex-direction: column; gap: 6px; min-height: 0; }
+.quick-group h3 { margin: 0; color: var(--text-3); font: 500 var(--fs-sm) var(--ui); }
+.quick-ideas { display: flex; flex-wrap: wrap; gap: 6px; }
+.quick-row { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 8px; border: 0; border-radius: var(--r-sm); background: none; color: var(--text); font: var(--fs-md) var(--ui); text-align: left; cursor: pointer; }
+.quick-row:hover { background: var(--hover); }
+.quick-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.quick-foot { margin-top: auto; display: flex; justify-content: flex-end; }

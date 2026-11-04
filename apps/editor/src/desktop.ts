@@ -6,6 +6,9 @@
 import { importFile } from './importer.ts';
 import { frame, tauri } from './tauri.ts';
 import { go } from './nav.ts';
+import { prefs } from './settings.ts';
+import { effect } from '@preact/signals';
+import { startQuickLink } from './quick-link.ts';
 
 export function initDesktop(): void {
   const app = tauri;
@@ -31,6 +34,9 @@ export function initDesktop(): void {
       .then((m) => { go(`/p/${m.id}`); })
       .catch((e) => console.warn('[tramme] desktop open:', (e as Error).message));
   };
+  // the quick bubble, a window of its own, follows the setting
+  effect(() => { app.core.invoke('desktop_quick_enable', { on: prefs.value.quickLauncher }).catch(() => {}); });
+  startQuickLink();
   // the listener first, so an open arriving during the read is not lost
   app.event.listen('desktop-open', () => pending());
   pending();

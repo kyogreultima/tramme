@@ -62,6 +62,8 @@ export interface Preferences {
   updateNotified: string;
   /** the / menu's commands used last, its first lines when it opens empty (at most six) */
   recentCommands: string[];
+  /** desktop app: a small floating button over the other apps while Tramme is behind them, with quick suggestions */
+  quickLauncher: boolean;
   /** pictures made by a provider: the one by default (auto: the first connected), the quality (auto: the tool's choice), the size at most (small costs less) */
   pictureProvider: 'auto' | 'openai' | 'gemini' | 'zai' | 'hydracept';
   pictureQuality: 'auto' | 'low' | 'medium' | 'high';
@@ -77,7 +79,7 @@ export interface Preferences {
 
 export const DEFAULT_PREFERENCES: Preferences = {
   language: 'auto', theme: 'studio', view: 'studio', motion: 'auto', still: 'display', blur: 'document', exactFrames: true, scrubAudio: true, sandboxPreview: false,
-  effectsDb: -8, musicDb: -14, duckDb: -12, varySounds: true, confirmPaid: true, paidPerTurn: 10, voiceProvider: 'auto', voice: '', voiceModel: '', previewVolume: 1, previewMuted: false, proxies: true, models: {}, pluginsOff: [], areaConfirm: 'always', checkUpdates: true, lastUpdateCheck: 0, updateNotified: '', recentCommands: [],
+  effectsDb: -8, musicDb: -14, duckDb: -12, varySounds: true, confirmPaid: true, paidPerTurn: 10, voiceProvider: 'auto', voice: '', voiceModel: '', previewVolume: 1, previewMuted: false, proxies: true, models: {}, pluginsOff: [], areaConfirm: 'always', checkUpdates: true, lastUpdateCheck: 0, updateNotified: '', recentCommands: [], quickLauncher: false,
   pictureProvider: 'auto', pictureQuality: 'auto', pictureSize: 'large', styleFrames: 2,
   videoProvider: 'auto', videoSeconds: 8, dictation: 'local',
 };
@@ -148,6 +150,7 @@ function load(): Preferences {
     p.checkUpdates = p.checkUpdates !== false;
     p.lastUpdateCheck = Number.isFinite(p.lastUpdateCheck) ? p.lastUpdateCheck : 0;
     p.updateNotified = typeof p.updateNotified === 'string' ? p.updateNotified : '';
+    p.quickLauncher = p.quickLauncher === true;
     p.recentCommands = Array.isArray(p.recentCommands) ? p.recentCommands.filter((x) => typeof x === 'string').slice(0, 6) : [];
     if (!['auto', 'openai', 'gemini', 'zai', 'hydracept'].includes(p.pictureProvider)) p.pictureProvider = DEFAULT_PREFERENCES.pictureProvider;
     if (!['auto', 'low', 'medium', 'high'].includes(p.pictureQuality)) p.pictureQuality = DEFAULT_PREFERENCES.pictureQuality;
@@ -165,6 +168,9 @@ function load(): Preferences {
 }
 
 export const prefs = signal<Preferences>(load());
+
+/** the preferences as another window of the app saved them (the quick bubble follows the main window's theme) */
+export function reloadPrefs() { prefs.value = load(); }
 
 export function setPrefs(patch: Partial<Preferences>) {
   prefs.value = { ...prefs.peek(), ...patch };

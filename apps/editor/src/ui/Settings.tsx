@@ -415,6 +415,11 @@ function Behavior() {
       <Row label={t('settings.notifyDone')} hint={t(NOTIFY_HINT[permission])}>
         <Toggle on={a.notify} onChange={notifyOn} />
       </Row>
+      {tauri && (
+        <Row label={t('settings.quickLauncher')} hint={t('settings.quickLauncherHint')}>
+          <Toggle on={prefs.value.quickLauncher} onChange={(on) => setPrefs({ quickLauncher: on })} />
+        </Row>
+      )}
       <Row label={t('settings.resume')} hint={t('settings.resumeHint')}>
         <Toggle on={a.resume} onChange={(on) => setAiSettings({ resume: on })} />
       </Row>

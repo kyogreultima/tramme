@@ -8,6 +8,23 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+### Added
+
+- **Quick button (desktop app)**: an optional small floating button, switched on in Settings > Behavior, that stays over your other apps while Tramme is behind them. It opens a panel to describe a film, start from an idea or reopen a recent project.
+- **Refractive glass theme (experimental)**: floating surfaces (the direction box, menus, pills, toolbars) now bend the picture behind them at the rim, with a faint colour fringe, in Chromium-based browsers and the desktop app. Other engines keep the frosted look.
+
+### Changed
+
+- **The former Liquid Glass theme is no longer offered under that name**: it was a frosted glass, not Liquid Glass. Its styles remain as the base of the refractive glass theme; those who had picked it now get that one.
+- The direction box on the home screen has a thinner focus ring.
+- The settings search has a custom clear button and a slightly taller field.
+- The home top bar groups its icons together, then its buttons.
+
+### Fixed
+
+- The / menu on the home screen is no longer covered by the film cards, and bends and blurs them in the glass themes instead of letting them show through its text.
+
+
 ## [0.19.0] - 2026-11-03
 
 ### Added
