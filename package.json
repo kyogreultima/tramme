@@ -16,6 +16,7 @@
     "dev:personal": "node apps/editor/build.ts --dev --personal",
     "deploy": "node apps/editor/build.ts && wrangler deploy -c apps/worker/wrangler.jsonc",
     "deploy:personal": "node apps/editor/build.ts && wrangler deploy -c apps/worker/wrangler.jsonc --env personal",
+    "deploy:cloud": "node apps/editor/build.ts && wrangler deploy -c apps/worker/wrangler.jsonc --env cloud",
     "site": "npm run dev -w apps/site",
     "site:build": "npm run build -w apps/site",
     "site:deploy": "npm run site:build && cd apps/site && wrangler deploy",
