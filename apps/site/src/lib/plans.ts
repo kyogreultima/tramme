@@ -4,9 +4,11 @@
 // Paid features are services the platform runs, not switches in the app's code.
 
 import type { Locale, Localised } from './i18n';
+// the figures (prices, credits) are the platform's: one source, read by the payment too
+import { PLAN_TERMS, termsOf, type PlanId } from '../../../../packages/billing/src/plans.ts';
 
-export type PlanId = 'basic' | 'plus' | 'pro';
-export const PLAN_IDS: PlanId[] = ['basic', 'plus', 'pro'];
+export type { PlanId };
+export const PLAN_IDS: PlanId[] = PLAN_TERMS.map((p) => p.id);
 
 export interface Plan {
   id: PlanId;
@@ -18,11 +20,13 @@ export interface Plan {
   line: Localised<string>;
 }
 
-export const PLANS: Plan[] = [
-  { id: 'basic', price: { month: 0, year: 0 }, credits: 0, line: { en: 'To try Tramme and make public films.', fr: 'Pour essayer Tramme et publier des films.' } },
-  { id: 'plus', price: { month: 12, year: 10 }, credits: 1000, line: { en: 'For the films you make every month.', fr: 'Pour les films que vous faites chaque mois.' } },
-  { id: 'pro', price: { month: 35, year: 29 }, credits: 4000, line: { en: 'For studios and freelancers who deliver.', fr: 'Pour les studios et les indépendants qui livrent.' } },
-];
+const LINES: Record<PlanId, Localised<string>> = {
+  basic: { en: 'To try Tramme and make public films.', fr: 'Pour essayer Tramme et publier des films.' },
+  plus: { en: 'For the films you make every month.', fr: 'Pour les films que vous faites chaque mois.' },
+  pro: { en: 'For studios and freelancers who deliver.', fr: 'Pour les studios et les indépendants qui livrent.' },
+};
+
+export const PLANS: Plan[] = PLAN_TERMS.map((t) => ({ id: t.id, price: t.price, credits: t.credits, line: LINES[t.id] }));
 
 export const plan = (id: PlanId): Plan => PLANS.find((p) => p.id === id)!;
 
@@ -40,7 +44,7 @@ const monthly = (n: number, en: string, fr: string): Localised<string> => ({ en:
 const row = (id: string, en: string, fr: string, basic: Cell, plus: Cell, pro: Cell): Row => ({ id, label: same(en, fr), values: { basic, plus, pro } });
 
 export const ROWS: Row[] = [
-  row('ai', 'AI included', 'IA incluse', same('The first film, offered once', 'Le premier film, offert une fois'), monthly(1000, 'credits a month', 'crédits par mois'), monthly(4000, 'credits a month, the best models', 'crédits par mois, les meilleurs modèles')),
+  row('ai', 'AI included', 'IA incluse', same('The first film, offered once', 'Le premier film, offert une fois'), monthly(termsOf('plus').credits, 'credits a month', 'crédits par mois'), monthly(4000, 'credits a month, the best models', 'crédits par mois, les meilleurs modèles')),
   row('key', 'Your own AI provider key (Anthropic, OpenAI, Gemini…)', 'Votre propre clé de fournisseur d\'IA (Anthropic, OpenAI, Gemini…)', true, true, true),
   row('cloud', 'Projects in the cloud', 'Projets dans le cloud', same('3', '3'), same('Unlimited', 'Illimités'), same('Unlimited', 'Illimités')),
   row('private', 'Private projects', 'Projets privés', same('No, public only', 'Non, publics uniquement'), true, true),
