@@ -109,6 +109,57 @@ describe('what a scene builder may change', () => {
     runner.dispose();
   });
 
+  it("a scene builder's own new compositions, assets and tokens stay its own: it can fill and change them in later proposals", async () => {
+    const { doc, project } = film();
+    load(doc, project.manifest, 'http://localhost/api/projects/test/files/document.json', '');
+    const runner = new ToolRunner();
+    runner.scope = SCOPE;
+    // a component of its own (what define_component makes), then its content in another proposal
+    const comp = await runner.run('propose_changes', { label: 'tile', ops: [{ op: 'add', path: '/compositions/price-tile', value: { name: 'Tile', width: 200, height: 200, fps: 30, duration: 4, layers: {}, order: [] } }] });
+    expect(comp.isError, JSON.stringify(comp.content)).toBeFalsy();
+    const fill = await runner.run('propose_changes', { label: 'tile content', ops: [{ op: 'add', path: '/compositions/price-tile/layers/a', value: { type: 'shape.rect' } }, { op: 'add', path: '/compositions/price-tile/order/-', value: 'a' }] });
+    expect(fill.isError, JSON.stringify(fill.content)).toBeFalsy();
+    // a token of its own, changed afterwards
+    await runner.run('propose_changes', { label: 'glow', ops: [{ op: 'add', path: '/tokens/glow', value: { type: 'color', value: '#123456' } }] });
+    const change = await runner.run('propose_changes', { label: 'glow again', ops: [{ op: 'replace', path: '/tokens/glow', value: { type: 'color', value: '#654321' } }] });
+    expect(change.isError, JSON.stringify(change.content)).toBeFalsy();
+    // what existed before the scene is still not its own
+    const other = await runner.run('propose_changes', { label: 'intro', ops: [{ op: 'add', path: '/compositions/intro/layers/x', value: { type: 'shape.rect' } }] });
+    expect(other.isError).toBe(true);
+    const token = await runner.run('propose_changes', { label: 'accent', ops: [{ op: 'replace', path: '/tokens/accent', value: { type: 'color', value: '#000000' } }] });
+    expect(token.isError).toBe(true);
+    runner.dispose();
+  });
+
+  it('a layer of a pack comes into the proposal with the pack itself, so the tools can draw what is proposed', async () => {
+    const { vi } = await import('vitest');
+    const { api } = await import('../src/api.ts');
+    const { installedTypes } = await import('../src/installed.ts');
+    const { doc, project } = film();
+    load(doc, project.manifest, 'http://localhost/api/projects/p/files/document.tramme.json', '');
+    // a pack attached to the editor (as the preview attaches them), its node known to the registry
+    const node = { type: 'demo.loop', props: { size: { type: 'vec2', default: [100, 100] } }, render: { canvas2d() {} } };
+    S.registry.peek().use({ nodes: [node] } as never, 'packs:demo-loops.js');
+    const pack = { file: 'demo-loops.js', manifest: { id: 'demo-loops', name: 'Demo loops', version: '1.0.0' }, size: 10, modified: '', code: 'export const nodes = [];', files: new Map(), enabled: true };
+    installedTypes.set('node:demo.loop', pack as never);
+    const written: string[] = [];
+    const write = vi.spyOn(api, 'write').mockImplementation((async (_p: string, path: string) => { written.push(path); }) as never);
+    try {
+      const runner = new ToolRunner();
+      runner.scope = SCOPE;
+      const out = await runner.run('propose_changes', { label: 'loop', ops: [{ op: 'add', path: '/compositions/price/layers/l', value: { type: 'demo.loop' } }, { op: 'add', path: '/compositions/price/order/-', value: 'l' }] });
+      expect(out.isError, JSON.stringify(out.content)).toBeFalsy();
+      const live = runner.liveDoc();
+      expect(live.assets['demo-loops']).toMatchObject({ type: 'module', src: 'plugins/demo-loops.js' });
+      expect(live.plugins).toContain('demo-loops');
+      expect(written).toContain('plugins/demo-loops.js');
+      // proposed again, the pack is not copied twice
+      await runner.run('propose_changes', { label: 'loop 2', ops: [{ op: 'add', path: '/compositions/price/layers/m', value: { type: 'demo.loop' } }, { op: 'add', path: '/compositions/price/order/-', value: 'm' }] });
+      expect(runner.liveDoc().plugins!.filter((p) => p === 'demo-loops')).toHaveLength(1);
+      runner.dispose();
+    } finally { installedTypes.delete('node:demo.loop'); write.mockRestore(); }
+  });
+
   it("a scene builder's tools work on its composition: a tool's layers land there, and values are read there", async () => {
     const { doc, project } = film();
     doc.compositions.price.layers.dot = { type: 'shape.ellipse', transform: { position: { $k: [{ t: 0, v: [0, 0] }, { t: 1, v: [100, 0] }] } } } as never;

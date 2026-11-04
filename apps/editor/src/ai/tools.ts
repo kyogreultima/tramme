@@ -4,7 +4,7 @@
 // project's text files, and the tools its plugins bring. The document itself
 // only changes through proposals the user applies.
 
-import { installedTypes } from '../installed.ts';
+import { copiesFor, copyId, installedTypes } from '../installed.ts';
 import { applyOps, Evaluator, getAt, isTranscript, pointer, remapTranscript, silences, toolInputIssues, toolOutput, validate, type TrammeDoc, type Op, type Registry, type ToolContext, type Transcript } from '@tramme/core';
 import { DOCUMENT, isChatPath, MANIFEST, pathIssue, srcPath } from '@tramme/project';
 import { VideoFrames } from '@tramme/render';
@@ -35,14 +35,16 @@ const partsOf = (path: string) => path.split('/').filter(Boolean).map((p) => p.r
 
 /**
  * Why an operation is not a scene builder's to make, or null when it is: the
- * scene's composition and its takes, new assets and tokens of its own, the
- * plan's record, plugins added. Another composition, the root, and an existing
- * asset or token are refused.
+ * scene's composition and its takes, compositions, assets and tokens of its own
+ * (a component it defines, a colour it adds, changed again later), the plan's
+ * record, plugins added. Another scene's composition, the root, and an asset or
+ * a token that existed before the scene are refused. `doc` is the document as
+ * it was when the scene began.
  */
 export function outOfScope(op: Op, scope: Scope, doc: TrammeDoc): string | null {
   const [section, id] = partsOf(op.path);
   if (section === 'compositions') {
-    if (id === scope.comp || (id !== undefined && id.startsWith(`${scope.comp}~take`))) return null;
+    if (id === scope.comp || (id !== undefined && (id.startsWith(`${scope.comp}~take`) || !doc.compositions[id]))) return null;
     if (id === scope.root) return `the root composition "${id}" is not yours: scenes are laid by the director, build only "${scope.comp}"`;
     return id === undefined ? 'the compositions as a whole are not yours' : `the composition "${id}" belongs to another scene: build only "${scope.comp}"`;
   }
@@ -63,11 +65,14 @@ export class ToolRunner {
   private scoped: Scope | null = null;
   /** the proposal as it stood when the scene began: all a discard in the scene goes back to */
   private before: Pending | null = null;
+  /** the document as it stood when the scene began: what is not in it is the scene's own */
+  private base: TrammeDoc | null = null;
   /** set while a scene is built apart: the proposals are kept to it, and its tools work on its composition */
   get scope(): Scope | null { return this.scoped; }
   set scope(s: Scope | null) {
     this.scoped = s;
     this.before = s && this.pending ? { ...this.pending, ops: [...this.pending.ops], steps: [...this.pending.steps] } : null;
+    this.base = s ? this.liveDoc() : null;
   }
   /** the composition the tools work on by default: the scene's while one is built apart, else the one on screen, else the root */
   private compOf(doc: TrammeDoc): string {
@@ -101,7 +106,10 @@ export class ToolRunner {
   /** the vocabulary of a document: the editor's when its plugins are the same */
   private async registry(doc: TrammeDoc): Promise<Registry> {
     const cur = S.doc.peek();
-    const same = JSON.stringify(doc.plugins ?? []) === JSON.stringify(cur.plugins ?? []) && (doc.plugins ?? []).every((id) => doc.assets[id]?.src === cur.assets[id]?.src);
+    // a copy of a pack or an installed plugin the editor has attached (its id, its file) brings nothing its registry lacks
+    const copies = new Map([...installedTypes.values()].map((p) => [copyId(p), `plugins/${p.file}`])), had = new Set(cur.plugins ?? []);
+    const own = (doc.plugins ?? []).filter((id) => had.has(id) || copies.get(id) !== doc.assets[id]?.src);
+    const same = JSON.stringify(own) === JSON.stringify(cur.plugins ?? []) && own.every((id) => doc.assets[id]?.src === cur.assets[id]?.src);
     return same ? S.registry.peek() : (await this.stills.rendererFor(doc)).registry;
   }
 
@@ -376,10 +384,22 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
   private async propose(label: string, ops: Op[]): Promise<ToolResult> {
     if (!Array.isArray(ops) || !ops.length) return text('no operations', true);
     if (this.scope) {
-      const live = this.liveDoc();
-      for (const op of ops) { const why = outOfScope(op, this.scope, live); if (why) return text(`operation refused, nothing is proposed: ${why}`, true); }
+      // judged against the document as the scene found it: what the scene added itself stays its own
+      const base = this.base ?? this.liveDoc();
+      for (const op of ops) { const why = outOfScope(op, this.scope, base); if (why) return text(`operation refused, nothing is proposed: ${why}`, true); }
     }
-    const merged = [...(this.pending?.ops ?? []), ...ops];
+    let merged = [...(this.pending?.ops ?? []), ...ops];
+    // a layer, an effect or a modifier of a pack (or of an installed plugin): its plugin joins the proposal now, its files
+    // written, so the stills, the check and the motion tool draw what is proposed; applying it then copies nothing more
+    let copied: string[] = [];
+    const copies = copiesFor(S.doc.peek(), merged);
+    if (copies) {
+      const id = S.project.peek().id;
+      try { await Promise.all(copies.files.map(([path, blob]) => api.write(id, path, blob, blob.type ? { type: blob.type } : {}))); }
+      catch (e) { return text(`the plugin ${copies.names.join(', ')} could not be copied into the project, nothing is proposed: ${(e as Error).message}`, true); }
+      merged = copies.ops;
+      copied = copies.names;
+    }
     let next: TrammeDoc;
     try { next = applyOps(S.doc.peek(), merged).doc; } catch (e) { return text(`operations refused: ${(e as Error).message}`, true); }
     const issues = validate(next, await this.registry(next));
@@ -389,7 +409,7 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
     const all = steps.join(' · ');
     this.pending = { id: this.pending?.id ?? uid(), label: all.length > 90 ? `${steps[0]} and ${steps.length - 1} more step(s)` : all, ops: merged, steps };
     this.events.push({ type: 'proposal', id: this.pending.id, label: this.pending.label, ops: merged });
-    return text(`Proposal "${this.pending.label}" ready (${merged.length} operations in all). The user sees it as a preview.`);
+    return text(`Proposal "${this.pending.label}" ready (${merged.length} operations in all). The user sees it as a preview.${copied.length ? ` ${copied.join(', ')} came into the project with it (its plugin and files), so the stills and the checks draw it.` : ''}`);
   }
 
   private async read(path: string, offset = 0): Promise<ToolResult> {

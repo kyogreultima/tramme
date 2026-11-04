@@ -134,7 +134,7 @@ describe('a failure worth a new attempt', () => {
     for (const m of ['Failed to fetch', 'companion: HTTP 503', 'Overloaded', 'read ECONNRESET', 'stream ended before the answer', 'rate_limit_error: rate limit, retry soon', EN.ai.companionCut, FR.ai.companionCut]) expect(passes(m), m).toBe(true);
   });
   it('is never a quota, a plan or a key', () => {
-    for (const m of ['You exceeded your current quota, please check your plan and billing details', 'Claude AI usage limit reached|1760000000', 'invalid x-api-key', 'HTTP 401', 'Please run /login', "You've hit your session limit · resets 3:40am (Africa/Porto-Novo)", 'a property is missing']) expect(passes(m), m).toBe(false);
+    for (const m of ['You exceeded your current quota, please check your plan and billing details', 'Claude AI usage limit reached|1760000000', 'invalid x-api-key', 'HTTP 401', 'Please run /login', "You've hit your session limit · resets 3:40am (Africa/Porto-Novo)", "Claude Code returned an error result: You've hit your 5-hour limit · resets 12:40am (Africa/Porto-Novo)", "You've hit your weekly limit · resets Mon 9:00am", 'a property is missing']) expect(passes(m), m).toBe(false);
   });
 });
 

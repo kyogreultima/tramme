@@ -94,6 +94,36 @@ describe('the model button', () => {
   });
 });
 
+describe('the model button, while a listing is already asked', () => {
+  it('names the model once the companion answers, even when a listing asked before it did is still on its way', async () => {
+    const { aiModels, aiSettings, setAiSettings, ensureClaudeModels } = await import('../src/ai/index.ts');
+    const { modelLabel, setClaudeModels } = await import('@tramme/assistant');
+    setClaudeModels([]);
+    aiModels.value = { ...aiModels.value, claude: [] };
+    setAiSettings({ model: 'claude-opus-5-5', prefer: 'auto' });
+    let companion = false;
+    const listing = vi.fn(async (url: string): Promise<Response> => {
+      if (url.endsWith('/health')) { if (!companion) throw new Error('refused'); return new Response(JSON.stringify({ engines: { claude: true } }), { status: 200 }); }
+      if (url.endsWith('/models')) return new Response(JSON.stringify({ claudeModels: [{ id: 'claude-opus-5-5', label: 'Opus 5.5', adaptive: true, efforts: ['high'] }] }), { status: 200 });
+      // the key's listing: slow, it is still on its way when the companion answers
+      if (url.includes('models')) return new Promise((r) => setTimeout(() => r(new Response(JSON.stringify({ data: [] }), { status: 200 })), 10_000));
+      return new Response('{}', { status: 404 });
+    });
+    vi.stubGlobal('fetch', listing);
+    aiStatus.value = { ...aiStatus.value, server: true, companion: 'absent' };
+    // a turn starts before the companion is found: its listing goes to the key only
+    void ensureClaudeModels();
+    companion = true;
+    const stop = watchCompanion();
+    await vi.advanceTimersByTimeAsync(4000);
+    expect(aiStatus.value.companion).toBe('ok');
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(modelLabel(aiSettings.value.model)).toBe('Opus 5.5');
+    stop();
+    setClaudeModels([]);
+  });
+});
+
 describe('the model chosen', () => {
   it('stays chosen when the companion misses one look after it answered', async () => {
     const { aiModels, aiSettings, setAiSettings } = await import('../src/ai/index.ts');

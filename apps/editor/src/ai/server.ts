@@ -98,7 +98,7 @@ function backoff(attempt: number, signal: AbortSignal, res?: Response): Promise<
 /** a failure worth trying again: a busy or failing server, no answer, a stream cut short */
 const transient = (status: number) => status === 0 || status === 429 || status === 529 || status >= 500;
 /** a failure, as its message tells, that waits for the user: a quota or a plan used up, a key or a login refused */
-const LASTING = /quota|insufficient|billing|credit|usage limit|limit reached|hit your (\w+ )?limit|exceeded your|subscription|upgrade|unauthori[sz]ed|forbidden|invalid.{0,20}(key|token)|api.?key|authenticat|log ?in|\b40[1-3]\b/i;
+const LASTING = /quota|insufficient|billing|credit|usage limit|limit reached|hit your ([\w-]+ )?limit|exceeded your|subscription|upgrade|unauthori[sz]ed|forbidden|invalid.{0,20}(key|token)|api.?key|authenticat|log ?in|\b40[1-3]\b/i;
 /** a failure, as its message tells, that passes: the network, a busy or failing server, an answer cut short */
 const PASSING = /network|fetch|connect|ECONN|ETIMEDOUT|EAI_AGAIN|ENOTFOUND|socket|timed? ?out|timeout|overload|busy|unavailable|temporar|stream|interrupted|interromp|reset|rate.?limit|\b(429|5\d\d)\b|does not answer|ne répond pas/i;
 /** whether a failure known by its message only (a companion's, a turn's last) is worth a new attempt later */
