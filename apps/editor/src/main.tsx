@@ -18,11 +18,18 @@ import { commit, hooks, load, S, select, setTime, undo } from './state.ts';
 import { loadChats, runTool, watchCompanion } from './ai/index.ts';
 import { App } from './ui/App.tsx';
 import { Home } from './ui/Home.tsx';
+import { normalize, route, SPA_PATHS, startRouter } from './router.ts';
+import { useEffect } from 'preact/hooks';
+import { AuthPage, type AuthMode } from './ui/AuthPage.tsx';
+import { SpacePage } from './ui/Space.tsx';
+import { messageFor, refreshAccount, verifyEmail } from './accounts.ts';
+import { toast } from './state.ts';
 import './theme/tokens.css';
 import './theme/base.css';
 import './theme/components.css';
 import './screens/home.css';
 import './screens/settings.css';
+import './screens/account.css';
 import './screens/conversation.css';
 import './screens/studio.css';
 import './screens/atelier.css';
@@ -79,6 +86,34 @@ async function openProject(id: string) {
   (window as any).__tramme = { S, preview, select, setTime, undo, commit, runTool, exportQueue };
 }
 
+const query = new URLSearchParams(location.search);
+const AUTH_PAGES = new Set(['/login', '/signup', '/forgot']);
+
+/** the page being shown: the home page or a page of the account, changed by the router without a load */
+function Pages() {
+  const { path, search } = route.value;
+  const q = new URLSearchParams(search);
+  const isHome = !AUTH_PAGES.has(path) && path !== '/space' && !(path === '/' && q.get('reset'));
+  // a page of the home page's has taken what the address carried (the words of the site): it goes back to being just "/"
+  useEffect(() => { if (isHome && search) history.replaceState(null, '', '/'); }, [isHome, search]);
+  if (AUTH_PAGES.has(path)) return <AuthPage key={path} mode={path.slice(1) as AuthMode} prompt={q.get('prompt') ?? undefined} />;
+  if (path === '/space') return <SpacePage />;
+  // the link of the mail of a forgotten password
+  if (path === '/' && q.get('reset')) return <AuthPage key="reset" mode="reset" token={q.get('reset') ?? ''} />;
+  return <Home />;
+}
+
+/** what the links of the mails and the sign-in with a provider leave in the address of the home page */
+async function answerNotices(q: URLSearchParams) {
+  const verify = q.get('verify'), failed = q.get('auth_error');
+  if (failed) toast(messageFor(failed), 'error');
+  if (verify) {
+    const r = await verifyEmail(verify);
+    toast(r.ok ? t('account.verify.done') : t('account.verify.failed'), r.ok ? 'info' : 'error');
+    if (r.ok) void refreshAccount();
+  }
+}
+
 const m = location.pathname.match(/^\/p\/([a-z0-9][a-z0-9-]{2,63})\/?$/);
 boot().then(() => {
   // the native app: a .tramme handed by the system imports like a dropped one
@@ -95,8 +130,11 @@ boot().then(() => {
       fail(t('app.couldNotOpenThe'), (e as Error).message);
     });
   } else {
-    if (location.pathname !== '/') history.replaceState(null, '', '/');
-    render(<Home />, root);
+    // anything else is the home page; its pages and the account's change without a load from here on
+    if (!SPA_PATHS.has(normalize(location.pathname))) history.replaceState(null, '', '/');
+    startRouter();
+    render(<Pages />, root);
     lift();
+    void answerNotices(query);
   }
 }, (e) => fail(t('personal.cannotStart'), (e as Error).message));

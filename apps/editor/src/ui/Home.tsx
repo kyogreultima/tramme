@@ -36,6 +36,8 @@ import { APP_VERSION, downloadOf, update } from '../version.ts';
 import { IDEAS } from '../ideas.ts';
 import { t } from '../i18n/index.ts';
 import { go } from '../nav.ts';
+import { AccountMenu } from './AccountMenu.tsx';
+import { account, resendVerification } from '../accounts.ts';
 
 interface Example { file: string; name: string; description: string; width: number; height: number; duration: number; thumbnail?: string }
 
@@ -190,7 +192,8 @@ function Card({ m, onMenu }: { m: Manifest; onMenu: (e: MouseEvent | { clientX: 
 
 /** the direction box: the words of the film, the material it is made from, the model that makes it, its format */
 export function DirectionBox({ busy, onStart }: { busy: boolean; onStart: (words: string, material: Picked[], format: [number, number]) => void }) {
-  const [words, setWords] = useState('');
+  // the words of the site's box, carried through the sign-up (?prompt=)
+  const [words, setWords] = useState(() => new URLSearchParams(location.search).get('prompt') ?? '');
   const [material, setMaterial] = useState<Picked[]>([]);
   const [format, setFormat] = useState('16x9');
   const area = useRef<HTMLTextAreaElement>(null);
@@ -359,6 +362,8 @@ export function Home() {
         ])}><Icon name="plus" /><span class="label">{t('home.otherWays')}</span></button>
         <input ref={input} type="file" accept=".tramme,.trame,.emotion,.zip,.json,application/json" hidden onChange={(e) => openFiles(chosen(e))} />
         <input ref={video} type="file" accept="video/*,.mp4,.mov,.webm,.mkv" hidden onChange={(e) => openFiles(chosen(e))} />
+        {/* the account, at the far right (the native app's window buttons stay beyond it) */}
+        <AccountMenu />
         <WindowControls />
       </header>
       <main class="home-main">
@@ -373,6 +378,10 @@ export function Home() {
             )}
           </div>
           {/* personal mode: nothing is kept on the server, the user should know where the projects are */}
+          {account.value.status === 'in' && !account.value.user.emailVerified && (
+            <div class="home-note"><Icon name="info" /><span>{t('account.verify.banner', { email: account.value.user.email })}</span>
+              <button class="btn sm" onClick={async () => { const r = await resendVerification(); toast(r.ok ? t('account.verify.sent') : r.error === 'too_many_attempts' ? t('account.verify.tooMany') : t('account.err.generic'), r.ok ? 'info' : 'error'); }}>{t('account.verify.resend')}</button></div>
+          )}
           {personal && <div class="home-note"><Icon name="info" /><span>{t('personal.storedHere')}</span></div>}
           {loadError && <div class="home-note err"><Icon name="alert" /><span>{t('home.projectsCannotBeRead', { error: loadError })}</span></div>}
           {!projects && !loadError && <div class="cards">{[0, 1, 2].map((i) => <div key={i} class="card ghost-card"><div class="card-thumb" /><div class="card-meta"><i /><i /></div></div>)}</div>}
