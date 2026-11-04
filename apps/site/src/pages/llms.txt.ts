@@ -5,6 +5,7 @@ import type { APIRoute } from 'astro';
 import { getEntry } from 'astro:content';
 import { DOCS, docHref, docId } from '../lib/docs';
 import { APP, REPO } from '../lib/links';
+import { systemsLine } from '../../../desktop/downloads.ts';
 import { SITE } from '../lib/site';
 
 // the site's own pages, besides the docs
@@ -13,7 +14,7 @@ const PAGES = [
   ['/explore/', 'Explore', 'Public projects made with Tramme by the community'],
   ['/pricing/', 'Pricing', 'Basic is free; Plus and Pro add cloud projects, AI ready to use and cloud export; prices in euros'],
   ['/roadmap/', 'Roadmap', 'What is coming to Tramme'],
-  ['/download/', 'Download', 'The desktop app for Windows, macOS and Linux'],
+  ['/download/', 'Download', `The desktop app for ${systemsLine('en')}`],
   ['/about/', 'About', 'What Tramme is, its licence, how to take part'],
   ['/terms/', 'Terms', 'Terms of use and sale'],
   ['/privacy/', 'Privacy', 'What is kept where'],

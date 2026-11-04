@@ -6,7 +6,7 @@
 // is built again. Without a release, or with GitHub out of reach, the links
 // stay out and the download page says so.
 
-import { INSTALLERS, type Installer } from '../../../desktop/downloads.ts';
+import { OFFERED_INSTALLERS, type Installer } from '../../../desktop/downloads.ts';
 import { REPO, REPO_NAME } from './links';
 
 export interface Offered extends Installer {
@@ -36,7 +36,7 @@ export async function latestRelease(log: (s: string) => void): Promise<Release |
     }
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const release = (await r.json()) as GitHubRelease;
-    const installers = INSTALLERS.flatMap((i): Offered[] => {
+    const installers = OFFERED_INSTALLERS.flatMap((i): Offered[] => {
       const asset = release.assets.find((a) => a.name === i.file);
       return asset ? [{ ...i, href: `${REPO}/releases/latest/download/${i.file}`, size: asset.size }] : [];
     });

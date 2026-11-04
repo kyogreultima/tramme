@@ -11,7 +11,7 @@
     "openApp": "Open the app",
     "openAppHint": "In your browser, nothing to install",
     "download": "Download",
-    "downloadHint": "Windows, macOS and Linux, offline",
+    "downloadHint": "{systems}, offline",
     "assistant": "The assistant",
     "assistantHint": "Directs, cuts and dresses the film with you",
     "studio": "Studio",

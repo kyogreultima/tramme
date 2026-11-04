@@ -11,7 +11,7 @@
     "openApp": "Ouvrir l'application",
     "openAppHint": "Dans votre navigateur, rien à installer",
     "download": "Télécharger",
-    "downloadHint": "Windows, macOS et Linux, hors ligne",
+    "downloadHint": "{systems}, hors ligne",
     "assistant": "L'assistant",
     "assistantHint": "Réalise, monte et habille le film avec vous",
     "studio": "Studio",

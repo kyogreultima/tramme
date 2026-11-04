@@ -27,3 +27,24 @@ export const INSTALLERS: Installer[] = [
 
 /** the systems, in the order they are offered, by their names */
 export const SYSTEMS: Record<Os, string> = { windows: 'Windows', mac: 'macOS', linux: 'Linux' };
+
+/**
+ * The systems whose app is built with every release but not offered, on the site
+ * or in the app's own notice of a new version. macOS: an app that Apple has not
+ * signed and notarized cannot be installed, and Tramme's is not yet. When it is,
+ * take 'mac' out of this list: the download page, the buttons, the menus and the
+ * FAQ follow (a test checks what they say).
+ */
+export const WITHHELD: readonly Os[] = ['mac'];
+
+/** the systems that are offered, in order */
+export const OFFERED_SYSTEMS: Os[] = (Object.keys(SYSTEMS) as Os[]).filter((os) => !WITHHELD.includes(os));
+/** the installers that are offered */
+export const OFFERED_INSTALLERS: Installer[] = INSTALLERS.filter((i) => !WITHHELD.includes(i.os));
+
+/** the systems that are offered, in a line: "Windows and Linux" */
+export function systemsLine(locale: 'en' | 'fr'): string {
+  const names = OFFERED_SYSTEMS.map((os) => SYSTEMS[os]);
+  const and = locale === 'fr' ? 'et' : 'and';
+  return names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} ${and} ${names.at(-1)}`;
+}

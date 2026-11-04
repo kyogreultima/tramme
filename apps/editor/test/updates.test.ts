@@ -44,7 +44,10 @@ describe('the download of an update', () => {
 
   it('is the installer of this system on the release when there is one: the file starts to download', () => {
     expect(downloadOf(found, 'Mozilla/5.0 (Windows NT 10.0)')).toEqual({ href: 'https://dl/win.exe', direct: true });
-    expect(downloadOf(found, 'Mozilla/5.0 (Macintosh)')).toEqual({ href: 'https://dl/mac.dmg', direct: true });
+  });
+
+  it('is the release page on a Mac, whose installer is not offered (the app is not signed by Apple): nothing there to install', () => {
+    expect(downloadOf(found, 'Mozilla/5.0 (Macintosh)')).toEqual({ href: 'https://page', direct: false });
   });
 
   it('is the release page when the system has none, the release holds no such file, or this is a phone', () => {

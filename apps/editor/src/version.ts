@@ -6,7 +6,7 @@
 
 import { signal } from '@preact/signals';
 import pkg from '../package.json' with { type: 'json' };
-import { INSTALLERS, type Os } from '../../desktop/downloads.ts';
+import { OFFERED_INSTALLERS, type Os } from '../../desktop/downloads.ts';
 import { prefs, setPrefs } from './settings.ts';
 import { toast } from './state.ts';
 import { t } from './i18n/index.ts';
@@ -29,7 +29,7 @@ export function osOf(ua = typeof navigator === 'undefined' ? '' : navigator.user
 /** where the Download button of an update goes: the installer of this system on the release, which starts to download; else the release's page */
 export function downloadOf(u: Update, ua?: string): { href: string; direct: boolean } {
   const os = osOf(ua);
-  const file = os ? INSTALLERS.find((i) => i.os === os) : undefined;
+  const file = os ? OFFERED_INSTALLERS.find((i) => i.os === os) : undefined;
   const asset = file && u.assets.find((a) => a.name === file.file);
   return asset ? { href: asset.url, direct: true } : { href: u.url, direct: false };
 }

@@ -1,0 +1,61 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { INSTALLERS, OFFERED_INSTALLERS, OFFERED_SYSTEMS, SYSTEMS, WITHHELD, systemsLine } from '../../desktop/downloads';
+import { faq } from '../src/lib/faq';
+import { menus } from '../src/lib/nav';
+import { LOCALES } from '../src/lib/i18n';
+import { read } from './sources';
+
+afterEach(() => vi.unstubAllGlobals());
+
+describe('the systems the app is offered for', () => {
+  it('leave macOS out while its app cannot be installed (it is not signed)', () => {
+    expect(WITHHELD).toEqual(['mac']);
+    expect(OFFERED_SYSTEMS).toEqual(['windows', 'linux']);
+    expect(OFFERED_INSTALLERS.map((i) => i.os)).toEqual(['windows', 'linux', 'linux']);
+  });
+
+  it('are still all built: the release carries every installer, so that offering one again is a change of one line', () => {
+    expect(INSTALLERS.some((i) => i.os === 'mac')).toBe(true);
+    expect(Object.keys(SYSTEMS)).toEqual(['windows', 'mac', 'linux']);
+  });
+
+  it('are named in a line, in each language', () => {
+    expect(systemsLine('en')).toBe('Windows and Linux');
+    expect(systemsLine('fr')).toBe('Windows et Linux');
+  });
+});
+
+describe('the release the site offers', () => {
+  it('has no macOS installer, even when GitHub\'s release has one', async () => {
+    const assets = INSTALLERS.map((i) => ({ name: i.file, size: 1_000_000 }));
+    vi.stubGlobal('fetch', async () => new Response(JSON.stringify({ tag_name: 'v1.2.3', html_url: 'https://example.test/r', assets }), { status: 200 }));
+    const { latestRelease } = await import('../src/lib/download');
+    const release = await latestRelease(() => {});
+    expect(release?.installers.map((i) => i.os)).toEqual(['windows', 'linux', 'linux']);
+    expect(release?.installers.every((i) => !/macos|\.dmg/i.test(i.href))).toBe(true);
+  });
+});
+
+describe('what the site says of the systems', () => {
+  it('names only the ones it offers', () => {
+    for (const locale of LOCALES) {
+      const hint = menus(locale).flatMap((m) => m.links).find((l) => l.href.endsWith('/download/'))?.hint;
+      expect(hint, `${locale} menu`).toMatch(/Windows/);
+      expect(hint, `${locale} menu`).not.toMatch(/mac/i);
+      const answer = faq(locale).find((f) => /Windows/.test(f.a))?.a ?? '';
+      expect(answer, `${locale} faq`).toMatch(/Windows/);
+      expect(answer, `${locale} faq`).not.toMatch(/macOS/);
+    }
+  });
+
+  it('writes the download page and llms.txt from the same line', () => {
+    expect(read('pages/[...lang]/download.astro')).toContain('systemsLine');
+    expect(read('pages/llms.txt.ts')).toContain('systemsLine');
+  });
+
+  it('tells a visitor on a Mac why there is no app for them, and where to go instead', () => {
+    const page = read('pages/[...lang]/download.astro');
+    expect(page).toContain("data-os='mac'");
+    expect(page).toContain('mac-note');
+  });
+});

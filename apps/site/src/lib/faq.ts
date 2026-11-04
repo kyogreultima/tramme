@@ -2,6 +2,7 @@
 // docs, the code and the plans (lib/plans.ts). Shown by components/Faq.astro
 // and told to the search engines (lib/site.ts). Plain text: no markup.
 
+import { systemsLine } from '../../../desktop/downloads.ts';
 import { FORMATS } from './formats';
 import type { Locale, Localised } from './i18n';
 import { formatCredits, formatPrice, plan } from './plans';
@@ -122,8 +123,8 @@ const ENTRIES: Entry[] = [
     topic: 'general',
     q: q('Which systems does the desktop app run on?', 'Sur quels systèmes tourne l\'application de bureau ?'),
     a: both(
-      'Windows, macOS and Linux. The installers are not signed by a known publisher yet, so the system may ask you to confirm the first launch: the download page says how.',
-      'Windows, macOS et Linux. Les installateurs ne sont pas encore signés par un éditeur connu : le système peut demander de confirmer le premier lancement, la page de téléchargement explique comment.',
+      `${systemsLine('en')}. The installers are not signed by a known publisher yet, so the system may ask you to confirm the first launch: the download page says how. On a Mac, Tramme runs in the browser.`,
+      `${systemsLine('fr')}. Les installateurs ne sont pas encore signés par un éditeur connu : le système peut demander de confirmer le premier lancement, la page de téléchargement explique comment. Sur Mac, Tramme fonctionne dans le navigateur.`,
     ),
   },
 ];

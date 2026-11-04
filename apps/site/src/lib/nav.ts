@@ -3,17 +3,18 @@
 // every internal link reaches a page that exists.
 
 import { APP, REPO, repoFile, logIn, signUp } from './links';
+import { systemsLine } from '../../../desktop/downloads.ts';
 import { docHref } from './docs';
 import { pathIn, t, type Locale } from './i18n';
 
-export interface NavLink { label: string; href: string; hint?: string }
+export interface NavLink { label: string; href: string; hint?: string; /** it leads to the app: it opens in a tab of its own */ app?: true }
 export interface NavMenu { id: string; label: string; links: NavLink[] }
 
 /** a link to a page of the site, in the language, its label and hint from the catalog (`nav.<key>`, `nav.<key>Hint`) */
 const page = (locale: Locale, key: string, href: string, hint = false): NavLink => ({
   label: t(locale, `nav.${key}`),
   href: pathIn(locale, href),
-  ...(hint && { hint: t(locale, `nav.${key}Hint`) }),
+  ...(hint && { hint: t(locale, `nav.${key}Hint`, { systems: systemsLine(locale) }) }),
 });
 
 /** the menus of the top bar */
@@ -23,7 +24,7 @@ export function menus(locale: Locale): NavMenu[] {
       id: 'product',
       label: t(locale, 'nav.product'),
       links: [
-        { label: t(locale, 'nav.openApp'), href: APP, hint: t(locale, 'nav.openAppHint') },
+        { label: t(locale, 'nav.openApp'), href: APP, hint: t(locale, 'nav.openAppHint'), app: true },
         page(locale, 'download', '/download/', true),
         page(locale, 'assistant', '/features/#assistant', true),
       ],
@@ -50,8 +51,8 @@ export function barLinks(locale: Locale): NavLink[] {
 /** the two buttons at the bar's end: log in, and start */
 export function barButtons(locale: Locale): { logIn: NavLink; start: NavLink } {
   return {
-    logIn: { label: t(locale, 'common.logIn'), href: logIn(locale) },
-    start: { label: t(locale, 'common.startFree'), href: signUp({ lang: locale }) },
+    logIn: { label: t(locale, 'common.logIn'), href: logIn(locale), app: true },
+    start: { label: t(locale, 'common.startFree'), href: signUp({ lang: locale }), app: true },
   };
 }
 
@@ -63,7 +64,7 @@ export function footerColumns(locale: Locale): NavMenu[] {
       id: 'product',
       label: t(locale, 'nav.product'),
       links: [
-        { label: t(locale, 'nav.openApp'), href: APP },
+        { label: t(locale, 'nav.openApp'), href: APP, app: true },
         page(locale, 'features', '/features/'),
         page(locale, 'download', '/download/'),
         page(locale, 'pricing', '/pricing/'),
