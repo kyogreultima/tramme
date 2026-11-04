@@ -26,6 +26,7 @@
     "typecheck": "tsc --noEmit -p . && tsc --noEmit -p apps/worker",
     "server:dev": "npm run dev -w apps/server",
     "server:test": "npm test -w apps/server",
+    "server:seed": "npm run db:seed -w apps/server",
     "db:dev": "node scripts/dev-db.ts",
     "tramme": "node packages/cli/src/main.ts",
     "edit": "node packages/cli/src/main.ts edit",
