@@ -17,8 +17,8 @@ import { SITE } from './src/lib/site.ts';
 const release = await latestRelease(console.log);
 
 export default defineConfig({
-  // the public address, for the canonical links, the sitemap and the preview image
-  site: process.env.SITE_URL ?? SITE.url,
+  // the address of this environment (local, beta, preprod, production: brand/environments.ts), for the canonical links, the sitemap and the preview image
+  site: SITE.url,
   // every page is prerendered today; the adapter lets /explore/ and /p/<id>/ switch to
   // server rendering (export const prerender = false) once the gallery API exists
   adapter: cloudflare({ imageService: 'compile', prerenderEnvironment: 'node' }),

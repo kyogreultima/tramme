@@ -1,14 +1,14 @@
 // What the site says of itself, wherever it is read: the pages' heads, the
 // link previews, the search engines' structured data, robots.txt, llms.txt.
 
-import { APP, REPO, repoFile } from './links';
+import { APP, ORIGINS, REPO, repoFile } from './links';
 import { faq } from './faq';
 import { plan } from './plans';
 import type { Locale } from './i18n';
 
 export const SITE = {
-  /** the public address (SITE_URL overrides it, for a deployment elsewhere) */
-  url: 'https://tramme.dev',
+  /** the address of the site in this environment (brand/environments.ts; SITE_URL still overrides it, for a deployment elsewhere) */
+  url: ORIGINS.site,
   name: 'Tramme',
   title: 'Tramme, motion design directed in words',
   description: 'A motion design app, free to use, with its source available: direct the film in words in the studio, refine every keyframe in the atelier, export what you see.',

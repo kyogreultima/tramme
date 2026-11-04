@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url';
 import * as esbuild from 'esbuild';
 import { checkProject, MANIFEST, packProject } from '@tramme/project';
 import { mark } from '../../scripts/brand.ts';
+import { originsFromEnv } from '../../brand/environments.ts';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '../..');
@@ -23,6 +24,8 @@ const ROOT = path.resolve(HERE, '../..');
 const DIST = process.env.TRAMME_DIST ? path.resolve(process.env.TRAMME_DIST) : path.join(HERE, 'dist');
 const dev = process.argv.includes('--dev');
 const personal = process.argv.includes('--personal');
+// the website of this environment (local, beta, preprod, production), for the app's links to it (brand/environments.ts)
+const ORIGINS = originsFromEnv(process.env, dev);
 
 // the app's icon and its link preview (scripts/og-image.ts), shared with the site (apps/site);
 // its PNGs for an installed app (scripts/app-icons.ts)
@@ -151,6 +154,7 @@ const options: esbuild.BuildOptions = {
   bundle: true, splitting: !dev, chunkNames: 'chunk-[hash]', format: 'esm', platform: 'browser', target: 'chrome120',
   minify: !dev && !process.env.TRAMME_NOMINIFY, sourcemap: 'linked', metafile: true, logLevel: 'warning',
   jsx: 'automatic', jsxImportSource: 'preact',
+  define: { __TRAMME_SITE__: JSON.stringify(ORIGINS.site) },
   loader: { '.ttf': 'file', '.woff2': 'file', '.md': 'text', '.svg': 'text' },
   legalComments: 'linked',
 };
