@@ -30,8 +30,30 @@ export interface Env {
   ACCESS_AUD?: string;
   /** '1' only from `wrangler dev` on this machine: no Access check */
   DEV_OPEN?: string;
-  /** accounts: the address of the backend (apps/server) that answers /api/auth, /api/account and /api/billing; none: no accounts */
+  /** accounts: the backend (apps/server) as a container behind this Worker, with no address of its own (container.ts) */
+  ACCOUNTS?: DurableObjectNamespace;
+  /** accounts, in development: the address of a backend started on this machine; neither this nor ACCOUNTS: no accounts */
   ACCOUNTS_URL?: string;
+  /** accounts: what the backend container is started with (backend-env.ts); the secrets by `wrangler secret put` */
+  APP_KEY?: string;
+  DATABASE_URL?: string;
+  EDGE_SECRET?: string;
+  INTERNAL_SECRET?: string;
+  MAIL_MAILER?: string;
+  SMTP_HOST?: string;
+  SMTP_PORT?: string;
+  SMTP_USERNAME?: string;
+  SMTP_PASSWORD?: string;
+  MAIL_FROM_NAME?: string;
+  MAIL_FROM_ADDRESS?: string;
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
+  GITHUB_CLIENT_ID?: string;
+  GITHUB_CLIENT_SECRET?: string;
+  BILLING_PROVIDER?: string;
+  BILLING_WEBHOOK_SECRET?: string;
+  WELCOME_CREDITS?: string;
+  LOG_LEVEL?: string;
   /** personal mode: the editor's address and the key vault's, another origin of the same site (https://tramme.app, https://cles.tramme.app) */
   APP_ORIGIN?: string;
   VAULT_ORIGIN?: string;

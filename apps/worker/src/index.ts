@@ -40,15 +40,23 @@ async function route(req: Request, env: Env, url: URL): Promise<Response> {
   throw new HttpError(404, `unknown route: ${m} ${url.pathname}`);
 }
 
+// the accounts backend, as a container behind this Worker (wrangler.jsonc, the `cloud` environment)
+export { AccountsContainer } from './container.ts';
+
 export default {
   async fetch(req, env) {
-    if (env.MODE === 'personal') return personal(req, env);
     const url = new URL(req.url);
+    // the routes of accounts come first, in every mode: a visitor has no session yet, and the personal
+    // deployment can have accounts (without ACCOUNTS or ACCOUNTS_URL they do not exist)
+    if (url.pathname.startsWith('/api/')) {
+      try {
+        const account = await accountRoute(req, env);
+        if (account) return account;
+      } catch (e) { return failure(e); }
+    }
+    if (env.MODE === 'personal') return personal(req, env);
     if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(req);
     try {
-      // sign-in comes before the guard: a visitor has no session yet
-      const account = await accountRoute(req, env);
-      if (account) return account;
       return (await guard(req, env)) ?? (await route(req, env, url));
     } catch (e) { return failure(e); }
   },

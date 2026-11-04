@@ -63,3 +63,72 @@ describe('worker: the accounts backend', () => {
     expect(res.status).not.toBe(200);
   });
 });
+
+/** the backend as a container behind the Worker: a Durable Object namespace, with no address */
+function container() {
+  const seen: { name: string; request: Request }[] = [];
+  const ACCOUNTS = {
+    idFromName: (name: string) => name,
+    get: (name: string) => ({ fetch: async (request: Request) => { seen.push({ name, request }); return new Response('{"from":"container"}', { status: 200 }); } }),
+  } as unknown as DurableObjectNamespace;
+  return { ACCOUNTS, seen };
+}
+
+describe('worker: the accounts backend as a container', () => {
+  it('reaches the container, one instance for everyone, and no address', async () => {
+    const { ACCOUNTS, seen } = container();
+    const fetched = vi.fn(async () => new Response('from the network'));
+    vi.stubGlobal('fetch', fetched);
+    const res = await call('/api/auth/me', { headers: { cookie: 'a=1' } }, env({ ACCOUNTS }));
+    expect(await res.text()).toBe('{"from":"container"}');
+    expect(fetched).not.toHaveBeenCalled();
+    expect(seen).toHaveLength(1);
+    expect(seen[0].name).toBe('accounts');
+    expect(new URL(seen[0].request.url).pathname).toBe('/api/auth/me');
+    expect(seen[0].request.headers.get('cookie')).toBe('a=1');
+  });
+
+  it('prefers the container to an address when both are set', async () => {
+    const { ACCOUNTS, seen } = container();
+    const fetched = vi.fn(async () => new Response('from the network'));
+    vi.stubGlobal('fetch', fetched);
+    await call('/api/billing', {}, env({ ACCOUNTS, ACCOUNTS_URL: 'http://127.0.0.1:3333' }));
+    expect(seen).toHaveLength(1);
+    expect(fetched).not.toHaveBeenCalled();
+  });
+
+  it('keeps a body and does not follow a redirect', async () => {
+    const { ACCOUNTS, seen } = container();
+    await call('/api/billing/webhook/fake', { method: 'POST', body: '{"signed":"bytes"}', headers: { 'x-signature': 'abc' } }, env({ ACCOUNTS }));
+    expect(await seen[0].request.text()).toBe('{"signed":"bytes"}');
+    expect(seen[0].request.headers.get('x-signature')).toBe('abc');
+    expect(seen[0].request.redirect).toBe('manual');
+  });
+
+  it('tells the backend who is calling by the address Cloudflare saw, never by what the visitor claims', async () => {
+    const { ACCOUNTS, seen } = container();
+    await call('/api/auth/login', { method: 'POST', body: '{}', headers: { 'cf-connecting-ip': '203.0.113.7', 'x-forwarded-for': '1.2.3.4' } }, env({ ACCOUNTS }));
+    expect(seen[0].request.headers.get('x-forwarded-for')).toBe('203.0.113.7');
+    await call('/api/auth/login', { method: 'POST', body: '{}', headers: { 'x-forwarded-for': '1.2.3.4' } }, env({ ACCOUNTS }));
+    expect(seen[1].request.headers.get('x-forwarded-for')).toBeNull();
+  });
+
+  it('never lets a visitor send the Worker\'s secret header through', async () => {
+    const { ACCOUNTS, seen } = container();
+    await call('/api/auth/me', { headers: { 'x-tramme-internal': 'guess' } }, env({ ACCOUNTS }));
+    expect(seen[0].request.headers.get('x-tramme-internal')).toBeNull();
+  });
+
+  it('is there in personal mode too: the personal deployment can have accounts', async () => {
+    const { ACCOUNTS, seen } = container();
+    const res = await call('/api/auth/me', {}, env({ ACCOUNTS, MODE: 'personal' }));
+    expect(await res.text()).toBe('{"from":"container"}');
+    expect(seen).toHaveLength(1);
+  });
+
+  it('does not hand over what is not an account route', async () => {
+    const { ACCOUNTS, seen } = container();
+    for (const path of ['/api/config', '/api/projects', '/internal/edge', '/api/authority']) await call(path, {}, env({ ACCOUNTS }));
+    expect(seen).toHaveLength(0);
+  });
+});
