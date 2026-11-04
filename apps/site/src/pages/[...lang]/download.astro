@@ -55,7 +55,7 @@ const mb = (bytes: number) => `${Math.round(bytes / 1e6)} MB`;
       {w.or}{' '}<a href={APP}>{w.browser}</a>, {w.nothing}.
     </PageHead>
     <section class="wrap download-preview">
-      <Shot light={studio.shot[0]} dark={studio.shot[1]} alt={pick(locale, studio.alt)} />
+      <Shot src={studio.shot} alt={pick(locale, studio.alt)} />
       <div class="download-intro">
         <h2>{locale === 'fr' ? 'Votre studio, sur votre ordinateur.' : 'Your studio, on your computer.'}</h2>
         <p>{w.lead}</p>

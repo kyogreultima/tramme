@@ -43,7 +43,7 @@ const { shot, alt } = shotOf('editor');
     <Head title={c.title} more={c.more} />
   </div>
   <div class="wrap">
-    <Shot light={shot[0]} dark={shot[1]} alt={pick(locale, alt)} />
+    <Shot src={shot} alt={pick(locale, alt)} />
     <Cards items={items} />
   </div>
 </section>

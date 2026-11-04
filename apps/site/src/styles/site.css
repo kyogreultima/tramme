@@ -65,14 +65,14 @@ body.site #tools .chips li { border-radius: 4px; background: var(--panel-2); }
 body.site .formats { gap: 0 28px; }
 body.site .formats > li { min-height: 152px; padding-inline: 0; border-top: 1px solid var(--line-2); border-radius: 0; background: transparent; }
 
-/* Pricing uses the same Paper action roles as the light application. */
+/* Pricing sits on a raised dark surface, with the dark action roles. */
 body[data-page='pricing'] .pricing-sheet {
   --bg: var(--paper); --panel: var(--paper-card); --ink: var(--paper-ink);
   --ink-2: var(--paper-muted); --ink-3: var(--paper-muted);
   --line: var(--paper-line); --line-2: var(--paper-line); --hover: var(--paper-hover);
-  --accent-text: var(--tramme-light-accent-text);
-  --accent: var(--tramme-light-accent); --accent-2: var(--tramme-light-accent-hover);
-  --accent-ink: var(--tramme-light-on-accent); --accent-soft: var(--tramme-light-accent-soft);
+  --accent-text: var(--tramme-dark-accent-text);
+  --accent: var(--tramme-dark-accent); --accent-2: var(--tramme-dark-accent-hover);
+  --accent-ink: var(--tramme-dark-on-accent); --accent-soft: var(--tramme-dark-accent-soft);
   background: var(--paper); color: var(--ink); padding-block: 44px 56px; margin-top: 40px;
 }
 body[data-page='pricing'] .pricing-sheet .plans { margin-top: 0; }

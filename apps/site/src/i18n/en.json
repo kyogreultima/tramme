@@ -39,8 +39,7 @@
     "licence": "Licence",
     "repository": "Repository",
     "copyright": "© 2026 Aziz Chanou. Source available, under the Functional Source License.",
-    "language": "Language",
-    "theme": "Theme"
+    "language": "Language"
   },
   "faq": {
     "title": "Questions, answered.",
@@ -53,8 +52,6 @@
     "downloadFor": "Download for {system}",
     "logIn": "Log in",
     "startFree": "Start for free",
-    "light": "Light",
-    "dark": "Dark",
     "english": "English",
     "french": "Français",
     "free": "Free",

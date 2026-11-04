@@ -15,7 +15,7 @@ const { locale } = Astro.props;
   <ul class="collection" role="list">
     {FEATURES.map((f) => <li>
       <a href={pathIn(locale, `/features/#${f.id}`)}>
-        <div class={`tile tile-${f.id}`}><Image src={'shot' in f.picture ? f.picture.shot[1] : f.picture.still} alt="" widths={[320, 640]} sizes="(max-width: 600px) 55vw, 20vw" loading="lazy" /></div>
+        <div class={`tile tile-${f.id}`}><Image src={'shot' in f.picture ? f.picture.shot : f.picture.still} alt="" widths={[320, 640]} sizes="(max-width: 600px) 55vw, 20vw" loading="lazy" /></div>
         <span class="name">{wordsOf(f, locale).name}</span>
       </a>
     </li>)}

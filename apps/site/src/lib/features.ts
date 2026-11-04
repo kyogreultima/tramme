@@ -5,15 +5,13 @@
 
 import type { ImageMetadata } from 'astro';
 import { pick, type Locale, type Localised } from './i18n';
-import studioLight from '../assets/studio-light.png';
-import studioDark from '../assets/studio-dark.png';
-import editorLight from '../assets/editor-light.png';
-import editorDark from '../assets/editor-dark.png';
+import studioShot from '../assets/film-studio.webp';
+import editorShot from '../assets/film-atelier.webp';
 import showreelStill from '../videos/showreel.webp';
 import launchStill from '../videos/launch-film.webp';
 
-/** The app follows its containing section: Paper on light, Studio on dark. */
-export interface ShotPicture { shot: [light: ImageMetadata, dark: ImageMetadata]; alt: Localised<string> }
+/** a screen of the app, taken from the launch film */
+export interface ShotPicture { shot: ImageMetadata; alt: Localised<string> }
 /** a still of a film */
 export interface StillPicture { still: ImageMetadata; alt: Localised<string> }
 
@@ -31,7 +29,7 @@ export const FEATURES: Feature[] = [
     name: { en: 'Studio', fr: 'Studio' },
     line: { en: 'Direct the film in words. Leave a note, get a take back on the picture, keep the ones you like.', fr: 'Dirigez le film avec des mots. Laissez une note, recevez une prise sur l’image, gardez celles qui vous plaisent.' },
     picture: {
-      shot: [studioLight, studioDark],
+      shot: studioShot,
       alt: { en: 'The Tramme studio: the Showreel example in front, its storyboard below, and the notes panel beside the film.', fr: 'Le studio de Tramme : l’exemple Showreel au premier plan, son storyboard dessous et le panneau de notes à côté du film.' },
     },
   },
@@ -40,7 +38,7 @@ export const FEATURES: Feature[] = [
     name: { en: 'Atelier', fr: 'Atelier' },
     line: { en: 'Every layer, key and curve, one switch away from the studio, on the same film.', fr: 'Chaque calque, image clé et courbe, à un bouton du studio, sur le même film.' },
     picture: {
-      shot: [editorLight, editorDark],
+      shot: editorShot,
       alt: { en: 'The Tramme atelier: the layers of the Showreel example on the left, the frame in the viewport, the timeline below and the inspector on the right.', fr: 'L’atelier de Tramme : les calques de l’exemple Showreel à gauche, l’image dans la vue, la timeline dessous et l’inspecteur à droite.' },
     },
   },
@@ -49,7 +47,7 @@ export const FEATURES: Feature[] = [
     name: { en: 'Assistant', fr: 'Assistant' },
     line: { en: 'The AI edits with your tools: it looks at its own frames, shows a take, and asks before it spends.', fr: 'L’IA monte avec vos outils : elle regarde ses propres images, montre une prise et demande avant de dépenser.' },
     picture: {
-      shot: [editorLight, editorDark],
+      shot: editorShot,
       alt: { en: 'The assistant beside the Showreel example in the Tramme atelier, with its tools and direction field.', fr: 'L’assistant à côté de l’exemple Showreel dans l’atelier Tramme, avec ses outils et son champ de direction.' },
     },
   },

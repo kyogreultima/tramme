@@ -35,10 +35,15 @@ describe.each(LOCALES)('the site map (%s)', (locale) => {
 });
 
 describe('the choices of the footer', () => {
-  it('offers exactly light and dark, with no "system"', () => {
-    const source = read('components/ThemeChoice.astro');
-    expect([...source.matchAll(/data-theme-option="(\w+)"/g)].map((m) => m[1])).toEqual(['light', 'dark']);
-    expect(source).not.toMatch(/system/i);
+  it('offers no theme choice: the site is dark only, the docs keep their toggle', () => {
+    expect(read('components/Footer.astro')).not.toMatch(/Theme/);
+    expect(read('layouts/Base.astro')).toContain("dataset.theme = 'dark'");
+  });
+
+  it('keeps no light surface on the site: the paper sections use the dark tokens', () => {
+    const site = read('styles/site.css') + read('components/Community.astro');
+    expect(site).not.toContain('--tramme-light');
+    expect(/--paper[\w-]*: var\(--tramme-light/.test(read('styles/theme.css'))).toBe(false);
   });
 
   it('changes language with plain links, without script', () => {

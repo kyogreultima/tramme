@@ -1,6 +1,4 @@
 ---
-// light or dark before the first paint, as in the docs
-import ThemeProvider from '../components/ThemeProvider.astro';
 // the visitor's system, for the download buttons
 import Platform from '../components/Platform.astro';
 import SiteHead from '../components/SiteHead.astro';
@@ -44,7 +42,7 @@ const page = segment === 'p' ? 'project' : segment;
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
     <SocialImage />
-    <ThemeProvider />
+    <script is:inline>document.documentElement.dataset.theme = 'dark';</script>
     <Platform />
     <SiteHead />
     <Font cssVariable="--font-display" preload />

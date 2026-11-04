@@ -3,8 +3,6 @@
 /* Website semantics mapped to the same foundation as Studio/Paper. */
 :root {
   color-scheme: dark;
-  --app-shot-light: none;
-  --app-shot-dark: block;
   --bg: var(--tramme-dark-bg);
   --panel: var(--tramme-dark-surface);
   --panel-2: var(--tramme-dark-surface-2);
@@ -25,12 +23,12 @@
   --on-screen: var(--tramme-dark-text);
   --on-media: var(--tramme-dark-text);
   --scrim: #10150fb8;
-  --paper: var(--tramme-light-surface);
-  --paper-ink: var(--tramme-light-text);
-  --paper-muted: var(--tramme-light-text-3);
-  --paper-line: var(--tramme-light-line-strong);
-  --paper-card: var(--tramme-light-surface-2);
-  --paper-hover: var(--tramme-light-hover);
+  --paper: var(--tramme-dark-surface);
+  --paper-ink: var(--tramme-dark-text);
+  --paper-muted: var(--tramme-dark-text-3);
+  --paper-line: var(--tramme-dark-line-strong);
+  --paper-card: var(--tramme-dark-surface-2);
+  --paper-hover: var(--tramme-dark-hover);
   --lift: 0 1px 0 var(--line-2);
   --float: 0 18px 48px #05090333;
   --brand-mark: var(--tramme-accent);
@@ -41,8 +39,6 @@
 }
 :root[data-theme='light'] {
   color-scheme: light;
-  --app-shot-light: block;
-  --app-shot-dark: none;
   --bg: var(--tramme-light-bg);
   --panel: var(--tramme-light-surface);
   --panel-2: var(--tramme-light-surface-2);
@@ -58,12 +54,3 @@
   --float: 0 18px 48px #20291a1f;
 }
 
-/* Screenshot variants inherit the section's theme, including fixed surfaces. */
-.screen, [data-app-theme='dark'] {
-  --app-shot-light: none;
-  --app-shot-dark: block;
-}
-.community, [data-app-theme='light'] {
-  --app-shot-light: block;
-  --app-shot-dark: none;
-}
