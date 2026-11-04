@@ -1,0 +1,21 @@
+# A Postgres for the backend, for a machine that has none (npm run db:dev creates the databases in the one you already run, e.g. Laragon's).
+# Port 5432 and the `postgres` user, as Laragon's, so one DATABASE_URL serves both (stop Laragon's Postgres first).
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: tramme
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - tramme-pg:/var/lib/postgresql/data
+      - ./apps/server/docker/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d tramme"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+volumes:
+  tramme-pg:
