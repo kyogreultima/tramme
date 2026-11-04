@@ -8,7 +8,7 @@ const items = ['devices', 'visibility', 'export'];
 <section class="platform wrap" id="platform">
   <span class="section-label">{t(locale, 'nav.cloud')}</span>
   <Head title={t(locale, 'landing.platform.title')} more={t(locale, 'landing.platform.more')} />
-  <ul class="details" role="list">
+  <ul class="details" role="list" data-stagger>
     {items.map((id) => <li><h3>{t(locale, `landing.platform.${id}.title`)}</h3><p>{t(locale, `landing.platform.${id}.text`)}</p><a href={pathIn(locale, '/features/#cloud')}>{t(locale, 'landing.pillars.learn')}</a></li>)}
   </ul>
 </section>

@@ -5,13 +5,13 @@ interface Props { locale: Locale }
 const { locale } = Astro.props;
 ---
 <section class="materials wrap">
-  <div class="intro">
+  <div class="intro" data-reveal>
     <span class="section-label">{t(locale, 'nav.features')}</span>
     <h2>{t(locale, 'landing.materials.title')}</h2>
     <p>{t(locale, 'landing.pillars.more')}</p>
     <a class="btn btn-ghost" href={pathIn(locale, '/features/')}>{t(locale, 'landing.pillars.learn')}</a>
   </div>
-  <ul class="collection" role="list">
+  <ul class="collection" role="list" data-stagger>
     {FEATURES.map((f) => <li>
       <a href={pathIn(locale, `/features/#${f.id}`)}>
         <span class="name">{wordsOf(f, locale).name}</span>

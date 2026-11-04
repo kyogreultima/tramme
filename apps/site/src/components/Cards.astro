@@ -6,7 +6,7 @@ interface Props { items: Item[]; columns?: number }
 const { items, columns = 3 } = Astro.props;
 ---
 
-<ul class="cards" role="list" style={`--cols: ${columns}`} data-reveal>
+<ul class="cards" role="list" style={`--cols: ${columns}`} data-reveal data-stagger>
   {items.map(({ Icon, title, text }) => (
     <li class="surface">
       <span class="icon"><Icon aria-hidden="true" /></span>

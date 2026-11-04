@@ -6,7 +6,25 @@ body.site .btn-sm { height: 32px; padding-inline: 12px; font-size: 0.75rem; }
 body.site .btn-accent { color: var(--accent-ink); }
 body.site .wrap, body.site .bleed { max-width: var(--max); margin-inline: auto; }
 body.landing main { padding-bottom: 0; }
-body.site [data-reveal] { animation: none; }
+
+/* Landing motion: scroll-driven, CSS only (no script, no library), so it costs the page nothing.
+   Where view timelines are missing, or motion is reduced, everything simply stands there. */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    body.landing [data-reveal] { animation: rise linear both; animation-timeline: view(); animation-range: entry 5% entry 55%; }
+    body.landing [data-stagger] > * { animation: rise linear both; animation-timeline: view(); animation-range: entry calc(5% + var(--i, 0) * 7%) entry calc(55% + var(--i, 0) * 7%); }
+    body.landing [data-stagger] > :nth-child(2) { --i: 1; }
+    body.landing [data-stagger] > :nth-child(3) { --i: 2; }
+    body.landing [data-stagger] > :nth-child(4) { --i: 3; }
+    body.landing [data-stagger] > :nth-child(5) { --i: 4; }
+    body.landing [data-stagger] > :nth-child(6) { --i: 5; }
+    body.landing .head h2 { animation: rise-big linear both; animation-timeline: view(); animation-range: entry 0% entry 60%; }
+    /* a list that staggers its children does not also fade as a block */
+    body.landing [data-reveal][data-stagger] { animation: none; }
+  }
+}
+@keyframes rise { from { opacity: 0; transform: translateY(36px); } }
+@keyframes rise-big { from { opacity: 0; transform: translateY(64px); } }
 body.site .nav-reference {
   position: sticky; top: 12px; height: 52px;
   width: calc(100% - 24px); max-width: var(--max); margin: 12px auto -64px; flex: none;
