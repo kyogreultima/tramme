@@ -33,6 +33,7 @@ import './screens/account.css';
 import './screens/conversation.css';
 import './screens/studio.css';
 import './screens/atelier.css';
+import './theme/frost.css';
 import './theme/liquid-glass.css';
 import { offerTours } from './tours/index.ts';
 import { startProject } from './start.ts';

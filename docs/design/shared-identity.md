@@ -30,13 +30,17 @@ du site suit désormais le thème et les surfaces de l'app, y compris en sombre.
 Les thèmes alternatifs restent disponibles ; leurs
 palettes particulières sont un choix personnel, avec la même grammaire de contrôle.
 
+Frost (verre dépoli) et Liquid Glass partagent la matière de `frost.css`. Liquid Glass y ajoute,
+dans `liquid-glass.css` et `refraction.ts`, une réfraction réelle du fond au bord des surfaces
+flottantes (Chromium seulement ; ailleurs, Frost).
+
 Liquid Glass conserve sa palette monochrome, ses transparences et ses reflets.
 Il hérite des rayons communs des contrôles, menus, panneaux et dialogues, ainsi
 que de la géométrie des lignes de paramètres et de menu. Les états de survol
 et les préférences de transparence ou de contraste ne changent pas ces formes.
 La gouttière de 8px sépare aussi la topbar du corps de l'Atelier et du Studio :
 les panneaux latéraux gardent ainsi leur contour, même avec des surfaces de
-verre très claires. `liquid-glass.css` conserve les règles propres au matériau
+verre très claires. `frost.css` conserve les règles propres au matériau
 (flou, reflets, transparence et états accessibles), sans redéfinir la géométrie
 commune.
 Les barres supérieures de Liquid Glass restent sans fond ni filet propre,

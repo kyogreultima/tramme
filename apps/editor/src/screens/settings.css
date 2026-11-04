@@ -5,7 +5,9 @@
 /* a menu of sections on the left, the one chosen on the right; the same height whatever the section */
 .modal-body.settings { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 0; padding: 0; height: min(640px, calc(100dvh - 80px)); }
 .set-nav { display: flex; flex-direction: column; gap: 2px; padding: 14px 10px; border-right: 1px solid var(--line); overflow: auto; }
-.set-search { height: var(--h-md); gap: 6px; padding-left: 8px; margin-bottom: 4px; }
+.set-search { height: calc(var(--h-md) + 1px); gap: 6px; padding-left: 8px; margin-bottom: 4px; }
+:root:root .field.set-search:focus-within { box-shadow: 0 0 0 1px var(--accent-line); }
+.set-search input::-webkit-search-cancel-button { display: none; -webkit-appearance: none; }
 .set-search svg.i { width: 14px; height: 14px; color: var(--text-3); flex: none; }
 .set-group { display: flex; flex-direction: column; gap: 2px; }
 .set-group-title { padding: 14px 10px 6px; color: var(--text-3); font: 500 var(--fs-xs)/1 var(--ui); }

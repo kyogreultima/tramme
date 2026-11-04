@@ -990,7 +990,8 @@
       "paper": "Paper",
       "linen": "Linen",
       "porcelain": "Porcelain",
-      "liquidGlass": "Liquid Glass (experimental)",
+      "frost": "Frost",
+      "liquidGlass": "Refractive glass (experimental)",
       "system": "System"
     },
     "settingsForThisComputer": "Settings for this computer, kept in this browser. Exports always render at full quality, whatever is chosen here.",
@@ -1086,6 +1087,7 @@
     "behavior": "Behavior",
     "connection": "Local companion",
     "searchSettings": "Search",
+    "clearSearch": "Clear search",
     "noMatch": "No setting for \"{query}\".",
     "effort": "Effort",
     "effortHint": "How hard the chosen model works on each message: deeper thinking and more checks as it rises, but slower and costlier. Kept for each model. Claude: High by default, which suits most work.",

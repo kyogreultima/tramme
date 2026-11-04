@@ -6,8 +6,9 @@
 import { effect, signal } from '@preact/signals';
 import { MODEL_TASKS, resolveModel, type ModelEntry, type ModelTask } from './models.ts';
 import type { DictationSource } from './speech.ts';
-import { FORMER_PREFERENCES_KEY, PREFERENCES_KEY, savedTheme, showTheme, VIEWS, type ThemeId, type View } from './theme/pref.ts';
+import { FORMER_PREFERENCES_KEY, GLASS_THEMES, PREFERENCES_KEY, savedTheme, showTheme, VIEWS, type ThemeId, type View } from './theme/pref.ts';
 import { installGlassLight } from './theme/liquid-glass.ts';
+import { installRefraction } from './theme/refraction.ts';
 
 export interface Preferences {
   /** interface language: the browser's (French or English), or chosen */
@@ -94,7 +95,9 @@ export const THEMES: ThemeInfo[] = [
   { id: 'paper', bg: 'var(--tramme-light-bg)', surface: 'var(--tramme-light-surface)', text: 'var(--tramme-light-text)', accent: 'var(--tramme-light-accent)' },
   { id: 'linen', bg: '#f7f3ec', surface: '#fffdf8', text: '#221d14', accent: '#0c7f6b' },
   { id: 'porcelain', bg: '#eef2f6', surface: '#ffffff', text: '#151a21', accent: '#0b7f95' },
-  { id: 'liquid-glass', bg: '#ededee', surface: 'rgba(255, 255, 255, 0.62)', text: '#202023', accent: '#29292c' },
+  // Frost is switched off in the picker: next to Liquid Glass it reads as the same theme. Its styles stay, Liquid Glass builds on them.
+  // { id: 'frost', bg: '#ededee', surface: 'rgba(255, 255, 255, 0.62)', text: '#202023', accent: '#29292c' },
+  { id: 'liquid-glass', bg: '#e4e6ea', surface: 'rgba(255, 255, 255, 0.62)', text: '#202023', accent: '#29292c' },
   { id: 'system', bg: 'var(--tramme-dark-bg)', surface: 'var(--tramme-dark-surface)', text: 'var(--tramme-dark-text)', accent: 'var(--tramme-dark-accent)' },
 ];
 const VOICE_PROVIDERS = ['auto', 'elevenlabs', 'openai', 'gemini', 'hydracept'] as const;
@@ -205,7 +208,12 @@ effect(() => {
 
 /** Dispose lighting listeners as soon as this theme is no longer selected. */
 effect(() => {
-  if (typeof document !== 'undefined' && prefs.value.theme === 'liquid-glass') return installGlassLight(document);
+  if (typeof document !== 'undefined' && GLASS_THEMES.includes(prefs.value.theme)) return installGlassLight(document);
+});
+
+/** Liquid Glass alone bends the picture behind its surfaces. */
+effect(() => {
+  if (typeof document !== 'undefined' && prefs.value.theme === 'liquid-glass') return installRefraction(document);
 });
 
 /** the settings dialog, opened from the top bar, the home screen or Ctrl+, */

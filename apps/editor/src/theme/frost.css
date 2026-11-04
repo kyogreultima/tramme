@@ -1,7 +1,7 @@
-/* Liquid Glass: colourless material, the shared control geometry and floating
+/* Frost (also the base of Liquid Glass, which adds refraction in liquid-glass.css): colourless material, the shared control geometry and floating
    controls. The picture supplies colour. Content stays quiet and legible;
    glass belongs to navigation and transient controls, not every nested row. */
-:root[data-theme="liquid-glass"] {
+:root:is([data-theme="frost"], [data-theme="liquid-glass"]) {
   color-scheme: light;
   --bg: #ededee; --surface: rgba(255, 255, 255, .76); --surface-2: rgba(118, 118, 128, .065); --raised: #f8f8f9;
   --field: rgba(118, 118, 128, .09); --field-hover: rgba(118, 118, 128, .14); --field-active: rgba(118, 118, 128, .2); --stage: #dedee1;
@@ -36,59 +36,59 @@
     radial-gradient(ellipse at 100% 90%, rgba(175, 175, 183, .2), transparent 65%);
 }
 
-:root[data-theme="liquid-glass"] :is(body, .home, .studio, .app) { background: var(--glass-wallpaper), var(--bg); }
-:root[data-theme="liquid-glass"] .workspace { background: transparent; }
+:root:is([data-theme="frost"], [data-theme="liquid-glass"]) :is(body, .home, .studio, .app) { background: var(--glass-wallpaper), var(--bg); }
+:root:is([data-theme="frost"], [data-theme="liquid-glass"]) .workspace { background: transparent; }
 
 /* No background of its own: a blurred wash of the last film's picture, laid over
    the home's own wallpaper gradient, so the top bar and the direction box have
    colour to bend instead of blurring flat paint. No picture yet: nothing to show,
    the gradient underneath carries on alone. */
-:root[data-theme="liquid-glass"] .home-wallpaper { opacity: 1; }
-:root[data-theme="liquid-glass"] .home-wallpaper::before { opacity: .4; filter: blur(90px) saturate(1.3) brightness(1.1); }
+:root:is([data-theme="frost"], [data-theme="liquid-glass"]) .home-wallpaper { opacity: 1; }
+:root:is([data-theme="frost"], [data-theme="liquid-glass"]) .home-wallpaper::before { opacity: .4; filter: blur(90px) saturate(1.3) brightness(1.1); }
 
 /* Resolve pointer coordinates on each lens, rather than inheriting an image
    already computed on the root. Opacity remains an inherited accessibility token. */
-:root[data-theme="liquid-glass"] :is(.pill, .viewport .toolbar, .viewport .loading, .graph-side, .graph-presets, .direct .composer, .brief-box, .seg button.on, .btn:where(:not(.primary, .danger, .danger-solid, .ghost, .outline))) {
+:root:is([data-theme="frost"], [data-theme="liquid-glass"]) :is(.pill, .viewport .toolbar, .viewport .loading, .graph-side, .graph-presets, .direct .composer, .brief-box, .seg button.on, .btn:where(:not(.primary, .danger, .danger-solid, .ghost, .outline))) {
   --glass-light: radial-gradient(ellipse 160px 90px at var(--glass-x, 18%) var(--glass-y, 0%), rgba(255, 255, 255, var(--glass-glint-opacity)), transparent 100%);
 }
 
 /* Regular material behind dense content; the stage retains its own pixels. */
-:root[data-theme="liquid-glass"] :is(.panel, .studio-side, .assistant, .storyboard) {
+:root:is([data-theme="frost"], [data-theme="liquid-glass"]) :is(.panel, .studio-side, .assistant, .storyboard) {
   background: var(--surface);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9), var(--shadow-1);
 }
-:root[data-theme="liquid-glass"] :is(.card, .home-empty) { background: rgba(255, 255, 255, .8); }
+:root:is([data-theme="frost"], [data-theme="liquid-glass"]) :is(.card, .home-empty) { background: rgba(255, 255, 255, .8); }
 
 /* A bright upper lip, a quiet lower lip and a cast shadow give the floating
    layer thickness. Background paint never covers text or intercepts gestures. */
-:root[data-theme="liquid-glass"] :is(.pill, .viewport .toolbar, .viewport .loading, .graph-side, .graph-presets, .direct .composer, .brief-box) {
+:root:is([data-theme="frost"], [data-theme="liquid-glass"]) :is(.pill, .viewport .toolbar, .viewport .loading, .graph-side, .graph-presets, .direct .composer, .brief-box) {
   --text-2: #3e3e44; --text-3: #44444b;
   background: var(--glass-light), var(--glass-sheen), var(--float);
   box-shadow: var(--glass-shadow);
   -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
 }
-:root[data-theme="liquid-glass"] :is(.pill, .viewport .toolbar, .graph-side, .graph-presets) {
+:root:is([data-theme="frost"], [data-theme="liquid-glass"]) :is(.pill, .viewport .toolbar, .graph-side, .graph-presets) {
   outline: 1px solid rgba(255, 255, 255, .6);
   outline-offset: -1px;
 }
-:root[data-theme="liquid-glass"] :is(.modal, .menu, .popover, .command-menu, .toast, .source-monitor, .filler-cuts, .multicam-panel) {
+:root:is([data-theme="frost"], [data-theme="liquid-glass"]) :is(.modal, .menu, .popover, .command-menu, .toast, .source-monitor, .filler-cuts, .multicam-panel) {
   --text-2: #3e3e44; --text-3: #44444b;
   background: var(--glass-sheen), var(--float);
   box-shadow: var(--glass-rim), var(--shadow-2);
   -webkit-backdrop-filter: var(--glass-regular-blur);
   backdrop-filter: var(--glass-regular-blur);
 }
-:root[data-theme="liquid-glass"] .modal { box-shadow: var(--glass-rim), var(--shadow-3); }
+:root:is([data-theme="frost"], [data-theme="liquid-glass"]) .modal { box-shadow: var(--glass-rim), var(--shadow-3); }
 /* The export overlays a pale inspector: a lighter veil makes the same frosted
    material visible there. Darker labels keep the thinner glass readable. */
-:root[data-theme="liquid-glass"] .export-pop {
+:root:is([data-theme="frost"], [data-theme="liquid-glass"]) .export-pop {
   --text-2: #303036; --text-3: #34343a;
   background: var(--glass-sheen), var(--glass-popover-fill);
 }
-:root[data-theme="liquid-glass"] .toast.error { box-shadow: var(--shadow-2), inset 0 0 0 1px var(--danger); }
-:root[data-theme="liquid-glass"] .modal-back { -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
-:root[data-theme="liquid-glass"] :is(.home-top, .topbar) {
+:root:is([data-theme="frost"], [data-theme="liquid-glass"]) .toast.error { box-shadow: var(--shadow-2), inset 0 0 0 1px var(--danger); }
+:root:is([data-theme="frost"], [data-theme="liquid-glass"]) .modal-back { -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+:root:is([data-theme="frost"], [data-theme="liquid-glass"]) :is(.home-top, .topbar) {
   --text-2: #3e3e44; --text-3: #44444b;
   /* Share the page's backdrop; only the controls carry a glass surface. */
   background: none;
@@ -98,55 +98,55 @@
 }
 
 /* Settings: one regular material, with quiet inset groups. */
-:root[data-theme="liquid-glass"] .set-nav { background: rgba(118, 118, 128, .035); }
-:root[data-theme="liquid-glass"] .set-group-card { background: rgba(255, 255, 255, .48); }
-:root[data-theme="liquid-glass"] .set-nav-item.on { background: rgba(255, 255, 255, .8); box-shadow: 0 1px 3px rgba(20, 20, 24, .09); }
-:root[data-theme="liquid-glass"] .modal-head { padding-top: 20px; padding-bottom: 12px; }
+:root:is([data-theme="frost"], [data-theme="liquid-glass"]) .set-nav { background: rgba(118, 118, 128, .035); }
+:root:is([data-theme="frost"], [data-theme="liquid-glass"]) .set-group-card { background: rgba(255, 255, 255, .48); }
+:root:is([data-theme="frost"], [data-theme="liquid-glass"]) .set-nav-item.on { background: rgba(255, 255, 255, .8); box-shadow: 0 1px 3px rgba(20, 20, 24, .09); }
+:root:is([data-theme="frost"], [data-theme="liquid-glass"]) .modal-head { padding-top: 20px; padding-bottom: 12px; }
 
 /* Controls share a rounded lens; primary and semantic actions keep solid ink. */
-:root[data-theme="liquid-glass"] .btn:where(:not(.primary, .danger, .danger-solid, .ghost, .outline)) {
+:root:is([data-theme="frost"], [data-theme="liquid-glass"]) .btn:where(:not(.primary, .danger, .danger-solid, .ghost, .outline)) {
   background: var(--glass-light), var(--glass-sheen), rgba(255, 255, 255, .58);
   box-shadow: var(--glass-rim), 0 2px 5px rgba(20, 20, 24, .08), 0 0 0 1px var(--line);
 }
-:root[data-theme="liquid-glass"] .btn:where(:not(.primary, .danger, .danger-solid, .ghost, .outline)):hover:not(:disabled) { background-color: rgba(255, 255, 255, .86); }
-:root[data-theme="liquid-glass"] .btn.primary { background: var(--accent); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .16), 0 2px 5px rgba(20, 20, 24, .16); }
-:root[data-theme="liquid-glass"] .btn.primary:hover { background: var(--accent-hover); }
-:root[data-theme="liquid-glass"] :is(.icon-btn, .chip) { transition: background-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease), scale var(--t-med) var(--ease); }
-:root[data-theme="liquid-glass"] :is(.btn, .icon-btn, .chip):active:not(:disabled) { scale: .96; }
-:root[data-theme="liquid-glass"] .btn:active { transform: none; }
-:root[data-theme="liquid-glass"] .icon-btn.on { background: rgba(255, 255, 255, .9); box-shadow: inset 0 1px 0 #ffffff, 0 1px 3px rgba(20, 20, 24, .12); }
+:root:is([data-theme="frost"], [data-theme="liquid-glass"]) .btn:where(:not(.primary, .danger, .danger-solid, .ghost, .outline)):hover:not(:disabled) { background-color: rgba(255, 255, 255, .86); }
+:root:is([data-theme="frost"], [data-theme="liquid-glass"]) .btn.primary { background: var(--accent); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .16), 0 2px 5px rgba(20, 20, 24, .16); }
+:root:is([data-theme="frost"], [data-theme="liquid-glass"]) .btn.primary:hover { background: var(--accent-hover); }
+:root:is([data-theme="frost"], [data-theme="liquid-glass"]) :is(.icon-btn, .chip) { transition: background-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease), scale var(--t-med) var(--ease); }
+:root:is([data-theme="frost"], [data-theme="liquid-glass"]) :is(.btn, .icon-btn, .chip):active:not(:disabled) { scale: .96; }
+:root:is([data-theme="frost"], [data-theme="liquid-glass"]) .btn:active { transform: none; }
+:root:is([data-theme="frost"], [data-theme="liquid-glass"]) .icon-btn.on { background: rgba(255, 255, 255, .9); box-shadow: inset 0 1px 0 #ffffff, 0 1px 3px rgba(20, 20, 24, .12); }
 
 /* A shallow well around the selected glass segment, with concentric radii. */
-:root[data-theme="liquid-glass"] .seg { background: rgba(118, 118, 128, .1); box-shadow: inset 0 1px 2px rgba(20, 20, 24, .035); }
-:root[data-theme="liquid-glass"] .seg button { transition: background-color var(--t-med) var(--ease), box-shadow var(--t-med) var(--ease), scale var(--t-med) var(--ease); }
-:root[data-theme="liquid-glass"] .seg button.on { background: var(--glass-light), var(--glass-sheen), rgba(255, 255, 255, .86); box-shadow: var(--glass-rim), 0 2px 5px rgba(20, 20, 24, .12); }
-:root[data-theme="liquid-glass"] .seg button:active:not(:disabled) { scale: .97; }
-:root[data-theme="liquid-glass"] :is(.field, .home-search, .composer) { box-shadow: inset 0 1px 2px rgba(20, 20, 24, .045), inset 0 0 0 1px rgba(20, 20, 24, .025); }
-:root[data-theme="liquid-glass"] :is(.field, .home-search, .composer):focus-within { box-shadow: 0 0 0 2px var(--accent-line); }
-:root[data-theme="liquid-glass"] :is(.brief-box, .direct .composer):focus-within { box-shadow: var(--glass-shadow), 0 0 0 2px var(--accent-line); }
-:root[data-theme="liquid-glass"] .field.invalid { box-shadow: 0 0 0 2px var(--danger); }
-:root[data-theme="liquid-glass"] :is(.btn, .icon-btn, .chip, .toggle, .set-nav-item, .seg button):focus-visible { box-shadow: var(--focus); }
+:root:is([data-theme="frost"], [data-theme="liquid-glass"]) .seg { background: rgba(118, 118, 128, .1); box-shadow: inset 0 1px 2px rgba(20, 20, 24, .035); }
+:root:is([data-theme="frost"], [data-theme="liquid-glass"]) .seg button { transition: background-color var(--t-med) var(--ease), box-shadow var(--t-med) var(--ease), scale var(--t-med) var(--ease); }
+:root:is([data-theme="frost"], [data-theme="liquid-glass"]) .seg button.on { background: var(--glass-light), var(--glass-sheen), rgba(255, 255, 255, .86); box-shadow: var(--glass-rim), 0 2px 5px rgba(20, 20, 24, .12); }
+:root:is([data-theme="frost"], [data-theme="liquid-glass"]) .seg button:active:not(:disabled) { scale: .97; }
+:root:is([data-theme="frost"], [data-theme="liquid-glass"]) :is(.field, .home-search, .composer) { box-shadow: inset 0 1px 2px rgba(20, 20, 24, .045), inset 0 0 0 1px rgba(20, 20, 24, .025); }
+:root:is([data-theme="frost"], [data-theme="liquid-glass"]) :is(.field, .home-search, .composer):focus-within { box-shadow: 0 0 0 2px var(--accent-line); }
+:root:is([data-theme="frost"], [data-theme="liquid-glass"]) :is(.brief-box, .direct .composer):focus-within { box-shadow: var(--glass-shadow), 0 0 0 1px var(--accent-line); }
+:root:is([data-theme="frost"], [data-theme="liquid-glass"]) .field.invalid { box-shadow: 0 0 0 2px var(--danger); }
+:root:is([data-theme="frost"], [data-theme="liquid-glass"]) :is(.btn, .icon-btn, .chip, .toggle, .set-nav-item, .seg button):focus-visible { box-shadow: var(--focus); }
 
-:root[data-theme="liquid-glass"] .toggle { box-shadow: inset 0 1px 3px rgba(20, 20, 24, .12); }
-:root[data-theme="liquid-glass"] .toggle::after {
+:root:is([data-theme="frost"], [data-theme="liquid-glass"]) .toggle { box-shadow: inset 0 1px 3px rgba(20, 20, 24, .12); }
+:root:is([data-theme="frost"], [data-theme="liquid-glass"]) .toggle::after {
   background: linear-gradient(165deg, #ffffff, #efeff1);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .85), 0 1px 3px rgba(20, 20, 24, .24);
 }
-:root[data-theme="liquid-glass"] .toggle:active:not(:disabled)::after { scale: 1.06 1; }
-:root[data-theme="liquid-glass"] :is(.menu-item:hover, .menu-item.active, .menu button:not(.menu-item):hover) { background: rgba(38, 38, 42, .07); }
-html.vault[data-theme="liquid-glass"], html.vault[data-theme="liquid-glass"] body { background: var(--raised); }
+:root:is([data-theme="frost"], [data-theme="liquid-glass"]) .toggle:active:not(:disabled)::after { scale: 1.06 1; }
+:root:is([data-theme="frost"], [data-theme="liquid-glass"]) :is(.menu-item:hover, .menu-item.active, .menu button:not(.menu-item):hover) { background: rgba(38, 38, 42, .07); }
+html.vault:is([data-theme="frost"], [data-theme="liquid-glass"]), html.vault:is([data-theme="frost"], [data-theme="liquid-glass"]) body { background: var(--raised); }
 
 /* The preview keeps the colourless lens with the shared component shapes. */
-.theme-card[data-theme-preview="liquid-glass"] .prev {
+.theme-card:is([data-theme-preview="frost"], [data-theme-preview="liquid-glass"]) .prev {
   background-image: radial-gradient(ellipse at 10% 10%, #ffffff, transparent 70%), linear-gradient(140deg, #e8e8ea, #b8b8bf) !important;
 }
-.theme-card[data-theme-preview="liquid-glass"] .prev .s {
+.theme-card:is([data-theme-preview="frost"], [data-theme-preview="liquid-glass"]) .prev .s {
   border: 1px solid rgba(255, 255, 255, .85);
   box-shadow: inset 0 1px 0 #ffffff, 0 5px 12px rgba(20, 20, 24, .1);
   -webkit-backdrop-filter: blur(5px);
   backdrop-filter: blur(5px);
 }
-.theme-card[data-theme-preview="liquid-glass"] .prev .a {
+.theme-card:is([data-theme-preview="frost"], [data-theme-preview="liquid-glass"]) .prev .a {
   left: 18%; right: 18%; top: auto; bottom: 10%; width: auto; height: 16%;
   background: rgba(255, 255, 255, .7) !important;
   box-shadow: inset 0 1px 0 #ffffff, inset 0 -1px 0 rgba(20, 20, 24, .08), 0 2px 5px rgba(20, 20, 24, .13);
@@ -155,35 +155,45 @@ html.vault[data-theme="liquid-glass"], html.vault[data-theme="liquid-glass"] bod
 
 /* Opaque fallbacks share the same shapes and interaction affordances. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  :root[data-theme="liquid-glass"] { --surface: #fafafa; --float: #f8f8f9; --glass-popover-fill: #f8f8f9; --glass-glint-opacity: 0; --glass-sheen: none; }
-  :root[data-theme="liquid-glass"] .btn:where(:not(.primary, .danger, .danger-solid, .ghost, .outline)) { background-color: var(--raised); }
+  :root:is([data-theme="frost"], [data-theme="liquid-glass"]) { --surface: #fafafa; --float: #f8f8f9; --glass-popover-fill: #f8f8f9; --glass-glint-opacity: 0; --glass-sheen: none; }
+  :root:is([data-theme="frost"], [data-theme="liquid-glass"]) .btn:where(:not(.primary, .danger, .danger-solid, .ghost, .outline)) { background-color: var(--raised); }
 }
 @media (prefers-reduced-transparency: reduce) {
-  :root[data-theme="liquid-glass"] {
+  :root:is([data-theme="frost"], [data-theme="liquid-glass"]) {
     --surface: #fafafa; --surface-2: #f0f0f2; --float: #f8f8f9; --glass-popover-fill: #f8f8f9;
     --glass-glint-opacity: 0; --glass-sheen: none; --glass-wallpaper: none;
     --glass-blur: none; --glass-regular-blur: none;
   }
-  :root[data-theme="liquid-glass"] :is(.card, .home-empty, .set-nav, .set-group-card, .btn:where(:not(.primary, .danger, .danger-solid, .ghost, .outline))) { background-color: var(--raised); }
-  :root[data-theme="liquid-glass"] .home-wallpaper { opacity: 0; }
-  .theme-card[data-theme-preview="liquid-glass"] .prev .s,
-  .theme-card[data-theme-preview="liquid-glass"] .prev .a { background: #fafafa !important; -webkit-backdrop-filter: none; backdrop-filter: none; }
+  :root:is([data-theme="frost"], [data-theme="liquid-glass"]) :is(.card, .home-empty, .set-nav, .set-group-card, .btn:where(:not(.primary, .danger, .danger-solid, .ghost, .outline))) { background-color: var(--raised); }
+  :root:is([data-theme="frost"], [data-theme="liquid-glass"]) .home-wallpaper { opacity: 0; }
+  .theme-card:is([data-theme-preview="frost"], [data-theme-preview="liquid-glass"]) .prev .s,
+  .theme-card:is([data-theme-preview="frost"], [data-theme-preview="liquid-glass"]) .prev .a { background: #fafafa !important; -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
 @media (prefers-reduced-motion: reduce) {
-  :root[data-theme="liquid-glass"] :is(.btn, .icon-btn, .chip, .seg button):active:not(:disabled) { scale: 1; }
-  :root[data-theme="liquid-glass"] .toggle:active:not(:disabled)::after { scale: 1; }
+  :root:is([data-theme="frost"], [data-theme="liquid-glass"]) :is(.btn, .icon-btn, .chip, .seg button):active:not(:disabled) { scale: 1; }
+  :root:is([data-theme="frost"], [data-theme="liquid-glass"]) .toggle:active:not(:disabled)::after { scale: 1; }
 }
 @media (prefers-contrast: more) {
-  :root[data-theme="liquid-glass"] {
+  :root:is([data-theme="frost"], [data-theme="liquid-glass"]) {
     --surface: #ffffff; --float: #fafafa; --glass-popover-fill: #fafafa; --text-2: #303034; --text-3: #47474d;
     --line: rgba(38, 38, 42, .3); --line-strong: rgba(38, 38, 42, .5);
     --glass-glint-opacity: 0; --glass-sheen: none;
   }
-  :root[data-theme="liquid-glass"] :is(.btn, .icon-btn, .toggle, .seg) { outline: 1px solid var(--line-strong); outline-offset: -1px; }
-  :root[data-theme="liquid-glass"] .home-wallpaper::before { opacity: 0; }
+  :root:is([data-theme="frost"], [data-theme="liquid-glass"]) :is(.btn, .icon-btn, .toggle, .seg) { outline: 1px solid var(--line-strong); outline-offset: -1px; }
+  :root:is([data-theme="frost"], [data-theme="liquid-glass"]) .home-wallpaper::before { opacity: 0; }
 }
 @media (forced-colors: active) {
-  :root[data-theme="liquid-glass"] { --glass-glint-opacity: 0; --glass-sheen: none; --glass-wallpaper: none; --glass-blur: none; --glass-regular-blur: none; }
-  :root[data-theme="liquid-glass"] :is(.btn, .icon-btn, .toggle, .seg button.on, .set-nav-item.on) { outline: 1px solid ButtonText; }
-  :root[data-theme="liquid-glass"] .home-wallpaper { opacity: 0; }
+  :root:is([data-theme="frost"], [data-theme="liquid-glass"]) { --glass-glint-opacity: 0; --glass-sheen: none; --glass-wallpaper: none; --glass-blur: none; --glass-regular-blur: none; }
+  :root:is([data-theme="frost"], [data-theme="liquid-glass"]) :is(.btn, .icon-btn, .toggle, .seg button.on, .set-nav-item.on) { outline: 1px solid ButtonText; }
+  :root:is([data-theme="frost"], [data-theme="liquid-glass"]) .home-wallpaper { opacity: 0; }
+}
+
+/* The direction box paints its glass on a pseudo-element behind its content: a
+   backdrop filter on the box itself would make it the backdrop of everything
+   inside, and the / menu, which opens within it, would only see the box and
+   never bend or blur the films below. */
+:root:is([data-theme="frost"], [data-theme="liquid-glass"]) .brief-box.brief-box { -webkit-backdrop-filter: none; backdrop-filter: none; }
+:root:is([data-theme="frost"], [data-theme="liquid-glass"]) .brief-box::before {
+  content: ''; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none;
+  -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
 }

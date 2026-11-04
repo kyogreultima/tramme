@@ -64,6 +64,7 @@ const THEME_NAME: Record<string, string> = {
   paper: m('settings.themes.paper'),
   linen: m('settings.themes.linen'),
   porcelain: m('settings.themes.porcelain'),
+  frost: m('settings.themes.frost'),
   'liquid-glass': m('settings.themes.liquidGlass'),
 };
 
@@ -565,7 +566,7 @@ export function SettingsDialog() {
     <Modal title={t('common.settings')} onClose={close} wide>
       <div class="modal-body settings">
         <nav class="set-nav">
-          <div class="field set-search"><Icon name="search" /><input type="search" value={query} placeholder={t('settings.searchSettings')} onInput={(e) => setQuery((e.target as HTMLInputElement).value)} /></div>
+          <div class="field set-search"><Icon name="search" /><input type="search" value={query} placeholder={t('settings.searchSettings')} onInput={(e) => setQuery((e.target as HTMLInputElement).value)} />{query && <button class="icon-btn xs" title={t('settings.clearSearch')} onClick={() => setQuery('')}><Icon name="x" /></button>}</div>
           {GROUPS.map((g) => (
             <div key={g.title()} class="set-group">
               <div class="set-group-title">{g.title()}</div>

@@ -32,6 +32,7 @@ import { personal } from '../mode.ts';
 import { install, installable } from '../install.ts';
 import { offerTours } from '../tours/index.ts';
 import { prefs, settingsOpen } from '../settings.ts';
+import { GLASS_THEMES } from '../theme/pref.ts';
 import { APP_VERSION, downloadOf, update } from '../version.ts';
 import { IDEAS } from '../ideas.ts';
 import { t } from '../i18n/index.ts';
@@ -274,7 +275,7 @@ export function Home() {
   // blurred, stands in for a wallpaper behind the home screen. No film yet, no picture: the
   // theme's plain gradient carries on alone.
   const withThumb = useMemo(() => projects?.find((m) => m.thumbnail), [projects]);
-  const wallpaper = prefs.value.theme === 'liquid-glass' && withThumb
+  const wallpaper = GLASS_THEMES.includes(prefs.value.theme) && withThumb
     ? `${api.fileUrl(withThumb.id, withThumb.thumbnail!)}?v=${encodeURIComponent(withThumb.modified)}` : null;
 
   const refresh = () => api.list().then(setProjects).catch((e) => setLoadError((e as Error).message));
@@ -350,9 +351,10 @@ export function Home() {
       <header class="home-top" {...windowBar}>
         <div class="brand"><Brand size={20} /></div>
         <span class="grow" />
-        {installable.value && <button class="btn outline sm" title={t('home.installAppHint')} onClick={install}><Icon name="download" /><span class="label">{t('home.installApp')}</span></button>}
         <HelpButton page="home" />
         <button class="icon-btn" data-tour="settings" title={t('common.settingsCtrl')} onClick={() => { settingsOpen.value = true; }}><Icon name="gear" /></button>
+        {/* icons first, then the buttons: the two kinds stay grouped */}
+        {installable.value && <button class="btn outline sm" title={t('home.installAppHint')} onClick={install}><Icon name="download" /><span class="label">{t('home.installApp')}</span></button>}
         {/* the other ways in: a blank project, a video to dress, a file to open */}
         <button class="btn outline sm" data-tour="home-more" onClick={(e) => openMenu((e.currentTarget as HTMLElement).getBoundingClientRect(), [
           { label: t('home.blankProject'), icon: 'plus', detail: t('home.blankProjectDetail'), onClick: () => setDialog({ kind: 'new' }) },

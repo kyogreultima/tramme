@@ -990,7 +990,8 @@
       "paper": "Papier",
       "linen": "Lin",
       "porcelain": "Porcelaine",
-      "liquidGlass": "Liquid Glass (expérimental)",
+      "frost": "Verre dépoli",
+      "liquidGlass": "Verre réfractif (expérimental)",
       "system": "Système"
     },
     "settingsForThisComputer": "Réglages de cet ordinateur, gardés dans ce navigateur. Les exports sont toujours rendus en pleine qualité, quoi qu'il soit choisi ici.",
@@ -1086,6 +1087,7 @@
     "behavior": "Comportement",
     "connection": "Compagnon local",
     "searchSettings": "Rechercher",
+    "clearSearch": "Effacer la recherche",
     "noMatch": "Aucun réglage pour « {query} ».",
     "effort": "Effort",
     "effortHint": "L'application que le modèle choisi met à chaque message : réflexion plus poussée et plus de vérifications quand il monte, mais plus lent et plus coûteux. Retenu pour chaque modèle. Claude : Élevé par défaut, ce qui convient à la plupart des travaux.",
