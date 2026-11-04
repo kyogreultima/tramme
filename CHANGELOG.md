@@ -8,6 +8,8 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-11-05
+
 ### Added
 
 - **Quick button (desktop app)**: an optional small floating button, switched on in Settings > Behavior, that stays over your other apps while Tramme is behind them. It opens a panel to describe a film, start from an idea or reopen a recent project.
@@ -630,7 +632,8 @@ First public release.
 
 - Cloudflare Worker serving the editor and the API, projects stored in R2, access protected by Cloudflare Access.
 
-[Unreleased]: ../../compare/v0.19.0...HEAD
+[Unreleased]: ../../compare/v0.20.0...HEAD
+[0.20.0]: ../../compare/v0.19.0...v0.20.0
 [0.19.0]: ../../compare/v0.18.0...v0.19.0
 [0.18.0]: ../../compare/v0.17.1...v0.18.0
 [0.17.1]: ../../compare/v0.17.0...v0.17.1
