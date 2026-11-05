@@ -10,12 +10,14 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Added
 
+- The mixer master now shows live three-second loudness, true peak and clipping before the personal listening volume, alongside the composition's target. Its stopped-film measurement remains available, and the assistant reads the same master levels.
 - Live meters on mixer tracks and buses show peak, RMS and a held peak during playback, with a clipping indicator that stays lit until reset. Closing the mixer releases its analysers; the assistant can read and reset the same meters with `meters`.
 - The desktop app has accounts: sign up, sign in and your space, like the web app. Its calls go to the accounts backend of the environment it was built for (the beta app to the beta, the stable one to production), the session is kept in the system keychain, and sign-in with Google or GitHub is not offered in the app yet.
 - A beta build of the desktop app, "Tramme Beta": it installs beside Tramme, and the beta site offers it.
 
 ### Fixed
 
+- Playback no longer adds the live limiter's automatic gain on top of the composition's loudness target, keeping a steady mix at its expected level.
 - The home page's top bar was squeezed against the top edge when the page was taller than the window; it keeps its height, now one value for every top bar.
 - The icons of the phones' apps sit on a white tile, not a dark one; the desktop icons stay the mark alone.
 

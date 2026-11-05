@@ -1,6 +1,6 @@
 # Sound parity roadmap
 
-Status: step 1 in progress; 3 boxes done, 26 open. Track meters are built; the live master meter is next.
+Status: step 1 built; 5 boxes done, 24 open. Track effects are next.
 
 What Raylight's Sound page ([raylight.app/sound](https://www.raylight.app/sound)) offers and Tramme does not yet, and the steps that close the gap. Read with [sound-roadmap.md](sound-roadmap.md), which this continues: its steps 1 to 9 are done, and nothing here replaces them.
 
@@ -53,8 +53,11 @@ The smallest step, and the most visible.
 
 - [x] A level per strip while playing: peak and RMS from an `AnalyserNode` on each track's output in the preview, read on `requestAnimationFrame`, with a peak hold.
   - Stereo channels are measured separately, including opposite phases; buses sum their tracks. The `meters` tool reads the same levels and resets the same clipping latch.
-- [ ] A master meter: peak, short-term loudness (3 s), true peak, with the composition's target drawn on it. The offline measure stays for a stopped film.
-- [ ] A clip indicator that stays lit until clicked, and a number in dB under each meter.
+- [x] A master meter: peak, short-term loudness (3 s), true peak, with the composition's target drawn on it. The offline measure stays for a stopped film.
+  - The master is tapped after the loudness gain and limiter, before the personal preview volume. Its bounded three-second window uses the same BS.1770 and 4× true-peak measurement as `check`; repeated animation frames add no duplicate samples, and a gap beyond the analyser's history starts a fresh window. The `meters` tool returns these readings under `$master`. A steady stereo 1 kHz sine agrees with the offline check within 0.5 LU in Chrome. To check on a device: master levels during playback in WebView2 and WKWebView.
+  - The live limiter's automatic makeup gain is compensated. A real preview with a -23 LUFS target measures -23.0 LUFS and -23.0 dBTP even with the personal listening volume at zero.
+- [x] A clip indicator that stays lit until clicked, and a number in dB under each meter.
+  - Every strip, including the master, keeps its clipping latch across stopping playback and closing the mixer. Starting another project clears it.
 - [x] No cost when the mixer is closed: the analysers exist only while the panel is shown.
 - [x] Test: a known sine through a track reads the expected level within 0.5 dB; a silent track reads the floor.
   - Chrome reads a mono and opposite-phase stereo 1 kHz sine at -6.02 dBFS peak and -9.04 dBFS RMS; silence reads -80 dBFS. Lifecycle, clipping across stop/close, and assistant access have regression tests. To check on a device: live playback and panel lifecycle in WebView2 and WKWebView.

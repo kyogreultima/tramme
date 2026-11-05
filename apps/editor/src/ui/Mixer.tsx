@@ -5,7 +5,7 @@
 
 import { signal } from '@preact/signals';
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { integratedLoudness, pointer, sampleKeyframes, staticValue, type Composition, type Keyframe, type SequenceTrack } from '@tramme/core';
+import { integratedLoudness, pointer, sampleKeyframes, soundMix, staticValue, type Composition, type Keyframe, type SequenceTrack } from '@tramme/core';
 import { mixComposition } from '@tramme/render';
 import { cancelDraft, comp, commit, draft, S, toast, uiTime } from '../state.ts';
 import { preview } from '../preview.ts';
@@ -14,7 +14,7 @@ import { Icon } from './icons.tsx';
 import { changeTrack } from './timeline/Tracks.tsx';
 import { addBusOps, faderMoveOps, trackBusOps, trackPanOps, trackVolumeOps } from './timeline/mixer.ts';
 import { clipsOn, soloOf } from './timeline/tracks.ts';
-import { METER_FLOOR, type LevelReading } from '../audio-meters.ts';
+import { MASTER_METER_ID, METER_FLOOR, type LevelReading } from '../audio-meters.ts';
 
 /** the tracks whose faders are recorded while the film plays */
 const armed = signal<Set<string>>(new Set());
@@ -24,9 +24,10 @@ const meterPosition = (db: number) => `${Math.max(0, Math.min(100, (db - METER_F
 function LiveMeter({ id }: { id: string }) {
   const level = levels.value[id];
   const peak = level?.peak ?? METER_FLOOR;
+  const details = `${t('timeline.peakLevel')}: ${peak.toFixed(1)} dBFS; RMS: ${(level?.rms ?? METER_FLOOR).toFixed(1)} dBFS; ${t('timeline.peakHold')}: ${(level?.hold ?? METER_FLOOR).toFixed(1)} dBFS`;
   return <div class="strip-level">
     <div class="meter-line">
-    <div class="live-meter" role="meter" aria-label={t('timeline.peakLevel')} aria-valuemin={METER_FLOOR} aria-valuemax={0} aria-valuenow={Math.min(0, peak)} aria-valuetext={`${peak.toFixed(1)} dBFS`}>
+    <div class="live-meter" role="meter" aria-label={t('timeline.peakLevel')} aria-valuemin={METER_FLOOR} aria-valuemax={0} aria-valuenow={Math.min(0, peak)} aria-valuetext={details} title={details}>
       <i class="peak" style={{ width: meterPosition(peak) }} />
       <i class="rms" style={{ width: meterPosition(level?.rms ?? METER_FLOOR) }} />
       <i class="hold" style={{ left: meterPosition(level?.hold ?? METER_FLOOR) }} />
@@ -96,7 +97,9 @@ function Strip({ compId, c, track }: { compId: string; c: Composition; track: Se
 function Master({ compId, c }: { compId: string; c: Composition }) {
   const [measured, setMeasured] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
-  const target = c.sound?.loudness === null || c.sound?.loudness === undefined ? null : Number(staticValue(c.sound.loudness));
+  const target = soundMix(c).loudness;
+  const playing = S.playing.value, live = levels.value[MASTER_METER_ID];
+  const shown = playing ? live?.lufs ?? null : measured;
   const measure = async () => {
     const r = preview.renderer;
     if (!r) return;
@@ -110,17 +113,22 @@ function Master({ compId, c }: { compId: string; c: Composition }) {
   return (
     <div class="strip master">
       <div class="strip-name">{t('timeline.master')}</div>
+      <LiveMeter id={MASTER_METER_ID} />
       <div class="loudness">
         <label>{t('timeline.loudnessTarget')}
-          <input type="number" min={-40} max={0} step={1} value={target ?? ''} placeholder={t('timeline.asMixed')}
+          <input type="number" min={-31} max={-6} step={1} value={target ?? ''} placeholder={t('timeline.asMixed')}
             onChange={(e) => { const v = (e.target as HTMLInputElement).value; commit(t('timeline.loudnessTarget'), [{ op: 'add', path: pointer('compositions', compId, 'sound'), value: { ...(c.sound ?? {}), loudness: v === '' ? null : Number(v) } }]); }} />
         </label>
         <div class="meter" aria-label={t('timeline.loudness')}>
           {target !== null && <i class="target" style={{ left: `${Math.max(0, Math.min(100, ((target + 40) / 40) * 100))}%` }} title={`${target} LUFS`} />}
-          {measured !== null && Number.isFinite(measured) && <i class="level" style={{ width: `${Math.max(0, Math.min(100, ((measured + 40) / 40) * 100))}%` }} />}
+          {shown !== null && Number.isFinite(shown) && <i class="level" style={{ width: `${Math.max(0, Math.min(100, ((shown + 40) / 40) * 100))}%` }} />}
         </div>
-        <button class="btn sm" disabled={busy} onClick={() => void measure()}>{busy ? t('timeline.measuring') : t('timeline.measure')}</button>
-        {measured !== null && Number.isFinite(measured) && <span class="mono">{measured.toFixed(1)} LUFS</span>}
+        {playing && <div class="master-figures">
+          <span class="short-term">{t('timeline.shortTermLoudness')}: {live?.lufs != null ? `${live.lufs.toFixed(1)} LUFS` : t('timeline.measuring')}</span>
+          <span>{t('timeline.truePeak')}: {(live?.truePeak ?? METER_FLOOR).toFixed(1)} dBTP</span>
+        </div>}
+        <button class="btn sm" disabled={busy || playing} onClick={() => void measure()}>{busy ? t('timeline.measuring') : t('timeline.measure')}</button>
+        {!playing && measured !== null && Number.isFinite(measured) && <span class="mono">{measured.toFixed(1)} LUFS</span>}
       </div>
     </div>
   );

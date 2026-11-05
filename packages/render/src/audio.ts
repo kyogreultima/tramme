@@ -13,6 +13,21 @@ export const MIX_RATE = 48000;
 /** samples of a moving gain per second */
 const GAIN_RATE = 100;
 
+/** Live loudness gain and limiter, before the personal preview volume. */
+export function liveMaster(ctx: BaseAudioContext, out: AudioNode): { input: GainNode; output: GainNode } {
+  const input = ctx.createGain(), limiter = ctx.createDynamicsCompressor(), output = ctx.createGain();
+  limiter.threshold.value = -1.5; limiter.knee.value = 0; limiter.ratio.value = 20;
+  limiter.attack.value = 0.002; limiter.release.value = 0.08;
+  // Web Audio's compressor adds automatic makeup gain: the reciprocal of
+  // its full-range compression gain, raised to 0.6. Cancel it for this
+  // zero-knee limiter so quiet audio retains the loudness gain we measured.
+  // https://www.w3.org/TR/webaudio/#computing-the-makeup-gain
+  const fullRangeDb = limiter.threshold.value * (1 - 1 / limiter.ratio.value);
+  output.gain.value = Math.pow(10, fullRangeDb * 0.6 / 20);
+  input.connect(limiter).connect(output).connect(out);
+  return { input, output };
+}
+
 /** a seeded random generator in [0, 1): the same sounds on every machine */
 export function seeded(seed: number): () => number {
   let s = (seed >>> 0) || 0x9e3779b9;

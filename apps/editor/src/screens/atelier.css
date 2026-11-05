@@ -342,6 +342,7 @@
 .mixer .add-bus { align-self: center; flex: none; }
 .strip.master { width: 190px; margin-left: auto; align-items: stretch; }
 .strip.master .loudness { display: flex; flex-direction: column; gap: 6px; font-size: var(--fs-xs); color: var(--text-2); }
+.master-figures { display: flex; flex-direction: column; gap: 4px; font-variant-numeric: tabular-nums; }
 .strip.master input[type=number] { width: 64px; margin-left: 6px; background: var(--surface); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-xs); }
 .meter { position: relative; height: 8px; border-radius: 4px; background: var(--surface); overflow: hidden; }
 .meter .level { position: absolute; left: 0; top: 0; bottom: 0; background: var(--ok); }

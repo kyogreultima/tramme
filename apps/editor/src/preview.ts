@@ -16,13 +16,13 @@ export const previewInfo = signal({ scale: 1, still: 1, motion: 0.5 });
 import { effect, signal } from '@preact/signals';
 import { audioClips, clipFileTime, curveAt, needsPitch, soundMix, type TrammeDoc, type EvaluatedFrame } from '@tramme/core';
 import { editorRegistry } from './vocabulary.ts';
-import { clipChain, loadPitch, masterGainDb, mixBus, playClip, Renderer } from '@tramme/render';
+import { clipChain, liveMaster, loadPitch, masterGainDb, mixBus, playClip, Renderer } from '@tramme/render';
 import { comp, compIdOf, S, setRegistry, setTime, toast, viewDoc } from './state.ts';
 import { attachInstalled, attachIsolated, filterModule, pluginHost } from './plugins/index.ts';
 import { copiesIn, copyId, counted, installed, installedFor, installedTypes, offIn, permitted, sandboxedDoc, stopped, STRIKES } from './installed.ts';
 import { bindSandbox, blitSandboxFrame, declarationsModule, ensureDeclared, ensureSandboxDoc, pluginItemsOf, resetSandbox, sandboxDeclaration, sandboxVideoFrames, type SandboxContext } from './plugins/sandbox-draw.ts';
 import { t } from './i18n/index.ts';
-import { previewMeters } from './audio-meters.ts';
+import { MASTER_METER_ID, previewMeters } from './audio-meters.ts';
 import { prefs } from './settings.ts';
 import { clockTime, scrubWindow, step, Runs, type Clock } from './playclock.ts';
 import { packAsInstalled, packBySrc, packContext, shippedPacks } from './packs.ts';
@@ -44,6 +44,7 @@ class Preview {
   private master: GainNode | null = null;
   /** the master of the exports, as near as a live playback gets: their loudness gain (measured ahead, kept per mix), then a limiter */
   private level: GainNode | null = null;
+  private meterOut: GainNode | null = null;
   private levels = new Map<string, Promise<number>>();
   /** this playback's way in to the level: cut on stop, so the buses of a playback do not outlive it */
   private playOut: GainNode | null = null;
@@ -515,6 +516,7 @@ class Preview {
     // the mixer of the exports: filters, gain curves, fades, reverb and the shared room sound the same here
     this.playOut = ctx.createGain();
     this.playOut.connect(this.level!);
+    this.meters.source(MASTER_METER_ID, ctx, this.meterOut!);
     const bus = mixBus(ctx, soundMix(doc.compositions[compId]), this.playOut);
     const trackOutputs = new Map<string, GainNode>();
     const output = (clip: (typeof clips)[number]) => {
@@ -605,10 +607,9 @@ class Preview {
     this.master = this.audio.createGain();
     this.master.connect(this.audio.destination);
     this.master.gain.value = prefs.peek().previewMuted ? 0 : prefs.peek().previewVolume;
-    const limiter = this.audio.createDynamicsCompressor();
-    limiter.threshold.value = -1.5; limiter.knee.value = 0; limiter.ratio.value = 20; limiter.attack.value = 0.002; limiter.release.value = 0.08;
-    this.level = this.audio.createGain();
-    this.level.connect(limiter).connect(this.master);
+    const chain = liveMaster(this.audio, this.master);
+    this.level = chain.input;
+    this.meterOut = chain.output;
   }
 
   /** the loudness gain of the master for this mix: measured once per mix (in the background the first time), then set on the level */

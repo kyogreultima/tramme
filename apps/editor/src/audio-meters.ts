@@ -1,8 +1,11 @@
 /** Preview-only metering; none of this changes the samples sent to the mix. */
 import type { ToolType } from '@tramme/core';
+import { MasterMeter } from './master-meter.ts';
 
 export const METER_FLOOR = -80;
-export interface LevelReading { peak: number; rms: number; hold: number; clipped: boolean }
+/** Cannot collide with a document track id. */
+export const MASTER_METER_ID = '$master';
+export interface LevelReading { peak: number; rms: number; hold: number; clipped: boolean; lufs?: number | null; truePeak?: number }
 const db = (amplitude: number) => Math.max(METER_FLOOR, 20 * Math.log10(amplitude));
 
 export class LevelMeter {
@@ -35,7 +38,7 @@ export class MeterTaps {
   private visible = false;
   private clipped = new Set<string>();
   private sources = new Map<string, { ctx: BaseAudioContext; nodes: Set<AudioNode> }>();
-  private taps = new Map<string, { input: GainNode; splitter: ChannelSplitterNode; analysers: AnalyserNode[]; samples: Float32Array<ArrayBuffer>[]; meter: LevelMeter }>();
+  private taps = new Map<string, { input: GainNode; splitter: ChannelSplitterNode; analysers: AnalyserNode[]; samples: Float32Array<ArrayBuffer>[]; meter: LevelMeter; master: MasterMeter | null }>();
 
   source(id: string, ctx: BaseAudioContext, node: AudioNode) {
     let group = this.sources.get(id);
@@ -66,13 +69,13 @@ export class MeterTaps {
     input.connect(splitter);
     const analysers = [0, 1].map((channel) => {
       const analyser = group.ctx.createAnalyser();
-      analyser.fftSize = 2048;
+      analyser.fftSize = id === MASTER_METER_ID ? 32768 : 2048;
       analyser.smoothingTimeConstant = 0;
       splitter.connect(analyser, channel);
       return analyser;
     });
     for (const node of group.nodes) node.connect(input);
-    this.taps.set(id, { input, splitter, analysers, samples: analysers.map((a) => new Float32Array(a.fftSize)), meter: new LevelMeter() });
+    this.taps.set(id, { input, splitter, analysers, samples: analysers.map((a) => new Float32Array(a.fftSize)), meter: new LevelMeter(), master: id === MASTER_METER_ID ? new MasterMeter(group.ctx.sampleRate, Math.round(group.ctx.currentTime * group.ctx.sampleRate)) : null });
   }
 
   private detach() {
@@ -90,8 +93,14 @@ export class MeterTaps {
     if (!this.visible) return readings;
     for (const id of this.clipped) readings[id] = { peak: METER_FLOOR, rms: METER_FLOOR, hold: METER_FLOOR, clipped: true };
     for (const [id, tap] of this.taps) {
+      const ctx = this.sources.get(id)!.ctx;
+      const audioFrame = tap.master ? Math.round(ctx.currentTime * ctx.sampleRate) : 0;
       tap.analysers.forEach((a, i) => a.getFloatTimeDomainData(tap.samples[i]));
       readings[id] = tap.meter.read(tap.samples, now);
+      if (tap.master) {
+        Object.assign(readings[id], tap.master.capture(tap.samples, audioFrame));
+        readings[id].clipped ||= readings[id].truePeak! >= 0;
+      }
       if (readings[id].clipped) this.clipped.add(id);
       readings[id].clipped ||= this.clipped.has(id);
     }
@@ -108,7 +117,7 @@ export const metersTool: ToolType<{ reset?: string }> = {
   name: 'meters', title: 'Live audio meters', description: 'reads peak, RMS, peak hold and clipping from the open mixer; optionally resets a track clipping indicator',
   input: { type: 'object', properties: { reset: { type: 'string', title: 'Reset clipping on track' } } },
   ai: {
-    when: 'while the mixer panel is open: read the same live dBFS levels as its strips, or reset a clipping indicator by track id',
+    when: 'while the mixer panel is open: read the same live dBFS levels as its strips; $master also reports 3-second LUFS (null while warming up) and true peak dBTP. Reset a clipping indicator by track id or $master',
     avoid: 'using an empty reading as proof of silence: closing the mixer removes its analysers; use check for an offline measure of the complete mix',
   },
   run(input) {
