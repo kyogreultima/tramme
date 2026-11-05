@@ -12,7 +12,7 @@ pub mod store;
 
 use std::borrow::Cow;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Mutex;
 use tauri::http::{Request, Response, StatusCode};
 use tauri::{DragDropEvent, Emitter, LogicalSize, Manager, PhysicalPosition, WebviewUrl, WebviewWindowBuilder, WindowEvent};
@@ -111,8 +111,8 @@ fn desktop_pending_bytes() -> tauri::ipc::Response {
 /// the bubble's size closed (a round button) and open (the suggestions), in logical px
 const BUBBLE: f64 = 56.0;
 const PANEL: (f64, f64) = (340.0, 440.0);
-/// the room kept from the screen's bottom and right edges, taskbar included
-const EDGE: (f64, f64) = (24.0, 88.0);
+/// the room kept from the bottom and right edges of a screen's work area (the part the taskbar leaves), in logical px
+const EDGE: f64 = 24.0;
 
 /// switched on in the settings: the bubble shows when Tramme is not in front
 static QUICK_ON: AtomicBool = AtomicBool::new(false);
@@ -140,8 +140,7 @@ fn build_quick(app: &tauri::AppHandle) -> tauri::Result<()> {
         builder = builder.additional_browser_args(&format!("--remote-debugging-port={port}"));
     }
     let window = builder.build()?;
-    let (x, y) = saved_position(app).unwrap_or_else(|| default_position(app));
-    let _ = window.set_position(PhysicalPosition::new(x, y));
+    place_bubble(app, &window);
     let handle = app.clone();
     window.on_window_event(move |event| match event {
         WindowEvent::DragDrop(DragDropEvent::Enter { .. }) => {
@@ -172,27 +171,69 @@ fn position_file() -> Option<PathBuf> {
     Some(dirs::config_dir()?.join("tramme-desktop").join("quick-position.json"))
 }
 
-/// bottom right of the main screen, where the system keeps its own small things
-fn default_position(app: &tauri::AppHandle) -> (i32, i32) {
-    let Ok(Some(monitor)) = app.primary_monitor() else { return (100, 100) };
-    let scale = monitor.scale_factor();
-    let (origin, size) = (monitor.position(), monitor.size());
+/// a rectangle in physical px: x, y, width, height
+type Rect = (i32, i32, i32, i32);
+
+fn overlap(a: Rect, b: Rect) -> i64 {
+    let w = (a.0 + a.2).min(b.0 + b.2) - a.0.max(b.0);
+    let h = (a.1 + a.3).min(b.1 + b.3) - a.1.max(b.1);
+    if w <= 0 || h <= 0 { 0 } else { w as i64 * h as i64 }
+}
+
+/// the bottom right corner of an area, where the system keeps its own small things
+fn corner(area: Rect, size: (i32, i32), margin: i32) -> (i32, i32) {
+    (area.0 + area.2 - size.0 - margin, area.1 + area.3 - size.1 - margin)
+}
+
+/// Where a window of `size` wanted at `at` really goes: on the screen it overlaps most, moved in until it
+/// is whole on it. A window that overlaps none (its screen was unplugged, the screens were rearranged)
+/// goes to the corner of `home`. `areas` are the screens' work areas, the taskbar left out.
+fn fit(at: (i32, i32), size: (i32, i32), areas: &[Rect], home: Rect, margin: i32) -> (i32, i32) {
+    let me = (at.0, at.1, size.0, size.1);
+    let Some(area) = areas.iter().copied().filter(|a| overlap(me, *a) > 0).max_by_key(|a| overlap(me, *a)) else {
+        return corner(home, size, margin);
+    };
     (
-        (origin.x as f64 + size.width as f64 - (BUBBLE + EDGE.0) * scale) as i32,
-        (origin.y as f64 + size.height as f64 - (BUBBLE + EDGE.1) * scale) as i32,
+        at.0.clamp(area.0, (area.0 + area.2 - size.0).max(area.0)),
+        at.1.clamp(area.1, (area.1 + area.3 - size.1).max(area.1)),
     )
 }
 
-/// where the bubble was left, if that is still on a screen
-fn saved_position(app: &tauri::AppHandle) -> Option<(i32, i32)> {
+/// the screens that exist now, as work areas, and the main one
+fn work_areas(app: &tauri::AppHandle) -> Option<(Vec<Rect>, Rect)> {
+    let rect = |m: &tauri::Monitor| {
+        let a = m.work_area();
+        (a.position.x, a.position.y, a.size.width as i32, a.size.height as i32)
+    };
+    let areas: Vec<Rect> = app.available_monitors().ok()?.iter().map(rect).collect();
+    let home = app.primary_monitor().ok().flatten().map(|m| rect(&m)).or_else(|| areas.first().copied())?;
+    Some((areas, home))
+}
+
+/// where the bubble was left, as it was written (it may be on a screen that is gone: `fit` decides)
+fn saved_position() -> Option<(i32, i32)> {
     let text = std::fs::read_to_string(position_file()?).ok()?;
     let v: serde_json::Value = serde_json::from_str(&text).ok()?;
-    let (x, y) = (v.get("x")?.as_i64()? as i32, v.get("y")?.as_i64()? as i32);
-    let on_screen = app.available_monitors().ok()?.iter().any(|m| {
-        let (p, s) = (m.position(), m.size());
-        x >= p.x && y >= p.y && x < p.x + s.width as i32 - 8 && y < p.y + s.height as i32 - 8
-    });
-    on_screen.then_some((x, y))
+    Some((v.get("x")?.as_i64()? as i32, v.get("y")?.as_i64()? as i32))
+}
+
+/// the bubble put where it was left, or in the corner of the main screen, and always whole on a screen that exists now
+fn place_bubble(app: &tauri::AppHandle, w: &tauri::WebviewWindow) {
+    let Some((areas, home)) = work_areas(app) else { return };
+    let scale = w.scale_factor().unwrap_or(1.0);
+    let side = (BUBBLE * scale).round() as i32;
+    let margin = (EDGE * scale).round() as i32;
+    let wanted = BUBBLE_AT.lock().unwrap().or_else(saved_position).unwrap_or_else(|| corner(home, (side, side), margin));
+    let (x, y) = fit(wanted, (side, side), &areas, home, margin);
+    let _ = w.set_position(PhysicalPosition::new(x, y));
+}
+
+/// the closed bubble, at its own size and on a screen, then shown: a window shown as it stood could be
+/// where a screen used to be, or still at the size it was made with (oval, before its page is drawn)
+fn reveal(app: &tauri::AppHandle, w: &tauri::WebviewWindow) {
+    let _ = w.set_size(LogicalSize::new(BUBBLE, BUBBLE));
+    place_bubble(app, w);
+    let _ = w.show();
 }
 
 /// the closed bubble moved: kept, and written at most twice a second
@@ -219,23 +260,33 @@ fn remember_position_now() {
     *WRITTEN.lock().unwrap() = Some(std::time::Instant::now());
 }
 
+/// the changes of focus, counted: only the last one decides
+static FOLLOW: AtomicU32 = AtomicU32::new(0);
+
 /// the bubble over the others while Tramme is behind them, away while it is in front
-fn follow_main(app: &tauri::AppHandle, main_focused: bool) {
+fn follow_main(app: &tauri::AppHandle) {
     if !QUICK_ON.load(Ordering::SeqCst) {
         return;
     }
+    let turn = FOLLOW.fetch_add(1, Ordering::SeqCst) + 1;
     let app = app.clone();
     // a window shown or hidden off the event loop's thread, so it never waits on itself
     std::thread::spawn(move || {
-        if let Some(w) = app.get_webview_window("quick") {
-            if main_focused {
-                // back in Tramme: the next time it shows, it is the closed bubble
-                resize_quick(&app, false);
-                let _ = app.emit_to("quick", "quick-fold", ());
-                let _ = w.hide();
-            } else {
-                let _ = w.show();
-            }
+        // a focus that goes and comes back at once is no change: the bubble's own window being made when it is
+        // switched on takes it for a moment, and showed the bubble where Tramme was in front (the flash)
+        std::thread::sleep(std::time::Duration::from_millis(250));
+        if FOLLOW.load(Ordering::SeqCst) != turn || !QUICK_ON.load(Ordering::SeqCst) {
+            return;
+        }
+        let Some(w) = app.get_webview_window("quick") else { return };
+        let in_front = app.get_webview_window("main").map(|m| m.is_focused().unwrap_or(true)).unwrap_or(true);
+        if in_front {
+            // back in Tramme: the next time it shows, it is the closed bubble
+            resize_quick(&app, false);
+            let _ = app.emit_to("quick", "quick-fold", ());
+            let _ = w.hide();
+        } else if !w.is_visible().unwrap_or(false) {
+            reveal(&app, &w);
         }
     });
 }
@@ -246,13 +297,8 @@ async fn desktop_quick_enable(app: tauri::AppHandle, on: bool) -> Result<(), Str
     QUICK_ON.store(on, Ordering::SeqCst);
     if on {
         build_quick(&app).map_err(|e| e.to_string())?;
-        // Tramme is already behind the others (a launch at login, a restart): show it now
-        let behind = app.get_webview_window("main").map(|w| !w.is_focused().unwrap_or(true)).unwrap_or(false);
-        if behind {
-            if let Some(w) = app.get_webview_window("quick") {
-                let _ = w.show();
-            }
-        }
+        // Tramme may already be behind the others (a launch at login, a restart): shown then, never while it is in front
+        follow_main(&app);
     } else if let Some(w) = app.get_webview_window("quick") {
         let _ = w.close();
     }
@@ -266,7 +312,14 @@ fn resize_quick(app: &tauri::AppHandle, open: bool) {
     let (width, height) = if open { PANEL } else { (BUBBLE, BUBBLE) };
     let (nw, nh) = ((width * scale).round() as i32, (height * scale).round() as i32);
     let _ = w.set_size(LogicalSize::new(width, height));
-    let _ = w.set_position(PhysicalPosition::new(pos.x + size.width as i32 - nw, pos.y + size.height as i32 - nh));
+    let anchored = (pos.x + size.width as i32 - nw, pos.y + size.height as i32 - nh);
+    // folded, it goes back to where the bubble lived, even if the panel had to be pushed in from an edge
+    let wanted = if open { anchored } else { BUBBLE_AT.lock().unwrap().unwrap_or(anchored) };
+    let (x, y) = match work_areas(app) {
+        Some((areas, home)) => fit(wanted, (nw, nh), &areas, home, (EDGE * scale).round() as i32),
+        None => wanted,
+    };
+    let _ = w.set_position(PhysicalPosition::new(x, y));
 }
 
 #[tauri::command]
@@ -358,7 +411,7 @@ pub fn run() {
             // the quick bubble follows the main window's focus; it goes when the window does
             let handle = app.handle().clone();
             main.on_window_event(move |event| match event {
-                WindowEvent::Focused(focused) => follow_main(&handle, *focused),
+                WindowEvent::Focused(_) => follow_main(&handle),
                 WindowEvent::Destroyed => {
                     if let Some(w) = handle.get_webview_window("quick") {
                         let _ = w.close();
@@ -463,6 +516,61 @@ fn asset_mime(name: &str) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // the screens of the user's desk: the laptop's 1920x1040 work area (the taskbar takes 40), and a larger
+    // monitor beside it, at its right
+    const LAPTOP: Rect = (0, 0, 1920, 1040);
+    const MONITOR: Rect = (1920, -200, 2560, 1440);
+    const BUBBLE_PX: (i32, i32) = (56, 56);
+
+    #[test]
+    fn a_bubble_on_a_screen_that_exists_stays_where_it_is() {
+        assert_eq!(fit((2500, 900), BUBBLE_PX, &[LAPTOP, MONITOR], LAPTOP, 24), (2500, 900));
+        assert_eq!(fit((100, 100), BUBBLE_PX, &[LAPTOP, MONITOR], LAPTOP, 24), (100, 100));
+    }
+
+    #[test]
+    fn a_bubble_left_on_a_monitor_that_was_unplugged_comes_back_to_the_main_screen() {
+        // bottom right of the monitor, then only the laptop is left
+        let (x, y) = fit((4300, 1100), BUBBLE_PX, &[LAPTOP], LAPTOP, 24);
+        assert_eq!((x, y), (1920 - 56 - 24, 1040 - 56 - 24));
+    }
+
+    #[test]
+    fn a_bubble_that_is_half_off_a_screen_is_moved_in() {
+        assert_eq!(fit((1900, 1030), BUBBLE_PX, &[LAPTOP], LAPTOP, 24), (1920 - 56, 1040 - 56));
+        assert_eq!(fit((-30, -10), BUBBLE_PX, &[LAPTOP], LAPTOP, 24), (0, 0));
+    }
+
+    #[test]
+    fn a_bubble_between_two_screens_goes_to_the_one_it_is_mostly_on() {
+        // 40 px on the laptop, 16 on the monitor
+        let at = (1880, 500);
+        assert_eq!(fit(at, BUBBLE_PX, &[LAPTOP, MONITOR], LAPTOP, 24), (1864, 500));
+        // 20 px on the laptop, 36 on the monitor
+        assert_eq!(fit((1900, 500), BUBBLE_PX, &[LAPTOP, MONITOR], LAPTOP, 24).0, 1920);
+    }
+
+    #[test]
+    fn a_panel_opened_near_the_top_left_is_pushed_into_the_screen() {
+        let panel = (340, 440);
+        // anchored at its bubble's corner it would hang over the top and the left of the screen
+        assert_eq!(fit((-200, -300), panel, &[LAPTOP], LAPTOP, 24), (0, 0));
+        // opened at the bottom right it fits where it grows
+        assert_eq!(fit((1920 - 340 - 24, 1040 - 440 - 24), panel, &[LAPTOP], LAPTOP, 24), (1556, 576));
+    }
+
+    #[test]
+    fn a_window_larger_than_its_screen_is_put_at_its_corner() {
+        assert_eq!(fit((50, 50), (3000, 2000), &[LAPTOP], LAPTOP, 24), (0, 0));
+    }
+
+    #[test]
+    fn the_main_screen_corner_leaves_room_for_the_taskbar_by_its_work_area() {
+        assert_eq!(corner(LAPTOP, BUBBLE_PX, 24), (1840, 960));
+        // a taskbar on the left: the work area starts further right
+        assert_eq!(corner((60, 0, 1860, 1080), BUBBLE_PX, 24), (1840, 1000));
+    }
 
     #[test]
     fn editor_pages_and_files() {
