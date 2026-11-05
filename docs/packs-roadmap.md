@@ -258,6 +258,6 @@ Open, for the author. Each step names the one it waits on; the recommended choic
 7. **Emoji.** Fluent Emoji Flat (MIT) or Noto Emoji (Apache-2.0); the few hundred most used (recommended) or the whole set (tens of megabytes beside the editor).
 
    Taken (2026-10-25): Fluent Emoji Flat (MIT), the 300 most used.
-8. **The roadmap loop.** Whether this roadmap joins the queue of [roadmap-loop.md](roadmap-loop.md), and at which place.
+8. **The roadmap loop.** Whether this roadmap joins the queue of the roadmap loop (replaced since by [roadmaps.md](roadmaps.md)), and at which place.
 
    Taken (2026-10-25): it joins the queue, after Polish and before the other roadmaps' open boxes (queue item 14).

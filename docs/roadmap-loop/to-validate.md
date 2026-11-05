@@ -8,7 +8,7 @@ blocked a box; the loop listed it and went on.
 ## Before anything
 
 ```
-git checkout feat/roadmap-loop
+git checkout develop
 npm ci
 npm run typecheck && npm test
 ```
