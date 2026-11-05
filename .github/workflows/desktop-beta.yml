@@ -1,5 +1,6 @@
-# The desktop app's beta build (apps/desktop), run by hand on develop from the
-# Actions tab: Windows and Linux, built with TRAMME_ENV=beta so the app's links
+# The desktop app's beta build (apps/desktop), made on develop when the app's
+# version changes, and by hand from the Actions tab: Windows and Linux, built
+# with TRAMME_ENV=beta so the app's links
 # lead to the beta (brand/environments.ts), and published as a prerelease
 # vX.Y.Z-beta.N that the beta site offers (apps/site/src/lib/download.ts), the
 # site being deployed again once it is out. The stable app (desktop.yml) is
@@ -13,6 +14,11 @@
 name: Desktop app (beta)
 
 on:
+  push:
+    branches: [develop]
+    # a new version of the app always changes the first; the second makes a change to this workflow try itself
+    # (a workflow that only runs by hand is not listed by GitHub until it is on the default branch)
+    paths: [apps/desktop/src-tauri/tauri.conf.json, .github/workflows/desktop-beta.yml]
   workflow_dispatch:
 
 permissions:

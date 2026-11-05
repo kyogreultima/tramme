@@ -52,6 +52,6 @@ Secrets: `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` in both repositories
 
 ## Beta desktop app
 
-`.github/workflows/desktop-beta.yml`, run by hand from the Actions tab on `develop`: the checks, then Windows and Linux builds with `TRAMME_ENV=beta`, published as the prerelease `vX.Y.Z-beta.N`, then the beta site deployed again so that it offers it (`apps/site/src/lib/download.ts` takes the latest prerelease on the beta, GitHub's latest release on production; with no prerelease yet the beta offers the latest release).
+`.github/workflows/desktop-beta.yml`, run on `develop` when the app's version changes (`tauri.conf.json`), and by hand from the Actions tab: the checks, then Windows and Linux builds with `TRAMME_ENV=beta`, published as the prerelease `vX.Y.Z-beta.N`, then the beta site deployed again so that it offers it (`apps/site/src/lib/download.ts` takes the latest prerelease on the beta, GitHub's latest release on production; with no prerelease yet the beta offers the latest release).
 
 The beta app is its own product, **Tramme Beta** (identifier `app.tramme.desktop.beta`, set through `TAURI_CONFIG`): it installs beside Tramme and does not replace it. Both associate with `.tramme` files; the last one installed opens them. macOS is left out, as in the stable release, until the app is signed. The stable app never sees a beta build: its update check, like the site's, reads GitHub's latest release, which skips prereleases.
