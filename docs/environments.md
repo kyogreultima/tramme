@@ -1,15 +1,14 @@
 # Environments
 
-Where Tramme lives, by environment. Every link from the site to the app (sign up, log in, open the editor, open a project) and from the app to the site (the terms) is written from one table, `brand/environments.ts`, never as a fixed address. Run on your machine, they stay on your machine; deployed to preprod, they stay in preprod.
+Where Tramme lives, by environment. Every link from the site to the app (sign up, log in, open the editor, open a project) and from the app to the site (the terms) is written from one table, `brand/environments.ts`, never as a fixed address. Run on your machine, they stay on your machine; deployed to beta, they stay in beta.
 
 | Environment | Website | App | When |
 |---|---|---|---|
 | `local` | `http://localhost:4321` | `http://localhost:8787` | `npm run site` and `npm run dev`: a dev server means local |
 | `beta` | `https://beta.tramme.dev` | `https://beta.app.tramme.dev` | `TRAMME_ENV=beta` |
-| `preprod` | `https://preprod.tramme.dev` | `https://app.preprod.tramme.dev` | `TRAMME_ENV=preprod` |
 | `production` | `https://tramme.dev` | `https://app.tramme.dev` | a build with no `TRAMME_ENV` |
 
-The addresses of preprod follow the production pattern. They are a guess: where those deployments really are is decided where they are created, and it is changed in that one file.
+Tramme has two deployed environments, beta and production. Their addresses are in that one file.
 
 ## Choosing
 
@@ -18,8 +17,8 @@ The addresses of preprod follow the production pattern. They are a guess: where 
 - Without any: `local` while a dev server runs, `production` for a build.
 
 ```
-TRAMME_ENV=preprod npm run site:build                 # the site's links lead to app.preprod.tramme.dev
-TRAMME_ENV=preprod node apps/editor/build.ts          # the app's links lead to preprod.tramme.dev
+TRAMME_ENV=beta npm run site:build                    # the site's links lead to beta.app.tramme.dev
+TRAMME_ENV=beta node apps/editor/build.ts             # the app's links lead to beta.tramme.dev
 TRAMME_ENV=local TRAMME_APP_URL=http://localhost:8790 npm run site   # the app is on another port here
 ```
 
@@ -35,7 +34,7 @@ The servers are given their address by their own settings, one per deployment:
 - the accounts backend (private repository): `APP_ORIGIN` (the address of the app: it is the only origin it takes changes from, the one in the links of its mails and the one OAuth providers send people back to) and `APP_URL` (its own);
 - the Worker: `APP_ORIGIN` and `VAULT_ORIGIN` (personal mode, `wrangler.jsonc`), `ACCOUNTS_URL` (the backend it hands the account routes to).
 
-For `local`, the backend's `.env.example` (private repository) and `apps/worker/.dev.vars.example` already hold the local ones. A beta or preprod deployment sets the same names to its own addresses (a Wrangler environment for the Worker, the host's settings for the backend).
+For `local`, the backend's `.env.example` (private repository) and `apps/worker/.dev.vars.example` already hold the local ones. A beta deployment sets the same names to its own addresses (a Wrangler environment for the Worker, the host's settings for the backend).
 
 ## Beta deployment
 

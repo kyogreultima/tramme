@@ -24,7 +24,7 @@ const ROOT = path.resolve(HERE, '../..');
 const DIST = process.env.TRAMME_DIST ? path.resolve(process.env.TRAMME_DIST) : path.join(HERE, 'dist');
 const dev = process.argv.includes('--dev');
 const personal = process.argv.includes('--personal');
-// the website of this environment (local, beta, preprod, production), for the app's links to it (brand/environments.ts)
+// the website of this environment (local, beta, production), for the app's links to it (brand/environments.ts)
 const ORIGINS = originsFromEnv(process.env, dev);
 
 // the app's icon and its link preview (scripts/og-image.ts), shared with the site (apps/site);

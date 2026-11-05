@@ -8,7 +8,7 @@ describe('the addresses of an environment', () => {
   });
 
   it('takes the environment that is named, even in dev', () => {
-    expect(resolveOrigins({ env: 'preprod', dev: true }).env).toBe('preprod');
+    expect(resolveOrigins({ env: 'beta', dev: true }).env).toBe('beta');
     expect(resolveOrigins({ env: 'beta' }).app).toBe(ENVIRONMENTS.beta.app);
   });
 
@@ -75,7 +75,7 @@ describe('the site\'s links', () => {
   });
 
   it('follow the environment of a deployment, and an address set by hand', async () => {
-    expect((await links({ TRAMME_ENV: 'preprod' })).logIn()).toBe('https://app.preprod.tramme.dev/login');
+    expect((await links({ TRAMME_ENV: 'beta' })).logIn()).toBe('https://beta.app.tramme.dev/login');
     expect((await links({ TRAMME_ENV: 'local', TRAMME_APP_URL: 'http://localhost:8790' })).space()).toBe('http://localhost:8790/space');
   });
 

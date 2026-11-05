@@ -1,5 +1,5 @@
 // Where the site and the app are, for the environment this runs in (local, beta,
-// preprod, production): brand/environments.ts. A dev server means local, a build
+// production): brand/environments.ts. A dev server means local, a build
 // production, TRAMME_ENV says otherwise.
 import { originsFromEnv } from '../../../../brand/environments';
 

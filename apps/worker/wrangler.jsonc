@@ -65,7 +65,7 @@
         "observability": { "enabled": true, "logs": { "invocation_logs": false } }
       }
     }
-    // The accounts deployments (beta, preprod, production: this Worker with the accounts backend as a container
+    // The accounts deployments (beta and production: this Worker with the accounts backend as a container
     // behind it) are defined and deployed from the private platform repository, which takes this Worker as is.
   }
 }

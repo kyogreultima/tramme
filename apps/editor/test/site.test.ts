@@ -18,7 +18,6 @@ describe('the editor\'s link to the website', () => {
 
   it('is the site of the environment the app is served from', async () => {
     expect(await siteAt('https://app.tramme.dev')).toBe('https://tramme.dev');
-    expect(await siteAt('https://app.preprod.tramme.dev')).toBe('https://preprod.tramme.dev');
     expect(await siteAt('https://beta.app.tramme.dev')).toBe('https://beta.tramme.dev');
   });
 

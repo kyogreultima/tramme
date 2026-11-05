@@ -5,7 +5,6 @@
 //
 //   local        what runs on this machine: `npm run site` (4321) and `npm run dev` (8787)
 //   beta         the beta deployment
-//   preprod      the deployment where a release is tried before it goes out
 //   production   the public one
 //
 // The choice is TRAMME_ENV, read when the site or the editor is built or
@@ -13,13 +12,13 @@
 // build. TRAMME_SITE_URL and TRAMME_APP_URL set one address by hand (another
 // port, a branch deployment); the site's older SITE_URL still counts.
 //
-// The addresses of beta and preprod follow the production ones' pattern; where
-// the deployments really are is decided where they are created: change them here.
+// The addresses of beta follow the production ones' pattern, the app on a
+// subdomain of the site's; where the deployments really are is decided where
+// they are created: change them here.
 
 export const ENVIRONMENTS = {
   local: { site: 'http://localhost:4321', app: 'http://localhost:8787' },
   beta: { site: 'https://beta.tramme.dev', app: 'https://beta.app.tramme.dev' },
-  preprod: { site: 'https://preprod.tramme.dev', app: 'https://app.preprod.tramme.dev' },
   production: { site: 'https://tramme.dev', app: 'https://app.tramme.dev' },
 } as const;
 
