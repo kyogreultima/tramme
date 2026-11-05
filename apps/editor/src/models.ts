@@ -6,8 +6,8 @@
 // each model downloads the first time its tool runs, or from the settings.
 //
 // `checked` marks the models the tools were tried with. The others come from
-// their model cards (licence, size, input) and are listed in
-// docs/roadmap-loop/to-validate.md until they are tried.
+// their model cards (licence, size, input) and stay marked "not tried" in the
+// settings until they are.
 
 export type ModelTask = 'cutout-person' | 'cutout-any' | 'detection' | 'depth' | 'transcription' | 'vad' | 'face' | 'upscale';
 export const MODEL_TASKS: ModelTask[] = ['cutout-person', 'cutout-any', 'detection', 'depth', 'transcription', 'vad', 'face', 'upscale'];
