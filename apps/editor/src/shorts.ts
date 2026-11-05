@@ -2,8 +2,7 @@
 // stand alone (candidates), the passages the assistant picks built into one
 // composition per short — the video framed to fill the format, the transcript
 // remapped to the short and captioned, a title with its bar. Every short is
-// an ordinary composition: editable, checked, exported like any other
-// (docs/shorts-roadmap.md).
+// an ordinary composition: editable, checked, exported like any other.
 
 import { ALL_FORMATS, CanvasSink, Input, UrlSource } from 'mediabunny';
 import { applyOps, isAudioAnalysis, isSubjects, isTranscript, pointer, remapTranscript, runChecks, transcriptIdOf, type Composition, type Layer, type Op, type Subjects, type ToolContext, type ToolType, type Transcript, type TrammeDoc, type AudioAnalysis } from '@tramme/core';

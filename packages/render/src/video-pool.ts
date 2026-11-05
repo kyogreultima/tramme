@@ -1,4 +1,4 @@
-// The readers of one video file (docs/performance-roadmap.md, step 5): one
+// The readers of one video file: one
 // per play position in use, so two layers showing the same file at different
 // moments (a crossfade between two shots of one take, a split screen) each
 // read forward instead of making one decoder seek back and forth every frame.

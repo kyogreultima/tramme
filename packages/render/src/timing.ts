@@ -1,4 +1,4 @@
-// Where a frame's time goes (docs/performance-roadmap.md, step 1): the parts
+// Where a frame's time goes: the parts
 // of an exported frame measured apart, added up over a run and printed next
 // to the total. The GPU works asynchronously: what it does for a frame is
 // paid when the pixels are read back, so its time lands in `readback`.

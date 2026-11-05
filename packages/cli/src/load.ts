@@ -2,7 +2,7 @@
 // the load cases of bench/load rendered one after the other, each in its own
 // project folder (the media it needs made once by ffmpeg), and the time per
 // frame broken down into its parts. --json keeps the figures, --before
-// compares with figures kept earlier (docs/performance-roadmap.md, step 1).
+// compares with figures kept earlier (bench/README.md has the reference ones).
 
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';

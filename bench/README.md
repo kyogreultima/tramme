@@ -67,7 +67,7 @@ calls, 76 pictures seen, 20 plugins written by the assistant, about 10 s of a
 ## Load cases: where a frame's time goes
 
 `load/cases.ts` builds documents that each push one part of a frame
-([performance roadmap](../docs/performance-roadmap.md), step 1):
+(the reference figures are below):
 
 | Case | What it pushes |
 |---|---|
@@ -92,6 +92,34 @@ npm run tramme -- load video4k --frames 30         # one case, its first second
 
 The figures depend on the machine (a real GPU or a software one, the cores):
 compare runs made on the same machine.
+
+### Reference figures
+
+15 frames per case, milliseconds per frame, after the decoder pool, one asset per
+file, the parallel export and the filter boxes were in.
+
+On a modest laptop with a GPU (Windows 11, Chrome 155 headless on ANGLE/D3D11, an
+Intel HD 620, an i5-7300U with 2 cores and 4 threads):
+
+| case | frame | evaluate | draw | video | readback | send | held back by |
+|---|---|---|---|---|---|---|---|
+| `layers` | 140 | 5.0 | 25 | 0 | 29 | 67 | the transfer |
+| `effects` | 8,716 | 2.3 | 8,616 | 0 | 35 | 50 | the JavaScript (Canvas 2D filters) |
+| `video4k` | 112 | 0.3 | 2.5 | 5.3 | 47 | 45 | the GPU |
+| `crossfade4k` | 159 | 0.5 | 2.6 | 21 | 67 | 55 | the GPU |
+| `simulation` | 133 | 0.3 | 36 | 0 | 28 | 57 | the transfer |
+| `instances` | 132 | 1.4 | 33 | 0 | 27 | 58 | the transfer |
+
+With a GPU the readback falls from 230–370 ms to 27–67 ms, and sending the frame to
+ffmpeg becomes the largest part of most cases. `effects` stays far above the others:
+an export draws in Canvas 2D on the processor by design (`raster: 'cpu'`, exact
+antialiasing; the editor's preview uses `'gpu'`), so its filters run there.
+
+The same cases in a cloud container with no GPU (Chrome's software GL), before the
+steps above, for comparison only: `layers` 341, `effects` 40,236, `video4k` 501,
+`crossfade4k` 666, `simulation` 331 ms a frame, the readback weighing 230–540 ms on
+each. They say where to look on such a machine, not on a user's. Worth taking again
+on a machine with a dedicated GPU.
 
 ## The critic column
 

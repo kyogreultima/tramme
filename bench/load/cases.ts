@@ -1,4 +1,4 @@
-// Load cases (docs/performance-roadmap.md, step 1): documents that each push
+// Load cases (their reference figures are in bench/README.md): documents that each push
 // one part of a frame, rendered by `tramme load` to tell whether the
 // JavaScript, the GPU, video decoding or the transfer is the bottleneck.
 // They are built here rather than kept as JSON: hundreds of layers, and a 4K
@@ -131,7 +131,7 @@ function simulation(): LoadCase {
  * A card component (a plate, a dot, a bar, their entrance) placed 400 times
  * by one distribution, its colour from the palette, played as a ripple by a
  * time field, a wiggle smoothed on the dot: the Evaluator for many
- * instances (docs/performance-roadmap.md, step 3)
+ * instances
  */
 function instances(): LoadCase {
   const enter = (a: unknown, b: unknown) => ({ $k: [{ t: 0, v: a, ease: [0.16, 1, 0.3, 1] }, { t: 0.6, v: b }] }) as { $k: { t: number; v: never }[] };

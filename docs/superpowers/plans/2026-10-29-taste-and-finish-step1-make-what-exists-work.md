@@ -246,7 +246,7 @@ The unit tests prove the parts; this task proves step 1 on the real case, first 
 - Create: `docs/taste-finish-roadmap.md` (boxes to tick, the steps of the spec; step 1 ticked as its tasks land)
 - Modify: `CHANGELOG.md`
 
-- [ ] **Step 1: Write the roadmap file** in the shape of `docs/taste-roadmap.md`: one section per step 0 to 8 of the spec with its bullets as boxes, step 0 marked as the user's runs from the `taste-baseline` tag, a line on how each step is measured.
+- [ ] **Step 1: Write the roadmap file** in the shape of the other roadmaps: one section per step 0 to 8 of the spec with its bullets as boxes, step 0 marked as the user's runs from the `taste-baseline` tag, a line on how each step is measured.
 - [ ] **Step 2: Add the changelog entry** under the unreleased heading, in the file's style.
 - [ ] **Step 3: Verify** `npm run typecheck`, `npm test`, `node scripts/packs/index.ts --check` — expected: all pass.
 - [ ] **Step 4: Audit the diff for duplication** (a second grouping helper, a second clip function, a second walk of the layer id prefixes, the screen's geometry computed twice in the pack, strings repeated between the check and the notice) and fix.

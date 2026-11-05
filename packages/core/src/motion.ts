@@ -3,8 +3,8 @@
 // linear tell), how many times it turns around, how far it passes its end
 // value and comes back, and when it settles. The assistant reads them to
 // judge a movement it cannot see (a strip of frames shows the spacing, the
-// figures say why it feels wrong); the quality checks read them too
-// (docs/motion-roadmap.md). Pure functions of sampled series: the values come
+// figures say why it feels wrong); the quality checks read them too.
+// Pure functions of sampled series: the values come
 // from the Evaluator — the same evaluation the render uses — and nothing
 // here renders or keeps state.
 

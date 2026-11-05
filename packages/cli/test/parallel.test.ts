@@ -1,4 +1,4 @@
-// The parallel export (docs/performance-roadmap.md, step 2): the film cut
+// The parallel export: the film cut
 // into segments rendered by pages of the same Chrome at once. Its frames are
 // the ones a single page draws, simulations included (the load case of
 // particles, cloth, a rope and a flock, started in the middle by the later

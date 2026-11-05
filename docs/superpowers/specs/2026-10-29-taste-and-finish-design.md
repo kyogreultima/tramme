@@ -8,7 +8,7 @@ From a prompt alone, with no asset given (no font, no background, no picture), T
 
 The bar is marketing's **level of finish, not its look or its genre**. Tramme must not learn to make dark-blue crypto promos; it must reach that finish on any subject and in any style, and the same brief asked twice still gives two different films of equal quality (the user's standing rule: taste and a director's method, never a template system). It stays autonomous and affordable: the user is on a Claude subscription, and quota burn decides whether the assistant is usable at all.
 
-Today the assistant carries the craft of *motion* (curves, staggers, durations, checks; [docs/taste-roadmap.md](../../taste-roadmap.md)) but not the craft of *the picture*: what a finished frame looks like, what it is made of, and when it is good enough. Without assets from the user, its films come out flat, repetitive and half finished.
+Today the assistant carries the craft of *motion* (curves, staggers, durations, checks) but not the craft of *the picture*: what a finished frame looks like, what it is made of, and when it is good enough. Without assets from the user, its films come out flat, repetitive and half finished.
 
 ## What we measured
 

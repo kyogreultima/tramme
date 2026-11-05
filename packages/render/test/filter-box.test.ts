@@ -1,5 +1,4 @@
-// The part of a layer its Canvas 2D filters run over (docs/performance-roadmap.md,
-// step 4): the layer's box on the canvas, grown by a margin for its ink and by
+// The part of a layer its Canvas 2D filters run over: the layer's box on the canvas, grown by a margin for its ink and by
 // what each filter spreads, or the whole frame when one of them cannot say.
 
 import { describe, expect, it } from 'vitest';

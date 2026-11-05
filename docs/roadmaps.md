@@ -25,7 +25,7 @@ The loose ends, one by one:
 
 ## Done
 
-[Motion](motion-roadmap.md), [Performance](performance-roadmap.md), [Polish](polish-roadmap.md), [Shorts](shorts-roadmap.md), [Taste](taste-roadmap.md): no open box. Performance should be re-read once web scenes exist, since a scene adds a render path the load cases do not cover.
+A roadmap with no open box is removed from `docs/`, and from the site's menu: its record is the changelog and the history. Five went that way (motion, performance, polish, shorts, taste). The performance figures they leave behind are in [bench/README.md](../bench/README.md): once web scenes exist, a load case for a scene is added there, since a scene is a render path the load cases do not cover.
 
 What the earlier agent runs could not check where they ran (no GPU, no phone, no model hub) is gathered in [to-validate.md](roadmap-loop/to-validate.md), each line with how to check it.
 

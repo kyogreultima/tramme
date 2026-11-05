@@ -23,8 +23,8 @@ its last.
 ## Performance
 
 - **Step 1 — reference figures.** Taken on a laptop with a GPU (Intel HD
-  620, Chrome 155): the second table of step 1 in
-  `docs/performance-roadmap.md`. The readback falls to 27–67 ms a frame;
+  620, Chrome 155): the reference figures of
+  `bench/README.md`. The readback falls to 27–67 ms a frame;
   `effects` stays at 8.7 s, because an export draws its filters on the
   processor by design (`raster: 'cpu'`). Worth taking again on a machine
   with a dedicated GPU.

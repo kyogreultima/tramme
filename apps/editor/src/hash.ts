@@ -1,5 +1,4 @@
-// The same file imported twice becomes one asset (docs/performance-roadmap.md,
-// step 5): a hash of its content, computed at import and kept on the asset,
+// The same file imported twice becomes one asset (one asset per file): a hash of its content, computed at import and kept on the asset,
 // answers an import of a file already in the project with the asset that
 // holds it. Small files are hashed whole; a large one (a long video) by its
 // size and evenly spread slices, so a 2 GB file is not read into memory.

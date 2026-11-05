@@ -1,5 +1,4 @@
-// The Evaluator alone on the load case of many instances (docs/performance-roadmap.md,
-// step 3): 400 instances of a component, read through a distribution and a
+// The Evaluator alone on the load case of many instances: 400 instances of a component, read through a distribution and a
 // time field, frame after frame, without drawing. node bench/evaluate-instances.ts
 // prints the milliseconds a frame takes; node --cpu-prof profiles it.
 
