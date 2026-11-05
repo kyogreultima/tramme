@@ -1581,7 +1581,14 @@
     "captionsAsk": "Add captions to the film, in the language that is spoken.",
     "cleanSound": "Clean up the sound",
     "cleanSoundAsk": "Clean up the sound of the film: take out the background noise and even out the levels.",
-    "export": "Last export"
+    "toStart": "Back to the start",
+    "play": "Play",
+    "pause": "Pause",
+    "loop": "Loop",
+    "undo": "Undo",
+    "redo": "Redo",
+    "exportOpen": "Export the film…",
+    "export": "Export"
   },
   "ideas": {
     "launch": "Launch film",

@@ -3,8 +3,9 @@
 // round button that can be moved, and that draws the playback of the open film
 // as a ring filling around it. Open it suggests where to go next. With no
 // project open: say what film to make, one of the usual films to start from, a
-// recent project. With one open: files dropped here join its assets, a few
-// requests for the assistant, the last export. What is picked goes to the main
+// recent project. With one open: its play, loop and history controls, files
+// dropped here join its assets, a few requests for the assistant, the export
+// panel and the last export. What is picked goes to the main
 // window (quick-link.ts answers it); this window only asks.
 
 import { useEffect, useRef, useState } from 'preact/hooks';
@@ -20,6 +21,8 @@ import { Icon } from './icons.tsx';
 import { LogoMark } from './Logo.tsx';
 
 const RECENT = 3;
+/** what the bubble asks without bringing Tramme to the front */
+const STAY_BEHIND: ReadonlySet<QuickAction['kind']> = new Set(['save-export', 'play-pause', 'to-start', 'loop', 'undo', 'redo']);
 /** how far the pointer goes before a press on the bubble is a move, not a click (px) */
 const MOVE = 4;
 
@@ -47,9 +50,10 @@ export function Quick() {
     setOpen(next);
     tauri?.core.invoke('desktop_quick_open', { open: next }).catch(() => {});
   };
-  // what needs Tramme in front goes through the app (it brings the window forward); saving the last export does not
+  // what needs Tramme in front goes through the app (it brings the window forward); saving the last export and the
+  // project's own controls do not: the film plays on behind the bubble
   const ask = (action: QuickAction, fold = true) => {
-    if (action.kind === 'save-export') void tauri?.event.emit('quick-action', action);
+    if (STAY_BEHIND.has(action.kind)) void tauri?.event.emit('quick-action', action);
     else tauri?.core.invoke('desktop_quick_do', { action }).catch(() => {});
     setWords('');
     if (fold) show(false);
@@ -151,18 +155,25 @@ export function Quick() {
       </header>
       {project ? (
         <>
+          <div class="quick-transport">
+            <button class="icon-btn" title={t('quick.toStart')} aria-label={t('quick.toStart')} onClick={() => ask({ kind: 'to-start' }, false)}><Icon name="start" /></button>
+            <button class="icon-btn primary" title={playing ? t('quick.pause') : t('quick.play')} aria-label={playing ? t('quick.pause') : t('quick.play')} onClick={() => ask({ kind: 'play-pause' }, false)}><Icon name={playing ? 'pause' : 'play'} /></button>
+            <button class={`icon-btn${link?.loop ? ' on' : ''}`} title={t('quick.loop')} aria-label={t('quick.loop')} aria-pressed={!!link?.loop} onClick={() => ask({ kind: 'loop' }, false)}><Icon name="loop" /></button>
+            <span class="grow" />
+            <button class="icon-btn" title={t('quick.undo')} aria-label={t('quick.undo')} disabled={!link?.canUndo} onClick={() => ask({ kind: 'undo' }, false)}><Icon name="undo" /></button>
+            <button class="icon-btn" title={t('quick.redo')} aria-label={t('quick.redo')} disabled={!link?.canRedo} onClick={() => ask({ kind: 'redo' }, false)}><Icon name="redo" /></button>
+          </div>
           <div class="quick-drop"><Icon name="upload" /><span>{note || t('quick.drop')}</span></div>
           <section class="quick-group">
             <h3>{t('quick.assistant')}</h3>
             <button class="quick-row" onClick={() => ask({ kind: 'ask', text: t('quick.captionsAsk') })}><Icon name="wand" /><span>{t('quick.captions')}</span></button>
             <button class="quick-row" onClick={() => ask({ kind: 'ask', text: t('quick.cleanSoundAsk') })}><Icon name="audio" /><span>{t('quick.cleanSound')}</span></button>
           </section>
-          {link?.lastExport && (
-            <section class="quick-group">
-              <h3>{t('quick.export')}</h3>
-              <button class="quick-row" onClick={() => ask({ kind: 'save-export' }, false)}><Icon name="download" /><span>{link.lastExport}</span></button>
-            </section>
-          )}
+          <section class="quick-group">
+            <h3>{t('quick.export')}</h3>
+            <button class="quick-row" onClick={() => ask({ kind: 'export' })}><Icon name="download" /><span>{t('quick.exportOpen')}</span></button>
+            {link?.lastExport && <button class="quick-row" onClick={() => ask({ kind: 'save-export' }, false)}><Icon name="download" /><span>{link.lastExport}</span></button>}
+          </section>
         </>
       ) : (
         <>

@@ -6,7 +6,7 @@
 // touches none of the editor's state.
 
 import { effect } from '@preact/signals';
-import { comp, S } from './state.ts';
+import { canRedo, canUndo, comp, redo, S, setTime, undo } from './state.ts';
 import { exportQueue, queueVersion } from './export-queue.ts';
 import { go } from './nav.ts';
 import { prefs } from './settings.ts';
@@ -22,6 +22,9 @@ export interface QuickState {
   at: number;
   duration: number;
   loop: boolean;
+  /** whether the history has something to undo, to redo */
+  canUndo: boolean;
+  canRedo: boolean;
   lastExport: string | null;
 }
 
@@ -32,7 +35,15 @@ export type QuickAction =
   | { kind: 'home' }
   | { kind: 'drop' }
   | { kind: 'save-export' }
-  | { kind: 'ask'; text: string };
+  | { kind: 'ask'; text: string }
+  // the open project's own controls: play or pause, back to the start, the loop, the history
+  | { kind: 'play-pause' }
+  | { kind: 'to-start' }
+  | { kind: 'loop' }
+  | { kind: 'undo' }
+  | { kind: 'redo' }
+  // Tramme in front, its export panel open
+  | { kind: 'export' };
 
 const lastExport = () => [...exportQueue.jobs].reverse().find((j) => j.status === 'done' && j.result);
 
@@ -45,6 +56,8 @@ function state(): QuickState {
     at: Date.now(),
     duration: open ? comp.peek().duration : 0,
     loop: S.loop.peek(),
+    canUndo: open && canUndo.peek(),
+    canRedo: open && canRedo.peek(),
     lastExport: open ? lastExport()?.result?.name ?? null : null,
   };
 }
@@ -58,7 +71,7 @@ export function startQuickLink(): void {
   // told at each change that matters to it, and again every second while playing (a seek, a loop, a drift)
   effect(() => {
     if (!prefs.value.quickLauncher) return;
-    void [S.project.value, S.doc.value, S.compId.value, S.playing.value, S.loop.value, queueVersion.value];
+    void [S.project.value, S.doc.value, S.compId.value, S.playing.value, S.loop.value, canUndo.value, canRedo.value, queueVersion.value];
     tell();
     if (S.playing.peek()) { const timer = setInterval(tell, 1000); return () => clearInterval(timer); }
   });
@@ -74,6 +87,18 @@ async function answer(a: QuickAction): Promise<void> {
   else if (a?.kind === 'drop') await take();
   else if (a?.kind === 'save-export') { const j = lastExport(); if (j?.result) await saveBlob(j.result.blob, j.result.name); }
   else if (a?.kind === 'ask' && typeof a.text === 'string' && state().project) { const { send } = await import('./ai/conversation.ts'); await send(a.text.slice(0, 2000)); }
+  else if (state().project) control(a);
+}
+
+/** the open project's controls, as its own buttons and keys do them */
+function control(a: QuickAction): void {
+  if (a?.kind === 'play-pause') S.playing.value = !S.playing.peek();
+  else if (a?.kind === 'to-start') setTime(0);
+  else if (a?.kind === 'loop') S.loop.value = !S.loop.peek();
+  else if (a?.kind === 'undo') undo();
+  else if (a?.kind === 'redo') redo();
+  // the export button of the top bar opens the panel with the film's options: they are chosen in Tramme
+  else if (a?.kind === 'export') document.querySelector<HTMLElement>('[data-tour="export"]')?.click();
 }
 
 /** the files dropped on the bubble go into the open project, as files dropped on its assets would; the bubble is told how many */

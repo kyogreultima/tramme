@@ -2827,7 +2827,14 @@
     "captionsAsk": "Ajoute des sous-titres au film, dans la langue parlée.",
     "cleanSound": "Nettoyer le son",
     "cleanSoundAsk": "Nettoie le son du film : retire le bruit de fond et égalise les niveaux.",
-    "export": "Dernier export"
+    "toStart": "Revenir au début",
+    "play": "Lecture",
+    "pause": "Pause",
+    "loop": "Boucle",
+    "undo": "Annuler",
+    "redo": "Rétablir",
+    "exportOpen": "Exporter le film…",
+    "export": "Export"
   },
   "ideas": {
     "launch": "Film de lancement",
