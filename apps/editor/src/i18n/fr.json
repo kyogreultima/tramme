@@ -1312,6 +1312,9 @@
     "measuring": "Mesure…",
     "noSoundToMeasure": "Il n'y a pas de son à mesurer",
     "noSoundTracks": "Pas encore de piste de son : le mixeur montre les pistes d'une séquence",
+    "peakLevel": "Niveau de crête",
+    "resetClip": "Réinitialiser le témoin de saturation",
+    "clipIndicator": "Saturation",
     "recordVoiceover": "Enregistrer une voix off",
     "recordHint": "Enregistrer une voix off à partir de la tête de lecture : casque conseillé, un appui l'arrête, Échap l'abandonne",
     "voiceTake": "Voix off {n}",
@@ -1569,6 +1572,9 @@
     "issue.loudness": "Le volume visé est {from}, ce format veut {to} LUFS"
   },
   "content": {
+    "Live audio meters": "Vu-mètres audio en direct",
+    "reads peak, RMS, peak hold and clipping from the open mixer; optionally resets a track clipping indicator": "lit la crête, le niveau RMS, la crête maintenue et la saturation du mixeur ouvert ; peut réinitialiser le témoin de saturation d'une piste",
+    "Reset clipping on track": "Réinitialiser la saturation de la piste",
     "ARC · product loop": "ARC · boucle produit",
     "A six-second pocket-speaker loop with editable type, product and background.": "Une boucle de six secondes pour une enceinte de poche, avec texte, produit et fond modifiables.",
     "Typefaces": "Polices",

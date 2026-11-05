@@ -17,6 +17,7 @@ import { channelsOf, cuesOf, measure } from './sound.ts';
 import { canvas, caption, drawCurve, drawSpectrogram, drawWave, INK, mark } from './sound-pictures.ts';
 import { prefs } from './settings.ts';
 import { t } from './i18n/index.ts';
+import { metersTool } from './audio-meters.ts';
 
 // ── the stems ────────────────────────────────────────────────
 interface Stems {
@@ -186,7 +187,7 @@ const mix: ToolType<Record<string, never>> = {
   },
 };
 
-export const MIXING_TOOLS: ToolType[] = [mix];
+export const MIXING_TOOLS: ToolType[] = [mix, metersTool];
 
 // ── the mix, checked ─────────────────────────────────────────
 /** what the sound checks say, English templates translated where shown (and listed for the catalogs) */

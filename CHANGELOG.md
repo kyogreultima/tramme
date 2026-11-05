@@ -10,6 +10,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Added
 
+- Live meters on mixer tracks and buses show peak, RMS and a held peak during playback, with a clipping indicator that stays lit until reset. Closing the mixer releases its analysers; the assistant can read and reset the same meters with `meters`.
 - The desktop app has accounts: sign up, sign in and your space, like the web app. Its calls go to the accounts backend of the environment it was built for (the beta app to the beta, the stable one to production), the session is kept in the system keychain, and sign-in with Google or GitHub is not offered in the app yet.
 - A beta build of the desktop app, "Tramme Beta": it installs beside Tramme, and the beta site offers it.
 

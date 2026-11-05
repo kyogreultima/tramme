@@ -4,7 +4,7 @@
 // master shows the loudness the composition aims at and measures the mix.
 
 import { signal } from '@preact/signals';
-import { useRef, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { integratedLoudness, pointer, sampleKeyframes, staticValue, type Composition, type Keyframe, type SequenceTrack } from '@tramme/core';
 import { mixComposition } from '@tramme/render';
 import { cancelDraft, comp, commit, draft, S, toast, uiTime } from '../state.ts';
@@ -14,9 +14,28 @@ import { Icon } from './icons.tsx';
 import { changeTrack } from './timeline/Tracks.tsx';
 import { addBusOps, faderMoveOps, trackBusOps, trackPanOps, trackVolumeOps } from './timeline/mixer.ts';
 import { clipsOn, soloOf } from './timeline/tracks.ts';
+import { METER_FLOOR, type LevelReading } from '../audio-meters.ts';
 
 /** the tracks whose faders are recorded while the film plays */
 const armed = signal<Set<string>>(new Set());
+const levels = signal<Record<string, LevelReading>>({});
+const meterPosition = (db: number) => `${Math.max(0, Math.min(100, (db - METER_FLOOR) / -METER_FLOOR * 100))}%`;
+
+function LiveMeter({ id }: { id: string }) {
+  const level = levels.value[id];
+  const peak = level?.peak ?? METER_FLOOR;
+  return <div class="strip-level">
+    <div class="meter-line">
+    <div class="live-meter" role="meter" aria-label={t('timeline.peakLevel')} aria-valuemin={METER_FLOOR} aria-valuemax={0} aria-valuenow={Math.min(0, peak)} aria-valuetext={`${peak.toFixed(1)} dBFS`}>
+      <i class="peak" style={{ width: meterPosition(peak) }} />
+      <i class="rms" style={{ width: meterPosition(level?.rms ?? METER_FLOOR) }} />
+      <i class="hold" style={{ left: meterPosition(level?.hold ?? METER_FLOOR) }} />
+    </div>
+    <button class={`clip-indicator${level?.clipped ? ' on' : ''}`} aria-label={t('timeline.resetClip')} title={t('timeline.clipIndicator')} aria-pressed={level?.clipped ?? false} onClick={() => preview.meters.reset(id)} />
+    </div>
+    <span class="mono strip-db" title={t('timeline.peakLevel')}>{peak.toFixed(1)} dBFS</span>
+  </div>;
+}
 
 /** a track's volume at a moment: its still value, or its automation read there */
 export function volumeAt(c: Composition, track: SequenceTrack, at: number): number {
@@ -50,6 +69,7 @@ function Strip({ compId, c, track }: { compId: string; c: Composition; track: Se
   return (
     <div class={`strip${track.muted ? ' muted' : ''}`} data-strip={track.id}>
       <div class="strip-name" title={track.name || track.id}>{track.name || track.id}</div>
+      <LiveMeter id={track.id} />
       <input class="fader" type="range" min={-60} max={12} step={0.5} value={db} aria-label={t('timeline.volume')}
         onInput={(e) => move(Number((e.target as HTMLInputElement).value))} onPointerUp={release} onKeyUp={release}
         onDblClick={() => commit(t('timeline.trackVolume'), trackVolumeOps(c, compId, track.id, 0))} />
@@ -107,6 +127,16 @@ function Master({ compId, c }: { compId: string; c: Composition }) {
 }
 
 export function Mixer() {
+  useEffect(() => {
+    preview.meters.show(true);
+    let frame = 0;
+    const read = (now: number) => {
+      levels.value = preview.meters.read(now / 1000);
+      frame = requestAnimationFrame(read);
+    };
+    frame = requestAnimationFrame(read);
+    return () => { cancelAnimationFrame(frame); preview.meters.show(false); levels.value = {}; };
+  }, []);
   const c = comp.value, compId = S.compId.value;
   const sound = (c.tracks ?? []).filter((x) => x.kind === 'audio');
   return (

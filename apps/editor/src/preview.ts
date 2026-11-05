@@ -22,6 +22,7 @@ import { attachInstalled, attachIsolated, filterModule, pluginHost } from './plu
 import { copiesIn, copyId, counted, installed, installedFor, installedTypes, offIn, permitted, sandboxedDoc, stopped, STRIKES } from './installed.ts';
 import { bindSandbox, blitSandboxFrame, declarationsModule, ensureDeclared, ensureSandboxDoc, pluginItemsOf, resetSandbox, sandboxDeclaration, sandboxVideoFrames, type SandboxContext } from './plugins/sandbox-draw.ts';
 import { t } from './i18n/index.ts';
+import { previewMeters } from './audio-meters.ts';
 import { prefs } from './settings.ts';
 import { clockTime, scrubWindow, step, Runs, type Clock } from './playclock.ts';
 import { packAsInstalled, packBySrc, packContext, shippedPacks } from './packs.ts';
@@ -31,6 +32,7 @@ import { syncPluginTours } from './tours/index.ts';
 const MIN_ELEMENT_RATE = 0.0625;
 
 class Preview {
+  readonly meters = previewMeters;
   readonly canvas: HTMLCanvasElement;
   renderer: Renderer | null = null;
   private applied: TrammeDoc | null = null;
@@ -82,6 +84,7 @@ class Preview {
   }
 
   async start() {
+    this.meters.clear(true);
     // a new project on the same page: what crossed for the old one is dropped
     resetSandbox();
     // every sandboxed draw goes through the open project's sandbox, fed with this preview's document and assets
@@ -513,8 +516,23 @@ class Preview {
     this.playOut = ctx.createGain();
     this.playOut.connect(this.level!);
     const bus = mixBus(ctx, soundMix(doc.compositions[compId]), this.playOut);
+    const trackOutputs = new Map<string, GainNode>();
+    const output = (clip: (typeof clips)[number]) => {
+      const track = doc.compositions[compId].tracks?.find((track) => track.id === doc.compositions[compId].layers[clip.layerId]?.track);
+      if (!track) return bus(clip);
+      const key = `${track.id}:${clip.role}`;
+      let node = trackOutputs.get(key);
+      if (!node) {
+        node = ctx.createGain();
+        node.connect(bus(clip));
+        trackOutputs.set(key, node);
+        this.meters.source(track.id, ctx, node);
+        if (track.to) this.meters.source(track.to, ctx, node);
+      }
+      return node;
+    };
     sounds.forEach((c, i) => {
-      const src = bufs[i] && playClip(ctx, c, bufs[i]!, bus(c), startAt, from);
+      const src = bufs[i] && playClip(ctx, c, bufs[i]!, output(c), startAt, from);
       if (src) this.sources.push(src);
     });
     // a video's sound streams from its file (never decoded whole): one element per cut, started and stopped on the clock
@@ -524,7 +542,7 @@ class Preview {
       el.playbackRate = Math.max(MIN_ELEMENT_RATE, c.rate);
       // the pitch goes with the speed, as in the exports, unless the layer keeps it: the browser does it for an element
       el.preservesPitch = c.keepPitch;
-      ctx.createMediaElementSource(el).connect(clipChain(ctx, { ...c, keepPitch: false }, bus(c), startAt, from));
+      ctx.createMediaElementSource(el).connect(clipChain(ctx, { ...c, keepPitch: false }, output(c), startAt, from));
       const skip = Math.max(0, from - c.at);
       // the element is timed like the file: the seek lands at the file's time (the pace included), wrapped into a loop it is past
       const looping = c.loopStart !== undefined && c.loopEnd !== undefined && c.loopEnd > c.loopStart;
@@ -613,6 +631,7 @@ class Preview {
 
   private stopAudio() {
     this.runs.cancel();
+    this.meters.clear();
     this.playOut?.disconnect();
     this.playOut = null;
     for (const s of this.sources) { try { s.stop(); } catch { /* not started */ } }
