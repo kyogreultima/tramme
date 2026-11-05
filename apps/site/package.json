@@ -15,6 +15,7 @@
     "@phosphor-icons/core": "^2.1.1",
     "@tramme/core": "*",
     "@tramme/nodes": "*",
+    "@tramme/plans": "*",
     "@tramme/render": "*",
     "astro": "^7.3.6",
     "cookie": "^2.0.1"

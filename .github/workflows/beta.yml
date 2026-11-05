@@ -1,9 +1,9 @@
-# The beta environment: the app (apps/editor served by apps/worker, the "beta"
-# Wrangler environment, with its own accounts backend) at beta.app.tramme.dev
-# and the site at beta.tramme.dev, both deployed again on every push to
-# develop, once the checks pass. Both are built with TRAMME_ENV=beta so their
-# links lead to each other (brand/environments.ts). A manual run on develop
-# deploys the same way. See docs/environments.md.
+# The beta environment, public half: the site at beta.tramme.dev, deployed again
+# on every push to develop once the checks pass, built with TRAMME_ENV=beta so
+# its links lead to beta.app.tramme.dev (brand/environments.ts). The app, with
+# the accounts backend behind it, is deployed by the private platform repository,
+# which is told here that develop moved. A manual run on develop does the same.
+# See docs/environments.md.
 
 name: Beta
 
@@ -24,28 +24,6 @@ jobs:
   checks:
     name: Checks
     uses: ./.github/workflows/ci.yml
-
-  app:
-    name: Deploy the app (beta.app.tramme.dev)
-    needs: checks
-    if: github.ref == 'refs/heads/develop'
-    runs-on: ubuntu-latest
-    env:
-      TRAMME_ENV: beta
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-    steps:
-      - name: Cloudflare's secrets
-        run: |
-          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
-            echo "::error::the repository's secrets CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are missing (Settings, Secrets and variables, Actions): the beta app was not deployed"
-            exit 1
-          fi
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup
-      - run: npm ci
-      # builds the editor, then wrangler deploy --env beta (the backend's image is built here: Docker is on the runner)
-      - run: npm run deploy:beta
 
   site:
     name: Deploy the site (beta.tramme.dev)
@@ -68,3 +46,25 @@ jobs:
       - run: npm ci
       # builds the site, then wrangler deploy as the Worker tramme-site-beta on beta.tramme.dev
       - run: npm run site:deploy:beta
+
+  app:
+    name: Tell the platform repository (beta.app.tramme.dev)
+    needs: checks
+    if: github.ref == 'refs/heads/develop'
+    runs-on: ubuntu-latest
+    env:
+      PLATFORM_DISPATCH_TOKEN: ${{ secrets.PLATFORM_DISPATCH_TOKEN }}
+    steps:
+      # a token that may write to the private repository (a fine-grained one, Contents: read and write, on that
+      # repository only): it sends the event its Beta workflow listens to, and that one deploys the app
+      - name: Send the event
+        run: |
+          if [ -z "$PLATFORM_DISPATCH_TOKEN" ]; then
+            echo "::error::the secret PLATFORM_DISPATCH_TOKEN is missing: the beta app was not deployed"
+            exit 1
+          fi
+          curl --fail-with-body -sS -X POST \
+            -H "Authorization: Bearer $PLATFORM_DISPATCH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/${{ github.repository_owner }}/tramme-platform/dispatches \
+            -d '{"event_type":"public-develop","client_payload":{"sha":"${{ github.sha }}"}}'

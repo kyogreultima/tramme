@@ -30,7 +30,7 @@ export interface Env {
   ACCESS_AUD?: string;
   /** '1' only from `wrangler dev` on this machine: no Access check */
   DEV_OPEN?: string;
-  /** accounts: the backend (apps/server) as a container behind this Worker, with no address of its own (container.ts) */
+  /** accounts: the backend (the private platform repository) as a container behind this Worker, with no address of its own (container.ts) */
   ACCOUNTS?: DurableObjectNamespace;
   /** accounts, in development: the address of a backend started on this machine; neither this nor ACCOUNTS: no accounts */
   ACCOUNTS_URL?: string;

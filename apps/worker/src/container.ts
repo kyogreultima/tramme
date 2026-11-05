@@ -1,4 +1,4 @@
-// The accounts backend (apps/server, AdonisJS) as a container behind the
+// The accounts backend (AdonisJS, in the private platform repository) as a container behind the
 // Worker. It has no address of its own: the only way to it is the Durable
 // Object binding `ACCOUNTS`, which the Worker calls for the account routes
 // (accounts.ts). One instance serves everyone; it sleeps when nobody asks, and

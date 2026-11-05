@@ -1,4 +1,4 @@
-// What the accounts backend (apps/server) is started with, when it runs as a
+// What the accounts backend (the private platform repository) is started with, when it runs as a
 // container behind the Worker. The container has no environment of its own:
 // the Worker gives it one, from its own settings and secrets (wrangler.jsonc's
 // vars, `wrangler secret put`), by the names the backend reads (start/env.ts).

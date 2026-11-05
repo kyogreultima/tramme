@@ -32,16 +32,16 @@ TRAMME_ENV=local TRAMME_APP_URL=http://localhost:8790 npm run site   # the app i
 
 The servers are given their address by their own settings, one per deployment:
 
-- the accounts backend: `APP_ORIGIN` (the address of the app: it is the only origin it takes changes from, the one in the links of its mails and the one OAuth providers send people back to) and `APP_URL` (its own);
+- the accounts backend (private repository): `APP_ORIGIN` (the address of the app: it is the only origin it takes changes from, the one in the links of its mails and the one OAuth providers send people back to) and `APP_URL` (its own);
 - the Worker: `APP_ORIGIN` and `VAULT_ORIGIN` (personal mode, `wrangler.jsonc`), `ACCOUNTS_URL` (the backend it hands the account routes to).
 
-For `local`, `apps/server/.env.example` and `apps/worker/.dev.vars.example` already hold the local ones. A beta or preprod deployment sets the same names to its own addresses (a Wrangler environment for the Worker, the host's settings for the backend).
+For `local`, the backend's `.env.example` (private repository) and `apps/worker/.dev.vars.example` already hold the local ones. A beta or preprod deployment sets the same names to its own addresses (a Wrangler environment for the Worker, the host's settings for the backend).
 
 ## Beta deployment
 
-`.github/workflows/beta.yml` deploys beta on every push to `develop`, once the checks pass (and by hand from the Actions tab):
+Two repositories deploy beta, on every push to `develop`. This one is public; the accounts backend and the billing live in the private `tramme-platform`, which holds this one as its `tramme` submodule.
 
-- the app: `npm run deploy:beta`, the `beta` Wrangler environment of `apps/worker/wrangler.jsonc` (Worker `tramme-beta`, custom domains `beta.app.tramme.dev` and `cles.beta.app.tramme.dev` for the key vault), with its own accounts backend container;
-- the site: `npm run site:deploy:beta` (Worker `tramme-site-beta`, custom domain `beta.tramme.dev`).
+- The site: `.github/workflows/beta.yml` here, once the checks pass (`npm run site:deploy:beta`: Worker `tramme-site-beta`, custom domain `beta.tramme.dev`, built with `TRAMME_ENV=beta`).
+- The app: the same workflow then sends the event `public-develop` to `tramme-platform`, whose Beta workflow builds the editor with `TRAMME_ENV=beta`, builds the backend's image and deploys the Worker `tramme-beta` (`beta.app.tramme.dev`, and `cles.beta.app.tramme.dev` for the key vault) from `deploy/wrangler.jsonc`, with this repository's Worker as is.
 
-Both are built with `TRAMME_ENV=beta`. It needs the repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`, and, once, the backend's secrets of this environment: `npx wrangler secret put <NAME> --env beta -c apps/worker/wrangler.jsonc` for `APP_KEY`, `DATABASE_URL` (its own database), `EDGE_SECRET`, `INTERNAL_SECRET`, `SMTP_PASSWORD` (and the OAuth ones when they exist).
+Secrets: `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` in both repositories; `PLATFORM_DISPATCH_TOKEN` here (a fine-grained token with Contents read and write on `tramme-platform` only). The backend's own secrets are given once, in Cloudflare: `npx wrangler secret put <NAME> --env beta -c deploy/wrangler.jsonc` from the platform repository, for `APP_KEY`, `DATABASE_URL` (its own database), `EDGE_SECRET`, `INTERNAL_SECRET`, `SMTP_PASSWORD` (and the OAuth ones when they exist).

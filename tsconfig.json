@@ -31,7 +31,6 @@
   ],
   "exclude": [
     "apps/worker",
-    "apps/site",
-    "apps/server"
+    "apps/site"
   ]
 }

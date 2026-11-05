@@ -1,4 +1,4 @@
-// The routes of accounts, handed to the accounts backend (apps/server).
+// The routes of accounts, handed to the accounts backend (the private platform repository).
 //
 // The Worker serves the editor, the projects and the providers; who someone is,
 // their account, their plan and their sign-in with Google or GitHub are the
@@ -11,7 +11,7 @@
 // - `ACCOUNTS`, a container behind the Worker (container.ts): it has no
 //   address, nothing but this Worker can reach it. What a deployment uses.
 // - `ACCOUNTS_URL`, an address: a backend started on this machine
-//   (`npm run server:dev`), for development.
+//   (`npm run server:dev` of the platform repository), for development.
 // With neither, none of these routes exist (the private and personal modes
 // have no accounts).
 

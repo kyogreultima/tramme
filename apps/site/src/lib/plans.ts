@@ -4,8 +4,8 @@
 // Paid features are services the platform runs, not switches in the app's code.
 
 import type { Locale, Localised } from './i18n';
-// the figures (prices, credits) are the platform's: one source, read by the payment too
-import { PLAN_TERMS, termsOf, type PlanId } from '../../../../packages/billing/src/plans.ts';
+// the figures (prices, credits) are the platform's: one source (packages/plans), read by the payment too
+import { PLAN_TERMS, termsOf, type PlanId } from '@tramme/plans';
 
 export type { PlanId };
 export const PLAN_IDS: PlanId[] = PLAN_TERMS.map((p) => p.id);

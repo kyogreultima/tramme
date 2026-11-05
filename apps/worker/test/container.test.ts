@@ -1,17 +1,9 @@
 import { describe, expect, it } from 'vitest';
-// the backend's own list of the variables it reads (start/env.ts), as text
-import backendSource from '../../server/start/env.ts?raw';
-import { BACKEND_VARIABLES, backendEnv } from '../src/backend-env.ts';
+import { backendEnv } from '../src/backend-env.ts';
 import { AccountsContainer } from '../src/container.ts';
 import type { Env } from '../src/http.ts';
 
 const env = (over: Partial<Env> = {}) => ({ ASSETS: {}, ...over }) as unknown as Env;
-
-/** what the backend declares in start/env.ts: its names, and which of them it cannot start without */
-function backendDeclares() {
-  const all = [...backendSource.matchAll(/^\s+([A-Z][A-Z0-9_]+):\s*Env\.schema\.(.*)$/gm)].map((m) => ({ name: m[1], required: !/\.optional\b/.test(m[2]) }));
-  return { all: all.map((v) => v.name), required: all.filter((v) => v.required).map((v) => v.name) };
-}
 
 describe('the environment of the accounts backend container', () => {
   it('gives it how to listen, where its state goes, and whom to trust', () => {
@@ -33,13 +25,8 @@ describe('the environment of the accounts backend container', () => {
     expect(e.NODE_ENV).toBe('production');
   });
 
-  it('is made of names the backend reads, and misses none it cannot start without', () => {
-    const { all, required } = backendDeclares();
-    expect(all.length).toBeGreaterThan(20);
-    for (const name of BACKEND_VARIABLES) expect(all, `${name} is not a variable of the backend`).toContain(name);
-    const given = new Set<string>([...BACKEND_VARIABLES, ...Object.keys(backendEnv(env()))]);
-    for (const name of required) expect(given.has(name), `the backend cannot start without ${name}, and the container is not given it`).toBe(true);
-  });
+  // that every name it passes is one the backend reads, and that none the backend needs is missing, is checked
+  // by the platform repository (test/backend-env.test.ts), which holds the backend
 });
 
 describe('the container', () => {

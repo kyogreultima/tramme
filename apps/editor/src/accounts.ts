@@ -1,6 +1,6 @@
 // The account of the person using the editor: who they are, and the calls the
 // sign-in, space and account menu pages make. The server is the accounts
-// backend (apps/server), reached through the Worker at the same address, so the
+// backend (the private platform repository), reached through the Worker at the same address, so the
 // session cookie rides along by itself.
 //
 // An editor on a server without accounts (personal mode, a private server)
