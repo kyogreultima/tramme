@@ -1,6 +1,6 @@
 // The /api routes of the desktop app, answered in the custom protocol handler
 // on the same origin as the editor: the storage over the local folders
-// (store.rs), the providers' keys (keys.rs) and /api/config. The provider
+// (store.rs), the providers' keys (keys.rs), the account (account.rs) and /api/config. The provider
 // routes themselves are answered by the page (apps/editor/src/tauri.ts), which
 // reaches the providers through the desktop_fetch command (fetch.rs).
 
@@ -101,6 +101,8 @@ fn route_inner(parts: &[String], req: Request<Vec<u8>>) -> Result<Body, store::H
         ("library", _) => shelf(&store, "plugins", parts, req),
         ("sounds", _) => shelf(&store, "sounds", parts, req),
         ("keys", _) => Ok(ok_json(KeyStore::system()?.route(method, &decode_segments(&parts[1..]), req.body())?)),
+        // the account: sent to the backend of this build's environment (account.rs)
+        ("auth" | "account" | "billing", _) => Ok(crate::account::route(&req)),
         // the provider routes are the page's (api.reach), never asked here
         ("claude" | "llm" | "models" | "generate" | "generate-image" | "generate-video" | "transcribe", _) => Ok(json_response(
             404,

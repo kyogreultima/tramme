@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ENVIRONMENTS, ENV_NAMES, originsFromEnv, resolveOrigins, siteOfApp } from '../../../brand/environments';
 
@@ -84,5 +85,19 @@ describe('the site\'s links', () => {
     vi.resetModules();
     const { SITE } = await import('../src/lib/site');
     expect(SITE.url).toBe('https://beta.tramme.dev');
+  });
+});
+
+// The desktop app's build (apps/desktop/src-tauri/build.rs) reads the app's address of its environment from this
+// table, line by line, to know which backend it signs in at: the form of the lines is part of the contract.
+describe('the table, as the desktop build reads it', () => {
+  const source = readFileSync(new URL('../../../brand/environments.ts', import.meta.url), 'utf8');
+
+  it('has each environment on one line: name, then site and app, each between single quotes', () => {
+    for (const name of ENV_NAMES) {
+      const line = source.split('\n').map((l) => l.trim()).find((l) => l.startsWith(`${name}: {`));
+      expect(line, `${name} has no line of its own`).toBeDefined();
+      expect(line!.split("app: '")[1]?.split("'")[0], `${name}'s app`).toBe(ENVIRONMENTS[name].app);
+    }
   });
 });

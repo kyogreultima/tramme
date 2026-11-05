@@ -3,6 +3,7 @@
 // (embedded from apps/editor/dist by Tauri) and the /api routes over the
 // local storage, so the editor runs unmodified, like behind its Worker.
 
+mod account;
 mod api;
 mod fetch;
 pub mod format;

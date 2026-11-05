@@ -81,6 +81,11 @@ impl Secrets for Keychain {
 
 static KEYCHAIN: Keychain = Keychain;
 
+/// the system keychain, for what else the app keeps in it (the account's session, account.rs)
+pub fn keychain() -> &'static dyn Secrets {
+    &KEYCHAIN
+}
+
 /// a provider of the OpenAI chat format added by the user
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Custom {
