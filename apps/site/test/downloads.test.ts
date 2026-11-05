@@ -36,6 +36,42 @@ describe('the release the site offers', () => {
   });
 });
 
+describe('the release the beta site offers', () => {
+  const assets = INSTALLERS.map((i) => ({ name: i.file, size: 1_000_000 }));
+  const release = (tag: string, over: object = {}) => ({ tag_name: tag, html_url: `https://example.test/${tag}`, assets, draft: false, prerelease: false, ...over });
+  const serve = (list: unknown[], latest: unknown) => vi.stubGlobal('fetch', async (url: string) => (String(url).endsWith('/releases/latest')
+    ? new Response(JSON.stringify(latest), { status: 200 })
+    : new Response(JSON.stringify(list), { status: 200 })));
+
+  it('is the latest prerelease, reached by its tag, not GitHub\'s "latest"', async () => {
+    serve([release('v1.3.0-beta.7', { prerelease: true }), release('v1.3.0-beta.6', { prerelease: true }), release('v1.2.3')], release('v1.2.3'));
+    const { latestRelease } = await import('../src/lib/download');
+    const found = await latestRelease(() => {}, 'beta');
+    expect(found?.version).toBe('1.3.0-beta.7');
+    expect(found?.installers.every((i) => i.href.includes('/releases/download/v1.3.0-beta.7/'))).toBe(true);
+  });
+
+  it('skips a draft and a prerelease with no installer', async () => {
+    serve([release('v1.3.0-beta.9', { prerelease: true, draft: true }), release('v1.3.0-beta.8', { prerelease: true, assets: [] }), release('v1.3.0-beta.5', { prerelease: true })], release('v1.2.3'));
+    const { latestRelease } = await import('../src/lib/download');
+    expect((await latestRelease(() => {}, 'beta'))?.version).toBe('1.3.0-beta.5');
+  });
+
+  it('is the latest release while there is no beta build yet', async () => {
+    serve([release('v1.2.3')], release('v1.2.3'));
+    const { latestRelease } = await import('../src/lib/download');
+    const found = await latestRelease(() => {}, 'beta');
+    expect(found?.version).toBe('1.2.3');
+    expect(found?.installers.every((i) => i.href.includes('/releases/latest/download/'))).toBe(true);
+  });
+
+  it('is never offered by the stable site, which keeps GitHub\'s latest release', async () => {
+    serve([release('v1.3.0-beta.7', { prerelease: true })], release('v1.2.3'));
+    const { latestRelease } = await import('../src/lib/download');
+    expect((await latestRelease(() => {}))?.version).toBe('1.2.3');
+  });
+});
+
 describe('what the site says of the systems', () => {
   it('names only the ones it offers', () => {
     for (const locale of LOCALES) {

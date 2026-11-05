@@ -44,3 +44,14 @@ Two repositories deploy beta, on every push to `develop`. This one is public; th
 - The app: the same workflow then sends the event `public-develop` to `tramme-platform`, whose Beta workflow builds the editor with `TRAMME_ENV=beta`, builds the backend's image and deploys the Worker `tramme-beta` (`beta.app.tramme.dev`, and `cles.beta.app.tramme.dev` for the key vault) from `deploy/wrangler.jsonc`, with this repository's Worker as is.
 
 Secrets: `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` in both repositories; `PLATFORM_DISPATCH_TOKEN` here (a fine-grained token with Contents read and write on `tramme-platform` only). The backend's own secrets are given once, in Cloudflare: `npx wrangler secret put <NAME> --env beta -c deploy/wrangler.jsonc` from the platform repository, for `APP_KEY`, `DATABASE_URL` (its own database), `EDGE_SECRET`, `INTERNAL_SECRET`, `SMTP_PASSWORD` (and the OAuth ones when they exist).
+
+## Which backend each build talks to
+
+- **The web app** (`app.tramme.dev`, `beta.app.tramme.dev`) calls `/api/...` at the address that serves it, so it talks to the Worker of its own deployment, and that Worker to its own backend (a binding, with no address). A beta page cannot reach the production backend, and the other way round.
+- **The desktop app** has no backend to sign in to yet: its own local API (`apps/desktop/src-tauri/src/api.rs`) answers 404 to `/api/auth/*`, so the editor inside it shows no account. It is built with the environment all the same (`TRAMME_ENV`), which decides where its links to the site lead. When it gets an account, this is where its backend is chosen: the beta app's `beta.app.tramme.dev`, the stable app's `app.tramme.dev`, never by the user's machine.
+
+## Beta desktop app
+
+`.github/workflows/desktop-beta.yml`, run by hand from the Actions tab on `develop`: the checks, then Windows and Linux builds with `TRAMME_ENV=beta`, published as the prerelease `vX.Y.Z-beta.N`, then the beta site deployed again so that it offers it (`apps/site/src/lib/download.ts` takes the latest prerelease on the beta, GitHub's latest release on production; with no prerelease yet the beta offers the latest release).
+
+The beta app is its own product, **Tramme Beta** (identifier `app.tramme.desktop.beta`, set through `TAURI_CONFIG`): it installs beside Tramme and does not replace it. Both associate with `.tramme` files; the last one installed opens them. macOS is left out, as in the stable release, until the app is signed. The stable app never sees a beta build: its update check, like the site's, reads GitHub's latest release, which skips prereleases.

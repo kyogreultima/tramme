@@ -1,8 +1,9 @@
 // Gathers the desktop app's installers built on this machine (npm run
 // desktop:build) under their release names (apps/desktop/downloads.ts), for
-// .github/workflows/desktop.yml:
+// .github/workflows/desktop.yml and desktop-beta.yml:
 //   node scripts/desktop-release.ts <out dir> [tag]
-// With a tag, it must be the app's version (vX.Y.Z, tauri.conf.json).
+// With a tag, it must be the app's version (vX.Y.Z, tauri.conf.json), or, for a
+// beta build, that version and a build number (vX.Y.Z-beta.N).
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -16,8 +17,8 @@ if (!out) {
 const root = path.resolve(import.meta.dirname, '..');
 const tauri = path.join(root, 'apps/desktop/src-tauri');
 const { version } = JSON.parse(fs.readFileSync(path.join(tauri, 'tauri.conf.json'), 'utf8')) as { version: string };
-if (tag && tag !== `v${version}`) {
-  console.error(`the tag ${tag} is not the app's version, v${version} (apps/desktop/src-tauri/tauri.conf.json)`);
+if (tag && tag !== `v${version}` && !new RegExp(`^v${version.replaceAll('.', '\\.')}-beta\\.\\d+$`).test(tag)) {
+  console.error(`the tag ${tag} is not the app's version, v${version}, nor a beta build of it, v${version}-beta.N (apps/desktop/src-tauri/tauri.conf.json)`);
   process.exit(1);
 }
 

@@ -34,6 +34,8 @@ jobs:
       TRAMME_ENV: beta
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      # the site reads the beta's latest desktop build (apps/site/src/lib/download.ts): GitHub's limit is lower without a token
+      GITHUB_TOKEN: ${{ github.token }}
     steps:
       - name: Cloudflare's secrets
         run: |

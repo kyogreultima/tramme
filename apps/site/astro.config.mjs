@@ -10,11 +10,11 @@ import starlight from '@astrojs/starlight';
 import cloudflare from '@astrojs/cloudflare';
 import { sidebar } from './src/lib/docs.ts';
 import { latestRelease } from './src/lib/download.ts';
-import { REPO } from './src/lib/links.ts';
+import { ORIGINS, REPO } from './src/lib/links.ts';
 import { SITE } from './src/lib/site.ts';
 
-// the desktop app's installers, from the latest release on GitHub (src/lib/download.ts)
-const release = await latestRelease(console.log);
+// the desktop app's installers, from GitHub's latest release, or the beta's latest build (src/lib/download.ts)
+const release = await latestRelease(console.log, ORIGINS.env === 'beta' ? 'beta' : 'stable');
 
 export default defineConfig({
   // the address of this environment (local, beta, production: brand/environments.ts), for the canonical links, the sitemap and the preview image
