@@ -437,6 +437,24 @@ mod tests {
         assert_eq!(text(&res), r#"{"error":"email_taken"}"#);
     }
 
+    /// against the real beta backend, by hand: cargo test --lib -- --ignored the_real_beta
+    #[test]
+    #[ignore = "needs the network and the beta deployment"]
+    fn the_real_beta_backend_takes_the_apps_origin() {
+        let beta = "https://beta.app.tramme.dev";
+        let secrets = Memory::default();
+        let me = forward(beta, &secrets, &request("GET", "tramme://localhost/api/auth/me", &[("accept", "application/json")], ""));
+        assert_eq!((me.status().as_u16(), text(&me).as_str()), (401, r#"{"error":"signed_out"}"#));
+        // a sign-in that fails for what it is (no such account), not for its origin: the backend took the app's
+        let login = forward(beta, &secrets, &request("POST", "tramme://localhost/api/auth/login", &[("content-type", "application/json")], r#"{"email":"nobody@example.invalid","password":"not a real password"}"#));
+        println!("login of nobody: {} {}", login.status(), text(&login));
+        assert!(!text(&login).contains("\"origin\""), "the backend refused the origin: {}", text(&login));
+        assert!([400, 401, 422].contains(&login.status().as_u16()), "{}", login.status());
+        // the backend keeps a session cookie even for a visitor: nobody is signed in all the same
+        let again = forward(beta, &secrets, &request("GET", "tramme://localhost/api/auth/me", &[], ""));
+        assert_eq!((again.status().as_u16(), text(&again).as_str()), (401, r#"{"error":"signed_out"}"#));
+    }
+
     #[test]
     fn set_cookie_lines() {
         let now = 1_800_000_000;
