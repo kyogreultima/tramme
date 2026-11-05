@@ -4,7 +4,8 @@
 
 a.brand { text-decoration: none; border-radius: var(--r-sm); padding: 2px 4px; margin: -2px -4px; }
 a.brand:hover { background: var(--hover); }
-.home { position: relative; height: 100vh; height: 100dvh; overflow: auto; background: var(--bg); }
+/* a column, the main part filling it: what ends the page (the version) rests at the bottom even when the page is short */
+.home { position: relative; display: flex; flex-direction: column; height: 100vh; height: 100dvh; overflow: auto; background: var(--bg); }
 /* An ambient backdrop, fixed behind the scrolling content. Plain themes leave it off;
    liquid glass turns it on in its own stylesheet, where it has something to bend. */
 .home-wallpaper { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; opacity: 0; }
@@ -19,7 +20,7 @@ a.brand:hover { background: var(--hover); }
 }
 .home-top .grow { flex: 1; }
 
-.home-main { max-width: 1280px; margin: 0 auto; padding: 28px 24px 64px; display: flex; flex-direction: column; gap: 36px; }
+.home-main { flex: 1; width: 100%; max-width: 1280px; margin: 0 auto; padding: 28px 24px 64px; display: flex; flex-direction: column; gap: 36px; }
 .home-h { display: flex; align-items: baseline; gap: 10px; margin-bottom: 14px; }
 .home-h h2 { margin: 0; font-size: var(--fs-lg); font-weight: 600; letter-spacing: -0.01em; }
 .home-h .faint { font-size: var(--fs-sm); }
@@ -144,5 +145,5 @@ a.brand:hover { background: var(--hover); }
   .brief-bar .seg { order: 3; flex: 1 0 100%; }
   .brief-bar .seg button { flex: 1 1 0; min-width: 0; padding: 0 6px; }
 }
-.home-version { margin-top: 8px; text-align: center; font-size: var(--fs-xs); }
+.home-version { margin-top: auto; padding-top: 8px; text-align: center; font-size: var(--fs-xs); }
 .home-version a { color: var(--accent); }

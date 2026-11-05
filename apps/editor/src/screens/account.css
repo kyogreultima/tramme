@@ -2,7 +2,8 @@
    forgotten password) and your space (/space). One quiet card, the editor's
    own fields and buttons; colours from the theme's tokens only. */
 
-.auth, .space { position: relative; min-height: 100vh; min-height: 100dvh; background: var(--bg); color: var(--text); overflow: auto; }
+/* a fixed height, like the home: the page behind is clipped (base.css), so the scroll is this block's own */
+.auth, .space { position: relative; height: 100vh; height: 100dvh; background: var(--bg); color: var(--text); overflow: auto; }
 
 /* ── coming in ─────────────────────────────────────────────── */
 .auth-main { display: flex; justify-content: center; padding: clamp(24px, 9vh, 96px) 20px 64px; }
