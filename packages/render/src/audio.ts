@@ -6,7 +6,7 @@
 // composition's loudness, its true peak held under -1 dBTP. Also: the WAV
 // encoder, and the synth that turns a sound's code into samples.
 
-import { audioClips, clipFileTime, curveAt, gainAt, gainMoves, needsPitch, pitchRatio, integratedLoudness, master, soundMix, type AudioClip, type SoundMix, type TrammeDoc } from '@tramme/core';
+import { audioClips, clipFileTime, curveAt, gainAt, gainMoves, needsPitch, pitchRatio, integratedLoudness, master, soundMix, type AudioClip, type AudioEffect, type SoundMix, type TrammeDoc } from '@tramme/core';
 import { loadPitch } from './pitch.ts';
 
 export const MIX_RATE = 48000;
@@ -78,6 +78,86 @@ export function mixBus(ctx: BaseAudioContext, mix: SoundMix, out: AudioNode): (c
   return (c) => (c.role === 'effect' ? fx : out);
 }
 
+function eqStages(ctx: BaseAudioContext, low: number, mid: number, frequency: number, q: number, high: number): AudioNode[] {
+  const nodes: AudioNode[] = [];
+  if (low) { const node = ctx.createBiquadFilter(); node.type = 'lowshelf'; node.frequency.value = 120; node.gain.value = low; nodes.push(node); }
+  if (mid) { const node = ctx.createBiquadFilter(); node.type = 'peaking'; node.frequency.value = frequency; node.Q.value = q; node.gain.value = mid; nodes.push(node); }
+  if (high) { const node = ctx.createBiquadFilter(); node.type = 'highshelf'; node.frequency.value = 8000; node.gain.value = high; nodes.push(node); }
+  return nodes;
+}
+
+function compressor(ctx: BaseAudioContext, amount: number): DynamicsCompressorNode {
+  const node = ctx.createDynamicsCompressor();
+  node.threshold.value = -12 - 18 * amount; node.knee.value = 24; node.ratio.value = 2 + 10 * amount;
+  node.attack.value = 0.004; node.release.value = 0.15;
+  return node;
+}
+
+/** Ordered, non-destructive inserts; flat and bypassed settings allocate no nodes. */
+export function audioEffectChain(ctx: BaseAudioContext, effects: AudioEffect[], out: AudioNode): AudioNode {
+  let next = out;
+  for (const effect of [...effects].reverse()) {
+    if (effect.bypass) continue;
+    let nodes: AudioNode[] = [];
+    if (effect.kind === 'eq') nodes = eqStages(ctx, effect.low, effect.mid, effect.midFreq, effect.midQ, effect.high);
+    else if (effect.kind === 'lowCut' || effect.kind === 'highCut') {
+      if (effect.frequency) { const node = ctx.createBiquadFilter(); node.type = effect.kind === 'lowCut' ? 'highpass' : 'lowpass'; node.frequency.value = effect.frequency; nodes.push(node); }
+    } else if (effect.kind === 'compressor') {
+      if (effect.amount) nodes.push(compressor(ctx, effect.amount));
+    } else if (effect.kind === 'reverb' && effect.wet) {
+      const input = ctx.createGain(), output = ctx.createGain(), send = ctx.createGain(), convolution = ctx.createConvolver();
+      send.gain.value = effect.wet;
+      convolution.buffer = room(ctx);
+      input.connect(output);
+      input.connect(send).connect(convolution).connect(output);
+      output.connect(next);
+      next = input;
+      continue;
+    }
+    if (nodes.length) { nodes.reduce((a, b) => a.connect(b)); nodes.at(-1)!.connect(next); next = nodes[0]; }
+  }
+  return next;
+}
+
+/** The shared track/bus routing of preview, scrubbing and every export.
+ * Clip gains/pan retain their existing audioClips semantics. A callback taps
+ * outputs for live meters, without participating in the sound path. */
+export function mixTracks(ctx: BaseAudioContext, doc: TrammeDoc, compId: string, out: AudioNode, tap?: (id: string, node: AudioNode) => void): (clip: AudioClip) => AudioNode {
+  const comp = doc.compositions[compId], tracks = comp.tracks ?? [], mix = soundMix(comp);
+  if (!tracks.some((track) => track.effects?.some((effect) => !effect.bypass))) {
+    // Keep the old single shared room and summing path for existing projects.
+    const bus = mixBus(ctx, mix, out), outputs = new Map<string, GainNode>();
+    return (clip) => {
+      const track = tracks.find((track) => track.id === comp.layers[clip.layerId]?.track);
+      if (!track) return bus(clip);
+      const key = `${track.id}:${clip.role}`;
+      let node = outputs.get(key);
+      if (!node) {
+        node = ctx.createGain(); node.connect(bus(clip)); outputs.set(key, node);
+        tap?.(track.id, node);
+        if (track.to) tap?.(track.to, node);
+      }
+      return node;
+    };
+  }
+  const inputs = new Map(tracks.map((track) => [track.id, ctx.createGain()]));
+  for (const track of tracks) {
+    const output = ctx.createGain();
+    output.connect(!track.bus && track.to ? inputs.get(track.to) ?? out : out);
+    inputs.get(track.id)!.connect(audioEffectChain(ctx, track.effects ?? [], output));
+    tap?.(track.id, output);
+  }
+  const rooms = new Map<string, (clip: AudioClip) => AudioNode>();
+  let untracked: ((clip: AudioClip) => AudioNode) | undefined;
+  return (clip) => {
+    const id = comp.layers[clip.layerId]?.track;
+    if (!id || !inputs.has(id)) return (untracked ??= mixBus(ctx, mix, out))(clip);
+    let route = rooms.get(id);
+    if (!route) { route = mixBus(ctx, mix, inputs.get(id)!); rooms.set(id, route); }
+    return route(clip);
+  };
+}
+
 /**
  * The chain of one clip into `out`: filters, then its gain, the reverb beside
  * it. `from` is the composition time played at `startAt` (time of the
@@ -106,19 +186,9 @@ export function clipChain(ctx: BaseAudioContext, clip: AudioClip, out: AudioNode
   }
   if (clip.highCut > 0) { const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = clip.highCut; stages.push(f); }
   // the equaliser: one biquad per band set, nothing at 0 dB (an uneq'd clip builds the same chain as before)
-  if (clip.eqLow !== 0) { const f = ctx.createBiquadFilter(); f.type = 'lowshelf'; f.frequency.value = 120; f.gain.value = clip.eqLow; stages.push(f); }
-  if (clip.eqMid !== 0) { const f = ctx.createBiquadFilter(); f.type = 'peaking'; f.frequency.value = clip.eqMidFreq; f.Q.value = 0.9; f.gain.value = clip.eqMid; stages.push(f); }
-  if (clip.eqHigh !== 0) { const f = ctx.createBiquadFilter(); f.type = 'highshelf'; f.frequency.value = 8000; f.gain.value = clip.eqHigh; stages.push(f); }
+  stages.push(...eqStages(ctx, clip.eqLow, clip.eqMid, clip.eqMidFreq, 0.9, clip.eqHigh));
   // the compressor: the loud moments brought down (a voice kept level), harder as `compress` grows
-  if (clip.compress > 0) {
-    const f = ctx.createDynamicsCompressor(), a = clip.compress;
-    f.threshold.value = -12 - 18 * a;
-    f.knee.value = 24;
-    f.ratio.value = 2 + 10 * a;
-    f.attack.value = 0.004;
-    f.release.value = 0.15;
-    stages.push(f);
-  }
+  if (clip.compress > 0) stages.push(compressor(ctx, clip.compress));
   const gain = ctx.createGain();
   stages.push(gain);
   stages.reduce((a, b) => (outOf.get(a) ?? a).connect(b));
@@ -258,7 +328,7 @@ export async function mixComposition(doc: TrammeDoc, compId: string, url: (asset
   const ctx = new OfflineAudioContext(2, Math.max(1, Math.ceil((b - a) * MIX_RATE)), MIX_RATE);
   // the pitch worklet, before any chain asks for it
   if (clips.some(needsPitch)) await loadPitch(ctx).catch(() => {});
-  const bus = mixBus(ctx, mix, ctx.destination);
+  const bus = mixTracks(ctx, doc, compId, ctx.destination);
   const decoded = new Map<string, Promise<AudioBuffer | null>>();
   for (const c of clips) {
     let p = decoded.get(c.asset);

@@ -10,7 +10,8 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Added
 
-- Projects can keep ordered, bypassable audio-effect settings on sound tracks and buses, with each edit undoable in one step. Playback/export of these chains and their mixer controls are still being built.
+- Ordered track and bus effects now process their combined sources in playback, scrubbing and every export, preserving source files and the existing per-clip settings. Changing a chain refreshes its live sound and loudness measurement.
+- Projects can keep ordered, bypassable audio-effect settings on sound tracks and buses, with each edit undoable in one step.
 - The mixer master now shows live three-second loudness, true peak and clipping before the personal listening volume, alongside the composition's target. Its stopped-film measurement remains available, and the assistant reads the same master levels.
 - Live meters on mixer tracks and buses show peak, RMS and a held peak during playback, with a clipping indicator that stays lit until reset. Closing the mixer releases its analysers; the assistant can read and reset the same meters with `meters`.
 - The desktop app has accounts: sign up, sign in and your space, like the web app. Its calls go to the accounts backend of the environment it was built for (the beta app to the beta, the stable one to production), the session is kept in the system keychain, and sign-in with Google or GitHub is not offered in the app yet.
@@ -18,6 +19,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Fixed
 
+- Live true-peak readings no longer show a spike created by the meter when screen and audio updates cross at different times.
 - Playback no longer adds the live limiter's automatic gain on top of the composition's loudness target, keeping a steady mix at its expected level.
 - The home page's top bar was squeezed against the top edge when the page was taller than the window; it keeps its height, now one value for every top bar.
 - The icons of the phones' apps sit on a white tile, not a dark one; the desktop icons stay the mark alone.

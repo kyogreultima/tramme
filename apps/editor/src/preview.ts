@@ -16,13 +16,14 @@ export const previewInfo = signal({ scale: 1, still: 1, motion: 0.5 });
 import { effect, signal } from '@preact/signals';
 import { audioClips, clipFileTime, curveAt, needsPitch, soundMix, type TrammeDoc, type EvaluatedFrame } from '@tramme/core';
 import { editorRegistry } from './vocabulary.ts';
-import { clipChain, liveMaster, loadPitch, masterGainDb, mixBus, playClip, Renderer } from '@tramme/render';
+import { clipChain, liveMaster, loadPitch, masterGainDb, mixTracks, playClip, Renderer } from '@tramme/render';
 import { comp, compIdOf, S, setRegistry, setTime, toast, viewDoc } from './state.ts';
 import { attachInstalled, attachIsolated, filterModule, pluginHost } from './plugins/index.ts';
 import { copiesIn, copyId, counted, installed, installedFor, installedTypes, offIn, permitted, sandboxedDoc, stopped, STRIKES } from './installed.ts';
 import { bindSandbox, blitSandboxFrame, declarationsModule, ensureDeclared, ensureSandboxDoc, pluginItemsOf, resetSandbox, sandboxDeclaration, sandboxVideoFrames, type SandboxContext } from './plugins/sandbox-draw.ts';
 import { t } from './i18n/index.ts';
 import { MASTER_METER_ID, previewMeters } from './audio-meters.ts';
+import { audioEffectsKey } from './audio-key.ts';
 import { prefs } from './settings.ts';
 import { clockTime, scrubWindow, step, Runs, type Clock } from './playclock.ts';
 import { packAsInstalled, packBySrc, packContext, shippedPacks } from './packs.ts';
@@ -126,8 +127,16 @@ class Preview {
       lastT = t;
       this.invalidate();
     });
-    // a solo changed while playing: the sound starts again with it
-    effect(() => { void S.solo.value; if (S.playing.value) this.play(); else this.stopAudio(); });
+    // A chain/routing edit or solo changes the live graph. Picture edits and
+    // fader drafts leave it running instead of repeatedly cutting the sound.
+    let audioKey = '';
+    effect(() => {
+      const playing = S.playing.value, solo = [...S.solo.value].sort(), doc = viewDoc.value;
+      void S.compId.value;
+      if (!playing) { audioKey = ''; this.stopAudio(); return; }
+      const key = JSON.stringify([solo, audioEffectsKey(doc, compIdOf(doc))]);
+      if (key !== audioKey) { audioKey = key; this.play(); }
+    });
     effect(() => { void S.previewScale.value; void prefs.value; this.invalidate(); });
     effect(() => { const p = prefs.value; if (this.master) this.master.gain.value = p.previewMuted ? 0 : p.previewVolume; });
     let seenInstalled = installed.peek(), seenStopped = 0;
@@ -517,22 +526,7 @@ class Preview {
     this.playOut = ctx.createGain();
     this.playOut.connect(this.level!);
     this.meters.source(MASTER_METER_ID, ctx, this.meterOut!);
-    const bus = mixBus(ctx, soundMix(doc.compositions[compId]), this.playOut);
-    const trackOutputs = new Map<string, GainNode>();
-    const output = (clip: (typeof clips)[number]) => {
-      const track = doc.compositions[compId].tracks?.find((track) => track.id === doc.compositions[compId].layers[clip.layerId]?.track);
-      if (!track) return bus(clip);
-      const key = `${track.id}:${clip.role}`;
-      let node = trackOutputs.get(key);
-      if (!node) {
-        node = ctx.createGain();
-        node.connect(bus(clip));
-        trackOutputs.set(key, node);
-        this.meters.source(track.id, ctx, node);
-        if (track.to) this.meters.source(track.to, ctx, node);
-      }
-      return node;
-    };
+    const output = mixTracks(ctx, doc, compId, this.playOut, (id, node) => this.meters.source(id, ctx, node));
     sounds.forEach((c, i) => {
       const src = bufs[i] && playClip(ctx, c, bufs[i]!, output(c), startAt, from);
       if (src) this.sources.push(src);
@@ -587,10 +581,15 @@ class Preview {
     // the drag is a gesture: the sound can start before the first playback
     this.ensureAudio();
     void this.audio!.resume();
+    const scrubOut = this.audio!.createGain();
+    scrubOut.connect(this.level ?? this.master!);
+    const output = mixTracks(this.audio!, doc, compIdOf(doc), scrubOut);
+    const cleanup = setTimeout(() => { scrubOut.disconnect(); this.timers = this.timers.filter((timer) => timer !== cleanup); }, (w.dur + 0.03) * 1000);
+    this.timers.push(cleanup);
     for (const c of clips) {
       void this.buffer(this.renderer.assets.url(c.asset)).then((buf) => {
         if (!buf || !this.audio || S.playing.peek()) return;
-        const src = playClip(this.audio, c, buf, this.level ?? this.master!, this.audio.currentTime + 0.005, w.from);
+        const src = playClip(this.audio, c, buf, output(c), this.audio.currentTime + 0.005, w.from);
         if (!src) return;
         this.sources.push(src);
         // a scrub's window is short-lived: it leaves the list once it has played, so a long drag keeps none
@@ -615,7 +614,7 @@ class Preview {
   /** the loudness gain of the master for this mix: measured once per mix (in the background the first time), then set on the level */
   private levelOf(doc: TrammeDoc, compId: string) {
     const r = this.renderer!, clips = audioClips(doc, compId);
-    const key = JSON.stringify([soundMix(doc.compositions[compId]), clips]);
+    const key = JSON.stringify([audioEffectsKey(doc, compId), soundMix(doc.compositions[compId]), clips]);
     let p = this.levels.get(key);
     if (!p) {
       // Video audio streams during playback. Measuring its complete mix here

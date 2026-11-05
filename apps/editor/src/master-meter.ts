@@ -33,15 +33,24 @@ export class MasterMeter {
     if (elapsed < 0 || elapsed > available) this.reset();
     const count = Math.min(available, elapsed < 0 ? Math.max(0, frame) : elapsed);
     this.frame = frame;
-    return this.push(channels.map((channel) => channel.subarray(available - count)));
+    return this.push(channels.map((channel) => channel.subarray(available - count)), channels);
   }
 
-  push(input: Float32Array[]): MasterReading {
+  push(input: Float32Array[], snapshot?: Float32Array[]): MasterReading {
     const n = input[0]?.length ?? 0;
     if (!n) return this.reading;
     const size = this.channels[0].length;
     const stereo = [input[0], input[1] ?? input[0]];
     const peakInput = stereo.map((channel, i) => {
+      // Analyser snapshots and currentTime can straddle a render quantum.
+      // Measure true peak within one coherent native window, rather than
+      // interpolating across a seam assembled from two timestamped reads.
+      if (snapshot) {
+        const coherent = snapshot[i] ?? snapshot[0];
+        const samples = coherent.subarray(Math.max(0, coherent.length - 2060));
+        this.tails[i].set(samples.subarray(Math.max(0, samples.length - 12)));
+        return samples;
+      }
       const samples = new Float32Array(n + 12);
       samples.set(this.tails[i]);
       samples.set(channel, 12);
@@ -50,8 +59,8 @@ export class MasterMeter {
     });
     let peak = 0;
     const envelope = truePeakEnvelope(peakInput);
-    // Six samples of lookahead: complete the previous packet's tail, leave
-    // this one's tail for the next packet, never interpolate against a fake edge.
+    // Leave six samples at either edge: packets carry their preceding tail,
+    // while analyser snapshots supply their own coherent interpolation window.
     for (let i = 6; i < envelope.length - 6; i++) peak = Math.max(peak, envelope[i]);
     const truePeak = Math.max(-80, 20 * Math.log10(peak));
     for (let i = 0; i < n; i++) {
