@@ -19,11 +19,13 @@ function server(initial: Uint8Array) {
 }
 
 it('loads a small preview in bounded parts and shares simultaneous reads', async () => {
-  const data = Uint8Array.from({ length: 600000 }, (_, i) => i % 251);
+  const data = new Uint8Array(600000);
+  for (let i = 0; i < data.length; i++) data[i] = i % 251;
   const fixture = server(data);
   const [first, second] = await Promise.all([load('https://tramme.test/preview-a.mp4'), load('https://tramme.test/preview-a.mp4')]);
   expect(first).toBe(second);
-  expect(new Uint8Array(await first!.arrayBuffer())).toEqual(data);
+  // compared as bytes: a 600 000-element deep equality is slow enough to time out on a busy runner
+  expect(Buffer.from(await first!.arrayBuffer()).equals(Buffer.from(data))).toBe(true);
   expect(fixture.ranges).toEqual(['bytes=0-262143', 'bytes=262144-524287', 'bytes=524288-599999']);
 });
 
