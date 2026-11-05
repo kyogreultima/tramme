@@ -18,7 +18,7 @@
 
 export const ENVIRONMENTS = {
   local: { site: 'http://localhost:4321', app: 'http://localhost:8787' },
-  beta: { site: 'https://beta.tramme.dev', app: 'https://app.beta.tramme.dev' },
+  beta: { site: 'https://beta.tramme.dev', app: 'https://beta.app.tramme.dev' },
   preprod: { site: 'https://preprod.tramme.dev', app: 'https://app.preprod.tramme.dev' },
   production: { site: 'https://tramme.dev', app: 'https://app.tramme.dev' },
 } as const;

@@ -5,11 +5,11 @@ Where Tramme lives, by environment. Every link from the site to the app (sign up
 | Environment | Website | App | When |
 |---|---|---|---|
 | `local` | `http://localhost:4321` | `http://localhost:8787` | `npm run site` and `npm run dev`: a dev server means local |
-| `beta` | `https://beta.tramme.dev` | `https://app.beta.tramme.dev` | `TRAMME_ENV=beta` |
+| `beta` | `https://beta.tramme.dev` | `https://beta.app.tramme.dev` | `TRAMME_ENV=beta` |
 | `preprod` | `https://preprod.tramme.dev` | `https://app.preprod.tramme.dev` | `TRAMME_ENV=preprod` |
 | `production` | `https://tramme.dev` | `https://app.tramme.dev` | a build with no `TRAMME_ENV` |
 
-The addresses of beta and preprod follow the production pattern. They are a guess: where those deployments really are is decided where they are created, and it is changed in that one file.
+The addresses of preprod follow the production pattern. They are a guess: where those deployments really are is decided where they are created, and it is changed in that one file.
 
 ## Choosing
 
@@ -36,3 +36,12 @@ The servers are given their address by their own settings, one per deployment:
 - the Worker: `APP_ORIGIN` and `VAULT_ORIGIN` (personal mode, `wrangler.jsonc`), `ACCOUNTS_URL` (the backend it hands the account routes to).
 
 For `local`, `apps/server/.env.example` and `apps/worker/.dev.vars.example` already hold the local ones. A beta or preprod deployment sets the same names to its own addresses (a Wrangler environment for the Worker, the host's settings for the backend).
+
+## Beta deployment
+
+`.github/workflows/beta.yml` deploys beta on every push to `develop`, once the checks pass (and by hand from the Actions tab):
+
+- the app: `npm run deploy:beta`, the `beta` Wrangler environment of `apps/worker/wrangler.jsonc` (Worker `tramme-beta`, custom domains `beta.app.tramme.dev` and `cles.beta.app.tramme.dev` for the key vault), with its own accounts backend container;
+- the site: `npm run site:deploy:beta` (Worker `tramme-site-beta`, custom domain `beta.tramme.dev`).
+
+Both are built with `TRAMME_ENV=beta`. It needs the repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`, and, once, the backend's secrets of this environment: `npx wrangler secret put <NAME> --env beta -c apps/worker/wrangler.jsonc` for `APP_KEY`, `DATABASE_URL` (its own database), `EDGE_SECRET`, `INTERNAL_SECRET`, `SMTP_PASSWORD` (and the OAuth ones when they exist).

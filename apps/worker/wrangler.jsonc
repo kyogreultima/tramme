@@ -108,6 +108,47 @@
       ],
       "durable_objects": { "bindings": [{ "name": "ACCOUNTS", "class_name": "AccountsContainer" }] },
       "exports": { "AccountsContainer": { "type": "durable-object", "storage": "sqlite" } }
+    },
+    // Beta (npm run deploy:beta, run by .github/workflows/beta.yml on every push to develop): the cloud environment
+    // at its own addresses, with its own backend, database and secrets (the list above, each given with
+    // `wrangler secret put <NAME> --env beta`). The editor is built with TRAMME_ENV=beta so its links lead to
+    // beta.tramme.dev; the key vault is another host of the same site, as in production.
+    "beta": {
+      "name": "tramme-beta",
+      "assets": {
+        "directory": "../editor/dist",
+        "binding": "ASSETS",
+        "not_found_handling": "single-page-application",
+        "run_worker_first": true
+      },
+      "vars": {
+        "MODE": "personal",
+        "APP_ORIGIN": "https://beta.app.tramme.dev",
+        "VAULT_ORIGIN": "https://cles.beta.app.tramme.dev",
+        "SMTP_HOST": "smtp.mx.cloudflare.net",
+        "SMTP_PORT": "465",
+        "SMTP_USERNAME": "api_token",
+        "MAIL_FROM_NAME": "Tramme beta",
+        "MAIL_FROM_ADDRESS": "no-reply@tramme.dev",
+        "BILLING_PROVIDER": "fake"
+      },
+      "routes": [
+        { "pattern": "beta.app.tramme.dev", "custom_domain": true },
+        { "pattern": "cles.beta.app.tramme.dev", "custom_domain": true }
+      ],
+      "ratelimits": [{ "name": "RELAY_LIMIT", "namespace_id": "1001", "simple": { "limit": 120, "period": 60 } }],
+      "observability": { "enabled": true, "logs": { "invocation_logs": false } },
+      "containers": [
+        {
+          "class_name": "AccountsContainer",
+          "image": "../server/Dockerfile",
+          "image_build_context": "../..",
+          "instance_type": "basic",
+          "max_instances": 1
+        }
+      ],
+      "durable_objects": { "bindings": [{ "name": "ACCOUNTS", "class_name": "AccountsContainer" }] },
+      "exports": { "AccountsContainer": { "type": "durable-object", "storage": "sqlite" } }
     }
   }
 }
