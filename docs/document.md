@@ -194,6 +194,16 @@ A film put together from clips is a composition with `"kind": "sequence"` and a 
 
 - A track is `{ id, kind: "video" | "audio", name?, locked?, hidden?, muted?, magnetic?, height? }`. A locked track cannot be edited by the operations; a magnetic one closes its gaps by itself; a layer on a `hidden` track is neither drawn nor heard, on a `muted` track it is drawn but silent (the exported film follows both). Soloing a track is a view of the editor's preview only, it is not written in the document.
 - The mixer of a sound track: `volume` (dB, added to the gain of each sound on it; keyframed, its keys are the fader's automation), `pan` (-1 left to 1 right) and `to`, the bus it feeds. A bus is a sound track with `bus: true` that holds no sound: its `volume`, `pan` and `muted` apply to the tracks that feed it. The preview and the export read them through the same `audioClips`, so they sound alike.
+- A sound track or bus may store an ordered `effects` list. Each entry has a `kind`, explicit parameters and an optional `bypass` flag (absent means active). The source audio stays unchanged. Settings and undoable editing operations are available; applying these chains in playback/export and their mixer controls are still being built.
+
+  | `kind` | Required parameters | Bounds |
+  |---|---|---|
+  | `eq` | `low`, `mid`, `high` (dB), `midFreq` (Hz), `midQ` | gains -24 to +12; mid frequency 200 to 8000; Q 0.1 to 20 |
+  | `compressor` | `amount` | 0 to 1, using the clip compressor's settings |
+  | `reverb` | `wet` | 0 to 1, using the existing room |
+  | `lowCut`, `highCut` | `frequency` (Hz) | 0 to 24000; zero disables the filter |
+
+  For example: `"effects": [{ "kind": "compressor", "amount": 0.5 }, { "kind": "eq", "low": 0, "mid": -3, "midFreq": 2400, "midQ": 0.9, "high": 0, "bypass": false }]`. Effects on a video track, unknown kinds/parameters and non-finite or out-of-range values are rejected. Removing the last effect removes the field; documents without it keep their existing format.
 - A layer's `track` puts it on a track of its composition (an unknown track is an error). Clips of one track follow one another; where a transition makes two overlap, the cut is the middle of the overlap.
 - Clips sharing a `link` move, split and are deleted together (a video and its sound detached onto an audio layer). A link joining a single clip is noted by the `sequence` check.
 - The draw order of `order` follows the tracks (a higher track above a lower one, a later clip above an earlier one); layers with no track keep their place.

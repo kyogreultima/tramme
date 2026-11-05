@@ -1,6 +1,6 @@
 # Sound parity roadmap
 
-Status: step 1 built; 5 boxes done, 24 open. Track effects are next.
+Status: step 1 built; step 2's format and editing operations built. 7 boxes done, 22 open; rendering the track chains is next.
 
 What Raylight's Sound page ([raylight.app/sound](https://www.raylight.app/sound)) offers and Tramme does not yet, and the steps that close the gap. Read with [sound-roadmap.md](sound-roadmap.md), which this continues: its steps 1 to 9 are done, and nothing here replaces them.
 
@@ -66,10 +66,12 @@ Done when: playing a film moves every strip's meter, and the master agrees with 
 
 ### Step 2. Effects on the track
 
-- [ ] An `effects` list on a sound track (`packages/core`): each entry a `kind`, its parameters and a `bypass`. The schema (`schema/tramme-1.schema.json`) and `docs/document.md` follow.
+- [x] An `effects` list on a sound track (`packages/core`): each entry a `kind`, its parameters and a `bypass`. The schema (`schema/tramme-1.schema.json`) and `docs/document.md` follow.
+  - Ordered EQ, compressor, reverb and low/high-cut settings are strict, finite data, on sound tracks and buses. The exported schema is regenerated. Applying them to audio and the mixer controls remain in the boxes below.
 - [ ] The existing per-clip fields (`eqLow`, `eqMid`, `eqHigh`, `compress`, `reverb`, `lowCut`, `highCut`) keep working; a track's chain runs after the clips are summed, so a voice track is treated once.
 - [ ] The mixer builds the chain in order, one node per effect, in the preview and every export (`playClip`, `mixComposition`).
-- [ ] Operations to add, remove, reorder, bypass and set an effect (`timeline/mixer.ts`), each undoable as one entry.
+- [x] Operations to add, remove, reorder, bypass and set an effect (`timeline/mixer.ts`), each undoable as one entry.
+  - The existing track lock applies; invalid indices/settings and no-op changes write nothing. Each operation and its undo are tested on the real document history. The `/` menu and effect controls are step 4.
 - [ ] A chain on a bus applies to every track it collects.
 
 Done when: a compressor then an EQ on a voice track sounds the same in the preview, the MP4 and the command line, and reordering them changes the sound.

@@ -253,6 +253,147 @@
                   "type": "string",
                   "pattern": "^[A-Za-z0-9_-]+$"
                 },
+                "effects": {
+                  "type": "array",
+                  "items": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "eq"
+                          },
+                          "bypass": {
+                            "type": "boolean"
+                          },
+                          "low": {
+                            "type": "number",
+                            "minimum": -24,
+                            "maximum": 12
+                          },
+                          "mid": {
+                            "type": "number",
+                            "minimum": -24,
+                            "maximum": 12
+                          },
+                          "midFreq": {
+                            "type": "number",
+                            "minimum": 200,
+                            "maximum": 8000
+                          },
+                          "midQ": {
+                            "type": "number",
+                            "minimum": 0.1,
+                            "maximum": 20
+                          },
+                          "high": {
+                            "type": "number",
+                            "minimum": -24,
+                            "maximum": 12
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "low",
+                          "mid",
+                          "midFreq",
+                          "midQ",
+                          "high"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "compressor"
+                          },
+                          "bypass": {
+                            "type": "boolean"
+                          },
+                          "amount": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "amount"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "reverb"
+                          },
+                          "bypass": {
+                            "type": "boolean"
+                          },
+                          "wet": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "wet"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "lowCut"
+                          },
+                          "bypass": {
+                            "type": "boolean"
+                          },
+                          "frequency": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 24000
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "frequency"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "highCut"
+                          },
+                          "bypass": {
+                            "type": "boolean"
+                          },
+                          "frequency": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 24000
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "frequency"
+                        ],
+                        "additionalProperties": false
+                      }
+                    ]
+                  }
+                },
                 "height": {
                   "type": "number"
                 }

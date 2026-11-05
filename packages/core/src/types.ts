@@ -4,6 +4,8 @@
 // compositions) are maps keyed by id, so a patch path stays valid while
 // other items are added, removed or reordered. Order lives in explicit arrays.
 
+import type { AudioEffect } from './audio-effects.ts';
+
 export const SCHEMA_VERSION = 'tramme/1';
 /** the same format under the tool's former names (trame, before that emotion); read, then saved as tramme/1 */
 export const LEGACY_SCHEMA_VERSIONS = ['trame/1', 'emotion/1'];
@@ -281,6 +283,8 @@ export interface SequenceTrack {
   bus?: boolean;
   /** the bus (a track with `bus`) this track feeds */
   to?: string;
+  /** ordered audio processors after this sound track's clips are summed; also available on a bus */
+  effects?: AudioEffect[];
   /** lane height in the timeline, px */
   height?: number;
 }

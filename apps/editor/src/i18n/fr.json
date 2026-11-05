@@ -1575,6 +1575,7 @@
     "issue.loudness": "Le volume visé est {from}, ce format veut {to} LUFS"
   },
   "content": {
+    "only a sound track has audio effects": "seule une piste de son peut avoir des effets audio",
     "Live audio meters": "Vu-mètres audio en direct",
     "reads peak, RMS, peak hold and clipping from the open mixer; optionally resets a track clipping indicator": "lit la crête, le niveau RMS, la crête maintenue et la saturation du mixeur ouvert ; peut réinitialiser le témoin de saturation d'une piste",
     "Reset clipping on track": "Réinitialiser la saturation de la piste",

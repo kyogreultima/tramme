@@ -5,6 +5,7 @@
 
 import { z } from 'zod';
 import { SCHEMA_VERSION } from './types.ts';
+import { AudioEffectSchema } from './audio-effects.ts';
 
 const finite = z.number().refine(Number.isFinite, 'finite number expected');
 const id = z.string().regex(/^[A-Za-z0-9_-]+$/, 'id: letters, digits, _ and - only');
@@ -142,6 +143,7 @@ const sequenceTrack = z.strictObject({
   pan: z.number().min(-1).max(1).optional(),
   bus: z.boolean().optional(),
   to: id.optional(),
+  effects: z.array(AudioEffectSchema).optional(),
   height: finite.optional(),
 });
 

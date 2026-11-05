@@ -141,6 +141,7 @@ class Checker {
     (comp.tracks || []).forEach((t, i) => {
       if (tracks.has(t.id)) this.err(pointer(...base, 'tracks', i, 'id'), `duplicate track id "${t.id}"`);
       tracks.add(t.id);
+      if (t.effects !== undefined && t.kind !== 'audio') this.err(pointer(...base, 'tracks', i, 'effects'), 'only a sound track has audio effects');
     });
     (comp.tracks || []).forEach((t, i) => {
       if (t.to === undefined) return;

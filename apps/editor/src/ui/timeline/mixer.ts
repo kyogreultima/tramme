@@ -2,7 +2,7 @@
 // automated by moving the fader while the film plays), its pan, the bus it
 // feeds, a new bus. Pure; the strips themselves are Mixer.tsx.
 
-import { pointer, type Composition, type Keyframe, type Op } from '@tramme/core';
+import { AudioEffectSchema, pointer, type AudioEffect, type Composition, type Keyframe, type Op } from '@tramme/core';
 
 const VOLUME: [number, number] = [-60, 12];
 /** a reading closer than this (dB) to the line between its neighbours is dropped */
@@ -80,4 +80,55 @@ export function addBusOps(c: Composition, compId: string): { ops: Op[]; id: stri
   while (tracks.some((t) => t.id === `B${n}`)) n++;
   const bus = { id: `B${n}`, kind: 'audio' as const, bus: true, name: `Bus ${n}` };
   return { id: bus.id, ops: [...(c.kind === 'sequence' ? [] : [{ op: 'add', path: pointer('compositions', compId, 'kind'), value: 'sequence' } as Op]), { op: 'add', path: pointer('compositions', compId, 'tracks'), value: [...tracks, bus] }] };
+}
+
+/** Replace a chain in one history entry; an empty chain removes its field. */
+function effectsOps(c: Composition, compId: string, trackId: string, update: (effects: AudioEffect[]) => AudioEffect[] | null): Op[] {
+  const i = soundTrack(c, trackId);
+  if (i < 0) return [];
+  const before = c.tracks![i].effects ?? [], after = update(before);
+  if (!after) return [];
+  const same = before.length === after.length && before.every((effect, index) => {
+    const a = effect as unknown as Record<string, unknown>, b = after[index] as unknown as Record<string, unknown>;
+    return [...new Set([...Object.keys(a), ...Object.keys(b)])].every((key) => key === 'bypass' ? !!a[key] === !!b[key] : a[key] === b[key]);
+  });
+  if (same) return [];
+  const path = pointer('compositions', compId, 'tracks', i, 'effects');
+  return after.length ? [{ op: 'add', path, value: after }] : [{ op: 'remove', path }];
+}
+
+const effectIndex = (effects: AudioEffect[], index: number) => Number.isInteger(index) && index >= 0 && index < effects.length;
+
+export function addTrackEffectOps(c: Composition, compId: string, trackId: string, effect: AudioEffect, at?: number): Op[] {
+  const parsed = AudioEffectSchema.safeParse(effect);
+  if (!parsed.success) return [];
+  return effectsOps(c, compId, trackId, (before) => {
+    const index = at ?? before.length;
+    if (!Number.isInteger(index) || index < 0 || index > before.length) return null;
+    return [...before.slice(0, index), parsed.data, ...before.slice(index)];
+  });
+}
+
+export function removeTrackEffectOps(c: Composition, compId: string, trackId: string, index: number): Op[] {
+  return effectsOps(c, compId, trackId, (before) => effectIndex(before, index) ? before.filter((_, i) => i !== index) : null);
+}
+
+export function moveTrackEffectOps(c: Composition, compId: string, trackId: string, from: number, to: number): Op[] {
+  return effectsOps(c, compId, trackId, (before) => {
+    if (!effectIndex(before, from) || !effectIndex(before, to) || from === to) return null;
+    const after = [...before], [effect] = after.splice(from, 1);
+    after.splice(to, 0, effect);
+    return after;
+  });
+}
+
+export function bypassTrackEffectOps(c: Composition, compId: string, trackId: string, index: number, bypass: boolean): Op[] {
+  return effectsOps(c, compId, trackId, (before) => effectIndex(before, index) && !!before[index].bypass !== bypass
+    ? before.map((effect, i) => i === index ? { ...effect, bypass } : effect) : null);
+}
+
+export function setTrackEffectOps(c: Composition, compId: string, trackId: string, index: number, effect: AudioEffect): Op[] {
+  const parsed = AudioEffectSchema.safeParse(effect);
+  if (!parsed.success) return [];
+  return effectsOps(c, compId, trackId, (before) => effectIndex(before, index) ? before.map((old, i) => i === index ? parsed.data : old) : null);
 }
