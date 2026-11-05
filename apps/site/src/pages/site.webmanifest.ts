@@ -3,7 +3,7 @@
 
 import type { APIRoute } from 'astro';
 import { SITE } from '../lib/site';
-import { ground } from '../lib/logo';
+import { ground, tile } from '../lib/logo';
 
 export const GET: APIRoute = () => Response.json({
   name: SITE.name,
@@ -11,7 +11,7 @@ export const GET: APIRoute = () => Response.json({
   description: SITE.description,
   start_url: '/',
   display: 'browser',
-  background_color: ground,
+  background_color: tile,
   theme_color: ground,
   icons: [
     { src: '/icon.svg', sizes: 'any', type: 'image/svg+xml' },

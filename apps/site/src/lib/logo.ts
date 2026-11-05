@@ -20,8 +20,12 @@ const dark = token('dark-accent');
 /** the mark in the studio theme's accent (the PNGs: it shows on a dark ground and on none) */
 export const markDark = mark.replaceAll(FILE_FILL, dark);
 
-/** the studio theme's ground, the one the home-screen icon sits on */
+/** the studio theme's ground: the page's, as the browser's bar shows it */
 export const ground = token('dark-bg');
+
+/** the white tile the home-screen icon sits on (the paper theme's surface), and the mark in the paper theme's accent on it */
+export const tile = token('light-surface');
+export const markOnTile = mark.replaceAll(FILE_FILL, light);
 
 /** the mark in the paper theme's accent, in the studio theme's on a dark tab or window */
 export const markAdaptive = mark
