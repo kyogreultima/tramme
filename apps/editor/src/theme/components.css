@@ -183,7 +183,7 @@ input[type=text].plain, input.plain { background: transparent; border: 0; outlin
 .filler-cuts ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
 .filler-cuts li { display: flex; align-items: center; gap: 8px; font-size: var(--fs-xs); color: var(--text-2); }
 .filler-cuts li .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.multicam-panel { position: fixed; top: 56px; left: 50%; transform: translateX(-50%); z-index: 55; display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: var(--r-lg); background: var(--raised); box-shadow: var(--shadow-2); }
+.multicam-panel { position: fixed; top: calc(var(--bar-h) + 4px); left: 50%; transform: translateX(-50%); z-index: 55; display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: var(--r-lg); background: var(--raised); box-shadow: var(--shadow-2); }
 .source-head { display: flex; align-items: center; gap: 6px; color: var(--text-2); font-size: var(--fs-sm); }
 .source-head .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .source-marks, .source-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }

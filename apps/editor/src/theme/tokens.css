@@ -14,6 +14,8 @@
   --ui: 'Geist Variable', 'Geist', 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, sans-serif;
   --mono: 'Geist Mono Variable', 'Geist Mono', 'Cascadia Mono', 'SF Mono', ui-monospace, Consolas, monospace;
 
+  --bar-h: 60px;      /* la barre du haut, sur tous les écrans : le titre de la fenêtre de l'app native */
+
   --fs-xs: 11px;      /* méta, légendes, étiquettes de règle */
   --fs-sm: 12px;      /* texte secondaire, petits boutons */
   --fs-md: 13px;      /* la base de l'interface */

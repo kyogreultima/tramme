@@ -16,7 +16,8 @@ a.brand:hover { background: var(--hover); }
 }
 .home-top {
   position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 8px;
-  height: 56px; padding: 0 24px; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  /* the page is a flex column taller than the window: without `flex: none` the bar is shrunk to its buttons' height */
+  flex: none; height: var(--bar-h); padding: 0 24px; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
 }
 .home-top .grow { flex: 1; }
 
