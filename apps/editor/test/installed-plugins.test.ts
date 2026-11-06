@@ -13,8 +13,8 @@ import { copiesFor, counted, installedTypes, offIn, permitted, sandboxedDoc, sto
 import { prefs } from '../src/settings.ts';
 import type { ToolContext } from '@tramme/core';
 
-const host = (fixtures: Map<string, PluginModule>) => {
-  const side = startWorkerSide({ post: (m) => queueMicrotask(() => receive(m)), importModule: async (url) => fixtures.get(url)! });
+const host = (fixtures: Map<string, PluginModule>, onImport?: (url: string) => void) => {
+  const side = startWorkerSide({ post: (m) => queueMicrotask(() => receive(m)), importModule: async (url) => { onImport?.(url); return fixtures.get(url)!; } });
   const { host, receive } = connectHost((m) => queueMicrotask(() => side.receive(m)), () => 'https://tramme.test/p1/document.tramme.json');
   return host;
 };
@@ -34,6 +34,26 @@ const plugin = (over: Partial<Installed> = {}): Installed => ({
 });
 
 describe('installed plugins in a project', () => {
+  it('runs installed tools in separate workers for their permission contexts', async () => {
+    const first: PluginModule = { tools: [{ name: 'first.tool', description: 'first', run: () => 'first' }] };
+    const second: PluginModule = { tools: [{ name: 'second.tool', description: 'second', run: () => 'second' }] };
+    const shared = host(new Map([['blob:first', first], ['blob:second', second]]));
+    const imports: string[] = [];
+    const single = new Map([
+      ['installed:first', host(new Map([['blob:first', first]]), (url) => imports.push(url))],
+      ['installed:second', host(new Map([['blob:second', second]]), (url) => imports.push(url))],
+    ]);
+    const registry = new Registry();
+    await attachInstalled(registry, shared, [
+      { id: 'installed:first', url: 'blob:first', name: 'First' },
+      { id: 'installed:second', url: 'blob:second', name: 'Second' },
+    ], { hostFor: (id) => single.get(id)! });
+    const { doc } = newProject({ name: 'T', width: 100, height: 100, fps: 30, duration: 1 });
+    const ctx = { doc, compId: doc.root, time: 0, selection: [], signal: new AbortController().signal } as unknown as ToolContext;
+    expect(await registry.tool('first.tool').tool.run({}, ctx)).toMatchObject({ text: 'first' });
+    expect(await registry.tool('second.tool').tool.run({}, ctx)).toMatchObject({ text: 'second' });
+    expect(imports.sort()).toEqual(['blob:first', 'blob:second']);
+  });
   it('selects the sandboxed picture path for an expression-only project when opted in', () => {
     const { doc } = newProject({ name: 'Expression', width: 100, height: 100, fps: 30, duration: 1 });
     doc.compositions[doc.root].background = { $expr: '"#ff0000"' };

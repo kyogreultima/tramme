@@ -18,7 +18,7 @@ import { audioClips, clipFileTime, curveAt, needsPitch, soundMix, type TrammeDoc
 import { editorRegistry } from './vocabulary.ts';
 import { clipChain, liveMaster, loadPitch, masterGainDb, mixTracks, playClip, Renderer } from '@tramme/render';
 import { comp, compIdOf, S, setRegistry, setTime, toast, viewDoc } from './state.ts';
-import { attachInstalled, attachIsolated, filterModule, pluginHost } from './plugins/index.ts';
+import { attachInstalled, attachIsolated, filterModule, pluginHost, pluginToolHost } from './plugins/index.ts';
 import { copiesIn, copyId, counted, installed, installedFor, installedTypes, offIn, permitted, sandboxedDoc, stopped, STRIKES } from './installed.ts';
 import { bindSandbox, blitSandboxFrame, declarationsModule, ensureDeclared, ensureSandboxDoc, pluginItemsOf, resetSandbox, sandboxDeclaration, sandboxVideoFrames, type SandboxContext } from './plugins/sandbox-draw.ts';
 import { t } from './i18n/index.ts';
@@ -173,7 +173,8 @@ class Preview {
     const mine = installedFor(doc);
     if (!(doc.plugins ?? []).length && !mine.length && !packs.length) return;
     try {
-      await attachIsolated(r.registry, pluginHost(new URL(S.docUrl.peek(), location.href).href), doc, (id) => {
+      const base = new URL(S.docUrl.peek(), location.href).href;
+      await attachIsolated(r.registry, pluginHost(base), doc, (id) => {
         const url = r.assets.url(id);
         // an edited plugin file: a fresh url, so the sandbox imports it again
         return reload.includes(id) ? `${url}${url.includes('?') ? '&' : '?'}pw=${++this.bust}` : url;
@@ -184,7 +185,7 @@ class Preview {
         // a copy of one of the editor's packs reads the pack's own data
         const pack = packBySrc(packs, doc.assets[id]?.src);
         return pack ? packContext(pack, ctx) : ctx;
-      });
+      }, (id, url) => pluginToolHost(base, id, url));
     } catch (e) {
       toast(t('editor.pluginSandbox', { error: (e as Error).message }), 'error', 9000);
     }
@@ -195,6 +196,7 @@ class Preview {
         brought: (id, key) => installedTypes.set(key, byId.get(id)!),
         context: (id, ctx) => permitted(ctx, byId.get(id)!),
         around: (id, run) => counted(byId.get(id)!, run, (p) => toast(t('plugins.stopped', { name: p.manifest.name, n: STRIKES }), 'error', 9000)),
+        hostFor: (id, url) => pluginToolHost(new URL(S.docUrl.peek(), location.href).href, id, url),
       });
     } catch (e) {
       toast(t('editor.installedRefused', { error: (e as Error).message }), 'error', 9000);
@@ -215,6 +217,7 @@ class Preview {
       await attachInstalled(r.registry, pluginHost(new URL(S.docUrl.peek(), location.href).href), list, {
         brought: (id, key) => { const p = byId.get(id); if (p) installedTypes.set(key, p); },
         context: (id, ctx) => { const p = byId.get(id); const pack = p && entryOf.get(p.file); return pack ? packContext(pack, ctx) : ctx; },
+        hostFor: (id, url) => pluginToolHost(new URL(S.docUrl.peek(), location.href).href, id, url),
       });
     } catch (e) {
       console.error('[packs]', e);

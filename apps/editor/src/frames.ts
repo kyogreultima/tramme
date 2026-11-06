@@ -7,7 +7,7 @@ import { effect, signal } from '@preact/signals';
 import type { TrammeDoc } from '@tramme/core';
 import { Renderer } from '@tramme/render';
 import { editorRegistry } from './vocabulary.ts';
-import { attachIsolated, filterModule, pluginHost } from './plugins/index.ts';
+import { attachIsolated, filterModule, pluginHost, pluginToolHost } from './plugins/index.ts';
 import { declarationsModule, ensureDeclared, ensureSandboxDoc, pluginItemsOf, sandboxDeclaration, sandboxVideoFrames } from './plugins/sandbox-draw.ts';
 import { prefs } from './settings.ts';
 import { sandboxedDoc } from './installed.ts';
@@ -38,7 +38,7 @@ export class Stills {
     }
     this.doc = doc; this.compId = id;
     // a proposal may add a plugin: its tools join as sandbox-backed entries
-    if ((doc.plugins ?? []).length) await attachIsolated(this.renderer.registry, pluginHost(base), doc, (pid) => this.renderer!.assets.url(pid)).catch((e) => console.error('[plugins]', (e as Error).message));
+    if ((doc.plugins ?? []).length) await attachIsolated(this.renderer.registry, pluginHost(base), doc, (pid) => this.renderer!.assets.url(pid), undefined, (id, url) => pluginToolHost(base, id, url)).catch((e) => console.error('[plugins]', (e as Error).message));
     return this.renderer;
   }
 

@@ -412,7 +412,8 @@ export function browserHost(docUrl: string): PluginHost {
       await Promise.all(m.plugins.map(async (plugin) => {
         try {
           const url = new URL(plugin.url, location.href);
-          if (!approved(url)) throw new Error('plugin module must belong to this project');
+          const shippedPack = plugin.id.startsWith('packs:') && url.origin === location.origin && /^\/plugins\/[a-zA-Z0-9._/-]+\.m?js$/.test(url.pathname);
+          if (!approved(url) && !shippedPack) throw new Error('plugin module must belong to this project');
           const response = await fetch(url.href, { credentials: 'same-origin' });
           if (!response.ok) throw new Error(`plugin module: HTTP ${response.status}`);
           const source = new TextDecoder().decode(await readLimitedBody(response, 1024 * 1024, 'plugin module'));

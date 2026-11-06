@@ -283,6 +283,25 @@ describe('the plugin sandbox', () => {
     expect(ctx.wrote).toEqual([['assets/stars.json', '{"count":12,"read":"night"}']]);
     expect(progress).toHaveBeenCalledWith(1, 2, 'placing');
   });
+  it('runs each project plugin tool in a worker containing only that plugin', async () => {
+    const a: PluginModule = { tools: [{ name: 'a.tool', description: 'A', run: () => 'A' }] };
+    const b: PluginModule = { tools: [{ name: 'b.tool', description: 'B', run: () => 'B' }] };
+    const shared = pair(new Map([['blob:a', a], ['blob:b', b]])).host;
+    const imports: string[] = [];
+    const dedicated = new Map([
+      ['a', pair(new Map([['blob:a', a]]), (url) => imports.push(url)).host],
+      ['b', pair(new Map([['blob:b', b]]), (url) => imports.push(url)).host],
+    ]);
+    const { doc: d } = doc();
+    d.plugins = ['a', 'b'];
+    d.assets.a = { type: 'module', src: 'plugins/a.js' };
+    d.assets.b = { type: 'module', src: 'plugins/b.js' };
+    const reg = new Registry();
+    await attachIsolated(reg, shared, d, (id) => `blob:${id}`, undefined, (id) => dedicated.get(id)!);
+    expect(toolOutput(await reg.tool('a.tool').tool.run({}, toolCtx(d))).text).toBe('A');
+    expect(toolOutput(await reg.tool('b.tool').tool.run({}, toolCtx(d))).text).toBe('B');
+    expect(imports.sort()).toEqual(['blob:a', 'blob:b']);
+  });
 
   it('keeps a plugin that the sandbox cannot load out of the vocabulary', async () => {
     const { host } = pair(new Map());

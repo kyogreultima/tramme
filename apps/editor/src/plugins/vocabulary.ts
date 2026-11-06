@@ -37,7 +37,7 @@ const attached = new WeakMap<Registry, { host: PluginHost; done: Set<string> }>(
  * loaded again. One plugin that cannot load keeps none of the others out;
  * the refusals are thrown together once all the others are attached.
  */
-export async function attachIsolated(registry: Registry, host: PluginHost, doc: TrammeDoc, urlOf: (id: string) => string | null, context?: (id: string, ctx: ToolContext) => ToolContext): Promise<void> {
+export async function attachIsolated(registry: Registry, host: PluginHost, doc: TrammeDoc, urlOf: (id: string) => string | null, context?: (id: string, ctx: ToolContext) => ToolContext, hostFor?: (id: string, url: string) => PluginHost): Promise<void> {
   const list = (doc.plugins ?? []).map((id) => ({ id, url: urlOf(id) })).filter((p): p is { id: string; url: string } => !!p.url);
   if (!list.length) return;
   let seen = attached.get(registry);
@@ -51,9 +51,14 @@ export async function attachIsolated(registry: Registry, host: PluginHost, doc: 
       const d = (await host.ensure([p])).get(p.id)!;
       noteSandboxDeclaration(d);
       if (d.tools.length || d.checks.length) {
+        const executionHost = async () => {
+          const target = hostFor?.(p.id, p.url) ?? host;
+          if (target !== host) await target.ensure([p]);
+          return target;
+        };
         registry.use({
-          tools: d.tools.map((t) => ({ ...t, run: (input, ctx) => host.runTool(t.name, input, context ? context(p.id, ctx) : ctx) })),
-          checks: d.checks.map((c) => ({ ...c, run: (ctx) => host.runCheck(c.name, ctx) })),
+          tools: d.tools.map((t) => ({ ...t, run: async (input, ctx) => (await executionHost()).runTool(t.name, input, context ? context(p.id, ctx) : ctx) })),
+          checks: d.checks.map((c) => ({ ...c, run: async (ctx) => (await executionHost()).runCheck(c.name, ctx) })),
         }, p.id);
       }
     } catch (e) { refused.push((e as Error).message); }
@@ -81,6 +86,8 @@ export interface InstalledHooks {
   context?(id: string, ctx: ToolContext): ToolContext;
   /** around each call of its tools and checks (its failures counted) */
   around?<T>(id: string, run: () => Promise<T>): Promise<T>;
+  /** a worker carrying only this plugin for tool and check capabilities */
+  hostFor?(id: string, url: string): PluginHost;
 }
 
 export async function attachInstalled(registry: Registry, host: PluginHost, list: { id: string; url: string; name: string }[], hooks: InstalledHooks = {}): Promise<void> {
@@ -106,8 +113,16 @@ export async function attachInstalled(registry: Registry, host: PluginHost, list
       const free = <T extends { name: string }>(xs: T[] | undefined, taken: { name: string }[]) => (xs ?? []).filter((x) => !taken.some((y) => y.name === x.name));
       registry.use({
         meta: d.meta, nodes, effects, modifiers,
-        tools: d.tools.filter((t) => !registry.hasTool(t.name)).map((t) => ({ ...t, run: (input, ctx) => around(p.id, () => host.runTool(t.name, input, hooks.context ? hooks.context(p.id, ctx) : ctx)) })),
-        checks: free(d.checks, registry.listChecks().map((c) => c.check)).map((c) => ({ ...c, run: (ctx) => around(p.id, () => host.runCheck(c.name, ctx)) })),
+        tools: d.tools.filter((t) => !registry.hasTool(t.name)).map((t) => ({ ...t, run: (input, ctx) => around(p.id, async () => {
+          const target = hooks.hostFor?.(p.id, p.url) ?? host;
+          if (target !== host) await target.ensure([{ id: p.id, url: p.url }]);
+          return target.runTool(t.name, input, hooks.context ? hooks.context(p.id, ctx) : ctx);
+        }) })),
+        checks: free(d.checks, registry.listChecks().map((c) => c.check)).map((c) => ({ ...c, run: (ctx) => around(p.id, async () => {
+          const target = hooks.hostFor?.(p.id, p.url) ?? host;
+          if (target !== host) await target.ensure([{ id: p.id, url: p.url }]);
+          return target.runCheck(c.name, ctx);
+        }) })),
         prompts: free(d.prompts, registry.listPrompts().map((x) => x.prompt)),
         kits: free(d.kits, registry.listKits().map((x) => x.kit)),
         presets: free(d.presets, registry.listPresets().map((x) => x.preset)),

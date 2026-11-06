@@ -10,6 +10,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Added
 
+- Project extensions now run tools and checks in separate isolated workers per plugin. One extension cannot use another extension's active call to borrow its network grant; updating a plugin replaces its worker.
 - An approved plugin network request now stops reading a response above 64 MB instead of buffering it without a limit.
 - The project host now stops reading an oversized plugin module or font as soon as its byte limit is crossed, even when the server keeps sending data.
 - The isolated project worker now coalesces document updates during startup and stops if more than 128 messages queue; a project host also refuses more than 64 distinct plugin modules.
