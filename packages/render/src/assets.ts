@@ -86,6 +86,15 @@ export class AssetStore {
 
   has(id: string) { return this.loaded.has(id); }
 
+  private assertProjectUrl(url: string): void {
+    if (!this.sandboxModules) return;
+    const target = new URL(url), base = new URL(this.base);
+    const root = new URL('./', base);
+    const projectFile = target.origin === base.origin && target.pathname.startsWith(root.pathname);
+    const localBlob = target.protocol === 'blob:' && target.origin === base.origin;
+    if (!projectFile && !localBlob) throw new Error('asset must belong to this project');
+  }
+
   /** load what the document needs and is not loaded yet; `reload` forces some ids (a module edited on disk) */
   async sync(doc: TrammeDoc, reload: string[] = [], tolerate = false): Promise<void> {
     this.doc = doc;
@@ -127,6 +136,7 @@ export class AssetStore {
 
   private async load(id: string, a: Asset): Promise<unknown> {
     const url = this.url(id);
+    this.assertProjectUrl(url);
     switch (a.type) {
       case 'image': {
         // an ImageBitmap, not the <img>: Chrome resamples an <img> with its
@@ -149,13 +159,6 @@ export class AssetStore {
       case 'module':
         return import(/* @vite-ignore */ this.version ? `${url}${url.includes('?') ? '&' : '?'}v=${this.version}` : url);
       case 'model': {
-        if (this.sandboxModules) {
-          const target = new URL(url), base = new URL(this.base);
-          const root = new URL('./', base);
-          const projectFile = target.origin === base.origin && target.pathname.startsWith(root.pathname);
-          const localBlob = target.protocol === 'blob:' && target.origin === base.origin;
-          if (!projectFile && !localBlob) throw new Error('model must belong to this project');
-        }
         const r = await fetch(url, { credentials: 'same-origin' });
         if (!r.ok) throw new Error(`model: HTTP ${r.status}`);
         const declared = Number(r.headers.get('content-length'));
@@ -181,7 +184,9 @@ export class AssetStore {
       case 'video': {
         const proxy = this.proxyOf(a);
         const cache = this.useProxies && (!!proxy || Object.values(this.doc.assets).some((asset) => asset.type === 'video' && asset.proxy === id));
-        return VideoFrames.open(proxy ? this.url(proxy) : url, { cache });
+        const source = proxy ? this.url(proxy) : url;
+        this.assertProjectUrl(source);
+        return VideoFrames.open(source, { cache });
       }
       case 'json': {
         const r = await fetch(url);

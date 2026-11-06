@@ -18,7 +18,7 @@ describe('model bytes for an isolated project', () => {
   it('reads a project model as bytes and refuses a private URL before fetch', async () => {
     const fetcher = vi.fn(async () => new Response(new Uint8Array([1, 2, 3])));
     vi.stubGlobal('fetch', fetcher);
-    await expect(load(store('../../private/keys.glb'), '../../private/keys.glb')).rejects.toThrow('model must belong to this project');
+    await expect(load(store('../../private/keys.glb'), '../../private/keys.glb')).rejects.toThrow('asset must belong to this project');
     expect(fetcher).not.toHaveBeenCalled();
     await expect(load(store('assets/mesh.glb'), 'assets/mesh.glb')).resolves.toEqual(new Uint8Array([1, 2, 3]).buffer);
     expect(fetcher).toHaveBeenCalledTimes(1);
@@ -33,6 +33,19 @@ describe('model bytes for an isolated project', () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(stream)));
     await expect(load(store('assets/huge.glb'), 'assets/huge.glb')).rejects.toThrow('model exceeds 32 MB');
     expect(cancelled).toBe(true);
+  });
+});
+
+describe('isolated asset paths', () => {
+  it('refuses a JSON asset outside the project before requesting it', async () => {
+    const doc = newProject({ name: 'JSON', width: 64, height: 64, fps: 1, duration: 1 }).doc;
+    doc.assets.data = { type: 'json', src: '/api/private' };
+    const loaded = new AssetStore(doc, 'https://example.test/projects/a/document.tramme.json');
+    loaded.sandboxModules = true;
+    const fetcher = vi.fn();
+    vi.stubGlobal('fetch', fetcher);
+    await expect((loaded as unknown as { load(id: string, a: typeof doc.assets.data): Promise<unknown> }).load('data', doc.assets.data)).rejects.toThrow('asset must belong to this project');
+    expect(fetcher).not.toHaveBeenCalled();
   });
 });
 
