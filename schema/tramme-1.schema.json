@@ -241,6 +241,44 @@
                   "type": "boolean"
                 },
                 "volume": {},
+                "volumeBlocks": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9_-]+$"
+                      },
+                      "keys": {
+                        "minItems": 4,
+                        "maxItems": 4,
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "t": {
+                              "type": "number"
+                            },
+                            "v": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "t",
+                            "v"
+                          ],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "keys"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
                 "pan": {
                   "type": "number",
                   "minimum": -1,

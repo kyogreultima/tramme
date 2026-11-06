@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { applyOps, History, type AudioEffect, type Composition, type TrammeDoc } from '@tramme/core';
-import { addBusOps, addTrackEffectOps, bypassTrackEffectOps, faderMoveOps, moveTrackEffectOps, removeTrackEffectOps, setTrackEffectOps, trackBusOps, trackPanOps, trackVolumeOps } from '../src/ui/timeline/mixer.ts';
+import { addBusOps, addTrackEffectOps, addVolumeBlockOps, bypassTrackEffectOps, faderMoveOps, moveTrackEffectOps, removeTrackEffectOps, resizeVolumeBlockOps, setTrackEffectOps, trackBusOps, trackPanOps, trackVolumeOps } from '../src/ui/timeline/mixer.ts';
 
 const seq = (): Composition => ({
   name: 'Seq', kind: 'sequence', width: 640, height: 360, fps: 30, duration: 10, background: null,
@@ -9,6 +9,30 @@ const seq = (): Composition => ({
 });
 const doc = (c: Composition) => ({ schema: 'tramme/1', meta: { title: 't' }, tokens: {}, assets: {}, root: 'main', compositions: { main: c } }) as TrammeDoc;
 const run = (c: Composition, ops: ReturnType<typeof trackVolumeOps>) => applyOps(doc(c), ops).doc.compositions.main;
+
+describe('editable volume blocks', () => {
+  it('draws a four-keyframe dip on a sound track without replacing its fader', () => {
+    const c = seq(), initial = doc(c), history = new History(initial);
+    const ops = addVolumeBlockOps(c, 'main', 'A2', 3, 5, -12, 0.15, 0.5);
+    expect(ops).toHaveLength(1);
+    history.apply({ label: 'Volume dip', ops });
+    const track = history.doc.compositions.main.tracks![2];
+    expect(track.volume).toEqual(c.tracks![2].volume);
+    expect(track.volumeBlocks?.[0].keys).toEqual([{ t: 2.85, v: 0 }, { t: 3, v: -12 }, { t: 5, v: -12 }, { t: 5.5, v: 0 }]);
+    expect(history.undo()).toEqual(initial);
+  });
+
+  it('moves the same block as one object and refuses invalid ranges or locked tracks', () => {
+    const c = seq(), added = run(c, addVolumeBlockOps(c, 'main', 'A1', 3, 5, -10, 0.2, 0.4));
+    const block = added.tracks![1].volumeBlocks![0];
+    const changed = run(added, resizeVolumeBlockOps(added, 'main', 'A1', block.id, 4, 6, -14, 0.2, 0.4));
+    expect(changed.tracks![1].volumeBlocks?.[0].keys).toEqual([{ t: 3.8, v: 0 }, { t: 4, v: -14 }, { t: 6, v: -14 }, { t: 6.4, v: 0 }]);
+    expect(added.tracks![1].volumeBlocks?.[0].keys[1].v).toBe(-10);
+    expect(addVolumeBlockOps(c, 'main', 'A1', 5, 3, -12, 0.2, 0.4)).toEqual([]);
+    c.tracks![1].locked = true;
+    expect(addVolumeBlockOps(c, 'main', 'A1', 3, 5, -12, 0.2, 0.4)).toEqual([]);
+  });
+});
 
 describe('an ordered track effect chain', () => {
   const compressor: AudioEffect = { kind: 'compressor', amount: 0.5 };

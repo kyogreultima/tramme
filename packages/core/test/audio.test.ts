@@ -8,6 +8,16 @@ const doc = (props: Record<string, unknown>, extra: Record<string, unknown> = {}
 } as unknown as TrammeDoc);
 
 describe('the sound of a layer', () => {
+  it('applies an editable track volume block over its existing fader automation', () => {
+    const d = doc({ gain: 0 });
+    const c = d.compositions.main;
+    c.layers.a.track = 'A1';
+    c.tracks = [{ id: 'A1', kind: 'audio', volume: -4, volumeBlocks: [{ id: 'dip1', keys: [{ t: 2.85, v: 0 }, { t: 3, v: -12 }, { t: 5, v: -12 }, { t: 5.5, v: 0 }] }] }];
+    const [clip] = audioClips(d, 'main');
+    expect(gainAt(clip, 2.5)).toBeCloseTo(10 ** (-4 / 20), 4);
+    expect(gainAt(clip, 4)).toBeCloseTo(10 ** (-16 / 20), 4);
+    expect(gainAt(clip, 5.25)).toBeCloseTo(10 ** (-10 / 20), 3);
+  });
   it('reads how it sounds: level, fades, speed, filters, reverb, within their ranges', () => {
     const [c] = audioClips(doc({ gain: -6, fadeIn: 0.5, fadeOut: 9, rate: 9, lowCut: 120, highCut: 8000, reverb: 2, start: 1 }), 'main');
     expect(c).toMatchObject({ at: 2, duration: 4, offset: 1, gainDb: -6, envelope: null, fadeIn: 0.5, fadeOut: 4, rate: 4, lowCut: 120, highCut: 8000, reverb: 1 });

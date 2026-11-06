@@ -50,7 +50,7 @@ export function trackMenu(e: { clientX: number; clientY: number } | DOMRect, com
   openMenu(e, items);
 }
 
-export function TrackHeader({ compId, c, track }: { compId: string; c: Composition; track: SequenceTrack }) {
+export function TrackHeader({ compId, c, track, drawing = false, onDraw }: { compId: string; c: Composition; track: SequenceTrack; drawing?: boolean; onDraw?: () => void }) {
   const [text, setText] = useState<string | null>(null);
   const audio = track.kind === 'audio', ids = clipsOn(c, track.id), soloed = ids.length > 0 && ids.every((id) => S.solo.value.has(id));
   const toggle = (key: keyof TrackChange, what: string) => (e: Event) => { e.stopPropagation(); changeTrack(compId, track, { [key]: !track[key as 'locked'] } as TrackChange, what); };
@@ -65,6 +65,7 @@ export function TrackHeader({ compId, c, track }: { compId: string; c: Compositi
             onBlur={() => { if (text !== label(track)) changeTrack(compId, track, { name: text === track.id ? '' : text }, t('timeline.renameTrack')); setText(null); }}
             onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); if (e.key === 'Escape') setText(null); e.stopPropagation(); }} />}
       {!audio && <button class={`tbtn${track.magnetic ? ' on' : ''}`} title={t('timeline.magnetic')} onClick={toggle('magnetic', t('timeline.magnetic'))}><Icon name="magnet" size={12} /></button>}
+      {audio && !track.bus && <button class={`tbtn${drawing ? ' on' : ''}`} type="button" title={t('timeline.drawVolumeDip')} aria-label={t('timeline.drawVolumeDip')} aria-pressed={drawing} disabled={track.locked} onClick={(e) => { e.stopPropagation(); onDraw?.(); }}>D</button>}
       {!audio && <button class={`tbtn${track.hidden ? ' on' : ''}`} title={track.hidden ? t('common.show') : t('common.hide')} onClick={toggle('hidden', t('panel.visibility'))}><Icon name={track.hidden ? 'eyeOff' : 'eye'} size={12} /></button>}
       <button class={`tbtn${track.muted ? ' on' : ''}`} title={track.muted ? t('timeline.unmuteTrack') : t('timeline.muteTrack')} onClick={toggle('muted', t('timeline.muteTrack'))}><Icon name="audio" size={12} /></button>
       {audio && <button class={`solo${soloed ? ' on' : ''}`} title={soloed ? t('timeline.soloOff') : t('timeline.solo')} onClick={(e) => { e.stopPropagation(); S.solo.value = soloOf(c, track.id, S.solo.value); }}>S</button>}

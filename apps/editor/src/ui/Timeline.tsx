@@ -26,6 +26,7 @@ import { peaksOf, wavePath, wavesReady } from '../waveforms.ts';
 import { m, t, tr } from '../i18n/index.ts';
 import { outgoingOf, TRANSITION_KINDS, transitionOf, transitionPlan, type TransitionKind } from '../transitions.ts';
 import { laneHeight, TrackHeader } from './timeline/Tracks.tsx';
+import { VolumeBlocks } from './timeline/VolumeBlocks.tsx';
 import { addTrackOps, clipsOn, laneOrder } from './timeline/tracks.ts';
 import { endMoveOps, withLinks } from './timeline/clipDrag.ts';
 import { ASSET_MIME, COMP_MIME } from './timeline/assets-drag.ts';
@@ -160,6 +161,7 @@ export function Timeline() {
   const [snapAt, setSnapAt] = useState<number | null>(null);
   /** the lane an asset of the media panel is being dragged over */
   const [dropLane, setDropLane] = useState<string | null>(null);
+  const [drawVolume, setDrawVolume] = useState<string | null>(null);
   const [band, setBand] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
 
   // ── interactions ───────────────────────────────────────────
@@ -478,7 +480,7 @@ export function Timeline() {
       </div>
       <div class="tl-names" ref={names} style={{ position: 'relative' }}>
         {rows.map((r) => r.kind === 'track' ? (
-          <TrackHeader key={`track.${r.track.id}`} compId={compId} c={c} track={r.track} />
+          <TrackHeader key={`track.${r.track.id}`} compId={compId} c={c} track={r.track} drawing={drawVolume === r.track.id} onDraw={() => setDrawVolume(drawVolume === r.track.id ? null : r.track.id)} />
         ) : r.kind === 'layer' ? (
           <div key={r.item.id} data-row={r.item.id} class={`tl-name${sel.includes(r.item.id) ? ' selected' : ''}`} style={{ paddingLeft: 6 + r.item.depth * 12 }} onClick={(e) => clickSelect(e, r.item.id, order)}>
             {r.item.layer.children
@@ -518,6 +520,7 @@ export function Timeline() {
                     if (inner) placeComp(inner, timeAt(e.clientX), track.id, mode); else void placeAsset(asset!, timeAt(e.clientX), track.id, mode);
                   }}>
                   {r.ids.map((id) => { const l = c.layers[id], a = l.in ?? 0; return clipView(id, l, a, Math.max(a, l.out ?? c.duration)); })}
+                  {track.kind === 'audio' && !track.bus && <VolumeBlocks compId={compId} c={c} track={track} k={k} X={X} T={T} drawing={drawVolume === track.id && !track.locked} />}
                 </div>
               );
             }

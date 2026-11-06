@@ -1,6 +1,6 @@
 # Sound parity roadmap
 
-Status: steps 1 to 5 built against fake providers; 22 boxes done, 7 open. A paid score still needs a listening and beat check on the user's quota. Drawn ducking is next.
+Status: steps 1 to 5 built against fake providers; step 6's drawn volume blocks are built. 23 boxes done, 6 open. A paid score still needs a listening and beat check on the user's quota.
 
 What Raylight's Sound page ([raylight.app/sound](https://www.raylight.app/sound)) offers and Tramme does not yet, and the steps that close the gap. Read with [sound-roadmap.md](sound-roadmap.md), which this continues: its steps 1 to 9 are done, and nothing here replaces them.
 
@@ -122,7 +122,8 @@ Done when: on a film with six cuts, at least five land on a beat without the use
 
 ### Step 6. Drawn ducking and volume blocks
 
-- [ ] Drag a range on a track to draw a dip: the editor writes the keyframes (down ramp, hold, up ramp) from a depth and a slope, and the range stays editable as one object.
+- [x] Drag a range on a track to draw a dip: the editor writes the keyframes (down ramp, hold, up ramp) from a depth and a slope, and the range stays editable as one object.
+  - Arm **D** on a sound track and drag a range: four relative dB keys are kept as one `volumeBlocks` entry, additive to the track fader and shared by playback and exports. Click the drawn block to edit its range, depth and two slopes or remove it; one edit is one undo step. The mixer reroutes live audio after the block changes. Browser QA covers drawing, editing, undo and 1280/390 px layouts. A voice track source and the existing `duck` tool's shared keys are the next two boxes.
 - [ ] A voice track can be marked as the one to duck under: the music's dip follows its clips without a transcript.
 - [ ] The existing `duck` tool and these blocks write the same keyframes, so both can be edited by hand afterwards.
 

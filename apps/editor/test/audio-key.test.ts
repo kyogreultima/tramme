@@ -25,6 +25,8 @@ it('invalidates live audio and loudness for changed parameters, order, bus chain
   expect(audioEffectsKey(moved, 'main')).not.toBe(before);
   const tempo = project(); tempo.compositions.main.sound = { tempo: 120 };
   expect(audioEffectsKey(tempo, 'main')).not.toBe(before);
+  const dip = project(); dip.compositions.main.tracks![0].volumeBlocks = [{ id: 'dip-1', keys: [{ t: 0, v: 0 }, { t: 0.1, v: -12 }, { t: 0.8, v: -12 }, { t: 0.9, v: 0 }] }];
+  expect(audioEffectsKey(dip, 'main')).not.toBe(before);
 });
 
 it('does not restart a sound for an unrelated picture, label, lane or fader draft', () => {

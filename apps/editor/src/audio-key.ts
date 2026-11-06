@@ -7,7 +7,7 @@ export function audioEffectsKey(doc: TrammeDoc, compId: string): string {
   return JSON.stringify([
     compId,
     comp.sound?.tempo ?? null,
-    (comp.tracks ?? []).map((track) => [track.id, track.to ?? null, track.effects ?? []]),
+    (comp.tracks ?? []).map((track) => [track.id, track.to ?? null, track.effects ?? [], track.volumeBlocks ?? []]),
     Object.entries(comp.layers).filter(([, layer]) => layer.type === 'audio' || layer.type === 'video').map(([id, layer]) => [id, layer.track ?? null]),
   ]);
 }

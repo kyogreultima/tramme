@@ -10,6 +10,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Added
 
+- Sound tracks now have editable volume dips: arm **D** in the timeline, drag a range, then click its block to adjust the range, depth and slopes. The dip adds to the existing fader, is undoable as one edit and is heard in preview and exports.
 - Generated music now keeps its proposed tempo, section plan, provider request mode and measured beat alignment beside the saved file. Providers without structured music use a prompt bed and the same beat check.
 - Music generation now checks the received score's beats against the film's cuts before placing it. When a speed change of at most 2% improves alignment, playback keeps the original pitch; the tool reports the counts before and after.
 - Music generation now sends film-shaped instrumental sections with an explicit tempo and exact section lengths to ElevenLabs Music v2.5. Invalid plans are rejected before the provider call.

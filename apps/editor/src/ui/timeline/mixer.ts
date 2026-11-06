@@ -2,7 +2,7 @@
 // automated by moving the fader while the film plays), its pan, the bus it
 // feeds, a new bus. Pure; the strips themselves are Mixer.tsx.
 
-import { AudioEffectSchema, pointer, type AudioEffect, type Composition, type Keyframe, type Op } from '@tramme/core';
+import { AudioEffectSchema, pointer, volumeBlockKeys, type AudioEffect, type Composition, type Keyframe, type Op } from '@tramme/core';
 
 const VOLUME: [number, number] = [-60, 12];
 /** a reading closer than this (dB) to the line between its neighbours is dropped */
@@ -10,6 +10,35 @@ const SLACK = 0.25;
 
 const soundTrack = (c: Composition, id: string) => { const i = (c.tracks ?? []).findIndex((t) => t.id === id); return i >= 0 && c.tracks![i].kind === 'audio' && !c.tracks![i].locked ? i : -1; };
 const round = (x: number, d: number) => +x.toFixed(d);
+
+/** Draw one dip as an editable group of four keys over the existing track fader. */
+export function addVolumeBlockOps(c: Composition, compId: string, trackId: string, from: number, to: number, depth: number, attack: number, release: number): Op[] {
+  const i = soundTrack(c, trackId), keys = volumeBlockKeys(from, to, depth, attack, release, c.duration);
+  if (i < 0 || !keys) return [];
+  const before = c.tracks![i].volumeBlocks ?? [];
+  let n = 1;
+  while (before.some((block) => block.id === `dip-${n}`)) n++;
+  return [{ op: 'add', path: pointer('compositions', compId, 'tracks', i, 'volumeBlocks'), value: [...before, { id: `dip-${n}`, keys }] }];
+}
+
+/** Resize or move one saved dip without touching its neighbours or the fader. */
+export function resizeVolumeBlockOps(c: Composition, compId: string, trackId: string, id: string, from: number, to: number, depth: number, attack: number, release: number): Op[] {
+  const i = soundTrack(c, trackId), keys = volumeBlockKeys(from, to, depth, attack, release, c.duration);
+  if (i < 0 || !keys) return [];
+  const before = c.tracks![i].volumeBlocks ?? [];
+  if (!before.some((block) => block.id === id)) return [];
+  return [{ op: 'add', path: pointer('compositions', compId, 'tracks', i, 'volumeBlocks'), value: before.map((block) => block.id === id ? { ...block, keys } : block) }];
+}
+
+export function removeVolumeBlockOps(c: Composition, compId: string, trackId: string, id: string): Op[] {
+  const i = soundTrack(c, trackId);
+  if (i < 0) return [];
+  const before = c.tracks![i].volumeBlocks ?? [];
+  if (!before.some((block) => block.id === id)) return [];
+  const after = before.filter((block) => block.id !== id);
+  const path = pointer('compositions', compId, 'tracks', i, 'volumeBlocks');
+  return after.length ? [{ op: 'add', path, value: after }] : [{ op: 'remove', path }];
+}
 
 /** the readings of a fader reduced to the points that shape the move (Ramer-Douglas-Peucker on the dB) */
 function thin(points: [number, number][]): [number, number][] {

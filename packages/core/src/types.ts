@@ -32,6 +32,9 @@ export interface Keyframe<T = unknown> {
   ease?: EaseSpec;
 }
 
+/** One editable gain dip, relative to the track fader. */
+export interface VolumeBlock { id: string; keys: Keyframe<number>[] }
+
 /** a modifier of the stack applied after the value is computed (see modifiers.ts) */
 export interface ModifierSpec { type: string; [param: string]: unknown }
 
@@ -277,6 +280,8 @@ export interface SequenceTrack {
   magnetic?: boolean;
   /** sound tracks: the fader, in dB over the gain of each sound on the track (animatable: its keys are the automation) */
   volume?: Prop<number>;
+  /** editable dips on the track; each group carries four relative dB keyframes and adds to the fader */
+  volumeBlocks?: VolumeBlock[];
   /** sound tracks: where the track sits between left (-1) and right (1) */
   pan?: number;
   /** this track is a bus: it holds no sound, its volume, pan and mute apply to the tracks that feed it */
