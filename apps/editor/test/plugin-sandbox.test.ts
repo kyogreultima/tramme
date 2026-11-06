@@ -194,6 +194,21 @@ describe('the plugin sandbox', () => {
     host.dispose();
     await expect(pending).rejects.toThrow('closed');
   });
+  it('cancels an oversized approved network response before forwarding it to a tool', async () => {
+    const sent: unknown[] = [];
+    const { host, receive } = connectHost((message) => sent.push(message), () => DOC_URL);
+    let cancelled = false;
+    const fetch = vi.fn(async () => new Response(new ReadableStream<Uint8Array>({
+      cancel() { cancelled = true; },
+    }), { headers: { 'content-length': String(64 * 1024 * 1024 + 1) } }));
+    const pending = host.runTool('fake', {}, toolCtx(doc().doc, { fetch }));
+    receive({ kind: 'ask', id: 1, call: 1, q: { kind: 'fetch', url: 'https://service.example.com/data' } });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(sent).toContainEqual({ kind: 'answer', id: 1, err: 'network response exceeds 64 MB' });
+    expect(cancelled).toBe(true);
+    host.dispose();
+    await expect(pending).rejects.toThrow('closed');
+  });
   it('terminates a plugin load that never answers', async () => {
     vi.useFakeTimers();
     try {

@@ -31,6 +31,8 @@ Startup queue bounds (2026-11-06): while the isolated frame starts, consecutive 
 
 Bounded resource reads (2026-11-06): approved project modules (1 MiB) and fonts (16 MiB) are now read through a bounded stream; the host cancels a response as soon as it exceeds its limit, without first buffering its whole body. A test uses a response that never finishes after crossing the module limit and verifies prompt cancellation. Other media and model transfers still need equivalent host capabilities and budgets.
 
+Approved network response budget (2026-11-06): when a plugin has a specific network grant, its bridge response body is read with a 64 MiB ceiling and cancelled before forwarding if it exceeds that ceiling. A test uses an open response advertising an oversized body and verifies cancellation. The network grant itself still needs separation by plugin identity; step 3 remains open.
+
 ## Goal
 
 A user opens, plays, edits and exports a `.tramme` project without granting its scripts the editor's rights. Ordinary animation code needs no general execution permission. Extra capabilities, such as sending a media file to an external service, require a specific, understandable permission.

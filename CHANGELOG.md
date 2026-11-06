@@ -10,6 +10,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Added
 
+- An approved plugin network request now stops reading a response above 64 MB instead of buffering it without a limit.
 - The project host now stops reading an oversized plugin module or font as soon as its byte limit is crossed, even when the server keeps sending data.
 - The isolated project worker now coalesces document updates during startup and stops if more than 128 messages queue; a project host also refuses more than 64 distinct plugin modules.
 - The experimental sandbox preview option now also selects isolated picture rendering for stills and raster exports of projects that contain expressions but no plugins.

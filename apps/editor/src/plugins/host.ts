@@ -164,7 +164,11 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
       const go = (ctx as ToolContext).fetch;
       if (!go) throw new Error('this plugin declared no network access (meta.permissions)');
       // the answer as plain data: the worker makes it a Response again
-      return go(a.url, { method: a.method, headers: a.headers, body: a.body }).then(async (r) => ({ status: r.status, headers: Object.fromEntries(r.headers), body: await r.arrayBuffer() }));
+      return go(a.url, { method: a.method, headers: a.headers, body: a.body }).then(async (r) => ({
+        status: r.status,
+        headers: Object.fromEntries(r.headers),
+        body: (await readLimitedBody(r, 64 * 1024 * 1024, 'network response')).buffer,
+      }));
     }
     if (a.kind === 'data') {
       if (typeof a.assetId !== 'string' || a.assetId.length > 128 || !('data' in ctx)) throw new Error('invalid data request');
