@@ -138,6 +138,8 @@
     "paidYes": "Make it",
     "kindSfx": "a sound effect",
     "kindMusic": "a music bed",
+    "musicPlanReady": "Film read: {cuts} cuts, {aligned} on the proposed beat grid, tempo {tempo} BPM.",
+    "musicPlanUnset": "Film read: {cuts} cuts; no tempo proposed without a cut.",
     "kindVoice": "a voice-over"
   },
   "image": {

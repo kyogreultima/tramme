@@ -138,6 +138,8 @@
     "paidYes": "Le créer",
     "kindSfx": "un effet sonore",
     "kindMusic": "un fond musical",
+    "musicPlanReady": "Montage lu : {cuts} coupes, {aligned} sur la grille de temps proposée, tempo {tempo} BPM.",
+    "musicPlanUnset": "Montage lu : {cuts} coupes ; aucun tempo proposé sans coupe.",
     "kindVoice": "une voix off"
   },
   "image": {
@@ -1581,6 +1583,8 @@
     "issue.loudness": "Le volume visé est {from}, ce format veut {to} LUFS"
   },
   "content": {
+    "Read the cut for music": "Lire le montage pour la musique",
+    "reads film length, cuts, markers and hero moments; finds a beat grid before asking for music": "lit la durée du film, ses coupes, ses marqueurs et ses temps forts ; cherche une grille de temps avant de demander de la musique",
     "Track effect chain": "Chaîne d'effets de piste",
     "lists or edits an ordered track or bus effect chain, including presets": "liste ou modifie une chaîne d'effets ordonnée sur une piste ou un bus, avec des préréglages",
     "Chain action": "Action sur la chaîne",

@@ -1,6 +1,6 @@
 # Sound parity roadmap
 
-Status: steps 1 to 4 built. 17 boxes done, 12 open; music written for the cut is next.
+Status: steps 1 to 4 built; step 5's film reading is built. 18 boxes done, 11 open; structured music requests are next.
 
 What Raylight's Sound page ([raylight.app/sound](https://www.raylight.app/sound)) offers and Tramme does not yet, and the steps that close the gap. Read with [sound-roadmap.md](sound-roadmap.md), which this continues: its steps 1 to 9 are done, and nothing here replaces them.
 
@@ -107,7 +107,8 @@ Done when: a user builds "clean voice" in four clicks, and the assistant does th
 
 The one step that changes how a sound is made.
 
-- [ ] Read the cut before asking for music: the composition's length, its cuts (`momentsOf`: `cuts`, `markers`), its hero cues (`soundCues`) and a tempo chosen so most cuts land on a beat.
+- [x] Read the cut before asking for music: the composition's length, its cuts (`momentsOf`: `cuts`, `markers`), its hero cues (`soundCues`) and a tempo chosen so most cuts land on a beat.
+  - `music-plan` shows length, cuts, markers, hero cues, candidate tempo and count of cuts within one frame of the beat grid without calling a provider. Music generation reads the same plan before paid consent and uses the composition length when no duration was given. A six-cut sequence regression aligns all six. An empty film leaves tempo unset. The provider request and post-generation check follow in the remaining boxes.
 - [ ] Ask the provider for the structure, not only a mood: sections whose lengths follow the picture (a calm opening, a rise before the reveal, the hit on the end card), with the tempo and the duration in the request.
 - [ ] After generation, measure how many cuts land within a frame of a beat (`beats` analysis); when too few, retime by whole bars, or stretch within a small limit, before the user hears it.
 - [ ] Keep the prompt, the tempo and the section plan beside the file, as the other generated sounds do.

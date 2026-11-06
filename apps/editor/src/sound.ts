@@ -9,6 +9,7 @@
 
 import { openverse } from './openverse.ts';
 import { audioClips, Evaluator, isAudioAnalysis, layerClock, pointer, searchSounds, soundCues, soundFigures, soundFlaws, staticValue, variantsOf, type Layer, type Op, type SoundCue, type SoundEntry, type SoundFigures, type SoundRole, type SoundVisual, type ToolContext, type ToolType } from '@tramme/core';
+import { musicCutPlan, type MusicCutPlan } from './music-plan.ts';
 import { encodeWav, renderSynth, SYNTH_MAX } from '@tramme/render';
 import { api } from './api.ts';
 import { payFor } from './confirm.ts';
@@ -408,6 +409,27 @@ const synth: ToolType<{ name: string; code: string; duration: number; seed?: num
 /** what the user is asked to pay for, in their words */
 const KIND_LABEL: Record<'sfx' | 'music' | 'voice', () => string> = { sfx: () => t('sound.kindSfx'), music: () => t('sound.kindMusic'), voice: () => t('sound.kindVoice') };
 
+/** The same film reading shown on demand and used before a paid music call. */
+export async function filmMusicPlan(ctx: ToolContext): Promise<MusicCutPlan> {
+  const c = ctx.doc.compositions[ctx.compId];
+  const [cuts, markers] = await Promise.all([momentsOf(ctx, undefined, 'cuts', undefined), momentsOf(ctx, undefined, 'markers', undefined)]);
+  const heroes = cuesOf(ctx).filter((cue) => cue.weight === 'hero');
+  return musicCutPlan(Math.max(3, c.duration), c.fps, [
+    ...cuts.map(({ t }) => ({ t, kind: 'cut' as const })),
+    ...markers.map(({ t }) => ({ t, kind: 'marker' as const })),
+    ...heroes.map(({ t }) => ({ t, kind: 'hero' as const })),
+  ]);
+}
+
+export const musicPlanTool: ToolType = {
+  name: 'music-plan', title: 'Read the cut for music', description: 'reads film length, cuts, markers and hero moments; finds a beat grid before asking for music',
+  ai: { when: 'before asking a provider to write music for the current cut; read the selected tempo and which cuts actually land on its beats', avoid: 'claiming every cut aligns when the reported count is lower, or requesting a paid music generation merely to inspect the film' },
+  run: async (_input, ctx) => {
+    const plan = await filmMusicPlan(ctx);
+    return { text: JSON.stringify(plan), notice: plan.tempo == null ? t('sound.musicPlanUnset', { cuts: plan.cuts.length }) : t('sound.musicPlanReady', { cuts: plan.cuts.length, aligned: plan.aligned, tempo: plan.tempo }) };
+  },
+};
+
 const generateSound: ToolType<{ kind: 'sfx' | 'music' | 'voice'; prompt: string; name?: string; duration?: number; voice?: string; style?: string; provider?: string; at?: unknown; on?: string; layers?: unknown; gain?: number; align?: 'peak' | 'start'; keep?: boolean }> = {
   name: 'generate-sound', title: 'Have a sound made', description: 'has a provider make a sound effect, a music bed or a voice-over (the server\'s keys), saves it in the project with what made it and places it',
   input: {
@@ -438,6 +460,10 @@ const generateSound: ToolType<{ kind: 'sfx' | 'music' | 'voice'; prompt: string;
     }
     // the ElevenLabs voice model of the settings (the newest by default); the others have one model
     const model = kind === 'voice' && p.voiceModel ? p.voiceModel : undefined;
+    // Read the picture before asking to spend a generation. The structured
+    // request and beat verification follow in the next roadmap boxes.
+    const film = kind === 'music' ? await filmMusicPlan(ctx) : null;
+    if (film && duration === undefined) duration = film.duration;
     // it costs money: the user says yes first, or the turn's allowance does (Sound settings)
     await payFor(t('sound.paidTitle'), t('sound.paidText', { kind: KIND_LABEL[kind](), prompt: clip(prompt, 140) }), t('sound.paidYes'), 'use the library or synth');
     const made = await api.generate({ kind, prompt, duration, voice, style, model, provider }, ctx.signal);
@@ -450,7 +476,7 @@ const generateSound: ToolType<{ kind: 'sfx' | 'music' | 'voice'; prompt: string;
     if (keep) await keepInLibrary(label, made.blob, { kind: kind === 'sfx' ? 'sfx' : kind, title: label, tags: prompt.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2).slice(0, 8), figures, prompt, provider: made.provider });
     return {
       ops: [...kept.ops, ...placed.ops], reload: kept.reload, label: `Sound ${label}`,
-      text: `${kind} made by ${made.provider} (${made.model}${made.voice ? `, voice ${made.voice}` : ''}), saved as asset ${kept.asset} with its prompt: ${figuresText(figures)}. ${placedText(placed, times)}${keep ? ' Kept in the library.' : ''}${kind === 'music' ? ' Duck it under a voice with duck.' : ''}`,
+      text: `${kind} made by ${made.provider} (${made.model}${made.voice ? `, voice ${made.voice}` : ''}), saved as asset ${kept.asset} with its prompt: ${figuresText(figures)}. ${placedText(placed, times)}${film ? ` Film read: ${film.cuts.length} cuts, ${film.aligned} on the proposed ${film.tempo ?? 'unset'} BPM grid.` : ''}${keep ? ' Kept in the library.' : ''}${kind === 'music' ? ' Duck it under a voice with duck.' : ''}`,
       images: [{ url: waveform(buffer, figures, label), caption: label }],
       notice: t('sound.made', { name: label, provider: made.provider, model: made.model }),
     };
@@ -722,4 +748,4 @@ const credits: ToolType<Record<string, never>> = {
   },
 };
 
-export const SOUND_TOOLS: ToolType[] = [cues, sfx, soundFind, synth, generateSound, voices, duck, soundKeep, credits];
+export const SOUND_TOOLS: ToolType[] = [cues, sfx, soundFind, synth, generateSound, musicPlanTool, voices, duck, soundKeep, credits];
