@@ -141,6 +141,7 @@ const sequenceTrack = z.strictObject({
   magnetic: z.boolean().optional(),
   volume: prop.optional(),
   volumeBlocks: z.array(z.strictObject({ id, keys: z.array(z.strictObject({ t: finite, v: finite })).length(4) })).optional(),
+  duckUnder: id.optional(),
   pan: z.number().min(-1).max(1).optional(),
   bus: z.boolean().optional(),
   to: id.optional(),

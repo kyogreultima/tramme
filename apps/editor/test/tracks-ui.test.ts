@@ -68,6 +68,15 @@ describe('adding and removing tracks', () => {
     expect(removeTrackOps(d, 'main', 'V1')).toEqual([]);
     expect(applyOps(d, removeTrackOps(d, 'main', 'V2')).doc.compositions.main.tracks!.map((t) => t.id)).toEqual(['V1', 'A1']);
   });
+
+  it('clears a ducking link when its empty voice source track is removed', () => {
+    const d = docOf(seq()), c = d.compositions.main;
+    c.tracks!.push({ id: 'A2', kind: 'audio' });
+    c.tracks!.find((track) => track.id === 'A1')!.duckUnder = 'A2';
+    const after = applyOps(d, removeTrackOps(d, 'main', 'A2')).doc.compositions.main;
+    expect(after.tracks!.map((track) => track.id)).toEqual(['V1', 'V2', 'A1']);
+    expect(after.tracks!.find((track) => track.id === 'A1')!.duckUnder).toBeUndefined();
+  });
 });
 
 describe('moving a clip to another track', () => {

@@ -1317,6 +1317,8 @@
     "dipFrom": "Début de baisse (s)",
     "dipTo": "Fin de baisse (s)",
     "removeVolumeDip": "Supprimer la baisse de volume",
+    "duckUnderTrack": "Baisser sous la piste de voix",
+    "noDuckTrack": "Aucune piste de voix",
     "writeAutomation": "Enregistrer les mouvements du potentiomètre pendant la lecture",
     "feedsBus": "Bus alimenté par cette piste",
     "noBus": "Aucun bus",

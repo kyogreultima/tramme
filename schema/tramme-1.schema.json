@@ -279,6 +279,10 @@
                     "additionalProperties": false
                   }
                 },
+                "duckUnder": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
                 "pan": {
                   "type": "number",
                   "minimum": -1,

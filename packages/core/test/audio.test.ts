@@ -18,6 +18,20 @@ describe('the sound of a layer', () => {
     expect(gainAt(clip, 4)).toBeCloseTo(10 ** (-16 / 20), 4);
     expect(gainAt(clip, 5.25)).toBeCloseTo(10 ** (-10 / 20), 3);
   });
+  it('ducks music under a marked voice track and follows its moved clips without a transcript', () => {
+    const d = doc({ role: 'music' }, { voice: { type: 'audio', track: 'V1', in: 3, out: 5, props: { audio: 's', role: 'voice' } } });
+    const c = d.compositions.main;
+    c.layers.a.in = 0; c.layers.a.out = 10; c.layers.a.track = 'M1';
+    c.tracks = [{ id: 'M1', kind: 'audio', duckUnder: 'V1' }, { id: 'V1', kind: 'audio' }];
+    const music = () => audioClips(d, 'main').find((clip) => clip.layerId === 'a')!;
+    expect(gainAt(music(), 2)).toBeCloseTo(1, 4);
+    expect(gainAt(music(), 4)).toBeCloseTo(10 ** (-12 / 20), 4);
+    c.layers.voice.in = 6; c.layers.voice.out = 8;
+    expect(gainAt(music(), 4)).toBeCloseTo(1, 4);
+    expect(gainAt(music(), 7)).toBeCloseTo(10 ** (-12 / 20), 4);
+    c.tracks[1].muted = true;
+    expect(gainAt(music(), 7)).toBeCloseTo(1, 4);
+  });
   it('reads how it sounds: level, fades, speed, filters, reverb, within their ranges', () => {
     const [c] = audioClips(doc({ gain: -6, fadeIn: 0.5, fadeOut: 9, rate: 9, lowCut: 120, highCut: 8000, reverb: 2, start: 1 }), 'main');
     expect(c).toMatchObject({ at: 2, duration: 4, offset: 1, gainDb: -6, envelope: null, fadeIn: 0.5, fadeOut: 4, rate: 4, lowCut: 120, highCut: 8000, reverb: 1 });

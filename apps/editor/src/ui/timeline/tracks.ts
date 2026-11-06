@@ -42,7 +42,8 @@ export { addTrackOps } from '@tramme/core';
 export function removeTrackOps(doc: TrammeDoc, compId: string, trackId: string): Op[] {
   const c = doc.compositions[compId], i = (c.tracks ?? []).findIndex((t) => t.id === trackId);
   if (i < 0 || trackClips(c, trackId).length) return [];
-  return [{ op: 'remove', path: pointer('compositions', compId, 'tracks', i) }];
+  const unlinks = (c.tracks ?? []).flatMap((track, index): Op[] => track.duckUnder === trackId ? [{ op: 'remove', path: pointer('compositions', compId, 'tracks', index, 'duckUnder') }] : []);
+  return [...unlinks, { op: 'remove', path: pointer('compositions', compId, 'tracks', i) }];
 }
 
 /**

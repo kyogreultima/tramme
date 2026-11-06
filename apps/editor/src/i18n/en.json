@@ -1317,6 +1317,8 @@
     "dipFrom": "Dip from (s)",
     "dipTo": "Dip to (s)",
     "removeVolumeDip": "Remove volume dip",
+    "duckUnderTrack": "Duck under voice track",
+    "noDuckTrack": "No voice track",
     "writeAutomation": "Write the fader's moves while the film plays",
     "feedsBus": "Bus this track feeds",
     "noBus": "No bus",

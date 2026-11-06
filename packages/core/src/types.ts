@@ -282,6 +282,8 @@ export interface SequenceTrack {
   volume?: Prop<number>;
   /** editable dips on the track; each group carries four relative dB keyframes and adds to the fader */
   volumeBlocks?: VolumeBlock[];
+  /** sound track whose audible clips automatically lower this track, without needing a transcript */
+  duckUnder?: string;
   /** sound tracks: where the track sits between left (-1) and right (1) */
   pan?: number;
   /** this track is a bus: it holds no sound, its volume, pan and mute apply to the tracks that feed it */

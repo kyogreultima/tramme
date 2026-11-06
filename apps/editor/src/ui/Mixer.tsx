@@ -12,10 +12,11 @@ import { preview } from '../preview.ts';
 import { t } from '../i18n/index.ts';
 import { Icon } from './icons.tsx';
 import { changeTrack } from './timeline/Tracks.tsx';
-import { addBusOps, faderMoveOps, trackBusOps, trackPanOps, trackVolumeOps } from './timeline/mixer.ts';
+import { addBusOps, duckTrackOps, faderMoveOps, trackBusOps, trackPanOps, trackVolumeOps } from './timeline/mixer.ts';
 import { clipsOn, soloOf } from './timeline/tracks.ts';
 import { MASTER_METER_ID, METER_FLOOR, type LevelReading } from '../audio-meters.ts';
 import { EffectSlots } from './EffectSlots.tsx';
+import { Popover } from './controls.tsx';
 
 /** the tracks whose faders are recorded while the film plays */
 const armed = signal<Set<string>>(new Set());
@@ -49,8 +50,10 @@ export function volumeAt(c: Composition, track: SequenceTrack, at: number): numb
 function Strip({ compId, c, track }: { compId: string; c: Composition; track: SequenceTrack }) {
   const readings = useRef<[number, number][]>([]);
   const [held, setHeld] = useState<number | null>(null);
+  const [duckAnchor, setDuckAnchor] = useState<HTMLElement | null>(null);
   const now = uiTime.value, automated = !!track.volume && typeof track.volume === 'object', write = armed.value.has(track.id);
   const db = held ?? volumeAt(c, track, now), buses = (c.tracks ?? []).filter((x) => x.bus && x.id !== track.id);
+  const voiceTracks = (c.tracks ?? []).filter((x) => x.kind === 'audio' && !x.bus && x.id !== track.id);
   const soloed = clipsOn(c, track.id).length > 0 && clipsOn(c, track.id).every((id) => S.solo.value.has(id));
   const recording = () => write && S.playing.peek();
   const move = (v: number) => {
@@ -84,6 +87,7 @@ function Strip({ compId, c, track }: { compId: string; c: Composition; track: Se
         <button class={`tbtn${track.muted ? ' on' : ''}`} title={track.muted ? t('timeline.unmuteTrack') : t('timeline.muteTrack')} onClick={() => changeTrack(compId, track, { muted: !track.muted }, t('timeline.muteTrack'))}>M</button>
         {!track.bus && <button class={`tbtn${soloed ? ' on' : ''}`} title={soloed ? t('timeline.soloOff') : t('timeline.solo')} onClick={() => { S.solo.value = soloOf(c, track.id, S.solo.value); }}>S</button>}
         <button class={`tbtn${write ? ' on' : ''}`} title={t('timeline.writeAutomation')} onClick={() => { const s = new Set(armed.value); write ? s.delete(track.id) : s.add(track.id); armed.value = s; }}>W</button>
+        {!track.bus && voiceTracks.length > 0 && <button class={`tbtn${track.duckUnder ? ' on' : ''}`} type="button" title={t('timeline.duckUnderTrack')} aria-label={t('timeline.duckUnderTrack')} onClick={(e) => setDuckAnchor(e.currentTarget as HTMLElement)}>D</button>}
       </div>
       {!track.bus && (
         <select class="strip-bus" value={track.to ?? ''} aria-label={t('timeline.feedsBus')} onChange={(e) => commit(t('timeline.feedsBus'), trackBusOps(S.doc.peek().compositions[compId], compId, track.id, (e.target as HTMLSelectElement).value || null))}>
@@ -91,6 +95,10 @@ function Strip({ compId, c, track }: { compId: string; c: Composition; track: Se
           {buses.map((b) => <option key={b.id} value={b.id}>{b.name || b.id}</option>)}
         </select>
       )}
+      {duckAnchor && <Popover anchor={duckAnchor} onClose={() => setDuckAnchor(null)} class="effect-popover"><label class="effect-field">{t('timeline.duckUnderTrack')}<select autoFocus value={track.duckUnder ?? ''} onChange={(e) => { commit(t('timeline.duckUnderTrack'), duckTrackOps(S.doc.peek().compositions[compId], compId, track.id, (e.currentTarget as HTMLSelectElement).value || null)); setDuckAnchor(null); }}>
+        <option value="">{t('timeline.noDuckTrack')}</option>
+        {voiceTracks.map((source) => <option key={source.id} value={source.id}>{source.name || source.id}</option>)}
+      </select></label></Popover>}
     </div>
   );
 }

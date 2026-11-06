@@ -147,6 +147,11 @@ class Checker {
       });
     });
     (comp.tracks || []).forEach((t, i) => {
+      if (t.volumeBlocks !== undefined && t.kind !== 'audio') this.err(pointer(...base, 'tracks', i, 'volumeBlocks'), 'only a sound track has volume blocks');
+      if (t.duckUnder !== undefined) {
+        const source = comp.tracks!.find((x) => x.id === t.duckUnder);
+        if (t.kind !== 'audio' || t.bus || !source || source.kind !== 'audio' || source.bus || source.id === t.id) this.err(pointer(...base, 'tracks', i, 'duckUnder'), 'duck source must be another sound track');
+      }
       if (t.to === undefined) return;
       const bus = comp.tracks!.find((x) => x.id === t.to);
       if (!bus || !bus.bus || t.bus || t.kind !== 'audio') this.err(pointer(...base, 'tracks', i, 'to'), t.kind !== 'audio' ? 'only a sound track feeds a bus' : t.bus ? 'a bus does not feed another bus' : `"${t.to}" is not a bus (a sound track with bus: true)`);

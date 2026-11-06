@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { applyOps, History, type AudioEffect, type Composition, type TrammeDoc } from '@tramme/core';
-import { addBusOps, addTrackEffectOps, addVolumeBlockOps, bypassTrackEffectOps, faderMoveOps, moveTrackEffectOps, removeTrackEffectOps, resizeVolumeBlockOps, setTrackEffectOps, trackBusOps, trackPanOps, trackVolumeOps } from '../src/ui/timeline/mixer.ts';
+import { addBusOps, addTrackEffectOps, addVolumeBlockOps, bypassTrackEffectOps, duckTrackOps, faderMoveOps, moveTrackEffectOps, removeTrackEffectOps, resizeVolumeBlockOps, setTrackEffectOps, trackBusOps, trackPanOps, trackVolumeOps } from '../src/ui/timeline/mixer.ts';
 
 const seq = (): Composition => ({
   name: 'Seq', kind: 'sequence', width: 640, height: 360, fps: 30, duration: 10, background: null,
@@ -32,6 +32,16 @@ describe('editable volume blocks', () => {
     c.tracks![1].locked = true;
     expect(addVolumeBlockOps(c, 'main', 'A1', 3, 5, -12, 0.2, 0.4)).toEqual([]);
   });
+});
+
+it('marks an audio track to duck under another sound track, and can clear the link', () => {
+  const c = seq();
+  expect(run(c, duckTrackOps(c, 'main', 'A1', 'A2')).tracks![1].duckUnder).toBe('A2');
+  expect(duckTrackOps(c, 'main', 'A1', 'V1')).toEqual([]);
+  expect(duckTrackOps(c, 'main', 'A1', 'B1')).toEqual([]);
+  expect(duckTrackOps(c, 'main', 'A1', 'A1')).toEqual([]);
+  c.tracks![1].duckUnder = 'A2';
+  expect(run(c, duckTrackOps(c, 'main', 'A1', null)).tracks![1].duckUnder).toBeUndefined();
 });
 
 describe('an ordered track effect chain', () => {

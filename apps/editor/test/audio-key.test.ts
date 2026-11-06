@@ -27,6 +27,8 @@ it('invalidates live audio and loudness for changed parameters, order, bus chain
   expect(audioEffectsKey(tempo, 'main')).not.toBe(before);
   const dip = project(); dip.compositions.main.tracks![0].volumeBlocks = [{ id: 'dip-1', keys: [{ t: 0, v: 0 }, { t: 0.1, v: -12 }, { t: 0.8, v: -12 }, { t: 0.9, v: 0 }] }];
   expect(audioEffectsKey(dip, 'main')).not.toBe(before);
+  const duck = project(); duck.compositions.main.tracks![0].duckUnder = 'B1';
+  expect(audioEffectsKey(duck, 'main')).not.toBe(before);
 });
 
 it('does not restart a sound for an unrelated picture, label, lane or fader draft', () => {
@@ -36,4 +38,17 @@ it('does not restart a sound for an unrelated picture, label, lane or fader draf
   doc.compositions.main.tracks![0].height = 150;
   doc.compositions.main.tracks![0].volume = -3;
   expect(audioEffectsKey(doc, 'main')).toBe(before);
+});
+
+it('rebuilds automatic ducking when a linked voice clip moves', () => {
+  const doc = project();
+  doc.compositions.main.tracks!.push({ id: 'A2', kind: 'audio' });
+  doc.compositions.main.tracks![0].duckUnder = 'A2';
+  doc.compositions.main.layers.voice.track = 'A2';
+  const before = audioEffectsKey(doc, 'main');
+  doc.compositions.main.layers.voice.in = 0.2;
+  expect(audioEffectsKey(doc, 'main')).not.toBe(before);
+  const moved = audioEffectsKey(doc, 'main');
+  doc.compositions.main.tracks!.find((track) => track.id === 'A2')!.muted = true;
+  expect(audioEffectsKey(doc, 'main')).not.toBe(moved);
 });

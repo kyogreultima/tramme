@@ -102,6 +102,16 @@ export function trackBusOps(c: Composition, compId: string, trackId: string, to:
   return c.tracks!.some((t) => t.id === to && t.bus) && had !== to ? [{ op: 'add', path, value: to }] : [];
 }
 
+/** An audio track's voice source for automatic clip-based ducking. */
+export function duckTrackOps(c: Composition, compId: string, trackId: string, under: string | null): Op[] {
+  const i = soundTrack(c, trackId);
+  if (i < 0 || c.tracks![i].bus) return [];
+  const path = pointer('compositions', compId, 'tracks', i, 'duckUnder'), had = c.tracks![i].duckUnder;
+  if (under === null) return had === undefined ? [] : [{ op: 'remove', path }];
+  if (under === trackId || !c.tracks!.some((t) => t.id === under && t.kind === 'audio' && !t.bus) || had === under) return [];
+  return [{ op: 'add', path, value: under }];
+}
+
 /** a new bus: a sound track that holds none, collecting the tracks that feed it (the first track makes the composition a sequence) */
 export function addBusOps(c: Composition, compId: string): { ops: Op[]; id: string } {
   const tracks = c.tracks ?? [];
