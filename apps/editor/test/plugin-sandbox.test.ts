@@ -100,6 +100,13 @@ describe('the plugin sandbox', () => {
     await expect(pending).rejects.toThrow('invalid sandbox response');
     expect(host.closed()).toBe(true);
   });
+  it('stops on an oversized nested tool result before giving it to the editor', async () => {
+    const { host, receive } = connectHost(() => {}, () => DOC_URL);
+    const pending = host.runTool('fake', {}, toolCtx(doc().doc));
+    receive({ kind: 'result', call: 1, ok: { text: 'x'.repeat(9 * 1024 * 1024) } });
+    await expect(pending).rejects.toThrow('sandbox response exceeds 8 MB');
+    expect(host.closed()).toBe(true);
+  });
   it('limits pending calls before accepting another worker request', async () => {
     const sent: unknown[] = [];
     const { host } = connectHost((message) => sent.push(message), () => DOC_URL);

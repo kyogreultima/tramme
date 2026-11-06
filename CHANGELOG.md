@@ -10,6 +10,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Added
 
+- The sandbox host now stops a project extension that returns more than 8 MB of nested plain data in one result, before passing that result into the editor.
 - Malformed sandbox declarations and draw results now stop the isolated worker and report an invalid response instead of breaking the editor page.
 - Project tools and checks now have at most 16 simultaneous requests to the host; repeated request IDs cannot repeat a project file operation.
 - Restoring an installed-plugin backup now refuses a file over 64 MB or entries declaring more than 128 MB expanded in total before decompressing them.

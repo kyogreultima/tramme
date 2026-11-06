@@ -12,6 +12,36 @@ const schemaOf = (n: NodeType) => ({ type: n.type, title: n.title, category: n.c
 const projectPath = (value: unknown): value is string => typeof value === 'string' && value.length > 0 && value.length <= 512 &&
   !value.includes('\\') && !value.startsWith('/') && !/^[a-z][a-z0-9+.-]*:/i.test(value) &&
   value.split('/').every((part) => part !== '' && part !== '.' && part !== '..');
+const RESPONSE_LIMIT = 8 * 1024 * 1024;
+/** Check nested plain data without serializing a potentially hostile response. */
+function responseTooLarge(value: unknown): boolean {
+  const stack = [value], seen = new Set<object>(), encoder = new TextEncoder();
+  let bytes = 0, entries = 0;
+  while (stack.length) {
+    if (++entries > 10000) return true;
+    const item = stack.pop();
+    if (typeof item === 'string') { if (item.length > RESPONSE_LIMIT) return true; bytes += encoder.encode(item).byteLength; }
+    else if (!item || typeof item !== 'object') continue;
+    else if (seen.has(item)) continue;
+    else {
+      seen.add(item);
+      if (typeof ImageBitmap !== 'undefined' && item instanceof ImageBitmap) {
+        if (item.width > 8192 || item.height > 8192 || item.width * item.height > 8192 * 8192) return true;
+      } else if (item instanceof ArrayBuffer || ArrayBuffer.isView(item)) bytes += item.byteLength;
+      else if (typeof Blob !== 'undefined' && item instanceof Blob) bytes += item.size;
+      else if (item instanceof Map) { if (item.size > 10000) return true; for (const [key, content] of item) stack.push(key, content); }
+      else if (item instanceof Set) { if (item.size > 10000) return true; for (const content of item) stack.push(content); }
+      else {
+        if (Array.isArray(item) && item.length > 10000) return true;
+        const fields = Object.entries(item);
+        if (fields.length > 10000) return true;
+        for (const [key, content] of fields) { bytes += key.length; stack.push(content); }
+      }
+    }
+    if (bytes > RESPONSE_LIMIT) return true;
+  }
+  return false;
+}
 
 export interface PluginHost {
   /**
@@ -125,6 +155,7 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
       if (!Array.isArray(m.plugins) || !Array.isArray(m.urls) || m.plugins.length !== m.urls.length || m.plugins.length > 64 ||
         m.plugins.some((d) => !d || typeof d !== 'object' || typeof d.id !== 'string' || d.id.length > 128) ||
         m.urls.some((url) => typeof url !== 'string' || url.length > 4 * 1024 * 1024)) { invalid(); return; }
+      if (responseTooLarge(m.plugins)) { timeout('sandbox response exceeds 8 MB'); return; }
       m.plugins.forEach((d, i) => {
         const url = m.urls[i];
         // an older url's answer: its waiters have it, the plugin keeps the latest
@@ -143,6 +174,7 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
     }
     if (m.kind === 'result') {
       if (m.err !== undefined && typeof m.err !== 'string') { invalid(); return; }
+      if (responseTooLarge(m.ok) || responseTooLarge(m.err)) { timeout('sandbox response exceeds 8 MB'); return; }
       const w = waits.get(m.call);
       if (!w) return;
       waits.delete(m.call);
@@ -153,6 +185,7 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
     }
     if (m.kind === 'drawn') {
       if (!Array.isArray(m.results) || m.results.length > 10000) { invalid(); return; }
+      if (responseTooLarge(m.results)) { timeout('sandbox response exceeds 8 MB'); return; }
       const w = waits.get(m.call);
       if (!w) return;
       waits.delete(m.call);
@@ -161,6 +194,7 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
     }
     if (m.kind === 'exported') {
       if ((m.err !== undefined && typeof m.err !== 'string') || (m.svg !== undefined && typeof m.svg !== 'string')) { invalid(); return; }
+      if (responseTooLarge(m.svg) || responseTooLarge(m.lottie) || responseTooLarge(m.err)) { timeout('sandbox response exceeds 8 MB'); return; }
       const w = waits.get(m.call);
       if (!w) return;
       waits.delete(m.call);
@@ -170,6 +204,7 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
     }
     if (m.kind === 'rendered') {
       if (m.err !== undefined && typeof m.err !== 'string') { invalid(); return; }
+      if (responseTooLarge(m.bitmap) || responseTooLarge(m.err)) { timeout('sandbox response exceeds 8 MB'); return; }
       const w = waits.get(m.call);
       if (!w) return;
       waits.delete(m.call);
@@ -178,7 +213,7 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
       return;
     }
     if (m.kind === 'progress') {
-      if (!Number.isFinite(m.done) || !Number.isFinite(m.total) || (m.step !== undefined && typeof m.step !== 'string')) { invalid(); return; }
+      if (!Number.isFinite(m.done) || !Number.isFinite(m.total) || (m.step !== undefined && (typeof m.step !== 'string' || m.step.length > 4096))) { invalid(); return; }
       const ctx = bridges.get(m.call);
       if (ctx && 'progress' in ctx) (ctx as ToolContext).progress?.(m.done, m.total, m.step);
       return;
