@@ -10,6 +10,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Added
 
+- Delay and distortion can be placed anywhere in a track or bus chain. Echoes use milliseconds or notes at an explicitly chosen composition tempo, with bounded feedback; distortion has drive, tone and wet controls. Existing telephone, radio, megaphone and echo voices keep their sound through the same processors.
 - Ordered track and bus effects now process their combined sources in playback, scrubbing and every export, preserving source files and the existing per-clip settings. Changing a chain refreshes its live sound and loudness measurement.
 - Projects can keep ordered, bypassable audio-effect settings on sound tracks and buses, with each edit undoable in one step.
 - The mixer master now shows live three-second loudness, true peak and clipping before the personal listening volume, alongside the composition's target. Its stopped-film measurement remains available, and the assistant reads the same master levels.

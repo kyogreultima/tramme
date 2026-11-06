@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { DocSchema, validate, type AudioEffect } from '../src/index.ts';
+import { AudioEffectSchema, delayTimeSeconds, DocSchema, validate, type AudioEffect } from '../src/index.ts';
 import { makeDoc, registry } from './fixtures.ts';
 
 const effects: AudioEffect[] = [
@@ -51,4 +51,42 @@ it('refuses sound effects on a video track', () => {
   doc.compositions.main.tracks![0].kind = 'video';
   delete doc.compositions.main.tracks![0].to;
   expect(validate(doc, registry())).toContainEqual({ path: '/compositions/main/tracks/0/effects', message: 'only a sound track has audio effects' });
+});
+
+it('stores delay/distortion and requires an explicit tempo only for an active note delay', () => {
+  const doc = withEffects();
+  doc.compositions.main.sound = { tempo: 120 };
+  doc.compositions.main.tracks![0].effects = [
+    { kind: 'delay', time: '1/4', feedback: 0.95, wet: 0.55 },
+    { kind: 'distortion', drive: 5, tone: 0, wet: 1 },
+  ];
+  expect(validate(doc, registry())).toEqual([]);
+  delete doc.compositions.main.sound.tempo;
+  expect(validate(doc, registry())).toContainEqual({ path: '/compositions/main/tracks/0/effects/0/time', message: 'a composition tempo is required for an active note delay' });
+  doc.compositions.main.tracks![0].effects![0].bypass = true;
+  expect(validate(doc, registry())).toEqual([]);
+  doc.compositions.main.tracks![0].effects![0] = { kind: 'delay', time: 280, feedback: 0.38, wet: 0.55 };
+  expect(validate(doc, registry())).toEqual([]);
+});
+
+it('converts milliseconds or musical notes to seconds and never invents a missing tempo', () => {
+  expect(delayTimeSeconds(280)).toBe(0.28);
+  expect(delayTimeSeconds('1/4', 120)).toBe(0.5);
+  expect(delayTimeSeconds('1/8', 120)).toBe(0.25);
+  expect(delayTimeSeconds('1/1', 60)).toBe(4);
+  expect(delayTimeSeconds('1/32', 300)).toBe(0.025);
+  expect(() => delayTimeSeconds('1/4')).toThrow(/tempo/);
+  expect(() => delayTimeSeconds('1/4', NaN)).toThrow(/tempo/);
+});
+
+it('rejects runaway feedback, unsupported notes and invalid drive/tone/wet settings', () => {
+  for (const effect of [
+    { kind: 'delay', time: 280, feedback: 0.96, wet: 0.5 },
+    { kind: 'delay', time: -1, feedback: 0.3, wet: 0.5 },
+    { kind: 'delay', time: 1, feedback: 0.3, wet: 0.5 },
+    { kind: 'delay', time: '1/3', feedback: 0.3, wet: 0.5 },
+    { kind: 'distortion', drive: 0, tone: 0, wet: 1 },
+    { kind: 'distortion', drive: 2, tone: Infinity, wet: 1 },
+    { kind: 'distortion', drive: 2, tone: 500, wet: 2 },
+  ]) expect(AudioEffectSchema.safeParse(effect).success).toBe(false);
 });

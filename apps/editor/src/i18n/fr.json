@@ -1575,6 +1575,10 @@
     "issue.loudness": "Le volume visé est {from}, ce format veut {to} LUFS"
   },
   "content": {
+    "Tempo": "Tempo",
+    "the composition tempo for note-valued delays; set it explicitly to sync an echo to beats": "le tempo de la composition pour les délais en valeurs de note ; renseignez-le pour synchroniser un écho sur les temps",
+    "a composition tempo is required for an active note delay": "un tempo de composition est nécessaire pour un délai actif en valeur de note",
+    "set a composition tempo between 20 and 300 BPM for a note delay": "renseignez un tempo de composition entre 20 et 300 BPM pour un délai en valeur de note",
     "only a sound track has audio effects": "seule une piste de son peut avoir des effets audio",
     "Live audio meters": "Vu-mètres audio en direct",
     "reads peak, RMS, peak hold and clipping from the open mixer; optionally resets a track clipping indicator": "lit la crête, le niveau RMS, la crête maintenue et la saturation du mixeur ouvert ; peut réinitialiser le témoin de saturation d'une piste",

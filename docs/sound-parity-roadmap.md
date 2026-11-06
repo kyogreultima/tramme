@@ -1,6 +1,6 @@
 # Sound parity roadmap
 
-Status: steps 1 and 2 built. 10 boxes done, 19 open; delay and distortion are next.
+Status: steps 1 to 3 built. 13 boxes done, 16 open; effect controls are next.
 
 What Raylight's Sound page ([raylight.app/sound](https://www.raylight.app/sound)) offers and Tramme does not yet, and the steps that close the gap. Read with [sound-roadmap.md](sound-roadmap.md), which this continues: its steps 1 to 9 are done, and nothing here replaces them.
 
@@ -18,7 +18,7 @@ Already in Tramme (checked in the code, not assumed):
 | Multitrack timeline, cut, move, adjust | tracks, clips, `Mixer.tsx` |
 | Faders, pan, bus, master | strips with fader (automatable by playing), pan, mute, solo, buses, master with a loudness target (`apps/editor/src/ui/Mixer.tsx`, `timeline/mixer.ts`) |
 | EQ, compressor, reverb, filter | three-band EQ, compressor, reverb, low and high cut, per clip |
-| Distortion, delay | only inside the voice looks (telephone, radio, megaphone, echo), not as free effects |
+| Distortion, delay | ordered track/bus inserts and the same processors in the historical voice looks |
 | Volume automation, ducking | keyframed `gain`, `duck` tool from a transcript |
 | Export with the mix | one mixer for the preview, the browser exports and the command line |
 
@@ -81,9 +81,12 @@ Done when: a compressor then an EQ on a voice track sounds the same in the previ
 
 ### Step 3. Delay and distortion
 
-- [ ] `delay`: time (milliseconds, or a note value that follows the composition's tempo), feedback, wet, with the feedback capped so it cannot run away.
-- [ ] `distortion`: drive, tone, wet, on the `WaveShaperNode` the voice looks already use; the voice looks become presets of the same effects instead of their own code.
-- [ ] Both bypassable, both in the chain of step 2.
+- [x] `delay`: time (milliseconds, or a note value that follows the composition's tempo), feedback, wet, with the feedback capped so it cannot run away.
+  - 3–16000 ms or whole to thirty-second notes, with an explicitly set `sound.tempo` (20–300 BPM, no default). Feedback is limited to 0.95 in both the schema and the renderer. Wet adds an echo to the dry signal; native feedback timing preserves the old echo. The first reflection, repeat levels, note timing at two tempos and the unchecked feedback cap are rendered in Chrome tests.
+- [x] `distortion`: drive, tone, wet, on the `WaveShaperNode` the voice looks already use; the voice looks become presets of the same effects instead of their own code.
+  - Drive shapes the same tanh curve, tone optionally low-passes it, and wet crossfades with the original. Telephone, radio, megaphone and echo are shared effect presets; their clip names and preset chains match the independently frozen old PCM within 0.000001.
+- [x] Both bypassable, both in the chain of step 2.
+  - Both use the shared playback/export graph on tracks and buses. A bypassed note delay needs no tempo; changing a tempo invalidates playback and loudness caches. To check on a device: listen to delay tails, distortion and historical voice looks in WebView2 and WKWebView.
 
 Done when: the voice looks (telephone, radio, megaphone, echo) are written as chains and sound the same as before; a regression test compares their rendered output.
 

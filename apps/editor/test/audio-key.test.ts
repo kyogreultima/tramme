@@ -23,6 +23,8 @@ it('invalidates live audio and loudness for changed parameters, order, bus chain
   expect(audioEffectsKey(routed, 'main')).not.toBe(before);
   const moved = project(); delete moved.compositions.main.layers.voice.track;
   expect(audioEffectsKey(moved, 'main')).not.toBe(before);
+  const tempo = project(); tempo.compositions.main.sound = { tempo: 120 };
+  expect(audioEffectsKey(tempo, 'main')).not.toBe(before);
 });
 
 it('does not restart a sound for an unrelated picture, label, lane or fader draft', () => {

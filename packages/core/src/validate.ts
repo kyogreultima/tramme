@@ -142,6 +142,9 @@ class Checker {
       if (tracks.has(t.id)) this.err(pointer(...base, 'tracks', i, 'id'), `duplicate track id "${t.id}"`);
       tracks.add(t.id);
       if (t.effects !== undefined && t.kind !== 'audio') this.err(pointer(...base, 'tracks', i, 'effects'), 'only a sound track has audio effects');
+      t.effects?.forEach((effect, index) => {
+        if (effect.kind === 'delay' && !effect.bypass && typeof effect.time === 'string' && !isNum(comp.sound?.tempo)) this.err(pointer(...base, 'tracks', i, 'effects', index, 'time'), 'a composition tempo is required for an active note delay');
+      });
     });
     (comp.tracks || []).forEach((t, i) => {
       if (t.to === undefined) return;

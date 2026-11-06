@@ -390,6 +390,89 @@
                           "frequency"
                         ],
                         "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "delay"
+                          },
+                          "bypass": {
+                            "type": "boolean"
+                          },
+                          "time": {
+                            "anyOf": [
+                              {
+                                "type": "number",
+                                "minimum": 3,
+                                "maximum": 16000
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "1/1",
+                                  "1/2",
+                                  "1/4",
+                                  "1/8",
+                                  "1/16",
+                                  "1/32"
+                                ]
+                              }
+                            ]
+                          },
+                          "feedback": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 0.95
+                          },
+                          "wet": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "time",
+                          "feedback",
+                          "wet"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "distortion"
+                          },
+                          "bypass": {
+                            "type": "boolean"
+                          },
+                          "drive": {
+                            "type": "number",
+                            "minimum": 0.1,
+                            "maximum": 20
+                          },
+                          "tone": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 24000
+                          },
+                          "wet": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "drive",
+                          "tone",
+                          "wet"
+                        ],
+                        "additionalProperties": false
                       }
                     ]
                   }
@@ -511,7 +594,19 @@
             "type": "object",
             "properties": {
               "loudness": {},
-              "room": {}
+              "room": {},
+              "tempo": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 20,
+                    "maximum": 300
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
             },
             "additionalProperties": false
           },

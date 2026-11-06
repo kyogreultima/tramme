@@ -202,6 +202,10 @@ A film put together from clips is a composition with `"kind": "sequence"` and a 
   | `compressor` | `amount` | 0 to 1, using the clip compressor's settings |
   | `reverb` | `wet` | 0 to 1, using the existing room |
   | `lowCut`, `highCut` | `frequency` (Hz) | 0 to 24000; zero disables the filter |
+  | `delay` | `time` (ms or note), `feedback`, `wet` | 3 to 16000 ms, or `1/1`, `1/2`, `1/4`, `1/8`, `1/16`, `1/32`; feedback 0 to 0.95; wet 0 to 1 |
+  | `distortion` | `drive`, `tone` (Hz), `wet` | drive 0.1 to 20; tone 0 to 24000 (zero leaves the full band); wet 0 to 1 |
+
+  A delay keeps the dry signal and adds the delayed share; its first reflection is at `time`, with native Web Audio feedback timing for repeats (including the render quantum around the feedback cycle). A distortion crossfades dry and shaped signals, with an optional low-pass tone filter. Both bypass without processing. The telephone, radio, megaphone and echo voice looks use these same processors and retain their historical sound. A note delay requires an explicit composition `sound.tempo` (20 to 300 BPM, nullable, no default); a quarter note is one beat. Bypassed note delays can be stored without a tempo. Changing the tempo rebuilds playback and the loudness measurement.
 
   For example: `"effects": [{ "kind": "compressor", "amount": 0.5 }, { "kind": "eq", "low": 0, "mid": -3, "midFreq": 2400, "midQ": 0.9, "high": 0, "bypass": false }]`. Effects on a video track, unknown kinds/parameters and non-finite or out-of-range values are rejected. Removing the last effect removes the field; documents without it keep their existing format.
 - A layer's `track` puts it on a track of its composition (an unknown track is an error). Clips of one track follow one another; where a transition makes two overlap, the cut is the middle of the overlap.

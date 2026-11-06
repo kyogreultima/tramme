@@ -33,7 +33,7 @@ export interface PropDef {
   min?: number;
   max?: number;
   step?: number;
-  unit?: 'px' | 'deg' | '%' | 'em' | 's' | 'x' | 'dB' | 'LUFS';
+  unit?: 'px' | 'deg' | '%' | 'em' | 's' | 'x' | 'dB' | 'LUFS' | 'BPM';
   /** enum values */
   options?: readonly string[];
   /** asset props: accepted asset type */
@@ -487,6 +487,7 @@ export const CAMERA_SCHEMA: PropSchema = {
 /** schema of the composition-level animatable settings */
 /** how a composition's sound is finished */
 export const SOUND_MIX_SCHEMA: PropSchema = {
+  tempo: { type: 'number', default: null, nullable: true, min: 20, max: 300, step: 1, unit: 'BPM', label: 'Tempo', animatable: false, description: 'the composition tempo for note-valued delays; set it explicitly to sync an echo to beats' },
   loudness: { type: 'number', default: -14, nullable: true, min: -31, max: -6, step: 1, unit: 'LUFS', label: 'Loudness', animatable: false, description: 'the master is brought to it, its true peak under -1 dBTP: -14 punchy (social), -18 calm, -23 broadcast; null leaves the mix as it is' },
   room: { type: 'number', default: 0.15, min: 0, max: 1, step: 0.05, label: 'Room', animatable: false, description: 'one short room the effects share, so recordings from different places sound like one; 0 dry' },
 };

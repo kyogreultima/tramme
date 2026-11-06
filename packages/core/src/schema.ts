@@ -160,7 +160,7 @@ const composition = z.strictObject({
   camera: z.strictObject({ pan: prop.optional(), zoom: prop.optional(), perspective: prop.optional(), focus: prop.optional(), blur: prop.optional() }).optional(),
   markers: z.array(marker).optional(),
   effects: z.array(effect).optional(),
-  sound: z.strictObject({ loudness: prop.optional(), room: prop.optional() }).optional(),
+  sound: z.strictObject({ loudness: prop.optional(), room: prop.optional(), tempo: z.number().min(20).max(300).nullable().optional() }).optional(),
   layers: z.record(id, layer),
   order: z.array(id),
   params: z.record(id, param).optional(),
