@@ -40,7 +40,7 @@ export interface PluginHost {
  * direct pair in tests). `docUrl` is the open document's address, the base
  * the sandbox resolves asset and file urls against.
  */
-export function connectHost(send: (m: ToWorker) => void, docUrl: () => string): { host: PluginHost; receive: (m: FromWorker) => void } {
+export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, onTimeout?: (reason: string) => void): { host: PluginHost; receive: (m: FromWorker) => void } {
   let call = 0, closed = false;
   const decls = new Map<string, PluginDecl>();
   const waits = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }>();
@@ -49,6 +49,7 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string): 
   /** the answers awaited, by plugin and url (an older url's answer may still come) */
   const answers = new Map<string, { resolve: (d: PluginDecl) => void; reject: (e: Error) => void }>();
   const answerKey = (id: string, url: string) => `${id}\n${url}`;
+  const timeout = (reason: string) => (onTimeout ? onTimeout(reason) : host.dispose(reason));
   /** the page context of a running call, asked for files, stills, data */
   const bridges = new Map<number, ToolContext | CheckContext>();
   /** a node type's schema, computed once (checks ship many samples of the same types) */
@@ -148,11 +149,15 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string): 
     if (ctx) bridges.set(c, ctx);
     const stop = () => send({ kind: 'abort', call: c });
     signal?.addEventListener('abort', stop, { once: true });
-    send(msg);
-    return new Promise((resolve, reject) => waits.set(c, {
-      resolve: (v) => { signal?.removeEventListener('abort', stop); resolve(v); },
-      reject: (e) => { signal?.removeEventListener('abort', stop); reject(e); },
-    }));
+    return new Promise((resolve, reject) => {
+      const seconds = msg.kind === 'tool' ? 120 : msg.kind === 'check' ? 30 : 30;
+      const timer = setTimeout(() => timeout(`${msg.kind} call timed out after ${seconds} seconds`), seconds * 1000);
+      waits.set(c, {
+        resolve: (v) => { clearTimeout(timer); signal?.removeEventListener('abort', stop); resolve(v); },
+        reject: (e) => { clearTimeout(timer); signal?.removeEventListener('abort', stop); reject(e); },
+      });
+      try { send(msg); } catch (error) { waits.get(c)?.reject(error as Error); waits.delete(c); bridges.delete(c); }
+    });
   };
 
   const host: PluginHost = {
@@ -161,7 +166,13 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string): 
       const pending = plugins.map((p) => {
         let load = loads.get(p.id);
         if (load?.url !== p.url) {
-          const done = new Promise<PluginDecl>((resolve, reject) => answers.set(answerKey(p.id, p.url), { resolve, reject }));
+          const done = new Promise<PluginDecl>((resolve, reject) => {
+            const timer = setTimeout(() => timeout(`plugin ${p.id} load timed out after 15 seconds`), 15_000);
+            answers.set(answerKey(p.id, p.url), {
+              resolve: (v) => { clearTimeout(timer); resolve(v); },
+              reject: (e) => { clearTimeout(timer); reject(e); },
+            });
+          });
           // refused with the others of a call that stopped at the first refusal: not an unhandled one
           done.catch(() => {});
           loads.set(p.id, load = { url: p.url, done });
@@ -246,9 +257,11 @@ export function browserHost(docUrl: string): PluginHost {
     return url.origin === location.origin && !!(projectFile || ownedBlob);
   };
   const post = (m: ToWorker) => frame.contentWindow?.postMessage({ kind: 'send', data: m }, '*', bitmapsIn(m));
-  const { host, receive } = connectHost((m) => send(m), () => docUrl);
+  const { host, receive } = connectHost((m) => send(m), () => docUrl, (reason) => dispose(reason));
+  const startupTimer = setTimeout(() => dispose('the isolated project worker did not start'), 10_000);
   const dispose = (reason?: string) => {
     if (host.closed()) return;
+    clearTimeout(startupTimer);
     host.dispose(reason);
     window.removeEventListener('message', onMessage);
     frame.contentWindow?.postMessage({ kind: 'stop' }, '*');
@@ -258,6 +271,7 @@ export function browserHost(docUrl: string): PluginHost {
     if (event.source !== frame.contentWindow || event.origin !== 'null') return;
     if (event.data?.kind === 'failed') { dispose(event.data.reason); return; }
     if (event.data?.kind === 'started') {
+      clearTimeout(startupTimer);
       started = true;
       for (const m of queue.splice(0)) send(m);
     }

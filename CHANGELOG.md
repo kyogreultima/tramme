@@ -10,6 +10,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Added
 
+- The isolated project host now stops and releases a frame that never starts or answers. Plugin loads, checks, tools and renders have deadlines; the next attempt creates a new frame.
 - Sandboxed plugin drawing now receives project font bytes from the trusted host, in document order, and waits for the face to load before drawing. A font URL outside the project is refused before any request.
 - CLI archive and folder validation now obtains plugin declarations from an opaque browser worker; project modules no longer initialize inside Node. A looping module is stopped after a deadline, and Node-only plugin behavior fails closed until its browser bridge is available.
 - Plugin workers now start inside an opaque-origin iframe with a network-denying policy in the web editor, desktop app and CLI; the host supplies their code and local plugin modules. The broader safe-projects gate remains open while other execution paths and desktop webviews are checked.

@@ -86,6 +86,27 @@ function toolCtx(doc: TrammeDoc, over: Partial<ToolContext> = {}): ToolContext &
 }
 
 describe('the plugin sandbox', () => {
+  it('terminates a plugin load that never answers', async () => {
+    vi.useFakeTimers();
+    try {
+      const { host } = connectHost(() => {}, () => DOC_URL);
+      const rejected = expect(host.ensure([{ id: 'slow', url: 'blob:slow' }])).rejects.toThrow('plugin slow load timed out');
+      await vi.advanceTimersByTimeAsync(15_001);
+      await rejected;
+      expect(host.closed()).toBe(true);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('terminates a drawing call that never answers', async () => {
+    vi.useFakeTimers();
+    try {
+      const { host } = connectHost(() => {}, () => DOC_URL);
+      const rejected = expect(host.draw({ frame: 0, comp: { width: 10, height: 10, duration: 1, fps: 30 }, layers: [], items: [] })).rejects.toThrow('draw call timed out');
+      await vi.advanceTimersByTimeAsync(30_001);
+      await rejected;
+      expect(host.closed()).toBe(true);
+    } finally { vi.useRealTimers(); }
+  });
   it('tells the page what a plugin declares, without its code', async () => {
     const { host } = pair(new Map([['blob:stars', plugin()]]));
     const decls = await host.ensure([{ id: 'stars', url: 'blob:stars' }]);

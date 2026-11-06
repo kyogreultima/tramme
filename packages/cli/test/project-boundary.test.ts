@@ -8,9 +8,11 @@ describe.skipIf(!CHROME)('the served project sandbox', () => {
   let port = 0;
   let privateReads = 0;
   let fontReads = 0;
+  let blankSandbox = false;
   beforeAll(async () => {
     server = new Server(readConfig(path.resolve(import.meta.dirname, 'fixtures/night-sky/document.tramme.json')));
     server.use((_req, res, url) => {
+      if (blankSandbox && url.pathname === '/project-sandbox.html') { res.writeHead(200, { 'content-type': 'text/html' }); res.end('<!doctype html><title>blank</title>'); return true; }
       if (url.pathname === '/api/private') { privateReads++; res.writeHead(200, { 'content-type': 'text/javascript' }); res.end('private account data'); return true; }
       if (url.pathname === '/project/assets/fonts/test.woff2') { fontReads++; res.writeHead(200, { 'content-type': 'font/woff2' }); res.end(Buffer.from([0, 1, 2, 3])); return true; }
       if (url.pathname === '/font-host') {
@@ -123,4 +125,19 @@ describe.skipIf(!CHROME)('the served project sandbox', () => {
     expect(refused).toContain('font must belong to this project');
     expect(privateReads).toBe(0);
   }, 30_000);
+
+  it('fails closed if the isolated page never starts its worker', async () => {
+    blankSandbox = true;
+    try {
+      await page.goto(`http://127.0.0.1:${port}/font-host`);
+      await page.waitForFunction(() => typeof (window as any).makeHost === 'function');
+      const reason = await page.evaluate(async () => {
+        const host = (window as any).makeHost(`${location.origin}/project/document.tramme.json`);
+        try { await host.draw({ frame: 0, comp: { width: 10, height: 10, duration: 1, fps: 30 }, layers: [], items: [] }); return 'rendered'; }
+        catch (error) { return (error as Error).message; }
+        finally { host.dispose(); }
+      });
+      expect(reason).toContain('the isolated project worker did not start');
+    } finally { blankSandbox = false; }
+  }, 20_000);
 });
