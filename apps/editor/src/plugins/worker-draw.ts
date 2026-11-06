@@ -220,12 +220,10 @@ export function makeSandboxDraw(modules: Map<string, PluginModule>): SandboxDraw
       side.images = new Map(Object.entries(d.images ?? {}));
       side.json = new Map(Object.entries(d.json ?? {}));
       for (const f of d.fonts ?? []) {
-        if (side.fonts.has(f.url)) continue;
+        if (side.fonts.has(f.url) || !f.data) continue;
         side.fonts.add(f.url);
-        void fetch(f.url).then((r) => r.arrayBuffer()).then((data) => {
-          const face = new FontFace(f.family, data, { weight: f.weight ?? '400' });
-          return face.load();
-        }).then((face) => self_.fonts.add(face)).catch(() => {});
+        const face = new FontFace(f.family, f.data, { weight: f.weight ?? '400' });
+        void face.load().then((loaded) => self_.fonts.add(loaded)).catch(() => side.fonts.delete(f.url));
       }
     },
 

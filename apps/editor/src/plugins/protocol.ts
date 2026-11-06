@@ -102,8 +102,8 @@ export interface SandboxDoc {
   images: Record<string, unknown>;
   /** the parsed json assets */
   json: Record<string, unknown>;
-  /** the fonts, loaded in the sandbox's own realm */
-  fonts: { url: string; family: string; weight?: string }[];
+  /** approved font bytes supplied by the host; the worker cannot fetch URLs */
+  fonts: { url: string; family: string; weight?: string; data?: ArrayBuffer }[];
 }
 
 /** one sandboxed layer to draw for a frame */

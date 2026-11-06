@@ -8,6 +8,8 @@ Boundary work (2026-11-06): `node scripts/verify-project-boundary.mjs` exercises
 
 CLI native-import removal (2026-11-06): archive and folder validation now load plugin declarations through the same browser sandbox. The Node registry holds schema and functions that refuse execution; project code runs only in the isolated worker, including during `validate`, `check` and pack/unpack validation. A plugin that loops during initialization is terminated after the declaration deadline. The CLI's actual plugin render continues to use the isolated browser worker. Plugin behavior needed by Node-only checks or vector comparisons must be bridged explicitly before those operations can claim full parity; the refusal is deliberate and the roadmap remains open.
 
+Font transfer (2026-11-06): the trusted page fetches font bytes only from the current project's file root or a local Blob and sends them in order before draw requests. The worker creates `FontFace` from those bytes and no longer fetches the document's font URL itself. Chrome and Edge tests confirm one approved read and that naming the private API as a font triggers a refusal before any request reaches it. Model files and other approved resources still need an explicit host capability; this does not close step 1.
+
 ## Goal
 
 A user opens, plays, edits and exports a `.tramme` project without granting its scripts the editor's rights. Ordinary animation code needs no general execution permission. Extra capabilities, such as sending a media file to an external service, require a specific, understandable permission.

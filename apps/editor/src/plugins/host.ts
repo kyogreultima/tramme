@@ -238,7 +238,13 @@ export function browserHost(docUrl: string): PluginHost {
   let started = false;
   const queue: ToWorker[] = [];
   const urls = new Map<string, string>();
+  const fontBytes = new Map<string, Promise<ArrayBuffer>>();
   const projectRoot = docUrl ? new URL('./', new URL(docUrl, location.href)).pathname : '';
+  const approved = (url: URL) => {
+    const projectFile = projectRoot && url.protocol === location.protocol && url.pathname.startsWith(projectRoot);
+    const ownedBlob = url.protocol === 'blob:' && url.origin === location.origin;
+    return url.origin === location.origin && !!(projectFile || ownedBlob);
+  };
   const post = (m: ToWorker) => frame.contentWindow?.postMessage({ kind: 'send', data: m }, '*', bitmapsIn(m));
   const { host, receive } = connectHost((m) => send(m), () => docUrl);
   const dispose = (reason?: string) => {
@@ -262,27 +268,48 @@ export function browserHost(docUrl: string): PluginHost {
       receive(message);
     }
   };
-  const send = (m: ToWorker) => {
-    if (!host.closed()) {
-      if (!started) { queue.push(m); return; }
-      if (m.kind === 'load') {
-        // Fetch only approved local modules in the trusted page. The opaque
-        // worker imports data modules; its CSP refuses remote imports.
-        void Promise.all(m.plugins.map(async (plugin) => {
-          try {
-            const url = new URL(plugin.url, location.href);
-            const projectFile = projectRoot && url.protocol === location.protocol && url.pathname.startsWith(projectRoot);
-            const ownedBlob = url.protocol === 'blob:' && url.origin === location.origin;
-            if (url.origin !== location.origin || !(projectFile || ownedBlob)) throw new Error('plugin module must belong to this project');
-            const response = await fetch(url.href, { credentials: 'same-origin' });
-            if (!response.ok) throw new Error(`plugin module: HTTP ${response.status}`);
-            const dataUrl = `data:text/javascript;charset=utf-8,${encodeURIComponent(await response.text())}`;
-            urls.set(dataUrl, plugin.url);
-            post({ kind: 'load', plugins: [{ id: plugin.id, url: dataUrl }] });
-          } catch (error) { receive({ kind: 'loadFailed', id: plugin.id, url: plugin.url, message: (error as Error).message }); }
-        }));
-      } else post(m);
+  const deliver = async (m: ToWorker) => {
+    if (host.closed()) return;
+    if (m.kind === 'load') {
+      await Promise.all(m.plugins.map(async (plugin) => {
+        try {
+          const url = new URL(plugin.url, location.href);
+          if (!approved(url)) throw new Error('plugin module must belong to this project');
+          const response = await fetch(url.href, { credentials: 'same-origin' });
+          if (!response.ok) throw new Error(`plugin module: HTTP ${response.status}`);
+          const dataUrl = `data:text/javascript;charset=utf-8,${encodeURIComponent(await response.text())}`;
+          urls.set(dataUrl, plugin.url);
+          if (!host.closed()) post({ kind: 'load', plugins: [{ id: plugin.id, url: dataUrl }] });
+        } catch (error) { if (!host.closed()) receive({ kind: 'loadFailed', id: plugin.id, url: plugin.url, message: (error as Error).message }); }
+      }));
+      return;
     }
+    if (m.kind === 'doc') {
+      const fonts = await Promise.all(m.doc.fonts.map(async (font) => {
+        const url = new URL(font.url, location.href);
+        if (!approved(url)) throw new Error(`font must belong to this project: ${font.url}`);
+        let bytes = fontBytes.get(url.href);
+        if (!bytes) {
+          bytes = fetch(url.href, { credentials: 'same-origin' }).then(async (response) => {
+            if (!response.ok) throw new Error(`font: HTTP ${response.status}`);
+            const data = await response.arrayBuffer();
+            if (data.byteLength > 16 * 1024 * 1024) throw new Error('font exceeds 16 MB');
+            return data;
+          });
+          fontBytes.set(url.href, bytes);
+        }
+        return { ...font, data: await bytes };
+      }));
+      if (!host.closed()) post({ ...m, doc: { ...m.doc, fonts } });
+      return;
+    }
+    post(m);
+  };
+  let transport = Promise.resolve();
+  const send = (m: ToWorker) => {
+    if (host.closed()) return;
+    if (!started) { queue.push(m); return; }
+    transport = transport.then(() => deliver(m)).catch((error: Error) => dispose(error.message));
   };
   window.addEventListener('message', onMessage);
   frame.addEventListener('load', () => {

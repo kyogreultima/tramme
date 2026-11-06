@@ -7,16 +7,24 @@ describe.skipIf(!CHROME)('the served project sandbox', () => {
   let server: Server, browser: Awaited<ReturnType<typeof launch>>['browser'], page: Awaited<ReturnType<typeof launch>>['page'];
   let port = 0;
   let privateReads = 0;
+  let fontReads = 0;
   beforeAll(async () => {
     server = new Server(readConfig(path.resolve(import.meta.dirname, 'fixtures/night-sky/document.tramme.json')));
     server.use((_req, res, url) => {
       if (url.pathname === '/api/private') { privateReads++; res.writeHead(200, { 'content-type': 'text/javascript' }); res.end('private account data'); return true; }
+      if (url.pathname === '/project/assets/fonts/test.woff2') { fontReads++; res.writeHead(200, { 'content-type': 'font/woff2' }); res.end(Buffer.from([0, 1, 2, 3])); return true; }
+      if (url.pathname === '/font-host') {
+        res.writeHead(200, { 'content-type': 'text/html' });
+        res.end('<!doctype html><script type="module">import {browserHost} from "/__tramme/font-host/host.js"; window.makeHost = browserHost;</script>');
+        return true;
+      }
       if (url.pathname !== '/boundary-host') return false;
       res.writeHead(200, { 'content-type': 'text/html' });
       res.end('<!doctype html><div id="private">editor data</div><script>localStorage.setItem("private", "editor data")</script>');
       return true;
     });
     port = await server.start();
+    await server.bundle('font-host', path.resolve(import.meta.dirname, '../../../apps/editor/src/plugins/host.ts'));
     ({ browser, page } = await launch());
   }, 60_000);
   afterAll(async () => { await browser?.close(); server?.close(); });
@@ -87,6 +95,32 @@ describe.skipIf(!CHROME)('the served project sandbox', () => {
     });
     expect(results.storage).toBe('SecurityError');
     for (const key of ['fetch', 'import', 'xhr', 'socket', 'nested']) expect(results[key]).not.toBe('reached');
+    expect(privateReads).toBe(0);
+  }, 30_000);
+
+  it('supplies approved font bytes through the host and refuses a private route as a font', async () => {
+    fontReads = 0;
+    privateReads = 0;
+    await page.goto(`http://127.0.0.1:${port}/font-host`);
+    await page.waitForFunction(() => typeof (window as any).makeHost === 'function');
+    const ok = await page.evaluate(async () => {
+      const base = `${location.origin}/project/document.tramme.json`;
+      const host = (window as any).makeHost(base);
+      host.setDoc({ doc: { assets: {}, compositions: {} }, docUrl: base, images: {}, json: {}, fonts: [{ url: `${location.origin}/project/assets/fonts/test.woff2`, family: 'Test' }] });
+      try { return await host.draw({ frame: 0, comp: { width: 10, height: 10, duration: 1, fps: 30 }, layers: [], items: [] }); }
+      finally { host.dispose(); }
+    });
+    expect(ok).toEqual([]);
+    expect(fontReads).toBe(1);
+    const refused = await page.evaluate(async () => {
+      const base = `${location.origin}/project/document.tramme.json`;
+      const host = (window as any).makeHost(base);
+      host.setDoc({ doc: { assets: {}, compositions: {} }, docUrl: base, images: {}, json: {}, fonts: [{ url: `${location.origin}/api/private`, family: 'Private' }] });
+      try { await host.draw({ frame: 0, comp: { width: 10, height: 10, duration: 1, fps: 30 }, layers: [], items: [] }); return 'allowed'; }
+      catch (error) { return (error as Error).message; }
+      finally { host.dispose(); }
+    });
+    expect(refused).toContain('font must belong to this project');
     expect(privateReads).toBe(0);
   }, 30_000);
 });
