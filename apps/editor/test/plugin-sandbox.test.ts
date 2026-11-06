@@ -175,6 +175,23 @@ describe('the plugin sandbox', () => {
     expect(() => host.setDoc({ doc: {}, docUrl: DOC_URL, images: {}, json: { huge }, fonts: [] })).toThrow('sandbox message exceeds 64 MB');
     expect(sent).toHaveLength(0);
   });
+  it('bounds bitmap memory separately from plain-data messages in both directions', async () => {
+    class Bitmap { width = 8192; height = 8192; }
+    vi.stubGlobal('ImageBitmap', Bitmap);
+    try {
+      const sent: unknown[] = [];
+      const { host, receive } = connectHost((message) => sent.push(message), () => DOC_URL);
+      const a = new Bitmap() as unknown as ImageBitmap, b = new Bitmap() as unknown as ImageBitmap;
+      expect(() => host.setDoc({ doc: {}, docUrl: DOC_URL, images: { a, b }, json: {}, fonts: [] })).toThrow('sandbox graphics exceed 256 MB');
+      expect(sent).toHaveLength(0);
+      const pending = host.draw({ frame: 0, comp: { width: 64, height: 64, fps: 1, duration: 1 }, layers: [], items: [] });
+      receive({ kind: 'drawn', call: 1, frame: 0, results: [
+        { id: 'a', ok: true, bitmap: a, area: { x: 0, y: 0, w: 1, h: 1 } },
+        { id: 'b', ok: true, bitmap: b, area: { x: 0, y: 0, w: 1, h: 1 } },
+      ] });
+      await expect(pending).rejects.toThrow('sandbox response exceeds its data or graphics budget');
+    } finally { vi.unstubAllGlobals(); }
+  });
   it('rejects a replayed bridge request id without repeating the file read', async () => {
     const sent: unknown[] = [];
     const { host, receive } = connectHost((message) => sent.push(message), () => DOC_URL);

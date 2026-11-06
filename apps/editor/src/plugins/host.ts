@@ -14,6 +14,7 @@ const projectPath = (value: unknown): value is string => typeof value === 'strin
   value.split('/').every((part) => part !== '' && part !== '.' && part !== '..');
 const RESPONSE_LIMIT = 8 * 1024 * 1024;
 const OUTBOUND_LIMIT = 64 * 1024 * 1024;
+const GRAPHICS_LIMIT = 256 * 1024 * 1024;
 const canvasSize = (width: number, height: number, scale = 1) => {
   if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 || !Number.isFinite(scale) || scale <= 0) throw new Error('invalid sandbox canvas');
   if (width > 8192 || height > 8192 || width * scale > 8192 || height * scale > 8192) throw new Error('sandbox canvas exceeds 8192 pixels');
@@ -44,6 +45,28 @@ function responseTooLarge(value: unknown, limit = RESPONSE_LIMIT): boolean {
       }
     }
     if (bytes > limit) return true;
+  }
+  return false;
+}
+
+/** Bound the decoded bitmap surfaces in one bridge message, separately from plain data. */
+function graphicsTooLarge(value: unknown): boolean {
+  if (typeof ImageBitmap === 'undefined') return false;
+  const stack = [value], seen = new Set<object>();
+  let bytes = 0;
+  while (stack.length) {
+    const item = stack.pop();
+    if (!item || typeof item !== 'object' || seen.has(item)) continue;
+    if (seen.size >= 10000) return true;
+    seen.add(item);
+    if (item instanceof ImageBitmap) {
+      if (!Number.isSafeInteger(item.width) || !Number.isSafeInteger(item.height) || item.width < 1 || item.height < 1) return true;
+      bytes += item.width * item.height * 4;
+      if (bytes > GRAPHICS_LIMIT) return true;
+    } else if (Array.isArray(item)) stack.push(...item);
+    else if (item instanceof Map) for (const [key, content] of item) stack.push(key, content);
+    else if (item instanceof Set) for (const content of item) stack.push(content);
+    else if (!(item instanceof ArrayBuffer) && !ArrayBuffer.isView(item)) stack.push(...Object.values(item));
   }
   return false;
 }
@@ -220,7 +243,7 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
     }
     if (m.kind === 'drawn') {
       if (!Array.isArray(m.results) || m.results.length > 10000) { invalid(); return; }
-      if (responseTooLarge(m.results)) { timeout('sandbox response exceeds 8 MB'); return; }
+      if (responseTooLarge(m.results) || graphicsTooLarge(m.results)) { timeout('sandbox response exceeds its data or graphics budget'); return; }
       const w = waits.get(m.call);
       if (!w) return;
       waits.delete(m.call);
@@ -239,7 +262,7 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
     }
     if (m.kind === 'rendered') {
       if (m.err !== undefined && typeof m.err !== 'string') { invalid(); return; }
-      if (responseTooLarge(m.bitmap) || responseTooLarge(m.err)) { timeout('sandbox response exceeds 8 MB'); return; }
+      if (responseTooLarge(m.bitmap) || responseTooLarge(m.err) || graphicsTooLarge(m.bitmap)) { timeout('sandbox response exceeds its data or graphics budget'); return; }
       const w = waits.get(m.call);
       if (!w) return;
       waits.delete(m.call);
@@ -277,6 +300,7 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
 
   const run = (msg: ToWorker & { call: number }, ctx?: ToolContext | CheckContext, signal?: AbortSignal): Promise<unknown> => {
     if (responseTooLarge(msg, OUTBOUND_LIMIT)) return Promise.reject(new Error('sandbox message exceeds 64 MB'));
+    if (graphicsTooLarge(msg)) return Promise.reject(new Error('sandbox graphics exceed 256 MB'));
     if (waits.size >= 64) return Promise.reject(new Error('too many pending sandbox calls'));
     const c = msg.call;
     if (ctx) bridges.set(c, ctx);
@@ -330,6 +354,7 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
     },
     setDoc(doc) {
       if (responseTooLarge(doc, OUTBOUND_LIMIT)) throw new Error('sandbox message exceeds 64 MB');
+      if (graphicsTooLarge(doc)) throw new Error('sandbox graphics exceed 256 MB');
       send({ kind: 'doc', doc });
     },
     async draw(payload) {
@@ -396,7 +421,10 @@ export function browserHost(docUrl: string): PluginHost {
   };
   const post = (m: ToWorker) => {
     if (responseTooLarge(m, OUTBOUND_LIMIT)) throw new Error('sandbox message exceeds 64 MB');
-    frame.contentWindow?.postMessage({ kind: 'send', data: m }, '*', bitmapsIn(m));
+    if (graphicsTooLarge(m)) throw new Error('sandbox graphics exceed 256 MB');
+    // Document images remain in the trusted page's AssetStore as well as the worker.
+    // Structured-clone them; transferring ownership would detach the page's copy.
+    frame.contentWindow?.postMessage({ kind: 'send', data: m }, '*', m.kind === 'doc' ? [] : bitmapsIn(m));
   };
   const { host, receive } = connectHost((m) => send(m), () => docUrl, (reason) => dispose(reason));
   const startupTimer = setTimeout(() => dispose('the isolated project worker did not start'), 10_000);

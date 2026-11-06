@@ -14,6 +14,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 - CLI plugin exports now load declarations before creating the renderer, keeping project modules out of the trusted browser page and removing its `sandbox=0` escape.
 - The isolated renderer now refuses assets and video proxies outside the current project folder before loading them.
 - Asset loading now runs at most eight requests concurrently and refuses oversized isolated images before bitmap creation.
+- Sandbox messages now budget decoded bitmap surfaces separately and preserve the page's copy of document images.
 - Isolation checks now exercise project code at module import and additional browser network APIs in Chrome and Edge, before any tool or drawing call.
 - Failed plugin attachments can be retried after repair, and storyboard stills report sandbox attachment errors.
 - Sandbox capability replies now reject oversized data before it crosses the worker bridge.
