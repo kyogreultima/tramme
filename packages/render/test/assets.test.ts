@@ -1,5 +1,40 @@
-import { describe, expect, it } from 'vitest';
-import { viewBoxSize, withSize } from '../src/assets.ts';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { newProject } from '@tramme/project';
+import { AssetStore, viewBoxSize, withSize } from '../src/assets.ts';
+
+afterEach(() => vi.unstubAllGlobals());
+
+describe('model bytes for an isolated project', () => {
+  const asset = (src: string) => ({ type: 'model' as const, src });
+  const store = (src: string) => {
+    const doc = newProject({ name: 'Model', width: 64, height: 64, fps: 1, duration: 1 }).doc;
+    doc.assets.mesh = asset(src);
+    const loaded = new AssetStore(doc, 'https://example.test/projects/a/document.tramme.json');
+    loaded.sandboxModules = true;
+    return loaded;
+  };
+  const load = (s: AssetStore, src: string) => (s as unknown as { load(id: string, a: ReturnType<typeof asset>): Promise<unknown> }).load('mesh', asset(src));
+
+  it('reads a project model as bytes and refuses a private URL before fetch', async () => {
+    const fetcher = vi.fn(async () => new Response(new Uint8Array([1, 2, 3])));
+    vi.stubGlobal('fetch', fetcher);
+    await expect(load(store('../../private/keys.glb'), '../../private/keys.glb')).rejects.toThrow('model must belong to this project');
+    expect(fetcher).not.toHaveBeenCalled();
+    await expect(load(store('assets/mesh.glb'), 'assets/mesh.glb')).resolves.toEqual(new Uint8Array([1, 2, 3]).buffer);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it('cancels an oversized streamed model', async () => {
+    let cancelled = false;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) { controller.enqueue(new Uint8Array(33 * 1024 * 1024)); },
+      cancel() { cancelled = true; },
+    });
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(stream)));
+    await expect(load(store('assets/huge.glb'), 'assets/huge.glb')).rejects.toThrow('model exceeds 32 MB');
+    expect(cancelled).toBe(true);
+  });
+});
 
 describe('an SVG without a size of its own', () => {
   it('takes the proportions of its viewBox', () => {

@@ -9,6 +9,7 @@ import { VideoFrames } from './video.ts';
 const SVG_RASTER = 2048;
 /** how long the page's own fonts (its CSS) are waited for once the document's are loaded */
 const FONTS_WAIT_MS = 3000;
+const MODEL_LIMIT = 32 * 1024 * 1024;
 
 /** the proportions of an SVG from its viewBox (1:1 when it has none) */
 export function viewBoxSize(svg: string): [number, number] {
@@ -147,6 +148,36 @@ export class AssetStore {
       }
       case 'module':
         return import(/* @vite-ignore */ this.version ? `${url}${url.includes('?') ? '&' : '?'}v=${this.version}` : url);
+      case 'model': {
+        if (this.sandboxModules) {
+          const target = new URL(url), base = new URL(this.base);
+          const root = new URL('./', base);
+          const projectFile = target.origin === base.origin && target.pathname.startsWith(root.pathname);
+          const localBlob = target.protocol === 'blob:' && target.origin === base.origin;
+          if (!projectFile && !localBlob) throw new Error('model must belong to this project');
+        }
+        const r = await fetch(url, { credentials: 'same-origin' });
+        if (!r.ok) throw new Error(`model: HTTP ${r.status}`);
+        const declared = Number(r.headers.get('content-length'));
+        if (declared > MODEL_LIMIT) { void r.body?.cancel(); throw new Error('model exceeds 32 MB'); }
+        const reader = r.body?.getReader();
+        if (!reader) {
+          const bytes = await r.arrayBuffer();
+          if (bytes.byteLength > MODEL_LIMIT) throw new Error('model exceeds 32 MB');
+          return bytes;
+        }
+        const chunks: Uint8Array[] = []; let size = 0;
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          size += value.byteLength;
+          if (size > MODEL_LIMIT) { void reader.cancel(); throw new Error('model exceeds 32 MB'); }
+          chunks.push(value);
+        }
+        const bytes = new Uint8Array(size); let at = 0;
+        for (const chunk of chunks) { bytes.set(chunk, at); at += chunk.byteLength; }
+        return bytes.buffer;
+      }
       case 'video': {
         const proxy = this.proxyOf(a);
         const cache = this.useProxies && (!!proxy || Object.values(this.doc.assets).some((asset) => asset.type === 'video' && asset.proxy === id));

@@ -54,6 +54,27 @@ afterEach(() => vi.unstubAllGlobals());
 const project = () => newProject({ name: 'Video regression', width: 1920, height: 1080, fps: 24, duration: 30 }).doc;
 
 describe('sandbox document assets', () => {
+  it('copies loaded model bytes into the worker and refreshes them after an edit', async () => {
+    const doc = project();
+    doc.assets.mesh = { type: 'model', src: 'assets/mesh.glb' };
+    const received: ArrayBuffer[] = [];
+    const mod: PluginModule = { nodes: [{
+      type: 'test.model-bytes', title: 'Model bytes', category: 'Test', props: {},
+      render: { canvas2d: (_ctx, _props, host) => { received.push(host.asset<ArrayBuffer>('mesh')); } },
+    }] };
+    const side = makeSandboxDraw(new Map([['model-bytes', mod]]));
+    const host = { setDoc: (d) => side.setDoc(d) } as PluginHost;
+    const first = new Uint8Array([1, 2]).buffer;
+    ensureSandboxDoc(host, { doc, docUrl: 'https://tramme.test/doc.json', loaded: () => first });
+    const payload = { frame: 0, comp: { width: 1920, height: 1080, fps: 24, duration: 30 }, layers: [], items: [{ id: 'mesh', type: 'test.model-bytes', props: {}, t: 0, frame: 0 }] };
+    expect((await side.draw(payload)).results[0]).toMatchObject({ ok: true });
+    expect(received.at(-1)).toBe(first);
+    const second = new Uint8Array([3, 4]).buffer;
+    ensureSandboxDoc(host, { doc, docUrl: 'https://tramme.test/doc.json', loaded: () => second });
+    expect((await side.draw(payload)).results[0]).toMatchObject({ ok: true });
+    expect(received.at(-1)).toBe(second);
+  });
+
   const picture = { width: 200, height: 100 };
   const pictureNode: PluginModule = { nodes: [{
     type: 'test.picture', title: 'Picture', category: 'Test', props: {},

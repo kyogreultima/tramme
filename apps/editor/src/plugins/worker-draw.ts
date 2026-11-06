@@ -38,11 +38,12 @@ interface DocSide {
   docUrl: string;
   images: Map<string, unknown>;
   json: Map<string, unknown>;
+  models: Map<string, ArrayBuffer>;
   fonts: Set<string>;
 }
 
 export function makeSandboxDraw(modules: Map<string, PluginModule>): SandboxDrawSide {
-  const side: DocSide = { doc: null, docUrl: '', images: new Map(), json: new Map(), fonts: new Set() };
+  const side: DocSide = { doc: null, docUrl: '', images: new Map(), json: new Map(), models: new Map(), fonts: new Set() };
   const self_ = self as unknown as { fonts: { add(f: unknown): void } };
   const pool = new WorkerPool();
   let output: OffscreenCanvas | null = null;
@@ -76,6 +77,7 @@ export function makeSandboxDraw(modules: Map<string, PluginModule>): SandboxDraw
     asset: ((id: string) => {
       if (side.images.has(id)) return side.images.get(id);
       if (side.json.has(id)) return side.json.get(id);
+      if (side.models.has(id)) return side.models.get(id);
       const a = assetInfo(id);
       if (a.type === 'font') return a.family ?? id;
       if (a.type === 'video') throw new Error('host.asset: video frames do not cross the sandbox (a video is read by its own layer)');
@@ -100,6 +102,7 @@ export function makeSandboxDraw(modules: Map<string, PluginModule>): SandboxDraw
   const sandboxAsset = (id: string, videos: Map<string, unknown>) => {
     if (side.images.has(id)) return side.images.get(id);
     if (side.json.has(id)) return side.json.get(id);
+    if (side.models.has(id)) return side.models.get(id);
     const a = assetInfo(id);
     if (a.type === 'font') return a.family ?? id;
     if (a.type === 'video') {
@@ -221,6 +224,7 @@ export function makeSandboxDraw(modules: Map<string, PluginModule>): SandboxDraw
       for (const [id, image] of side.images) if (image !== d.images[id]) (image as { close?(): void }).close?.();
       side.images = new Map(Object.entries(d.images ?? {}));
       side.json = new Map(Object.entries(d.json ?? {}));
+      side.models = new Map(Object.entries(d.models ?? {}));
       fontsReady = Promise.all((d.fonts ?? []).map((f) => {
         let pending = fontLoads.get(f.url);
         if (pending) return pending;

@@ -12,9 +12,9 @@ import { M, ident, mul, trs, turnY, turnX, move, project, lookAt, uploadMesh, en
 
 // ── the parsed files and their uploads ───────────────────────
 
-/** parsed files, keyed by asset id, with the address they were read from (a replaced file is read again) */
+/** parsed files, keyed by asset id and its loaded bytes (a replaced file is read again) */
 const models = new Map<string, GltfModel>();
-const modelUrls = new Map<string, string>();
+const modelBytes = new Map<string, ArrayBuffer>();
 /** uploaded meshes, keyed by asset id; made again when the context is new */
 interface Uploads { gl: WebGL2RenderingContext; prims: (Upload & { color: number[] })[] }
 const uploads = new Map<string, Uploads>();
@@ -53,6 +53,16 @@ void main() {
 
 const T = new Float32Array(3), Q = new Float32Array(4), S = new Float32Array(3);
 
+function loadedModel(id: string, bytes: ArrayBuffer): GltfModel {
+  if (!(bytes instanceof ArrayBuffer)) throw new Error('the model bytes are unavailable');
+  if (models.has(id) && modelBytes.get(id) === bytes) return models.get(id)!;
+  const parsed = parseGltf(bytes);
+  models.set(id, parsed);
+  modelBytes.set(id, bytes);
+  uploads.delete(id);
+  return parsed;
+}
+
 /** the node's local matrix at ta, its animation tracks applied */
 function localOf(n: GltfNode, ta: number, out: Mat4): Mat4 {
   T.set(n.translation); Q.set(n.rotation); S.set(n.scale);
@@ -77,13 +87,7 @@ export const model: NodeType = {
   },
   async load(p, host) {
     if (!p.source) return;
-    const url = host.asset<string>(p.source);
-    if (models.has(p.source) && modelUrls.get(p.source) === url) return;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`the model file could not be read (HTTP ${res.status})`);
-    models.set(p.source, parseGltf(await res.arrayBuffer()));
-    modelUrls.set(p.source, url);
-    uploads.delete(p.source);
+    loadedModel(p.source, host.asset<ArrayBuffer>(p.source));
   },
   bounds(p) {
     const h = Math.max(8, p.height ?? 400);
@@ -91,7 +95,7 @@ export const model: NodeType = {
   },
   render: {
     gl(g: NodeGL, p: any, host) {
-      const m = p.source ? models.get(p.source) : null;
+      const m = p.source ? loadedModel(p.source, host.asset<ArrayBuffer>(p.source)) : null;
       if (!m) throw new Error('the model file is not loaded yet');
       const { gl } = g;
       // this layer's picture: g.width × g.height from the bottom left of the type's shared canvas

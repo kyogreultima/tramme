@@ -102,6 +102,8 @@ export interface SandboxDoc {
   images: Record<string, unknown>;
   /** the parsed json assets */
   json: Record<string, unknown>;
+  /** approved model bytes, copied into the worker with the document */
+  models?: Record<string, ArrayBuffer>;
   /** approved font bytes supplied by the host; the worker cannot fetch URLs */
   fonts: { url: string; family: string; weight?: string; data?: ArrayBuffer }[];
 }

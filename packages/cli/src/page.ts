@@ -1,6 +1,6 @@
 // Runtime page driven by the CLI through Puppeteer: loads one document,
 // validates it, loads its assets and exposes window.TRAMME.
-//   /__tramme/?doc=/project/film.tramme.json[&comp=main][&sandbox=0]
+//   /__tramme/?doc=/project/film.tramme.json[&comp=main]
 // With plugins in the project, the whole frame is evaluated and drawn in the
 // plugin sandbox's worker (docs/evaluator-sandbox.md): the page ships the
 // document and each video asset's decoded frame, and one picture comes back.
@@ -8,12 +8,11 @@
 import type { TrammeDoc } from '@tramme/core';
 import { builtinRegistry } from '@tramme/nodes';
 import { addParts, encodeWav, formatParts, mixComposition, noParts, perFrame, Renderer, type FrameParts, type RenderOptions } from '@tramme/render';
-import { blitSandboxFrame, ensureDeclared, ensureSandboxDoc, pluginItemsOf, sandboxVideoFrames } from '../../../apps/editor/src/plugins/sandbox-draw.ts';
+import { blitSandboxFrame, declarationsModule, ensureDeclared, ensureSandboxDoc, pluginItemsOf, sandboxDeclaration, sandboxVideoFrames } from '../../../apps/editor/src/plugins/sandbox-draw.ts';
 import { browserHost, type PluginHost } from '../../../apps/editor/src/plugins/host.ts';
 
 const q = new URLSearchParams(location.search);
 const docUrl = new URL(q.get('doc') || '', location.href).href;
-const sandboxOn = q.get('sandbox') !== '0';
 let renderer: Renderer;
 let currentDoc: TrammeDoc | null = null;
 let sandbox: PluginHost | null = null;
@@ -22,13 +21,26 @@ async function init() {
   const r = await fetch(docUrl);
   if (!r.ok) throw new Error(`document not found: ${docUrl}`);
   currentDoc = (await r.json()) as TrammeDoc;
-  renderer = await Renderer.open(currentDoc, builtinRegistry(), docUrl, document.getElementById('out') as HTMLCanvasElement, { compId: q.get('comp') || currentDoc.root });
+  const isolated = !!currentDoc.plugins?.length;
+  if (isolated) {
+    sandbox = browserHost(docUrl);
+    await ensureDeclared(sandbox, pluginItemsOf(currentDoc, docUrl));
+  }
+  renderer = await Renderer.open(currentDoc, builtinRegistry(), docUrl, document.getElementById('out') as HTMLCanvasElement, {
+    compId: q.get('comp') || currentDoc.root,
+    sandboxModules: isolated,
+    sandboxDeclarations: isolated ? (id) => {
+      const decl = sandboxDeclaration(id);
+      if (!decl) throw new Error(`plugin declaration missing: ${id}`);
+      return declarationsModule(decl, id);
+    } : undefined,
+  });
 }
 
 /** the sandbox host, when the document carries plugins and the flag is not off */
 async function sandboxReady(): Promise<PluginHost | null> {
   const doc = currentDoc;
-  if (!sandboxOn || !doc || !(doc.plugins ?? []).length) return null;
+  if (!doc || !(doc.plugins ?? []).length) return null;
   sandbox ??= browserHost(docUrl);
   // the document's plugins loaded in the worker first (a url it knows is not loaded again), as the editor does
   await ensureDeclared(sandbox, pluginItemsOf(doc, docUrl));

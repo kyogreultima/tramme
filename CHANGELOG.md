@@ -10,6 +10,8 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Added
 
+- Isolated model rendering now receives bounded, approved `.glb` bytes through the host instead of fetching from the sandbox worker.
+- CLI plugin exports now load declarations before creating the renderer, keeping project modules out of the trusted browser page and removing its `sandbox=0` escape.
 - Isolation checks now exercise project code at module import and additional browser network APIs in Chrome and Edge, before any tool or drawing call.
 - Failed plugin attachments can be retried after repair, and storyboard stills report sandbox attachment errors.
 - Sandbox capability replies now reject oversized data before it crosses the worker bridge.
