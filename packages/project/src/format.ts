@@ -4,6 +4,7 @@
 //   document.tramme.json   the document (schema tramme/1)
 //   assets/                 files referenced by the document's assets
 //   plugins/                modules listed in the document's plugins
+//   scenes/<id>/             a web scene's scene.json and its local files
 //   thumbnail.webp          picture for the home screen (optional)
 //   .tramme/chats/         the assistant's conversations (<id>.json) and their index (index.json)
 //   .tramme/chat.json      a single conversation (older projects; still read)
@@ -16,6 +17,7 @@
 import { z } from 'zod';
 import { DocSchema } from '@tramme/core/schema';
 import { upgradeDoc, type TrammeDoc } from '@tramme/core/types';
+import { SceneSchema } from './scene.ts';
 
 export const PROJECT_FORMAT = 'tramme-project/1';
 export const MANIFEST = 'tramme.json';
@@ -102,10 +104,12 @@ export const maxSize = (path: string) => (isMedia(path) ? LIMITS.media : LIMITS.
 const EXT: Record<string, string[]> = {
   assets: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'avif', 'svg', 'ttf', 'otf', 'woff', 'woff2', 'wav', 'mp3', 'ogg', 'm4a', 'flac', 'mp4', 'webm', 'mov', 'json', 'js', 'mjs', 'pdf', 'md', 'markdown', 'cube', 'glb', 'gltf'],
   plugins: ['js', 'mjs'],
+  scenes: ['html', 'css', 'js', 'mjs', 'json', 'svg', 'png', 'jpg', 'jpeg', 'webp', 'gif', 'avif', 'woff', 'woff2', 'ttf', 'otf', 'glb', 'gltf', 'bin', 'mp4', 'webm', 'wav', 'mp3', 'ogg'],
   renders: ['mp4', 'webm', 'mov', 'gif', 'png', 'zip', 'json', 'svg', 'wav'],
 };
 
 export const MIME: Record<string, string> = {
+  html: 'text/html; charset=utf-8', css: 'text/css; charset=utf-8',
   json: 'application/json; charset=utf-8', js: 'text/javascript; charset=utf-8', mjs: 'text/javascript; charset=utf-8',
   png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif', avif: 'image/avif', svg: 'image/svg+xml',
   ttf: 'font/ttf', otf: 'font/otf', woff: 'font/woff', woff2: 'font/woff2', pdf: 'application/pdf',
@@ -128,9 +132,10 @@ export function pathIssue(path: string): string | null {
   if (parts.some((p) => /[\u0000-\u001f<>:"|?*]/.test(p))) return 'forbidden character in the path';
   if (path === MANIFEST || path === DOCUMENT || isChatPath(path)) return null;
   if (/^thumbnail\.(webp|png|jpg)$/.test(path)) return null;
+  if (parts[0] === 'scenes' && (parts.length < 3 || !/^[a-z0-9][a-z0-9-]{0,63}$/.test(parts[1]))) return 'invalid scene folder';
   const ext = path.includes('.') ? path.split('.').pop()!.toLowerCase() : '';
   const allowed = EXT[parts[0]];
-  if (!allowed || parts.length < 2) return 'location not allowed by the format (assets/, plugins/, renders/)';
+  if (!allowed || parts.length < 2) return 'location not allowed by the format (assets/, plugins/, scenes/, renders/)';
   return allowed.includes(ext) ? null : `extension .${ext} not allowed in ${parts[0]}/`;
 }
 
@@ -194,6 +199,21 @@ export function checkProject(files: Map<string, Uint8Array>): { issues: Issue[];
       else if (!files.has(p)) issues.push({ path: `${DOCUMENT}/assets/${id}/src`, message: `missing file: ${p}` });
     }
     for (const id of doc.plugins || []) if (doc.assets[id]?.type !== 'module') issues.push({ path: `${DOCUMENT}/plugins`, message: `plugin "${id}" without a module` });
+  }
+  const sceneRoots = new Set([...files.keys()].filter((p) => p.startsWith('scenes/')).map((p) => p.split('/').slice(0, 2).join('/')));
+  for (const root of sceneRoots) {
+    const manifestPath = `${root}/scene.json`;
+    if (!files.has(manifestPath)) { issues.push({ path: manifestPath, message: 'scene manifest missing' }); continue; }
+    try {
+      const parsed = SceneSchema.safeParse(JSON.parse(text(manifestPath)));
+      if (!parsed.success) {
+        issues.push(...parsed.error.issues.slice(0, 20).map((i) => ({ path: `${manifestPath}/${i.path.join('/')}`, message: i.message })));
+        continue;
+      }
+      const entryPath = `${root}/${parsed.data.entry}`;
+      if (!/\.html$/i.test(parsed.data.entry) || pathIssue(entryPath)) issues.push({ path: `${manifestPath}/entry`, message: 'scene entry must be a local HTML file in this scene' });
+      else if (!files.has(entryPath)) issues.push({ path: `${manifestPath}/entry`, message: `missing scene entry: ${entryPath}` });
+    } catch { issues.push({ path: manifestPath, message: 'unreadable scene manifest JSON' }); }
   }
   return { issues, manifest, doc };
 }

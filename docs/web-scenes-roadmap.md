@@ -2,7 +2,7 @@
 
 How the assistant writes real web (HTML, CSS, JS, GSAP, Three.js) inside one layer of a film, with the freedom [HyperFrames](https://github.com/heygen-com/hyperframes) gives, and keeps what Tramme already has: a structured document, undo, takes to compare, and a correction that touches one part only.
 
-Status: **in progress (28 open, 4 done).** Step 0's alpha-composited CLI node, iframe preview, three-scene measurements and engine decision are complete as prototypes. Product integration begins at step 1. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
+Status: **in progress (25 open, 7 done).** Step 0's alpha-composited CLI node, iframe preview, three-scene measurements and engine decision are complete as prototypes. Step 1's scene manifest, project validation and archive round trip are complete. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
 
 ## Why
 
@@ -40,9 +40,9 @@ A scene with GSAP, flexbox, an animated SVG stroke, a CSS gradient and a rotatio
 
 ### Step 1: format
 
-- [ ] Manifest (`scene.json`): duration, size, entry file, parameters.
-- [ ] JSON schema, validation, allowed paths in `tramme-project/1`, `.tramme` pack and unpack.
-- [ ] A scene survives an export then an import of an archive.
+- [x] Manifest (`scene.json`): duration, size, entry file, parameters. A scene lives at `scenes/<id>/scene.json`; its typed parameters carry defaults. See `SceneSchema` in `packages/project/src/scene.ts`.
+- [x] JSON schema, validation, allowed paths in `tramme-project/1`, `.tramme` pack and unpack. `schema/webscene-1.schema.json` is generated from the same schema used by `checkProject`. The project format admits scene HTML, CSS, scripts, fonts and media beneath a valid scene ID; the manifest's entry must be a present HTML file in that folder.
+- [x] A scene survives an export then an import of an archive. The project-format test compares its manifest and entry bytes after `packProject` and `unpackProject`, then validates the restored project.
 
 ### Step 2: contract and adapters
 

@@ -10,6 +10,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Added
 
+- Web scenes now have a validated `scene.json` manifest, published JSON Schema, approved project paths and archive round-trip coverage.
 - Isolated model rendering now receives bounded, approved `.glb` bytes through the host instead of fetching from the sandbox worker.
 - CLI plugin exports now load declarations before creating the renderer, keeping project modules out of the trusted browser page and removing its `sandbox=0` escape.
 - The isolated renderer now refuses assets and video proxies outside the current project folder before loading them.

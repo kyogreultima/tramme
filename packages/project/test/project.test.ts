@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { zipSync } from 'fflate';
-import { checkProject, DOCUMENT, isMedia, mimeOf, LEGACIES, MANIFEST, newProject, packProject, parseDocument, pathIssue, srcPath, unpackProject } from '../src/index.ts';
+import { checkProject, DOCUMENT, isMedia, mimeOf, LEGACIES, MANIFEST, newProject, packProject, parseDocument, pathIssue, sceneJsonSchema, SceneSchema, srcPath, unpackProject } from '../src/index.ts';
 
 const enc = (s: string) => new TextEncoder().encode(s);
 const json = (v: unknown) => enc(JSON.stringify(v));
@@ -15,6 +15,11 @@ describe('project format', () => {
   it('allowed and refused paths', () => {
     expect(pathIssue('assets/photo.png')).toBeNull();
     expect(pathIssue('plugins/etoile.js')).toBeNull();
+    expect(pathIssue('scenes/title/scene.json')).toBeNull();
+    expect(pathIssue('scenes/title/index.html')).toBeNull();
+    expect(pathIssue('scenes/title/styles/main.css')).toBeNull();
+    expect(pathIssue('scenes/title/../other/index.html')).not.toBeNull();
+    expect(pathIssue('scenes/title/remote.ts')).not.toBeNull();
     expect(pathIssue('thumbnail.webp')).toBeNull();
     expect(pathIssue('.tramme/chats/mfz1k2-ab12.json')).toBeNull();
     // a 3D model brought in with the sources (a folder holding .glb or .gltf files): allowed, a large .glb sent in parts
@@ -55,6 +60,25 @@ describe('project format', () => {
     const wrapped = zipSync(Object.fromEntries([...sample()].map(([k, v]) => [`My project/${k}`, v])));
     expect(checkProject(unpackProject(wrapped)).issues).toEqual([]);
     expect(() => unpackProject(enc('not a zip'))).toThrow(/archive/);
+  });
+
+  it('validates a scene manifest and keeps its files through archive export and import', () => {
+    const files = sample();
+    const scene = { duration: 2, size: [640, 360], entry: 'index.html', parameters: { speed: { type: 'number', default: 1 }, tint: { type: 'color', default: '#aabbcc' } } };
+    expect(SceneSchema.safeParse(scene).success).toBe(true);
+    expect(sceneJsonSchema()).toMatchObject({ type: 'object', required: ['duration', 'size', 'entry', 'parameters'] });
+    files.set('scenes/title/scene.json', json(scene));
+    files.set('scenes/title/index.html', enc('<html><link rel="stylesheet" href="style.css"></html>'));
+    files.set('scenes/title/style.css', enc('body { color: red }'));
+    expect(checkProject(files).issues).toEqual([]);
+    const restored = unpackProject(packProject(files));
+    expect(restored.get('scenes/title/index.html')).toEqual(files.get('scenes/title/index.html'));
+    expect(restored.get('scenes/title/scene.json')).toEqual(files.get('scenes/title/scene.json'));
+    expect(checkProject(restored).issues).toEqual([]);
+    files.set('scenes/title/scene.json', json({ ...scene, entry: '../other/index.html' }));
+    expect(checkProject(files).issues).toContainEqual(expect.objectContaining({ path: 'scenes/title/scene.json/entry', message: expect.stringContaining('local HTML') }));
+    files.delete('scenes/title/scene.json');
+    expect(checkProject(files).issues).toContainEqual({ path: 'scenes/title/scene.json', message: 'scene manifest missing' });
   });
 
   for (const [name, l] of [['trame', LEGACIES[0]], ['emotion', LEGACIES[1]]] as const) {
