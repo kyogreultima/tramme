@@ -21,6 +21,22 @@ import { bucket, keyStore, workerKeys } from './keys.ts';
 import { personal } from './personal.ts';
 import { transcribe } from './speech.ts';
 
+// HTML returned through ASSETS.fetch does not always inherit _headers (notably
+// the SPA asset path in local workerd). Enforce the project boundary here too.
+const PROJECT_SANDBOX_CSP = "sandbox allow-scripts; default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' data:; worker-src data:; connect-src 'none'; img-src data: blob:; font-src data: blob:; style-src 'unsafe-inline'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'";
+
+async function projectSandbox(req: Request, env: Env): Promise<Response> {
+  // Workers Assets canonicalizes HTML files to extensionless URLs. Fetch that
+  // URL directly, otherwise a 307 would escape this response-header wrapper.
+  const asset = await env.ASSETS.fetch(new Request(new URL('/project-sandbox', req.url), req));
+  if (!asset.ok) return asset;
+  const headers = new Headers(asset.headers);
+  headers.set('content-security-policy', PROJECT_SANDBOX_CSP);
+  headers.set('cache-control', 'no-store');
+  headers.set('x-content-type-options', 'nosniff');
+  return new Response(asset.body, { status: asset.status, headers });
+}
+
 async function route(req: Request, env: Env, url: URL): Promise<Response> {
   const parts = url.pathname.slice('/api/'.length).split('/');
   const m = req.method;
@@ -46,6 +62,9 @@ export { AccountsContainer } from './container.ts';
 export default {
   async fetch(req, env) {
     const url = new URL(req.url);
+    if ((url.pathname === '/project-sandbox.html' || url.pathname === '/project-sandbox') && (env.MODE !== 'personal' || url.origin === env.APP_ORIGIN)) {
+      return projectSandbox(req, env);
+    }
     // the routes of accounts come first, in every mode: a visitor has no session yet, and the personal
     // deployment can have accounts (without ACCOUNTS or ACCOUNTS_URL they do not exist)
     if (url.pathname.startsWith('/api/')) {

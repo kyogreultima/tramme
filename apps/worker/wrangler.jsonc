@@ -10,7 +10,7 @@
     "directory": "../editor/dist",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*"]
+    "run_worker_first": ["/api/*", "/project-sandbox.html", "/project-sandbox"]
   },
   // the projects (npx wrangler r2 bucket create tramme-projects)
   "r2_buckets": [{ "binding": "FILES", "bucket_name": "tramme-projects" }],

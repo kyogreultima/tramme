@@ -18,6 +18,7 @@ use tauri::http::{Request, Response, StatusCode};
 use tauri::{DragDropEvent, Emitter, LogicalSize, Manager, PhysicalPosition, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 
 const SCHEME: &str = "tramme";
+const PROJECT_SANDBOX_CSP: &str = "sandbox allow-scripts; default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' data:; worker-src data:; connect-src 'none'; img-src data: blob:; font-src data: blob:; style-src 'unsafe-inline'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'";
 
 /// a .tramme the system handed to the app (a double-click), waiting for the
 /// editor to import it
@@ -442,12 +443,16 @@ fn asset_response(app: &tauri::AppHandle, path: &str) -> Response<Vec<u8>> {
     let name = if name.is_empty() || is_editor_page(name) { "index.html" } else { name };
     let mime = asset_mime(name);
     match app.asset_resolver().get(name.to_string()) {
-        Some(asset) => Response::builder()
-            .status(StatusCode::OK)
-            .header("content-type", mime)
-            .header("cache-control", "no-cache")
-            .body(asset.bytes)
-            .unwrap(),
+        Some(asset) => {
+            let mut response = Response::builder()
+                .status(StatusCode::OK)
+                .header("content-type", mime)
+                .header("cache-control", "no-cache");
+            if name == "project-sandbox.html" {
+                response = response.header("content-security-policy", PROJECT_SANDBOX_CSP);
+            }
+            response.body(asset.bytes).unwrap()
+        }
         // an unknown route without an extension is a page: the editor routes it
         None if !has_extension(name) => {
             let index = app.asset_resolver().get("index.html".to_string()).map(|a| a.bytes).unwrap_or_default();

@@ -6,9 +6,11 @@ import { readConfig, Server } from '../src/server.ts';
 describe.skipIf(!CHROME)('the served project sandbox', () => {
   let server: Server, browser: Awaited<ReturnType<typeof launch>>['browser'], page: Awaited<ReturnType<typeof launch>>['page'];
   let port = 0;
+  let privateReads = 0;
   beforeAll(async () => {
     server = new Server(readConfig(path.resolve(import.meta.dirname, 'fixtures/night-sky/document.tramme.json')));
     server.use((_req, res, url) => {
+      if (url.pathname === '/api/private') { privateReads++; res.writeHead(200, { 'content-type': 'text/javascript' }); res.end('private account data'); return true; }
       if (url.pathname !== '/boundary-host') return false;
       res.writeHead(200, { 'content-type': 'text/html' });
       res.end('<!doctype html><div id="private">editor data</div><script>localStorage.setItem("private", "editor data")</script>');
@@ -50,5 +52,41 @@ describe.skipIf(!CHROME)('the served project sandbox', () => {
     expect(result.storage).not.toBe('editor data');
     expect(result.network).not.toBe('reached');
     expect(result.canvas).toBe(true);
+  }, 30_000);
+
+  it('blocks direct network and remote imports, including from a nested worker', async () => {
+    privateReads = 0;
+    await page.goto(`http://127.0.0.1:${port}/boundary-host`);
+    const results = await page.evaluate(async () => {
+      const frame = document.createElement('iframe');
+      frame.sandbox.add('allow-scripts');
+      frame.src = '/project-sandbox.html';
+      document.body.append(frame);
+      await new Promise<void>((resolve) => frame.addEventListener('load', () => resolve(), { once: true }));
+      const answer = new Promise<Record<string, string>>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('sandbox did not answer')), 5000);
+        addEventListener('message', function onMessage(event) {
+          if (event.source !== frame.contentWindow || event.data?.kind !== 'worker') return;
+          clearTimeout(timer);
+          removeEventListener('message', onMessage);
+          resolve(event.data.data);
+        });
+      });
+      const api = `${location.origin}/api/private`;
+      const code = `const api = ${JSON.stringify(api)};
+        const result = {};
+        try { result.storage = indexedDB.open('private').readyState; } catch (e) { result.storage = e.name; }
+        try { await fetch(api); result.fetch = 'reached'; } catch (e) { result.fetch = e.name; }
+        try { await import(api); result.import = 'reached'; } catch (e) { result.import = e.name; }
+        result.xhr = await new Promise(resolve => { try { const xhr = new XMLHttpRequest(); xhr.open('GET', api); xhr.onload = () => resolve('reached'); xhr.onerror = () => resolve('blocked'); xhr.send(); } catch (e) { resolve(e.name); } });
+        result.socket = await new Promise(resolve => { try { const socket = new WebSocket(api.replace('http:', 'ws:')); socket.onopen = () => { socket.close(); resolve('reached'); }; socket.onerror = () => resolve('blocked'); } catch (e) { resolve(e.name); } });
+        result.nested = await new Promise(resolve => { const source = 'fetch(' + JSON.stringify(api) + ').then(() => postMessage("reached")).catch(() => postMessage("blocked"))'; const worker = new Worker('data:text/javascript,' + encodeURIComponent(source), { type: 'module' }); worker.onmessage = e => { worker.terminate(); resolve(e.data); }; worker.onerror = () => resolve('blocked'); });
+        postMessage(result);`;
+      frame.contentWindow!.postMessage({ kind: 'start', code }, '*');
+      return answer;
+    });
+    expect(results.storage).toBe('SecurityError');
+    for (const key of ['fetch', 'import', 'xhr', 'socket', 'nested']) expect(results[key]).not.toBe('reached');
+    expect(privateReads).toBe(0);
   }, 30_000);
 });
