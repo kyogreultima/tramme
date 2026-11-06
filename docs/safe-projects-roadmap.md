@@ -4,6 +4,8 @@ Priority: **now**, before removing the code-execution question or accepting proj
 
 Status: **planned, not implemented**. The existing worker and experimental whole-frame renderer are a foundation, not completion of this roadmap. All acceptance boxes below remain open.
 
+Boundary prototype (2026-11-06): `node scripts/verify-project-boundary.mjs` exercises an HTTP-served CSP and an `allow-scripts` iframe in the CLI's Chromium browser. The frame's message origin is `null`; reads of the parent DOM, cookies, localStorage, IndexedDB and CacheStorage throw `SecurityError`. A same-origin private API request is refused by `connect-src 'none'`. A module worker created from a `data:` URL has opaque origin, cannot fetch that API, and retains OffscreenCanvas and WebGL2 in this browser. A `blob:` module worker failed to start in this setup, so the proposed transport uses `data:` until wider compatibility is established. This is a browser-policy proof, **not** the editor's runtime boundary: the current editor worker still has the old origin and headers. The actual deployed route, desktop webviews, other supported browsers, alternative network APIs, remote imports and all project execution paths remain to be tested before any box is checked.
+
 ## Goal
 
 A user opens, plays, edits and exports a `.tramme` project without granting its scripts the editor's rights. Ordinary animation code needs no general execution permission. Extra capabilities, such as sending a media file to an external service, require a specific, understandable permission.
