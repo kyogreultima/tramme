@@ -6,7 +6,7 @@ import { validate, type TrammeDoc } from '@tramme/core';
 import { builtinRegistry } from '@tramme/nodes';
 import { CHROME, launch } from '../src/browser.ts';
 import { compareFiles } from '../src/compare.ts';
-import { filesRegistry } from '../src/plugins.ts';
+import { docRegistry, filesRegistry } from '../src/plugins.ts';
 import { readConfig, Server } from '../src/server.ts';
 
 /** a project folder as the files of an archive */
@@ -26,14 +26,14 @@ function read(dir: string): Map<string, Uint8Array> {
 const NIGHT_SKY = path.resolve(import.meta.dirname, 'fixtures/night-sky');
 
 describe('a project in memory (pack, unpack)', () => {
-  it('is checked with its own plugins, not the built-in vocabulary alone', async () => {
+  it.skipIf(!CHROME)('is checked with its own plugins, not the built-in vocabulary alone', async () => {
     const files = read(NIGHT_SKY);
     const doc = JSON.parse(new TextDecoder().decode(files.get('document.tramme.json'))) as TrammeDoc;
     expect(validate(doc, builtinRegistry()).some((i) => /unknown node type/.test(i.message))).toBe(true);
     expect(validate(doc, await filesRegistry(doc, files))).toEqual([]);
-  });
+  }, 30_000);
 
-  it('names a plugin that is missing or does not load', async () => {
+  it.skipIf(!CHROME)('names a plugin that is missing or does not load', async () => {
     const files = read(NIGHT_SKY);
     const doc = JSON.parse(new TextDecoder().decode(files.get('document.tramme.json'))) as TrammeDoc;
     const id = doc.plugins![0], file = doc.assets[id].src;
@@ -41,6 +41,42 @@ describe('a project in memory (pack, unpack)', () => {
     await expect(filesRegistry(doc, missing)).rejects.toThrow(`plugin "${id}" not found`);
     const broken = new Map(files); broken.set(file, new TextEncoder().encode('export const nodes = [ {'));
     await expect(filesRegistry(doc, broken)).rejects.toThrow(`plugin "${id}" unreadable`);
+  }, 30_000);
+
+  it.skipIf(!CHROME)('loads declarations without running archive code in Node', async () => {
+    const files = read(NIGHT_SKY);
+    const doc = JSON.parse(new TextDecoder().decode(files.get('document.tramme.json'))) as TrammeDoc;
+    const file = doc.assets[doc.plugins![0]].src;
+    const source = new TextDecoder().decode(files.get(file));
+    files.set(file, new TextEncoder().encode("if (typeof process !== 'undefined') throw new Error('native Node access');\n" + source));
+    expect(validate(doc, await filesRegistry(doc, files))).toEqual([]);
+  }, 30_000);
+
+  it.skipIf(!CHROME)('stops an archive plugin that loops at module load', async () => {
+    const files = read(NIGHT_SKY);
+    const doc = JSON.parse(new TextDecoder().decode(files.get('document.tramme.json'))) as TrammeDoc;
+    files.set(doc.assets[doc.plugins![0]].src, new TextEncoder().encode('while (true) {}'));
+    await expect(filesRegistry(doc, files)).rejects.toThrow('plugin declaration timed out');
+  }, 30_000);
+
+  it.skipIf(!CHROME)('loads a folder plugin without giving it the Node process', async () => {
+    const files = read(NIGHT_SKY);
+    const doc = JSON.parse(new TextDecoder().decode(files.get('document.tramme.json'))) as TrammeDoc;
+    const file = doc.assets[doc.plugins![0]].src;
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tramme-isolated-registry-'));
+    try {
+      fs.mkdirSync(path.join(dir, path.dirname(file)), { recursive: true });
+      fs.writeFileSync(path.join(dir, file), "if (typeof process !== 'undefined') throw new Error('native Node access');\n" + new TextDecoder().decode(files.get(file)));
+      expect(validate(doc, await docRegistry(doc, dir))).toEqual([]);
+    } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+  }, 30_000);
+
+  it('rejects a folder plugin path outside its project before reading it', async () => {
+    const files = read(NIGHT_SKY);
+    const doc = JSON.parse(new TextDecoder().decode(files.get('document.tramme.json'))) as TrammeDoc;
+    const id = doc.plugins![0];
+    doc.assets[id].src = '..\\secret.js';
+    await expect(docRegistry(doc, NIGHT_SKY)).rejects.toThrow('invalid path');
   });
 });
 

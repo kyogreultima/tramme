@@ -5,7 +5,7 @@
 // a context bridged over these messages. Everything that crosses is plain
 // data: live objects (elements, Path2D, functions) stay on their own side.
 
-import type { CheckType, NodeType, EffectType, KitType, PluginMeta, PresetType, PromptType, ToolType } from '@tramme/core';
+import type { CheckType, NodeType, EffectType, KitType, ModifierType, PluginMeta, PresetType, PromptType, ToolType } from '@tramme/core';
 
 /** a plugin as the sandbox sees it: its declarations, without any function */
 export interface PluginDecl {
@@ -59,7 +59,9 @@ export interface SchemaEffect {
 export interface SchemaModifier {
   type: string;
   title: string;
-  params?: Record<string, unknown>;
+  description: string;
+  ai?: ModifierType['ai'];
+  params: ModifierType['params'];
 }
 
 /** what a tool run ships across: the document and its moment, the project's base */

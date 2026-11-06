@@ -38,7 +38,7 @@ export interface WorkerSideOptions {
 
 const schemaNode = (n: NodeType): SchemaNode => ({ type: n.type, title: n.title, category: n.category, description: n.description, ai: n.ai, props: n.props, ...(n.container ? { container: true } : {}), ...(n.path ? { hasPath: true } : {}), ...(n.handles ? { hasHandles: true } : {}), ...(n.export ? { hasExport: true } : {}) });
 const schemaEffect = (e: EffectType): SchemaEffect => ({ type: e.type, title: e.title, category: e.category, description: e.description, ai: e.ai, props: e.props, stage: e.stage });
-const schemaModifier = (m: ModifierType): SchemaModifier => ({ type: m.type, title: m.title, ...(m.params ? { params: m.params } : {}) });
+const schemaModifier = (m: ModifierType): SchemaModifier => ({ type: m.type, title: m.title, description: m.description, ai: m.ai, params: m.params });
 
 /**
  * The vocabulary as a sandboxed tool may read it: schemas and notes, never
