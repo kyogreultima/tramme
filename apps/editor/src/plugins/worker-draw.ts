@@ -27,7 +27,7 @@ const FALLING_AREA = { x: -60, y: -60, w: 120, h: 120 };
 
 /** a canvas pool for a worker: OffscreenCanvases instead of document canvases */
 class WorkerPool extends CanvasPool {
-  constructor() { super(false); }
+  constructor() { super(false, 2); }
   protected override make(): HTMLCanvasElement {
     return new OffscreenCanvas(300, 150) as unknown as HTMLCanvasElement;
   }

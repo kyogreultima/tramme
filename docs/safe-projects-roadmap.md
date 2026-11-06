@@ -37,6 +37,8 @@ Permission separation (2026-11-06): declarations and drawing may share the proje
 
 Canvas request bounds (2026-11-06): the host refuses malformed dimensions and draw or whole-frame requests above 8,192 pixels on either side, using the same per-side ceiling as the editor's project-size control. Scale is checked before a worker message is sent. Per-layer graphics allocations, aggregate pixels and platform memory limits still keep step 4's resource box open.
 
+Worker canvas retention (2026-11-06): the isolated renderer now keeps at most two released full-frame canvases in its reuse pool; further released canvases are resized to zero rather than held for later frames. This bounds that cache, while simultaneous layer allocations, WebGL contexts and actual browser/GPU memory still need measurement and limits before step 4 is complete.
+
 ## Goal
 
 A user opens, plays, edits and exports a `.tramme` project without granting its scripts the editor's rights. Ordinary animation code needs no general execution permission. Extra capabilities, such as sending a media file to an external service, require a specific, understandable permission.

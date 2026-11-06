@@ -10,6 +10,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Added
 
+- The isolated renderer now keeps at most two reusable full-frame canvases after a frame, releasing excess surfaces instead of retaining them in memory.
 - Sandbox renders now refuse invalid sizes or a canvas side above the editor's 8,192-pixel project limit before allocating the frame.
 - Project extensions now run tools and checks in separate isolated workers per plugin. One extension cannot use another extension's active call to borrow its network grant; updating a plugin replaces its worker.
 - An approved plugin network request now stops reading a response above 64 MB instead of buffering it without a limit.

@@ -26,7 +26,8 @@ export type HostFactory = (layerId: string) => Host;
 export class CanvasPool {
   private free: HTMLCanvasElement[] = [];
   private cpu: boolean;
-  constructor(cpu = true) { this.cpu = cpu; }
+  private maxFree: number;
+  constructor(cpu = true, maxFree = Infinity) { this.cpu = cpu; this.maxFree = maxFree; }
   /** the canvas class a pool builds (a worker builds OffscreenCanvases) */
   protected make(): HTMLCanvasElement { return document.createElement('canvas'); }
   get(w: number, h: number): CanvasRenderingContext2D {
@@ -38,7 +39,10 @@ export class CanvasPool {
     ctx.clearRect(0, 0, w, h);
     return ctx;
   }
-  release(ctx: CanvasRenderingContext2D) { this.free.push(ctx.canvas); }
+  release(ctx: CanvasRenderingContext2D) {
+    if (this.free.length < this.maxFree) this.free.push(ctx.canvas);
+    else { ctx.canvas.width = 0; ctx.canvas.height = 0; }
+  }
 }
 
 export interface DrawEnv {
