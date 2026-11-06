@@ -55,6 +55,8 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
   const timeout = (reason: string) => (onTimeout ? onTimeout(reason) : host.dispose(reason));
   /** the page context of a running call, asked for files, stills, data */
   const bridges = new Map<number, ToolContext | CheckContext>();
+  const pendingAsks = new Map<number, number>();
+  let lastAskId = 0;
   /** a node type's schema, computed once (checks ship many samples of the same types) */
   const schemas = new WeakMap<NodeType, unknown>();
   const schemaShipped = (n: NodeType) => {
@@ -172,10 +174,16 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
     if (m.kind === 'ask') {
       const ctx = bridges.get(m.call);
       if (!ctx) { send({ kind: 'answer', id: m.id, err: 'the call is over' }); return; }
+      if (!Number.isSafeInteger(m.id) || m.id <= lastAskId) { send({ kind: 'answer', id: m.id, err: 'invalid sandbox request id' }); return; }
+      lastAskId = m.id;
+      const count = pendingAsks.get(m.call) ?? 0;
+      if (count >= 16) { send({ kind: 'answer', id: m.id, err: 'too many pending sandbox requests' }); return; }
+      pendingAsks.set(m.call, count + 1);
       void Promise.resolve()
         .then(() => answer(ctx, m.q))
-        .then((ok) => send({ kind: 'answer', id: m.id, ok: ok === undefined ? null : ok }))
-        .catch((e: Error) => send({ kind: 'answer', id: m.id, err: e.message }));
+        .then((ok) => { if (bridges.has(m.call) && !closed) send({ kind: 'answer', id: m.id, ok: ok === undefined ? null : ok }); })
+        .catch((e: Error) => { if (bridges.has(m.call) && !closed) send({ kind: 'answer', id: m.id, err: e.message }); })
+        .finally(() => { const left = (pendingAsks.get(m.call) ?? 1) - 1; if (left) pendingAsks.set(m.call, left); else pendingAsks.delete(m.call); });
     }
   };
 
@@ -256,6 +264,7 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
       waits.clear();
       answers.clear();
       loads.clear();
+      pendingAsks.clear();
     },
     closed: () => closed,
   };

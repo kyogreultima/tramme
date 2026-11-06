@@ -97,6 +97,31 @@ describe('the plugin sandbox', () => {
     await Promise.all(pending);
     expect(sent).toHaveLength(64);
   });
+  it('limits unanswered bridge requests from one running tool', async () => {
+    const sent: unknown[] = [];
+    const { host, receive } = connectHost((message) => sent.push(message), () => DOC_URL);
+    const readText = vi.fn(() => new Promise<string>(() => {}));
+    const pending = host.runTool('fake', {}, toolCtx(doc().doc, { readText }));
+    for (let id = 1; id <= 17; id++) receive({ kind: 'ask', id, call: 1, q: { kind: 'readText', path: 'assets/sky.txt' } });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(readText).toHaveBeenCalledTimes(16);
+    expect(sent).toContainEqual({ kind: 'answer', id: 17, err: 'too many pending sandbox requests' });
+    host.dispose();
+    await expect(pending).rejects.toThrow('closed');
+  });
+  it('rejects a replayed bridge request id without repeating the file read', async () => {
+    const sent: unknown[] = [];
+    const { host, receive } = connectHost((message) => sent.push(message), () => DOC_URL);
+    const readText = vi.fn(async () => 'project data');
+    const pending = host.runTool('fake', {}, toolCtx(doc().doc, { readText }));
+    receive({ kind: 'ask', id: 1, call: 1, q: { kind: 'readText', path: 'assets/sky.txt' } });
+    receive({ kind: 'ask', id: 1, call: 1, q: { kind: 'readText', path: 'assets/sky.txt' } });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(readText).toHaveBeenCalledTimes(1);
+    expect(sent).toContainEqual({ kind: 'answer', id: 1, err: 'invalid sandbox request id' });
+    host.dispose();
+    await expect(pending).rejects.toThrow('closed');
+  });
   it('rejects an unknown worker request instead of reading check data', async () => {
     const sent: unknown[] = [];
     const { host, receive } = connectHost((message) => sent.push(message), () => DOC_URL);

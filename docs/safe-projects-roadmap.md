@@ -19,6 +19,8 @@ Host resource bounds (2026-11-06): at most 64 worker calls can wait at once; the
 
 Plugin-backup expansion (2026-11-06): the installed-plugin backup reader now refuses a compressed file over 64 MiB and a declared expanded total over 128 MiB before inflating entries. The project archive and single-plugin package readers already had expansion limits. Other import paths, total bridge message size, graphics allocations and recovery still keep step 4 open.
 
+Bridge request concurrency (2026-11-06): one active tool or check can have at most 16 host requests waiting at once. The host refuses replayed request IDs before repeating a file or network operation, and no longer sends an answer back after the call has ended. Per-plugin permission identity and limits on returned payloads still keep step 3 open.
+
 ## Goal
 
 A user opens, plays, edits and exports a `.tramme` project without granting its scripts the editor's rights. Ordinary animation code needs no general execution permission. Extra capabilities, such as sending a media file to an external service, require a specific, understandable permission.
