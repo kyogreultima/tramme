@@ -9,6 +9,9 @@ import type { Ask, DrawPayload, DrawResult, FramePayload, FromWorker, PluginDecl
 
 /** the schema of a node without its code: what a check's samples may cross */
 const schemaOf = (n: NodeType) => ({ type: n.type, title: n.title, category: n.category, description: n.description, ai: n.ai, props: n.props, ...(n.container ? { container: true } : {}) });
+const projectPath = (value: unknown): value is string => typeof value === 'string' && value.length > 0 && value.length <= 512 &&
+  !value.includes('\\') && !value.startsWith('/') && !/^[a-z][a-z0-9+.-]*:/i.test(value) &&
+  value.split('/').every((part) => part !== '' && part !== '.' && part !== '..');
 
 export interface PluginHost {
   /**
@@ -61,23 +64,55 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
   };
 
   const answer = (ctx: ToolContext | CheckContext, a: Ask): unknown | Promise<unknown> => {
-    if (a.kind === 'readText') return (ctx as ToolContext).readText(a.path);
+    if (!a || typeof a !== 'object') throw new Error('unknown worker request');
+    if (a.kind === 'readText') {
+      if (!projectPath(a.path)) throw new Error('invalid project path');
+      return (ctx as ToolContext).readText(a.path);
+    }
     if (a.kind === 'packFile') {
+      if (!projectPath(a.path)) throw new Error('invalid project path');
       const read = (ctx as ToolContext).packFile;
       if (!read) throw new Error("packFile: only the editor's own packs reach their data here");
       return read(a.path);
     }
     if (a.kind === 'files') return (ctx as ToolContext).files();
-    if (a.kind === 'writeFile') return (ctx as ToolContext).writeFile(a.path, 'text' in a.data ? a.data.text : new Blob([a.data.bytes]));
-    if (a.kind === 'renderStill') return (ctx as ToolContext).renderStill(a.t, a.compId);
-    if (a.kind === 'transcript') return (ctx as ToolContext).transcript(a.assetId, { ask: a.ask });
+    if (a.kind === 'writeFile') {
+      if (!projectPath(a.path)) throw new Error('invalid project path');
+      const data = a.data;
+      if (!data || typeof data !== 'object') throw new Error('invalid file data');
+      if ('text' in data && typeof data.text === 'string' && data.text.length <= 64 * 1024 * 1024) return (ctx as ToolContext).writeFile(a.path, data.text);
+      if ('bytes' in data && data.bytes instanceof ArrayBuffer && data.bytes.byteLength <= 64 * 1024 * 1024) return (ctx as ToolContext).writeFile(a.path, new Blob([data.bytes]));
+      throw new Error('invalid file data');
+    }
+    if (a.kind === 'renderStill') {
+      if (!Number.isFinite(a.t) || a.t < 0 || (a.compId !== undefined && (typeof a.compId !== 'string' || a.compId.length > 128))) throw new Error('invalid still request');
+      return (ctx as ToolContext).renderStill(a.t, a.compId);
+    }
+    if (a.kind === 'transcript') {
+      if (typeof a.assetId !== 'string' || a.assetId.length > 128 || typeof a.ask !== 'boolean') throw new Error('invalid transcript request');
+      return (ctx as ToolContext).transcript(a.assetId, { ask: a.ask });
+    }
     if (a.kind === 'fetch') {
+      if (typeof a.url !== 'string' || a.url.length > 2048 || !/^https?:\/\//i.test(a.url)) throw new Error('invalid network request');
+      let target: URL;
+      try { target = new URL(a.url); } catch { throw new Error('invalid network request'); }
+      if (target.username || target.password || (a.method !== undefined && (typeof a.method !== 'string' || !/^[A-Z]{1,12}$/i.test(a.method)))) throw new Error('invalid network request');
+      if (a.headers !== undefined) {
+        if (!a.headers || typeof a.headers !== 'object' || Array.isArray(a.headers)) throw new Error('invalid network request');
+        const entries = Object.entries(a.headers);
+        if (entries.length > 32 || entries.some(([key, value]) => key.length > 128 || typeof value !== 'string' || value.length > 4096)) throw new Error('invalid network request');
+      }
+      if (a.body !== undefined && !((typeof a.body === 'string' && a.body.length <= 64 * 1024 * 1024) || (a.body instanceof ArrayBuffer && a.body.byteLength <= 64 * 1024 * 1024))) throw new Error('invalid network request');
       const go = (ctx as ToolContext).fetch;
       if (!go) throw new Error('this plugin declared no network access (meta.permissions)');
       // the answer as plain data: the worker makes it a Response again
       return go(a.url, { method: a.method, headers: a.headers, body: a.body }).then(async (r) => ({ status: r.status, headers: Object.fromEntries(r.headers), body: await r.arrayBuffer() }));
     }
-    return (ctx as CheckContext).data(a.assetId);
+    if (a.kind === 'data') {
+      if (typeof a.assetId !== 'string' || a.assetId.length > 128 || !('data' in ctx)) throw new Error('invalid data request');
+      return ctx.data(a.assetId);
+    }
+    throw new Error('unknown worker request');
   };
 
   const receive = (m: FromWorker) => {

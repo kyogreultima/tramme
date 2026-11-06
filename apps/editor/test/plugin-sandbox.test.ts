@@ -86,6 +86,40 @@ function toolCtx(doc: TrammeDoc, over: Partial<ToolContext> = {}): ToolContext &
 }
 
 describe('the plugin sandbox', () => {
+  it('rejects an unknown worker request instead of reading check data', async () => {
+    const sent: unknown[] = [];
+    const { host, receive } = connectHost((message) => sent.push(message), () => DOC_URL);
+    const read = vi.fn(() => 'private');
+    const ctx = { doc: {}, compId: 'root', comp: {}, registry: new Registry(), evaluator: undefined, samples: [], step: 1, data: read } as unknown as CheckContext;
+    const pending = host.runCheck('fake', ctx);
+    receive({ kind: 'ask', id: 1, call: 1, q: { kind: 'unknown', assetId: 'secret' } } as never);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(read).not.toHaveBeenCalled();
+    expect(sent).toContainEqual({ kind: 'answer', id: 1, err: 'unknown worker request' });
+    host.dispose();
+    await expect(pending).rejects.toThrow('closed');
+  });
+
+  it('rejects paths that leave the project before invoking host file capabilities', async () => {
+    const sent: unknown[] = [];
+    const { host, receive } = connectHost((message) => sent.push(message), () => DOC_URL);
+    const readText = vi.fn(async () => 'private');
+    const writeFile = vi.fn(async () => 'written');
+    const fetch = vi.fn(async () => new Response('private'));
+    const pending = host.runTool('fake', {}, toolCtx(doc().doc, { readText, writeFile, fetch }));
+    receive({ kind: 'ask', id: 1, call: 1, q: { kind: 'readText', path: '../secret.txt' } });
+    receive({ kind: 'ask', id: 2, call: 1, q: { kind: 'writeFile', path: '/api/keys', data: { text: 'x' } } });
+    receive({ kind: 'ask', id: 3, call: 1, q: { kind: 'fetch', url: 'file:///secret.txt' } });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(readText).not.toHaveBeenCalled();
+    expect(writeFile).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+    expect(sent).toContainEqual({ kind: 'answer', id: 1, err: 'invalid project path' });
+    expect(sent).toContainEqual({ kind: 'answer', id: 2, err: 'invalid project path' });
+    expect(sent).toContainEqual({ kind: 'answer', id: 3, err: 'invalid network request' });
+    host.dispose();
+    await expect(pending).rejects.toThrow('closed');
+  });
   it('terminates a plugin load that never answers', async () => {
     vi.useFakeTimers();
     try {

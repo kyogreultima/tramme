@@ -10,6 +10,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Added
 
+- The plugin host now rejects unknown bridge requests, project path escapes and malformed or oversized file/network requests before calling the editor's capabilities.
 - The isolated project host now stops and releases a frame that never starts or answers. Plugin loads, checks, tools and renders have deadlines; the next attempt creates a new frame.
 - Sandboxed plugin drawing now receives project font bytes from the trusted host, in document order, and waits for the face to load before drawing. A font URL outside the project is refused before any request.
 - CLI archive and folder validation now obtains plugin declarations from an opaque browser worker; project modules no longer initialize inside Node. A looping module is stopped after a deadline, and Node-only plugin behavior fails closed until its browser bridge is available.

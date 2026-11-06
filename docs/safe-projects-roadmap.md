@@ -13,6 +13,8 @@ The worker now waits for each supplied `FontFace` to finish loading before the f
 
 Startup and call deadlines (2026-11-06): if the iframe does not start its worker in ten seconds, the host rejects waiting operations and removes it. Plugin loading has a 15-second deadline; checks, drawing, frame renders and vector exports have 30 seconds; tools have 120 seconds. A timeout closes the host so the next attempt creates a fresh isolated frame. A browser test serves a blank frame to prove the startup refusal; fake-time tests cover load and draw timeouts. Resource budgets and a user-facing recovery flow are still open in step 4.
 
+Bridge input checks (2026-11-06): unknown worker requests no longer fall through to the check's asset-data capability. Host file requests reject absolute paths, traversal and URL-like paths before invoking the project context; file payloads and network request fields have size and shape bounds. A test sends forged requests during an active check/tool call and verifies that no private data or file action is reached. This does not establish a plugin's identity inside the shared worker: permission separation, replay protection and result limits in step 3 remain open.
+
 ## Goal
 
 A user opens, plays, edits and exports a `.tramme` project without granting its scripts the editor's rights. Ordinary animation code needs no general execution permission. Extra capabilities, such as sending a media file to an external service, require a specific, understandable permission.
