@@ -1,6 +1,6 @@
 # Sound parity roadmap
 
-Status: steps 1 to 4 built; step 5's film reading, structured provider request and post-generation beat check are built. 20 boxes done, 9 open; the file's sidecar is next.
+Status: steps 1 to 5 built against fake providers; 22 boxes done, 7 open. A paid score still needs a listening and beat check on the user's quota. Drawn ducking is next.
 
 What Raylight's Sound page ([raylight.app/sound](https://www.raylight.app/sound)) offers and Tramme does not yet, and the steps that close the gap. Read with [sound-roadmap.md](sound-roadmap.md), which this continues: its steps 1 to 9 are done, and nothing here replaces them.
 
@@ -113,8 +113,10 @@ The one step that changes how a sound is made.
   - `generate-sound` divides the film at its cuts, markers and hero cues into 3–120 s instrumental sections, carries the proposed BPM in each section and sends their exact durations as an ElevenLabs Music v2.5 `composition_plan`. The API validates section bounds, count and total duration before a provider call. Hydracept still receives its prompt. Contract tests use a fake provider; a paid provider result has not yet been heard or measured.
 - [x] After generation, measure how many cuts land within a frame of a beat (`beats` analysis); when too few, retime by whole bars, or stretch within a small limit, before the user hears it.
   - The received audio is resampled to the same 16 kHz mono input as `beats`; the count is measured against actual detected beats within one film frame. A speed correction of at most 2% is chosen only when it improves the count, and `keepPitch` preserves the notes in preview and export. The tool reports both counts and the applied speed, including when no steady pulse was found. A six-cut synthetic beat regression reaches six after correction. No real paid provider output has been checked; an arbitrary provider score may still fail the five-of-six goal and is reported honestly.
-- [ ] Keep the prompt, the tempo and the section plan beside the file, as the other generated sounds do.
-- [ ] Fall back to the current path (a bed, then alignment) when the provider cannot take a structure.
+- [x] Keep the prompt, the tempo and the section plan beside the file, as the other generated sounds do.
+  - The generated sound's `.sound.json` keeps the prompt and provider as before, plus `music.tempo`, `music.sectionPlan`, `music.requestMode` and the actual `music.beatCheck` counts and speed.
+- [x] Fall back to the current path (a bed, then alignment) when the provider cannot take a structure.
+  - Hydracept receives the prompt and duration as a music bed, without the unsupported `compositionPlan`; the same post-generation beat check and small correction then run. The route is covered by a fake provider job. Hydracept caps music at 300 s; the tool reports any cuts the returned score cannot cover.
 
 Done when: on a film with six cuts, at least five land on a beat without the user moving anything, and the check reports it.
 

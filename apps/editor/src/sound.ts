@@ -485,7 +485,8 @@ const generateSound: ToolType<{ kind: 'sfx' | 'music' | 'voice'; prompt: string;
     const { buffer, figures } = await measure(made.blob);
     const musicAlignment = film ? alignMusicBeats(film, await generatedBeats(buffer), times[0]?.t ?? 0) : null;
     const label = name ?? `${kind}-${prompt.toLowerCase().split(/\s+/).slice(0, 4).join('-')}`;
-    const record = { kind, prompt, provider: made.provider, model: made.model, voice: made.voice, style, duration };
+    const record = { kind, prompt, provider: made.provider, model: made.model, voice: made.voice, style, duration,
+      ...(film ? { music: { tempo: film.tempo, sectionPlan: plan, requestMode: made.provider === 'elevenlabs' ? 'composition_plan' : 'prompt_bed', beatCheck: musicAlignment } } : {}) };
     const kept = await keepFile(ctx, label, made.blob, label, figures, record);
     const placed = place(ctx, [[{ asset: kept.asset, title: label, figures, kind: kind === 'sfx' ? 'sfx' : kind }]], times, { gain: gain ?? (kind === 'music' ? p.musicDb : kind === 'voice' ? 0 : p.effectsDb), rate: musicAlignment?.rate, keepPitch: musicAlignment?.keepPitch, align, vary: false });
     if (keep) await keepInLibrary(label, made.blob, { kind: kind === 'sfx' ? 'sfx' : kind, title: label, tags: prompt.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2).slice(0, 8), figures, prompt, provider: made.provider });
