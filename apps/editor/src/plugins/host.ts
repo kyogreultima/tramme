@@ -13,6 +13,10 @@ const projectPath = (value: unknown): value is string => typeof value === 'strin
   !value.includes('\\') && !value.startsWith('/') && !/^[a-z][a-z0-9+.-]*:/i.test(value) &&
   value.split('/').every((part) => part !== '' && part !== '.' && part !== '..');
 const RESPONSE_LIMIT = 8 * 1024 * 1024;
+const canvasSize = (width: number, height: number, scale = 1) => {
+  if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 || !Number.isFinite(scale) || scale <= 0) throw new Error('invalid sandbox canvas');
+  if (width > 8192 || height > 8192 || width * scale > 8192 || height * scale > 8192) throw new Error('sandbox canvas exceeds 8192 pixels');
+};
 /** Check nested plain data without serializing a potentially hostile response. */
 function responseTooLarge(value: unknown): boolean {
   const stack = [value], seen = new Set<object>(), encoder = new TextEncoder();
@@ -321,6 +325,7 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
       send({ kind: 'doc', doc });
     },
     async draw(payload) {
+      canvasSize(payload.comp.width, payload.comp.height);
       return await run({ kind: 'draw', call: ++call, payload }) as DrawResult[];
     },
     async exportOf(type, props) {
@@ -329,6 +334,7 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
     },
     async renderFrame(payload) {
       try {
+        canvasSize(payload.width, payload.height, payload.scale);
         const r = await run({ kind: 'render', call: ++call, payload });
         return (r ?? {}) as { bitmap?: unknown; err?: string };
       } finally {

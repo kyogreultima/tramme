@@ -86,6 +86,15 @@ function toolCtx(doc: TrammeDoc, over: Partial<ToolContext> = {}): ToolContext &
 }
 
 describe('the plugin sandbox', () => {
+  it('refuses invalid canvas dimensions before sending a render to the worker', async () => {
+    const sent: unknown[] = [];
+    const { host } = connectHost((message) => sent.push(message), () => DOC_URL);
+    await expect(host.renderFrame({ compId: 'main', t: 0, scale: 1, width: 100_000, height: 10 })).rejects.toThrow('sandbox canvas exceeds 8192 pixels');
+    await expect(host.renderFrame({ compId: 'main', t: 0, scale: Number.POSITIVE_INFINITY, width: 10, height: 10 })).rejects.toThrow('invalid sandbox canvas');
+    await expect(host.draw({ frame: 0, comp: { width: 100_000, height: 10, duration: 1, fps: 30 }, layers: [], items: [] })).rejects.toThrow('sandbox canvas exceeds 8192 pixels');
+    expect(sent).toEqual([]);
+    host.dispose();
+  });
   it('cancels an oversized module stream without waiting for its body to finish', async () => {
     let cancelled = false;
     const body = new ReadableStream<Uint8Array>({

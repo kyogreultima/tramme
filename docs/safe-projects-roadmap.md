@@ -35,6 +35,8 @@ Approved network response budget (2026-11-06): when a plugin has a specific netw
 
 Permission separation (2026-11-06): declarations and drawing may share the project worker, but tools and checks now run in a separate opaque worker per plugin ID and module URL. The trusted host selects that worker from its own registry entry; the plugin cannot choose another host in a message. Changing the module URL or project disposes the former worker. Browser tests show a second plugin's forged request cannot invoke the first plugin's active fetch grant and verify host replacement. Editor-shipped packs are transferred only under their pack identity. Other capability checks in step 3 remain open.
 
+Canvas request bounds (2026-11-06): the host refuses malformed dimensions and draw or whole-frame requests above 8,192 pixels on either side, using the same per-side ceiling as the editor's project-size control. Scale is checked before a worker message is sent. Per-layer graphics allocations, aggregate pixels and platform memory limits still keep step 4's resource box open.
+
 ## Goal
 
 A user opens, plays, edits and exports a `.tramme` project without granting its scripts the editor's rights. Ordinary animation code needs no general execution permission. Extra capabilities, such as sending a media file to an external service, require a specific, understandable permission.
