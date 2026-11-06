@@ -1,6 +1,6 @@
 # Sound parity roadmap
 
-Status: steps 1 to 3 built. 13 boxes done, 16 open; effect controls are next.
+Status: steps 1 to 4 built. 17 boxes done, 12 open; music written for the cut is next.
 
 What Raylight's Sound page ([raylight.app/sound](https://www.raylight.app/sound)) offers and Tramme does not yet, and the steps that close the gap. Read with [sound-roadmap.md](sound-roadmap.md), which this continues: its steps 1 to 9 are done, and nothing here replaces them.
 
@@ -92,10 +92,14 @@ Done when: the voice looks (telephone, radio, megaphone, echo) are written as ch
 
 ### Step 4. The chain in the interface
 
-- [ ] A strip shows its chain as a row of small slots; a click opens an effect's controls, a drag reorders, a toggle bypasses.
-- [ ] A start from presets: voice cleanup (low cut, compressor, de-ess EQ), music under voice, telephone, big room.
-- [ ] The `/` menu and the assistant reach the same operations (`use_tool`), and the assistant's proposal shows the chain it would add before applying it.
-- [ ] Keyboard use and focus order checked; every control has a label in both languages.
+- [x] A strip shows its chain as a row of small slots; a click opens an effect's controls, a drag reorders, a toggle bypasses.
+  - Each strip and bus shows its inserts in order. Controls derive their bounds from the strict effect schema; a note delay offers notes only after an explicit tempo. Edits, bypass and reordering use the existing one-step undo operations. A Chrome interaction run verifies settings, bypass, drag and responsive widths.
+- [x] A start from presets: voice cleanup (low cut, compressor, de-ess EQ), music under voice, telephone, big room.
+  - The add menu offers the four named chains and individual processors. A preset appends as one undoable edit, preserving existing inserts. Voice cleanup is two clicks from a strip; the telephone preset uses the same processors as the historic voice look.
+- [x] The `/` menu and the assistant reach the same operations (`use_tool`), and the assistant's proposal shows the chain it would add before applying it.
+  - `chain` lists, adds, appends a preset, edits, moves, bypasses and removes, through the same pure mixer operations. It refuses invalid/locked targets and active note delays without a tempo. The proposal card names the track and shows every processor and parameter without truncating the chain.
+- [x] Keyboard use and focus order checked; every control has a label in both languages.
+  - Alt + Left/Right reorders a focused slot; Tab stays in the open dialog and Escape returns focus to its trigger. The interface labels are English and French. To check on a device: drag and keyboard focus in WebView2 and WKWebView; touch screen scrolling of long chains.
 
 Done when: a user builds "clean voice" in four clicks, and the assistant does the same from one sentence and shows what it did.
 

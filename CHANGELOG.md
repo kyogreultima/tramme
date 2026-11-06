@@ -10,6 +10,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Added
 
+- Mixer strips now show their ordered effect chains. You can open an insert's settings, bypass or move it, and add voice cleanup, music under voice, telephone or big room presets. The `/chain` command and assistant can propose the same edits with the full chain shown before applying it.
 - Delay and distortion can be placed anywhere in a track or bus chain. Echoes use milliseconds or notes at an explicitly chosen composition tempo, with bounded feedback; distortion has drive, tone and wet controls. Existing telephone, radio, megaphone and echo voices keep their sound through the same processors.
 - Ordered track and bus effects now process their combined sources in playback, scrubbing and every export, preserving source files and the existing per-clip settings. Changing a chain refreshes its live sound and loudness measurement.
 - Projects can keep ordered, bypassable audio-effect settings on sound tracks and buses, with each edit undoable in one step.

@@ -1,4 +1,10 @@
 {
+  "audioEffects": {
+    "chain": "Chaîne d'effets", "add": "Ajouter un effet", "addPreset": "Ajouter un préréglage", "change": "Modifier l'effet", "move": "Déplacer l'effet", "remove": "Retirer l'effet", "bypass": "Contourner l'effet", "close": "Fermer les réglages de l'effet", "reorderHint": "Glisser ou appuyer sur Alt + Gauche/Droite pour réordonner", "presets": "Partir d'un préréglage", "effects": "Effets individuels",
+    "eq": "Égaliseur", "compressor": "Compresseur", "reverb": "Réverbération", "lowCut": "Coupe-bas", "highCut": "Coupe-haut", "delay": "Délai", "distortion": "Distorsion",
+    "voiceCleanup": "Nettoyage de la voix", "musicUnderVoice": "Musique sous la voix", "telephone": "Téléphone", "bigRoom": "Grande salle",
+    "low": "Graves (dB)", "mid": "Médiums (dB)", "midFreq": "Fréquence médium (Hz)", "midQ": "Q médium", "high": "Aigus (dB)", "amount": "Quantité", "frequency": "Fréquence (Hz)", "wet": "Effet", "time": "Temps", "feedback": "Répétition", "drive": "Saturation", "tone": "Tonalité (Hz)", "timeUnit": "Unité du temps", "milliseconds": "Millisecondes", "tempo": "Tempo (BPM)", "tempoUnset": "Non défini", "tempoNeeded": "Définissez un tempo pour activer ce délai en valeur de note"
+  },
   "common": {
     "pickInViewport": "Prendre dans la vue (Échap : annuler)",
     "companionHttpStatus": "compagnon : HTTP {status}",
@@ -1575,6 +1581,23 @@
     "issue.loudness": "Le volume visé est {from}, ce format veut {to} LUFS"
   },
   "content": {
+    "Track effect chain": "Chaîne d'effets de piste",
+    "lists or edits an ordered track or bus effect chain, including presets": "liste ou modifie une chaîne d'effets ordonnée sur une piste ou un bus, avec des préréglages",
+    "Chain action": "Action sur la chaîne",
+    "Sound track": "Piste audio",
+    "audio track or bus id; inferred from a selected clip or the only audio track": "identifiant de piste audio ou de bus ; déduit du clip sélectionné ou de l'unique piste audio",
+    "Effect kind": "Type d'effet",
+    "for add without effect settings: insert a neutral effect": "pour ajouter sans réglages : insérer un effet neutre",
+    "Chain preset": "Préréglage de chaîne",
+    "Effect settings": "Réglages de l'effet",
+    "complete effect object as JSON; the assistant may also pass an object": "objet d'effet complet en JSON ; l'assistant peut aussi passer un objet",
+    "Effect index": "Position de l'effet",
+    "zero-based position in the chain": "position dans la chaîne, à partir de zéro",
+    "Move to index": "Déplacer à la position",
+    "Bypass effect": "Contourner l'effet",
+    "list": "lister", "add": "ajouter", "preset": "préréglage", "set": "régler", "move": "déplacer", "bypass": "contourner", "remove": "retirer",
+    "eq": "égaliseur", "compressor": "compresseur", "reverb": "réverbération", "lowCut": "coupe-bas", "highCut": "coupe-haut", "delay": "délai", "distortion": "distorsion",
+    "voice-cleanup": "nettoyage de la voix", "music-under-voice": "musique sous la voix", "telephone": "téléphone", "big-room": "grande salle",
     "Tempo": "Tempo",
     "the composition tempo for note-valued delays; set it explicitly to sync an echo to beats": "le tempo de la composition pour les délais en valeurs de note ; renseignez-le pour synchroniser un écho sur les temps",
     "a composition tempo is required for an active note delay": "un tempo de composition est nécessaire pour un délai actif en valeur de note",

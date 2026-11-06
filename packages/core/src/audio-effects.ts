@@ -20,6 +20,8 @@ export const AudioEffectSchema = z.discriminatedUnion('kind', [
 ]);
 
 export type AudioEffect = z.infer<typeof AudioEffectSchema>;
+/** Control and tool bounds come from the document's validation schema. */
+export const audioEffectJsonSchema = () => z.toJSONSchema(AudioEffectSchema, { target: 'draft-2020-12' });
 
 /** Quarter notes are one beat; a note delay never chooses a tempo for a film. */
 export function delayTimeSeconds(time: DelayTime, tempo?: number | null): number {

@@ -15,6 +15,7 @@ import { changeTrack } from './timeline/Tracks.tsx';
 import { addBusOps, faderMoveOps, trackBusOps, trackPanOps, trackVolumeOps } from './timeline/mixer.ts';
 import { clipsOn, soloOf } from './timeline/tracks.ts';
 import { MASTER_METER_ID, METER_FLOOR, type LevelReading } from '../audio-meters.ts';
+import { EffectSlots } from './EffectSlots.tsx';
 
 /** the tracks whose faders are recorded while the film plays */
 const armed = signal<Set<string>>(new Set());
@@ -71,6 +72,7 @@ function Strip({ compId, c, track }: { compId: string; c: Composition; track: Se
     <div class={`strip${track.muted ? ' muted' : ''}`} data-strip={track.id}>
       <div class="strip-name" title={track.name || track.id}>{track.name || track.id}</div>
       <LiveMeter id={track.id} />
+      <EffectSlots compId={compId} c={c} track={track} />
       <input class="fader" type="range" min={-60} max={12} step={0.5} value={db} aria-label={t('timeline.volume')}
         onInput={(e) => move(Number((e.target as HTMLInputElement).value))} onPointerUp={release} onKeyUp={release}
         onDblClick={() => commit(t('timeline.trackVolume'), trackVolumeOps(c, compId, track.id, 0))} />

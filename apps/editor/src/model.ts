@@ -1,8 +1,9 @@
 // Pure helpers over the document for the editor: tree order, parents,
 // keyframes, time formatting, and the ops of common edits.
 
-import { animatedProps, carriedStart, getAt, keysOf, parentOf, pointer, propPath, rawProp, setKeyframe, setProp, shiftLayerOps, snap, splitLayerOps, staticValue, subtree, trimInOps, type Composition, type TrammeDoc, type Keyframe, type Layer, type Op, type Prop } from '@tramme/core';
+import { animatedProps, carriedStart, getAt, keysOf, parentOf, pointer, propPath, rawProp, setKeyframe, setProp, shiftLayerOps, snap, splitLayerOps, staticValue, subtree, trimInOps, type AudioEffect, type Composition, type TrammeDoc, type Keyframe, type Layer, type Op, type Prop } from '@tramme/core';
 import { locale, t } from './i18n/index.ts';
+import { chainText } from './effect-chain.ts';
 
 // the time helpers live in core (packages/core/src/timing.ts); the editor keeps importing them from here
 export { animatedProps, carriedStart, keysOf, parentOf, propPath, rawProp, shiftLayerOps, shiftProp, snap, splitLayerOps, subtree, trimInOps } from '@tramme/core';
@@ -219,6 +220,10 @@ export function freshId(taken: Record<string, unknown>, base: string): string {
 /** a short description of an op, for proposal cards */
 export function describeOp(doc: TrammeDoc, op: Op): string {
   const parts = op.path.split('/').slice(1).map((s) => s.replace(/~1/g, '/').replace(/~0/g, '~'));
+  if (parts[0] === 'compositions' && parts[2] === 'tracks' && parts[4] === 'effects') {
+    const track = doc.compositions[parts[1]]?.tracks?.[Number(parts[3])];
+    return `${track?.name ?? track?.id ?? parts[3]} · ${t('audioEffects.chain')}: ${chainText('value' in op ? op.value as AudioEffect[] : [], (kind) => t(kind))}`;
+  }
   const short = (v: unknown) => { const s = JSON.stringify(v); return s.length > 48 ? s.slice(0, 46) + '…' : s; };
   if (parts[0] === 'compositions' && parts[2] === 'layers' && parts[3]) {
     const l = doc.compositions[parts[1]]?.layers[parts[3]];

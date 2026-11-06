@@ -322,9 +322,27 @@
 .strip { display: flex; flex-direction: column; align-items: center; gap: 6px; flex: none; width: 84px; padding: 8px 6px; border-radius: var(--r-md); background: var(--surface-2); }
 .strip.muted { opacity: .6; }
 .strip-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-xs); color: var(--text-2); }
-.strip .fader { flex: 1; min-height: 60px; writing-mode: vertical-lr; direction: rtl; width: 22px; accent-color: var(--accent); }
+.strip .fader { flex: 1; min-height: 40px; writing-mode: vertical-lr; direction: rtl; width: 22px; accent-color: var(--accent); }
 .strip-db { font-size: var(--fs-xs); color: var(--text-2); }
 .strip-level { display: flex; flex-direction: column; gap: 4px; width: 100%; align-items: center; flex-shrink: 0; }
+.effect-row { display: flex; align-items: center; gap: 3px; width: 100%; min-width: 0; }
+.effect-slots { display: flex; align-items: center; gap: 3px; flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: thin; }
+.effect-slot { display: flex; flex: none; align-items: center; border: 1px solid var(--line); border-radius: var(--r-xs); background: var(--surface); }
+.effect-slot.bypassed { opacity: .55; }
+.effect-slot button, .effect-add { border: 0; background: transparent; color: var(--text-2); height: 22px; cursor: pointer; }
+.effect-slot-name { min-width: 27px; padding: 0 3px; font: 600 10px var(--mono); }
+.effect-slot-bypass { width: 19px; padding: 0; font-size: 12px; }
+.effect-slot-bypass[aria-pressed=true] { color: var(--danger); }
+.effect-add { flex: none; width: 23px; border: 1px solid var(--line); border-radius: var(--r-xs); font-size: 16px; }
+.effect-popover { width: min(310px, calc(100vw - 16px)); padding: 12px; color: var(--text); }
+.effect-dialog-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.effect-dialog-head button { border: 0; background: transparent; color: var(--text-2); cursor: pointer; }
+.effect-list-title { margin: 10px 0 5px; color: var(--text-3); font-size: var(--fs-xs); }
+.effect-add-list { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.effect-add-list button, .effect-actions button { border: 1px solid var(--line); border-radius: var(--r-xs); background: var(--surface-2); color: var(--text); padding: 5px; text-align: left; cursor: pointer; }
+.effect-field { display: flex; flex-direction: column; gap: 3px; margin: 7px 0; font-size: var(--fs-xs); color: var(--text-2); }
+.effect-field input, .effect-field select { width: 100%; border: 1px solid var(--line); border-radius: var(--r-xs); background: var(--surface); color: var(--text); padding: 5px; }
+.effect-actions { display: flex; justify-content: flex-end; margin-top: 12px; }
 .strip .strip-name { flex-shrink: 0; }
 .meter-line { display: flex; align-items: center; gap: 4px; width: 100%; }
 .live-meter { position: relative; height: 10px; width: 100%; overflow: hidden; background: var(--surface); border-radius: var(--r-xs); }

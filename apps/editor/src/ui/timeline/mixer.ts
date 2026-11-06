@@ -132,3 +132,10 @@ export function setTrackEffectOps(c: Composition, compId: string, trackId: strin
   if (!parsed.success) return [];
   return effectsOps(c, compId, trackId, (before) => effectIndex(before, index) ? before.map((old, i) => i === index ? parsed.data : old) : null);
 }
+
+/** Add a whole preset in one history step, retaining the existing chain. */
+export function appendTrackEffectsOps(c: Composition, compId: string, trackId: string, effects: readonly AudioEffect[]): Op[] {
+  const parsed = effects.map((effect) => AudioEffectSchema.safeParse(effect));
+  if (!effects.length || parsed.some((result) => !result.success)) return [];
+  return effectsOps(c, compId, trackId, (before) => [...before, ...parsed.map((result) => result.data!)]);
+}

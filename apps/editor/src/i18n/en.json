@@ -1,4 +1,10 @@
 {
+  "audioEffects": {
+    "chain": "Effect chain", "add": "Add effect", "addPreset": "Add effect preset", "change": "Change effect", "move": "Move effect", "remove": "Remove effect", "bypass": "Bypass effect", "close": "Close effect controls", "reorderHint": "Drag or press Alt + Left/Right to reorder", "presets": "Start from a preset", "effects": "Individual effects",
+    "eq": "EQ", "compressor": "Compressor", "reverb": "Reverb", "lowCut": "Low cut", "highCut": "High cut", "delay": "Delay", "distortion": "Distortion",
+    "voiceCleanup": "Voice cleanup", "musicUnderVoice": "Music under voice", "telephone": "Telephone", "bigRoom": "Big room",
+    "low": "Low (dB)", "mid": "Mid (dB)", "midFreq": "Mid frequency (Hz)", "midQ": "Mid Q", "high": "High (dB)", "amount": "Amount", "frequency": "Frequency (Hz)", "wet": "Wet", "time": "Time", "feedback": "Feedback", "drive": "Drive", "tone": "Tone (Hz)", "timeUnit": "Time unit", "milliseconds": "Milliseconds", "tempo": "Tempo (BPM)", "tempoUnset": "Not set", "tempoNeeded": "Set a tempo to enable this note delay"
+  },
   "common": {
     "pickInViewport": "Pick in the viewport (Escape: cancel)",
     "companionHttpStatus": "companion: HTTP {status}",
