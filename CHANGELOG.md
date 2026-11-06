@@ -12,6 +12,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 - Isolation checks now exercise project code at module import and additional browser network APIs in Chrome and Edge, before any tool or drawing call.
 - Failed plugin attachments can be retried after repair, and storyboard stills report sandbox attachment errors.
+- Sandbox capability replies now reject oversized data before it crosses the worker bridge.
 - The isolated renderer now keeps at most two reusable full-frame canvases after a frame, releasing excess surfaces instead of retaining them in memory.
 - Sandbox renders now refuse invalid sizes or a canvas side above the editor's 8,192-pixel project limit before allocating the frame.
 - Project extensions now run tools and checks in separate isolated workers per plugin. One extension cannot use another extension's active call to borrow its network grant; updating a plugin replaces its worker.

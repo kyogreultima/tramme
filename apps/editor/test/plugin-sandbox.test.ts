@@ -156,6 +156,17 @@ describe('the plugin sandbox', () => {
     host.dispose();
     await expect(pending).rejects.toThrow('closed');
   });
+  it('refuses an oversized file answer before posting it to the sandbox', async () => {
+    const sent: unknown[] = [];
+    const { host, receive } = connectHost((message) => sent.push(message), () => DOC_URL);
+    const pending = host.runTool('fake', {}, toolCtx(doc().doc, { readText: async () => 'x'.repeat(8 * 1024 * 1024 + 1) }));
+    receive({ kind: 'ask', id: 1, call: 1, q: { kind: 'readText', path: 'assets/large.txt' } });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(sent).toContainEqual({ kind: 'answer', id: 1, err: 'sandbox answer exceeds 8 MB' });
+    expect(sent).not.toContainEqual(expect.objectContaining({ kind: 'answer', id: 1, ok: expect.any(String) }));
+    host.dispose();
+    await expect(pending).rejects.toThrow('closed');
+  });
   it('rejects a replayed bridge request id without repeating the file read', async () => {
     const sent: unknown[] = [];
     const { host, receive } = connectHost((message) => sent.push(message), () => DOC_URL);
@@ -215,6 +226,19 @@ describe('the plugin sandbox', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(sent).toContainEqual({ kind: 'answer', id: 1, err: 'network response exceeds 64 MB' });
     expect(cancelled).toBe(true);
+    host.dispose();
+    await expect(pending).rejects.toThrow('closed');
+  });
+  it('keeps the approved network response budget above the ordinary data budget', async () => {
+    const sent: unknown[] = [];
+    const { host, receive } = connectHost((message) => sent.push(message), () => DOC_URL);
+    const body = new Uint8Array(8 * 1024 * 1024 + 1);
+    const pending = host.runTool('fake', {}, toolCtx(doc().doc, { fetch: async () => new Response(body) }));
+    receive({ kind: 'ask', id: 1, call: 1, q: { kind: 'fetch', url: 'https://service.example.com/data' } });
+    for (let i = 0; i < 20 && !sent.some((m) => (m as { kind?: string }).kind === 'answer'); i++) await new Promise((resolve) => setTimeout(resolve, 0));
+    const reply = sent.find((m) => (m as { kind?: string }).kind === 'answer') as { ok?: { body: ArrayBuffer }; err?: string } | undefined;
+    expect(reply?.err).toBeUndefined();
+    expect(reply?.ok?.body.byteLength).toBe(body.byteLength);
     host.dispose();
     await expect(pending).rejects.toThrow('closed');
   });

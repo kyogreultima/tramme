@@ -18,13 +18,13 @@ const canvasSize = (width: number, height: number, scale = 1) => {
   if (width > 8192 || height > 8192 || width * scale > 8192 || height * scale > 8192) throw new Error('sandbox canvas exceeds 8192 pixels');
 };
 /** Check nested plain data without serializing a potentially hostile response. */
-function responseTooLarge(value: unknown): boolean {
+function responseTooLarge(value: unknown, limit = RESPONSE_LIMIT): boolean {
   const stack = [value], seen = new Set<object>(), encoder = new TextEncoder();
   let bytes = 0, entries = 0;
   while (stack.length) {
     if (++entries > 10000) return true;
     const item = stack.pop();
-    if (typeof item === 'string') { if (item.length > RESPONSE_LIMIT) return true; bytes += encoder.encode(item).byteLength; }
+    if (typeof item === 'string') { if (item.length > limit) return true; bytes += encoder.encode(item).byteLength; }
     else if (!item || typeof item !== 'object') continue;
     else if (seen.has(item)) continue;
     else {
@@ -42,7 +42,7 @@ function responseTooLarge(value: unknown): boolean {
         for (const [key, content] of fields) { bytes += key.length; stack.push(content); }
       }
     }
-    if (bytes > RESPONSE_LIMIT) return true;
+    if (bytes > limit) return true;
   }
   return false;
 }
@@ -262,7 +262,12 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
       pendingAsks.set(m.call, count + 1);
       void Promise.resolve()
         .then(() => answer(ctx, m.q))
-        .then((ok) => { if (bridges.has(m.call) && !closed) send({ kind: 'answer', id: m.id, ok: ok === undefined ? null : ok }); })
+        .then((ok) => {
+          if (!bridges.has(m.call) || closed) return;
+          const limit = m.q.kind === 'fetch' ? 64 * 1024 * 1024 + 16 * 1024 : RESPONSE_LIMIT;
+          if (responseTooLarge(ok, limit)) throw new Error(`sandbox answer exceeds ${m.q.kind === 'fetch' ? 64 : 8} MB`);
+          send({ kind: 'answer', id: m.id, ok: ok === undefined ? null : ok });
+        })
         .catch((e: Error) => { if (bridges.has(m.call) && !closed) send({ kind: 'answer', id: m.id, err: e.message }); })
         .finally(() => { const left = (pendingAsks.get(m.call) ?? 1) - 1; if (left) pendingAsks.set(m.call, left); else pendingAsks.delete(m.call); });
     }

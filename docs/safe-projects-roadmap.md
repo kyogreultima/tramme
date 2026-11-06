@@ -41,6 +41,8 @@ Worker canvas retention (2026-11-06): the isolated renderer now keeps at most tw
 
 Failure recovery (2026-11-06): a failed project or installed plugin attachment is no longer cached as a successful attachment; the next attempt can load a repaired source. Storyboard stills now propagate plugin attachment failures and display their error instead of silently producing a picture with missing plugin tools. A complete safe retry/open-without-extension flow and preservation tests for unsaved work remain open in step 4.
 
+Bridge answer budget (2026-11-06): host replies to a sandbox file, data, still or other capability request are checked against the 8 MiB nested-data budget before posting; an oversized reply is refused to that call. Approved network replies retain their separate 64 MiB streamed-body ceiling. Tests cover both sides of this distinction. This does not yet bound outbound document snapshots or all media transfers, so step 4's resource box stays open.
+
 ## Goal
 
 A user opens, plays, edits and exports a `.tramme` project without granting its scripts the editor's rights. Ordinary animation code needs no general execution permission. Extra capabilities, such as sending a media file to an external service, require a specific, understandable permission.
