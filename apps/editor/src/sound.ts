@@ -8,9 +8,10 @@
 // the exports.
 
 import { openverse } from './openverse.ts';
-import { audioClips, Evaluator, isAudioAnalysis, layerClock, pointer, searchSounds, soundCues, soundFigures, soundFlaws, staticValue, variantsOf, type Layer, type Op, type SoundCue, type SoundEntry, type SoundFigures, type SoundRole, type SoundVisual, type ToolContext, type ToolType } from '@tramme/core';
+import { analyseAudio, audioClips, Evaluator, isAudioAnalysis, layerClock, pointer, searchSounds, soundCues, soundFigures, soundFlaws, staticValue, variantsOf, type Layer, type Op, type SoundCue, type SoundEntry, type SoundFigures, type SoundRole, type SoundVisual, type ToolContext, type ToolType } from '@tramme/core';
 import { musicCutPlan, type MusicCutPlan } from './music-plan.ts';
 import { musicSections } from './music-structure.ts';
+import { alignMusicBeats } from './music-alignment.ts';
 import { encodeWav, renderSynth, SYNTH_MAX } from '@tramme/render';
 import { api } from './api.ts';
 import { payFor } from './confirm.ts';
@@ -145,6 +146,17 @@ export async function measure(data: Blob): Promise<{ buffer: AudioBuffer; figure
 export const channelsOf = (b: AudioBuffer) => Array.from({ length: b.numberOfChannels }, (_, c) => b.getChannelData(c));
 const wavBlob = (b: AudioBuffer) => new Blob([encodeWav(b) as BlobPart], { type: 'audio/wav' });
 
+/** Match the existing beats tool's mono 16 kHz input using the browser's resampler. */
+async function generatedBeats(buffer: AudioBuffer): Promise<number[]> {
+  const rate = 16000;
+  const ctx = new OfflineAudioContext(1, Math.max(1, Math.ceil(buffer.duration * rate)), rate);
+  const source = ctx.createBufferSource();
+  source.buffer = buffer;
+  source.connect(ctx.destination);
+  source.start();
+  return analyseAudio((await ctx.startRendering()).getChannelData(0), rate).beats;
+}
+
 /** a sound of the library brought into the project: its file copied (with where it comes from and its license), or its code rendered */
 async function bring(ctx: ToolContext, e: SoundEntry): Promise<ProjectSound> {
   if (e.code) {
@@ -198,7 +210,7 @@ function soundGroup(ctx: ToolContext, taken: Record<string, unknown>, ops: Op[])
  * gives the layer what it underlines and its weight. The layers go in the
  * Sound group.
  */
-function place(ctx: ToolContext, sounds: Placement[][], moments: Moment[], o: { gain: number; rate?: number; align?: 'peak' | 'start'; vary: boolean; weight?: 'hero' | 'support' }): { ops: Op[]; layers: string[] } {
+function place(ctx: ToolContext, sounds: Placement[][], moments: Moment[], o: { gain: number; rate?: number; keepPitch?: boolean; align?: 'peak' | 'start'; vary: boolean; weight?: 'hero' | 'support' }): { ops: Op[]; layers: string[] } {
   const c = ctx.doc.compositions[ctx.compId], taken: Record<string, unknown> = { ...c.layers };
   const ops: Op[] = [], layers: string[] = [];
   if (!moments.length) return { ops, layers };
@@ -206,7 +218,7 @@ function place(ctx: ToolContext, sounds: Placement[][], moments: Moment[], o: { 
   moments.forEach((m, i) => {
     const stack = sounds[i % sounds.length];
     const nudge = o.vary && sounds.length === 1 && moments.length > 1 ? 1 + ((((i * 0.618034) % 1) - 0.5) * 0.08) : 1;
-    const rate = +((o.rate ?? 1) * nudge).toFixed(3);
+    const rate = +((o.rate ?? 1) * nudge).toFixed(o.keepPitch ? 4 : 3);
     const weight = o.weight ?? m.weight;
     stack.forEach((s, k) => {
       const align = o.align ?? (FROM_START.has(s.kind) ? 'start' : 'peak');
@@ -220,6 +232,7 @@ function place(ctx: ToolContext, sounds: Placement[][], moments: Moment[], o: { 
       layers.push(id);
       const props: Record<string, unknown> = { audio: s.asset, start: +start.toFixed(4), gain: +(o.gain - STACK_DB * k).toFixed(1) };
       if (rate !== 1) props.rate = rate;
+      if (o.keepPitch && rate !== 1) props.keepPitch = true;
       if (ROLE[s.kind]) props.role = ROLE[s.kind];
       if (weight === 'hero') props.weight = 'hero';
       if (m.visual) props.visual = m.visual;
@@ -468,16 +481,17 @@ const generateSound: ToolType<{ kind: 'sfx' | 'music' | 'voice'; prompt: string;
     // it costs money: the user says yes first, or the turn's allowance does (Sound settings)
     await payFor(t('sound.paidTitle'), t('sound.paidText', { kind: KIND_LABEL[kind](), prompt: clip(prompt, 140) }), t('sound.paidYes'), 'use the library or synth');
     const made = await api.generate({ kind, prompt, duration, voice, style, model, provider, plan }, ctx.signal);
+    const times = await timesOf(ctx, { at, on: on ?? (at === undefined ? 'now' : undefined), layers });
     const { buffer, figures } = await measure(made.blob);
+    const musicAlignment = film ? alignMusicBeats(film, await generatedBeats(buffer), times[0]?.t ?? 0) : null;
     const label = name ?? `${kind}-${prompt.toLowerCase().split(/\s+/).slice(0, 4).join('-')}`;
     const record = { kind, prompt, provider: made.provider, model: made.model, voice: made.voice, style, duration };
     const kept = await keepFile(ctx, label, made.blob, label, figures, record);
-    const times = await timesOf(ctx, { at, on: on ?? (at === undefined ? 'now' : undefined), layers });
-    const placed = place(ctx, [[{ asset: kept.asset, title: label, figures, kind: kind === 'sfx' ? 'sfx' : kind }]], times, { gain: gain ?? (kind === 'music' ? p.musicDb : kind === 'voice' ? 0 : p.effectsDb), align, vary: false });
+    const placed = place(ctx, [[{ asset: kept.asset, title: label, figures, kind: kind === 'sfx' ? 'sfx' : kind }]], times, { gain: gain ?? (kind === 'music' ? p.musicDb : kind === 'voice' ? 0 : p.effectsDb), rate: musicAlignment?.rate, keepPitch: musicAlignment?.keepPitch, align, vary: false });
     if (keep) await keepInLibrary(label, made.blob, { kind: kind === 'sfx' ? 'sfx' : kind, title: label, tags: prompt.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2).slice(0, 8), figures, prompt, provider: made.provider });
     return {
       ops: [...kept.ops, ...placed.ops], reload: kept.reload, label: `Sound ${label}`,
-      text: `${kind} made by ${made.provider} (${made.model}${made.voice ? `, voice ${made.voice}` : ''}), saved as asset ${kept.asset} with its prompt: ${figuresText(figures)}. ${placedText(placed, times)}${film ? ` Film read: ${film.cuts.length} cuts, ${film.aligned} on the proposed ${film.tempo ?? 'unset'} BPM grid.` : ''}${keep ? ' Kept in the library.' : ''}${kind === 'music' ? ' Duck it under a voice with duck.' : ''}`,
+      text: `${kind} made by ${made.provider} (${made.model}${made.voice ? `, voice ${made.voice}` : ''}), saved as asset ${kept.asset} with its prompt: ${figuresText(figures)}. ${placedText(placed, times)}${film ? ` Film read: ${film.cuts.length} cuts, ${film.aligned} on the proposed ${film.tempo ?? 'unset'} BPM grid.` : ''}${musicAlignment ? ` Heard beats: ${musicAlignment.before}/${musicAlignment.total} cuts within one frame before correction, ${musicAlignment.after}/${musicAlignment.total} after${musicAlignment.keepPitch ? ` a pitch-preserving ${musicAlignment.rate.toFixed(4)}× speed change` : ' no speed change'}.` : ''}${keep ? ' Kept in the library.' : ''}${kind === 'music' ? ' Duck it under a voice with duck.' : ''}`,
       images: [{ url: waveform(buffer, figures, label), caption: label }],
       notice: t('sound.made', { name: label, provider: made.provider, model: made.model }),
     };
