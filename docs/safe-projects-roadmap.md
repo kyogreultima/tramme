@@ -41,7 +41,9 @@ Worker canvas retention (2026-11-06): the isolated renderer now keeps at most tw
 
 Failure recovery (2026-11-06): a failed project or installed plugin attachment is no longer cached as a successful attachment; the next attempt can load a repaired source. Storyboard stills now propagate plugin attachment failures and display their error instead of silently producing a picture with missing plugin tools. A complete safe retry/open-without-extension flow and preservation tests for unsaved work remain open in step 4.
 
-Bridge answer budget (2026-11-06): host replies to a sandbox file, data, still or other capability request are checked against the 8 MiB nested-data budget before posting; an oversized reply is refused to that call. Approved network replies retain their separate 64 MiB streamed-body ceiling. Tests cover both sides of this distinction. This does not yet bound outbound document snapshots or all media transfers, so step 4's resource box stays open.
+Bridge answer budget (2026-11-06): host replies to a sandbox file, data, still or other capability request are checked against the 8 MiB nested-data budget before posting; an oversized reply is refused to that call. Approved network replies retain their separate 64 MiB streamed-body ceiling. Tests cover both sides of this distinction. Media transfers still need their own budgets, so step 4's resource box stays open.
+
+Outbound message budget (2026-11-06): tool, check, draw, render and document messages are refused before the host sends more than 64 MiB of nested data or 10,000 entries. The browser transport checks again after it adds approved font bytes. A test verifies that an oversized tool input and document snapshot do not reach the worker. Transferred image/video bitmap allocations and aggregate graphics work remain outside this plain-data bound, so step 4 stays open.
 
 ## Goal
 

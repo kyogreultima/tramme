@@ -167,6 +167,14 @@ describe('the plugin sandbox', () => {
     host.dispose();
     await expect(pending).rejects.toThrow('closed');
   });
+  it('refuses oversized outbound calls and document snapshots before posting', async () => {
+    const sent: unknown[] = [];
+    const { host } = connectHost((message) => sent.push(message), () => DOC_URL);
+    const huge = new ArrayBuffer(64 * 1024 * 1024 + 1);
+    await expect(host.runTool('fake', { huge }, toolCtx(doc().doc))).rejects.toThrow('sandbox message exceeds 64 MB');
+    expect(() => host.setDoc({ doc: {}, docUrl: DOC_URL, images: {}, json: { huge }, fonts: [] })).toThrow('sandbox message exceeds 64 MB');
+    expect(sent).toHaveLength(0);
+  });
   it('rejects a replayed bridge request id without repeating the file read', async () => {
     const sent: unknown[] = [];
     const { host, receive } = connectHost((message) => sent.push(message), () => DOC_URL);

@@ -13,6 +13,7 @@ const projectPath = (value: unknown): value is string => typeof value === 'strin
   !value.includes('\\') && !value.startsWith('/') && !/^[a-z][a-z0-9+.-]*:/i.test(value) &&
   value.split('/').every((part) => part !== '' && part !== '.' && part !== '..');
 const RESPONSE_LIMIT = 8 * 1024 * 1024;
+const OUTBOUND_LIMIT = 64 * 1024 * 1024;
 const canvasSize = (width: number, height: number, scale = 1) => {
   if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 || !Number.isFinite(scale) || scale <= 0) throw new Error('invalid sandbox canvas');
   if (width > 8192 || height > 8192 || width * scale > 8192 || height * scale > 8192) throw new Error('sandbox canvas exceeds 8192 pixels');
@@ -275,6 +276,7 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
   };
 
   const run = (msg: ToWorker & { call: number }, ctx?: ToolContext | CheckContext, signal?: AbortSignal): Promise<unknown> => {
+    if (responseTooLarge(msg, OUTBOUND_LIMIT)) return Promise.reject(new Error('sandbox message exceeds 64 MB'));
     if (waits.size >= 64) return Promise.reject(new Error('too many pending sandbox calls'));
     const c = msg.call;
     if (ctx) bridges.set(c, ctx);
@@ -327,6 +329,7 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
       return Array.isArray(out) ? out as QualityIssue[] : [];
     },
     setDoc(doc) {
+      if (responseTooLarge(doc, OUTBOUND_LIMIT)) throw new Error('sandbox message exceeds 64 MB');
       send({ kind: 'doc', doc });
     },
     async draw(payload) {
@@ -391,7 +394,10 @@ export function browserHost(docUrl: string): PluginHost {
     const ownedBlob = url.protocol === 'blob:' && url.origin === location.origin;
     return url.origin === location.origin && !!(projectFile || ownedBlob);
   };
-  const post = (m: ToWorker) => frame.contentWindow?.postMessage({ kind: 'send', data: m }, '*', bitmapsIn(m));
+  const post = (m: ToWorker) => {
+    if (responseTooLarge(m, OUTBOUND_LIMIT)) throw new Error('sandbox message exceeds 64 MB');
+    frame.contentWindow?.postMessage({ kind: 'send', data: m }, '*', bitmapsIn(m));
+  };
   const { host, receive } = connectHost((m) => send(m), () => docUrl, (reason) => dispose(reason));
   const startupTimer = setTimeout(() => dispose('the isolated project worker did not start'), 10_000);
   const dispose = (reason?: string) => {
