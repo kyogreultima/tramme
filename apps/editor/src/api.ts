@@ -172,7 +172,7 @@ export const api = {
   soundDelete: (name: string) => call<{ deleted: string }>(api.soundUrl(name), { method: 'DELETE' }),
   soundPut: (name: string, data: Blob, entry: unknown) => call<{ name: string; size: number }>(api.soundUrl(name), { method: 'PUT', headers: { 'content-type': data.type || 'application/octet-stream', 'x-tramme-entry': JSON.stringify(entry) }, body: data }),
   /** a sound effect, a music bed or a voice-over made by a provider with the user's key */
-  async generate(ask: { kind: 'sfx' | 'music' | 'voice'; prompt: string; duration?: number; voice?: string; style?: string; model?: string; provider?: string }, signal?: AbortSignal): Promise<MadeSound> {
+  async generate(ask: { kind: 'sfx' | 'music' | 'voice'; prompt: string; duration?: number; voice?: string; style?: string; model?: string; provider?: string; plan?: import('./music-structure.ts').MusicStructure }, signal?: AbortSignal): Promise<MadeSound> {
     const r = await answered(await reach('/api/generate', { ...jsonInit('POST', ask), signal }));
     return { blob: await r.blob(), provider: r.headers.get('x-tramme-provider') ?? '', model: r.headers.get('x-tramme-model') ?? '', voice: r.headers.get('x-tramme-voice') ?? undefined };
   },

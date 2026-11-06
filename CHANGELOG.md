@@ -10,6 +10,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Added
 
+- Music generation now sends film-shaped instrumental sections with an explicit tempo and exact section lengths to ElevenLabs Music v2.5. Invalid plans are rejected before the provider call.
 - Music generation now reads the film's length, cuts, markers and hero moments before its paid request. `/music-plan` shows the proposed tempo and how many cuts land on its beats without making a sound.
 - Mixer strips now show their ordered effect chains. You can open an insert's settings, bypass or move it, and add voice cleanup, music under voice, telephone or big room presets. The `/chain` command and assistant can propose the same edits with the full chain shown before applying it.
 - Delay and distortion can be placed anywhere in a track or bus chain. Echoes use milliseconds or notes at an explicitly chosen composition tempo, with bounded feedback; distortion has drive, tone and wet controls. Existing telephone, radio, megaphone and echo voices keep their sound through the same processors.

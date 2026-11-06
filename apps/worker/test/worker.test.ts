@@ -351,6 +351,25 @@ describe('sounds made by a provider', () => {
     } finally { p.restore(); }
   });
 
+  it('sends a film music composition plan to ElevenLabs and rejects inconsistent sections', async () => {
+    const { call } = setup({ ELEVENLABS_API_KEY: 'el-key' });
+    const p = providers();
+    const plan = { chunks: [
+      { text: '[Intro]', duration_ms: 6000, positive_styles: ['warm piano', '120 BPM', 'instrumental'], negative_styles: ['vocals'], context_adherence: 'high' },
+      { text: '[Reveal]', duration_ms: 6000, positive_styles: ['warm piano', '120 BPM', 'instrumental'], negative_styles: ['vocals'], context_adherence: 'high' },
+    ] };
+    try {
+      const made = await call('/api/generate', ask({ kind: 'music', prompt: 'warm piano', duration: 12, plan }));
+      expect(made.status).toBe(200);
+      expect(p.seen[0].body).toMatchObject({ model_id: 'music_v2_5', composition_plan: plan, force_instrumental: true });
+      expect(p.seen[0].body).not.toHaveProperty('prompt');
+      expect(p.seen[0].body).not.toHaveProperty('music_length_ms');
+      expect((await call('/api/generate', ask({ kind: 'music', prompt: 'warm piano', duration: 13, plan }))).status).toBe(400);
+      expect((await call('/api/generate', ask({ kind: 'music', prompt: 'warm piano', plan: { chunks: [{ ...plan.chunks[0], duration_ms: 2000 }] } }))).status).toBe(400);
+      expect(p.seen).toHaveLength(1);
+    } finally { p.restore(); }
+  });
+
   it('says a voice-over with Eleven v4 by default, its style as an audio tag, the model asked for otherwise', async () => {
     const { call } = setup({ ELEVENLABS_API_KEY: 'el-key' });
     const p = providers();

@@ -10,6 +10,7 @@
 import { openverse } from './openverse.ts';
 import { audioClips, Evaluator, isAudioAnalysis, layerClock, pointer, searchSounds, soundCues, soundFigures, soundFlaws, staticValue, variantsOf, type Layer, type Op, type SoundCue, type SoundEntry, type SoundFigures, type SoundRole, type SoundVisual, type ToolContext, type ToolType } from '@tramme/core';
 import { musicCutPlan, type MusicCutPlan } from './music-plan.ts';
+import { musicSections } from './music-structure.ts';
 import { encodeWav, renderSynth, SYNTH_MAX } from '@tramme/render';
 import { api } from './api.ts';
 import { payFor } from './confirm.ts';
@@ -460,13 +461,13 @@ const generateSound: ToolType<{ kind: 'sfx' | 'music' | 'voice'; prompt: string;
     }
     // the ElevenLabs voice model of the settings (the newest by default); the others have one model
     const model = kind === 'voice' && p.voiceModel ? p.voiceModel : undefined;
-    // Read the picture before asking to spend a generation. The structured
-    // request and beat verification follow in the next roadmap boxes.
+    // Read the picture and shape the provider's sections before asking to spend a generation.
     const film = kind === 'music' ? await filmMusicPlan(ctx) : null;
     if (film && duration === undefined) duration = film.duration;
+    const plan = film ? musicSections({ ...film, duration: duration! }, prompt) : undefined;
     // it costs money: the user says yes first, or the turn's allowance does (Sound settings)
     await payFor(t('sound.paidTitle'), t('sound.paidText', { kind: KIND_LABEL[kind](), prompt: clip(prompt, 140) }), t('sound.paidYes'), 'use the library or synth');
-    const made = await api.generate({ kind, prompt, duration, voice, style, model, provider }, ctx.signal);
+    const made = await api.generate({ kind, prompt, duration, voice, style, model, provider, plan }, ctx.signal);
     const { buffer, figures } = await measure(made.blob);
     const label = name ?? `${kind}-${prompt.toLowerCase().split(/\s+/).slice(0, 4).join('-')}`;
     const record = { kind, prompt, provider: made.provider, model: made.model, voice: made.voice, style, duration };

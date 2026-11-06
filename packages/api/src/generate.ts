@@ -16,7 +16,8 @@ import type { Reach } from './providers.ts';
 export type SoundKind = 'sfx' | 'music' | 'voice';
 type Provider = 'elevenlabs' | 'openai' | 'gemini' | 'hydracept';
 
-interface Ask { kind: SoundKind; prompt: string; duration?: number; voice?: string; style?: string; model?: string }
+interface MusicPlan { chunks: { text: string; duration_ms: number; positive_styles: string[]; negative_styles: string[]; context_adherence: 'high' }[] }
+interface Ask { kind: SoundKind; prompt: string; duration?: number; voice?: string; style?: string; model?: string; plan?: MusicPlan }
 interface Made { audio: ArrayBuffer; type: string; model: string; voice?: string; headers?: Record<string, string> }
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
@@ -53,7 +54,9 @@ const PROVIDERS: Record<Provider, { kinds: SoundKind[]; make(key: string, ask: A
         res = await post(`${ELEVEN}/sound-generation?${MP3}`, { text: ask.prompt, model_id: model, prompt_influence: 0.5, ...(ask.duration ? { duration_seconds: clamp(ask.duration, 0.5, 30) } : {}) });
       } else if (ask.kind === 'music') {
         model = 'music_v2_5';
-        res = await post(`${ELEVEN}/music?${MP3}`, { prompt: ask.prompt, model_id: model, force_instrumental: true, ...(ask.duration ? { music_length_ms: Math.round(clamp(ask.duration, 3, 600) * 1000) } : {}) });
+        res = await post(`${ELEVEN}/music?${MP3}`, ask.plan
+          ? { composition_plan: ask.plan, model_id: model, force_instrumental: true }
+          : { prompt: ask.prompt, model_id: model, force_instrumental: true, ...(ask.duration ? { music_length_ms: Math.round(clamp(ask.duration, 3, 600) * 1000) } : {}) });
       } else {
         model = ask.model && ask.model in ELEVEN_VOICE_MODELS ? ask.model : ELEVEN_VOICE_DEFAULT;
         // a voice of the shared library comes as owner/voice: it is added to the account when the provider does not know it yet
@@ -127,12 +130,24 @@ export function soundConfig(keys: Keys): Record<SoundKind, Provider[]> {
   return { sfx: has.filter((p) => PROVIDERS[p].kinds.includes('sfx')), music: has.filter((p) => PROVIDERS[p].kinds.includes('music')), voice: has.filter((p) => PROVIDERS[p].kinds.includes('voice')) };
 }
 
+function musicPlan(value: unknown, duration: unknown): MusicPlan {
+  const plan = value as MusicPlan;
+  const chunks = plan?.chunks;
+  const styles = (list: unknown) => Array.isArray(list) && list.length <= 50 && list.every((s) => typeof s === 'string' && s.trim().length > 0 && s.length <= 500);
+  if (!Array.isArray(chunks) || chunks.length < 1 || chunks.length > 30 || !chunks.every((c) => c && typeof c.text === 'string' && c.text.trim().length > 0 && c.text.length <= 500 && Number.isInteger(c.duration_ms) && c.duration_ms >= 3000 && c.duration_ms <= 120000 && styles(c.positive_styles) && styles(c.negative_styles) && c.context_adherence === 'high')) throw new HttpError(400, 'invalid music composition plan');
+  const total = chunks.reduce((sum, c) => sum + c.duration_ms, 0);
+  if (total < 3000 || total > 600000 || (duration !== undefined && (typeof duration !== 'number' || !Number.isFinite(duration) || Math.abs(Math.round(duration * 1000) - total) > 1))) throw new HttpError(400, 'music plan duration does not match');
+  return plan;
+}
+
 export async function generate(req: Request, { keys, fetch }: Reach) {
   const b = await readJson<Partial<Ask> & { provider?: string }>(req);
   if (b.kind !== 'sfx' && b.kind !== 'music' && b.kind !== 'voice') throw new HttpError(400, 'kind: sfx, music or voice');
   const prompt = typeof b.prompt === 'string' ? b.prompt.trim() : '';
   if (!prompt) throw new HttpError(400, b.kind === 'voice' ? 'the text to say is missing' : 'say what to make (prompt)');
   if (prompt.length > 4000) throw new HttpError(413, 'prompt too long (4000 characters at most)');
+  if (b.plan !== undefined && b.kind !== 'music') throw new HttpError(400, 'composition plan only applies to music');
+  const plan = b.plan === undefined ? undefined : musicPlan(b.plan, b.duration);
   const able = soundConfig(keys)[b.kind];
   const provider = (b.provider ?? able[0]) as Provider | undefined;
   if (!provider || !PROVIDERS[provider]) {
@@ -142,7 +157,7 @@ export async function generate(req: Request, { keys, fetch }: Reach) {
   if (!PROVIDERS[provider].kinds.includes(b.kind)) throw new HttpError(400, `${provider} does not make ${b.kind}`);
   const key = keys.get(provider);
   if (!key) throw new HttpError(503, `no ${provider} key: ${keys.how([provider])}`);
-  const ask: Ask = { kind: b.kind, prompt, duration: typeof b.duration === 'number' ? b.duration : undefined, voice: typeof b.voice === 'string' ? b.voice : undefined, style: typeof b.style === 'string' ? b.style.slice(0, 500) : undefined, model: typeof b.model === 'string' ? b.model : undefined };
+  const ask: Ask = { kind: b.kind, prompt, duration: typeof b.duration === 'number' ? b.duration : undefined, voice: typeof b.voice === 'string' ? b.voice : undefined, style: typeof b.style === 'string' ? b.style.slice(0, 500) : undefined, model: typeof b.model === 'string' ? b.model : undefined, plan };
   const made = await PROVIDERS[provider].make(key, ask, fetch, keys);
   return new Response(made.audio, {
     headers: { 'content-type': made.type, 'cache-control': 'no-store', 'x-tramme-provider': provider, 'x-tramme-model': made.model, ...(made.voice ? { 'x-tramme-voice': made.voice } : {}), ...made.headers },
