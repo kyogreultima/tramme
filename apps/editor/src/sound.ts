@@ -8,7 +8,7 @@
 // the exports.
 
 import { openverse } from './openverse.ts';
-import { analyseAudio, audioClips, Evaluator, isAudioAnalysis, layerClock, pointer, searchSounds, soundCues, soundFigures, soundFlaws, staticValue, variantsOf, type Layer, type Op, type SoundCue, type SoundEntry, type SoundFigures, type SoundRole, type SoundVisual, type ToolContext, type ToolType } from '@tramme/core';
+import { analyseAudio, audioClips, Evaluator, isAudioAnalysis, layerClock, pointer, searchSounds, soundCues, soundFigures, soundFlaws, staticValue, variantsOf, volumeBlockKeys, type Layer, type Op, type SoundCue, type SoundEntry, type SoundFigures, type SoundRole, type SoundVisual, type ToolContext, type ToolType } from '@tramme/core';
 import { musicCutPlan, type MusicCutPlan } from './music-plan.ts';
 import { musicSections } from './music-structure.ts';
 import { alignMusicBeats } from './music-alignment.ts';
@@ -580,10 +580,26 @@ const duck: ToolType<{ layers?: unknown; under?: string; depth?: number; attack?
     const voiceLayers = new Set((Object.entries(c.layers) as [string, Layer][]).filter(([, l]) => source && staticValue(l.props?.[l.type]) === source).map(([id]) => id));
     const targets = listOf(layers).length ? listOf(layers) : (Object.entries(c.layers) as [string, Layer][]).filter(([id, l]) => l.type === 'audio' && !voiceLayers.has(id)).map(([id]) => id);
     if (!targets.length) throw new Error('no sound to duck: give its layers');
-    const ops: Op[] = [];
+    const ops: Op[] = [], writtenTracks = new Set<string>();
     for (const id of targets) {
       const l = c.layers[id];
       if (!l || (l.type !== 'audio' && l.type !== 'video')) throw new Error(`${id} is not a sound layer`);
+      const trackIndex = c.tracks?.findIndex((track) => track.id === l.track && track.kind === 'audio' && !track.bus && !track.locked) ?? -1;
+      const blockKeys = trackIndex >= 0 ? spans.map(([start, end]) => volumeBlockKeys(start, end, depth, attack, release, c.duration)) : [];
+      if (trackIndex >= 0 && blockKeys.every((keys) => keys !== null)) {
+        const track = c.tracks![trackIndex];
+        if (writtenTracks.has(track.id)) continue;
+        writtenTracks.add(track.id);
+        const blocks = [...(track.volumeBlocks ?? [])];
+        let n = 1;
+        for (const keys of blockKeys) {
+          while (blocks.some((block) => block.id === `dip-${n}`)) n++;
+          blocks.push({ id: `dip-${n++}`, keys: keys! });
+        }
+        if (track.duckUnder) ops.push({ op: 'remove', path: pointer('compositions', ctx.compId, 'tracks', trackIndex, 'duckUnder') });
+        ops.push({ op: 'add', path: pointer('compositions', ctx.compId, 'tracks', trackIndex, 'volumeBlocks'), value: blocks });
+        continue;
+      }
       // the layer's own gain (a voice played with its cleaned copy has its share taken back)
       const clip = audioClips(ctx.doc, ctx.compId).find((x) => x.layerId === id);
       const base = Number((clip?.gainDb ?? 0) - (clip?.share ?? 0));

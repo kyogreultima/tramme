@@ -10,6 +10,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Added
 
+- The `duck` tool now creates the same editable four-keyframe track blocks as drawing a dip; sounds outside a track retain their existing layer gain automation.
 - A sound track can now duck under another track's voice clips without a transcript. The mix follows clip moves and mute changes; the source is chosen from the mixer's **D** control.
 - Sound tracks now have editable volume dips: arm **D** in the timeline, drag a range, then click its block to adjust the range, depth and slopes. The dip adds to the existing fader, is undoable as one edit and is heard in preview and exports.
 - Generated music now keeps its proposed tempo, section plan, provider request mode and measured beat alignment beside the saved file. Providers without structured music use a prompt bed and the same beat check.

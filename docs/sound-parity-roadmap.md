@@ -1,6 +1,6 @@
 # Sound parity roadmap
 
-Status: steps 1 to 5 built against fake providers; step 6's drawn blocks and clip-based voice source are built. 24 boxes done, 5 open. A paid score still needs a listening and beat check on the user's quota.
+Status: steps 1 to 6 built against fake providers; 25 boxes done, 4 open. A paid score still needs a listening and beat check on the user's quota. Step 7's first-take voice flow is outside the agent execution queue.
 
 What Raylight's Sound page ([raylight.app/sound](https://www.raylight.app/sound)) offers and Tramme does not yet, and the steps that close the gap. Read with [sound-roadmap.md](sound-roadmap.md), which this continues: its steps 1 to 9 are done, and nothing here replaces them.
 
@@ -126,7 +126,8 @@ Done when: on a film with six cuts, at least five land on a beat without the use
   - Arm **D** on a sound track and drag a range: four relative dB keys are kept as one `volumeBlocks` entry, additive to the track fader and shared by playback and exports. Click the drawn block to edit its range, depth and two slopes or remove it; one edit is one undo step. The mixer reroutes live audio after the block changes. Browser QA covers drawing, editing, undo and 1280/390 px layouts. A voice track source and the existing `duck` tool's shared keys are the next two boxes.
 - [x] A voice track can be marked as the one to duck under: the music's dip follows its clips without a transcript.
   - The mixer's **D** menu links a sound track to another sound track. The mixer computes a -12 dB dip from the linked track's audible clip ranges, merging close or overlapping clips; it recomputes after a clip moves or its source is muted, and clears the link if the source track is deleted. No transcript or saved stale keyframes are needed. Core audio tests cover movement and muting; browser QA covers the selection and narrow layout.
-- [ ] The existing `duck` tool and these blocks write the same keyframes, so both can be edited by hand afterwards.
+- [x] The existing `duck` tool and these blocks write the same keyframes, so both can be edited by hand afterwards.
+  - For sounds on an audio track, `duck` writes editable `volumeBlocks` using the same four-keyframe function as the timeline. The two-drag regression compares every key against two transcript stretches. A sound without a track keeps its historical layer gain automation, editable through its keyframes. The tool deduplicates multiple target layers on one track and replaces an automatic voice link when explicit blocks are requested, avoiding a doubled dip.
 
 Done when: a ducking drawn in two drags is identical, keyframe for keyframe, to what `duck` writes for the same range.
 
