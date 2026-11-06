@@ -25,6 +25,8 @@ Worker response envelopes (2026-11-06): the host checks the shape and basic boun
 
 Worker result budget (2026-11-06): the host traverses returned declarations, tool outputs, drawings and vector exports with an 8 MiB limit for nested plain data and a 10,000-entry limit. Returned ImageBitmaps are checked for dimensions but their actual GPU allocation is controlled by the browser; they are not counted as plain bytes. Per-plugin permission identity, message transfer allocations and platform memory limits still keep steps 3 and 4 open.
 
+Expression-only picture path (2026-11-06): when a user has explicitly enabled the experimental sandbox preview, a project without plugins now selects the same sandboxed picture path for stills and raster exports. Previously the export selector required a plugin even under that opt-in. The default remains off; page-side mirror evaluation, sound evaluation and vector export can still evaluate expressions outside the boundary, so step 2 is open.
+
 ## Goal
 
 A user opens, plays, edits and exports a `.tramme` project without granting its scripts the editor's rights. Ordinary animation code needs no general execution permission. Extra capabilities, such as sending a media file to an external service, require a specific, understandable permission.

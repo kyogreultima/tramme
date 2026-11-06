@@ -9,7 +9,8 @@ import { Registry, type PluginModule, type TrammeDoc } from '@tramme/core';
 import { connectHost } from '../src/plugins/host.ts';
 import { startWorkerSide } from '../src/plugins/worker-side.ts';
 import { attachInstalled } from '../src/plugins/vocabulary.ts';
-import { copiesFor, counted, installedTypes, offIn, permitted, stopped, STRIKES, typesOf, type Installed } from '../src/installed.ts';
+import { copiesFor, counted, installedTypes, offIn, permitted, sandboxedDoc, stopped, STRIKES, typesOf, type Installed } from '../src/installed.ts';
+import { prefs } from '../src/settings.ts';
 import type { ToolContext } from '@tramme/core';
 
 const host = (fixtures: Map<string, PluginModule>) => {
@@ -33,6 +34,15 @@ const plugin = (over: Partial<Installed> = {}): Installed => ({
 });
 
 describe('installed plugins in a project', () => {
+  it('selects the sandboxed picture path for an expression-only project when opted in', () => {
+    const { doc } = newProject({ name: 'Expression', width: 100, height: 100, fps: 30, duration: 1 });
+    doc.compositions[doc.root].background = { $expr: '"#ff0000"' };
+    const previous = prefs.peek();
+    try {
+      prefs.value = { ...previous, sandboxPreview: true };
+      expect(sandboxedDoc(doc)).toBe(true);
+    } finally { prefs.value = previous; }
+  });
   it('bring their tools, workflows, kits, presets and nodes, never a name the project has', async () => {
     const reg = new Registry();
     reg.use({ tools: [{ name: 'shared', description: 'the project one', run: () => 'project' }] }, 'own');

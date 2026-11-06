@@ -320,7 +320,7 @@ export const copiesIn = (doc: TrammeDoc): Record<string, string> => {
  * that carries a copy of an installed plugin (code from outside the project
  * the user did not write).
  */
-export const sandboxedDoc = (doc: TrammeDoc): boolean => (doc.plugins ?? []).length > 0 && (prefs.peek().sandboxPreview || Object.keys(copiesIn(doc)).length > 0);
+export const sandboxedDoc = (doc: TrammeDoc): boolean => prefs.peek().sandboxPreview || ((doc.plugins ?? []).length > 0 && Object.keys(copiesIn(doc)).length > 0);
 
 /** the operations that copy a plugin into a project (beside the ones that made it needed), and the files to write first */
 export function copyOps(doc: TrammeDoc, p: Installed): { ops: Op[]; files: [string, Blob][] } {
