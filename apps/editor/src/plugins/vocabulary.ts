@@ -26,7 +26,7 @@ export function filterModule(mod: PluginModule): PluginModule {
   };
 }
 
-/** the plugins (id and url) a registry already carries from a sandbox, or was refused */
+/** the plugins (id and url) a registry already carries from a sandbox */
 const attached = new WeakMap<Registry, { host: PluginHost; done: Set<string> }>();
 
 /**
@@ -61,9 +61,8 @@ export async function attachIsolated(registry: Registry, host: PluginHost, doc: 
           checks: d.checks.map((c) => ({ ...c, run: async (ctx) => (await executionHost()).runCheck(c.name, ctx) })),
         }, p.id);
       }
+      done.add(`${p.id}\n${p.url}`);
     } catch (e) { refused.push((e as Error).message); }
-    // said once per url: the same file is not tried again at each edit of the document
-    done.add(`${p.id}\n${p.url}`);
   }));
   if (refused.length) throw new Error(refused.join('; '));
 }
@@ -127,8 +126,8 @@ export async function attachInstalled(registry: Registry, host: PluginHost, list
         kits: free(d.kits, registry.listKits().map((x) => x.kit)),
         presets: free(d.presets, registry.listPresets().map((x) => x.preset)),
       }, p.id);
+      done.add(`${p.id}\n${p.url}`);
     } catch (e) { refused.push(`${p.name}: ${(e as Error).message}`); }
-    done.add(`${p.id}\n${p.url}`);
   }));
   tell();
   if (refused.length) throw new Error(refused.join('; '));

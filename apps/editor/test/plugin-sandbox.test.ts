@@ -399,8 +399,11 @@ describe('the plugin sandbox', () => {
     const reg = new Registry();
     await expect(attachIsolated(reg, host, d, (id) => `blob:${id}`)).rejects.toThrow(/plugin ghost: no such module/);
     expect(reg.hasTool('sky.stars')).toBe(true);
-    // said once: the next edit of the document does not ask the same file again
+    // A failed load stays visible and can be retried after its source is repaired.
+    await expect(attachIsolated(reg, host, d, (id) => `blob:${id}`)).rejects.toThrow(/plugin ghost: no such module/);
+    fixtures.set('blob:ghost', { tools: [{ name: 'ghost.tool', description: 'repaired', run: () => 'ok' }] });
     await expect(attachIsolated(reg, host, d, (id) => `blob:${id}`)).resolves.toBeUndefined();
+    expect(reg.hasTool('ghost.tool')).toBe(true);
   });
 
   it('refuses what waits when the sandbox stops, with the reason', async () => {

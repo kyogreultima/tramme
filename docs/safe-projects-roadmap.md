@@ -39,6 +39,8 @@ Canvas request bounds (2026-11-06): the host refuses malformed dimensions and dr
 
 Worker canvas retention (2026-11-06): the isolated renderer now keeps at most two released full-frame canvases in its reuse pool; further released canvases are resized to zero rather than held for later frames. This bounds that cache, while simultaneous layer allocations, WebGL contexts and actual browser/GPU memory still need measurement and limits before step 4 is complete.
 
+Failure recovery (2026-11-06): a failed project or installed plugin attachment is no longer cached as a successful attachment; the next attempt can load a repaired source. Storyboard stills now propagate plugin attachment failures and display their error instead of silently producing a picture with missing plugin tools. A complete safe retry/open-without-extension flow and preservation tests for unsaved work remain open in step 4.
+
 ## Goal
 
 A user opens, plays, edits and exports a `.tramme` project without granting its scripts the editor's rights. Ordinary animation code needs no general execution permission. Extra capabilities, such as sending a media file to an external service, require a specific, understandable permission.

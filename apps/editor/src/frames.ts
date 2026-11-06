@@ -38,7 +38,7 @@ export class Stills {
     }
     this.doc = doc; this.compId = id;
     // a proposal may add a plugin: its tools join as sandbox-backed entries
-    if ((doc.plugins ?? []).length) await attachIsolated(this.renderer.registry, pluginHost(base), doc, (pid) => this.renderer!.assets.url(pid), undefined, (id, url) => pluginToolHost(base, id, url)).catch((e) => console.error('[plugins]', (e as Error).message));
+    if ((doc.plugins ?? []).length) await attachIsolated(this.renderer.registry, pluginHost(base), doc, (pid) => this.renderer!.assets.url(pid), undefined, (id, url) => pluginToolHost(base, id, url));
     return this.renderer;
   }
 
@@ -123,7 +123,8 @@ class Frames {
         if (w.doc !== this.current || this.cache.has(w.key) || !w.doc.compositions[w.compId]) continue;
         let url: string;
         try { url = await this.stills.still(w.doc, w.t, w.compId, this.width, 0.78); }
-        catch { continue; }
+        catch (e) { S.renderError.value = `storyboard: ${(e as Error).message}`; continue; }
+        if (S.renderError.peek()?.startsWith('storyboard:')) S.renderError.value = null;
         this.cache.set(w.key, url);
         this.last.set(w.where, url);
         // the oldest frames go first when there are many
