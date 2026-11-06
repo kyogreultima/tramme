@@ -180,6 +180,7 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
   };
 
   const run = (msg: ToWorker & { call: number }, ctx?: ToolContext | CheckContext, signal?: AbortSignal): Promise<unknown> => {
+    if (waits.size >= 64) return Promise.reject(new Error('too many pending sandbox calls'));
     const c = msg.call;
     if (ctx) bridges.set(c, ctx);
     const stop = () => send({ kind: 'abort', call: c });
@@ -326,7 +327,9 @@ export function browserHost(docUrl: string): PluginHost {
           if (!approved(url)) throw new Error('plugin module must belong to this project');
           const response = await fetch(url.href, { credentials: 'same-origin' });
           if (!response.ok) throw new Error(`plugin module: HTTP ${response.status}`);
-          const dataUrl = `data:text/javascript;charset=utf-8,${encodeURIComponent(await response.text())}`;
+          const source = await response.text();
+          if (new TextEncoder().encode(source).byteLength > 1024 * 1024) throw new Error('plugin module exceeds 1 MB');
+          const dataUrl = `data:text/javascript;charset=utf-8,${encodeURIComponent(source)}`;
           urls.set(dataUrl, plugin.url);
           if (!host.closed()) post({ kind: 'load', plugins: [{ id: plugin.id, url: dataUrl }] });
         } catch (error) { if (!host.closed()) receive({ kind: 'loadFailed', id: plugin.id, url: plugin.url, message: (error as Error).message }); }

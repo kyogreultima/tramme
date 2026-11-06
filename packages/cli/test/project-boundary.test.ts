@@ -8,6 +8,7 @@ describe.skipIf(!CHROME)('the served project sandbox', () => {
   let port = 0;
   let privateReads = 0;
   let fontReads = 0;
+  let moduleReads = 0;
   let blankSandbox = false;
   beforeAll(async () => {
     server = new Server(readConfig(path.resolve(import.meta.dirname, 'fixtures/night-sky/document.tramme.json')));
@@ -15,6 +16,7 @@ describe.skipIf(!CHROME)('the served project sandbox', () => {
       if (blankSandbox && url.pathname === '/project-sandbox.html') { res.writeHead(200, { 'content-type': 'text/html' }); res.end('<!doctype html><title>blank</title>'); return true; }
       if (url.pathname === '/api/private') { privateReads++; res.writeHead(200, { 'content-type': 'text/javascript' }); res.end('private account data'); return true; }
       if (url.pathname === '/project/assets/fonts/test.woff2') { fontReads++; res.writeHead(200, { 'content-type': 'font/woff2' }); res.end(Buffer.from([0, 1, 2, 3])); return true; }
+      if (url.pathname === '/project/oversized.js') { moduleReads++; res.writeHead(200, { 'content-type': 'text/javascript' }); res.end(' '.repeat(1024 * 1024 + 1)); return true; }
       if (url.pathname === '/font-host') {
         res.writeHead(200, { 'content-type': 'text/html' });
         res.end('<!doctype html><script type="module">import {browserHost} from "/__tramme/font-host/host.js"; window.makeHost = browserHost;</script>');
@@ -124,6 +126,22 @@ describe.skipIf(!CHROME)('the served project sandbox', () => {
     });
     expect(refused).toContain('font must belong to this project');
     expect(privateReads).toBe(0);
+  }, 30_000);
+
+  it('refuses an oversized project module before transferring it to the worker', async () => {
+    moduleReads = 0;
+    await page.goto(`http://127.0.0.1:${port}/font-host`);
+    await page.waitForFunction(() => typeof (window as any).makeHost === 'function');
+    const reason = await page.evaluate(async () => {
+      const host = (window as any).makeHost(`${location.origin}/project/document.tramme.json`);
+      try {
+        await host.ensure([{ id: 'huge', url: `${location.origin}/project/oversized.js` }]);
+        return 'loaded';
+      } catch (error) { return (error as Error).message; }
+      finally { host.dispose(); }
+    });
+    expect(reason).toContain('plugin module exceeds 1 MB');
+    expect(moduleReads).toBe(1);
   }, 30_000);
 
   it('fails closed if the isolated page never starts its worker', async () => {

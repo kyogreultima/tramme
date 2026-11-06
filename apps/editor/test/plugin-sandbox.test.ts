@@ -86,6 +86,17 @@ function toolCtx(doc: TrammeDoc, over: Partial<ToolContext> = {}): ToolContext &
 }
 
 describe('the plugin sandbox', () => {
+  it('limits pending calls before accepting another worker request', async () => {
+    const sent: unknown[] = [];
+    const { host } = connectHost((message) => sent.push(message), () => DOC_URL);
+    const payload: DrawPayload = { frame: 0, comp: { width: 10, height: 10, duration: 1, fps: 30 }, layers: [], items: [] };
+    const pending = Array.from({ length: 64 }, () => host.draw(payload).catch(() => {}));
+    const overflow = host.draw(payload);
+    host.dispose();
+    await expect(overflow).rejects.toThrow('too many pending sandbox calls');
+    await Promise.all(pending);
+    expect(sent).toHaveLength(64);
+  });
   it('rejects an unknown worker request instead of reading check data', async () => {
     const sent: unknown[] = [];
     const { host, receive } = connectHost((message) => sent.push(message), () => DOC_URL);
