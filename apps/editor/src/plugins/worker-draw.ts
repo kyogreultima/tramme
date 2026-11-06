@@ -47,6 +47,8 @@ export function makeSandboxDraw(modules: Map<string, PluginModule>): SandboxDraw
   const pool = new WorkerPool();
   let output: OffscreenCanvas | null = null;
   let compositor: Compositor | null = null;
+  const fontLoads = new Map<string, Promise<void>>();
+  let fontsReady: Promise<void> = Promise.resolve();
 
   const nodeOf = (type: string): NodeType | null => {
     for (const mod of modules.values()) {
@@ -207,7 +209,7 @@ export function makeSandboxDraw(modules: Map<string, PluginModule>): SandboxDraw
 
   return {
     async renderFrame(p) {
-      try { return await renderFrame(p); }
+      try { await fontsReady; return await renderFrame(p); }
       finally {
         // These are the worker's copies; the page closes its own copies.
         for (const frame of Object.values(p.videos ?? {})) (frame as { close?(): void }).close?.();
@@ -219,15 +221,20 @@ export function makeSandboxDraw(modules: Map<string, PluginModule>): SandboxDraw
       for (const [id, image] of side.images) if (image !== d.images[id]) (image as { close?(): void }).close?.();
       side.images = new Map(Object.entries(d.images ?? {}));
       side.json = new Map(Object.entries(d.json ?? {}));
-      for (const f of d.fonts ?? []) {
-        if (side.fonts.has(f.url) || !f.data) continue;
-        side.fonts.add(f.url);
+      fontsReady = Promise.all((d.fonts ?? []).map((f) => {
+        let pending = fontLoads.get(f.url);
+        if (pending) return pending;
+        if (!f.data) return Promise.reject(new Error(`font bytes missing: ${f.url}`));
         const face = new FontFace(f.family, f.data, { weight: f.weight ?? '400' });
-        void face.load().then((loaded) => self_.fonts.add(loaded)).catch(() => side.fonts.delete(f.url));
-      }
+        pending = face.load().then((loaded) => { self_.fonts.add(loaded); side.fonts.add(f.url); }).catch((error) => { fontLoads.delete(f.url); throw error; });
+        fontLoads.set(f.url, pending);
+        return pending;
+      })).then(() => {});
+      void fontsReady.catch(() => {});
     },
 
     async draw(payload: DrawPayload) {
+      await fontsReady;
       const results = await Promise.all(payload.items.map(async (item): Promise<DrawResult> => {
         const node = nodeOf(item.type);
         if (!node) return { id: item.id, ok: false, err: `unknown node type: ${item.type}` };
@@ -279,6 +286,7 @@ export function makeSandboxDraw(modules: Map<string, PluginModule>): SandboxDraw
     },
 
     async exportOf(type: string, props: unknown) {
+      await fontsReady;
       const node = nodeOf(type);
       if (!node?.export) return { err: node ? `${type} has no vector export` : `unknown node type: ${type}` };
       try {

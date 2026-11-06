@@ -12,6 +12,7 @@ import { connectHost, type PluginHost } from '../src/plugins/host.ts';
 import { guardRealm, startWorkerSide, type SandboxDrawSide } from '../src/plugins/worker-side.ts';
 import { bindSandbox, declarationsModule, noteSandboxDeclaration, resetSandbox, primeSandboxExports, sandboxDeclaration, sandboxNode } from '../src/plugins/sandbox-draw.ts';
 import { RecordingPath2D } from '../src/plugins/recording-path.ts';
+import { makeSandboxDraw } from '../src/plugins/worker-draw.ts';
 import type { DrawPayload, DrawResult, SandboxDoc } from '../src/plugins/protocol.ts';
 import { attachIsolated, filterModule } from '../src/plugins/vocabulary.ts';
 
@@ -256,6 +257,39 @@ describe('the plugin sandbox', () => {
 
 describe('the sandboxed drawing', () => {
   beforeEach(() => resetSandbox());
+
+  it('waits for a supplied font before drawing the first frame', async () => {
+    const oldSelf = (globalThis as any).self, oldFace = (globalThis as any).FontFace;
+    let finish!: () => void;
+    const added: unknown[] = [];
+    (globalThis as any).self = { fonts: { add: (face: unknown) => added.push(face) } };
+    (globalThis as any).FontFace = class {
+      constructor(_family: string, _data: ArrayBuffer) {}
+      load() { return new Promise((resolve) => { finish = () => resolve(this); }); }
+    };
+    try {
+      const draw = makeSandboxDraw(new Map());
+      draw.setDoc({ doc: { assets: {} }, docUrl: DOC_URL, images: {}, json: {}, fonts: [{ url: `${DOC_URL}/font`, family: 'Test', data: new ArrayBuffer(4) }] });
+      let settled = false;
+      const frame = draw.draw({ frame: 0, comp: { width: 10, height: 10, duration: 1, fps: 30 }, layers: [], items: [] }).then((result) => { settled = true; return result; });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(settled).toBe(false);
+      finish();
+      expect((await frame).results).toEqual([]);
+      expect(added).toHaveLength(1);
+    } finally { (globalThis as any).self = oldSelf; (globalThis as any).FontFace = oldFace; }
+  });
+
+  it('refuses the frame when a supplied font cannot load', async () => {
+    const oldSelf = (globalThis as any).self, oldFace = (globalThis as any).FontFace;
+    (globalThis as any).self = { fonts: { add() {} } };
+    (globalThis as any).FontFace = class { load() { return Promise.reject(new Error('bad font')); } };
+    try {
+      const draw = makeSandboxDraw(new Map());
+      draw.setDoc({ doc: { assets: {} }, docUrl: DOC_URL, images: {}, json: {}, fonts: [{ url: `${DOC_URL}/bad`, family: 'Bad', data: new ArrayBuffer(4) }] });
+      await expect(draw.draw({ frame: 0, comp: { width: 10, height: 10, duration: 1, fps: 30 }, layers: [], items: [] })).rejects.toThrow('bad font');
+    } finally { (globalThis as any).self = oldSelf; (globalThis as any).FontFace = oldFace; }
+  });
 
   it('draws a frame in the sandbox and hands the pictures to the page', async () => {
     const docs: SandboxDoc[] = [], payloads: DrawPayload[] = [];
