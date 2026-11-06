@@ -19,6 +19,7 @@ describe.skipIf(!CHROME)('the served project sandbox', () => {
       if (url.pathname === '/project/oversized.js') { moduleReads++; res.writeHead(200, { 'content-type': 'text/javascript' }); res.end(' '.repeat(1024 * 1024 + 1)); return true; }
       if (url.pathname === '/project/holder.js') { res.writeHead(200, { 'content-type': 'text/javascript' }); res.end('export const tools = [{ name: "hold", description: "waits", run: () => new Promise(() => {}) }];'); return true; }
       if (url.pathname === '/project/forger.js') { res.writeHead(200, { 'content-type': 'text/javascript' }); res.end(`postMessage({ kind: 'ask', call: 1, id: 999, q: { kind: 'fetch', url: 'http://127.0.0.1:${port}/api/private' } }); export const tools = [];`); return true; }
+      if (url.pathname === '/project/spying.js') { res.writeHead(200, { 'content-type': 'text/javascript' }); res.end(`let storage; try { storage = indexedDB.open('private').readyState; } catch (error) { storage = error.name; } fetch('http://127.0.0.1:${port}/api/private').catch(() => {}); export const meta = { name: storage }; export const tools = [];`); return true; }
       if (url.pathname === '/plugins/shipped.js') { res.writeHead(200, { 'content-type': 'text/javascript' }); res.end('export const tools = [];'); return true; }
       if (url.pathname === '/font-host') {
         res.writeHead(200, { 'content-type': 'text/html' });
@@ -98,16 +99,18 @@ describe.skipIf(!CHROME)('the served project sandbox', () => {
         const result = {};
         try { result.storage = indexedDB.open('private').readyState; } catch (e) { result.storage = e.name; }
         try { await fetch(api); result.fetch = 'reached'; } catch (e) { result.fetch = e.name; }
+        try { await fetch(api, { mode: 'no-cors' }); result.noCors = 'reached'; } catch (e) { result.noCors = e.name; }
         try { await import(api); result.import = 'reached'; } catch (e) { result.import = e.name; }
         result.xhr = await new Promise(resolve => { try { const xhr = new XMLHttpRequest(); xhr.open('GET', api); xhr.onload = () => resolve('reached'); xhr.onerror = () => resolve('blocked'); xhr.send(); } catch (e) { resolve(e.name); } });
         result.socket = await new Promise(resolve => { try { const socket = new WebSocket(api.replace('http:', 'ws:')); socket.onopen = () => { socket.close(); resolve('reached'); }; socket.onerror = () => resolve('blocked'); } catch (e) { resolve(e.name); } });
+        result.eventSource = await new Promise(resolve => { if (typeof EventSource === 'undefined') { resolve('unsupported'); return; } try { const source = new EventSource(api); const timer = setTimeout(() => { source.close(); resolve('blocked'); }, 500); source.onopen = () => { clearTimeout(timer); source.close(); resolve('reached'); }; source.onerror = () => { clearTimeout(timer); source.close(); resolve('blocked'); }; } catch (e) { resolve(e.name); } });
         result.nested = await new Promise(resolve => { const source = 'fetch(' + JSON.stringify(api) + ').then(() => postMessage("reached")).catch(() => postMessage("blocked"))'; const worker = new Worker('data:text/javascript,' + encodeURIComponent(source), { type: 'module' }); worker.onmessage = e => { worker.terminate(); resolve(e.data); }; worker.onerror = () => resolve('blocked'); });
         postMessage(result);`;
       frame.contentWindow!.postMessage({ kind: 'start', code }, '*');
       return answer;
     });
     expect(results.storage).toBe('SecurityError');
-    for (const key of ['fetch', 'import', 'xhr', 'socket', 'nested']) expect(results[key]).not.toBe('reached');
+    for (const key of ['fetch', 'noCors', 'import', 'xhr', 'socket', 'eventSource', 'nested']) expect(results[key]).not.toBe('reached');
     expect(privateReads).toBe(0);
   }, 30_000);
 
@@ -175,6 +178,23 @@ describe.skipIf(!CHROME)('the served project sandbox', () => {
       } finally { holder.dispose(); forger.dispose(); }
     });
     expect(result).toBe(0);
+    expect(privateReads).toBe(0);
+  }, 30_000);
+
+  it('blocks private API and storage access during project module initialization', async () => {
+    privateReads = 0;
+    await page.goto(`http://127.0.0.1:${port}/font-host`);
+    await page.waitForFunction(() => typeof (window as any).makeHost === 'function');
+    const storage = await page.evaluate(async () => {
+      const base = `${location.origin}/project/document.tramme.json`;
+      const host = (window as any).makeHost(base);
+      try {
+        const declarations = await host.ensure([{ id: 'spy', url: `${location.origin}/project/spying.js` }]);
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        return declarations.get('spy')?.meta?.name;
+      } finally { host.dispose(); }
+    });
+    expect(storage).toBe('SecurityError');
     expect(privateReads).toBe(0);
   }, 30_000);
 
