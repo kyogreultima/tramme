@@ -87,6 +87,9 @@ const HEADERS = `/assets/*
 /plugin-worker.js
   Cache-Control: no-cache
   Content-Security-Policy: default-src 'none'; script-src 'self' blob: 'unsafe-eval'; connect-src 'self'; img-src 'self' data: blob:; font-src 'self' data:; style-src 'unsafe-inline'
+/project-sandbox.html
+  Cache-Control: no-store
+  Content-Security-Policy: sandbox allow-scripts; default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' data:; worker-src data:; connect-src 'none'; img-src data: blob:; font-src data: blob:; style-src 'unsafe-inline'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'
 /*
   X-Content-Type-Options: nosniff
   Referrer-Policy: same-origin
@@ -175,7 +178,7 @@ const workerOptions = (shell: string[], build: string): esbuild.BuildOptions => 
 function shellOf(meta: esbuild.Metafile): { shell: string[]; build: string } {
   const bundles = Object.keys(meta.outputs).map((p) => `/${path.relative(DIST, path.resolve(ROOT, p)).split(path.sep).join('/')}`).filter((p) => !/\.(map|txt)$/.test(p) && !p.startsWith('/assets/vault-'));
   const icons = fs.readdirSync(ICONS).map((f) => `/icons/${f}`);
-  const shell = ['/', '/manifest.webmanifest', '/icon.svg', '/plugin-worker.js', ...icons, ...bundles.sort()];
+  const shell = ['/', '/manifest.webmanifest', '/icon.svg', '/plugin-worker.js', '/project-sandbox.html', ...icons, ...bundles.sort()];
   // the bundles' names carry their hash; the sandbox's file does not: its bytes are counted in
   const hash = createHash('sha256').update(shell.join('\n')).update(fs.readFileSync(path.join(DIST, 'plugin-worker.js'))).digest('hex').slice(0, 12);
   return { shell, build: hash };
@@ -193,6 +196,7 @@ fs.mkdirSync(DIST, { recursive: true });
 for (const f of fs.readdirSync(DIST)) fs.rmSync(path.join(DIST, f), { recursive: true, force: true });
 fs.mkdirSync(path.join(DIST, 'assets'), { recursive: true });
 fs.writeFileSync(path.join(DIST, '_headers'), HEADERS);
+fs.copyFileSync(path.join(HERE, 'project-sandbox.html'), path.join(DIST, 'project-sandbox.html'));
 // installable as an app (a phone's home screen, a computer's): opens full screen, in the editor's colours,
 // with the icons each system asks for; the launch screen is white, the colour of the icons' tile (scripts/app-icons.ts)
 fs.writeFileSync(path.join(DIST, 'icon.svg'), ICON);

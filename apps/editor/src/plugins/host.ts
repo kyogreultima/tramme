@@ -216,13 +216,81 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string): 
   return { host, receive };
 }
 
-/** the editor's sandbox: one browser worker, at its fixed address */
+function bitmapsIn(value: unknown): Transferable[] {
+  const out: Transferable[] = [], seen = new Set<object>(), stack = [value];
+  while (stack.length && seen.size < 10000) {
+    const item = stack.pop();
+    if (!item || typeof item !== 'object' || seen.has(item)) continue;
+    seen.add(item);
+    if (typeof ImageBitmap !== 'undefined' && item instanceof ImageBitmap) { out.push(item); continue; }
+    if (Array.isArray(item)) for (const entry of item) stack.push(entry);
+    else for (const entry of Object.values(item)) stack.push(entry);
+  }
+  return out;
+}
+
+/** The editor's sandbox: an opaque iframe owns the worker, never the page. */
 export function browserHost(docUrl: string): PluginHost {
-  const worker = new Worker('/plugin-worker.js', { type: 'module' });
-  const { host, receive } = connectHost((m) => worker.postMessage(m), () => docUrl);
-  const dispose = (reason?: string) => { host.dispose(reason); worker.terminate(); };
-  worker.onmessage = (e: MessageEvent) => receive(e.data as FromWorker);
-  // the worker failed (its script, or an error nothing caught): what waits is told why, the next call gets a new one (plugins/index.ts)
-  worker.onerror = (e: ErrorEvent) => dispose(e.message || 'the worker could not start');
+  const frame = document.createElement('iframe');
+  frame.sandbox.add('allow-scripts');
+  frame.hidden = true;
+  frame.src = '/project-sandbox.html';
+  let started = false;
+  const queue: ToWorker[] = [];
+  const urls = new Map<string, string>();
+  const projectRoot = docUrl ? new URL('./', new URL(docUrl, location.href)).pathname : '';
+  const post = (m: ToWorker) => frame.contentWindow?.postMessage({ kind: 'send', data: m }, '*', bitmapsIn(m));
+  const { host, receive } = connectHost((m) => send(m), () => docUrl);
+  const dispose = (reason?: string) => {
+    if (host.closed()) return;
+    host.dispose(reason);
+    window.removeEventListener('message', onMessage);
+    frame.contentWindow?.postMessage({ kind: 'stop' }, '*');
+    frame.remove();
+  };
+  const onMessage = (event: MessageEvent) => {
+    if (event.source !== frame.contentWindow || event.origin !== 'null') return;
+    if (event.data?.kind === 'failed') { dispose(event.data.reason); return; }
+    if (event.data?.kind === 'started') {
+      started = true;
+      for (const m of queue.splice(0)) send(m);
+    }
+    if (event.data?.kind === 'worker') {
+      const message = event.data.data as FromWorker;
+      if (message?.kind === 'loaded') message.urls = message.urls.map((url) => urls.get(url) ?? url);
+      if (message?.kind === 'loadFailed') message.url = urls.get(message.url) ?? message.url;
+      receive(message);
+    }
+  };
+  const send = (m: ToWorker) => {
+    if (!host.closed()) {
+      if (!started) { queue.push(m); return; }
+      if (m.kind === 'load') {
+        // Fetch only approved local modules in the trusted page. The opaque
+        // worker imports data modules; its CSP refuses remote imports.
+        void Promise.all(m.plugins.map(async (plugin) => {
+          try {
+            const url = new URL(plugin.url, location.href);
+            const projectFile = projectRoot && url.protocol === location.protocol && url.pathname.startsWith(projectRoot);
+            const ownedBlob = url.protocol === 'blob:' && url.origin === location.origin;
+            if (url.origin !== location.origin || !(projectFile || ownedBlob)) throw new Error('plugin module must belong to this project');
+            const response = await fetch(url.href, { credentials: 'same-origin' });
+            if (!response.ok) throw new Error(`plugin module: HTTP ${response.status}`);
+            const dataUrl = `data:text/javascript;charset=utf-8,${encodeURIComponent(await response.text())}`;
+            urls.set(dataUrl, plugin.url);
+            post({ kind: 'load', plugins: [{ id: plugin.id, url: dataUrl }] });
+          } catch (error) { receive({ kind: 'loadFailed', id: plugin.id, url: plugin.url, message: (error as Error).message }); }
+        }));
+      } else post(m);
+    }
+  };
+  window.addEventListener('message', onMessage);
+  frame.addEventListener('load', () => {
+    void fetch('/plugin-worker.js', { credentials: 'same-origin' }).then(async (response) => {
+      if (!response.ok) throw new Error(`worker bundle: HTTP ${response.status}`);
+      frame.contentWindow?.postMessage({ kind: 'start', code: await response.text() }, '*');
+    }).catch((error: Error) => dispose(error.message));
+  }, { once: true });
+  document.body.append(frame);
   return { ...host, dispose };
 }

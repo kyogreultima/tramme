@@ -15,6 +15,8 @@ import * as esbuild from 'esbuild';
 import { WebSocketServer } from 'ws';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
+const PROJECT_SANDBOX = fs.readFileSync(path.join(HERE, '../../../apps/editor/project-sandbox.html'), 'utf8');
+const PROJECT_SANDBOX_CSP = "sandbox allow-scripts; default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' data:; worker-src data:; connect-src 'none'; img-src data: blob:; font-src data: blob:; style-src 'unsafe-inline'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'";
 
 export const MIME: Record<string, string> = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8',
@@ -93,7 +95,7 @@ export class Server {
    * Bundle an entry with esbuild and serve its outputs under /__tramme/<name>/
    * (main.js, main.css...). watch: rebuild on change (editor development).
    */
-  async bundle(name: string, entry: string, { watch = false } = {}) {
+  async bundle(name: string, entry: string, { watch = false, minify = false, sourcemap = true } = {}) {
     const store = (r: esbuild.BuildResult) => {
       for (const f of r.outputFiles || []) {
         const ext = path.extname(f.path);
@@ -101,8 +103,8 @@ export class Server {
       }
     };
     const options: esbuild.BuildOptions = {
-      entryPoints: [entry], bundle: true, format: 'esm', platform: 'browser', target: 'chrome120',
-      outdir: path.join(HERE, '.out', name), write: false, sourcemap: 'inline', logLevel: 'error',
+      entryPoints: [entry], bundle: true, minify, format: 'esm', platform: 'browser', target: 'chrome120',
+      outdir: path.join(HERE, '.out', name), write: false, sourcemap: sourcemap ? 'inline' : false, logLevel: 'error',
       jsx: 'automatic', jsxImportSource: 'preact', loader: { '.ttf': 'file', '.woff2': 'file' },
     };
     if (!watch) { store(await esbuild.build(options)); return; }
@@ -115,7 +117,7 @@ export class Server {
   async start(port = 0): Promise<number> {
     await this.bundle('render', path.join(HERE, 'page.ts'));
     // the plugin sandbox's worker (shared with the editor), at the fixed address its host creates
-    await this.bundle('sandbox', path.join(HERE, '../../../apps/editor/src/plugins/worker.ts'));
+    await this.bundle('sandbox', path.join(HERE, '../../../apps/editor/src/plugins/worker.ts'), { minify: true, sourcemap: false });
     this.files.set('/plugin-worker.js', this.files.get('/__tramme/sandbox/worker.js')!);
     await new Promise<void>((resolve, reject) => {
       this.http.once('error', reject);
@@ -146,6 +148,10 @@ export class Server {
     for (const h of this.handlers) if (await h(req, res, url)) return;
     if (url.pathname === '/__tramme/' || url.pathname === '/__tramme/index.html') {
       res.writeHead(200, { 'content-type': MIME['.html'], 'cache-control': 'no-store' }); res.end(PAGE); return;
+    }
+    if (url.pathname === '/project-sandbox.html') {
+      res.writeHead(200, { 'content-type': MIME['.html'], 'cache-control': 'no-store', 'content-security-policy': PROJECT_SANDBOX_CSP });
+      res.end(PROJECT_SANDBOX); return;
     }
     if (url.pathname === '/favicon.ico') { res.writeHead(204); res.end(); return; }
     const built = this.files.get(url.pathname);
