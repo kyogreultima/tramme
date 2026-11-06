@@ -172,8 +172,14 @@ export function packInstalled(files: Map<string, Uint8Array>, state: InstalledSt
 }
 
 export function unpackInstalled(zip: Uint8Array): { files: Map<string, Uint8Array>; state: InstalledState } {
+  if (zip.byteLength > PACKAGE_LIMIT) throw new Error('plugin backup too large');
   if (zip[0] !== 0x50 || zip[1] !== 0x4b) throw new Error('this file is not a backup of plugins (zip)');
-  const raw = unzipSync(zip);
+  let total = 0;
+  const raw = unzipSync(zip, { filter: (entry) => {
+    total += entry.originalSize;
+    if (total > PACKAGE_LIMIT * 2) throw new Error(`entry too large: ${entry.name}`);
+    return !entry.name.endsWith('/');
+  } });
   const files = new Map<string, Uint8Array>();
   for (const [p, d] of Object.entries(raw)) if (p.startsWith('plugins/') && /^[a-z0-9][a-z0-9_-]{0,62}\.(js|mjs)$/.test(p.slice(8))) files.set(p.slice(8), d);
   let state: InstalledState = { version: 1, disabled: [] };

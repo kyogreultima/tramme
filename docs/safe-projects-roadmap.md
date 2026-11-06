@@ -15,7 +15,9 @@ Startup and call deadlines (2026-11-06): if the iframe does not start its worker
 
 Bridge input checks (2026-11-06): unknown worker requests no longer fall through to the check's asset-data capability. Host file requests reject absolute paths, traversal and URL-like paths before invoking the project context; file payloads and network request fields have size and shape bounds. A test sends forged requests during an active check/tool call and verifies that no private data or file action is reached. This does not establish a plugin's identity inside the shared worker: permission separation, replay protection and result limits in step 3 remain open.
 
-Host resource bounds (2026-11-06): at most 64 worker calls can wait at once; the next is refused before it reaches the worker. The host refuses a project module larger than 1 MiB before sending its source into the opaque frame. Unit and browser tests exercise these limits. Archive expansion, total message size, graphics allocations and a user-facing recovery path remain open in step 4.
+Host resource bounds (2026-11-06): at most 64 worker calls can wait at once; the next is refused before it reaches the worker. The host refuses a project module larger than 1 MiB before sending its source into the opaque frame. Unit and browser tests exercise these limits. Total message size, graphics allocations and a user-facing recovery path remain open in step 4.
+
+Plugin-backup expansion (2026-11-06): the installed-plugin backup reader now refuses a compressed file over 64 MiB and a declared expanded total over 128 MiB before inflating entries. The project archive and single-plugin package readers already had expansion limits. Other import paths, total bridge message size, graphics allocations and recovery still keep step 4 open.
 
 ## Goal
 

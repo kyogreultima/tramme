@@ -49,4 +49,19 @@ describe('the package and the backup', () => {
     expect([...files.keys()].sort()).toEqual(['charts.js', 'stars.js']);
     expect(state.disabled).toEqual(['stars.js']);
   });
+
+  it('refuses a backup that advertises an oversized expanded entry before inflating it', () => {
+    const zip = packInstalled(new Map([['stars.js', new Uint8Array([1])]]), { version: 1, disabled: [] });
+    const edited = zip.slice();
+    const view = new DataView(edited.buffer);
+    let changed = false;
+    for (let i = 0; i < edited.length - 46; i++) {
+      if (view.getUint32(i, true) !== 0x02014b50) continue;
+      view.setUint32(i + 24, 129 * 1024 * 1024, true);
+      changed = true;
+      break;
+    }
+    expect(changed).toBe(true);
+    expect(() => unpackInstalled(edited)).toThrow(/entry too large/);
+  });
 });
