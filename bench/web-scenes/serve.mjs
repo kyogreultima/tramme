@@ -8,7 +8,7 @@ export async function serveScene(sceneDir) {
   const server = http.createServer((request, response) => {
     const pathname = new URL(`http://localhost${request.url}`).pathname;
     if (pathname === '/favicon.ico') { response.writeHead(204).end(); return; }
-    if (pathname === '/preview') { response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }).end('<!doctype html><html><body style="margin:0"></body></html>'); return; }
+    if (pathname === '/preview') { response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); fs.createReadStream(path.resolve('bench/web-scenes/preview.html')).pipe(response); return; }
     const vendor = pathname === '/vendor/gsap.min.js' ? 'gsap/dist/gsap.min.js'
       : pathname === '/vendor/three.module.js' ? 'three/build/three.module.js'
       : pathname === '/vendor/three.core.js' ? 'three/build/three.core.js' : null;

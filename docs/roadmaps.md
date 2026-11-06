@@ -7,7 +7,7 @@ The only thread: every roadmap in `docs/`, in the order they should be worked, a
 | # | Roadmap | State | Why here | By an agent |
 |---|---|---|---|---|
 | 1 | [Safe projects](safe-projects-roadmap.md) | **In progress:** 18 open, 2 done. Forced cancellation and separate workers for each plugin's tools and checks are complete; the opaque frame, network policy, CLI declaration isolation, font transfer and initial bridge limits are built. Full path coverage and security gates remain open | Marked "now" in its file. It blocks opening unknown projects, removing the code-execution question, the commercial launch and the isolation of web scenes | Steps 1 to 5: the boundary is chosen (an opaque-origin sandboxed iframe, see Decisions). What only a device shows (WebView2, WKWebView) is the user's to check. Step 6 ends on an independent security review and devices: the user's, and the general code question stays until then |
-| 2 | [Web scenes](web-scenes-roadmap.md) | **In progress:** 31 open, 1 done. Step 0's three-scene preview/export measurement is complete; the node, editor preview and engine decision remain open | Lifts the ceiling on what a film can look like. Step 0 runs alongside 1; steps 5 and after wait for its boundary | Step 0's remaining prototype boxes, with the figures; the user then writes its decision. After it: steps 1 to 4 and 6 to 8, and step 9 for desktop and CLI (no rendering service, see Decisions). Step 5, the isolation, waits for item 1's boundary. Step 10 is a blind scoring on the user's quota |
+| 2 | [Web scenes](web-scenes-roadmap.md) | **In progress:** 28 open, 4 done. Step 0's CLI alpha-composition node, iframe preview, three-scene measurements and engine decision are complete as prototypes | Lifts the ceiling on what a film can look like. Step 0 runs alongside 1; steps 5 and after wait for its boundary | Steps 1 to 4 and 6 to 8, and step 9 for desktop and CLI (no rendering service, see Decisions). Step 5, the isolation, waits for item 1's boundary. Step 10 is a blind scoring on the user's quota |
 | 3 | [Taste and finish](taste-finish-roadmap.md) | 10 open, 19 done; steps 1 to 5 built, waiting for their measure | The autonomy goal. Run the measure first: it says whether the limit is the tools or the prompt, and sets the baseline before web scenes | No. Every open box is a run on the user's quota ("waits for the user's go") or a blind scoring |
 | 4 | Platform: accounts backend and billing | in progress; payment provider last | Needed for the commercial launch under FSL-1.1-ALv2 | Not in this repository. It lives in the private `tramme-platform` (`docs/accounts.md`, `docs/billing.md` there). Built since the first version of this file: the beta deployment of both repositories, the accounts in the web and desktop apps, the account mails. Left there: the payment provider, the sign-in with Google and GitHub, the cloud storage of projects |
 | 5 | [Installed plugins](installed-plugins-roadmap.md) | 5 open, 26 done; the marketplace waits for the API | Unblocked by 4 | No. The five boxes are the marketplace: catalogue, author accounts and signatures, reviews, revocation. They need the platform's API and decisions on who reviews |
@@ -30,7 +30,8 @@ A roadmap with no open box is removed from `docs/`, and from the site's menu: it
 ## Decisions
 
 - 2026-11-05, safe projects: the boundary is an opaque-origin sandboxed iframe with a Content-Security-Policy that denies the network, hosting the worker. A dedicated origin only if a supported webview fails the proof. The independent security review comes later, and until it has happened the code question stays.
-- 2026-11-05, web scenes: the web editor does not render scenes through a server; their export is for the desktop app and the command line, and the web editor says so. The engine (reuse HyperFrames, reuse it with limits, or write Tramme's own capture) is decided after step 0's measures.
+- 2026-11-05, web scenes: the web editor does not render scenes through a server; their export is for the desktop app and the command line, and the web editor says so.
+- 2026-11-06, web scenes: after step 0's measurements, the user chose the pinned low-level `@hyperframes/engine` for CLI and desktop with documented iframe-preview limits. The higher-level HyperFrames CLI froze a custom-seek test scene; use the low-level seek capture path.
 
 ## What an agent can work
 
@@ -38,10 +39,10 @@ Of the open boxes of items 1 to 7, the ones an agent can land alone, in the orde
 
 1. Sound parity, steps 1 to 6. Nothing waits for the user.
 2. Safe projects, steps 1 to 5. Nothing waits for the user to start; the devices' checks come back to them.
-3. Web scenes, step 0's three prototype boxes at once. Its decision is the user's to write from the figures; then steps 1 to 4 and 6 to 8, step 9 for desktop and CLI, and step 5 after item 2 above.
+3. Web scenes, step 0's prototypes and the user's engine decision are complete. Next: steps 1 to 4 and 6 to 8, step 9 for desktop and CLI, and step 5 after item 2 above.
 4. The Generation palette-tool box.
 
-Everything else above waits for the user: a decision, a run on their quota, a blind scoring, a device, an independent review or a hand-picked set of recordings. The agent lists those as blocked and does not start them. The one decision still ahead is the web scenes engine, written from step 0's figures.
+Everything else above waits for the user: a run on their quota, a blind scoring, a device, an independent review or a hand-picked set of recordings. The agent lists those as blocked and does not start them. The web scenes engine decision was recorded on 2026-11-06 from step 0's figures.
 
 ## Rules of the order
 
