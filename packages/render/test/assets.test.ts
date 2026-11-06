@@ -47,6 +47,35 @@ describe('isolated asset paths', () => {
     await expect((loaded as unknown as { load(id: string, a: typeof doc.assets.data): Promise<unknown> }).load('data', doc.assets.data)).rejects.toThrow('asset must belong to this project');
     expect(fetcher).not.toHaveBeenCalled();
   });
+
+  it('bounds concurrent asset loads to eight', async () => {
+    const doc = newProject({ name: 'Many assets', width: 64, height: 64, fps: 1, duration: 1 }).doc;
+    for (let i = 0; i < 20; i++) doc.assets[`data-${i}`] = { type: 'json', src: `assets/${i}.json` };
+    const loaded = new AssetStore(doc, 'https://example.test/projects/a/document.tramme.json');
+    loaded.sandboxModules = true;
+    let active = 0, maximum = 0;
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      maximum = Math.max(maximum, ++active);
+      await new Promise((resolve) => setTimeout(resolve, 2));
+      active--;
+      return new Response('{}', { headers: { 'content-type': 'application/json' } });
+    }));
+    vi.stubGlobal('document', { fonts: { ready: Promise.resolve() } });
+    await loaded.sync(doc);
+    expect(maximum).toBe(8);
+  });
+
+  it('refuses an oversized image before creating its bitmap', async () => {
+    const doc = newProject({ name: 'Large image', width: 64, height: 64, fps: 1, duration: 1 }).doc;
+    doc.assets.image = { type: 'image', src: 'assets/huge.png' };
+    const loaded = new AssetStore(doc, 'https://example.test/projects/a/document.tramme.json');
+    loaded.sandboxModules = true;
+    vi.stubGlobal('Image', class { src = ''; naturalWidth = 6000; naturalHeight = 6000; async decode() {} });
+    const bitmap = vi.fn();
+    vi.stubGlobal('createImageBitmap', bitmap);
+    await expect((loaded as unknown as { load(id: string, a: typeof doc.assets.image): Promise<unknown> }).load('image', doc.assets.image)).rejects.toThrow('16 million pixels');
+    expect(bitmap).not.toHaveBeenCalled();
+  });
 });
 
 describe('an SVG without a size of its own', () => {

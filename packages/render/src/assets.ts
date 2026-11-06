@@ -10,6 +10,8 @@ const SVG_RASTER = 2048;
 /** how long the page's own fonts (its CSS) are waited for once the document's are loaded */
 const FONTS_WAIT_MS = 3000;
 const MODEL_LIMIT = 32 * 1024 * 1024;
+const MAX_ACTIVE_ASSETS = 8;
+const MAX_IMAGE_PIXELS = 16 * 1024 * 1024;
 
 /** the proportions of an SVG from its viewBox (1:1 when it has none) */
 export function viewBoxSize(svg: string): [number, number] {
@@ -102,7 +104,8 @@ export class AssetStore {
     for (const id of [...this.offline.keys()]) if (!doc.assets[id]) { this.offline.delete(id); this.failed.delete(id); }
     const refused: string[] = [];
     if (reload.length) this.version++;
-    await Promise.all(Object.entries(doc.assets).map(async ([id, a]) => {
+    const entries = Object.entries(doc.assets);
+    for (let start = 0; start < entries.length; start += MAX_ACTIVE_ASSETS) await Promise.all(entries.slice(start, start + MAX_ACTIVE_ASSETS).map(async ([id, a]) => {
       // a sub-clip is a range of another asset, no file of its own
       if (a.of !== undefined) { this.loaded.delete(id); return; }
       // the sandbox owns the project's plugin modules: their code never loads here
@@ -144,6 +147,9 @@ export class AssetStore {
         const img = new Image();
         img.src = url;
         await img.decode();
+        if (this.sandboxModules && (!img.naturalWidth || !img.naturalHeight || img.naturalWidth > 8192 || img.naturalHeight > 8192 || img.naturalWidth * img.naturalHeight > MAX_IMAGE_PIXELS)) {
+          throw new Error('image exceeds 8192 pixels per side or 16 million pixels total');
+        }
         try { return await createImageBitmap(img); } catch (e) { if (!/svg/i.test((e as Error).message)) throw e; }
         return svgBitmap(url);
       }
