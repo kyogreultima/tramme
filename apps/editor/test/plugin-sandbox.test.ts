@@ -215,6 +215,24 @@ describe('the plugin sandbox', () => {
       expect(host.closed()).toBe(true);
     } finally { vi.useRealTimers(); }
   });
+  it('terminates unanswered checks, tools, whole frames and vector exports', async () => {
+    vi.useFakeTimers();
+    try {
+      const cases = [
+        { kind: 'check', ms: 30_001, start: (host: PluginHost) => host.runCheck('slow', { doc: doc().doc, compId: 'root', comp: {}, samples: [], step: 1 } as unknown as CheckContext) },
+        { kind: 'tool', ms: 120_001, start: (host: PluginHost) => host.runTool('slow', {}, toolCtx(doc().doc)) },
+        { kind: 'render', ms: 30_001, start: (host: PluginHost) => host.renderFrame({ compId: 'root', t: 0, scale: 1, width: 10, height: 10 }) },
+        { kind: 'export', ms: 30_001, start: (host: PluginHost) => host.exportOf('slow', {}) },
+      ];
+      for (const test of cases) {
+        const { host } = connectHost(() => {}, () => DOC_URL);
+        const rejected = expect(test.start(host)).rejects.toThrow(`${test.kind} call timed out`);
+        await vi.advanceTimersByTimeAsync(test.ms);
+        await rejected;
+        expect(host.closed()).toBe(true);
+      }
+    } finally { vi.useRealTimers(); }
+  });
   it('tells the page what a plugin declares, without its code', async () => {
     const { host } = pair(new Map([['blob:stars', plugin()]]));
     const decls = await host.ensure([{ id: 'stars', url: 'blob:stars' }]);

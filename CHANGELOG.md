@@ -19,7 +19,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 - Restoring an installed-plugin backup now refuses a file over 64 MB or entries declaring more than 128 MB expanded in total before decompressing them.
 - The project sandbox now refuses a 65th simultaneous call and project plugin modules larger than 1 MB before transferring them to its worker.
 - The plugin host now rejects unknown bridge requests, project path escapes and malformed or oversized file/network requests before calling the editor's capabilities.
-- The isolated project host now stops and releases a frame that never starts or answers. Plugin loads, checks, tools and renders have deadlines; the next attempt creates a new frame.
+- A project extension that hangs during load, checks, tools, rendering or vector export now stops after a deadline. The isolated frame is released and the next attempt starts a new one.
 - Sandboxed plugin drawing now receives project font bytes from the trusted host, in document order, and waits for the face to load before drawing. A font URL outside the project is refused before any request.
 - CLI archive and folder validation now obtains plugin declarations from an opaque browser worker; project modules no longer initialize inside Node. A looping module is stopped after a deadline, and Node-only plugin behavior fails closed until its browser bridge is available.
 - Plugin workers now start inside an opaque-origin iframe with a network-denying policy in the web editor, desktop app and CLI; the host supplies their code and local plugin modules. The broader safe-projects gate remains open while other execution paths and desktop webviews are checked.
