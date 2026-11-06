@@ -2,7 +2,7 @@
 
 How the assistant writes real web (HTML, CSS, JS, GSAP, Three.js) inside one layer of a film, with the freedom [HyperFrames](https://github.com/heygen-com/hyperframes) gives, and keeps what Tramme already has: a structured document, undo, takes to compare, and a correction that touches one part only.
 
-Status: **in progress (25 open, 7 done).** Step 0's alpha-composited CLI node, iframe preview, three-scene measurements and engine decision are complete as prototypes. Step 1's scene manifest, project validation and archive round trip are complete. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
+Status: **in progress (23 open, 9 done).** Step 0's prototypes and step 1's format are complete. Step 2 now has a static determinism linter and readable CLI checks; seek adapters remain open. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
 
 ## Why
 
@@ -47,8 +47,8 @@ A scene with GSAP, flexbox, an animated SVG stroke, a CSS gradient and a rotatio
 ### Step 2: contract and adapters
 
 - [ ] `window.__hf.seek(t)` and duration; adapters for CSS and WAAPI, GSAP, SVG, Lottie, Three.js.
-- [ ] A linter that refuses what breaks determinism: free `Date.now`, `Math.random`, `fetch`, `requestAnimationFrame`.
-- [ ] `tramme check` reports a scene's errors in readable form.
+- [x] A linter that refuses what breaks determinism: free `Date.now`, `Math.random`, `fetch`, `requestAnimationFrame`. The CLI parses local JavaScript and inline HTML scripts without executing them, detects unbound global access and common aliases, and rejects syntax errors. It refuses a script over 1 MiB before parsing. This is a static seekability check, not an isolation boundary; dynamic code and browser behavior still need step 5's boundary and tests.
+- [x] `tramme check` reports a scene's errors in readable form. It prints `scenes/<id>/<file>:<line>` and the offending API; `tramme pack` also refuses a scene that fails the linter. The CLI integration test checks both commands.
 
 ### Step 3: export
 

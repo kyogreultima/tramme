@@ -31,6 +31,7 @@ import { VIDEO_FORMATS, type VideoFormat } from './media.ts';
 import { docRegistry, filesRegistry } from './plugins.ts';
 import { readConfig, Server } from './server.ts';
 import { checkProject, DOCUMENT, isChatPath, MANIFEST, newProject, packProject, unpackProject, LEGACIES, migrateProject } from '@tramme/project';
+import { lintSceneFiles, MAX_SCENE_SOURCE } from './scene-lint.ts';
 
 const [cmd, ...rest] = process.argv.slice(2);
 const pos: string[] = [];
@@ -86,7 +87,11 @@ async function cmdValidate(file: string) {
 async function cmdCheck(file: string) {
   const doc = readDoc(file);
   const { checkReport } = await import('./check.ts');
-  console.log(await checkReport(doc, await registryOf(file, doc).registry, str('comp')));
+  const project = registryOf(file, doc);
+  console.log(await checkReport(doc, await project.registry, str('comp')));
+  const issues = lintSceneFiles(readSceneScripts(project.dir));
+  for (const issue of issues) console.log(`  ${issue.path}:${issue.line} : ${issue.message}`);
+  if (issues.length) throw new Error(`${issues.length} scene issue(s)`);
 }
 
 async function cmdStill(file: string) {
@@ -214,10 +219,31 @@ function readFolder(dir: string): Map<string, Uint8Array> {
   return migrateProject(files);
 }
 
+/** only the small script/text files of scenes: checking must not read a film's large media */
+function readSceneScripts(dir: string): Map<string, Uint8Array> {
+  const files = new Map<string, Uint8Array>(), root = path.join(dir, 'scenes');
+  if (!fs.existsSync(root)) return files;
+  const walk = (folder: string) => {
+    for (const entry of fs.readdirSync(path.join(dir, folder), { withFileTypes: true })) {
+      const relative = `${folder}/${entry.name}`.replaceAll('\\', '/');
+      if (entry.isSymbolicLink()) throw new Error(`scene symlink not allowed: ${relative}`);
+      if (entry.isDirectory()) walk(relative);
+      else if (/\.(html|js|mjs)$/i.test(relative)) {
+        const file = path.join(dir, relative);
+        if (fs.statSync(file).size > MAX_SCENE_SOURCE) throw new Error(`scene script exceeds 1 MB: ${relative}`);
+        files.set(relative, new Uint8Array(fs.readFileSync(file)));
+      }
+    }
+  };
+  walk('scenes');
+  return files;
+}
+
 /** structure (format) then meaning (registry with the project's own plugins) of a project's files */
 async function reportProject(files: Map<string, Uint8Array>, label: string) {
   const { issues, doc } = checkProject(files);
   const all = [...issues];
+  all.push(...lintSceneFiles(files).map((i) => ({ path: `${i.path}:${i.line}`, message: i.message })));
   if (doc && !issues.length) {
     try { all.push(...validate(doc, await filesRegistry(doc, files)).map((i) => ({ path: `${DOCUMENT}${i.path}`, message: i.message }))); }
     catch (e) { all.push({ path: `${DOCUMENT}/plugins`, message: (e as Error).message }); }
