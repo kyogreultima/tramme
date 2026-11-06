@@ -118,7 +118,13 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
   };
 
   const receive = (m: FromWorker) => {
+    const invalid = () => timeout('invalid sandbox response');
+    if (!m || typeof m !== 'object' || typeof m.kind !== 'string') { invalid(); return; }
+    if ('call' in m && (!Number.isSafeInteger(m.call) || m.call < 1)) { invalid(); return; }
     if (m.kind === 'loaded') {
+      if (!Array.isArray(m.plugins) || !Array.isArray(m.urls) || m.plugins.length !== m.urls.length || m.plugins.length > 64 ||
+        m.plugins.some((d) => !d || typeof d !== 'object' || typeof d.id !== 'string' || d.id.length > 128) ||
+        m.urls.some((url) => typeof url !== 'string' || url.length > 4 * 1024 * 1024)) { invalid(); return; }
       m.plugins.forEach((d, i) => {
         const url = m.urls[i];
         // an older url's answer: its waiters have it, the plugin keeps the latest
@@ -129,12 +135,14 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
       return;
     }
     if (m.kind === 'loadFailed') {
+      if (typeof m.id !== 'string' || typeof m.url !== 'string' || typeof m.message !== 'string' || m.message.length > 4096) { invalid(); return; }
       if (loads.get(m.id)?.url === m.url) loads.delete(m.id);
       answers.get(answerKey(m.id, m.url))?.reject(new Error(`plugin ${m.id}: ${m.message}`));
       answers.delete(answerKey(m.id, m.url));
       return;
     }
     if (m.kind === 'result') {
+      if (m.err !== undefined && typeof m.err !== 'string') { invalid(); return; }
       const w = waits.get(m.call);
       if (!w) return;
       waits.delete(m.call);
@@ -144,6 +152,7 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
       return;
     }
     if (m.kind === 'drawn') {
+      if (!Array.isArray(m.results) || m.results.length > 10000) { invalid(); return; }
       const w = waits.get(m.call);
       if (!w) return;
       waits.delete(m.call);
@@ -151,6 +160,7 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
       return;
     }
     if (m.kind === 'exported') {
+      if ((m.err !== undefined && typeof m.err !== 'string') || (m.svg !== undefined && typeof m.svg !== 'string')) { invalid(); return; }
       const w = waits.get(m.call);
       if (!w) return;
       waits.delete(m.call);
@@ -159,6 +169,7 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
       return;
     }
     if (m.kind === 'rendered') {
+      if (m.err !== undefined && typeof m.err !== 'string') { invalid(); return; }
       const w = waits.get(m.call);
       if (!w) return;
       waits.delete(m.call);
@@ -167,6 +178,7 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
       return;
     }
     if (m.kind === 'progress') {
+      if (!Number.isFinite(m.done) || !Number.isFinite(m.total) || (m.step !== undefined && typeof m.step !== 'string')) { invalid(); return; }
       const ctx = bridges.get(m.call);
       if (ctx && 'progress' in ctx) (ctx as ToolContext).progress?.(m.done, m.total, m.step);
       return;
@@ -185,6 +197,7 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
         .catch((e: Error) => { if (bridges.has(m.call) && !closed) send({ kind: 'answer', id: m.id, err: e.message }); })
         .finally(() => { const left = (pendingAsks.get(m.call) ?? 1) - 1; if (left) pendingAsks.set(m.call, left); else pendingAsks.delete(m.call); });
     }
+    else invalid();
   };
 
   const run = (msg: ToWorker & { call: number }, ctx?: ToolContext | CheckContext, signal?: AbortSignal): Promise<unknown> => {

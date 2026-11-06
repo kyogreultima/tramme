@@ -86,6 +86,20 @@ function toolCtx(doc: TrammeDoc, over: Partial<ToolContext> = {}): ToolContext &
 }
 
 describe('the plugin sandbox', () => {
+  it('stops on a malformed worker declaration instead of trusting its shape', async () => {
+    const { host, receive } = connectHost(() => {}, () => DOC_URL);
+    const pending = host.ensure([{ id: 'bad', url: 'bad.js' }]);
+    expect(() => receive({ kind: 'loaded', plugins: null, urls: [] } as never)).not.toThrow();
+    await expect(pending).rejects.toThrow('invalid sandbox response');
+    expect(host.closed()).toBe(true);
+  });
+  it('stops on a malformed draw result instead of resolving it as picture data', async () => {
+    const { host, receive } = connectHost(() => {}, () => DOC_URL);
+    const pending = host.draw({ frame: 0, comp: { width: 10, height: 10, duration: 1, fps: 30 }, layers: [], items: [] });
+    receive({ kind: 'drawn', call: 1, frame: 0, results: null } as never);
+    await expect(pending).rejects.toThrow('invalid sandbox response');
+    expect(host.closed()).toBe(true);
+  });
   it('limits pending calls before accepting another worker request', async () => {
     const sent: unknown[] = [];
     const { host } = connectHost((message) => sent.push(message), () => DOC_URL);

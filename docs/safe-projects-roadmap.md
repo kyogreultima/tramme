@@ -21,6 +21,8 @@ Plugin-backup expansion (2026-11-06): the installed-plugin backup reader now ref
 
 Bridge request concurrency (2026-11-06): one active tool or check can have at most 16 host requests waiting at once. The host refuses replayed request IDs before repeating a file or network operation, and no longer sends an answer back after the call has ended. Per-plugin permission identity and limits on returned payloads still keep step 3 open.
 
+Worker response envelopes (2026-11-06): the host checks the shape and basic bounds of declarations, call IDs, draw result lists, progress, and error fields before using them. A malformed response closes the isolated frame and rejects waiting work. It does not yet bound all nested result payloads or prove plugin identity; step 3 remains open.
+
 ## Goal
 
 A user opens, plays, edits and exports a `.tramme` project without granting its scripts the editor's rights. Ordinary animation code needs no general execution permission. Extra capabilities, such as sending a media file to an external service, require a specific, understandable permission.

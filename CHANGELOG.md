@@ -10,6 +10,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Added
 
+- Malformed sandbox declarations and draw results now stop the isolated worker and report an invalid response instead of breaking the editor page.
 - Project tools and checks now have at most 16 simultaneous requests to the host; repeated request IDs cannot repeat a project file operation.
 - Restoring an installed-plugin backup now refuses a file over 64 MB or entries declaring more than 128 MB expanded in total before decompressing them.
 - The project sandbox now refuses a 65th simultaneous call and project plugin modules larger than 1 MB before transferring them to its worker.
