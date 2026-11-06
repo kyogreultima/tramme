@@ -2,7 +2,7 @@
 
 How the assistant writes real web (HTML, CSS, JS, GSAP, Three.js) inside one layer of a film, with the freedom [HyperFrames](https://github.com/heygen-com/hyperframes) gives, and keeps what Tramme already has: a structured document, undo, takes to compare, and a correction that touches one part only.
 
-Status: **planned, not started.** Step 0 decides the rest. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
+Status: **in progress (31 open, 1 done).** Step 0's three-scene measurement is complete; the node, editor preview and engine decision remain open. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
 
 ## Why
 
@@ -35,7 +35,7 @@ A scene with GSAP, flexbox, an animated SVG stroke, a CSS gradient and a rotatio
 
 - [ ] A `webscene` node that points at a scene folder, rendered on export by the HyperFrames engine to alpha PNG and composed with the other layers.
 - [ ] The preview in an iframe seeked to `t` with the same contract.
-- [ ] Three scenes (GSAP, SVG and CSS; a custom font; Three.js) compared preview against export with `tramme compare` (PSNR).
+- [x] Three scenes (GSAP, SVG and CSS; a custom font; Three.js) compared preview against export with `tramme compare` (PSNR). See [the reproducible prototype](../bench/web-scenes/README.md): six frames at 320×180 and 6 fps per scene, iframe preview against the pinned engine's alpha PNG output. Minimum PSNR: 31.86 dB (GSAP), 33.14 dB (CSS/SVG with Geist), 45.04 dB (Three.js). All 18 export frames changed over time, and each six-frame sequence repeated byte for byte. Headless Chrome 152 (engine) and Chrome 156 (preview) were used on Windows; this is a prototype measurement, not the editor node or its integration test.
 - [ ] Decision written here: reuse the engine (preview within a small PSNR gap), reuse it with documented limits, or write Tramme's own capture and take only the adapters that matter.
 
 ### Step 1: format

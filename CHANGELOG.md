@@ -14,6 +14,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 - Failed plugin attachments can be retried after repair, and storyboard stills report sandbox attachment errors.
 - Sandbox capability replies now reject oversized data before it crosses the worker bridge.
 - Page-to-sandbox calls and document snapshots now have a 64 MiB plain-data budget.
+- A repeatable web-scene prototype now measures iframe preview against alpha PNG capture for GSAP, CSS/SVG with a custom font, and Three.js.
 - The isolated renderer now keeps at most two reusable full-frame canvases after a frame, releasing excess surfaces instead of retaining them in memory.
 - Sandbox renders now refuse invalid sizes or a canvas side above the editor's 8,192-pixel project limit before allocating the frame.
 - Project extensions now run tools and checks in separate isolated workers per plugin. One extension cannot use another extension's active call to borrow its network grant; updating a plugin replaces its worker.

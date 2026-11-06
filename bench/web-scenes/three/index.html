@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; width: 320px; height: 180px; background: transparent; }
+  #stage { position: relative; width: 320px; height: 180px; overflow: hidden; background: transparent; }
+  canvas { display: block; }
+</style>
+<div id="stage" data-composition-id="three" data-no-timeline data-width="320" data-height="180" data-duration="1" data-fps="6"></div>
+<script type="module">
+  import * as THREE from '/vendor/three.module.js';
+  const stage = document.getElementById('stage');
+  const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: false, preserveDrawingBuffer: true });
+  renderer.setSize(320, 180, false);
+  renderer.setPixelRatio(1);
+  renderer.setClearColor(0x000000, 0);
+  stage.append(renderer.domElement);
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(42, 320 / 180, 0.1, 20);
+  camera.position.z = 5;
+  scene.add(new THREE.AmbientLight(0xffffff, 1.5));
+  const light = new THREE.DirectionalLight(0xffffff, 3);
+  light.position.set(-2, 3, 4);
+  scene.add(light);
+  const mesh = new THREE.Mesh(
+    new THREE.BoxGeometry(1.7, 1.7, 1.7),
+    new THREE.MeshStandardMaterial({ color: 0x39b9b1, metalness: 0.1, roughness: 0.4 }),
+  );
+  scene.add(mesh);
+  window.__hf = {
+    duration: 1,
+    seek(t) {
+      mesh.rotation.x = t * Math.PI * 0.8;
+      mesh.rotation.y = t * Math.PI * 1.2;
+      renderer.render(scene, camera);
+    },
+  };
+  window.__hf.seek(0);
+</script>
