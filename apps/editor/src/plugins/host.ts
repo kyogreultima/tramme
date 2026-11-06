@@ -43,6 +43,32 @@ function responseTooLarge(value: unknown): boolean {
   return false;
 }
 
+/** Read only approved bytes; cancel a slow or oversized response before it fills memory. */
+export async function readLimitedBody(response: Response, max: number, label: string): Promise<Uint8Array> {
+  const tooLarge = () => new Error(`${label} exceeds ${max / (1024 * 1024)} MB`);
+  const length = response.headers.get('content-length');
+  if (length && Number(length) > max) { await response.body?.cancel(); throw tooLarge(); }
+  if (!response.body) return new Uint8Array();
+  const reader = response.body.getReader(), chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > max) throw tooLarge();
+      chunks.push(value);
+    }
+  } catch (error) {
+    await reader.cancel().catch(() => {});
+    throw error;
+  } finally { reader.releaseLock(); }
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) { out.set(chunk, offset); offset += chunk.byteLength; }
+  return out;
+}
+
 export interface PluginHost {
   /**
    * the declarations of the loaded plugins, once these ones are (a known url
@@ -385,8 +411,7 @@ export function browserHost(docUrl: string): PluginHost {
           if (!approved(url)) throw new Error('plugin module must belong to this project');
           const response = await fetch(url.href, { credentials: 'same-origin' });
           if (!response.ok) throw new Error(`plugin module: HTTP ${response.status}`);
-          const source = await response.text();
-          if (new TextEncoder().encode(source).byteLength > 1024 * 1024) throw new Error('plugin module exceeds 1 MB');
+          const source = new TextDecoder().decode(await readLimitedBody(response, 1024 * 1024, 'plugin module'));
           const dataUrl = `data:text/javascript;charset=utf-8,${encodeURIComponent(source)}`;
           urls.set(dataUrl, plugin.url);
           if (!host.closed()) post({ kind: 'load', plugins: [{ id: plugin.id, url: dataUrl }] });
@@ -402,9 +427,7 @@ export function browserHost(docUrl: string): PluginHost {
         if (!bytes) {
           bytes = fetch(url.href, { credentials: 'same-origin' }).then(async (response) => {
             if (!response.ok) throw new Error(`font: HTTP ${response.status}`);
-            const data = await response.arrayBuffer();
-            if (data.byteLength > 16 * 1024 * 1024) throw new Error('font exceeds 16 MB');
-            return data;
+            return (await readLimitedBody(response, 16 * 1024 * 1024, 'font')).buffer as ArrayBuffer;
           });
           fontBytes.set(url.href, bytes);
         }

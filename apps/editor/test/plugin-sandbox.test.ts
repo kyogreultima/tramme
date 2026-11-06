@@ -8,7 +8,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { newProject, type Manifest } from '@tramme/project';
 import { Registry, toolOutput, type Host, type PluginModule, type ToolContext, type CheckContext, type TrammeDoc } from '@tramme/core';
-import { connectHost, type PluginHost } from '../src/plugins/host.ts';
+import { connectHost, readLimitedBody, type PluginHost } from '../src/plugins/host.ts';
 import { guardRealm, startWorkerSide, type SandboxDrawSide } from '../src/plugins/worker-side.ts';
 import { bindSandbox, declarationsModule, noteSandboxDeclaration, resetSandbox, primeSandboxExports, sandboxDeclaration, sandboxNode } from '../src/plugins/sandbox-draw.ts';
 import { RecordingPath2D } from '../src/plugins/recording-path.ts';
@@ -86,6 +86,15 @@ function toolCtx(doc: TrammeDoc, over: Partial<ToolContext> = {}): ToolContext &
 }
 
 describe('the plugin sandbox', () => {
+  it('cancels an oversized module stream without waiting for its body to finish', async () => {
+    let cancelled = false;
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) { controller.enqueue(new Uint8Array(1024 * 1024 + 1)); },
+      cancel() { cancelled = true; },
+    });
+    await expect(readLimitedBody(new Response(body), 1024 * 1024, 'plugin module')).rejects.toThrow('plugin module exceeds 1 MB');
+    expect(cancelled).toBe(true);
+  });
   it('refuses a batch of more than 64 plugin modules before sending it', async () => {
     const sent: unknown[] = [];
     const { host } = connectHost((message) => sent.push(message), () => DOC_URL);
