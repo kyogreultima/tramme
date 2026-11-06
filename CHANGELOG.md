@@ -10,6 +10,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Added
 
+- The isolated project worker now coalesces document updates during startup and stops if more than 128 messages queue; a project host also refuses more than 64 distinct plugin modules.
 - The experimental sandbox preview option now also selects isolated picture rendering for stills and raster exports of projects that contain expressions but no plugins.
 - The sandbox host now stops a project extension that returns more than 8 MB of nested plain data in one result, before passing that result into the editor.
 - Malformed sandbox declarations and draw results now stop the isolated worker and report an invalid response instead of breaking the editor page.

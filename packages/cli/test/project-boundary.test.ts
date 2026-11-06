@@ -158,4 +158,26 @@ describe.skipIf(!CHROME)('the served project sandbox', () => {
       expect(reason).toContain('the isolated project worker did not start');
     } finally { blankSandbox = false; }
   }, 20_000);
+
+  it('bounds queued document and draw messages while the isolated worker is starting', async () => {
+    blankSandbox = true;
+    try {
+      await page.goto(`http://127.0.0.1:${port}/font-host`);
+      await page.waitForFunction(() => typeof (window as any).makeHost === 'function');
+      const reason = await page.evaluate(async () => {
+        const base = `${location.origin}/project/document.tramme.json`;
+        const host = (window as any).makeHost(base);
+        const pending: Promise<unknown>[] = [];
+        const payload = { frame: 0, comp: { width: 10, height: 10, duration: 1, fps: 30 }, layers: [], items: [] };
+        for (let i = 0; i < 64; i++) {
+          host.setDoc({ doc: { index: i }, docUrl: base, images: {}, json: {}, fonts: [] });
+          pending.push(host.draw(payload).catch(() => {}));
+        }
+        try { await host.ensure([{ id: 'extra', url: `${location.origin}/project/extra.js` }]); return 'accepted'; }
+        catch (error) { await Promise.all(pending); return (error as Error).message; }
+        finally { host.dispose(); }
+      });
+      expect(reason).toContain('too many queued sandbox messages');
+    } finally { blankSandbox = false; }
+  }, 20_000);
 });

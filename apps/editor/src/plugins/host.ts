@@ -254,6 +254,7 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
 
   const host: PluginHost = {
     async ensure(plugins) {
+      if (new Set([...loads.keys(), ...plugins.map((p) => p.id)]).size > 64) throw new Error('too many project plugins');
       const fresh: { id: string; url: string }[] = [];
       const pending = plugins.map((p) => {
         let load = loads.get(p.id);
@@ -417,7 +418,12 @@ export function browserHost(docUrl: string): PluginHost {
   let transport = Promise.resolve();
   const send = (m: ToWorker) => {
     if (host.closed()) return;
-    if (!started) { queue.push(m); return; }
+    if (!started) {
+      if (m.kind === 'doc' && queue.at(-1)?.kind === 'doc') queue[queue.length - 1] = m;
+      else if (queue.length >= 128) dispose('too many queued sandbox messages');
+      else queue.push(m);
+      return;
+    }
     transport = transport.then(() => deliver(m)).catch((error: Error) => dispose(error.message));
   };
   window.addEventListener('message', onMessage);

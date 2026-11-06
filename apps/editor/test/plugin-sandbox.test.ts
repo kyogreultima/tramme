@@ -86,6 +86,14 @@ function toolCtx(doc: TrammeDoc, over: Partial<ToolContext> = {}): ToolContext &
 }
 
 describe('the plugin sandbox', () => {
+  it('refuses a batch of more than 64 plugin modules before sending it', async () => {
+    const sent: unknown[] = [];
+    const { host } = connectHost((message) => sent.push(message), () => DOC_URL);
+    const plugins = Array.from({ length: 65 }, (_, i) => ({ id: `plugin-${i}`, url: `plugin-${i}.js` }));
+    await expect(host.ensure(plugins)).rejects.toThrow('too many project plugins');
+    expect(sent).toEqual([]);
+    host.dispose();
+  });
   it('stops on a malformed worker declaration instead of trusting its shape', async () => {
     const { host, receive } = connectHost(() => {}, () => DOC_URL);
     const pending = host.ensure([{ id: 'bad', url: 'bad.js' }]);
