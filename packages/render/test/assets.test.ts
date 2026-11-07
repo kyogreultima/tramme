@@ -37,6 +37,17 @@ describe('model bytes for an isolated project', () => {
 });
 
 describe('isolated asset paths', () => {
+  it('refuses an excessive asset inventory before loading any file', async () => {
+    const doc = newProject({ name: 'Asset flood', width: 64, height: 64, fps: 1, duration: 1 }).doc;
+    for (let i = 0; i < 4097; i++) doc.assets[`asset-${i}`] = { type: 'json', src: `assets/${i}.json` };
+    const loaded = new AssetStore(doc, 'https://example.test/projects/a/document.tramme.json');
+    loaded.sandboxModules = true;
+    const fetcher = vi.fn();
+    vi.stubGlobal('fetch', fetcher);
+    await expect(loaded.sync(doc)).rejects.toThrow('exceeds 4096 assets');
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
   it.each([
     ['font', 'font', 16, 'font exceeds 16 MB'],
     ['json', 'json', 8, 'JSON exceeds 8 MB'],

@@ -16,6 +16,7 @@ const IMAGE_LIMIT = 32 * 1024 * 1024;
 const MAX_ACTIVE_ASSETS = 8;
 const MAX_IMAGE_PIXELS = 16 * 1024 * 1024;
 const MAX_RETAINED_IMAGE_PIXELS = 64 * 1024 * 1024;
+const MAX_PROJECT_ASSETS = 4096;
 
 async function boundedBytes(response: Response, limit: number, label: string): Promise<ArrayBuffer> {
   const declared = Number(response.headers.get('content-length'));
@@ -131,12 +132,13 @@ export class AssetStore {
 
   /** load what the document needs and is not loaded yet; `reload` forces some ids (a module edited on disk) */
   async sync(doc: TrammeDoc, reload: string[] = [], tolerate = false): Promise<void> {
+    const entries = Object.entries(doc.assets);
+    if (this.sandboxModules && entries.length > MAX_PROJECT_ASSETS) throw new Error(`isolated project exceeds ${MAX_PROJECT_ASSETS} assets`);
     this.doc = doc;
     for (const [id, old] of this.loaded) if (!doc.assets[id]) { this.release(old.entry, old.value); this.loaded.delete(id); }
     for (const id of [...this.offline.keys()]) if (!doc.assets[id]) { this.offline.delete(id); this.failed.delete(id); }
     const refused: string[] = [];
     if (reload.length) this.version++;
-    const entries = Object.entries(doc.assets);
     for (let start = 0; start < entries.length; start += MAX_ACTIVE_ASSETS) await Promise.all(entries.slice(start, start + MAX_ACTIVE_ASSETS).map(async ([id, a]) => {
       // a sub-clip is a range of another asset, no file of its own
       if (a.of !== undefined) { const old = this.loaded.get(id); if (old) this.release(old.entry, old.value); this.loaded.delete(id); return; }
