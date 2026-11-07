@@ -86,6 +86,7 @@ export class AssetStore {
 
   private release(entry: Asset, value: unknown): void {
     if (entry.type === 'image') (value as { close?: () => void } | null)?.close?.();
+    if (entry.type === 'video') (value as { dispose?: () => void } | null)?.dispose?.();
   }
 
   /** what a loaded asset is kept under: its entry, and for a video with a proxy, which of the two plays */
@@ -245,7 +246,7 @@ export class AssetStore {
         const cache = this.useProxies && (!!proxy || Object.values(this.doc.assets).some((asset) => asset.type === 'video' && asset.proxy === id));
         const source = proxy ? this.url(proxy) : url;
         this.assertProjectUrl(source);
-        return VideoFrames.open(source, { cache });
+        return VideoFrames.open(source, { cache, maxPixels: this.sandboxModules ? MAX_IMAGE_PIXELS : undefined });
       }
       case 'json': {
         const r = await fetch(url);

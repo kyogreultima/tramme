@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { newProject } from '@tramme/project';
 import { AssetStore, viewBoxSize, withSize } from '../src/assets.ts';
+import { VideoFrames, assertVideoDimensions } from '../src/video.ts';
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 describe('model bytes for an isolated project', () => {
   const asset = (src: string) => ({ type: 'model' as const, src });
@@ -37,6 +38,25 @@ describe('model bytes for an isolated project', () => {
 });
 
 describe('isolated asset paths', () => {
+  it('bounds video dimensions before decoder creation and disposes an unloaded video', async () => {
+    expect(() => assertVideoDimensions(1920, 1080, 16 * 1024 * 1024)).not.toThrow();
+    expect(() => assertVideoDimensions(9000, 100, 16 * 1024 * 1024)).toThrow('video exceeds 8192');
+    expect(() => assertVideoDimensions(5000, 5000, 16 * 1024 * 1024)).toThrow('16 million pixels');
+    const doc = newProject({ name: 'Video', width: 64, height: 64, fps: 1, duration: 1 }).doc;
+    doc.assets.clip = { type: 'video', src: 'assets/clip.mp4' };
+    const loaded = new AssetStore(doc, 'https://example.test/projects/a/document.tramme.json');
+    loaded.sandboxModules = true;
+    const dispose = vi.fn();
+    const open = vi.spyOn(VideoFrames, 'open').mockResolvedValue({ dispose } as unknown as VideoFrames);
+    vi.stubGlobal('document', { fonts: { ready: Promise.resolve() } });
+    await loaded.sync(doc);
+    expect(open).toHaveBeenCalledWith('https://example.test/projects/a/assets/clip.mp4', { cache: false, maxPixels: 16 * 1024 * 1024 });
+    const removed = structuredClone(doc);
+    delete removed.assets.clip;
+    await loaded.sync(removed);
+    expect(dispose).toHaveBeenCalledTimes(1);
+  });
+
   it('refuses an excessive asset inventory before loading any file', async () => {
     const doc = newProject({ name: 'Asset flood', width: 64, height: 64, fps: 1, duration: 1 }).doc;
     for (let i = 0; i < 4097; i++) doc.assets[`asset-${i}`] = { type: 'json', src: `assets/${i}.json` };
