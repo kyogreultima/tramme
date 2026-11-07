@@ -88,8 +88,14 @@ const api = {
   },
   /** switch to another version of the document (validated, new assets loaded) */
   async load(doc: TrammeDoc, compId?: string) {
-    currentDoc = doc;
+    const isolated = needsIsolation(doc);
+    if (isolated !== renderer.sandboxModules) throw new Error('document isolation mode changed; open a new render page');
+    if (isolated) {
+      sandbox ??= browserHost(docUrl);
+      await ensureDeclared(sandbox, moduleItemsOf(doc));
+    }
     await renderer.setDoc(doc, { compId: compId || doc.root });
+    currentDoc = doc;
     return api.info();
   },
   /** PNG of one frame as a data URL; maxWidth scales it down (previews for the assistant) */

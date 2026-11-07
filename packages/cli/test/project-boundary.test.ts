@@ -296,4 +296,25 @@ describe.skipIf(!CHROME)('the served project sandbox', () => {
       expect(unsafeModuleReads).toBe(1);
     } finally { unsafeDoc = null; }
   }, 30_000);
+
+  it('refuses an in-page load that would turn an unisolated renderer into a code renderer', async () => {
+    const clean = newProject({ name: 'Clean', width: 64, height: 64, fps: 1, duration: 1 }).doc;
+    const coded = structuredClone(clean);
+    coded.assets.unused = { type: 'module', src: 'plugins/unused.js' };
+    coded.compositions.main.layers.code = { type: 'code', transform: {}, props: { module: 'unused', entry: 'default', params: null } } as never;
+    coded.compositions.main.order = ['code'];
+    unsafeDoc = JSON.stringify(clean);
+    unsafeModuleReads = 0;
+    try {
+      await page.goto(`http://127.0.0.1:${port}/__tramme/?doc=/project/unsafe-code.tramme.json`);
+      const reason = await page.evaluate(async (doc) => {
+        await (window as any).TRAMME.ready;
+        try { await (window as any).TRAMME.load(doc); return 'loaded'; }
+        catch (error) { return (error as Error).message; }
+      }, coded);
+      expect(reason).toContain('document isolation mode changed');
+      expect(unsafeModuleReads).toBe(0);
+      expect(await page.evaluate(() => (window as any).TRAMME.info().title)).toBe('Clean');
+    } finally { unsafeDoc = null; }
+  }, 30_000);
 });
