@@ -23,7 +23,7 @@ import { packBySrc, packIdOf, packUpdates, shippedPacks, type PackEntry, type Pa
 import { api } from '../api.ts';
 import { fromLottie } from '@tramme/interop';
 import { mediaOf, TranscribeButton, transcribeItem } from './Transcribe.tsx';
-import { safeName, takenPaths, upload } from '../files.ts';
+import { fileProject, requireFileProject, sameFileProject, safeName, takenPaths, upload, type FileProject } from '../files.ts';
 import { askUser } from '../confirm.ts';
 import { assetWithHash, contentHash } from '../hash.ts';
 import { m, t, tr } from '../i18n/index.ts';
@@ -477,16 +477,19 @@ function typeOfFile(name: string): Asset['type'] | null {
 }
 
 /** merge an imported document (Lottie) into this one: its compositions and assets, ids made unique */
-async function importLottie(f: File) {
+async function importLottie(f: File, project: FileProject) {
   const { doc: src, files, warnings } = fromLottie(JSON.parse(await f.text()));
+  requireFileProject(project);
   // the animation's embedded images become files of the project
   if (files.length) {
     const taken = await takenPaths(), moved = new Map<string, string>();
     const folder = `assets/${safeName(f.name.replace(/(\.lottie)?\.json$/i, ''))}`;
     for (const file of files) moved.set(file.path, await upload(taken, `${folder}/${safeName(file.path.split('/').pop()!)}`, file.data));
+    requireFileProject(project);
     for (const a of Object.values(src.assets)) a.src = moved.get(a.src) ?? a.src;
   }
   const doc = S.doc.peek();
+  requireFileProject(project);
   const ops: Op[] = [];
   const assetIds = new Map<string, string>(), compIds = new Map<string, string>();
   const takenA: Record<string, unknown> = { ...doc.assets }, takenC: Record<string, unknown> = { ...doc.compositions };
@@ -510,6 +513,7 @@ async function importLottie(f: File) {
 }
 
 export async function importFiles(files: FileList | File[]) {
+  const project = fileProject();
   const doc = S.doc.peek();
   const ops = [];
   const taken: Record<string, unknown> = { ...doc.assets };
@@ -521,8 +525,9 @@ export async function importFiles(files: FileList | File[]) {
   // a file already in the project (or twice in this import) is answered with its asset, nothing written
   const added = new Map<string, string>(), already: string[] = [];
   for (const f of Array.from(files)) {
+    if (!sameFileProject(project)) return;
     if (/\.json$/i.test(f.name)) {
-      try { await importLottie(f); } catch (e) { toast(t('panel.couldNotImportLottie', { error: (e as Error).message }), 'error'); }
+      try { await importLottie(f, project); } catch (e) { toast(t('panel.couldNotImportLottie', { error: (e as Error).message }), 'error'); }
       continue;
     }
     const type = typeOfFile(f.name);
@@ -530,11 +535,13 @@ export async function importFiles(files: FileList | File[]) {
     let src: string, hash: string;
     try {
       hash = await contentHash(f);
+      requireFileProject(project);
       const have = assetWithHash(doc, hash) ?? added.get(hash);
       if (have) { already.push(t('panel.nameIsAsset', { name: f.name, asset: have })); continue; }
       paths ??= await takenPaths();
       src = await upload(paths, `${type === 'image' ? folder : 'assets'}/${safeName(f.name)}`, f);
-    } catch (e) { toast(t('panel.couldNotImportName', { name: f.name, error: (e as Error).message }), 'error'); continue; }
+      requireFileProject(project);
+    } catch (e) { toast(t('panel.couldNotImportName', { name: f.name, error: (e as Error).message }), 'error'); if (!sameFileProject(project)) return; continue; }
     const id = freshId(taken, f.name.replace(/\.[^.]+$/, '').toLowerCase().replace(/[^a-z0-9_-]+/g, '-'));
     taken[id] = 1;
     added.set(hash, id);
@@ -542,6 +549,7 @@ export async function importFiles(files: FileList | File[]) {
     if (type === 'font') asset.family = asset.name;
     ops.push({ op: 'add' as const, path: pointer('assets', id), value: asset });
   }
+  if (!sameFileProject(project)) return;
   if (ops.length && commit(ops.length > 1 ? t('panel.importNFiles', { n: ops.length }) : t('panel.importName', { name: (ops[0].value as Asset).name ?? '' }), ops) && stem) {
     toast(t('panel.nDrawingsInFolder', { n: images.length, folder }), 'info', 9000);
   }
@@ -549,16 +557,19 @@ export async function importFiles(files: FileList | File[]) {
   // a video this machine decodes slower than it plays: a proxy offered (measured on a second of it)
   for (const o of ops) {
     const a = o.value as Asset, f = Array.from(files).find((x) => x.name.replace(/\.[^.]+$/, '') === a.name);
-    if (a.type === 'video' && f) void offerProxy(o.path.split('/').pop()!, f);
+    if (a.type === 'video' && f) void offerProxy(o.path.split('/').pop()!, f, project);
   }
 }
 
-async function offerProxy(id: string, file: File) {
+async function offerProxy(id: string, file: File, project: FileProject) {
   const { decodeRate, playsPoorly, proxySize } = await import('../proxy.ts');
   const rate = await decodeRate(file).catch(() => null);
+  if (!sameFileProject(project)) return;
   if (!rate || !proxySize(rate.width, rate.height) || !playsPoorly(rate.fps, rate.fileFps)) return;
   if (!(await askUser(t('panel.proxyTitle'), t('panel.proxyText', { name: file.name, fps: Math.round(rate.fps), need: Math.round(rate.fileFps) }), t('panel.makeProxy')))) return;
+  if (!sameFileProject(project)) return;
   const { listCommands } = await import('../ai/commands.ts'), { runCommand } = await import('../ai/conversation.ts');
+  if (!sameFileProject(project)) return;
   const cmd = listCommands(S.registry.peek()).find((c) => c.name === 'proxy');
   if (cmd) await runCommand(cmd, { video: id });
 }
@@ -714,11 +725,14 @@ function Assets() {
 
 /** the shipped packs, one click each: the file enters the project, the document loads it */
 async function addPack(p: PackEntry) {
+  const project = fileProject();
   const text = await fetch(`/plugins/${p.file}`).then((r) => {
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     return r.text();
   });
+  requireFileProject(project);
   const path = await upload(await takenPaths(), `plugins/${p.file}`, new Blob([text], { type: 'text/javascript; charset=utf-8' }));
+  requireFileProject(project);
   const doc = S.doc.peek();
   const id = freshId(doc.assets, p.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'));
   const ops: Op[] = [{ op: 'add', path: pointer('assets', id), value: { type: 'module', src: path, name: p.name } }];
@@ -729,8 +743,11 @@ async function addPack(p: PackEntry) {
 
 /** the shipped version put in the open project in place of its older copy (asked, never applied alone), its version recorded as an installed plugin's copy keeps its own */
 async function takeUpdate(u: PackUpdate) {
+  const project = fileProject();
   const text = await fetch(`/plugins/${u.file}`).then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.text(); });
-  await api.write(S.project.peek().id, u.src, new Blob([text], { type: 'text/javascript; charset=utf-8' }), { type: 'text/javascript; charset=utf-8' });
+  requireFileProject(project);
+  await api.write(project.id, u.src, new Blob([text], { type: 'text/javascript; charset=utf-8' }), { type: 'text/javascript; charset=utf-8' });
+  requireFileProject(project);
   const doc = S.doc.peek(), copies = { ...copiesIn(doc), [packIdOf(u.file)]: u.to };
   const ops: Op[] = [{ op: doc.meta.installedCopies === undefined ? 'add' : 'replace', path: '/meta/installedCopies', value: copies }];
   if (commit(t('panel.packUpdated', { name: u.name, version: u.to }), ops)) await preview.reload([u.assetId]);

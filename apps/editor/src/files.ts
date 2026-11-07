@@ -7,10 +7,11 @@ import { slug } from './model.ts';
 import { S } from './state.ts';
 import { t } from './i18n/index.ts';
 
-interface FileProject { id: string; docUrl: string }
-const projectOf = (): FileProject => ({ id: S.project.peek().id, docUrl: S.docUrl.peek() });
-const requireProject = (project: FileProject) => {
-  if (S.project.peek()?.id !== project.id || S.docUrl.peek() !== project.docUrl) throw new Error(t('common.projectChangedDuringFile'));
+export interface FileProject { id: string; docUrl: string }
+export const fileProject = (): FileProject => ({ id: S.project.peek().id, docUrl: S.docUrl.peek() });
+export const sameFileProject = (project: FileProject): boolean => S.project.peek()?.id === project.id && S.docUrl.peek() === project.docUrl;
+export const requireFileProject = (project: FileProject) => {
+  if (!sameFileProject(project)) throw new Error(t('common.projectChangedDuringFile'));
 };
 const listedProjects = new WeakMap<Set<string>, FileProject>();
 
@@ -32,9 +33,9 @@ export function freePath(taken: Set<string>, path: string): string {
 
 /** paths already used by the project's files */
 export async function takenPaths(): Promise<Set<string>> {
-  const project = projectOf();
+  const project = fileProject();
   const { files } = await api.info(project.id);
-  requireProject(project);
+  requireFileProject(project);
   const taken = new Set(files.map((f) => f.path));
   listedProjects.set(taken, project);
   return taken;
@@ -46,8 +47,8 @@ let uploadId = 0;
 
 /** write a file of the project at a free path near the wanted one, large ones in parts; returns the path */
 export async function upload(taken: Set<string>, wanted: string, body: Blob | Uint8Array): Promise<string> {
-  const project = listedProjects.get(taken) ?? projectOf();
-  requireProject(project);
+  const project = listedProjects.get(taken) ?? fileProject();
+  requireFileProject(project);
   const path = freePath(taken, wanted);
   const bad = pathIssue(path);
   if (bad) throw new Error(`${path} : ${bad}`);
@@ -62,7 +63,7 @@ export async function upload(taken: Set<string>, wanted: string, body: Blob | Ui
   } finally {
     if (track) uploads.value = uploads.peek().filter((u) => u.id !== track);
   }
-  requireProject(project);
+  requireFileProject(project);
   taken.add(path);
   return path;
 }
