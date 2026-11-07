@@ -7,7 +7,7 @@
 // sound or video already in the project is attached as the asset that has it,
 // nothing written again.
 
-import { signal } from '@preact/signals';
+import { effect, signal } from '@preact/signals';
 import { pointer, type TrammeDoc } from '@tramme/core';
 import { api } from './api.ts';
 import { safeName, takenPaths, upload } from './files.ts';
@@ -30,26 +30,37 @@ export interface Attachment {
 
 /** files joined to the message being written */
 export const pending = signal<Attachment[]>([]);
+let pendingProject = '';
+effect(() => {
+  const project = `${S.project.value?.id ?? ''}\n${S.docUrl.value}`;
+  if (pendingProject && project !== pendingProject) pending.value = [];
+  pendingProject = project;
+});
 /** files still being sent */
 export const attaching = signal(0);
 /** words put in the message box for the user to send (a workflow ready to run), taken by the box when it shows */
 export const draft = signal('');
 
 export async function attachFiles(files: File[]) {
+  const project = `${S.project.peek()?.id ?? ''}\n${S.docUrl.peek()}`;
+  const current = () => `${S.project.peek()?.id ?? ''}\n${S.docUrl.peek()}` === project;
   const taken = await takenPaths();
   for (const f of files) {
+    if (!current()) break;
     const kind = kindOf(f);
     if (kind === 'file' && !/\.(json|svg|js|mjs)$/i.test(f.name)) { toast(t('attachments.nameImageSoundVideo', { name: f.name }), 'error'); continue; }
     attaching.value++;
     try {
       const media = kind !== 'file' && kind !== 'document';
       const hash = media ? await contentHash(f) : undefined;
+      if (!current()) throw new Error(t('common.projectChangedDuringFile'));
       const have = hash ? assetWithHash(S.doc.peek(), hash) : undefined;
       if (have) {
         pending.value = [...pending.peek(), { path: S.doc.peek().assets[have].src, name: f.name, kind, size: f.size, asset: have }];
         continue;
       }
       const path = await upload(taken, `assets/chat/${safeName(f.name)}`, f);
+      if (!current()) throw new Error(t('common.projectChangedDuringFile'));
       let asset: string | undefined;
       if (media) {
         const doc = S.doc.peek();
