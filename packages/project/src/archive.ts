@@ -7,8 +7,12 @@ import { LEGACIES, LIMITS, MANIFEST, maxSize, migrateProject, pathIssue } from '
 /** zip the project's files; renders/ and unknown places stay out */
 export function packProject(files: Map<string, Uint8Array>): Uint8Array {
   const entries: Zippable = {};
+  let count = 0, total = 0;
   for (const [p, data] of files) {
     if (p.startsWith('renders/') || pathIssue(p)) continue;
+    if (++count > LIMITS.files) throw new Error(`too many project files (${LIMITS.files} at most)`);
+    total += data.byteLength;
+    if (data.byteLength > maxSize(p) || total > LIMITS.archive * 2) throw new Error(`project file too large: ${p}`);
     // media are already compressed: store them as they are
     const stored = /\.(png|jpe?g|webp|gif|avif|mp3|ogg|m4a|mp4|webm|mov|woff2?)$/i.test(p);
     entries[p] = [data, { level: stored ? 0 : 6 }];

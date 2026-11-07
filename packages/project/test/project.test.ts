@@ -67,6 +67,7 @@ describe('project format', () => {
   it('refuses excessive archive entries before inflating their contents', () => {
     const entries = Object.fromEntries(Array.from({ length: 2001 }, (_, i) => [`assets/${i}.json`, enc('{}')]));
     expect(() => unpackProject(zipSync(entries))).toThrow(/too many archive entries/);
+    expect(() => packProject(new Map(Object.entries(entries)))).toThrow(/too many project files/);
   });
 
   it('validates a scene manifest and keeps its files through archive export and import', () => {
