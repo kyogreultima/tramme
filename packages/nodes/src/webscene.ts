@@ -20,7 +20,8 @@ export const webscene: NodeType<WebSceneProps> = {
   bounds: ({ size: [w, h] }) => ({ x: -w / 2, y: -h / 2, w, h }),
   render: {
     canvas2d(ctx, p, host) {
-      if (!p.frames.length || p.fps <= 0) return;
+      if (!p.frames.length) throw new Error(`web scene ${p.folder || '(unnamed)'} has no captured frames`);
+      if (p.fps <= 0) throw new Error(`web scene ${p.folder || '(unnamed)'} has an invalid frame rate`);
       const index = Math.min(p.frames.length - 1, Math.max(0, Math.floor(host.t * p.fps + 1e-6)));
       const image = host.asset<CanvasImageSource>(p.frames[index]);
       ctx.drawImage(image, -p.size[0] / 2, -p.size[1] / 2, p.size[0], p.size[1]);

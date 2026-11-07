@@ -95,6 +95,8 @@ Needs the boundary of [safe projects](safe-projects-roadmap.md).
 
 Browser limit (2026-11-07): a visual export containing a `webscene` now stops with a clear message before the editor starts rendering. The Known limits section points to the CLI prototype. Ordinary CLI and desktop capture remain open, so the platform box is still unchecked.
 
+Missing capture failure (2026-11-07): the built-in `webscene` node now throws a named error when its frame list is empty or its capture frame rate is invalid, instead of silently exporting a blank layer. Ordinary capture preparation in CLI and desktop remains step 3 and step 9 work.
+
 - [ ] CLI and desktop first (Chrome sidecar on desktop).
 - [ ] Web editor: export reserved to desktop and CLI, written in Known limits, with a clear message where a web scene is exported from the web editor. Decided (2026-11-05): no rendering service for now, which would be a server to run; one can be added later if wanted.
 
