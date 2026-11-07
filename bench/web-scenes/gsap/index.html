@@ -12,13 +12,16 @@
   <div class="panel"></div><div class="bar"></div><div class="mark"></div>
 </div>
 <script src="/vendor/gsap.min.js"></script>
-<script>
+<script type="module">
+  import { sceneController } from '/vendor/scene-runtime.js';
   const timeline = gsap.timeline({ paused: true });
   timeline.fromTo('.panel', { x: -60, rotation: -7 }, { x: 0, rotation: 0, duration: 1, ease: 'none' }, 0);
   timeline.fromTo('.bar', { scaleX: 0.1 }, { scaleX: 1, duration: 1, ease: 'none' }, 0);
   timeline.fromTo('.mark', { x: 0, y: 0 }, { x: 150, y: -8, duration: 1, ease: 'none' }, 0);
   window.__timelines = window.__timelines || {};
   window.__timelines.gsap = timeline;
-  window.__hf = { duration: 1, seek(t) { timeline.time(Math.max(0, Math.min(1, t))); } };
+  const controller = sceneController(1);
+  controller.gsap(timeline);
+  controller.install(window);
   window.__hf.seek(0);
 </script>

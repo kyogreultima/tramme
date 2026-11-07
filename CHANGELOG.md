@@ -10,6 +10,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Added
 
+- Web scenes now share an absolute-time `window.__hf` runtime with browser-tested CSS, WAAPI, SVG, GSAP, Lottie and Three.js seek adapters.
 - Web scenes now have a validated `scene.json` manifest, published JSON Schema, approved project paths and archive round-trip coverage.
 - CLI scene checks now name nondeterministic browser APIs by file and line, and project packing refuses those scenes.
 - Isolated model rendering now receives bounded, approved `.glb` bytes through the host instead of fetching from the sandbox worker.

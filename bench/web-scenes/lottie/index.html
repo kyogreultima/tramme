@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; width: 320px; height: 180px; background: transparent; }
+  #stage { width: 320px; height: 180px; background: transparent; }
+</style>
+<div id="stage" data-composition-id="lottie" data-no-timeline data-width="320" data-height="180" data-duration="1" data-fps="6"></div>
+<script src="/vendor/lottie.min.js"></script>
+<script type="module">
+  import { sceneController } from '/vendor/scene-runtime.js';
+  const data = {
+    v: '5.7.4', fr: 30, ip: 0, op: 30, w: 320, h: 180, nm: 'Lottie seek', ddd: 0, assets: [],
+    layers: [{
+      ddd: 0, ind: 1, ty: 4, nm: 'Moving rectangle', sr: 1, ao: 0, ip: 0, op: 30, st: 0, bm: 0,
+      ks: {
+        o: { a: 0, k: 100 }, r: { a: 0, k: 0 }, a: { a: 0, k: [0, 0, 0] }, s: { a: 0, k: [100, 100, 100] },
+        p: { a: 1, k: [{ t: 0, s: [65, 90, 0], o: { x: [0], y: [0] }, i: { x: [1], y: [1] }, to: [0, 0, 0], ti: [0, 0, 0] }, { t: 30, s: [255, 90, 0] }] },
+      },
+      shapes: [{ ty: 'gr', nm: 'Box', it: [
+        { ty: 'rc', p: { a: 0, k: [0, 0] }, s: { a: 0, k: [92, 64] }, r: { a: 0, k: 10 } },
+        { ty: 'fl', c: { a: 0, k: [0.91, 0.27, 0.41, 1] }, o: { a: 0, k: 100 } },
+        { ty: 'tr', p: { a: 0, k: [0, 0] }, a: { a: 0, k: [0, 0] }, s: { a: 0, k: [100, 100] }, r: { a: 0, k: 0 }, o: { a: 0, k: 100 } },
+      ] }],
+    }],
+  };
+  const animation = window.lottie.loadAnimation({ container: document.getElementById('stage'), renderer: 'svg', autoplay: false, loop: false, animationData: data });
+  const ready = () => {
+    const controller = sceneController(1);
+    controller.lottie(animation);
+    controller.install(window);
+    window.__hf.seek(0);
+  };
+  if (animation.isLoaded) ready(); else animation.addEventListener('DOMLoaded', ready);
+</script>

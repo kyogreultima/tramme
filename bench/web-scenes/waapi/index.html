@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; width: 320px; height: 180px; background: transparent; }
+  #stage { position: relative; width: 320px; height: 180px; overflow: hidden; }
+  #bar { position: absolute; left: 28px; top: 65px; width: 100px; height: 50px; border-radius: 12px; background: #e76f51; }
+</style>
+<div id="stage" data-composition-id="waapi" data-no-timeline data-width="320" data-height="180" data-duration="1" data-fps="6"><div id="bar"></div></div>
+<script type="module">
+  import { sceneController } from '/vendor/scene-runtime.js';
+  document.getElementById('bar').animate([
+    { transform: 'translateX(0px) rotate(-8deg)' },
+    { transform: 'translateX(180px) rotate(8deg)' },
+  ], { duration: 1000, fill: 'both' });
+  const controller = sceneController(1);
+  controller.waapi(document);
+  controller.install(window);
+  window.__hf.seek(0);
+</script>

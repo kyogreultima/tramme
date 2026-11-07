@@ -1,16 +1,20 @@
-# Web scene step 0 prototype
+# Web scene seek and composition prototypes
 
-Three isolated scene folders exercise the seek contract without adding a web scene to the Tramme document yet:
+Five scene folders exercise the seek contract. The CSS, WAAPI, SVG, GSAP, Lottie and Three.js adapters share `sceneController` from `packages/project/src/scene-runtime.ts`. The step 0 compositor prototype still uses a project plugin node; ordinary editor and export integration are later roadmap steps.
 
 | Scene | Content | Minimum PSNR, engine vs iframe preview | Median PSNR |
 |---|---|---:|---:|
-| `css-svg` | CSS gradient, SVG path and locally loaded Geist variable font | 33.14 dB | 35.68 dB |
+| `css-svg` | CSS animation, SVG SMIL and locally loaded Geist variable font | 28.35 dB | - |
 | `gsap` | Paused GSAP timeline and transformed HTML elements | 31.86 dB | 34.48 dB |
-| `three` | Seeked Three.js WebGL box with alpha | 45.04 dB | 51.29 dB |
+| `three` | Three.js AnimationMixer driving a WebGL box with alpha | 45.04 dB | 51.29 dB |
+| `lottie` | Local Lottie animation with alpha | 45.05 dB | - |
+| `waapi` | Web Animations API transform | 38.80 dB | - |
 
-The measurement used six frames per scene at 320×180, 6 fps, on Windows. `@hyperframes/engine@0.9.13` captured PNG with Headless Chrome 152; Tramme's Puppeteer launch captured an actual iframe in Chrome 156. `compare-preview.mjs` calls the same `compareFiles` PSNR function as `tramme compare`. Every exported frame differs from the previous one; a second engine capture of each scene matched all six PNG files byte for byte. The browser versions differ, so these PSNR values are evidence for the prototype only. They are not a preview fidelity guarantee on other hardware.
+All five scenes produced six distinct export frames; a second capture of each was byte-identical. The native CSS/SVG animations have a larger early-frame preview gap (minimum 28.35 dB). These measurements are prototype evidence, not a fidelity guarantee on other hardware.
 
-The higher-level `hyperframes@0.9.13 render --format png-sequence` command was also tested with the first custom-seek scene. It emitted six identical initial-pose frames even though its lint passed and the iframe moved. The lower-level engine called `window.__hf.seek(t)` and produced six distinct frames. This difference must inform the engine decision after the node and editor preview prototypes exist.
+The measurements use six frames per scene at 320x180 and 6 fps on Windows. The pinned engine captures alpha PNGs; the comparison harness captures an iframe and reports PSNR with the same function as `tramme compare`.
+
+The higher-level `hyperframes@0.9.13 render --format png-sequence` command froze the first custom-seek scene at its initial pose. The user selected the pinned low-level engine with documented iframe preview limits for CLI and desktop integration.
 
 ## Reproduce
 
@@ -18,9 +22,10 @@ Use Node 24 and a local Chrome installation. Install the pinned prototype tools 
 
 ```sh
 npm install --prefix .cache/roadmaps/hyperframes-0.9.13 --no-audit --no-fund @hyperframes/engine@0.9.13 gsap@3.15.1 three@0.187.0
+npm install --no-audit --no-fund
 ```
 
-For each of `css-svg`, `gsap`, and `three`:
+For each of `css-svg`, `gsap`, `three`, `lottie` and `waapi`:
 
 ```sh
 node bench/web-scenes/capture-engine.mjs bench/web-scenes/css-svg .cache/roadmaps/webscene-css-svg-export
@@ -41,3 +46,5 @@ node packages/cli/src/main.ts validate .cache/roadmaps/webscene-layer/project/do
 The helper checks that all six final frames differ and that a transparent scene pixel reveals the underlying Tramme layer. In the measured middle frame, the transparent scene pixel `(0,0,0,0)` became `(23,55,76,255)` after composition; the center was `(110,71,133,255)`. The node lives in this prototype's plugin and the export helper is explicit. Normal project import, editor preview and a built-in node remain for later steps.
 
 The engine comes from [HyperFrames](https://github.com/heygen-com/hyperframes/blob/main/LICENSE) under Apache 2.0. The GSAP core is used for the prototype under its [standard no-charge license](https://gsap.com/standard-license/); Three.js is MIT. The copied Geist font in `css-svg` is OFL 1.1; its notice is beside it.
+
+Adapter API references: [GSAP time](https://gsap.com/docs/v3/GSAP/Timeline/time%28%29/), [Three.js AnimationMixer](https://threejs.org/docs/pages/AnimationMixer), [Lottie playback](https://github.com/airbnb/lottie-web/blob/master/README.md), [Web Animation currentTime](https://developer.mozilla.org/en-US/docs/Web/API/Animation/currentTime), [SVG animation clock](https://developer.mozilla.org/en-US/docs/Web/API/SVGSVGElement).

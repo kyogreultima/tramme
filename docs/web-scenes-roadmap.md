@@ -2,7 +2,7 @@
 
 How the assistant writes real web (HTML, CSS, JS, GSAP, Three.js) inside one layer of a film, with the freedom [HyperFrames](https://github.com/heygen-com/hyperframes) gives, and keeps what Tramme already has: a structured document, undo, takes to compare, and a correction that touches one part only.
 
-Status: **in progress (23 open, 9 done).** Step 0's prototypes and step 1's format are complete. Step 2 now has a static determinism linter and readable CLI checks; seek adapters remain open. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
+Status: **in progress (22 open, 10 done).** Step 0's prototypes and step 1's format are complete. Step 2 has a static determinism linter, readable CLI checks and browser-tested seek adapters. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
 
 ## Why
 
@@ -19,7 +19,7 @@ The freedom goes in one layer, not in the whole format. Making HTML the source o
 
 ## What the test showed
 
-A scene with GSAP, flexbox, an animated SVG stroke, a CSS gradient and a rotation, rendered twice with `hyperframes@0.9.13` (`render --format png-sequence`, 1280x720, 30 fps, 90 frames): **90 of 90 frames identical byte for byte**, PNG with transparency, 16 to 20 s with one worker, Chrome start included. Not tested: Three.js, Lottie, `<video>`, audio, the preview in the editor.
+A scene with GSAP, flexbox, an animated SVG stroke, a CSS gradient and a rotation, rendered twice with `hyperframes@0.9.13` (`render --format png-sequence`, 1280x720, 30 fps, 90 frames): **90 of 90 frames identical byte for byte**, PNG with transparency, 16 to 20 s with one worker, Chrome start included. Later low-level engine prototypes tested Three.js, Lottie, WAAPI, CSS/SVG and GSAP with iframe preview; see the measurements below. Still untested: `<video>`, audio and the preview in the editor.
 
 ## Principles
 
@@ -46,7 +46,7 @@ A scene with GSAP, flexbox, an animated SVG stroke, a CSS gradient and a rotatio
 
 ### Step 2: contract and adapters
 
-- [ ] `window.__hf.seek(t)` and duration; adapters for CSS and WAAPI, GSAP, SVG, Lottie, Three.js.
+- [x] `window.__hf.seek(t)` and duration; adapters for CSS and WAAPI, GSAP, SVG, Lottie, Three.js. `sceneController` exposes the absolute-time contract; all five browser prototypes produced six distinct frames, and a second capture of each was byte-identical. The [prototype measurements](../bench/web-scenes/README.md) show the remaining iframe preview differences. Ordinary editor and export integration remain in steps 3 and 4.
 - [x] A linter that refuses what breaks determinism: free `Date.now`, `Math.random`, `fetch`, `requestAnimationFrame`. The CLI parses local JavaScript and inline HTML scripts without executing them, detects unbound global access and common aliases, and rejects syntax errors. It refuses a script over 1 MiB before parsing. This is a static seekability check, not an isolation boundary; dynamic code and browser behavior still need step 5's boundary and tests.
 - [x] `tramme check` reports a scene's errors in readable form. It prints `scenes/<id>/<file>:<line>` and the offending API; `tramme pack` also refuses a scene that fails the linter. The CLI integration test checks both commands.
 

@@ -8,6 +8,7 @@
 </style>
 <div id="stage" data-composition-id="three" data-no-timeline data-width="320" data-height="180" data-duration="1" data-fps="6"></div>
 <script type="module">
+  import { sceneController } from '/vendor/scene-runtime.js';
   import * as THREE from '/vendor/three.module.js';
   const stage = document.getElementById('stage');
   const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: false, preserveDrawingBuffer: true });
@@ -27,13 +28,14 @@
     new THREE.MeshStandardMaterial({ color: 0x39b9b1, metalness: 0.1, roughness: 0.4 }),
   );
   scene.add(mesh);
-  window.__hf = {
-    duration: 1,
-    seek(t) {
-      mesh.rotation.x = t * Math.PI * 0.8;
-      mesh.rotation.y = t * Math.PI * 1.2;
-      renderer.render(scene, camera);
-    },
-  };
+  const mixer = new THREE.AnimationMixer(mesh);
+  const turn = new THREE.AnimationClip('turn', 1, [
+    new THREE.NumberKeyframeTrack('.rotation[x]', [0, 1], [0, Math.PI * 0.8]),
+    new THREE.NumberKeyframeTrack('.rotation[y]', [0, 1], [0, Math.PI * 1.2]),
+  ]);
+  mixer.clipAction(turn).play();
+  const controller = sceneController(1);
+  controller.three(mixer, () => renderer.render(scene, camera));
+  controller.install(window);
   window.__hf.seek(0);
 </script>
