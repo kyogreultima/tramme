@@ -44,6 +44,8 @@ A scene with GSAP, flexbox, an animated SVG stroke, a CSS gradient and a rotatio
 - [x] JSON schema, validation, allowed paths in `tramme-project/1`, `.tramme` pack and unpack. `schema/webscene-1.schema.json` is generated from the same schema used by `checkProject`. The project format admits scene HTML, CSS, scripts, fonts and media beneath a valid scene ID; the manifest's entry must be a present HTML file in that folder.
 - [x] A scene survives an export then an import of an archive. The project-format test compares its manifest and entry bytes after `packProject` and `unpackProject`, then validates the restored project.
 
+The five seek prototypes now carry `scene.json`. The built-in-layer CLI prototype writes a complete project manifest; `tramme pack` and `tramme unpack` accepted its 12-file CSS/SVG project, including the Geist font's OFL notice. Ordinary scene capture still needs step 3 integration.
+
 ### Step 2: contract and adapters
 
 - [x] `window.__hf.seek(t)` and duration; adapters for CSS and WAAPI, GSAP, SVG, Lottie, Three.js. `sceneController` exposes the absolute-time contract; all five browser prototypes produced six distinct frames, and a second capture of each was byte-identical. The [prototype measurements](../bench/web-scenes/README.md) show the remaining iframe preview differences. Ordinary editor and export integration remain in steps 3 and 4.

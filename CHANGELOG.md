@@ -10,6 +10,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Added
 
+- All five web-scene prototypes now carry `scene.json`; the CLI composite produces a project that packs and unpacks with its font licence.
 - `webscene` is now a built-in node; the six-frame CLI composition prototype no longer needs a project plugin.
 - Isolated video assets now refuse oversized frame dimensions and release replaced decoders.
 - Isolated projects now refuse an asset inventory above 4,096 entries before loading files.

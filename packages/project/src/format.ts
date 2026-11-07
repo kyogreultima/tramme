@@ -104,13 +104,13 @@ export const maxSize = (path: string) => (isMedia(path) ? LIMITS.media : LIMITS.
 const EXT: Record<string, string[]> = {
   assets: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'avif', 'svg', 'ttf', 'otf', 'woff', 'woff2', 'wav', 'mp3', 'ogg', 'm4a', 'flac', 'mp4', 'webm', 'mov', 'json', 'js', 'mjs', 'pdf', 'md', 'markdown', 'cube', 'glb', 'gltf'],
   plugins: ['js', 'mjs'],
-  scenes: ['html', 'css', 'js', 'mjs', 'json', 'svg', 'png', 'jpg', 'jpeg', 'webp', 'gif', 'avif', 'woff', 'woff2', 'ttf', 'otf', 'glb', 'gltf', 'bin', 'mp4', 'webm', 'wav', 'mp3', 'ogg'],
+  scenes: ['html', 'css', 'js', 'mjs', 'json', 'txt', 'svg', 'png', 'jpg', 'jpeg', 'webp', 'gif', 'avif', 'woff', 'woff2', 'ttf', 'otf', 'glb', 'gltf', 'bin', 'mp4', 'webm', 'wav', 'mp3', 'ogg'],
   renders: ['mp4', 'webm', 'mov', 'gif', 'png', 'zip', 'json', 'svg', 'wav'],
 };
 
 export const MIME: Record<string, string> = {
   html: 'text/html; charset=utf-8', css: 'text/css; charset=utf-8',
-  json: 'application/json; charset=utf-8', js: 'text/javascript; charset=utf-8', mjs: 'text/javascript; charset=utf-8',
+  json: 'application/json; charset=utf-8', txt: 'text/plain; charset=utf-8', js: 'text/javascript; charset=utf-8', mjs: 'text/javascript; charset=utf-8',
   png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif', avif: 'image/avif', svg: 'image/svg+xml',
   ttf: 'font/ttf', otf: 'font/otf', woff: 'font/woff', woff2: 'font/woff2', pdf: 'application/pdf',
   md: 'text/markdown; charset=utf-8', markdown: 'text/markdown; charset=utf-8', cube: 'text/plain; charset=utf-8',

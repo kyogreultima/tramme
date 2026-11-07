@@ -6,7 +6,7 @@ import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { PNG } from 'pngjs';
-import { newProject } from '@tramme/project';
+import { MANIFEST, newProject } from '@tramme/project';
 
 const [sceneArg, outputArg] = process.argv.slice(2);
 if (!sceneArg || !outputArg) throw new Error('usage: render-layer.mjs <scene-dir> <output-dir>');
@@ -27,7 +27,7 @@ const frameFiles = fs.readdirSync(captured).filter((file) => /^frame_\d+\.png$/.
 if (frameFiles.length !== 6) throw new Error(`expected six captured frames, got ${frameFiles.length}`);
 const frameDir = path.join(projectDir, 'assets', 'webscene');
 fs.mkdirSync(frameDir, { recursive: true });
-const { doc } = newProject({ name: 'Web scene layer prototype', width: 320, height: 180, fps: 6, duration: 1 });
+const { doc, manifest } = newProject({ name: 'Web scene layer prototype', width: 320, height: 180, fps: 6, duration: 1 });
 const frameIds = frameFiles.map((file, index) => {
   const id = `scene-frame-${index}`;
   fs.copyFileSync(path.join(captured, file), path.join(frameDir, file));
@@ -41,6 +41,7 @@ comp.layers.scene = { type: 'webscene', name: 'Seekable web scene', transform: {
 comp.order = ['under', 'scene'];
 const documentFile = path.join(projectDir, 'document.tramme.json');
 fs.writeFileSync(documentFile, JSON.stringify(doc, null, 2));
+fs.writeFileSync(path.join(projectDir, MANIFEST), JSON.stringify(manifest, null, 2));
 const framesOut = path.join(outputDir, 'composited');
 await run(path.resolve('packages/cli/src/main.ts'), ['render', documentFile, '--format', 'png', '--out', framesOut, '--to', '1', '--pages', '1']);
 const renderedFiles = fs.readdirSync(framesOut).filter((file) => /^\d+\.png$/.test(file)).sort();

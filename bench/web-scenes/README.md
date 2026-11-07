@@ -1,6 +1,6 @@
 # Web scene seek and composition prototypes
 
-Five scene folders exercise the seek contract. The CSS, WAAPI, SVG, GSAP, Lottie and Three.js adapters share `sceneController` from `packages/project/src/scene-runtime.ts`. The compositor prototype now uses Tramme's built-in `webscene` node; ordinary editor and export integration are later roadmap steps.
+Five scene folders exercise the seek contract. Each has a `scene.json` manifest in the project format. The CSS, WAAPI, SVG, GSAP, Lottie and Three.js adapters share `sceneController` from `packages/project/src/scene-runtime.ts`. The compositor prototype uses Tramme's built-in `webscene` node; ordinary editor and export integration are later roadmap steps.
 
 | Scene | Content | Minimum PSNR, engine vs iframe preview | Median PSNR |
 |---|---|---:|---:|
@@ -41,6 +41,7 @@ The CLI layer prototype runs the same capture, builds a temporary valid Tramme p
 ```sh
 node bench/web-scenes/render-layer.mjs bench/web-scenes/css-svg .cache/roadmaps/webscene-layer
 node packages/cli/src/main.ts validate .cache/roadmaps/webscene-layer/project/document.tramme.json
+node packages/cli/src/main.ts pack .cache/roadmaps/webscene-layer/project --out .cache/roadmaps/webscene-layer/project.tramme
 ```
 
 The helper checks that all six final frames differ and that a transparent scene pixel reveals the underlying Tramme layer. In the measured middle frame, the transparent scene pixel `(0,0,0,0)` became `(23,55,76,255)` after composition; the center was `(111,71,133,255)`. The node is built in, while capture and frame injection still happen in this explicit prototype helper. Ordinary export and editor preview remain for later steps.

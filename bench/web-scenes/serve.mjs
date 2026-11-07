@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import { build } from 'esbuild';
+import { mimeOf } from '@tramme/project';
 
 export async function serveScene(sceneDir) {
   const root = path.resolve(sceneDir);
@@ -22,7 +23,7 @@ export async function serveScene(sceneDir) {
     }
     const file = vendor ? path.join(vendorRoot, vendor) : path.resolve(root, pathname === '/' ? 'index.html' : pathname.replace(/^\/+/, ''));
     if ((!vendor && !file.startsWith(`${root}${path.sep}`)) || !fs.existsSync(file) || !fs.statSync(file).isFile()) { response.writeHead(404).end(); return; }
-    const type = file.endsWith('.woff2') ? 'font/woff2' : file.endsWith('.js') ? 'text/javascript' : 'text/html; charset=utf-8';
+    const type = mimeOf(file);
     response.writeHead(200, { 'content-type': type });
     fs.createReadStream(file).pipe(response);
   });

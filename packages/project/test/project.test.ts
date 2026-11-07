@@ -18,6 +18,8 @@ describe('project format', () => {
     expect(pathIssue('scenes/title/scene.json')).toBeNull();
     expect(pathIssue('scenes/title/index.html')).toBeNull();
     expect(pathIssue('scenes/title/styles/main.css')).toBeNull();
+    expect(pathIssue('scenes/title/OFL-LICENSE.txt')).toBeNull();
+    expect(mimeOf('scenes/title/OFL-LICENSE.txt')).toContain('text/plain');
     expect(pathIssue('scenes/title/../other/index.html')).not.toBeNull();
     expect(pathIssue('scenes/title/remote.ts')).not.toBeNull();
     expect(pathIssue('thumbnail.webp')).toBeNull();
