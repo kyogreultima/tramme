@@ -12,6 +12,7 @@ const FONTS_WAIT_MS = 3000;
 const MODEL_LIMIT = 32 * 1024 * 1024;
 const FONT_LIMIT = 16 * 1024 * 1024;
 const DATA_LIMIT = 8 * 1024 * 1024;
+const IMAGE_LIMIT = 32 * 1024 * 1024;
 const MAX_ACTIVE_ASSETS = 8;
 const MAX_IMAGE_PIXELS = 16 * 1024 * 1024;
 
@@ -164,14 +165,22 @@ export class AssetStore {
       case 'image': {
         // an ImageBitmap, not the <img>: Chrome resamples an <img> with its
         // own filter when it is scaled down, a bitmap like any canvas pixels
-        const img = new Image();
-        img.src = url;
-        await img.decode();
-        if (this.sandboxModules && (!img.naturalWidth || !img.naturalHeight || img.naturalWidth > 8192 || img.naturalHeight > 8192 || img.naturalWidth * img.naturalHeight > MAX_IMAGE_PIXELS)) {
-          throw new Error('image exceeds 8192 pixels per side or 16 million pixels total');
+        let source = url;
+        if (this.sandboxModules) {
+          const response = await fetch(url);
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          source = URL.createObjectURL(new Blob([await boundedBytes(response, IMAGE_LIMIT, 'image')], { type: response.headers.get('content-type') || 'application/octet-stream' }));
         }
-        try { return await createImageBitmap(img); } catch (e) { if (!/svg/i.test((e as Error).message)) throw e; }
-        return svgBitmap(url);
+        try {
+          const img = new Image();
+          img.src = source;
+          await img.decode();
+          if (this.sandboxModules && (!img.naturalWidth || !img.naturalHeight || img.naturalWidth > 8192 || img.naturalHeight > 8192 || img.naturalWidth * img.naturalHeight > MAX_IMAGE_PIXELS)) {
+            throw new Error('image exceeds 8192 pixels per side or 16 million pixels total');
+          }
+          try { return await createImageBitmap(img); } catch (e) { if (!/svg/i.test((e as Error).message)) throw e; }
+          return await svgBitmap(source);
+        } finally { if (source !== url) URL.revokeObjectURL(source); }
       }
       case 'font': {
         const r = await fetch(url);

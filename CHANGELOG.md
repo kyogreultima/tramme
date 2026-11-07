@@ -10,6 +10,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Added
 
+- Isolated image assets now have a 32 MiB compressed-file limit before browser decoding.
 - Isolated font, JSON and LUT asset loads now stop at bounded response sizes and cancel oversized streams.
 - The CLI project server now confines static files to their mount and refuses project configuration that overrides `/project/`.
 - Web scenes now share an absolute-time `window.__hf` runtime with browser-tested CSS, WAAPI, SVG, GSAP, Lottie and Three.js seek adapters.

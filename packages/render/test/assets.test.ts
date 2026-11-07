@@ -89,11 +89,30 @@ describe('isolated asset paths', () => {
     doc.assets.image = { type: 'image', src: 'assets/huge.png' };
     const loaded = new AssetStore(doc, 'https://example.test/projects/a/document.tramme.json');
     loaded.sandboxModules = true;
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(new Uint8Array([1]), { headers: { 'content-type': 'image/png' } })));
     vi.stubGlobal('Image', class { src = ''; naturalWidth = 6000; naturalHeight = 6000; async decode() {} });
     const bitmap = vi.fn();
     vi.stubGlobal('createImageBitmap', bitmap);
     await expect((loaded as unknown as { load(id: string, a: typeof doc.assets.image): Promise<unknown> }).load('image', doc.assets.image)).rejects.toThrow('16 million pixels');
     expect(bitmap).not.toHaveBeenCalled();
+  });
+
+  it('cancels an oversized image response before creating a decoder', async () => {
+    const doc = newProject({ name: 'Large image file', width: 64, height: 64, fps: 1, duration: 1 }).doc;
+    doc.assets.image = { type: 'image', src: 'assets/huge.png' };
+    const loaded = new AssetStore(doc, 'https://example.test/projects/a/document.tramme.json');
+    loaded.sandboxModules = true;
+    let cancelled = false;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) { controller.enqueue(new Uint8Array(33 * 1024 * 1024)); },
+      cancel() { cancelled = true; },
+    });
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(stream)));
+    const decoder = vi.fn();
+    vi.stubGlobal('Image', decoder);
+    await expect((loaded as unknown as { load(id: string, a: typeof doc.assets.image): Promise<unknown> }).load('image', doc.assets.image)).rejects.toThrow('image exceeds 32 MB');
+    expect(cancelled).toBe(true);
+    expect(decoder).not.toHaveBeenCalled();
   });
 });
 
