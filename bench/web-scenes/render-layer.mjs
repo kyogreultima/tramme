@@ -1,4 +1,4 @@
-// Step 0 CLI prototype: capture a scene folder, then composite its PNGs as a webscene node.
+// Step 0 CLI prototype: capture a scene folder, then composite its PNGs as a built-in webscene node.
 // node bench/web-scenes/render-layer.mjs bench/web-scenes/css-svg .cache/roadmaps/webscene-layer
 import fs from 'node:fs';
 import path from 'node:path';
@@ -26,13 +26,8 @@ await run(path.join(here, 'capture-engine.mjs'), [path.join(projectDir, 'scenes'
 const frameFiles = fs.readdirSync(captured).filter((file) => /^frame_\d+\.png$/.test(file)).sort();
 if (frameFiles.length !== 6) throw new Error(`expected six captured frames, got ${frameFiles.length}`);
 const frameDir = path.join(projectDir, 'assets', 'webscene');
-const pluginDir = path.join(projectDir, 'plugins');
 fs.mkdirSync(frameDir, { recursive: true });
-fs.mkdirSync(pluginDir, { recursive: true });
-fs.copyFileSync(path.join(here, 'webscene-plugin.js'), path.join(pluginDir, 'webscene.js'));
 const { doc } = newProject({ name: 'Web scene layer prototype', width: 320, height: 180, fps: 6, duration: 1 });
-doc.assets['webscene-plugin'] = { type: 'module', src: 'plugins/webscene.js' };
-doc.plugins = ['webscene-plugin'];
 const frameIds = frameFiles.map((file, index) => {
   const id = `scene-frame-${index}`;
   fs.copyFileSync(path.join(captured, file), path.join(frameDir, file));

@@ -10,6 +10,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Added
 
+- `webscene` is now a built-in node; the six-frame CLI composition prototype no longer needs a project plugin.
 - Isolated video assets now refuse oversized frame dimensions and release replaced decoders.
 - Isolated projects now refuse an asset inventory above 4,096 entries before loading files.
 - Isolated projects now cap retained decoded images at 256 MiB and release replaced image bitmaps.
