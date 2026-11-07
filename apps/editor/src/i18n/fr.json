@@ -1357,6 +1357,7 @@
     "tenBit": "10 bits",
     "tenBitUnavailable": "Ce navigateur ne sait pas encoder de vidéo 10 bits à cette taille : l'export reste en 8 bits",
     "couldNotSaveTo": "Enregistrement dans le projet impossible : {error}",
+    "projectChangedDuringExport": "Le projet a changé pendant l'export.",
     "blur": "Flou",
     "documentSetting": "Réglage du document",
     "noBlurFast": "Sans flou (rapide)",

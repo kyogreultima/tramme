@@ -16,6 +16,7 @@ import { PublishPanel } from './PublishPanel.tsx';
 import { hdrCapability } from '../hdr.ts';
 import { ExportQueueList } from './ExportQueueList.tsx';
 import { exportQueue } from '../export-queue.ts';
+import { exportProject, requireExportProject, sameExportProject, waitExportProject, type ExportProject } from '../export-project.ts';
 import { exportRangeOf, frameSpan } from '../exportspan.ts';
 import { VIDEO, WEB_FORMATS, type WebFormat } from '../formats.ts';
 import { Icon } from './icons.tsx';
@@ -35,7 +36,7 @@ const FORMATS: [string, string, number, number][] = [
   ['4k', '16:9 · 3840×2160', 3840, 2160],
 ];
 
-interface Done { blob: Blob; name: string; seconds: number; warnings: string[]; saved?: string }
+interface Done { blob: Blob; name: string; seconds: number; warnings: string[]; project: ExportProject; saved?: string }
 
 // ── the project's versions: named points one can come back to ──
 /** the saved document itself is the current version; the snapshots live beside it */
@@ -157,40 +158,49 @@ function ExportPop({ anchor, onClose }: { anchor: HTMLElement; onClose: () => vo
   const trim = () => commit(t('topbar.trimToContent'), [{ op: 'replace', path: pointer('compositions', S.compId.peek(), 'duration'), value: end }]);
   const run = async () => {
     const t0 = performance.now(), at = S.time.peek();
+    const project = exportProject(), doc = S.doc.peek(), base = new URL(project.docUrl, location.href).href;
+    const compId = S.compId.peek(), registry = S.registry.peek(), format = expFormat.value;
     expAbort.current = new AbortController();
     expState.value = { done: 0, total: VIDEO.has(expFormat.value) ? frameSpan(c.fps, c.duration, range).f1 - frameSpan(c.fps, c.duration, range).f0 : 1 };
     try {
       const { exportInBrowser } = await import('../webexport.ts');
-      const r = await exportInBrowser(S.doc.peek(), new URL(S.docUrl.peek(), location.href).href, expFormat.value, {
-        compId: S.compId.peek(), registry: S.registry.peek(), t: at, signal: expAbort.current.signal,
+      requireExportProject(project);
+      const r = await waitExportProject(project, exportInBrowser(doc, base, format, {
+        compId, registry, t: at, signal: expAbort.current.signal,
         samples: expSamples.value === 'doc' ? undefined : Number(expSamples.value),
         depth: expDeep.value && deepable && deepLabel ? 10 : 8, range,
-        onProgress: (done, total) => { if (done % 3 === 0 || done === total) expState.value = { done, total }; },
-      });
+        onProgress: (done, total) => { if (sameExportProject(project) && (done % 3 === 0 || done === total)) expState.value = { done, total }; },
+      }));
       const stem = safeName(S.project.peek().name);
-      const name = expFormat.value === 'svg' ? `${stem}_${at.toFixed(2)}.svg` : `${stem}.${r.ext}`;
-      expState.value = { blob: r.blob, name, seconds: (performance.now() - t0) / 1000, warnings: r.warnings };
+      const name = format === 'svg' ? `${stem}_${at.toFixed(2)}.svg` : `${stem}.${r.ext}`;
+      expState.value = { blob: r.blob, name, seconds: (performance.now() - t0) / 1000, warnings: r.warnings, project };
     } catch (e) {
       expState.value = (e as Error).name === 'AbortError' ? null : { error: (e as Error).message };
     } finally { expAbort.current = null; }
   };
   // all the shorts, one after another for the memory's sake, each named after its title
   const exportAll = async () => {
+    const project = exportProject(), doc = S.doc.peek(), base = new URL(project.docUrl, location.href).href;
+    const registry = S.registry.peek(), format = expFormat.value;
+    const exportShorts = shortsOf(doc);
     expStop.current = false;
     expAbort.current = new AbortController();
     try {
       const { exportInBrowser } = await import('../webexport.ts');
-      for (let i = 0; i < shorts.length; i++) {
+      requireExportProject(project);
+      for (let i = 0; i < exportShorts.length; i++) {
+        requireExportProject(project);
         if (expStop.current) break;
-        const { id: cid, name } = shorts[i];
-        expBatch.value = { i: i + 1, n: shorts.length, name };
+        const { id: cid, name } = exportShorts[i];
+        expBatch.value = { i: i + 1, n: exportShorts.length, name };
         expState.value = null;
-        const r = await exportInBrowser(S.doc.peek(), new URL(S.docUrl.peek(), location.href).href, expFormat.value, {
-          compId: cid, registry: S.registry.peek(), signal: expAbort.current.signal,
+        const r = await waitExportProject(project, exportInBrowser(doc, base, format, {
+          compId: cid, registry, signal: expAbort.current.signal,
           samples: expSamples.value === 'doc' ? undefined : Number(expSamples.value),
-        });
+        }));
         const file = `${safeName(name)}.${r.ext}`;
         await saveBlob(r.blob, file);
+        requireExportProject(project);
         try { await upload(await takenPaths(), `renders/${name.replace(/\.png\.zip$/, '.zip')}`, r.blob); } catch { /* the file is on disk anyway */ }
       }
     } catch (e) {
@@ -206,7 +216,9 @@ function ExportPop({ anchor, onClose }: { anchor: HTMLElement; onClose: () => vo
   // a copy in the project's renders/ folder (kept out of .tramme archives)
   const keep = async (done: Done) => {
     try {
+      requireExportProject(done.project);
       const path = await upload(await takenPaths(), `renders/${done.name.replace(/\.png\.zip$/, '.zip').replace(/\.lottie\.json$/, '.json')}`, done.blob);
+      requireExportProject(done.project);
       expState.value = { ...done, saved: path };
     } catch (e) { toast(t('topbar.couldNotSaveTo', { error: (e as Error).message }), 'error'); }
   };
