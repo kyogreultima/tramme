@@ -66,6 +66,8 @@ Isolated layer preparation (2026-11-07): the trusted renderer no longer calls an
 
 Trusted mirror evaluation (2026-11-07): `Evaluator` now has a fail-closed option that refuses expressions before compilation or execution. The isolated renderer uses it, as do the editor's viewport, inspector, graph, retouch view, review checks, critique and authoring tools when sandbox preview is selected. A test uses an expression that would write to `globalThis` and confirms it is refused without executing. The inspector's property rows now ask the isolated worker for a value when local evaluation is refused, and discard a reply for a different document, composition, address or time. A worker-protocol test evaluates a real expression and propagates an invalid-address error. Other views still lack worker-backed geometry or values; the setting is still opt-in, so step 2 remains open.
 
+Vector preflight guard (2026-11-07): the editor's vector preflight helper now uses the same expression refusal when its document is isolated, even if it is called without the browser export entry point's earlier expression check. A test attempts a global write through a plugin node's property and confirms the helper refuses it before execution. Isolated expression-based SVG/Lottie export still needs worker-side conversion; step 2 remains open.
+
 Vector and CLI checks (2026-11-07): isolated browser SVG/Lottie export now reports that expression-bearing projects need raster export. CLI `export`, `check-export` and `check` refuse such expressions before native vector conversion or picture checks. Tests exercise all three CLI commands and the browser export's early refusal. Worker-backed vector values and checks remain open.
 
 Editor module transfer (2026-11-07): when isolated preview is enabled, the editor's preview, stills, raster export and thumbnail now load every project module through the bounded opaque host before drawing. This includes Free code modules that are not listed as plugins. Reloads and document changes refresh the worker's module list. The editor setting is still opt-in, and browser coverage of these paths remains before step 2 can close.
@@ -99,8 +101,8 @@ This work extends [plugin isolation](plugin-isolation.md) and [the evaluator in 
 ## What exists, and what is missing
 
 - `apps/editor/src/importer.ts` inventories plugins and expressions and asks before running imported code. Keep this question until the release gate below passes.
-- `apps/editor/src/plugins/` runs tools, checks and drawing in a per-project worker. Whole-frame evaluation and rendering also exist, behind a setting that is off by default.
-- The worker is created on the editor's origin. Its `guardRealm` limits `fetch` to that origin and removes `WebSocket`; the published CSP also permits same-origin requests. This does not deny access to the editor's authenticated API or same-origin storage.
+- `apps/editor/src/plugins/` runs tools, checks and drawing in workers hosted by an opaque-origin iframe with a network-denying CSP. Whole-frame evaluation and rendering also exist, behind a setting that is off by default.
+- The iframe and its worker cannot reach the editor's origin as their own origin; `guardRealm` also narrows globals inside the worker. Desktop webviews, all execution paths and the independent review still need proof before the boundary is considered complete.
 - Expressions use `new Function` with selected global names shadowed. A blocked-name list is not a security boundary. Expressions must be covered even when a project has no plugins, including any mirror evaluator used by the interface.
 - Import validation, thumbnails, stills, vector exports, browser exports, the desktop app and the CLI must obey the same boundary. A sandboxed preview does not make an earlier native or page-side import safe.
 

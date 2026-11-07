@@ -13,6 +13,7 @@ import { guardRealm, startWorkerSide, type SandboxDrawSide } from '../src/plugin
 import { bindSandbox, declarationsModule, noteSandboxDeclaration, resetSandbox, primeSandboxExports, sandboxDeclaration, sandboxNode } from '../src/plugins/sandbox-draw.ts';
 import { RecordingPath2D } from '../src/plugins/recording-path.ts';
 import { makeSandboxDraw } from '../src/plugins/worker-draw.ts';
+import { prefs } from '../src/settings.ts';
 import type { DrawPayload, DrawResult, SandboxDoc } from '../src/plugins/protocol.ts';
 import { attachIsolated, filterModule } from '../src/plugins/vocabulary.ts';
 
@@ -726,6 +727,21 @@ describe('the sandboxed drawing', () => {
     expect(exported).toEqual([{ radius: 5 }]);
     expect(reg.node('sky.moon').export!.svg!({ radius: 5 })).toBe('<circle r="5"/>');
     expect(reg.node('sky.moon').export!.lottie!({ radius: 5 })).toEqual([{ radius: 5 }]);
+  });
+
+  it('refuses a vector preflight expression in an isolated document', async () => {
+    const fakeHost = { exportOf: async () => ({ svg: '<circle/>' }) } as unknown as PluginHost;
+    bindSandbox({ host: () => fakeHost, context: () => null });
+    const { doc: d } = doc();
+    d.compositions[d.root].layers.moon = { type: 'sky.moon', props: { radius: { $expr: `({}).constructor.constructor('globalThis.__vectorLeak = true; return 5')()` } } } as never;
+    d.compositions[d.root].order = ['moon'];
+    const reg = new Registry().register({ ...sandboxNode(plugin().nodes![0]) });
+    const previous = prefs.peek();
+    prefs.value = { ...previous, sandboxPreview: true };
+    try {
+      await expect(primeSandboxExports(d, reg, 0)).rejects.toThrow('expression evaluation is isolated from this page');
+      expect((globalThis as any).__vectorLeak).toBeUndefined();
+    } finally { prefs.value = previous; }
   });
 });
 

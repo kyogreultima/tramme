@@ -10,6 +10,7 @@
 
 import type { EffectType, Handle, Host, ModifierType, NodeType, PluginModule, Rect, Registry, TrammeDoc } from '@tramme/core';
 import { Evaluator } from '@tramme/core';
+import { sandboxedDoc } from '../installed.ts';
 import type { Renderer } from '@tramme/render';
 import type { PluginHost } from './host.ts';
 import type { PluginDecl, SandboxDoc, SchemaModifier, SchemaNode } from './protocol.ts';
@@ -265,7 +266,7 @@ export async function primeSandboxExports(doc: TrammeDoc, registry: Registry, t:
   const e = env;
   if (!e) return;
   const h = e.host();
-  const evaluator = new Evaluator(doc, registry);
+  const evaluator = new Evaluator(doc, registry, { allowExpressions: !sandboxedDoc(doc) });
   const jobs: Promise<void>[] = [];
   for (const [cid, comp] of Object.entries(doc.compositions)) {
     for (const [id, layer] of Object.entries(comp.layers)) {
