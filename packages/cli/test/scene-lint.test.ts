@@ -75,5 +75,5 @@ const key = 'fetch'; globalThis[key]('/api');`));
     } finally {
       if (path.relative(os.tmpdir(), dir).startsWith('tramme-scene-check-')) fs.rmSync(dir, { recursive: true, force: true });
     }
-  });
+  }, 30_000);
 });

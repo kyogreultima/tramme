@@ -318,27 +318,35 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
   // ── tools brought by the project's plugins ───────────────────
   private toolContext(doc: TrammeDoc, registry: Registry): ToolContext {
     const compId = this.compOf(doc);
+    // A worker can ask for a capability after the user has opened another
+    // project. Bind every bridge operation to the project that started it.
+    const projectId = S.project.peek().id, docUrl = S.docUrl.peek();
+    const current = () => {
+      if (S.project.peek()?.id !== projectId || S.docUrl.peek() !== docUrl) throw new Error('the project changed while the tool was running');
+    };
+    const urlOf = (src: string) => { current(); return new URL(src, new URL(docUrl, location.href)).href; };
     return {
       doc, compId, registry,
       time: S.time.peek(),
       selection: S.selection.peek().filter((id) => doc.compositions[compId].layers[id]),
-      assetUrl: (id) => { const a = doc.assets[id]; if (!a) throw new Error(`unknown asset: ${id}`); return this.urlOf(a.src); },
-      readText: (path) => readProjectText(S.project.peek().id, path),
-      files: async () => (await api.info(S.project.peek().id)).files.map(({ path, size }) => ({ path, size })),
-      fileUrl: (path) => this.urlOf(path),
+      assetUrl: (id) => { current(); const a = doc.assets[id]; if (!a) throw new Error(`unknown asset: ${id}`); return urlOf(a.src); },
+      readText: async (path) => { current(); const value = await readProjectText(projectId, path); current(); return value; },
+      files: async () => { current(); const value = (await api.info(projectId)).files.map(({ path, size }) => ({ path, size })); current(); return value; },
+      fileUrl: (path) => urlOf(path),
       writeFile: async (path, data) => {
+        current();
         const bad = pathIssue(path);
         const plugin = /^plugins\/.+\.(js|mjs)$/i.test(path);
         if (bad || (!path.startsWith('assets/') && !plugin)) throw new Error(`${path}: ${bad ?? 'a tool writes under assets/, or a plugin under plugins/'}`);
-        const id = S.project.peek().id;
         // a computed video (a cut-out mask) may pass the single request limit: sent in parts
-        if (typeof data === 'string') await api.write(id, path, new Blob([data], { type: plugin ? 'text/javascript' : /\.json$/i.test(path) ? 'application/json' : 'text/plain' }));
-        else await api.writeAny(id, path, data);
+        if (typeof data === 'string') await api.write(projectId, path, new Blob([data], { type: plugin ? 'text/javascript' : /\.json$/i.test(path) ? 'application/json' : 'text/plain' }));
+        else await api.writeAny(projectId, path, data);
+        current();
         if (plugin) this.wrotePlugins.add(path);
         return path;
       },
-      renderStill: (t, id) => this.stillUrl(t, id),
-      transcript: async (id, opts) => (await this.readTranscript(id, opts?.ask ?? true)).t,
+      renderStill: (t, id) => { current(); return this.stillUrl(t, id).then((value) => { current(); return value; }); },
+      transcript: async (id, opts) => { current(); const value = (await this.readTranscript(id, opts?.ask ?? true)).t; current(); return value; },
       signal: this.signal,
       // a plugin's figures are not trusted: what is not a number is shown as a step without a share
       progress: (done, total, step) => this.onProgress?.(Number.isFinite(done) ? done : 0, Number.isFinite(total) ? total : 0, typeof step === 'string' ? step : undefined),
@@ -348,7 +356,11 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
   /** a tool of the project's plugins: its text and images for the assistant, its operations added to the proposal */
   private async useTool(name: string, input: unknown): Promise<ToolResult> {
     this.notice = '';
+    const projectId = S.project.peek().id, docUrl = S.docUrl.peek();
+    const current = () => S.project.peek()?.id === projectId && S.docUrl.peek() === docUrl;
+    const changed = () => text('the project changed while the tool was running', true);
     const doc = this.liveDoc(), reg = await this.registry(doc);
+    if (!current()) return changed();
     if (!reg.hasTool(name)) {
       const names = reg.listTools().map((e) => e.tool.name);
       return text(`unknown tool: ${name}. ${names.length ? `Tools of this project: ${names.join(', ')}.` : 'This project has no tools (list_nodes).'}`, true);
@@ -359,7 +371,7 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
     let out;
     // a plugin brought from the library is no plugin written in this turn: it is not offered back to it
     const brought = name === 'library-use' ? new Set(this.wrotePlugins) : null;
-    try { out = toolOutput(await tool.run(input, this.toolContext(doc, reg))); if (brought) this.wrotePlugins = brought; }
+    try { out = toolOutput(await tool.run(input, this.toolContext(doc, reg))); if (!current()) return changed(); if (brought) this.wrotePlugins = brought; }
     catch (e) { if (this.signal.aborted) return text(`${name}: stopped by the user`, true); return text(`${name} (plugin ${from}) failed: ${(e as Error).message}`, true); }
     const content: ToolResult['content'] = [];
     for (const img of out.images ?? []) {
@@ -374,7 +386,7 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
     this.told = out.notice ?? '';
     const lines = out.text ? [out.text] : [];
     if (out.ops?.length) {
-      const r = await this.propose(out.label ?? tool.title ?? name, out.ops);
+      const r = await this.propose(out.label ?? tool.title ?? name, out.ops, current);
       const said = r.content[0]?.type === 'text' ? r.content[0].text : '';
       if (r.isError) return text([said, ...lines].join('\n'), true);
       lines.push(said);
@@ -383,7 +395,9 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
     return { content };
   }
 
-  private async propose(label: string, ops: Op[]): Promise<ToolResult> {
+  private async propose(label: string, ops: Op[], current: () => boolean = () => true): Promise<ToolResult> {
+    const changed = () => text('the project changed while the tool was running', true);
+    if (!current()) return changed();
     if (!Array.isArray(ops) || !ops.length) return text('no operations', true);
     if (this.scope) {
       // judged against the document as the scene found it: what the scene added itself stays its own
@@ -399,12 +413,14 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
       const id = S.project.peek().id;
       try { await Promise.all(copies.files.map(([path, blob]) => api.write(id, path, blob, blob.type ? { type: blob.type } : {}))); }
       catch (e) { return text(`the plugin ${copies.names.join(', ')} could not be copied into the project, nothing is proposed: ${(e as Error).message}`, true); }
+      if (!current()) return changed();
       merged = copies.ops;
       copied = copies.names;
     }
     let next: TrammeDoc;
     try { next = applyOps(S.doc.peek(), merged).doc; } catch (e) { return text(`operations refused: ${(e as Error).message}`, true); }
     const issues = validate(next, await this.registry(next));
+    if (!current()) return changed();
     if (issues.length) return text(`invalid document after these operations, nothing is proposed:\n${issues.slice(0, 30).map((i) => `${i.path}: ${i.message}`).join('\n')}`, true);
     // several steps in one proposal: each one named
     const steps = [...new Set([...(this.pending?.steps ?? []), label])];
