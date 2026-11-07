@@ -14,6 +14,7 @@ import { analyses } from '../perception.ts';
 import { renderAndTarget } from '../review.ts';
 import { scenesOf } from '../scenes.ts';
 import { t } from '../i18n/index.ts';
+import { sandboxedDoc } from '../installed.ts';
 import { doneIssues, type DoneIssue } from './done.ts';
 import { gather, type Evidence } from './evidence.ts';
 
@@ -97,7 +98,7 @@ const critique: ToolType<Input> = {
     if (!ctx.doc.compositions[id]) throw new Error(`unknown composition: ${id}`);
     const limit = host.rounds();
     const plan = parsePlan(await ctx.readText(FILM_PLAN_PATH).catch(() => null));
-    const issues = await runChecks(ctx.doc, ctx.registry, id, { data: await analyses(ctx) });
+    const issues = await runChecks(ctx.doc, ctx.registry, id, { data: await analyses(ctx), allowExpressions: !sandboxedDoc(ctx.doc) });
     const beats = { data: await analyses(ctx), analysisIds: Object.keys(ctx.doc.assets).filter((a) => /^analysis-/.test(a)) };
     const found = doneIssues(ctx.doc, id, ctx.registry, plan, issues, beats);
     const measured = found.filter((i) => i.blocking);

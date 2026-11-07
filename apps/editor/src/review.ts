@@ -3,7 +3,9 @@
 // are tools of the editor's vocabulary, run by the assistant before it sums
 // up (use_tool) or by the user from the / menu.
 
-import { Evaluator, groupIssues, likeness, pictureDiff, motionReport, REPORT_MAX, reportCounts, reportHead, reportLines, runChecks, type QualityIssue, type ToolContext, type ToolType, type TrammeDoc } from '@tramme/core';
+import { groupIssues, likeness, pictureDiff, motionReport, REPORT_MAX, reportCounts, reportHead, reportLines, runChecks, type QualityIssue, type ToolContext, type ToolType, type TrammeDoc } from '@tramme/core';
+import { editorEvaluator } from './evaluator.ts';
+import { sandboxedDoc } from './installed.ts';
 import { pixelsOf, flowLines } from './flow.ts';
 import { analyses, canvas } from './perception.ts';
 import { masterText, soundReport } from './mixing.ts';
@@ -87,7 +89,7 @@ const check: ToolType<{ frames?: number }> = {
   ai: { when: 'before summing up any change, and whenever the user asks if it looks right; read the issues, look at the sheet, fix what matters' },
   async run({ frames = 8 }, ctx) {
     const sound = await soundReport(ctx, { image: true });
-    const issues = [...await runChecks(ctx.doc, ctx.registry, ctx.compId, { data: await analyses(ctx) }), ...sound.issues];
+    const issues = [...await runChecks(ctx.doc, ctx.registry, ctx.compId, { data: await analyses(ctx), allowExpressions: !sandboxedDoc(ctx.doc) }), ...sound.issues];
     const times = keyTimes(ctx.doc, ctx.compId, issues, frames);
     const url = await sheet(ctx, times, Math.min(4, times.length), ctx.compId);
     const { warnings, notes } = reportCounts(issues);
@@ -125,7 +127,7 @@ const motion: ToolType<{ t: number; span?: number; steps?: number }> = {
     const images = await stills(ctx, times, ctx.compId);
     const url = sheetOf(images.map((image, i) => ({ image, label: `${times[i].toFixed(2)} s` })), CELL, Math.round((CELL * c.height) / c.width), Math.min(steps, 6));
     // the same evaluation the render uses, so the figures are the movement's
-    const report = motionReport(new Evaluator(ctx.doc, ctx.registry), ctx.compId, from, to, { limit: 6 });
+    const report = motionReport(editorEvaluator(ctx.doc, ctx.registry), ctx.compId, from, to, { limit: 6 });
     const figs = report.figures.map(({ address, figures: f }) => {
       const pace = f.evenness > 0.92 ? 'constant speed (the linear tell: ease it)' : f.evenness > 0.6 ? 'eased' : 'strongly eased';
       const way = f.turns === 0 ? 'one way' : `${f.turns} turn(s)`;

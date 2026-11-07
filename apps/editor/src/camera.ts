@@ -2,7 +2,8 @@
 // figure) and come back, keyed on the composition camera, with the framing
 // kept readable. A pure function frames the detail; the tool keys the move.
 
-import { Evaluator, quadBounds, sampleAt, pointer, type Op, type ToolContext, type ToolType, type Vec2 } from '@tramme/core';
+import { quadBounds, sampleAt, pointer, type Op, type ToolContext, type ToolType, type Vec2 } from '@tramme/core';
+import { editorEvaluator } from './evaluator.ts';
 import { quadAt } from './pin.ts';
 
 interface Box { x: number; y: number; w: number; h: number }
@@ -57,7 +58,7 @@ const pushIn: ToolType<Input> = {
     const comp = ctx.doc.compositions[ctx.compId];
     if (!comp.layers[a.layer]) throw new Error(`${a.layer}: no such layer in the composition`);
     const none = (why: string) => ({ ops: [] as Op[], text: `${a.layer} ${why}: nothing was proposed.` });
-    const ev = new Evaluator(ctx.doc, ctx.registry);
+    const ev = editorEvaluator(ctx.doc, ctx.registry);
     let target: Box;
     try { target = quadBounds(quadAt(ev, ctx.compId, a.layer, a.at)); } catch (e) { return none(`cannot be pushed onto at ${a.at.toFixed(2)} s (${(e as Error).message})`); }
     // the smallest text inside the detail, so it reads when the camera is there

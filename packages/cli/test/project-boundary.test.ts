@@ -317,4 +317,24 @@ describe.skipIf(!CHROME)('the served project sandbox', () => {
       expect(await page.evaluate(() => (window as any).TRAMME.info().title)).toBe('Clean');
     } finally { unsafeDoc = null; }
   }, 30_000);
+
+  it('does not evaluate model load expressions on the trusted page', async () => {
+    const doc = newProject({ name: 'Model expression', width: 64, height: 64, fps: 1, duration: 1 }).doc;
+    doc.compositions.main.layers.model = {
+      type: 'model.3d', transform: {}, props: {
+        source: null,
+        height: { $expr: `({}).constructor.constructor('document.body.dataset.executed = "yes"; return 400')()` },
+      },
+    } as never;
+    doc.compositions.main.order = ['model'];
+    unsafeDoc = JSON.stringify(doc);
+    try {
+      await page.goto(`http://127.0.0.1:${port}/__tramme/?doc=/project/unsafe-code.tramme.json`);
+      const touched = await page.evaluate(async () => {
+        await (window as any).TRAMME.ready;
+        return document.body.dataset.executed ?? null;
+      });
+      expect(touched).toBeNull();
+    } finally { unsafeDoc = null; }
+  }, 30_000);
 });

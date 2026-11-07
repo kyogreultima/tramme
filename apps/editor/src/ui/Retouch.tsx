@@ -8,6 +8,7 @@ import { Evaluator, sampleAt, type Vec2 } from '@tramme/core';
 import { running } from '../ai/conversation.ts';
 import { draft } from '../attachments.ts';
 import { comp, S, uiTime } from '../state.ts';
+import { sandboxedDoc } from '../installed.ts';
 import { addPin, cancelReview, confirmReview, editRetouch, moveRetouch, notes, removePin, removeRetouch, resetRetouch, sendRetouches, strokeDone, studio, toggleReview } from '../studio.ts';
 import { anchorPoint, summaryOf, type Pin, type Placed, type Pt } from '../retouch.ts';
 import { Icon } from './icons.tsx';
@@ -17,7 +18,7 @@ import { t } from '../i18n/index.ts';
 export function placedNow(): Placed[] {
   const doc = S.doc.peek(), id = S.compId.peek();
   try {
-    return sampleAt(new Evaluator(doc, S.registry.peek()), id, uiTime.peek()).layers.map((p) => ({ id: p.id, name: p.layer.name ?? p.id, type: p.layer.type, box: p.box, opacity: p.opacity, locked: p.layer.locked }));
+    return sampleAt(new Evaluator(doc, S.registry.peek(), { allowExpressions: !sandboxedDoc(doc) }), id, uiTime.peek()).layers.map((p) => ({ id: p.id, name: p.layer.name ?? p.id, type: p.layer.type, box: p.box, opacity: p.opacity, locked: p.layer.locked }));
   } catch { return []; }
 }
 

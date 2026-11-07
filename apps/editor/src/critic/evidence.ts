@@ -1,7 +1,9 @@
 // Bounded visual evidence: an overview across the whole film, details around
 // selected events and directed beats, the target, plan and measured facts.
 
-import { Evaluator, runChecks, sampleAt, type QualityIssue, type Registry, type ToolContext, type TrammeDoc } from '@tramme/core';
+import { runChecks, sampleAt, type QualityIssue, type Registry, type ToolContext, type TrammeDoc } from '@tramme/core';
+import { editorEvaluator } from '../evaluator.ts';
+import { sandboxedDoc } from '../installed.ts';
 import { analyses } from '../perception.ts';
 import { sheetOf, stills } from '../review.ts';
 import { filmTime, scenesOf, sceneAt } from '../scenes.ts';
@@ -74,7 +76,7 @@ export function momentsOf(doc: TrammeDoc, compId: string, registry: Registry, is
   for (const m of comp.markers ?? []) if (m.kind === 'hero') found.push({ t: m.t, why: `hero: ${m.label || m.id}`, scene: where(m.t), rank: 1 });
   for (const i of issues) if (i.check === 'coverage') found.push({ t: +((i.t ?? 0) + (i.rank ?? 0) / 2).toFixed(2), why: `the speaker alone for ${Math.round(i.rank ?? 0)} s`, scene: where((i.t ?? 0) + (i.rank ?? 0) / 2), rank: 2 });
 
-  const ev = new Evaluator(doc, registry), area = comp.width * comp.height;
+  const ev = editorEvaluator(doc, registry), area = comp.width * comp.height;
   /** whether the layer, a moment after it enters, covers enough of the frame (found in the root's placed layers by its id, nested ones by the end of theirs) */
   const big = (layerId: string, at: number) => {
     const sample = sampleAt(ev, compId, Math.min(Math.max(0, at), comp.duration - 0.01));
@@ -149,7 +151,7 @@ export interface Evidence {
 export async function gather(ctx: ToolContext, compId: string, checked?: QualityIssue[]): Promise<Evidence> {
   const doc = ctx.doc, comp = doc.compositions[compId];
   const plan = parsePlan(await ctx.readText(FILM_PLAN_PATH).catch(() => null));
-  const issues = checked ?? await runChecks(doc, ctx.registry, compId, { data: await analyses(ctx) });
+  const issues = checked ?? await runChecks(doc, ctx.registry, compId, { data: await analyses(ctx), allowExpressions: !sandboxedDoc(doc) });
   const moments = momentsOf(doc, compId, ctx.registry, issues);
   const directed = directedMoments(doc, compId, plan);
   const samples = reviewSamples(comp.duration, comp.fps, moments, directed);

@@ -4,7 +4,8 @@
 // N at once by a layout and rules, an instance detached into plain layers.
 // The assistant reaches them through use_tool, the user through the / menu.
 
-import { defineComponentPlan, detachPlan, Evaluator, pointer, sampleComposition, type Distribution, type Layout, type Op, type ToolContext, type ToolType, type TrammeDoc, type Vec2 } from '@tramme/core';
+import { defineComponentPlan, detachPlan, pointer, sampleComposition, type Distribution, type Layout, type Op, type ToolContext, type ToolType, type TrammeDoc, type Vec2 } from '@tramme/core';
+import { editorEvaluator } from './evaluator.ts';
 import { freshId, slug } from './model.ts';
 import { api } from './api.ts';
 import { libraryList, refreshLibrary } from './library.ts';
@@ -26,7 +27,7 @@ function drawnBox(ctx: ToolContext, ids: string[]): { x: number; y: number; w: n
   ids.forEach(take);
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   const step = Math.max(1 / c.fps, Math.min(0.25, c.duration / 40));
-  for (const s of sampleComposition(new Evaluator(ctx.doc, ctx.registry), ctx.compId, step)) {
+  for (const s of sampleComposition(editorEvaluator(ctx.doc, ctx.registry), ctx.compId, step)) {
     for (const p of s.layers) {
       if (!inside.has(p.id) || !p.box) continue;
       x0 = Math.min(x0, p.box.x); y0 = Math.min(y0, p.box.y); x1 = Math.max(x1, p.box.x + p.box.w); y1 = Math.max(y1, p.box.y + p.box.h);

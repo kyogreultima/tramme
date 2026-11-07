@@ -6,7 +6,8 @@
 // the assistant runs them (use_tool), the user too (/ menu).
 
 import { ALL_FORMATS, CanvasSink, Input, UrlSource, type InputVideoTrack } from 'mediabunny';
-import { applyMat, Evaluator, following, grayFrame, invertMat, isTrack, layerClock, layerMatrix, matMul, pictureRect, pointer, trackId, type Box, type Composition, type GrayFrame, type Mat2D, type Op, type ToolContext, type ToolType, type Track, type Vec2 } from '@tramme/core';
+import { applyMat, following, grayFrame, invertMat, isTrack, layerClock, layerMatrix, matMul, pictureRect, pointer, trackId, type Evaluator, type Box, type Composition, type GrayFrame, type Mat2D, type Op, type ToolContext, type ToolType, type Track, type Vec2 } from '@tramme/core';
+import { editorEvaluator } from './evaluator.ts';
 import { t } from './i18n/index.ts';
 import { freshId, parentOf, siblingsOf, slug } from './model.ts';
 import { canvas, CUT, distance, histogram, objectsIn, readJson } from './perception.ts';
@@ -111,7 +112,7 @@ const track: ToolType<TrackArgs> = {
     const c = compOf(ctx), videoId = videoLayer(ctx, a.video), vl = c.layers[videoId], asset = String(vl.props?.video ?? '');
     if (!ctx.doc.assets[asset]) throw new Error(`${videoId} plays no video file`);
     const vin = vl.in ?? 0, vout = vl.out ?? c.duration, now = ctx.time;
-    const ev = new Evaluator(ctx.doc, ctx.registry), clock = layerClock(ev, ctx.compId, videoId);
+    const ev = editorEvaluator(ctx.doc, ctx.registry), clock = layerClock(ev, ctx.compId, videoId);
     const from = Math.max(vin, a.from ?? vin), to = Math.min(vout, a.to ?? vout), every = a.every ?? 0.1, file = clock.fileTime;
     if (now < from || now > to) throw new Error(`track: the current time (${r(now)} s) is outside the span followed (${r(from)} to ${r(to)} s of "${videoId}"): put the playhead where the object shows`);
     const rect = a.rectangle ?? (a.region === undefined && !a.object ? ctx.selection.find((id) => c.layers[id]?.type === 'shape.rect') : undefined);
@@ -216,7 +217,7 @@ const callout: ToolType<CalloutArgs> = {
     const tr = data, playing = Object.keys(c.layers).filter((lid) => c.layers[lid].type === 'video' && c.layers[lid].props?.video === tr.source);
     const videoId = a.video ?? ctx.selection.find((s) => playing.includes(s)) ?? playing[0];
     if (!videoId || !playing.includes(videoId)) throw new Error(`no video layer of this composition plays ${tr.source ?? 'the file tracked'}${a.video ? ` ("${a.video}" plays another one)` : ''}`);
-    const vl = c.layers[videoId], vin = vl.in ?? 0, vout = vl.out ?? c.duration, clock = layerClock(new Evaluator(ctx.doc, ctx.registry), ctx.compId, videoId);
+    const vl = c.layers[videoId], vin = vl.in ?? 0, vout = vl.out ?? c.duration, clock = layerClock(editorEvaluator(ctx.doc, ctx.registry), ctx.compId, videoId);
     // when the object shows, in composition time, while its layer plays (at its speed, a speed curve inverted, once per turn of a loop)
     const seen = tr.frames.filter((f) => f.box).flatMap((f) => clock.moments(f.t)).sort((x, y) => x - y);
     if (!seen.length && a.at === undefined) throw new Error(`the object of ${id} is never seen while "${videoId}" plays`);

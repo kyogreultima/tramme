@@ -5,7 +5,8 @@
 // only changes through proposals the user applies.
 
 import { copiesFor, copyId, installedTypes } from '../installed.ts';
-import { applyOps, Evaluator, getAt, isTranscript, pointer, remapTranscript, silences, toolInputIssues, toolOutput, validate, type TrammeDoc, type Op, type Registry, type ToolContext, type Transcript } from '@tramme/core';
+import { applyOps, getAt, isTranscript, pointer, remapTranscript, silences, toolInputIssues, toolOutput, validate, type TrammeDoc, type Op, type Registry, type ToolContext, type Transcript } from '@tramme/core';
+import { editorEvaluator } from '../evaluator.ts';
 import { DOCUMENT, isChatPath, MANIFEST, pathIssue, srcPath } from '@tramme/project';
 import { VideoFrames } from '@tramme/render';
 import { Stills } from '../frames.ts';
@@ -262,7 +263,7 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
           const doc = this.liveDoc(), reg = await this.registry(doc);
           // the analyses and event lists reach the expressions that read them
           const data = await analyses(this.toolContext(doc, reg));
-          return text(JSON.stringify(new Evaluator(doc, reg, { data }).value(String(input.address), Number(input.t), input.compId ?? (this.scoped ? this.compOf(doc) : undefined))));
+          return text(JSON.stringify(editorEvaluator(doc, reg, { data }).value(String(input.address), Number(input.t), input.compId ?? (this.scoped ? this.compOf(doc) : undefined))));
         }
         case 'render_still': return await this.still(Number(input.t), input.compId, input.caption);
         case 'propose_changes': return await this.propose(String(input.label ?? 'Change'), input.ops as Op[]);

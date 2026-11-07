@@ -8,7 +8,8 @@
 // the exports.
 
 import { openverse } from './openverse.ts';
-import { analyseAudio, audioClips, Evaluator, isAudioAnalysis, layerClock, pointer, searchSounds, soundCues, soundFigures, soundFlaws, staticValue, variantsOf, volumeBlockKeys, type Layer, type Op, type SoundCue, type SoundEntry, type SoundFigures, type SoundRole, type SoundVisual, type ToolContext, type ToolType } from '@tramme/core';
+import { analyseAudio, audioClips, isAudioAnalysis, layerClock, pointer, searchSounds, soundCues, soundFigures, soundFlaws, staticValue, variantsOf, volumeBlockKeys, type Layer, type Op, type SoundCue, type SoundEntry, type SoundFigures, type SoundRole, type SoundVisual, type ToolContext, type ToolType } from '@tramme/core';
+import { editorEvaluator } from './evaluator.ts';
 import { musicCutPlan, type MusicCutPlan } from './music-plan.ts';
 import { musicSections } from './music-structure.ts';
 import { alignMusicBeats } from './music-alignment.ts';
@@ -58,7 +59,7 @@ export function cuesOf(ctx: ToolContext): SoundCue[] {
   let byComp = cueCache.get(ctx.doc);
   if (!byComp) { byComp = new Map(); cueCache.set(ctx.doc, byComp); }
   let list = byComp.get(ctx.compId);
-  if (!list) { list = soundCues(new Evaluator(ctx.doc, ctx.registry), ctx.compId); byComp.set(ctx.compId, list); }
+  if (!list) { list = soundCues(editorEvaluator(ctx.doc, ctx.registry), ctx.compId); byComp.set(ctx.compId, list); }
   return list;
 }
 
@@ -87,7 +88,7 @@ export async function momentsOf(ctx: ToolContext, at: unknown, on: unknown, laye
   const cued = (keep: (x: SoundCue) => boolean) => found.push(...cuesOf(ctx).filter((x) => keep(x) && (!named.length || named.includes(x.layer))).map((x) => ({ t: x.t, visual: x.kind, weight: x.weight })));
   // where a layer plays a file: composition times of a time in that file (at the layer's speed, once per turn of a loop)
   const playing = (asset: string) => (Object.entries(c.layers) as [string, Layer][]).filter(([, l]) => (l.type === 'audio' || l.type === 'video') && staticValue(l.props?.[l.type]) === asset).map(([id]) => id);
-  const ev = new Evaluator(ctx.doc, ctx.registry);
+  const ev = editorEvaluator(ctx.doc, ctx.registry);
   const inFile = (asset: string, fileTimes: number[]) => playing(asset).flatMap((id) => {
     const { moments } = layerClock(ev, ctx.compId, id);
     return fileTimes.flatMap(moments);
@@ -253,7 +254,7 @@ const bedLayers = (ctx: ToolContext) => audioClips(ctx.doc, ctx.compId).filter((
  * before a hero and a build into it are written over a ducking already there.
  */
 function shapeOps(ctx: ToolContext, ids: string[], prop: string, spans: { from: number; to: number; keys: (base: (t: number) => number) => { t: number; v: number }[] }[], rest: number): Op[] {
-  const c = ctx.doc.compositions[ctx.compId], ev = new Evaluator(ctx.doc, ctx.registry);
+  const c = ctx.doc.compositions[ctx.compId], ev = editorEvaluator(ctx.doc, ctx.registry);
   return ids.flatMap((id) => {
     const l = c.layers[id];
     if (!l) return [];

@@ -11,6 +11,7 @@ import { zipSync } from 'fflate';
 import type { TrammeDoc, Registry } from '@tramme/core';
 import { fetchAssetReader, toLottie, toSvg } from '@tramme/interop';
 import { deepCodec, encodeWav, i420p10, mixComposition, Renderer, SETTLE_LIMIT } from '@tramme/render';
+import { containsExpression } from '@tramme/project';
 
 import { AVC_FROM_STREAM } from './avc.ts';
 import type { WebFormat } from './formats.ts';
@@ -67,6 +68,7 @@ export async function exportInBrowser(doc: TrammeDoc, base: string, format: WebF
     throw new Error(t('export.websceneDesktopOnly'));
   }
   if (format === 'lottie' || format === 'svg') {
+    if (sandboxedDoc(doc) && containsExpression(doc)) throw new Error(t('export.isolatedVectorExpressions'));
     const readAsset = await fetchAssetReader(doc, base);
     // the sandboxed nodes' vector exports are computed in the sandbox first: the conversion reads them synchronously
     await primeSandboxExports(doc, opts.registry, opts.t ?? 0);

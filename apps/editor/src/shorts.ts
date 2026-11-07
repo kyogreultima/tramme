@@ -10,6 +10,7 @@ import { TEMPLATES } from './templates.ts';
 import { sheetOf } from './review.ts';
 import { clip, freshId, slug } from './model.ts';
 import { t } from './i18n/index.ts';
+import { sandboxedDoc } from './installed.ts';
 
 const FORMATS = { vertical: [1080, 1920], square: [1080, 1080], horizontal: [1920, 1080] } as const;
 type Format = keyof typeof FORMATS;
@@ -452,7 +453,7 @@ const shorts: ToolType<{ asset: string; format?: Format; min?: number; max?: num
     // each short, seen as the checks see it (the sound is left to check, run per composition)
     const lines: string[] = [];
     for (const m of made) {
-      const issues = await runChecks(doc, ctx.registry, m.comp);
+      const issues = await runChecks(doc, ctx.registry, m.comp, { allowExpressions: !sandboxedDoc(doc) });
       lines.push(`- ${m.comp}: "${m.title}", ${m.duration.toFixed(1)} s (${format}${m.follow === 'matte' ? ', the frame follows the speaker by the cutout\'s mask (the boxes jumped)' : m.follow ? ', the frame follows the speaker' : ''}${m.zoom ? `, a push-in to ×${m.zoom}` : ''}) — ${issues.length ? `${issues.length} note(s): ${issues.slice(0, 3).map((i) => i.message).join('; ')}${issues.length > 3 ? '…' : ''}` : 'nothing to fix at first read'}`);
     }
     // a contact sheet, one cell per short, when there are several

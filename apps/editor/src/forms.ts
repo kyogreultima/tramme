@@ -3,7 +3,8 @@
 // one form, and when a scene is built in another kind than the film plan gave
 // it. The kinds are the film plan's (filmplan.ts).
 
-import { Evaluator, sampleAt, type PlacedLayer, type Registry, type TrammeDoc } from '@tramme/core';
+import { sampleAt, type PlacedLayer, type Registry, type TrammeDoc } from '@tramme/core';
+import { editorEvaluator } from './evaluator.ts';
 import { builtinRegistry } from '@tramme/nodes';
 import { planIssues, type FilmPlan, type PictureKind, type PlanScene } from './filmplan.ts';
 import { scenesOf, type Scene } from './scenes.ts';
@@ -33,7 +34,7 @@ export function formOf(doc: TrammeDoc, compId: string, opts: { registry?: Regist
   const comp = doc.compositions[compId];
   if (!comp) return NONE;
   let sample;
-  try { sample = sampleAt(new Evaluator(doc, opts.registry ?? builtinRegistry()), compId, Math.min(opts.at ?? comp.duration / 2, Math.max(0, comp.duration - 1e-3))); } catch { return NONE; }
+  try { sample = sampleAt(editorEvaluator(doc, opts.registry ?? builtinRegistry()), compId, Math.min(opts.at ?? comp.duration / 2, Math.max(0, comp.duration - 1e-3))); } catch { return NONE; }
   const area = new Map<PictureKind, { area: number; why: Set<string> }>();
   const add = (kind: PictureKind, a: number, why: string) => {
     const e = area.get(kind) ?? { area: 0, why: new Set<string>() };

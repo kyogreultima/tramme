@@ -113,12 +113,15 @@ export function nestedTime(p: NestedTiming, t: number, layerIn: number, duration
 export interface EvaluatorOptions {
   /** the loaded content of a JSON asset (analyses), when the caller has it: the renderer does */
   data?(assetId: string): unknown;
+  /** false on a trusted page that mirrors an isolated project's values */
+  allowExpressions?: boolean;
 }
 
 export class Evaluator {
   readonly doc: TrammeDoc;
   readonly registry: Registry;
   private data?: (assetId: string) => unknown;
+  private allowExpressions: boolean;
   /** address -> addresses it read, from the last evaluations */
   readonly deps = new Map<string, Set<string>>();
   /** fixed values, by composition then address */
@@ -128,6 +131,7 @@ export class Evaluator {
     this.doc = doc;
     this.registry = registry;
     this.data = opts.data;
+    this.allowExpressions = opts.allowExpressions ?? true;
   }
 
   /**
@@ -598,6 +602,7 @@ export class Evaluator {
   }
 
   private runExpr(ctx: FrameCtx, address: string, src: string, value: unknown, def: PropDef, at?: { index: number; count: number; row: unknown }): unknown {
+    if (!this.allowExpressions) throw new EvalError(address, 'expression evaluation is isolated from this page');
     const { comp } = ctx;
     const tokens = this.doc.tokens;
     const [index, count] = at ? [at.index, at.count] : ctx.inst?.rank ?? (address[0] === '$' ? [0, 1] : this.rank(comp, address.split('.')[0]));

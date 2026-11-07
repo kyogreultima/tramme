@@ -30,7 +30,7 @@ import { defaultPages, renderAudio, renderVideo } from './jobs.ts';
 import { VIDEO_FORMATS, type VideoFormat } from './media.ts';
 import { docRegistry, filesRegistry } from './plugins.ts';
 import { readConfig, resolveMountedPath, Server } from './server.ts';
-import { checkProject, DOCUMENT, isChatPath, MANIFEST, newProject, packProject, unpackProject, LEGACIES, migrateProject } from '@tramme/project';
+import { checkProject, containsExpression, DOCUMENT, isChatPath, MANIFEST, newProject, packProject, unpackProject, LEGACIES, migrateProject } from '@tramme/project';
 import { lintSceneFiles, MAX_SCENE_SOURCE } from './scene-lint.ts';
 
 const [cmd, ...rest] = process.argv.slice(2);
@@ -86,6 +86,7 @@ async function cmdValidate(file: string) {
 
 async function cmdCheck(file: string) {
   const doc = readDoc(file);
+  if (containsExpression(doc)) throw new Error('picture checks with expressions require an isolated evaluator');
   const { checkReport } = await import('./check.ts');
   const project = registryOf(file, doc);
   console.log(await checkReport(doc, await project.registry, str('comp')));
@@ -158,6 +159,7 @@ function cmdCompare(ref: string, test: string) {
 async function cmdExport(file: string) {
   const doc = readDoc(file);
   const format = str('format');
+  if ((format === 'lottie' || format === 'svg') && containsExpression(doc)) throw new Error('vector export with expressions requires an isolated renderer; use raster export');
   const { registry, resolve, dir } = registryOf(file, doc);
   const compId = str('comp') ?? doc.root;
   const readAsset = fileAssetReader(doc, dir, resolve);

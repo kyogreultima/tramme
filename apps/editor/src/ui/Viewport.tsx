@@ -14,6 +14,7 @@ import { decide } from '../ai/conversation.ts';
 import { editAtOps, flatTree, layerName, parentOf, propPath, rawProp } from '../model.ts';
 import { assetData, preview, previewInfo } from '../preview.ts';
 import { prefs, setPrefs, settingsOpen, type Preferences } from '../settings.ts';
+import { sandboxedDoc } from '../installed.ts';
 import { openMenu, type MenuItem } from './controls.tsx';
 import { Icon } from './icons.tsx';
 import { m, t } from '../i18n/index.ts';
@@ -127,7 +128,8 @@ export function Viewport({ bare = false, inset = INSET, overlay, intercept }: Vi
   const [spaceDown, setSpace] = useState(false);
   const c = comp.value, doc = viewDoc.value, now = S.time.value, compId = S.compId.value;
   const reg = S.registry.value;
-  const ev = useMemo(() => new Evaluator(doc, reg, { data: assetData }), [doc, reg]);
+  const isolated = prefs.value.sandboxPreview || sandboxedDoc(doc);
+  const ev = useMemo(() => new Evaluator(doc, reg, { data: assetData, allowExpressions: !isolated }), [doc, reg, isolated]);
 
   useLayoutEffect(() => {
     stageRef.current!.prepend(preview.canvas);

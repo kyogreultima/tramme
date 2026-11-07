@@ -5,7 +5,8 @@
 // start the path again, so a stabilised edit does not drift across a cut.
 
 import { ALL_FORMATS, CanvasSink, Input, UrlSource } from 'mediabunny';
-import { corrections, coverZoom, frameMotion, grayFrame, layerClock, Evaluator, pointer, type GrayFrame, type Motion, type Stabilization, type ToolType } from '@tramme/core';
+import { corrections, coverZoom, frameMotion, grayFrame, layerClock, pointer, type GrayFrame, type Motion, type Stabilization, type ToolType } from '@tramme/core';
+import { editorEvaluator } from './evaluator.ts';
 import { canvas, CUT, distance, histogram } from './perception.ts';
 import { compOf, r } from './recipes.ts';
 import { videoLayer } from './tracking.ts';
@@ -32,7 +33,7 @@ const stabilize: ToolType<StabilizeArgs> = {
   async run(a, ctx) {
     const c = compOf(ctx), videoId = videoLayer(ctx, a.video), vl = c.layers[videoId], asset = String(vl.props?.video ?? '');
     if (!ctx.doc.assets[asset]) throw new Error(`${videoId} plays no video file`);
-    const clock = layerClock(new Evaluator(ctx.doc, ctx.registry), ctx.compId, videoId);
+    const clock = layerClock(editorEvaluator(ctx.doc, ctx.registry), ctx.compId, videoId);
     const vin = vl.in ?? 0, vout = vl.out ?? c.duration;
     const input = new Input({ source: new UrlSource(ctx.assetUrl(asset)), formats: ALL_FORMATS });
     try {

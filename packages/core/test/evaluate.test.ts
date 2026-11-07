@@ -31,6 +31,14 @@ describe('curves and interpolation', () => {
 });
 
 describe('expressions', () => {
+  it('refuses to evaluate an expression in a trusted mirror', () => {
+    const doc = makeDoc();
+    (doc.compositions.main.layers.a.props as any).radius = { $expr: `({}).constructor.constructor('globalThis.__mirrorLeak = true; return 1')()` };
+    const mirror = new Evaluator(doc, registry(), { allowExpressions: false });
+    expect(() => mirror.value('a.radius', 0)).toThrow('expression evaluation is isolated from this page');
+    expect((globalThis as any).__mirrorLeak).toBeUndefined();
+  });
+
   const scope = (over = {}) => ({
     t: 2, frame: 60, fps: 30, value: 5, comp: { width: 10, height: 10, duration: 1, fps: 30 },
     prop: () => 0, token: () => 0, marker: () => ({ t: 0, frame: 0 }), ease: (_: unknown, x: number) => x, audio: () => audioReader(null, 0), events: () => eventsReader(null, 0), track: () => trackReader(null, 0, null), ...over,

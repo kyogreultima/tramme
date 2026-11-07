@@ -3,7 +3,8 @@
 // layer (a picture riding a card that turns). The render draws the layer
 // alone and carries its box onto the corners in perspective (fx.pin).
 
-import { DEFAULT_PERSPECTIVE, Evaluator, layerQuad, pointer, type Op, type Quad, type ToolContext, type ToolType, type Vec2 } from '@tramme/core';
+import { DEFAULT_PERSPECTIVE, layerQuad, pointer, type Evaluator, type Op, type Quad, type ToolContext, type ToolType, type Vec2 } from '@tramme/core';
+import { editorEvaluator } from './evaluator.ts';
 
 interface Input { layer: string; corners?: [Vec2, Vec2, Vec2, Vec2]; onto?: string; from?: number; to?: number }
 
@@ -56,7 +57,7 @@ const pin: ToolType<Input> = {
       if (!target) throw new Error(`${a.onto}: no such layer in the composition`);
       const from = a.from ?? target.in ?? 0, to = Math.min(comp.duration, a.to ?? target.out ?? comp.duration);
       if (!(to > from)) throw new Error(`${a.onto}: nothing to follow between ${from} and ${to} s`);
-      const ev = new Evaluator(ctx.doc, ctx.registry), n = Math.ceil((to - from) / STEP - 1e-9);
+      const ev = editorEvaluator(ctx.doc, ctx.registry), n = Math.ceil((to - from) / STEP - 1e-9);
       const keys: Record<(typeof CORNERS)[number], { t: number; v: Vec2 }[]> = { tl: [], tr: [], br: [], bl: [] };
       for (let i = 0; i <= n; i++) {
         // the last key lands on the end (the last step may be shorter)

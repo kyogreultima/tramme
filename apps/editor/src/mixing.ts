@@ -11,7 +11,8 @@
 // each effect, and five moments are given to check by ear: a human does the
 // final listen.
 
-import { audioClips, bandPowers, noiseFigures, NOISY_SNR, curveAt, Evaluator, integratedLoudness, loudnessSeries, pictureMotion, pointer, powerDb, soundFigures, soundMix, truePeak, type AudioClip, type Op, type QualityIssue, type SoundFigures, type ToolContext, type ToolType } from '@tramme/core';
+import { audioClips, bandPowers, noiseFigures, NOISY_SNR, curveAt, integratedLoudness, loudnessSeries, pictureMotion, pointer, powerDb, soundFigures, soundMix, truePeak, type AudioClip, type Op, type QualityIssue, type SoundFigures, type ToolContext, type ToolType } from '@tramme/core';
+import { editorEvaluator } from './evaluator.ts';
 import { mixComposition } from '@tramme/render';
 import { channelsOf, cuesOf, measure } from './sound.ts';
 import { canvas, caption, drawCurve, drawSpectrogram, drawWave, INK, mark } from './sound-pictures.ts';
@@ -327,7 +328,7 @@ function mixPicture(ctx: ToolContext, final: AudioBuffer, effects: Effect[]): st
   caption(g, `${c.name ?? ctx.compId} · ${c.duration.toFixed(1)} s`, x0, 14);
   drawWave(g, d, x0, 22, w, 90, '#d6dde0');
   drawSpectrogram(g, d, final.sampleRate, x0, 118, w, 170);
-  const motion = pictureMotion(new Evaluator(ctx.doc, ctx.registry), ctx.compId);
+  const motion = pictureMotion(editorEvaluator(ctx.doc, ctx.registry), ctx.compId);
   drawCurve(g, motion.motion, x0, 296, w, 70);
   caption(g, 'picture motion', x0, 392, INK.motion, '11px system-ui, sans-serif');
   for (const e of effects) if (e.hit !== null) mark(g, px(e.hit), 22, 344, e.clip.weight === 'hero' ? INK.hero : INK.support, e.name.slice(0, 22));

@@ -6,6 +6,8 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { Evaluator, getAt, pointer, propKind, staticValue, sheetIssues, TRANSFORM_SCHEMA, MOTION_BLUR_SCHEMA, CAMERA_SCHEMA, SOUND_MIX_SCHEMA, type TrammeDoc, type Op, type Paint, type Prop, type PropDef, type PropSchema, type Token, MASK_SCHEMA, curveTable, type PathValue } from '@tramme/core';
 import { comp, commit, draft, cancelDraft, S, viewDoc, select, toast, uiTime } from '../state.ts';
 import { assetData } from '../preview.ts';
+import { sandboxedDoc } from '../installed.ts';
+import { prefs } from '../settings.ts';
 import { addModifierOps, editAtOps, fixedOps, folderOf, imagesIn, keyAtOps, keyIndexAt, keysOf, removeKeyOps, removeModifierOps, setAtOps, snap, freshId, cutEndOps, fmtSeconds } from '../model.ts';
 import { addressDef, componentOf, detachPlan, modsOf, modifierParams, paramDef } from '@tramme/core';
 import { followTrackOps, tracksOf } from '../masks.ts';
@@ -872,7 +874,8 @@ function CompInspector({ ctx }: { ctx: Ctx }) {
 export function Inspector() {
   const doc = viewDoc.value, c = comp.value, now = uiTime.value, reg = S.registry.value;
   const compId = S.compId.value;
-  const ev = useMemo(() => new Evaluator(doc, reg, { data: assetData }), [doc, reg]);
+  const isolated = prefs.value.sandboxPreview || sandboxedDoc(doc);
+  const ev = useMemo(() => new Evaluator(doc, reg, { data: assetData, allowExpressions: !isolated }), [doc, reg, isolated]);
   const ctx: Ctx = { doc, compId, t: now, fps: c.fps, ev, tokens: doc.tokens };
   const sel = S.selection.value.filter((id) => c.layers[id]);
   if (sel.length > 1) {

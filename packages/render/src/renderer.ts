@@ -169,7 +169,7 @@ export class Renderer {
     this.doc = doc;
     this.registry = registry;
     // analyses (JSON assets) reach the expressions and modifiers that follow the music
-    this.evaluator = new Evaluator(doc, registry, { data: (id) => (this.assets.has(id) ? this.assets.get(id) : undefined) });
+    this.evaluator = new Evaluator(doc, registry, { data: (id) => (this.assets.has(id) ? this.assets.get(id) : undefined), allowExpressions: !this.sandboxModules });
     this.compId = compId ?? (doc.compositions[this.compId] ? this.compId : doc.root);
     const comp = this.evaluator.comp(this.compId);
     const resized = !this.comp || comp.width !== this.comp.width || comp.height !== this.comp.height;
@@ -209,7 +209,9 @@ export class Renderer {
       for (const [id, layer] of Object.entries(comp.layers)) {
         if (this.loadedLayers.has(layer)) continue;
         const node = this.registry.node(layer.type);
-        if (node.load && !(this.sandboxModules && layer.type === 'code')) {
+        // Evaluating any layer's props here can execute an expression on the
+        // trusted page. The isolated worker prepares and draws those layers.
+        if (node.load && !this.sandboxModules) {
           const t = layer.in ?? 0;
           const L = this.evaluator.layerAt(id, t, compId);
           await node.load(L.props, this.hostFactory({ t, frame: Math.round(t * comp.fps) }, compId)(id));
