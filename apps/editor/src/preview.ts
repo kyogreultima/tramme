@@ -270,6 +270,12 @@ class Preview {
     if (!this.renderer) return;
     if (this.renderer.sandboxModules) {
       const base = new URL(S.docUrl.peek(), location.href).href;
+      // A saved edit can keep the same asset URL. Discard the worker's module
+      // cache so the next load reads the new source and declarations.
+      if (assetIds.some((id) => this.applied!.assets[id]?.type === 'module')) {
+        pluginHost(base).dispose('project module changed');
+        resetSandbox();
+      }
       await ensureDeclared(pluginHost(base), moduleItemsOf(this.applied!, base));
     }
     await this.renderer.setDoc(this.applied!, { compId: compIdOf(this.applied!), reload: assetIds });

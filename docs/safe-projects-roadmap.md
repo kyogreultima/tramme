@@ -52,6 +52,8 @@ CLI module transfer (2026-11-07): with isolation selected, the trusted asset loa
 
 Editor module transfer (2026-11-07): when isolated preview is enabled, the editor's preview, stills, raster export and thumbnail now load every project module through the bounded opaque host before drawing. This includes Free code modules that are not listed as plugins. Reloads and document changes refresh the worker's module list. The editor setting is still opt-in, and browser coverage of these paths remains before step 2 can close.
 
+Editor module edit reload (2026-11-07): when an isolated module asset is reloaded at the same URL, the preview now disposes its worker and clears declarations and retained pictures before loading that URL again. This prevents a saved JavaScript edit from leaving its previous code active. The editor still needs end-to-end browser coverage and isolation by default.
+
 Startup queue bounds (2026-11-06): while the isolated frame starts, consecutive document snapshots are coalesced and the host stops at 128 queued messages. A project may load at most 64 distinct plugin modules in one host. A browser test holds the frame at startup and verifies that excess messages close it promptly. Overall message bytes, media copies and platform memory remain open in step 4.
 
 Bounded resource reads (2026-11-06): approved project modules (1 MiB) and fonts (16 MiB) are now read through a bounded stream; the host cancels a response as soon as it exceeds its limit, without first buffering its whole body. A test uses a response that never finishes after crossing the module limit and verifies prompt cancellation. Other media and model transfers still need equivalent host capabilities and budgets.
