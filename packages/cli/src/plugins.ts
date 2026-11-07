@@ -10,6 +10,14 @@ import type { PluginDecl } from '../../../apps/editor/src/plugins/protocol.ts';
 import { launch } from './browser.ts';
 import { Server } from './server.ts';
 
+const MAX_PLUGIN_SOURCE = 1024 * 1024;
+const MAX_PROJECT_PLUGINS = 64;
+const pluginIds = (doc: TrammeDoc) => {
+  const ids = doc.plugins ?? [];
+  if (ids.length > MAX_PROJECT_PLUGINS) throw new Error(`too many project plugins (${MAX_PROJECT_PLUGINS} at most)`);
+  return ids;
+};
+
 async function isolatedDeclarations(plugins: { id: string; code: string }[]): Promise<PluginDecl[]> {
   if (!plugins.length) return [];
   const server = new Server({ dir: process.cwd(), mounts: [] });
@@ -55,10 +63,11 @@ function registryFrom(declarations: PluginDecl[]): Registry {
 /** Vocabulary of an archive, with module initialization isolated from Node. */
 export async function filesRegistry(doc: TrammeDoc, files: Map<string, Uint8Array>): Promise<Registry> {
   const sources: { id: string; code: string }[] = [];
-  for (const id of doc.plugins || []) {
+  for (const id of pluginIds(doc)) {
     const file = srcPath(doc.assets[id]?.src ?? '');
     const data = file ? files.get(file) : undefined;
     if (!data) throw new Error(`plugin "${id}" not found in the project`);
+    if (data.byteLength > MAX_PLUGIN_SOURCE) throw new Error(`plugin "${id}" exceeds 1 MB`);
     sources.push({ id, code: new TextDecoder().decode(data) });
   }
   try { return registryFrom(await isolatedDeclarations(sources)); }
@@ -72,7 +81,7 @@ export async function filesRegistry(doc: TrammeDoc, files: Map<string, Uint8Arra
 /** Vocabulary of a project folder and its configured mounts, isolated. */
 export async function docRegistry(doc: TrammeDoc, dir: string, resolve?: (urlPath: string) => string | null): Promise<Registry> {
   const sources: { id: string; code: string }[] = [];
-  for (const id of doc.plugins || []) {
+  for (const id of pluginIds(doc)) {
     const asset = doc.assets[id];
     if (!asset || asset.type !== 'module') continue;
     const relative = asset.src.startsWith('/') ? null : srcPath(asset.src);
@@ -85,6 +94,9 @@ export async function docRegistry(doc: TrammeDoc, dir: string, resolve?: (urlPat
       const rel = path.relative(realRoot, realFile);
       if (rel === '..' || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel)) throw new Error(`plugin "${id}" leaves its project`);
     }
+    const stat = fs.statSync(file);
+    if (!stat.isFile()) throw new Error(`plugin "${id}" is not a file`);
+    if (stat.size > MAX_PLUGIN_SOURCE) throw new Error(`plugin "${id}" exceeds 1 MB`);
     sources.push({ id, code: fs.readFileSync(file, 'utf8') });
   }
   try { return registryFrom(await isolatedDeclarations(sources)); }

@@ -94,6 +94,22 @@ describe('a project in memory (pack, unpack)', () => {
       await expect(docRegistry(doc, project)).rejects.toThrow(`plugin "${id}" leaves its project`);
     } finally { fs.rmSync(temp, { recursive: true, force: true }); }
   });
+
+  it('bounds plugin source before native read or archive decoding', async () => {
+    const files = read(NIGHT_SKY);
+    const doc = JSON.parse(new TextDecoder().decode(files.get('document.tramme.json'))) as TrammeDoc;
+    const id = doc.plugins![0], relative = doc.assets[id].src;
+    const oversized = Buffer.alloc(1024 * 1024 + 1, 32);
+    files.set(relative, oversized);
+    await expect(filesRegistry(doc, files)).rejects.toThrow(`plugin "${id}" exceeds 1 MB`);
+    const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'tramme-plugin-size-'));
+    try {
+      const file = path.join(temp, relative);
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(file, oversized);
+      await expect(docRegistry(doc, temp)).rejects.toThrow(`plugin "${id}" exceeds 1 MB`);
+    } finally { fs.rmSync(temp, { recursive: true, force: true }); }
+  });
 });
 
 // The CLI draws a project with plugins in the sandbox's worker: its plugins

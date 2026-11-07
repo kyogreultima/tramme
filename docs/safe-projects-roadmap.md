@@ -38,6 +38,8 @@ Bridge input checks (2026-11-06): unknown worker requests no longer fall through
 
 Host resource bounds (2026-11-06): at most 64 worker calls can wait at once; the next is refused before it reaches the worker. The host refuses a project module larger than 1 MiB before sending its source into the opaque frame. Unit and browser tests exercise these limits. Total message size, graphics allocations and a user-facing recovery path remain open in step 4.
 
+CLI declaration input bound (2026-11-07): folder and archive plugin validation now refuse more than 64 plugins and a plugin source over 1 MiB before reading or decoding it in the native CLI process. This matches the browser host's module limit. A test covers the oversized archive bytes and an oversized file on disk. Aggregate memory and recovery remain open.
+
 Plugin-backup expansion (2026-11-06): the installed-plugin backup reader now refuses a compressed file over 64 MiB and a declared expanded total over 128 MiB before inflating entries. The project archive and single-plugin package readers already had expansion limits. Other import paths, total bridge message size, graphics allocations and recovery still keep step 4 open.
 
 Project archive entry bound (2026-11-07): `unpackProject` now refuses more than the project's 2,000-file limit while reading zip metadata, before inflating the excess entry. This closes the many-small-files gap left by the existing compressed and expanded byte limits. Other resource and recovery gates remain open.
