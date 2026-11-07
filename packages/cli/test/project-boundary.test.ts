@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { CHROME, launch } from '../src/browser.ts';
 import { readConfig, Server } from '../src/server.ts';
 import { newProject } from '@tramme/project';
+import { PNG } from 'pngjs';
 
 describe.skipIf(!CHROME)('the served project sandbox', () => {
   let server: Server, browser: Awaited<ReturnType<typeof launch>>['browser'], page: Awaited<ReturnType<typeof launch>>['page'];
@@ -17,7 +18,7 @@ describe.skipIf(!CHROME)('the served project sandbox', () => {
     server = new Server(readConfig(path.resolve(import.meta.dirname, 'fixtures/night-sky/document.tramme.json')));
     server.use((_req, res, url) => {
       if (unsafeDoc && url.pathname === '/project/unsafe-code.tramme.json') { res.writeHead(200, { 'content-type': 'application/json' }); res.end(unsafeDoc); return true; }
-      if (url.pathname === '/project/plugins/unused.js') { unsafeModuleReads++; res.writeHead(200, { 'content-type': 'text/javascript' }); res.end('throw new Error("module executed in trusted page")'); return true; }
+      if (url.pathname === '/project/plugins/unused.js') { unsafeModuleReads++; res.writeHead(200, { 'content-type': 'text/javascript' }); res.end('if (typeof document !== "undefined") throw new Error("module executed in trusted page"); export default { init() { globalThis.__codeInit = (globalThis.__codeInit || 0) + 1; }, render(ctx) { ctx.fillStyle = globalThis.__codeInit === 1 ? "#ff0000" : "#0000ff"; ctx.fillRect(0, 0, 64, 64); } };'); return true; }
       if (blankSandbox && url.pathname === '/project-sandbox.html') { res.writeHead(200, { 'content-type': 'text/html' }); res.end('<!doctype html><title>blank</title>'); return true; }
       if (url.pathname === '/api/private') { privateReads++; res.writeHead(200, { 'content-type': 'text/javascript' }); res.end('private account data'); return true; }
       if (url.pathname === '/project/assets/fonts/test.woff2') { fontReads++; res.writeHead(200, { 'content-type': 'font/woff2' }); res.end(Buffer.from([0, 1, 2, 3])); return true; }
@@ -278,7 +279,7 @@ describe.skipIf(!CHROME)('the served project sandbox', () => {
     } finally { blankSandbox = false; }
   }, 20_000);
 
-  it('refuses a Free code module before the trusted CLI page imports it', async () => {
+  it('renders a Free code module in the worker without executing it on the trusted page', async () => {
     const doc = newProject({ name: 'Unsafe code', width: 64, height: 64, fps: 1, duration: 1 }).doc;
     doc.assets.unused = { type: 'module', src: 'plugins/unused.js' };
     doc.compositions.main.layers.code = { type: 'code', transform: {}, props: { module: 'unused', entry: 'default', params: null } } as never;
@@ -287,12 +288,12 @@ describe.skipIf(!CHROME)('the served project sandbox', () => {
     unsafeModuleReads = 0;
     try {
       await page.goto(`http://127.0.0.1:${port}/__tramme/?doc=/project/unsafe-code.tramme.json`);
-      const reason = await page.evaluate(async () => {
-        try { await (window as any).TRAMME.ready; return 'opened'; }
-        catch (error) { return (error as Error).message; }
-      });
-      expect(reason).toContain('CLI export requires isolated module support');
-      expect(unsafeModuleReads).toBe(0);
+      const urls = await page.evaluate(async () => { await (window as any).TRAMME.ready; const first = await (window as any).TRAMME.still(0); const second = await (window as any).TRAMME.still(0); return [first, second]; }) as string[];
+      for (const url of urls) {
+        const png = PNG.sync.read(Buffer.from(url.split(',')[1], 'base64'));
+        expect([...png.data.subarray((10 * png.width + 10) * 4, (10 * png.width + 10) * 4 + 3)]).toEqual([255, 0, 0]);
+      }
+      expect(unsafeModuleReads).toBe(1);
     } finally { unsafeDoc = null; }
   }, 30_000);
 });

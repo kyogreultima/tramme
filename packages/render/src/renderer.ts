@@ -209,7 +209,7 @@ export class Renderer {
       for (const [id, layer] of Object.entries(comp.layers)) {
         if (this.loadedLayers.has(layer)) continue;
         const node = this.registry.node(layer.type);
-        if (node.load) {
+        if (node.load && !(this.sandboxModules && layer.type === 'code')) {
           const t = layer.in ?? 0;
           const L = this.evaluator.layerAt(id, t, compId);
           await node.load(L.props, this.hostFactory({ t, frame: Math.round(t * comp.fps) }, compId)(id));

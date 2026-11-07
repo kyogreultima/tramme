@@ -8,7 +8,7 @@
 import type { TrammeDoc } from '@tramme/core';
 import { builtinRegistry } from '@tramme/nodes';
 import { addParts, encodeWav, formatParts, mixComposition, noParts, perFrame, Renderer, type FrameParts, type RenderOptions } from '@tramme/render';
-import { blitSandboxFrame, declarationsModule, ensureDeclared, ensureSandboxDoc, pluginItemsOf, sandboxDeclaration, sandboxVideoFrames } from '../../../apps/editor/src/plugins/sandbox-draw.ts';
+import { blitSandboxFrame, declarationsModule, ensureDeclared, ensureSandboxDoc, sandboxDeclaration, sandboxVideoFrames } from '../../../apps/editor/src/plugins/sandbox-draw.ts';
 import { browserHost, type PluginHost } from '../../../apps/editor/src/plugins/host.ts';
 import { containsExpression } from '@tramme/project';
 
@@ -17,26 +17,17 @@ const docUrl = new URL(q.get('doc') || '', location.href).href;
 let renderer: Renderer;
 let currentDoc: TrammeDoc | null = null;
 let sandbox: PluginHost | null = null;
-const needsIsolation = (doc: TrammeDoc) => !!doc.plugins?.length || containsExpression(doc);
-
-function unsupportedModule(doc: TrammeDoc): string | null {
-  const pluginIds = new Set(doc.plugins ?? []);
-  const other = Object.entries(doc.assets).find(([id, asset]) => asset.type === 'module' && !pluginIds.has(id));
-  if (other) return other[0];
-  if (Object.values(doc.compositions).some((comp) => Object.values(comp.layers).some((layer) => layer.type === 'code'))) return 'Free code layer';
-  return null;
-}
+const needsIsolation = (doc: TrammeDoc) => Object.values(doc.assets).some((asset) => asset.type === 'module') || containsExpression(doc);
+const moduleItemsOf = (doc: TrammeDoc) => Object.entries(doc.assets).filter(([, asset]) => asset.type === 'module').map(([id, asset]) => ({ id, url: new URL(asset.src, docUrl).href }));
 
 async function init() {
   const r = await fetch(docUrl);
   if (!r.ok) throw new Error(`document not found: ${docUrl}`);
   currentDoc = (await r.json()) as TrammeDoc;
-  const module = unsupportedModule(currentDoc);
-  if (module) throw new Error(`${module}: CLI export requires isolated module support; this project was not run`);
   const isolated = needsIsolation(currentDoc);
   if (isolated) {
     sandbox = browserHost(docUrl);
-    await ensureDeclared(sandbox, pluginItemsOf(currentDoc, docUrl));
+    await ensureDeclared(sandbox, moduleItemsOf(currentDoc));
   }
   renderer = await Renderer.open(currentDoc, builtinRegistry(), docUrl, document.getElementById('out') as HTMLCanvasElement, {
     compId: q.get('comp') || currentDoc.root,
@@ -55,7 +46,7 @@ async function sandboxReady(): Promise<PluginHost | null> {
   if (!doc || !needsIsolation(doc)) return null;
   sandbox ??= browserHost(docUrl);
   // the document's plugins loaded in the worker first (a url it knows is not loaded again), as the editor does
-  await ensureDeclared(sandbox, pluginItemsOf(doc, docUrl));
+  await ensureDeclared(sandbox, moduleItemsOf(doc));
   ensureSandboxDoc(sandbox, {
     doc, docUrl,
     loaded: (id) => { try { return renderer.assets.get(id); } catch { return null; } },

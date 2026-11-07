@@ -428,8 +428,8 @@ export class Evaluator {
       if (mk && def) return { prop: mk.props?.[parts[3]], def };
       throw new EvalError(address, 'unknown mask or mask property');
     }
-    if (parts[1] === 'params') {
-      const p = parts.length === 3 ? componentOf(this.doc, layer)?.params?.[parts[2]] : undefined;
+    if (parts[1] === 'params' && parts.length === 3) {
+      const p = componentOf(this.doc, layer)?.params?.[parts[2]];
       if (p) return { prop: layer.params?.[parts[2]], def: paramDef(p) };
       throw new EvalError(address, 'unknown parameter');
     }

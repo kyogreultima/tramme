@@ -10,7 +10,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Added
 
-- The isolated asset loader never imports a module into the trusted page; CLI rendering refuses Free code until it has an isolated module path.
+- The isolated asset loader never imports a module into the trusted page; CLI Free code layers now load and initialize their modules inside the opaque worker.
 - CLI stills and raster exports now route expression-only projects through the opaque sandbox, including nested instance expressions.
 - All five web-scene prototypes now carry `scene.json`; the CLI composite produces a project that packs and unpacks with its font licence.
 - `webscene` is now a built-in node; the six-frame CLI composition prototype no longer needs a project plugin.
