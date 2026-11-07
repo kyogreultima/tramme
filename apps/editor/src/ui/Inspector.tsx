@@ -5,8 +5,10 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { Evaluator, getAt, pointer, propKind, staticValue, sheetIssues, TRANSFORM_SCHEMA, MOTION_BLUR_SCHEMA, CAMERA_SCHEMA, SOUND_MIX_SCHEMA, type TrammeDoc, type Op, type Paint, type Prop, type PropDef, type PropSchema, type Token, MASK_SCHEMA, curveTable, type PathValue } from '@tramme/core';
 import { comp, commit, draft, cancelDraft, S, viewDoc, select, toast, uiTime } from '../state.ts';
-import { assetData } from '../preview.ts';
+import { assetData, preview } from '../preview.ts';
 import { sandboxedDoc } from '../installed.ts';
+import { pluginHost } from '../plugins/index.ts';
+import { ensureDeclared, ensureSandboxDoc, moduleItemsOf } from '../plugins/sandbox-draw.ts';
 import { prefs } from '../settings.ts';
 import { addModifierOps, editAtOps, fixedOps, folderOf, imagesIn, keyAtOps, keyIndexAt, keysOf, removeKeyOps, removeModifierOps, setAtOps, snap, freshId, cutEndOps, fmtSeconds } from '../model.ts';
 import { addressDef, componentOf, detachPlan, modsOf, modifierParams, paramDef } from '@tramme/core';
@@ -27,6 +29,7 @@ interface Ctx {
   fps: number;
   ev: Evaluator;
   tokens: Record<string, Token>;
+  isolated: boolean;
 }
 
 function evalSafe(ev: Evaluator, address: string, t: number, compId: string): { v?: unknown; error?: string } {
@@ -38,24 +41,52 @@ function PropRow({ ctx, label, def, path, address }: { ctx: Ctx; label: string; 
   const raw = getAt(ctx.doc, path) as Prop | undefined;
   const kind = raw === undefined ? 'static' : propKind(raw);
   const keys = keysOf(raw);
-  const { v, error } = evalSafe(ctx.ev, address, ctx.t, ctx.compId);
+  const local = evalSafe(ctx.ev, address, ctx.t, ctx.compId);
+  const needsRemote = ctx.isolated && !!local.error;
+  const [remote, setRemote] = useState<{ doc: TrammeDoc; compId: string; t: number; address: string; result: { v?: unknown; error?: string } } | null>(null);
+  useEffect(() => {
+    if (!needsRemote) return;
+    let live = true;
+    const doc = ctx.doc, compId = ctx.compId, time = ctx.t;
+    const timer = setTimeout(() => { void (async () => {
+      try {
+        const renderer = preview.renderer;
+        if (!renderer) throw new Error('preview is not ready');
+        const base = new URL(S.docUrl.peek(), location.href).href;
+        const host = pluginHost(base);
+        await ensureDeclared(host, moduleItemsOf(doc, base));
+        if (!live) return;
+        ensureSandboxDoc(host, { doc, docUrl: base, loaded: (id) => { try { return renderer.assets.get(id); } catch { return null; } } });
+        const v = await host.evaluateValue(address, time, compId);
+        if (live) setRemote({ doc, compId, t: time, address, result: { v } });
+      } catch (e) {
+        if (live) setRemote({ doc, compId, t: time, address, result: { error: (e as Error).message } });
+      }
+    })(); }, 40);
+    return () => { live = false; clearTimeout(timer); };
+  }, [ctx.doc, ctx.compId, ctx.t, address, needsRemote]);
+  const current = remote?.doc === ctx.doc && remote.compId === ctx.compId && remote.t === ctx.t && remote.address === address;
+  const pendingValue = needsRemote && !current;
+  const { v, error } = current ? remote.result : needsRemote ? { v: undefined } : local;
   const value = v === undefined ? def.default : v;
   const here = keyIndexAt(keys, ctx.t, ctx.fps);
   const tKey = snap(ctx.t, ctx.fps);
   const animatable = def.animatable !== false;
 
-  const live = (x: unknown) => draft(editAtOps(ctx.doc, path, x, ctx.t, ctx.fps));
-  const set = (x: unknown) => commit(`${label}`, editAtOps(ctx.doc, path, x, ctx.t, ctx.fps));
+  const live = (x: unknown) => { if (!pendingValue) draft(editAtOps(ctx.doc, path, x, ctx.t, ctx.fps)); };
+  const set = (x: unknown) => { if (!pendingValue) commit(`${label}`, editAtOps(ctx.doc, path, x, ctx.t, ctx.fps)); };
   const setRaw = (p: Prop | undefined, what: string) =>
     commit(what, p === undefined ? (raw === undefined ? [] : [{ op: 'remove', path }]) : setAtOps(ctx.doc, path, p));
 
   const toggleKey = () => {
+    if (pendingValue) return;
     if (!keys) commit(t('inspector.animateName', { name: label }), setAtOps(ctx.doc, path, { $k: [{ t: tKey, v: value }] }));
     else if (here >= 0) commit(t('inspector.deleteTheKeyframeOf', { name: label }), removeKeyOps(ctx.doc, path, here));
     else commit(t('inspector.keyframeOfName', { name: label }), keyAtOps(ctx.doc, path, tKey, value, ctx.fps));
   };
 
   const menu = (e: MouseEvent) => {
+    if (pendingValue) return;
     const items: MenuItem[] = [];
     if (animatable) {
       if (keys) {
@@ -100,7 +131,7 @@ function PropRow({ ctx, label, def, path, address }: { ctx: Ctx; label: string; 
   return (
     <div class={`prop${cls}`}>
       {animatable ? (
-        <button class={`kbtn${keys ? ' has' : ''}${here >= 0 ? ' here' : ''}`} title={keys ? (here >= 0 ? t('common.deleteKeyframe') : t('inspector.addAKeyframeHere')) : t('inspector.animate')} onClick={toggleKey}>
+        <button class={`kbtn${keys ? ' has' : ''}${here >= 0 ? ' here' : ''}`} disabled={pendingValue} title={keys ? (here >= 0 ? t('common.deleteKeyframe') : t('inspector.addAKeyframeHere')) : t('inspector.animate')} onClick={toggleKey}>
           <svg viewBox="0 0 10 10"><path d="M5 .8 9.2 5 5 9.2.8 5z" fill={keys ? 'none' : 'none'} stroke="currentColor" stroke-width="1.3" /></svg>
         </button>
       ) : <span />}
@@ -114,25 +145,25 @@ function PropRow({ ctx, label, def, path, address }: { ctx: Ctx; label: string; 
             if (hex) set(hex);
           } : undefined} />
           : kind === 'expression'
-            ? <span class="prop-note">{short(value)}</span>
-            : <span class="prop-note">{short(value)}</span>}
+            ? <span class="prop-note">{pendingValue ? '…' : short(value)}</span>
+            : <span class="prop-note">{pendingValue ? '…' : short(value)}</span>}
       </div>
-      <button class={`icon-btn xs more${kind !== 'static' ? ' on' : ''}`} title={t('inspector.options')} onClick={menu}><Icon name="more" /></button>
+      <button class={`icon-btn xs more${kind !== 'static' ? ' on' : ''}`} disabled={pendingValue} title={t('inspector.options')} onClick={menu}><Icon name="more" /></button>
       {(kind === 'expression' || (kind === 'keyframes' && (raw as any).$expr !== undefined)) && (
         <div class="prop-extra">
           <TextInput code value={(raw as any).$expr} onCommit={(src) => setRaw({ ...(raw as object), $expr: src } as Prop, t('inspector.expressionOfName', { name: label }))} />
-          {error ? <div class="prop-note err">{error}</div> : <div class="prop-note">= {short(value)}</div>}
+          {error ? <div class="prop-note err">{error}</div> : <div class="prop-note">= {pendingValue ? '…' : short(value)}</div>}
         </div>
       )}
       {kind === 'link' && (
         <div class="prop-extra">
           <LinkField ctx={ctx} def={def} value={(raw as any).$link} onCommit={(a) => setRaw({ $link: a } as Prop, t('inspector.linkOfName', { name: label }))} />
-          {error ? <div class="prop-note err">{error}</div> : <div class="prop-note">= {short(value)}</div>}
+          {error ? <div class="prop-note err">{error}</div> : <div class="prop-note">= {pendingValue ? '…' : short(value)}</div>}
         </div>
       )}
       {modsOf(raw) && <ModStack ctx={ctx} path={path} raw={raw} label={label} />}
       {error && editable && <div class="prop-extra"><div class="prop-note err">{error}</div></div>}
-      {!error && <PropCheck ctx={ctx} path={path} value={value} />}
+      {!error && !pendingValue && <PropCheck ctx={ctx} path={path} value={value} />}
     </div>
   );
 }
@@ -876,7 +907,7 @@ export function Inspector() {
   const compId = S.compId.value;
   const isolated = prefs.value.sandboxPreview || sandboxedDoc(doc);
   const ev = useMemo(() => new Evaluator(doc, reg, { data: assetData, allowExpressions: !isolated }), [doc, reg, isolated]);
-  const ctx: Ctx = { doc, compId, t: now, fps: c.fps, ev, tokens: doc.tokens };
+  const ctx: Ctx = { doc, compId, t: now, fps: c.fps, ev, tokens: doc.tokens, isolated };
   const sel = S.selection.value.filter((id) => c.layers[id]);
   if (sel.length > 1) {
     return (

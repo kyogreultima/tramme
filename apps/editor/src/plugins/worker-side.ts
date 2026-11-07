@@ -25,6 +25,8 @@ export interface SandboxDrawSide {
   exportOf(type: string, props: unknown): Promise<{ svg?: string; lottie?: unknown; err?: string }>;
   /** a whole composition evaluated and drawn here (the evaluator's move); the picture may be transferred */
   renderFrame(p: FramePayload): Promise<{ bitmap?: unknown; transfer?: Transferable[]; err?: string }>;
+  /** evaluate one property without running its expression on the page */
+  evaluateValue(address: string, t: number, compId: string): Promise<unknown>;
 }
 
 export interface WorkerSideOptions {
@@ -171,6 +173,13 @@ export function startWorkerSide({ post, importModule, sandbox: makeSandbox }: Wo
           const r: { bitmap?: unknown; transfer?: Transferable[]; err?: string } = await sandbox.renderFrame(m.payload).catch((e: Error) => ({ err: e.message }));
           post({ kind: 'rendered', call: m.call, ...r }, r.transfer);
         })();
+        return;
+      }
+      if (m.kind === 'evaluate') {
+        if (!sandbox) { post({ kind: 'evaluated', call: m.call, err: 'the sandbox cannot evaluate here' }); return; }
+        void sandbox.evaluateValue(m.address, m.t, m.compId)
+          .then((value) => post({ kind: 'evaluated', call: m.call, value }))
+          .catch((e: Error) => post({ kind: 'evaluated', call: m.call, err: e.message }));
         return;
       }
       if (m.kind === 'export') {

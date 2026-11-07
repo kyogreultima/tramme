@@ -116,6 +116,8 @@ export interface PluginHost {
   exportOf(type: string, props: unknown): Promise<{ svg?: string; lottie?: unknown; err?: string }>;
   /** a whole composition evaluated and drawn in the sandbox; one picture comes back */
   renderFrame(payload: FramePayload): Promise<{ bitmap?: unknown; err?: string }>;
+  /** an evaluated property, computed in the worker */
+  evaluateValue(address: string, t: number, compId: string): Promise<unknown>;
   /** stop: every call waiting is refused, with `reason` when there is one */
   dispose(reason?: string): void;
   /** disposed (its worker stopped): the next project's or call's sandbox is a new one */
@@ -270,6 +272,16 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
       else w.resolve({ bitmap: m.bitmap });
       return;
     }
+    if (m.kind === 'evaluated') {
+      if (m.err !== undefined && (typeof m.err !== 'string' || m.err.length > 4096)) { invalid(); return; }
+      if (responseTooLarge(m.value) || responseTooLarge(m.err)) { timeout('sandbox response exceeds 8 MB'); return; }
+      const w = waits.get(m.call);
+      if (!w) return;
+      waits.delete(m.call);
+      if (m.err) w.reject(new Error(m.err));
+      else w.resolve(m.value);
+      return;
+    }
     if (m.kind === 'progress') {
       if (!Number.isFinite(m.done) || !Number.isFinite(m.total) || (m.step !== undefined && (typeof m.step !== 'string' || m.step.length > 4096))) { invalid(); return; }
       const ctx = bridges.get(m.call);
@@ -374,6 +386,10 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
         // the frames shipped were copied by the message: the page's bitmaps are done with
         for (const v of Object.values(payload.videos ?? {})) (v as { close?(): void }).close?.();
       }
+    },
+    async evaluateValue(address, t, compId) {
+      if (address.length > 4096 || compId.length > 4096 || !Number.isFinite(t)) throw new Error('invalid sandbox evaluation request');
+      return run({ kind: 'evaluate', call: ++call, address, t, compId });
     },
     dispose(reason) {
       closed = true;

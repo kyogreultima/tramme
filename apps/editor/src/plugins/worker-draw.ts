@@ -231,6 +231,16 @@ export function makeSandboxDraw(modules: Map<string, PluginModule>): SandboxDraw
   };
 
   return {
+    async evaluateValue(address, t, compId) {
+      const doc = theDoc();
+      if (!doc || !doc.compositions[compId]) throw new Error('unknown sandbox composition');
+      const reg = builtinRegistry().clone();
+      for (const [id, mod] of modules) reg.use(mod, id);
+      const evaluator = new Evaluator(doc, reg, { data: (id) => side.json.get(id) });
+      const value = evaluator.value(address, t, compId);
+      // postMessage cannot transfer functions or cyclic expression results.
+      return structuredClone(value);
+    },
     async renderFrame(p) {
       try { await fontsReady; return await renderFrame(p); }
       finally {

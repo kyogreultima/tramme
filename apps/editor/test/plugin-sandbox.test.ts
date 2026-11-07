@@ -500,6 +500,19 @@ describe('the plugin sandbox', () => {
 describe('the sandboxed drawing', () => {
   beforeEach(() => resetSandbox());
 
+  it('evaluates an expression through the worker protocol', async () => {
+    const oldSelf = (globalThis as any).self;
+    (globalThis as any).self = { fonts: { add() {} } };
+    try {
+      const project = doc().doc;
+      project.compositions[project.root].layers.box = { type: 'shape.rect', props: { radius: { $expr: '3 + 4' } } } as never;
+      const { host } = pair(new Map(), undefined, (modules) => makeSandboxDraw(modules));
+      host.setDoc({ doc: project, docUrl: DOC_URL, images: {}, json: {}, fonts: [] });
+      await expect(host.evaluateValue('box.radius', 0, project.root)).resolves.toBe(7);
+      await expect(host.evaluateValue('$comp.unknown', 0, project.root)).rejects.toThrow();
+    } finally { (globalThis as any).self = oldSelf; }
+  });
+
   it('waits for a supplied font before drawing the first frame', async () => {
     const oldSelf = (globalThis as any).self, oldFace = (globalThis as any).FontFace;
     let finish!: () => void;
@@ -546,6 +559,7 @@ describe('the sandboxed drawing', () => {
         };
       },
       exportOf: async () => ({ err: 'not this test' }),
+      evaluateValue: async () => 0,
       renderFrame: async () => ({ err: 'not this test' }),
     };
     const { host } = pair(new Map([['blob:stars', plugin()]]), undefined, () => sandbox);
@@ -568,6 +582,7 @@ describe('the sandboxed drawing', () => {
         if (!node?.export) return { err: `${type} has no vector export` };
         return { svg: node.export.svg?.(props), lottie: node.export.lottie?.(props) };
       },
+      evaluateValue: async () => 0,
       renderFrame: async (p) => {
         if (!p.videos || !p.videos.clip) return { err: 'no video frame shipped' };
         const b = { width: 100 } as unknown as ImageBitmap;
@@ -588,6 +603,7 @@ describe('the sandboxed drawing', () => {
       setDoc: () => {},
       draw: async () => ({ results: [] }),
       exportOf: async () => ({}),
+      evaluateValue: async () => 0,
       renderFrame: async (p) => { frames.push(p); return { bitmap, transfer: [bitmap] }; },
     }));
     host.setDoc({ doc: { assets: {} }, docUrl: DOC_URL, images: {}, json: {}, fonts: [] });
