@@ -3054,7 +3054,8 @@
     "notYet": "Pas encore transcrit. Transcrivez pour poser des sous-titres sur les mots et laisser l'assistant lire ce qui est dit.",
     "readyHint": "Transcrit : les sous-titres et l'assistant peuvent utiliser les mots.",
     "askTitle": "Transcrire la parole ?",
-    "askText": "L'assistant a besoin de ce qui est dit dans {name}. Le transcrire maintenant ?"
+    "askText": "L'assistant a besoin de ce qui est dit dans {name}. Le transcrire maintenant ?",
+    "projectChanged": "Le projet a changé pendant la transcription."
   },
   "removebg": {
     "reading": "lecture du sujet",

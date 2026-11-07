@@ -1777,7 +1777,8 @@
     "notYet": "Not transcribed. Transcribe it to place captions on the words and let the assistant read what is said.",
     "readyHint": "Transcribed: the captions and the assistant can use the words.",
     "askTitle": "Transcribe the speech?",
-    "askText": "The assistant needs what is said in {name}. Transcribe it now?"
+    "askText": "The assistant needs what is said in {name}. Transcribe it now?",
+    "projectChanged": "The project changed during transcription."
   },
   "removebg": {
     "reading": "reading the subject",
