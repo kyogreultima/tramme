@@ -25,4 +25,16 @@ describe('native export asset reads', () => {
       expect(read('link')).toBeNull();
     } finally { fs.rmSync(temp, { recursive: true, force: true }); }
   });
+
+  it('refuses an oversized file before reading its bytes', () => {
+    const project = fs.mkdtempSync(path.join(os.tmpdir(), 'tramme-export-size-'));
+    try {
+      const file = path.join(project, 'large.woff2');
+      fs.closeSync(fs.openSync(file, 'w'));
+      fs.truncateSync(file, 16 * 1048576 + 1);
+      const doc = newProject({ name: 'Size', width: 64, height: 64, fps: 1, duration: 1 }).doc;
+      doc.assets.large = { type: 'font', src: 'large.woff2' };
+      expect(() => fileAssetReader(doc, project)('large')).toThrow('asset "large" exceeds 16 MB');
+    } finally { fs.rmSync(project, { recursive: true, force: true }); }
+  });
 });
