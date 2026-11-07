@@ -21,6 +21,7 @@ import { transcriptFor, transcriptIdOf } from '../speech.ts';
 import { placeTemplate, TEMPLATES } from '../templates.ts';
 import { S } from '../state.ts';
 import { t } from '../i18n/index.ts';
+import { readProjectText } from '../plugins/read-project-text.ts';
 
 const text =(s: string, isError = false): ToolResult => ({ content: [{ type: 'text', text: s }], isError });
 const STILL_WIDTH = 768;
@@ -322,7 +323,7 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
       time: S.time.peek(),
       selection: S.selection.peek().filter((id) => doc.compositions[compId].layers[id]),
       assetUrl: (id) => { const a = doc.assets[id]; if (!a) throw new Error(`unknown asset: ${id}`); return this.urlOf(a.src); },
-      readText: async (path) => (await api.readText(S.project.peek().id, path))?.text ?? null,
+      readText: (path) => readProjectText(S.project.peek().id, path),
       files: async () => (await api.info(S.project.peek().id)).files.map(({ path, size }) => ({ path, size })),
       fileUrl: (path) => this.urlOf(path),
       writeFile: async (path, data) => {

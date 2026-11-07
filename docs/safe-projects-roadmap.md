@@ -68,6 +68,8 @@ Trusted mirror evaluation (2026-11-07): `Evaluator` now has a fail-closed option
 
 Vector preflight guard (2026-11-07): the editor's vector preflight helper now uses the same expression refusal when its document is isolated, even if it is called without the browser export entry point's earlier expression check. A test attempts a global write through a plugin node's property and confirms the helper refuses it before execution. Isolated expression-based SVG/Lottie export still needs worker-side conversion; step 2 remains open.
 
+Bounded tool text reads (2026-11-07): a sandboxed tool's `readText` capability now streams the project file with an 8 MiB limit before decoding it, cancelling an oversized open stream instead of first filling a string in the trusted page. Tests cover cancellation, a normal read and a missing file. Other host reads and aggregate capability budgets remain open in step 4.
+
 Vector and CLI checks (2026-11-07): isolated browser SVG/Lottie export now reports that expression-bearing projects need raster export. CLI `export`, `check-export` and `check` refuse such expressions before native vector conversion or picture checks. Tests exercise all three CLI commands and the browser export's early refusal. Worker-backed vector values and checks remain open.
 
 Editor module transfer (2026-11-07): when isolated preview is enabled, the editor's preview, stills, raster export and thumbnail now load every project module through the bounded opaque host before drawing. This includes Free code modules that are not listed as plugins. Reloads and document changes refresh the worker's module list. The editor setting is still opt-in, and browser coverage of these paths remains before step 2 can close.

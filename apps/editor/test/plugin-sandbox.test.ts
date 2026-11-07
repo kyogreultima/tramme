@@ -14,6 +14,7 @@ import { bindSandbox, declarationsModule, noteSandboxDeclaration, resetSandbox, 
 import { RecordingPath2D } from '../src/plugins/recording-path.ts';
 import { makeSandboxDraw } from '../src/plugins/worker-draw.ts';
 import { prefs } from '../src/settings.ts';
+import { readProjectText } from '../src/plugins/read-project-text.ts';
 import type { DrawPayload, DrawResult, SandboxDoc } from '../src/plugins/protocol.ts';
 import { attachIsolated, filterModule } from '../src/plugins/vocabulary.ts';
 
@@ -104,6 +105,30 @@ describe('the plugin sandbox', () => {
     });
     await expect(readLimitedBody(new Response(body), 1024 * 1024, 'plugin module')).rejects.toThrow('plugin module exceeds 1 MB');
     expect(cancelled).toBe(true);
+  });
+  it('cancels an oversized project text read before buffering its whole response', async () => {
+    let cancelled = false;
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) { controller.enqueue(new Uint8Array(8 * 1024 * 1024 + 1)); },
+      cancel() { cancelled = true; },
+    });
+    const fetch = vi.fn(async (_url: string) => new Response(body));
+    vi.stubGlobal('fetch', fetch);
+    try {
+      await expect(readProjectText('project-1', 'assets/notes.json')).rejects.toThrow('project text exceeds 8 MB');
+      expect(cancelled).toBe(true);
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(fetch.mock.calls[0][0]).toContain('/files/assets/notes.json');
+    } finally { vi.unstubAllGlobals(); }
+  });
+  it('reads a bounded project text file and preserves missing-file behavior', async () => {
+    let calls = 0;
+    const fetch = vi.fn(async (_url: string) => ++calls === 1 ? new Response('notes') : new Response(null, { status: 404 }));
+    vi.stubGlobal('fetch', fetch);
+    try {
+      await expect(readProjectText('project-1', 'assets/notes.json')).resolves.toBe('notes');
+      await expect(readProjectText('project-1', 'assets/missing.json')).resolves.toBeNull();
+    } finally { vi.unstubAllGlobals(); }
   });
   it('refuses a batch of more than 64 plugin modules before sending it', async () => {
     const sent: unknown[] = [];
