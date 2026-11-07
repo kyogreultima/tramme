@@ -10,18 +10,20 @@ import { builtinRegistry } from '@tramme/nodes';
 import { addParts, encodeWav, formatParts, mixComposition, noParts, perFrame, Renderer, type FrameParts, type RenderOptions } from '@tramme/render';
 import { blitSandboxFrame, declarationsModule, ensureDeclared, ensureSandboxDoc, pluginItemsOf, sandboxDeclaration, sandboxVideoFrames } from '../../../apps/editor/src/plugins/sandbox-draw.ts';
 import { browserHost, type PluginHost } from '../../../apps/editor/src/plugins/host.ts';
+import { containsExpression } from '@tramme/project';
 
 const q = new URLSearchParams(location.search);
 const docUrl = new URL(q.get('doc') || '', location.href).href;
 let renderer: Renderer;
 let currentDoc: TrammeDoc | null = null;
 let sandbox: PluginHost | null = null;
+const needsIsolation = (doc: TrammeDoc) => !!doc.plugins?.length || containsExpression(doc);
 
 async function init() {
   const r = await fetch(docUrl);
   if (!r.ok) throw new Error(`document not found: ${docUrl}`);
   currentDoc = (await r.json()) as TrammeDoc;
-  const isolated = !!currentDoc.plugins?.length;
+  const isolated = needsIsolation(currentDoc);
   if (isolated) {
     sandbox = browserHost(docUrl);
     await ensureDeclared(sandbox, pluginItemsOf(currentDoc, docUrl));
@@ -37,10 +39,10 @@ async function init() {
   });
 }
 
-/** the sandbox host, when the document carries plugins and the flag is not off */
+/** the sandbox host whenever project code (plugins or expressions) can run */
 async function sandboxReady(): Promise<PluginHost | null> {
   const doc = currentDoc;
-  if (!doc || !(doc.plugins ?? []).length) return null;
+  if (!doc || !needsIsolation(doc)) return null;
   sandbox ??= browserHost(docUrl);
   // the document's plugins loaded in the worker first (a url it knows is not loaded again), as the editor does
   await ensureDeclared(sandbox, pluginItemsOf(doc, docUrl));

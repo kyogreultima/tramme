@@ -34,6 +34,13 @@ const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeo
 /** the property carries code: an expression of its own, or one over its keyframes */
 const hasExpr = (v: unknown) => isPlainObject(v) && v.$expr !== undefined;
 
+/** Detect expressions anywhere in a document, including nested instance parameters. */
+export function containsExpression(value: unknown): boolean {
+  if (!value || typeof value !== 'object') return false;
+  if (Array.isArray(value)) return value.some(containsExpression);
+  return hasExpr(value) || Object.values(value).some(containsExpression);
+}
+
 /** the kinds a plugin module declares to bring, in the order the vocabulary presents them */
 const KINDS = ['nodes', 'effects', 'modifiers', 'tools', 'prompts', 'checks', 'kits', 'presets', 'tours'] as const;
 const EXPORTED_KIND = /export\s+(?:const|let|var)\s+(nodes|effects|modifiers|tools|prompts|checks|kits|presets|tours)\b/g;
