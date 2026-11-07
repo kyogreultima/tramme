@@ -211,9 +211,10 @@ export function resetSandbox() {
   declareCache.clear();
 }
 
-/** the sandbox's requests for a document's plugins: id and url (the asset's own, resolved against the document) */
-export function pluginItemsOf(doc: TrammeDoc, docUrl: string): { id: string; url: string }[] {
-  return (doc.plugins ?? []).map((id) => ({ id, url: new URL(String(doc.assets[id]?.src ?? ''), docUrl).href })).filter((p) => !!p.url);
+/** Every project module needed by isolated rendering, including Free code assets. */
+export function moduleItemsOf(doc: TrammeDoc, docUrl: string): { id: string; url: string }[] {
+  return Object.entries(doc.assets).filter(([, asset]) => asset.type === 'module')
+    .map(([id, asset]) => ({ id, url: new URL(asset.src, docUrl).href }));
 }
 
 /**

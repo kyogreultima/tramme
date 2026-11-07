@@ -20,7 +20,7 @@ import { clipChain, liveMaster, loadPitch, masterGainDb, mixTracks, playClip, Re
 import { comp, compIdOf, S, setRegistry, setTime, toast, viewDoc } from './state.ts';
 import { attachInstalled, attachIsolated, filterModule, pluginHost, pluginToolHost } from './plugins/index.ts';
 import { copiesIn, copyId, counted, installed, installedFor, installedTypes, offIn, permitted, sandboxedDoc, stopped, STRIKES } from './installed.ts';
-import { bindSandbox, blitSandboxFrame, declarationsModule, ensureDeclared, ensureSandboxDoc, pluginItemsOf, resetSandbox, sandboxDeclaration, sandboxVideoFrames, type SandboxContext } from './plugins/sandbox-draw.ts';
+import { bindSandbox, blitSandboxFrame, declarationsModule, ensureDeclared, ensureSandboxDoc, moduleItemsOf, resetSandbox, sandboxDeclaration, sandboxVideoFrames, type SandboxContext } from './plugins/sandbox-draw.ts';
 import { t } from './i18n/index.ts';
 import { MASTER_METER_ID, previewMeters } from './audio-meters.ts';
 import { audioEffectsKey } from './audio-key.ts';
@@ -106,7 +106,7 @@ class Preview {
       const doc0 = S.doc.peek();
       const sandboxed = sandboxedDoc(doc0);
       // the sandbox's declarations are needed before the renderer opens: it registers from them, and the modules never load on the page
-      if (sandboxed) await ensureDeclared(pluginHost(new URL(S.docUrl.peek(), location.href).href), pluginItemsOf(doc0, new URL(S.docUrl.peek(), location.href).href));
+      if (sandboxed) await ensureDeclared(pluginHost(new URL(S.docUrl.peek(), location.href).href), moduleItemsOf(doc0, new URL(S.docUrl.peek(), location.href).href));
       this.renderer = await Renderer.open(doc0, editorRegistry(), new URL(S.docUrl.peek(), location.href).href, this.canvas, { compId: compIdOf(doc0), raster: 'gpu', scale: S.previewScale.peek(), preserve: false, isolate: true, proxies: prefs.peek().proxies, pluginModule: filterModule, sandboxModules: sandboxed, sandboxDeclarations: (id) => declarationsModule(sandboxDeclaration(id)!, id) });
       this.applied = doc0;
       await this.attachPlugins();
@@ -247,7 +247,7 @@ class Preview {
       const sandboxed = sandboxedDoc(doc), base = new URL(S.docUrl.peek(), location.href).href;
       const reload = sandboxed !== this.renderer.sandboxModules ? (doc.plugins ?? []) : [];
       this.renderer.sandboxModules = this.renderer.assets.sandboxModules = sandboxed;
-      if (sandboxed) await ensureDeclared(pluginHost(base), pluginItemsOf(doc, base));
+      if (sandboxed) await ensureDeclared(pluginHost(base), moduleItemsOf(doc, base));
       await this.renderer.setDoc(doc, { compId, trusted: doc === S.draft.peek(), fresh, reload });
       this.applied = doc;
       await this.attachPlugins();
@@ -268,6 +268,10 @@ class Preview {
   /** load a module asset again (a plugin edited on disk) */
   async reload(assetIds: string[]) {
     if (!this.renderer) return;
+    if (this.renderer.sandboxModules) {
+      const base = new URL(S.docUrl.peek(), location.href).href;
+      await ensureDeclared(pluginHost(base), moduleItemsOf(this.applied!, base));
+    }
     await this.renderer.setDoc(this.applied!, { compId: compIdOf(this.applied!), reload: assetIds });
     await this.attachPlugins(assetIds);
     setRegistry(this.renderer.registry);
@@ -302,6 +306,23 @@ class Preview {
   async thumbnail(t: number, width = 480): Promise<Blob | null> {
     const r = this.renderer;
     if (!r) return null;
+    if (r.sandboxModules) {
+      const doc = this.applied;
+      if (!doc) return null;
+      const base = new URL(S.docUrl.peek(), location.href).href;
+      const host = pluginHost(base);
+      await ensureDeclared(host, moduleItemsOf(doc, base));
+      ensureSandboxDoc(host, { doc, docUrl: base, loaded: (id) => { try { return r.assets.get(id); } catch { return null; } } });
+      const scale = Math.min(1, width / r.comp.width);
+      const videos = await sandboxVideoFrames(r, doc, t);
+      const picture = await host.renderFrame({ compId: r.compId, t, scale, width: r.comp.width, height: r.comp.height, videos });
+      if (picture.err || !picture.bitmap) throw new Error(picture.err ?? 'no picture from the sandbox');
+      const small = document.createElement('canvas');
+      small.width = Math.round(r.comp.width * scale); small.height = Math.round(r.comp.height * scale);
+      try { small.getContext('2d')!.drawImage(picture.bitmap as ImageBitmap, 0, 0, small.width, small.height); }
+      finally { (picture.bitmap as ImageBitmap).close(); }
+      return new Promise((res) => small.toBlob(res, 'image/webp', 0.82));
+    }
     // every video frame exact, then drawn once more right before reading (the canvas keeps nothing between tasks)
     await r.renderComplete(t);
     r.render(t);
