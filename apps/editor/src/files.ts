@@ -5,6 +5,14 @@ import { pathIssue } from '@tramme/project';
 import { api } from './api.ts';
 import { slug } from './model.ts';
 import { S } from './state.ts';
+import { t } from './i18n/index.ts';
+
+interface FileProject { id: string; docUrl: string }
+const projectOf = (): FileProject => ({ id: S.project.peek().id, docUrl: S.docUrl.peek() });
+const requireProject = (project: FileProject) => {
+  if (S.project.peek()?.id !== project.id || S.docUrl.peek() !== project.docUrl) throw new Error(t('common.projectChangedDuringFile'));
+};
+const listedProjects = new WeakMap<Set<string>, FileProject>();
 
 /** a file name fit for a storage path: ascii, digits, dashes, the extension kept */
 export function safeName(name: string): string {
@@ -24,8 +32,12 @@ export function freePath(taken: Set<string>, path: string): string {
 
 /** paths already used by the project's files */
 export async function takenPaths(): Promise<Set<string>> {
-  const { files } = await api.info(S.project.peek().id);
-  return new Set(files.map((f) => f.path));
+  const project = projectOf();
+  const { files } = await api.info(project.id);
+  requireProject(project);
+  const taken = new Set(files.map((f) => f.path));
+  listedProjects.set(taken, project);
+  return taken;
 }
 
 /** files being sent, with their progress (shown at the bottom of the screen) */
@@ -34,6 +46,8 @@ let uploadId = 0;
 
 /** write a file of the project at a free path near the wanted one, large ones in parts; returns the path */
 export async function upload(taken: Set<string>, wanted: string, body: Blob | Uint8Array): Promise<string> {
+  const project = listedProjects.get(taken) ?? projectOf();
+  requireProject(project);
   const path = freePath(taken, wanted);
   const bad = pathIssue(path);
   if (bad) throw new Error(`${path} : ${bad}`);
@@ -42,12 +56,13 @@ export async function upload(taken: Set<string>, wanted: string, body: Blob | Ui
   const track = blob.size > 4 * 1024 * 1024 ? ++uploadId : 0;
   if (track) uploads.value = [...uploads.peek(), { id: track, name: path.split('/').pop()!, sent: 0, total: blob.size }];
   try {
-    await api.writeAny(S.project.peek().id, path, blob, (sent, total) => {
+    await api.writeAny(project.id, path, blob, (sent, total) => {
       if (track) uploads.value = uploads.peek().map((u) => (u.id === track ? { ...u, sent, total } : u));
     });
   } finally {
     if (track) uploads.value = uploads.peek().filter((u) => u.id !== track);
   }
+  requireProject(project);
   taken.add(path);
   return path;
 }

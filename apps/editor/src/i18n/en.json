@@ -9,6 +9,7 @@
     "pickInViewport": "Pick in the viewport (Escape: cancel)",
     "companionHttpStatus": "companion: HTTP {status}",
     "companion": "Companion",
+    "projectChangedDuringFile": "The project changed during the file operation.",
     "server": "Server",
     "unknown": "unknown",
     "transcriptOfName": "Transcript of {name}",

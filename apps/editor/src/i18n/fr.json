@@ -9,6 +9,7 @@
     "pickInViewport": "Prendre dans la vue (Échap : annuler)",
     "companionHttpStatus": "compagnon : HTTP {status}",
     "companion": "Compagnon",
+    "projectChangedDuringFile": "Le projet a changé pendant l'opération sur le fichier.",
     "server": "Serveur",
     "unknown": "inconnu",
     "transcriptOfName": "Transcription de {name}",
