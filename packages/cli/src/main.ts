@@ -29,7 +29,7 @@ import { formatParts } from '@tramme/render/src/timing.ts';
 import { defaultPages, renderAudio, renderVideo } from './jobs.ts';
 import { VIDEO_FORMATS, type VideoFormat } from './media.ts';
 import { docRegistry, filesRegistry } from './plugins.ts';
-import { readConfig, Server } from './server.ts';
+import { readConfig, resolveMountedPath, Server } from './server.ts';
 import { checkProject, DOCUMENT, isChatPath, MANIFEST, newProject, packProject, unpackProject, LEGACIES, migrateProject } from '@tramme/project';
 import { lintSceneFiles, MAX_SCENE_SOURCE } from './scene-lint.ts';
 
@@ -72,7 +72,7 @@ async function session(docFile: string) {
 /** the document's vocabulary, its plugins loaded from its folder and mounts */
 function registryOf(file: string, doc: TrammeDoc) {
   const cfg = readConfig(path.resolve(file));
-  const resolve = (u: string) => { for (const [prefix, dir] of cfg.mounts) if (u.startsWith(prefix)) return path.join(dir, u.slice(prefix.length)); return null; };
+  const resolve = (u: string) => resolveMountedPath(cfg, u);
   return { registry: docRegistry(doc, cfg.dir, resolve), resolve, dir: cfg.dir };
 }
 

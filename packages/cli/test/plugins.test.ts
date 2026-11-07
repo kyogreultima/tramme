@@ -78,6 +78,22 @@ describe('a project in memory (pack, unpack)', () => {
     doc.assets[id].src = '..\\secret.js';
     await expect(docRegistry(doc, NIGHT_SKY)).rejects.toThrow('invalid path');
   });
+
+  it('rejects a plugin reached through a link outside the project', async () => {
+    const files = read(NIGHT_SKY);
+    const doc = JSON.parse(new TextDecoder().decode(files.get('document.tramme.json'))) as TrammeDoc;
+    const id = doc.plugins![0];
+    const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'tramme-plugin-link-'));
+    try {
+      const project = path.join(temp, 'project'), privateDir = path.join(temp, 'private');
+      fs.mkdirSync(path.join(project, 'plugins'), { recursive: true });
+      fs.mkdirSync(privateDir);
+      fs.writeFileSync(path.join(privateDir, 'secret.js'), 'export const nodes = []');
+      fs.symlinkSync(privateDir, path.join(project, 'plugins', 'linked'), process.platform === 'win32' ? 'junction' : 'dir');
+      doc.assets[id].src = 'plugins/linked/secret.js';
+      await expect(docRegistry(doc, project)).rejects.toThrow(`plugin "${id}" leaves its project`);
+    } finally { fs.rmSync(temp, { recursive: true, force: true }); }
+  });
 });
 
 // The CLI draws a project with plugins in the sandbox's worker: its plugins

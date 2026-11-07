@@ -33,6 +33,24 @@ const PAGE = `<!doctype html>
 
 export interface ProjectConfig { dir: string; mounts: [string, string][] }
 
+/** Resolve a project URL without following a link outside its selected mount. */
+export function resolveMountedPath(config: ProjectConfig, urlPath: string): string | null {
+  for (const [prefix, dir] of config.mounts) {
+    if (urlPath.startsWith(prefix)) {
+      const root = path.resolve(dir);
+      const file = path.resolve(root, urlPath.slice(prefix.length));
+      const within = (base: string, candidate: string) => {
+        const rel = path.relative(base, candidate);
+        return rel === '' || (rel !== '..' && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel));
+      };
+      if (!within(root, file)) return null;
+      if (fs.existsSync(file) && !within(fs.realpathSync(root), fs.realpathSync(file))) return null;
+      return file;
+    }
+  }
+  return null;
+}
+
 /** mounts of tramme.config.json beside the document (paths relative to that file) */
 export function readConfig(docFile: string): ProjectConfig {
   const dir = path.dirname(docFile);
@@ -140,22 +158,7 @@ export class Server {
 
   /** filesystem path behind a URL path, or null outside every mount */
   resolve(urlPath: string): string | null {
-    for (const [prefix, dir] of this.config.mounts) {
-      if (urlPath.startsWith(prefix)) {
-        const root = path.resolve(dir);
-        const file = path.resolve(root, urlPath.slice(prefix.length));
-        const within = (base: string, candidate: string) => {
-          const rel = path.relative(base, candidate);
-          return rel === '' || (rel !== '..' && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel));
-        };
-        if (!within(root, file)) return null;
-        // A project symlink must not turn a URL inside /project/ into a read
-        // outside that mount. Explicit mounts have their own permitted roots.
-        if (fs.existsSync(file) && !within(fs.realpathSync(root), fs.realpathSync(file))) return null;
-        return file;
-      }
-    }
-    return null;
+    return resolveMountedPath(this.config, urlPath);
   }
 
   private async handle(req: http.IncomingMessage, res: http.ServerResponse) {

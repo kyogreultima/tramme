@@ -80,6 +80,11 @@ export async function docRegistry(doc: TrammeDoc, dir: string, resolve?: (urlPat
     const file = asset.src.startsWith('/') ? resolve?.(asset.src) ?? null : path.resolve(dir, relative!);
     if (relative && (path.relative(dir, file!).startsWith(`..${path.sep}`) || path.isAbsolute(path.relative(dir, file!)))) throw new Error(`plugin "${id}" leaves its project`);
     if (!file || !fs.existsSync(file)) throw new Error(`plugin "${id}" not found: ${asset.src}`);
+    if (relative) {
+      const realRoot = fs.realpathSync(dir), realFile = fs.realpathSync(file);
+      const rel = path.relative(realRoot, realFile);
+      if (rel === '..' || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel)) throw new Error(`plugin "${id}" leaves its project`);
+    }
     sources.push({ id, code: fs.readFileSync(file, 'utf8') });
   }
   try { return registryFrom(await isolatedDeclarations(sources)); }
