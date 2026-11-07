@@ -69,7 +69,7 @@ export class AssetStore {
   private version = 0;
   /** a font of the page stayed loading past FONTS_WAIT_MS: not waited for again */
   private pageFontsStuck = false;
-  /** the sandbox owns the project's plugin modules: sync skips them, their code never loads here */
+  /** the sandbox owns project code: no module asset is imported by the trusted page */
   sandboxModules = false;
   /** a video with a proxy plays its proxy (the editor's preview, when its setting asks); exports always read the original */
   useProxies = false;
@@ -143,8 +143,9 @@ export class AssetStore {
     for (let start = 0; start < entries.length; start += MAX_ACTIVE_ASSETS) await Promise.all(entries.slice(start, start + MAX_ACTIVE_ASSETS).map(async ([id, a]) => {
       // a sub-clip is a range of another asset, no file of its own
       if (a.of !== undefined) { const old = this.loaded.get(id); if (old) this.release(old.entry, old.value); this.loaded.delete(id); return; }
-      // the sandbox owns the project's plugin modules: their code never loads here
-      if (this.sandboxModules && a.type === 'module' && (doc.plugins || []).includes(id)) { const old = this.loaded.get(id); if (old) this.release(old.entry, old.value); this.loaded.delete(id); return; }
+      // A non-plugin module can be an unused asset or a Free code layer. Neither
+      // may import into the trusted page while isolation is selected.
+      if (this.sandboxModules && a.type === 'module') { const old = this.loaded.get(id); if (old) this.release(old.entry, old.value); this.loaded.delete(id); return; }
       const have = this.loaded.get(id);
       if (have && !reload.includes(id)) {
         const key = this.keyOf(a);

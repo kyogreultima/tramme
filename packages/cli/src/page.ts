@@ -19,10 +19,20 @@ let currentDoc: TrammeDoc | null = null;
 let sandbox: PluginHost | null = null;
 const needsIsolation = (doc: TrammeDoc) => !!doc.plugins?.length || containsExpression(doc);
 
+function unsupportedModule(doc: TrammeDoc): string | null {
+  const pluginIds = new Set(doc.plugins ?? []);
+  const other = Object.entries(doc.assets).find(([id, asset]) => asset.type === 'module' && !pluginIds.has(id));
+  if (other) return other[0];
+  if (Object.values(doc.compositions).some((comp) => Object.values(comp.layers).some((layer) => layer.type === 'code'))) return 'Free code layer';
+  return null;
+}
+
 async function init() {
   const r = await fetch(docUrl);
   if (!r.ok) throw new Error(`document not found: ${docUrl}`);
   currentDoc = (await r.json()) as TrammeDoc;
+  const module = unsupportedModule(currentDoc);
+  if (module) throw new Error(`${module}: CLI export requires isolated module support; this project was not run`);
   const isolated = needsIsolation(currentDoc);
   if (isolated) {
     sandbox = browserHost(docUrl);

@@ -38,6 +38,16 @@ describe('model bytes for an isolated project', () => {
 });
 
 describe('isolated asset paths', () => {
+  it('never imports any module asset into the trusted page', async () => {
+    const doc = newProject({ name: 'Module asset', width: 64, height: 64, fps: 1, duration: 1 }).doc;
+    doc.assets.unused = { type: 'module', src: 'plugins/unused.js' };
+    const loaded = new AssetStore(doc, 'https://example.test/projects/a/document.tramme.json');
+    loaded.sandboxModules = true;
+    vi.stubGlobal('document', { fonts: { ready: Promise.resolve() } });
+    await loaded.sync(doc);
+    expect(loaded.has('unused')).toBe(false);
+  });
+
   it('bounds video dimensions before decoder creation and disposes an unloaded video', async () => {
     expect(() => assertVideoDimensions(1920, 1080, 16 * 1024 * 1024)).not.toThrow();
     expect(() => assertVideoDimensions(9000, 100, 16 * 1024 * 1024)).toThrow('video exceeds 8192');

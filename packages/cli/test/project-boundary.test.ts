@@ -2,6 +2,7 @@ import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { CHROME, launch } from '../src/browser.ts';
 import { readConfig, Server } from '../src/server.ts';
+import { newProject } from '@tramme/project';
 
 describe.skipIf(!CHROME)('the served project sandbox', () => {
   let server: Server, browser: Awaited<ReturnType<typeof launch>>['browser'], page: Awaited<ReturnType<typeof launch>>['page'];
@@ -10,9 +11,13 @@ describe.skipIf(!CHROME)('the served project sandbox', () => {
   let fontReads = 0;
   let moduleReads = 0;
   let blankSandbox = false;
+  let unsafeDoc: string | null = null;
+  let unsafeModuleReads = 0;
   beforeAll(async () => {
     server = new Server(readConfig(path.resolve(import.meta.dirname, 'fixtures/night-sky/document.tramme.json')));
     server.use((_req, res, url) => {
+      if (unsafeDoc && url.pathname === '/project/unsafe-code.tramme.json') { res.writeHead(200, { 'content-type': 'application/json' }); res.end(unsafeDoc); return true; }
+      if (url.pathname === '/project/plugins/unused.js') { unsafeModuleReads++; res.writeHead(200, { 'content-type': 'text/javascript' }); res.end('throw new Error("module executed in trusted page")'); return true; }
       if (blankSandbox && url.pathname === '/project-sandbox.html') { res.writeHead(200, { 'content-type': 'text/html' }); res.end('<!doctype html><title>blank</title>'); return true; }
       if (url.pathname === '/api/private') { privateReads++; res.writeHead(200, { 'content-type': 'text/javascript' }); res.end('private account data'); return true; }
       if (url.pathname === '/project/assets/fonts/test.woff2') { fontReads++; res.writeHead(200, { 'content-type': 'font/woff2' }); res.end(Buffer.from([0, 1, 2, 3])); return true; }
@@ -272,4 +277,22 @@ describe.skipIf(!CHROME)('the served project sandbox', () => {
       expect(reason).toContain('too many queued sandbox messages');
     } finally { blankSandbox = false; }
   }, 20_000);
+
+  it('refuses a Free code module before the trusted CLI page imports it', async () => {
+    const doc = newProject({ name: 'Unsafe code', width: 64, height: 64, fps: 1, duration: 1 }).doc;
+    doc.assets.unused = { type: 'module', src: 'plugins/unused.js' };
+    doc.compositions.main.layers.code = { type: 'code', transform: {}, props: { module: 'unused', entry: 'default', params: null } } as never;
+    doc.compositions.main.order = ['code'];
+    unsafeDoc = JSON.stringify(doc);
+    unsafeModuleReads = 0;
+    try {
+      await page.goto(`http://127.0.0.1:${port}/__tramme/?doc=/project/unsafe-code.tramme.json`);
+      const reason = await page.evaluate(async () => {
+        try { await (window as any).TRAMME.ready; return 'opened'; }
+        catch (error) { return (error as Error).message; }
+      });
+      expect(reason).toContain('CLI export requires isolated module support');
+      expect(unsafeModuleReads).toBe(0);
+    } finally { unsafeDoc = null; }
+  }, 30_000);
 });
