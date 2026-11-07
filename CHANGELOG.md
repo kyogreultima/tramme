@@ -10,6 +10,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Added
 
+- The CLI project server now confines static files to their mount and refuses project configuration that overrides `/project/`.
 - Web scenes now share an absolute-time `window.__hf` runtime with browser-tested CSS, WAAPI, SVG, GSAP, Lottie and Three.js seek adapters.
 - Web scenes now have a validated `scene.json` manifest, published JSON Schema, approved project paths and archive round-trip coverage.
 - CLI scene checks now name nondeterministic browser APIs by file and line, and project packing refuses those scenes.

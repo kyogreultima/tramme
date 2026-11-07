@@ -41,7 +41,13 @@ export function readConfig(docFile: string): ProjectConfig {
   const mounts: [string, string][] = [['/project/', dir]];
   if (fs.existsSync(f)) {
     const cfg = JSON.parse(fs.readFileSync(f, 'utf8'));
-    for (const [prefix, rel] of Object.entries<string>(cfg.mounts || {})) mounts.push([prefix.endsWith('/') ? prefix : prefix + '/', path.resolve(dir, rel)]);
+    for (const [prefix, rel] of Object.entries<string>(cfg.mounts || {})) {
+      const mounted = prefix.endsWith('/') ? prefix : `${prefix}/`;
+      if (!mounted.startsWith('/') || mounted.includes('\\') || mounted.split('/').some((part) => part === '.' || part === '..') || mounted.startsWith('/project/') || mounted.startsWith('/__tramme/')) {
+        throw new Error(`invalid or reserved project mount: ${prefix}`);
+      }
+      mounts.push([mounted, path.resolve(dir, rel)]);
+    }
   }
   // longest prefix first
   mounts.sort((a, b) => b[0].length - a[0].length);
@@ -136,8 +142,17 @@ export class Server {
   resolve(urlPath: string): string | null {
     for (const [prefix, dir] of this.config.mounts) {
       if (urlPath.startsWith(prefix)) {
-        const f = path.join(dir, urlPath.slice(prefix.length));
-        return f.startsWith(dir) ? f : null;
+        const root = path.resolve(dir);
+        const file = path.resolve(root, urlPath.slice(prefix.length));
+        const within = (base: string, candidate: string) => {
+          const rel = path.relative(base, candidate);
+          return rel === '' || (rel !== '..' && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel));
+        };
+        if (!within(root, file)) return null;
+        // A project symlink must not turn a URL inside /project/ into a read
+        // outside that mount. Explicit mounts have their own permitted roots.
+        if (fs.existsSync(file) && !within(fs.realpathSync(root), fs.realpathSync(file))) return null;
+        return file;
       }
     }
     return null;
