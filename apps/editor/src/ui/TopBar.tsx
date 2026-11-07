@@ -7,7 +7,7 @@ import { DOCUMENT } from '@tramme/project';
 import { api } from '../api.ts';
 import { confirmWith } from '../confirm.ts';
 import { saveBlob } from '../download.ts';
-import { safeName, takenPaths, upload } from '../files.ts';
+import { fileProject, requireFileProject, sameFileProject, safeName, takenPaths, upload, type FileProject } from '../files.ts';
 import { canRedo, canUndo, comp, commit, redo, redoLabel, S, saveNow, toast, undo, undoLabel } from '../state.ts';
 import { ago, contentEnd, fmtSeconds, snap } from '../model.ts';
 import { shortsOf } from '../shorts.ts';
@@ -43,30 +43,40 @@ interface Done { blob: Blob; name: string; seconds: number; warnings: string[]; 
 const VERSIONS_INDEX = 'versions/index.json';
 interface Snap { file: string; label: string; at: string }
 
-async function listVersions(): Promise<Snap[]> {
+export async function listVersions(project: FileProject): Promise<Snap[]> {
   try {
-    const r = await api.readText(S.project.peek().id, VERSIONS_INDEX);
+    const r = await api.readText(project.id, VERSIONS_INDEX);
+    requireFileProject(project);
     if (!r) return [];
     const j = JSON.parse(r.text) as { versions?: Snap[] };
     return Array.isArray(j.versions) ? j.versions.slice(0, 30) : [];
-  } catch { return []; }
+  } catch { requireFileProject(project); return []; }
 }
 
 function VersionsPop({ anchor, onClose }: { anchor: HTMLElement; onClose: () => void }) {
+  const [project] = useState(fileProject);
   const [list, setList] = useState<Snap[] | null>(null);
   const [busy, setBusy] = useState(false);
-  useEffect(() => { listVersions().then(setList); }, []);
+  useEffect(() => {
+    let live = true;
+    listVersions(project).then((versions) => { if (live && sameFileProject(project)) setList(versions); }).catch(() => {});
+    return () => { live = false; };
+  }, []);
   // the state is saved first: the snapshot says exactly what the user sees
   const create = async () => {
+    if (!sameFileProject(project)) return;
     setBusy(true);
     try {
       await saveNow();
-      const id = S.project.peek().id, now = new Date();
+      requireFileProject(project);
+      const id = project.id, now = new Date();
       const file = `versions/${now.toISOString().replace(/[:.]/g, '-')}.json`;
       await api.write(id, file, stringifyDoc(S.doc.peek() as TrammeDoc), { type: 'application/json' });
-      const prev = await listVersions();
+      requireFileProject(project);
+      const prev = await listVersions(project);
       const next = [{ file, label: now.toLocaleString(locale, { dateStyle: 'medium', timeStyle: 'short' }), at: now.toISOString() }, ...prev].slice(0, 30);
       await api.write(id, VERSIONS_INDEX, JSON.stringify({ versions: next }), { type: 'application/json' });
+      requireFileProject(project);
       // a version pushed out by the cap is deleted with its index row: the file would otherwise stay forever
       await Promise.all(prev.filter((v) => !next.some((n) => n.file === v.file)).map((v) => api.removeFile(id, v.file).catch(() => {})));
       setList(next);
@@ -76,24 +86,31 @@ function VersionsPop({ anchor, onClose }: { anchor: HTMLElement; onClose: () => 
   };
   // the document of the snapshot becomes the document: the page reloads on it
   const restore = async (v: Snap) => {
+    if (!sameFileProject(project)) return;
     if (!await confirmWith(t('topbar.restoreVersion'), t('topbar.restoreVersionBody', { label: v.label }), t('topbar.restore'))) return;
+    if (!sameFileProject(project)) return;
     setBusy(true);
     try {
-      const id = S.project.peek().id, r = await api.readText(id, v.file);
+      const id = project.id, r = await api.readText(id, v.file);
+      requireFileProject(project);
       if (!r) throw new Error(`${v.file}: missing`);
       JSON.parse(r.text) as TrammeDoc;
       await api.write(id, DOCUMENT, r.text, { type: 'application/json' });
+      requireFileProject(project);
       // the reloaded page must not be asked to save what it is only starting to read: the write above is the state of record
       S.save.value = 'saved';
       location.reload();
     } catch (e) { toast((e as Error).message, 'error'); setBusy(false); }
   };
   const remove = async (v: Snap) => {
+    if (!sameFileProject(project)) return;
     try {
-      const id = S.project.peek().id;
+      const id = project.id;
       await api.removeFile(id, v.file);
-      const next = (await listVersions()).filter((x) => x.file !== v.file);
+      requireFileProject(project);
+      const next = (await listVersions(project)).filter((x) => x.file !== v.file);
       await api.write(id, VERSIONS_INDEX, JSON.stringify({ versions: next }), { type: 'application/json' });
+      requireFileProject(project);
       setList(next);
     } catch (e) { toast((e as Error).message, 'error'); }
   };
