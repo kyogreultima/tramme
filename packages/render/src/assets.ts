@@ -10,8 +10,28 @@ const SVG_RASTER = 2048;
 /** how long the page's own fonts (its CSS) are waited for once the document's are loaded */
 const FONTS_WAIT_MS = 3000;
 const MODEL_LIMIT = 32 * 1024 * 1024;
+const FONT_LIMIT = 16 * 1024 * 1024;
+const DATA_LIMIT = 8 * 1024 * 1024;
 const MAX_ACTIVE_ASSETS = 8;
 const MAX_IMAGE_PIXELS = 16 * 1024 * 1024;
+
+async function boundedBytes(response: Response, limit: number, label: string): Promise<ArrayBuffer> {
+  const declared = Number(response.headers.get('content-length'));
+  if (declared > limit) { void response.body?.cancel(); throw new Error(`${label} exceeds ${limit / 1048576} MB`); }
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error(`${label} requires a streamed response`);
+  const chunks: Uint8Array[] = []; let size = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > limit) { void reader.cancel(); throw new Error(`${label} exceeds ${limit / 1048576} MB`); }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(size); let at = 0;
+  for (const chunk of chunks) { bytes.set(chunk, at); at += chunk.byteLength; }
+  return bytes.buffer as ArrayBuffer;
+}
 
 /** the proportions of an SVG from its viewBox (1:1 when it has none) */
 export function viewBoxSize(svg: string): [number, number] {
@@ -157,7 +177,8 @@ export class AssetStore {
         const r = await fetch(url);
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         const family = a.family || id;
-        const face = new FontFace(family, await r.arrayBuffer(), { weight: a.weight || '400', style: a.style || 'normal' });
+        const bytes = this.sandboxModules ? await boundedBytes(r, FONT_LIMIT, 'font') : await r.arrayBuffer();
+        const face = new FontFace(family, bytes, { weight: a.weight || '400', style: a.style || 'normal' });
         await face.load();
         document.fonts.add(face);
         return family;
@@ -197,12 +218,12 @@ export class AssetStore {
       case 'json': {
         const r = await fetch(url);
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json();
+        return this.sandboxModules ? JSON.parse(new TextDecoder().decode(await boundedBytes(r, DATA_LIMIT, 'JSON'))) : r.json();
       }
       case 'lut': {
         const r = await fetch(url);
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return parseCube(await r.text());
+        return parseCube(this.sandboxModules ? new TextDecoder().decode(await boundedBytes(r, DATA_LIMIT, 'LUT')) : await r.text());
       }
       case 'audio': {
         // a sound is decoded by the mixer when it plays: here only its presence is checked, a byte asked for

@@ -37,6 +37,25 @@ describe('model bytes for an isolated project', () => {
 });
 
 describe('isolated asset paths', () => {
+  it.each([
+    ['font', 'font', 16, 'font exceeds 16 MB'],
+    ['json', 'json', 8, 'JSON exceeds 8 MB'],
+    ['lut', 'cube', 8, 'LUT exceeds 8 MB'],
+  ] as const)('cancels an oversized %s before decoding it', async (type, ext, megabytes, message) => {
+    const doc = newProject({ name: 'Oversized asset', width: 64, height: 64, fps: 1, duration: 1 }).doc;
+    doc.assets.data = { type, src: `assets/huge.${ext}` };
+    const loaded = new AssetStore(doc, 'https://example.test/projects/a/document.tramme.json');
+    loaded.sandboxModules = true;
+    let cancelled = false;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) { controller.enqueue(new Uint8Array((megabytes + 1) * 1024 * 1024)); },
+      cancel() { cancelled = true; },
+    });
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(stream)));
+    await expect((loaded as unknown as { load(id: string, a: typeof doc.assets.data): Promise<unknown> }).load('data', doc.assets.data)).rejects.toThrow(message);
+    expect(cancelled).toBe(true);
+  });
+
   it('refuses a JSON asset outside the project before requesting it', async () => {
     const doc = newProject({ name: 'JSON', width: 64, height: 64, fps: 1, duration: 1 }).doc;
     doc.assets.data = { type: 'json', src: '/api/private' };
