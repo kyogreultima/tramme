@@ -93,6 +93,8 @@ Needs the boundary of [safe projects](safe-projects-roadmap.md).
 
 ### Step 9: platforms
 
+Browser limit (2026-11-07): a visual export containing a `webscene` now stops with a clear message before the editor starts rendering. The Known limits section points to the CLI prototype. Ordinary CLI and desktop capture remain open, so the platform box is still unchecked.
+
 - [ ] CLI and desktop first (Chrome sidecar on desktop).
 - [ ] Web editor: export reserved to desktop and CLI, written in Known limits, with a clear message where a web scene is exported from the web editor. Decided (2026-11-05): no rendering service for now, which would be a server to run; one can be added later if wanted.
 

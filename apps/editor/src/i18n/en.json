@@ -1441,6 +1441,7 @@
     "encoderStalled": "the video encoder stopped answering ({s} s without progress)",
     "softwareEncoder": "the hardware video encoder stopped answering for {s} s: the film was encoded again in software",
     "exportCancelled": "export cancelled",
+    "websceneDesktopOnly": "Browser export cannot capture web scenes yet. The CLI prototype is available in bench/web-scenes.",
     "frameNeverReady": "frame {frame} ({time} s) never finished: a video frame or a plugin picture did not come in {s} s. The export is stopped rather than made with a wrong picture.",
     "noSoundLayerIn": "no sound layer in this composition",
     "pngFailed": "PNG failed",

@@ -63,6 +63,9 @@ function encoderStep<T>(p: Promise<T>, signal?: AbortSignal): Promise<T> {
 }
 
 export async function exportInBrowser(doc: TrammeDoc, base: string, format: WebFormat, opts: WebExportOptions): Promise<WebExportResult> {
+  if (format !== 'wav' && Object.values(doc.compositions).some((comp) => Object.values(comp.layers).some((layer) => layer.type === 'webscene'))) {
+    throw new Error(t('export.websceneDesktopOnly'));
+  }
   if (format === 'lottie' || format === 'svg') {
     const readAsset = await fetchAssetReader(doc, base);
     // the sandboxed nodes' vector exports are computed in the sandbox first: the conversion reads them synchronously
