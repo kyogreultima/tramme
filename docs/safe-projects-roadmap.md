@@ -36,6 +36,8 @@ Host resource bounds (2026-11-06): at most 64 worker calls can wait at once; the
 
 Plugin-backup expansion (2026-11-06): the installed-plugin backup reader now refuses a compressed file over 64 MiB and a declared expanded total over 128 MiB before inflating entries. The project archive and single-plugin package readers already had expansion limits. Other import paths, total bridge message size, graphics allocations and recovery still keep step 4 open.
 
+Project archive entry bound (2026-11-07): `unpackProject` now refuses more than the project's 2,000-file limit while reading zip metadata, before inflating the excess entry. This closes the many-small-files gap left by the existing compressed and expanded byte limits. Other resource and recovery gates remain open.
+
 Bridge request concurrency (2026-11-06): one active tool or check can have at most 16 host requests waiting at once. The host refuses replayed request IDs before repeating a file or network operation, and no longer sends an answer back after the call has ended. This is one part of the broader capability validation still open in step 3.
 
 Worker response envelopes (2026-11-06): the host checks the shape and basic bounds of declarations, call IDs, draw result lists, progress, and error fields before using them. A malformed response closes the isolated frame and rejects waiting work. Plugin identity and complete capability checks still keep step 3 open.

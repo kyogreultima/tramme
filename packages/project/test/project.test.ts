@@ -64,6 +64,11 @@ describe('project format', () => {
     expect(() => unpackProject(enc('not a zip'))).toThrow(/archive/);
   });
 
+  it('refuses excessive archive entries before inflating their contents', () => {
+    const entries = Object.fromEntries(Array.from({ length: 2001 }, (_, i) => [`assets/${i}.json`, enc('{}')]));
+    expect(() => unpackProject(zipSync(entries))).toThrow(/too many archive entries/);
+  });
+
   it('validates a scene manifest and keeps its files through archive export and import', () => {
     const files = sample();
     const scene = { duration: 2, size: [640, 360], entry: 'index.html', parameters: { speed: { type: 'number', default: 1 }, tint: { type: 'color', default: '#aabbcc' } } };

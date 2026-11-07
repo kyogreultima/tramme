@@ -20,10 +20,11 @@ export function packProject(files: Map<string, Uint8Array>): Uint8Array {
 export function unpackProject(zip: Uint8Array): Map<string, Uint8Array> {
   if (zip.byteLength > LIMITS.archive) throw new Error('archive too large');
   if (zip[0] !== 0x50 || zip[1] !== 0x4b) throw new Error('this file is not a .tramme archive (zip)');
-  let total = 0;
+  let total = 0, entries = 0;
   const raw = unzipSync(zip, {
     // refuse oversized entries before inflating them (zip bombs)
     filter: (f) => {
+      if (++entries > LIMITS.files) throw new Error(`too many archive entries (${LIMITS.files} at most)`);
       total += f.originalSize;
       if (f.originalSize > maxSize(f.name) || total > LIMITS.archive * 2) throw new Error(`entry too large: ${f.name}`);
       return !f.name.endsWith('/');
