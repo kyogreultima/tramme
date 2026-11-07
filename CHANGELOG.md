@@ -10,6 +10,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Added
 
+- Isolated projects now cap retained decoded images at 256 MiB and release replaced image bitmaps.
 - Isolated image assets now have a 32 MiB compressed-file limit before browser decoding.
 - Isolated font, JSON and LUT asset loads now stop at bounded response sizes and cancel oversized streams.
 - The CLI project server now confines static files to their mount and refuses project configuration that overrides `/project/`.

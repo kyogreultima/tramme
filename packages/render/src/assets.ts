@@ -15,6 +15,7 @@ const DATA_LIMIT = 8 * 1024 * 1024;
 const IMAGE_LIMIT = 32 * 1024 * 1024;
 const MAX_ACTIVE_ASSETS = 8;
 const MAX_IMAGE_PIXELS = 16 * 1024 * 1024;
+const MAX_RETAINED_IMAGE_PIXELS = 64 * 1024 * 1024;
 
 async function boundedBytes(response: Response, limit: number, label: string): Promise<ArrayBuffer> {
   const declared = Number(response.headers.get('content-length'));
@@ -76,6 +77,16 @@ export class AssetStore {
   /** what each failed asset was when it failed: it is not asked for again until it changes or is reloaded */
   private failed = new Map<string, string>();
 
+  private imagePixels(entry: Asset, value: unknown): number {
+    if (entry.type !== 'image' || !value || typeof value !== 'object') return 0;
+    const image = value as { width?: number; height?: number };
+    return Number(image.width) * Number(image.height) || 0;
+  }
+
+  private release(entry: Asset, value: unknown): void {
+    if (entry.type === 'image') (value as { close?: () => void } | null)?.close?.();
+  }
+
   /** what a loaded asset is kept under: its entry, and for a video with a proxy, which of the two plays */
   private keyOf(a: Asset): string {
     return JSON.stringify(a) + (this.proxyOf(a) ? '|proxy' : '');
@@ -121,16 +132,16 @@ export class AssetStore {
   /** load what the document needs and is not loaded yet; `reload` forces some ids (a module edited on disk) */
   async sync(doc: TrammeDoc, reload: string[] = [], tolerate = false): Promise<void> {
     this.doc = doc;
-    for (const id of this.loaded.keys()) if (!doc.assets[id]) this.loaded.delete(id);
+    for (const [id, old] of this.loaded) if (!doc.assets[id]) { this.release(old.entry, old.value); this.loaded.delete(id); }
     for (const id of [...this.offline.keys()]) if (!doc.assets[id]) { this.offline.delete(id); this.failed.delete(id); }
     const refused: string[] = [];
     if (reload.length) this.version++;
     const entries = Object.entries(doc.assets);
     for (let start = 0; start < entries.length; start += MAX_ACTIVE_ASSETS) await Promise.all(entries.slice(start, start + MAX_ACTIVE_ASSETS).map(async ([id, a]) => {
       // a sub-clip is a range of another asset, no file of its own
-      if (a.of !== undefined) { this.loaded.delete(id); return; }
+      if (a.of !== undefined) { const old = this.loaded.get(id); if (old) this.release(old.entry, old.value); this.loaded.delete(id); return; }
       // the sandbox owns the project's plugin modules: their code never loads here
-      if (this.sandboxModules && a.type === 'module' && (doc.plugins || []).includes(id)) { this.loaded.delete(id); return; }
+      if (this.sandboxModules && a.type === 'module' && (doc.plugins || []).includes(id)) { const old = this.loaded.get(id); if (old) this.release(old.entry, old.value); this.loaded.delete(id); return; }
       const have = this.loaded.get(id);
       if (have && !reload.includes(id)) {
         const key = this.keyOf(a);
@@ -140,10 +151,20 @@ export class AssetStore {
       const key = this.keyOf(a);
       if (tolerate && this.failed.get(id) === key && !reload.includes(id)) return;
       try {
-        this.loaded.set(id, { key, entry: a, value: await this.load(id, a) });
+        const value = await this.load(id, a);
+        if (this.sandboxModules && a.type === 'image') {
+          const retained = [...this.loaded.entries()].reduce((sum, [otherId, old]) => sum + (otherId === id ? 0 : this.imagePixels(old.entry, old.value)), 0);
+          if (retained + this.imagePixels(a, value) > MAX_RETAINED_IMAGE_PIXELS) {
+            this.release(a, value);
+            throw new Error('images exceed 256 MB of retained decoded pixels');
+          }
+        }
+        if (have) this.release(have.entry, have.value);
+        this.loaded.set(id, { key, entry: a, value });
         this.offline.delete(id); this.failed.delete(id);
       } catch (e) {
         const why = `asset "${id}" (${a.src}): ${(e as Error).message}`;
+        if (have) this.release(have.entry, have.value);
         this.loaded.delete(id);
         if (!tolerate) { refused.push(why); return; }
         this.offline.set(id, (e as Error).message); this.failed.set(id, key);
