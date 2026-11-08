@@ -744,6 +744,7 @@
     "maskIntersect": "Intersect",
     "masks": "Masks",
     "addAMask": "Add a mask",
+    "maskBoundsUnavailable": "The isolated mask bounds could not be calculated: {error}",
     "noMasks": "No masks.",
     "enableMask": "Enable the mask",
     "disableMask": "Disable the mask",

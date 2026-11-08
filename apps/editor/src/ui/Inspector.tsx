@@ -798,11 +798,31 @@ function SpeechSection({ asset }: { asset: string }) {
 
 /** the drawn masks of a layer: add (a rectangle over the layer, to edit in the viewport), toggle, remove, reorder, their props */
 function MasksSection({ ctx, base, id, masks }: { ctx: Ctx; base: string; id: string; masks: import('@tramme/core').Mask[] }) {
-  const add = () => {
+  const add = async () => {
     const mid = freshId(Object.fromEntries(masks.map((x) => [x.id, 1])), 'mask');
     // a rectangle over what the layer draws, when it knows its bounds
     let b: { x: number; y: number; w: number; h: number } | null = null;
-    try { const L = ctx.ev.layerAt(id, ctx.t, ctx.compId); b = L.node.bounds?.(L.props, {} as never) ?? null; } catch { /* the default rectangle */ }
+    if (ctx.isolated) {
+      const project = fileProject();
+      try {
+        const renderer = preview.renderer;
+        if (!renderer) throw new Error('preview is not ready');
+        const docUrl = new URL(project.docUrl, location.href).href, host = pluginHost(docUrl);
+        await ensureDeclared(host, moduleItemsOf(ctx.doc, docUrl));
+        if (!sameFileProject(project) || viewDoc.peek() !== ctx.doc) return;
+        ensureSandboxDoc(host, { doc: ctx.doc, docUrl, loaded: (asset) => { try { return renderer.assets.get(asset); } catch { return null; } } });
+        const [sample] = await host.evaluateLayers([id], ctx.t, ctx.compId);
+        if (!sameFileProject(project) || viewDoc.peek() !== ctx.doc || S.compId.peek() !== ctx.compId || uiTime.peek() !== ctx.t) return;
+        if (!sample || 'err' in sample) throw new Error(sample?.err ?? 'missing layer');
+        const node = S.registry.peek().node(ctx.doc.compositions[ctx.compId].layers[id].type);
+        b = node.bounds?.(sample.props, {} as never) ?? null;
+      } catch (e) {
+        if (sameFileProject(project)) toast(t('inspector.maskBoundsUnavailable', { error: (e as Error).message }));
+        return;
+      }
+    } else {
+      try { const L = ctx.ev.layerAt(id, ctx.t, ctx.compId); b = L.node.bounds?.(L.props, {} as never) ?? null; } catch { /* the default rectangle */ }
+    }
     const path = b ? { v: [[b.x, b.y], [b.x + b.w, b.y], [b.x + b.w, b.y + b.h], [b.x, b.y + b.h]], closed: true } : MASK_SCHEMA.path.default;
     const value = { id: mid, props: { path } };
     commit(t('inspector.addAMask'), masks.length ? [{ op: 'add', path: `${base}/masks/-`, value }] : [{ op: 'add', path: `${base}/masks`, value: [value] }]);

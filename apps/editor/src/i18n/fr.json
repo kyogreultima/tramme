@@ -744,6 +744,7 @@
     "maskIntersect": "Intersection",
     "masks": "Masques",
     "addAMask": "Ajouter un masque",
+    "maskBoundsUnavailable": "Les limites du masque isolé n'ont pas pu être calculées : {error}",
     "noMasks": "Aucun masque.",
     "enableMask": "Activer le masque",
     "disableMask": "Désactiver le masque",

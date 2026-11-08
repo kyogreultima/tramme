@@ -7,9 +7,9 @@ import { newProject } from '@tramme/project';
 const gate = vi.hoisted(() => {
   let release!: () => void;
   const first = new Promise<void>((resolve) => { release = resolve; });
-  return { first, release, declared: vi.fn(), evaluated: vi.fn(async (..._args: unknown[]) => 7) };
+  return { first, release, declared: vi.fn(), evaluated: vi.fn(async (..._args: unknown[]) => 7), sampled: vi.fn(async () => [{ id: 'box', props: { size: [24, 16], radius: 7 }, transform: {}, masks: [] }]) };
 });
-vi.mock('../src/plugins/index.ts', async (original) => ({ ...await original(), pluginHost: (base: string) => ({ base, evaluateValue: (...args: unknown[]) => gate.evaluated(base, ...args) }) }));
+vi.mock('../src/plugins/index.ts', async (original) => ({ ...await original(), pluginHost: (base: string) => ({ base, evaluateValue: (...args: unknown[]) => gate.evaluated(base, ...args), evaluateLayers: gate.sampled }) }));
 vi.mock('../src/plugins/sandbox-draw.ts', async (original) => ({ ...await original(),
   ensureDeclared: (host: { base: string }) => { gate.declared(host.base); return host.base.includes('/old/') ? gate.first : Promise.resolve(); },
   ensureSandboxDoc: () => {}, moduleItemsOf: () => [],
@@ -52,6 +52,39 @@ describe('isolated inspector project identity', () => {
       mount.remove();
       gate.declared.mockClear();
       gate.evaluated.mockClear();
+      S.project.value = previous.project;
+      S.docUrl.value = previous.docUrl;
+      S.doc.value = previous.doc;
+      S.compId.value = previous.compId;
+      S.selection.value = previous.selection;
+      prefs.value = previous.prefs;
+      preview.renderer = previous.renderer;
+    }
+  });
+
+  it('requests worker-evaluated bounds when adding a mask', async () => {
+    const project = newProject({ name: 'Mask', width: 64, height: 64, fps: 30, duration: 2 });
+    project.doc.compositions[project.doc.root].layers.box = { type: 'shape.rect', props: { size: { $expr: '[24, 16]' } } } as never;
+    project.doc.compositions[project.doc.root].order.push('box');
+    const previous = { project: S.project.peek(), docUrl: S.docUrl.peek(), doc: S.doc.peek(), compId: S.compId.peek(), selection: S.selection.peek(), prefs: prefs.peek(), renderer: preview.renderer };
+    const mount = document.body.appendChild(document.createElement('div'));
+    try {
+      S.project.value = project.manifest;
+      S.docUrl.value = 'https://tramme.test/mask/document.tramme.json';
+      S.doc.value = project.doc;
+      S.compId.value = project.doc.root;
+      S.selection.value = ['box'];
+      prefs.value = { ...prefs.peek(), sandboxPreview: true };
+      preview.renderer = { assets: { get: () => null } } as never;
+      await act(() => { render(h(Inspector, {}), mount); });
+      const button = [...mount.querySelectorAll('button')].find((el) => el.title === 'Add a mask');
+      expect(button).toBeDefined();
+      await act(async () => { button!.click(); await vi.waitFor(() => expect(gate.sampled).toHaveBeenCalled()); });
+      expect(gate.sampled).toHaveBeenCalledWith(['box'], expect.any(Number), project.doc.root);
+    } finally {
+      render(null, mount);
+      mount.remove();
+      gate.sampled.mockClear();
       S.project.value = previous.project;
       S.docUrl.value = previous.docUrl;
       S.doc.value = previous.doc;
