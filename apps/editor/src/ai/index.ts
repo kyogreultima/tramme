@@ -30,6 +30,7 @@ import type { Command } from './commands.ts';
 import { describe, imageBlocks, type Attachment } from '../attachments.ts';
 import { locale, t } from '../i18n/index.ts';
 import { personal } from '../mode.ts';
+import { fileProject, sameFileProject } from '../files.ts';
 import { packLines, shippedPacks } from '../packs.ts';
 import { held, queue, type Queued } from './queue.ts';
 
@@ -489,7 +490,9 @@ const ranAlone: string[] = [];
 
 /** a tool run straight from the / menu, without a model: its activity, pictures and proposal in the conversation */
 export async function* runTool(name: string, input: Record<string, unknown>, signal?: AbortSignal): AsyncGenerator<AiEvent> {
+  const project = fileProject();
   const r = yield* runCall(runner, 'use_tool', { name, input }, signal, false);
+  if (signal?.aborted || !sameFileProject(project)) return;
   const said = r.content.map((c) => (c.type === 'text' ? c.text : '')).filter(Boolean).join('\n');
   if (r.isError) yield { type: 'error', message: said };
   else if (runner.notice) yield { type: 'item', item: { id: uid(), role: 'assistant', text: runner.notice } };
@@ -525,12 +528,16 @@ setCriticHost({ via: criticVia, rounds: () => aiSettings.peek().criticRounds });
 
 /** one user message; yields the assistant's events */
 export async function* ask(p: AskPayload, signal: AbortSignal): AsyncGenerator<AiEvent> {
+  const project = fileProject();
+  const current = () => !signal.aborted && sameFileProject(project);
   if (!aiRoute.peek()) await refreshStatus();
+  if (!current()) return;
   const route = aiRoute.peek();
   if (!route) { yield { type: 'error', message: unavailableReason() }; return; }
   // a Claude turn needs its model's listing (its thinking, its effort levels) and a model: the one nobody chose is the recommended
   if (providerOf(aiSettings.peek().model) === 'anthropic') {
     await ensureClaudeModels();
+    if (!current()) return;
     if (!aiSettings.peek().model) { yield { type: 'error', message: t('ai.noClaudeModels') }; return; }
   }
   // a proposal neither applied nor refused is dropped at the next message
@@ -549,6 +556,7 @@ export async function* ask(p: AskPayload, signal: AbortSignal): AsyncGenerator<A
   // the interface's language is the user's: the answers, proposal titles and new layer names follow it
   notes.push(`The user's interface is in ${locale === 'fr' ? 'French' : 'English'}: reply in that language, including the titles of your proposals and the names of the layers you create.`);
   const images = await imageBlocks(p.attachments ?? []);
+  if (!current()) return;
   // each agent of the companion keeps its own history (the session is the engine's): another one taking over the conversation reads what was said
   const model = aiSettings.peek().model, cacheTtl = aiSettings.peek().cacheTtl, effort = currentEffort(model), engine = engineOf(model);
   // a conversation saved before the engines holds Claude's session alone
@@ -558,10 +566,12 @@ export async function* ask(p: AskPayload, signal: AbortSignal): AsyncGenerator<A
   const prompt = p.queued ? queuedPrompt(p.queued.map((m) => ({ text: m.text, ctx: m.context })), notes) : userPrompt(p.text, p.context, notes);
   // the project's brief, when there is one, rides in the system prompt: the assistant follows it from the first word
   let brief: string | null = null;
-  try { brief = (await api.readText(S.project.peek().id, 'assets/brief.json'))?.text ?? null; } catch { brief = null; }
+  try { brief = (await api.readText(project.id, 'assets/brief.json'))?.text ?? null; } catch { brief = null; }
+  if (!current()) return;
   // the film plan rides beside it: the kinds of picture, the scenes and the direction the assistant follows
   let plan: string | undefined;
-  try { const parsed = parsePlan((await api.readText(S.project.peek().id, FILM_PLAN_PATH))?.text); plan = parsed ? planText(parsed) : undefined; } catch { plan = undefined; }
+  try { const parsed = parsePlan((await api.readText(project.id, FILM_PLAN_PATH))?.text); plan = parsed ? planText(parsed) : undefined; } catch { plan = undefined; }
+  if (!current()) return;
   // the installed plugins, named once (enabled, not turned off here): the assistant searches them when the project's own vocabulary falls short
   const offHere = offIn(S.doc.peek());
   const mine = installed.peek().filter((x) => x.enabled && !offHere.includes(x.manifest.id)).map((x) => `${x.manifest.name}${x.manifest.description ? `: ${x.manifest.description}` : ''}`);
@@ -587,12 +597,17 @@ export async function* ask(p: AskPayload, signal: AbortSignal): AsyncGenerator<A
   const tally: Tally = { usage: NO_USAGE, seen: 0, reported: false };
   /** the tool calls of the scenes built apart: their own lines hold them, the director's does not */
   let apart = 0;
+  if (!current()) return;
   yield* resuming(attempt, signal, tally);
+  if (!current()) return;
   // a film planned this turn with scenes to build is built scene by scene, each in a fresh context, then assembled in this one
   if (aiSettings.peek().scenesApart === 'auto' && !signal.aborted) {
-    const projectId = S.project.peek().id;
-    const readPlan = async () => parsePlan((await api.readText(projectId, FILM_PLAN_PATH).catch(() => null))?.text);
+    const readPlan = async () => {
+      const result = await api.readText(project.id, FILM_PLAN_PATH).catch(() => null);
+      return current() ? parsePlan(result?.text) : null;
+    };
     const planned = await readPlan();
+    if (!current()) return;
     // the plan must be this turn's: an old plan does not start a run on an unrelated message
     if (planned && Date.parse(planned.updated) >= started && todoScenes(planned, runner.liveDoc()).run.length >= 3) {
       const sceneSystem = systemParts(reference, brief ?? undefined, mine, packLines(packs), planText(planned));
@@ -600,6 +615,7 @@ export async function* ask(p: AskPayload, signal: AbortSignal): AsyncGenerator<A
       // what each scene's turn used, for its own line and to leave out of the director's
       const sceneUse = new Map<string, { tools: number; images: number }>();
       const sceneTurn = (scenePrompt: string, scene: PlanScene) => (async function* (): AsyncGenerator<AiEvent> {
+        if (!current()) return;
         const own = new ServerSession(), mine2: Tally = { usage: NO_USAGE, seen: 0, reported: false }, before = runner.calls;
         let sid: string | undefined;
         runner.scope = { comp: scene.comp!, root: S.doc.peek().root, tokens: [] };
@@ -610,14 +626,20 @@ export async function* ask(p: AskPayload, signal: AbortSignal): AsyncGenerator<A
       })();
       const result = yield* runScenes({
         plan: planned, doc: () => runner.liveDoc(), turn: sceneTurn, read: readPlan,
-        save: async (p) => { await api.write(projectId, FILM_PLAN_PATH, JSON.stringify(p, null, 1)); },
+        save: async (p) => {
+          if (!current()) throw new Error('the project changed while the plan was being saved');
+          await api.write(project.id, FILM_PLAN_PATH, JSON.stringify(p, null, 1));
+          if (!current()) throw new Error('the project changed while the plan was being saved');
+        },
         line: (scene, u, ms) => ({ ...u, tools: sceneUse.get(scene.id)?.tools ?? 0, images: sceneUse.get(scene.id)?.images ?? 0, ms, model, route: USAGE_ROUTE[route], scene: scene.name }),
         signal,
       });
+      if (!current()) return;
       for (const u of sceneUse.values()) apart += u.tools;
       if (!signal.aborted) yield* resuming(attempt, signal, tally, assemblyNote(result));
     }
   }
+  if (!current()) return;
   const { usage, seen, reported } = tally;
   const harvest = harvestNote([...runner.wrotePlugins]);
   if (harvest) yield { type: 'item', item: { id: uid(), role: 'assistant', text: harvest } };
