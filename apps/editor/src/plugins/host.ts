@@ -5,7 +5,7 @@
 // registry carries — plugins/vocabulary.ts puts them there).
 
 import { toolOutput, type CheckContext, type NodeType, type PlacedLayer, type QualityIssue, type ToolContext, type ToolOutput } from '@tramme/core';
-import type { Ask, DrawPayload, DrawResult, FramePayload, FromWorker, LayerSample, PluginDecl, SandboxDoc, ToWorker } from './protocol.ts';
+import type { Ask, DrawPayload, DrawResult, FramePayload, FromWorker, LayerSample, PlacedSample, PluginDecl, SandboxDoc, ToWorker } from './protocol.ts';
 
 /** the schema of a node without its code: what a check's samples may cross */
 const schemaOf = (n: NodeType) => ({ type: n.type, title: n.title, category: n.category, description: n.description, ai: n.ai, props: n.props, ...(n.container ? { container: true } : {}) });
@@ -121,6 +121,7 @@ export interface PluginHost {
   /** values[address][time], sampled together in one isolated evaluator */
   evaluateSeries(addresses: string[], times: number[], compId: string): Promise<unknown[][]>;
   evaluateLayers(ids: string[], t: number, compId: string): Promise<LayerSample[]>;
+  samplePlaced(t: number, compId: string): Promise<PlacedSample[]>;
   /** stop: every call waiting is refused, with `reason` when there is one */
   dispose(reason?: string): void;
   /** disposed (its worker stopped): the next project's or call's sandbox is a new one */
@@ -307,6 +308,17 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
       else w.resolve(m.values);
       return;
     }
+    if (m.kind === 'sampledPlaced') {
+      if (m.err !== undefined && (typeof m.err !== 'string' || m.err.length > 4096)) { invalid(); return; }
+      if (responseTooLarge(m.values) || responseTooLarge(m.err)) { timeout('sandbox response exceeds 8 MB'); return; }
+      const w = waits.get(m.call);
+      if (!w) return;
+      waits.delete(m.call);
+      if (m.err) w.reject(new Error(m.err));
+      else if (!Array.isArray(m.values)) w.reject(new Error('invalid sandbox placed sample'));
+      else w.resolve(m.values);
+      return;
+    }
     if (m.kind === 'progress') {
       if (!Number.isFinite(m.done) || !Number.isFinite(m.total) || (m.step !== undefined && (typeof m.step !== 'string' || m.step.length > 4096))) { invalid(); return; }
       const ctx = bridges.get(m.call);
@@ -430,6 +442,13 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
       const values = await run({ kind: 'evaluateLayers', call: ++call, ids, t, compId }) as LayerSample[];
       if (!Array.isArray(values) || values.length !== ids.length || values.some((value, i) => !value || value.id !== ids[i] ||
           !('err' in value) && (!value.transform || !value.props || !Array.isArray(value.masks)))) throw new Error('invalid sandbox layers response');
+      return values;
+    },
+    async samplePlaced(t, compId) {
+      if (!Number.isFinite(t) || typeof compId !== 'string' || compId.length > 256) throw new Error('invalid sandbox placed sample');
+      const values = await run({ kind: 'samplePlaced', call: ++call, t, compId }) as PlacedSample[];
+      if (!Array.isArray(values) || values.length > 4096 || values.some((v) => !v || typeof v.id !== 'string' || typeof v.name !== 'string' || typeof v.type !== 'string' ||
+          !Number.isFinite(v.opacity) || (v.box !== null && (!v.box || ![v.box.x, v.box.y, v.box.w, v.box.h].every(Number.isFinite))))) throw new Error('invalid sandbox placed sample response');
       return values;
     },
     dispose(reason) {

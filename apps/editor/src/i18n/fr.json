@@ -2944,6 +2944,7 @@
     "removeRetouch": "Retirer",
     "retouchPinsOnly": "À propos de ce que j’ai marqué.",
     "reviewTitle": "Quels calques voulez-vous dire ?",
+    "areaUnavailable": "La sélection de zone n'a pas pu lire l'image : {error}",
     "reviewTap": "Touchez un calque sur l’image pour l’ajouter, ou un nom ci-dessous pour le retirer.",
     "reviewNone": "Rien trouvé ici. Touchez un calque sur l’image pour l’ajouter.",
     "reviewTooMany": "{n} calques : trop. Tracez une ligne plus étroite, ou servez-vous-en comme indication.",

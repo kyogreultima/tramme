@@ -1667,6 +1667,7 @@
     "removeRetouch": "Remove",
     "retouchPinsOnly": "About what I marked.",
     "reviewTitle": "Which layers do you mean?",
+    "areaUnavailable": "Area selection could not read the picture: {error}",
     "reviewTap": "Tap a layer on the picture to add it, or a name below to drop it.",
     "reviewNone": "Nothing found there. Tap a layer on the picture to add it.",
     "reviewTooMany": "{n} layers: too many. Draw a narrower line, or use it as a hint.",

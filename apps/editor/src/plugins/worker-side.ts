@@ -5,7 +5,7 @@
 // project is a message answered by the page. Nothing here touches the DOM.
 
 import { Registry, type CheckContext, type CheckType, type EffectType, type ModifierType, type NodeType, type PluginModule, type QualityIssue, type ToolContext, type ToolOutput } from '@tramme/core';
-import type { Ask, CheckCtxData, DrawPayload, DrawResult, FramePayload, FromWorker, LayerSample, PluginDecl, SandboxDoc, SchemaEffect, SchemaModifier, SchemaNode, ToWorker, ToolCtxData } from './protocol.ts';
+import type { Ask, CheckCtxData, DrawPayload, DrawResult, FramePayload, FromWorker, LayerSample, PlacedSample, PluginDecl, SandboxDoc, SchemaEffect, SchemaModifier, SchemaNode, ToWorker, ToolCtxData } from './protocol.ts';
 
 /** the sandbox id of an installed plugin (installed:<file>): the project's own plugins have the document's asset ids */
 export const INSTALLED = 'installed:';
@@ -29,6 +29,7 @@ export interface SandboxDrawSide {
   evaluateValue(address: string, t: number, compId: string): Promise<unknown>;
   evaluateSeries(addresses: string[], times: number[], compId: string): Promise<unknown[][]>;
   evaluateLayers(ids: string[], t: number, compId: string): Promise<LayerSample[]>;
+  samplePlaced(t: number, compId: string): Promise<PlacedSample[]>;
 }
 
 export interface WorkerSideOptions {
@@ -201,6 +202,14 @@ export function startWorkerSide({ post, importModule, sandbox: makeSandbox }: Wo
         void sandbox.evaluateLayers(m.ids, m.t, m.compId)
           .then((values) => post({ kind: 'evaluatedLayers', call: m.call, values }))
           .catch((e: Error) => post({ kind: 'evaluatedLayers', call: m.call, err: e.message }));
+        return;
+      }
+      if (m.kind === 'samplePlaced') {
+        if (!sandbox) { post({ kind: 'sampledPlaced', call: m.call, err: 'the sandbox cannot sample here' }); return; }
+        if (!Number.isFinite(m.t) || typeof m.compId !== 'string' || m.compId.length > 256) { post({ kind: 'sampledPlaced', call: m.call, err: 'invalid sandbox placed sample' }); return; }
+        void sandbox.samplePlaced(m.t, m.compId)
+          .then((values) => post({ kind: 'sampledPlaced', call: m.call, values }))
+          .catch((e: Error) => post({ kind: 'sampledPlaced', call: m.call, err: e.message }));
         return;
       }
       if (m.kind === 'export') {

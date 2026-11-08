@@ -14,7 +14,7 @@
 // back. The page ships the document (setDoc) and each video asset's current
 // frame (their decoding still happens there, for now).
 
-import { Evaluator, parseColor, type Host, type Instance, type NodeType, type PluginModule, type TrammeDoc } from '@tramme/core';
+import { Evaluator, parseColor, sampleAt, type Host, type Instance, type NodeType, type PluginModule, type TrammeDoc } from '@tramme/core';
 import { builtinRegistry } from '@tramme/nodes';
 import { CanvasPool, Compositor, drawComposed, drawFrame, drawLayers, finishOf, subTimes } from '@tramme/render/src/index.ts';
 import { nodeContext, resizeNode } from '@tramme/render/src/gpu.ts';
@@ -261,6 +261,16 @@ export function makeSandboxDraw(modules: Map<string, PluginModule>): SandboxDraw
           return structuredClone({ id, props: layer.props, transform: layer.transform, masks: layer.masks });
         } catch (e) { return { id, err: (e as Error).message.slice(0, 512) }; }
       });
+    },
+    async samplePlaced(t, compId) {
+      const doc = theDoc();
+      if (!doc || !doc.compositions[compId]) throw new Error('unknown sandbox composition');
+      const reg = builtinRegistry().clone();
+      for (const [id, mod] of modules) reg.use(mod, id);
+      const evaluator = new Evaluator(doc, reg, { data: (id) => side.json.get(id) });
+      const layers = sampleAt(evaluator, compId, t).layers;
+      if (layers.length > 4096) throw new Error('sandbox placed sample exceeds 4096 layers');
+      return structuredClone(layers.map((p) => ({ id: p.id, name: p.layer.name ?? p.id, type: p.layer.type, box: p.box, opacity: p.opacity, locked: p.layer.locked })));
     },
     async renderFrame(p) {
       try { await fontsReady; return await renderFrame(p); }

@@ -83,13 +83,14 @@ describe('the gesture on the picture', () => {
     expect(st.studio.pins.value[0]).toMatchObject({ kind: 'point', at: [0.25, 0.2], under: { id: 'a', name: 'Card' } });
   });
 
-  it('a drag with the path tool draws a path, shown while it is drawn, a pin when the finger lifts', () => {
+  it('a drag with the path tool draws a path, shown while it is drawn, a pin when the finger lifts', async () => {
     st.studio.tool.value = 'path';
     pressPicture([100, 400], new Event('pointerdown') as PointerEvent, () => null, toComp, area);
     for (let i = 1; i <= 10; i++) move(100 + i * 70, 400 - i * 30);
     expect(st.studio.drawing.value!.length).toBeGreaterThan(5);
     dispatchEvent(new Event('pointerup'));
     expect(st.studio.drawing.value).toBeNull();
+    await vi.waitFor(() => expect(st.studio.pins.value).toHaveLength(1));
     const p = st.studio.pins.value[0];
     expect(p.kind).toBe('path');
     expect(p.kind === 'path' && p.points.length).toBe(2);

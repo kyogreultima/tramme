@@ -532,12 +532,15 @@ describe('the sandboxed drawing', () => {
     try {
       const project = doc().doc;
       project.compositions[project.root].layers.box = { type: 'shape.rect', props: { radius: { $expr: '3 + 4' } } } as never;
+      project.compositions[project.root].order.push('box');
       const { host } = pair(new Map(), undefined, (modules) => makeSandboxDraw(modules));
       host.setDoc({ doc: project, docUrl: DOC_URL, images: {}, json: {}, fonts: [] });
       await expect(host.evaluateValue('box.radius', 0, project.root)).resolves.toBe(7);
       await expect(host.evaluateSeries(['box.radius'], [0, 0.5, 1], project.root)).resolves.toEqual([[7, 7, 7]]);
       const layers = await host.evaluateLayers(['box'], 0, project.root);
       expect(layers[0]).toMatchObject({ id: 'box', props: { radius: 7 }, transform: { opacity: 1 } });
+      await expect(host.samplePlaced(0, project.root)).resolves.toMatchObject([{ id: 'box', type: 'shape.rect', opacity: 1 }]);
+      await expect(host.samplePlaced(Number.NaN, project.root)).rejects.toThrow('invalid sandbox placed sample');
       await expect(host.evaluateLayers(Array(65).fill('box'), 0, project.root)).rejects.toThrow('invalid sandbox layers');
       await expect(host.evaluateValue('$comp.unknown', 0, project.root)).rejects.toThrow();
     } finally { (globalThis as any).self = oldSelf; }
@@ -592,6 +595,7 @@ describe('the sandboxed drawing', () => {
       evaluateValue: async () => 0,
       evaluateSeries: async () => [[0]],
       evaluateLayers: async () => [],
+      samplePlaced: async () => [],
       renderFrame: async () => ({ err: 'not this test' }),
     };
     const { host } = pair(new Map([['blob:stars', plugin()]]), undefined, () => sandbox);
@@ -617,6 +621,7 @@ describe('the sandboxed drawing', () => {
       evaluateValue: async () => 0,
       evaluateSeries: async () => [[0]],
       evaluateLayers: async () => [],
+      samplePlaced: async () => [],
       renderFrame: async (p) => {
         if (!p.videos || !p.videos.clip) return { err: 'no video frame shipped' };
         const b = { width: 100 } as unknown as ImageBitmap;
@@ -640,6 +645,7 @@ describe('the sandboxed drawing', () => {
       evaluateValue: async () => 0,
       evaluateSeries: async () => [[0]],
       evaluateLayers: async () => [],
+      samplePlaced: async () => [],
       renderFrame: async (p) => { frames.push(p); return { bitmap, transfer: [bitmap] }; },
     }));
     host.setDoc({ doc: { assets: {} }, docUrl: DOC_URL, images: {}, json: {}, fonts: [] });
@@ -670,6 +676,7 @@ describe('the sandboxed drawing', () => {
         return addresses.map((_, i) => times.map((t) => i + t));
       },
       evaluateLayers: async () => [],
+      samplePlaced: async () => [],
       renderFrame: async () => ({}),
     }));
     expect(await host.evaluateSeries(['layer.x', 'layer.y'], [0, 0.5], 'root')).toEqual([[0, 0.5], [1, 1.5]]);

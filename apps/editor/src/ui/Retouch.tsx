@@ -4,21 +4,37 @@
 // studio.ts and the pure parts in retouch.ts; these are the views and the gesture.
 
 import type { RefObject } from 'preact';
+import { useEffect, useState } from 'preact/hooks';
 import { Evaluator, sampleAt, type Vec2 } from '@tramme/core';
 import { running } from '../ai/conversation.ts';
 import { draft } from '../attachments.ts';
-import { comp, S, uiTime } from '../state.ts';
+import { comp, S, toast, uiTime } from '../state.ts';
 import { sandboxedDoc } from '../installed.ts';
+import { pluginHost } from '../plugins/index.ts';
+import { ensureDeclared, ensureSandboxDoc, moduleItemsOf } from '../plugins/sandbox-draw.ts';
+import { fileProject, sameFileProject } from '../files.ts';
+import { preview } from '../preview.ts';
 import { addPin, cancelReview, confirmReview, editRetouch, moveRetouch, notes, removePin, removeRetouch, resetRetouch, sendRetouches, strokeDone, studio, toggleReview } from '../studio.ts';
 import { anchorPoint, summaryOf, type Pin, type Placed, type Pt } from '../retouch.ts';
 import { Icon } from './icons.tsx';
 import { t } from '../i18n/index.ts';
 
 /** the layers on the picture now, with their boxes: what an area is proposed from */
-export function placedNow(): Placed[] {
-  const doc = S.doc.peek(), id = S.compId.peek();
+export async function placedNow(): Promise<Placed[]> {
+  const doc = S.doc.peek(), id = S.compId.peek(), time = uiTime.peek();
+  if (sandboxedDoc(doc)) {
+    const project = fileProject(), renderer = preview.renderer;
+    if (!renderer) throw new Error('preview is not ready');
+    const base = new URL(project.docUrl, location.href).href, host = pluginHost(base);
+    await ensureDeclared(host, moduleItemsOf(doc, base));
+    if (!sameFileProject(project) || S.doc.peek() !== doc || S.compId.peek() !== id || uiTime.peek() !== time) throw new Error(t('common.projectChangedDuringFile'));
+    ensureSandboxDoc(host, { doc, docUrl: base, loaded: (asset) => { try { return renderer.assets.get(asset); } catch { return null; } } });
+    const layers = await host.samplePlaced(time, id);
+    if (!sameFileProject(project) || S.doc.peek() !== doc || S.compId.peek() !== id || uiTime.peek() !== time) throw new Error(t('common.projectChangedDuringFile'));
+    return layers;
+  }
   try {
-    return sampleAt(new Evaluator(doc, S.registry.peek(), { allowExpressions: !sandboxedDoc(doc) }), id, uiTime.peek()).layers.map((p) => ({ id: p.id, name: p.layer.name ?? p.id, type: p.layer.type, box: p.box, opacity: p.opacity, locked: p.layer.locked }));
+    return sampleAt(new Evaluator(doc, S.registry.peek()), id, time).layers.map((p) => ({ id: p.id, name: p.layer.name ?? p.id, type: p.layer.type, box: p.box, opacity: p.opacity, locked: p.layer.locked }));
   } catch { return []; }
 }
 
@@ -52,8 +68,12 @@ export function pressPicture(p: Vec2, _e: PointerEvent, hit: () => string | null
     studio.drawing.value = null;
     // a tap is no stroke: nothing is drawn
     if (ev.type === 'pointercancel' || pts.length < 3 || long(pts) < 0.03) return;
-    strokeDone(tool, pts, placedNow(), { w: c.width, h: c.height }, under);
-    requestAnimationFrame(() => area.current?.focus());
+    const project = fileProject();
+    void placedNow().then((placed) => {
+      if (!sameFileProject(project)) return;
+      strokeDone(tool, pts, placed, { w: c.width, h: c.height }, under);
+      requestAnimationFrame(() => area.current?.focus());
+    }).catch((e) => { if (sameFileProject(project)) toast(t('studio.areaUnavailable', { error: (e as Error).message })); });
   };
   addEventListener('pointermove', move); addEventListener('pointerup', done); addEventListener('pointercancel', done);
   return true;
@@ -92,7 +112,18 @@ export function Marks() {
   const listed = studio.retouches.value.flatMap((r) => r.pins), all = [...listed, ...draft];
   const near = notes.value.filter(({ note }) => note.pin && Math.abs(note.at! - now) < 0.75);
   const k = comp.value;
-  const boxes = review ? placedNow().filter((p) => p.box && review.candidates.some((c) => c.id === p.id)) : [];
+  const doc = S.doc.value, projectId = S.project.value?.id, docUrl = S.docUrl.value, compId = S.compId.value;
+  const [sample, setSample] = useState<{ doc: typeof doc; projectId: string; docUrl: string; compId: string; time: number; layers: Placed[] } | null>(null);
+  useEffect(() => {
+    if (!review) return;
+    let live = true;
+    void placedNow().then((layers) => {
+      if (live) setSample({ doc, projectId: projectId!, docUrl, compId, time: now, layers });
+    }).catch((e) => { if (live) toast(t('studio.areaUnavailable', { error: (e as Error).message })); });
+    return () => { live = false; };
+  }, [review, doc, projectId, docUrl, compId, now]);
+  const boxes = review && sample?.doc === doc && sample.projectId === projectId && sample.docUrl === docUrl && sample.compId === compId && sample.time === now
+    ? sample.layers.filter((p) => p.box && review.candidates.some((c) => c.id === p.id)) : [];
   return (
     <div class="pins">
       <svg class="strokes" viewBox="0 0 1 1" preserveAspectRatio="none">
