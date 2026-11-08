@@ -637,6 +637,9 @@ export function browserHost(docUrl: string): PluginHost {
     if (host.closed()) return;
     clearTimeout(startupTimer);
     host.dispose(reason);
+    urls.clear();
+    fontBytes.clear();
+    queue.length = 0;
     window.removeEventListener('message', onMessage);
     frame.contentWindow?.postMessage({ kind: 'stop' }, '*');
     frame.remove();
@@ -652,9 +655,17 @@ export function browserHost(docUrl: string): PluginHost {
     if (event.data?.kind === 'worker') {
       const message = event.data.data as FromWorker;
       if (message?.kind === 'loaded' && Array.isArray(message.urls) && message.urls.length <= 64 && message.urls.every((url) => typeof url === 'string' && url.length <= 4 * 1024 * 1024)) {
-        message.urls = message.urls.map((url) => urls.get(url) ?? url);
+        message.urls = message.urls.map((url) => {
+          const original = urls.get(url) ?? url;
+          urls.delete(url);
+          return original;
+        });
       }
-      if (message?.kind === 'loadFailed' && typeof message.url === 'string' && message.url.length <= 4 * 1024 * 1024) message.url = urls.get(message.url) ?? message.url;
+      if (message?.kind === 'loadFailed' && typeof message.url === 'string' && message.url.length <= 4 * 1024 * 1024) {
+        const original = urls.get(message.url) ?? message.url;
+        urls.delete(message.url);
+        message.url = original;
+      }
       receive(message);
     }
   };
