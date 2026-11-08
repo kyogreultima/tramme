@@ -8,8 +8,9 @@
 // the exports.
 
 import { openverse } from './openverse.ts';
-import { analyseAudio, audioClips, isAudioAnalysis, layerClock, pointer, searchSounds, soundCues, soundFigures, soundFlaws, staticValue, variantsOf, volumeBlockKeys, type Layer, type Op, type SoundCue, type SoundEntry, type SoundFigures, type SoundRole, type SoundVisual, type ToolContext, type ToolType } from '@tramme/core';
+import { analyseAudio, audioClips, isAudioAnalysis, pointer, searchSounds, soundCues, soundFigures, soundFlaws, staticValue, variantsOf, volumeBlockKeys, type Layer, type Op, type SoundCue, type SoundEntry, type SoundFigures, type SoundRole, type SoundVisual, type ToolContext, type ToolType } from '@tramme/core';
 import { editorEvaluator } from './evaluator.ts';
+import { sampleLayerClock } from './isolated-clock.ts';
 import { sandboxedDoc } from './installed.ts';
 import { musicCutPlan, type MusicCutPlan } from './music-plan.ts';
 import { musicSections } from './music-structure.ts';
@@ -103,11 +104,9 @@ export async function momentsOf(ctx: ToolContext, at: unknown, on: unknown, laye
   const cued = async (keep: (x: SoundCue) => boolean) => found.push(...(await cuesOf(ctx)).filter((x) => keep(x) && (!named.length || named.includes(x.layer))).map((x) => ({ t: x.t, visual: x.kind, weight: x.weight })));
   // where a layer plays a file: composition times of a time in that file (at the layer's speed, once per turn of a loop)
   const playing = (asset: string) => (Object.entries(c.layers) as [string, Layer][]).filter(([, l]) => (l.type === 'audio' || l.type === 'video') && staticValue(l.props?.[l.type]) === asset).map(([id]) => id);
-  const ev = editorEvaluator(ctx.doc, ctx.registry);
-  const inFile = (asset: string, fileTimes: number[]) => playing(asset).flatMap((id) => {
-    const { moments } = layerClock(ev, ctx.compId, id);
-    return fileTimes.flatMap(moments);
-  });
+  const inFile = async (asset: string, fileTimes: number[]) => (await Promise.all(playing(asset).map(async (id) =>
+    (await sampleLayerClock(ctx, id, [], fileTimes)).moments.flat(),
+  ))).flat();
   const read = words.some((w) => ['cuts', 'beats', 'bars'].includes(w)) ? await analyses(ctx) : () => undefined;
   const assets = Object.keys(ctx.doc.assets);
   for (const w of words) {
@@ -121,12 +120,12 @@ export async function momentsOf(ctx: ToolContext, at: unknown, on: unknown, laye
       push((Object.values(c.layers) as Layer[]).filter((l) => l.type === 'video').map((l) => l.in ?? 0).filter((x) => x > 0));
       for (const id of assets.filter((a) => a.startsWith('shots-'))) {
         const s = read(id) as { source?: string; cuts?: number[] } | undefined;
-        if (s?.source && Array.isArray(s.cuts)) push(inFile(s.source, s.cuts));
+        if (s?.source && Array.isArray(s.cuts)) push(await inFile(s.source, s.cuts));
       }
     } else if (w === 'beats' || w === 'bars') {
       for (const id of assets.filter((a) => a.startsWith('analysis-'))) {
         const a = read(id);
-        if (isAudioAnalysis(a) && a.source) push(inFile(a.source, w === 'bars' ? a.downbeats : a.beats));
+        if (isAudioAnalysis(a) && a.source) push(await inFile(a.source, w === 'bars' ? a.downbeats : a.beats));
       }
     } else throw new Error(`unknown moment "${w}": ${MOMENTS.join(', ')}, or times in seconds`);
   }

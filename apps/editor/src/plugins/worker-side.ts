@@ -5,7 +5,7 @@
 // project is a message answered by the page. Nothing here touches the DOM.
 
 import { Registry, type CheckContext, type CheckType, type EffectType, type ModifierType, type NodeType, type PluginModule, type QualityIssue, type SoundCue, type ToolContext, type ToolOutput } from '@tramme/core';
-import type { Ask, CheckCtxData, DrawPayload, DrawResult, FramePayload, FromWorker, LayerSample, PlacedSample, PluginDecl, SandboxDoc, SchemaEffect, SchemaModifier, SchemaNode, ToWorker, ToolCtxData } from './protocol.ts';
+import type { Ask, CheckCtxData, ClockSample, DrawPayload, DrawResult, FramePayload, FromWorker, LayerSample, PlacedSample, PluginDecl, SandboxDoc, SchemaEffect, SchemaModifier, SchemaNode, ToWorker, ToolCtxData } from './protocol.ts';
 
 /** the sandbox id of an installed plugin (installed:<file>): the project's own plugins have the document's asset ids */
 export const INSTALLED = 'installed:';
@@ -30,6 +30,7 @@ export interface SandboxDrawSide {
   evaluateSeries(addresses: string[], times: number[], compId: string): Promise<unknown[][]>;
   evaluateLayers(ids: string[], t: number, compId: string): Promise<LayerSample[]>;
   soundCues(compId: string): Promise<SoundCue[]>;
+  sampleClock(layerId: string, compId: string, compTimes: number[], fileTimes: number[]): Promise<ClockSample>;
   samplePlaced(t: number, compId: string): Promise<PlacedSample[]>;
 }
 
@@ -211,6 +212,18 @@ export function startWorkerSide({ post, importModule, sandbox: makeSandbox }: Wo
         void sandbox.soundCues(m.compId)
           .then((values) => post({ kind: 'soundCues', call: m.call, values }))
           .catch((e: Error) => post({ kind: 'soundCues', call: m.call, err: e.message }));
+        return;
+      }
+      if (m.kind === 'sampleClock') {
+        if (!sandbox) { post({ kind: 'sampledClock', call: m.call, err: 'the sandbox cannot sample a clock here' }); return; }
+        if (typeof m.layerId !== 'string' || m.layerId.length > 256 || typeof m.compId !== 'string' || m.compId.length > 256 ||
+            !Array.isArray(m.compTimes) || !Array.isArray(m.fileTimes) || m.compTimes.length + m.fileTimes.length > 512 ||
+            m.compTimes.some((t) => !Number.isFinite(t)) || m.fileTimes.some((t) => !Number.isFinite(t))) {
+          post({ kind: 'sampledClock', call: m.call, err: 'invalid sandbox clock request' }); return;
+        }
+        void sandbox.sampleClock(m.layerId, m.compId, m.compTimes, m.fileTimes)
+          .then((value) => post({ kind: 'sampledClock', call: m.call, value }))
+          .catch((e: Error) => post({ kind: 'sampledClock', call: m.call, err: e.message }));
         return;
       }
       if (m.kind === 'samplePlaced') {
