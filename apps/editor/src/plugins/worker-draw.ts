@@ -318,7 +318,7 @@ export function makeSandboxDraw(modules: Map<string, PluginModule>): SandboxDraw
       const evaluator = new Evaluator(doc, reg, { data: (id) => side.json.get(id) });
       const layers = sampleAt(evaluator, compId, t).layers;
       if (layers.length > 4096) throw new Error('sandbox placed sample exceeds 4096 layers');
-      return structuredClone(layers.map((p) => ({ id: p.id, name: p.layer.name ?? p.id, type: p.layer.type, box: p.box, opacity: p.opacity, locked: p.layer.locked })));
+      return structuredClone(layers.map((p) => ({ id: p.id, name: p.layer.name ?? p.id, type: p.layer.type, box: p.box, opacity: p.opacity, locked: p.layer.locked, textSize: p.textSize })));
     },
     async renderFrame(p) {
       try { await fontsReady; return await renderFrame(p); }

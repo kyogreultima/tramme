@@ -10,7 +10,7 @@ import type { CheckType, NodeType, EffectType, KitType, ModifierType, PluginMeta
 /** plain evaluated values used by selection geometry; node callbacks stay in the worker */
 export type LayerSample = { id: string; props: Record<string, unknown>; transform: EvaluatedTransform; masks: { id: string; props: Record<string, unknown> }[] } | { id: string; err: string };
 /** placed layer data for area selection; node callbacks and raw properties stay in the worker */
-export type PlacedSample = { id: string; name: string; type: string; box: { x: number; y: number; w: number; h: number } | null; opacity: number; locked?: boolean };
+export type PlacedSample = { id: string; name: string; type: string; box: { x: number; y: number; w: number; h: number } | null; opacity: number; locked?: boolean; textSize?: number };
 /** file/composition time mapping for authoring tools; no evaluator callback crosses */
 export type ClockSample = { clock: MediaClock; fileTimes: number[]; moments: number[][] };
 export type MotionSample = { times: number[]; motion: number[] };
