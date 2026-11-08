@@ -1406,6 +1406,7 @@
     "hdrUnavailable": "HDR: this browser's canvas cannot hold it yet, the export stays SDR"
   },
   "viewport": {
+    "isolatedUnavailable": "Isolated selection could not be calculated: {error}",
     "waveform": "Waveform",
     "vectorscope": "Vectorscope",
     "socialSafeZoneReels": "Social safe zone (Reels, TikTok)",

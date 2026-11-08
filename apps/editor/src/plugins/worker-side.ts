@@ -5,7 +5,7 @@
 // project is a message answered by the page. Nothing here touches the DOM.
 
 import { Registry, type CheckContext, type CheckType, type EffectType, type ModifierType, type NodeType, type PluginModule, type QualityIssue, type ToolContext, type ToolOutput } from '@tramme/core';
-import type { Ask, CheckCtxData, DrawPayload, DrawResult, FramePayload, FromWorker, PluginDecl, SandboxDoc, SchemaEffect, SchemaModifier, SchemaNode, ToWorker, ToolCtxData } from './protocol.ts';
+import type { Ask, CheckCtxData, DrawPayload, DrawResult, FramePayload, FromWorker, LayerSample, PluginDecl, SandboxDoc, SchemaEffect, SchemaModifier, SchemaNode, ToWorker, ToolCtxData } from './protocol.ts';
 
 /** the sandbox id of an installed plugin (installed:<file>): the project's own plugins have the document's asset ids */
 export const INSTALLED = 'installed:';
@@ -28,6 +28,7 @@ export interface SandboxDrawSide {
   /** evaluate one property without running its expression on the page */
   evaluateValue(address: string, t: number, compId: string): Promise<unknown>;
   evaluateSeries(addresses: string[], times: number[], compId: string): Promise<unknown[][]>;
+  evaluateLayers(ids: string[], t: number, compId: string): Promise<LayerSample[]>;
 }
 
 export interface WorkerSideOptions {
@@ -191,6 +192,15 @@ export function startWorkerSide({ post, importModule, sandbox: makeSandbox }: Wo
         void sandbox.evaluateSeries(m.addresses, m.times, m.compId)
           .then((values) => post({ kind: 'evaluatedSeries', call: m.call, values }))
           .catch((e: Error) => post({ kind: 'evaluatedSeries', call: m.call, err: e.message }));
+        return;
+      }
+      if (m.kind === 'evaluateLayers') {
+        if (!sandbox) { post({ kind: 'evaluatedLayers', call: m.call, err: 'the sandbox cannot evaluate here' }); return; }
+        if (!Array.isArray(m.ids) || !m.ids.length || m.ids.length > 64 || m.ids.some((id) => typeof id !== 'string' || id.length > 256) ||
+            !Number.isFinite(m.t) || typeof m.compId !== 'string' || m.compId.length > 256) { post({ kind: 'evaluatedLayers', call: m.call, err: 'invalid sandbox layers' }); return; }
+        void sandbox.evaluateLayers(m.ids, m.t, m.compId)
+          .then((values) => post({ kind: 'evaluatedLayers', call: m.call, values }))
+          .catch((e: Error) => post({ kind: 'evaluatedLayers', call: m.call, err: e.message }));
         return;
       }
       if (m.kind === 'export') {

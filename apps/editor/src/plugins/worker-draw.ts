@@ -19,7 +19,7 @@ import { builtinRegistry } from '@tramme/nodes';
 import { CanvasPool, Compositor, drawComposed, drawFrame, drawLayers, finishOf, subTimes } from '@tramme/render/src/index.ts';
 import { nodeContext, resizeNode } from '@tramme/render/src/gpu.ts';
 import { RecordingPath2D } from './recording-path.ts';
-import type { DrawPayload, DrawResult, FramePayload, SandboxDoc } from './protocol.ts';
+import type { DrawPayload, DrawResult, FramePayload, LayerSample, SandboxDoc } from './protocol.ts';
 import type { SandboxDrawSide } from './worker-side.ts';
 
 const MAX_PIXELS = 2048;
@@ -248,6 +248,19 @@ export function makeSandboxDraw(modules: Map<string, PluginModule>): SandboxDraw
       for (const [id, mod] of modules) reg.use(mod, id);
       const evaluator = new Evaluator(doc, reg, { data: (id) => side.json.get(id) });
       return structuredClone(addresses.map((address) => times.map((t) => evaluator.value(address, t, compId))));
+    },
+    async evaluateLayers(ids, t, compId): Promise<LayerSample[]> {
+      const doc = theDoc();
+      if (!doc || !doc.compositions[compId]) throw new Error('unknown sandbox composition');
+      const reg = builtinRegistry().clone();
+      for (const [id, mod] of modules) reg.use(mod, id);
+      const evaluator = new Evaluator(doc, reg, { data: (id) => side.json.get(id) });
+      return ids.map((id): LayerSample => {
+        try {
+          const layer = evaluator.layerAt(id, t, compId);
+          return structuredClone({ id, props: layer.props, transform: layer.transform, masks: layer.masks });
+        } catch (e) { return { id, err: (e as Error).message.slice(0, 512) }; }
+      });
     },
     async renderFrame(p) {
       try { await fontsReady; return await renderFrame(p); }

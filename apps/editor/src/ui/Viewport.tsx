@@ -15,6 +15,9 @@ import { editAtOps, flatTree, layerName, parentOf, propPath, rawProp } from '../
 import { assetData, preview, previewInfo } from '../preview.ts';
 import { prefs, setPrefs, settingsOpen, type Preferences } from '../settings.ts';
 import { sandboxedDoc } from '../installed.ts';
+import { pluginHost } from '../plugins/index.ts';
+import { ensureDeclared, ensureSandboxDoc, moduleItemsOf } from '../plugins/sandbox-draw.ts';
+import { fileProject, sameFileProject } from '../files.ts';
 import { openMenu, type MenuItem } from './controls.tsx';
 import { Icon } from './icons.tsx';
 import { m, t } from '../i18n/index.ts';
@@ -30,14 +33,19 @@ const pan = signal<Vec2>([0, 0]);
 interface Geo { matrix: DOMMatrix; parent: DOMMatrix; bounds: Rect; layer: EvaluatedLayer }
 
 /** world matrix and local bounds of a layer at time t */
-function geometry(ev: Evaluator, c: Composition, compId: string, id: string, t: number): Geo | null {
+function geometry(layerAt: (id: string) => EvaluatedLayer | null, c: Composition, id: string, t: number): Geo | null {
   if (!preview.renderer) return null;
   let parent = new DOMMatrix();
   const chain: string[] = [];
   for (let p = parentOf(c, id); p; p = parentOf(c, p)) chain.unshift(p);
   try {
-    for (const p of chain) parent = parent.multiply(localMatrix(ev.layerAt(p, t, compId).transform));
-    const L = ev.layerAt(id, t, compId);
+    for (const p of chain) {
+      const layer = layerAt(p);
+      if (!layer) return null;
+      parent = parent.multiply(localMatrix(layer.transform));
+    }
+    const L = layerAt(id);
+    if (!L) return null;
     const host = preview.renderer.hostFactory({ t, frame: Math.round(t * c.fps) })(id);
     const bounds = L.node.bounds?.(L.props, host) ?? (L.node.render.canvas2d ? { x: 0, y: 0, w: c.width, h: c.height } : null);
     if (!bounds) return null;
@@ -127,9 +135,50 @@ export function Viewport({ bare = false, inset = INSET, overlay, intercept }: Vi
   const [hover, setHover] = useState<string | null>(null);
   const [spaceDown, setSpace] = useState(false);
   const c = comp.value, doc = viewDoc.value, now = S.time.value, compId = S.compId.value;
+  const projectId = S.project.value?.id, docUrl = S.docUrl.value;
   const reg = S.registry.value;
   const isolated = prefs.value.sandboxPreview || sandboxedDoc(doc);
   const ev = useMemo(() => new Evaluator(doc, reg, { data: assetData, allowExpressions: !isolated }), [doc, reg, isolated]);
+  const [remote, setRemote] = useState<{ doc: TrammeDoc; projectId: string; docUrl: string; compId: string; t: number; layers: Map<string, EvaluatedLayer>; error?: string } | null>(null);
+  const currentRemote = remote?.doc === doc && remote.projectId === projectId && remote.docUrl === docUrl && remote.compId === compId && remote.t === now ? remote : null;
+  useEffect(() => {
+    if (!isolated) return;
+    const ids = flatTree(c).map((item) => item.id);
+    if (!ids.length) return;
+    const project = fileProject();
+    let live = true;
+    const timer = setTimeout(() => { void (async () => {
+      try {
+        const renderer = preview.renderer;
+        if (!renderer) throw new Error('preview is not ready');
+        const base = new URL(project.docUrl, location.href).href;
+        const host = pluginHost(base);
+        await ensureDeclared(host, moduleItemsOf(doc, base));
+        if (!live || !sameFileProject(project)) return;
+        ensureSandboxDoc(host, { doc, docUrl: base, loaded: (id) => { try { return renderer.assets.get(id); } catch { return null; } } });
+        const layers = new Map<string, EvaluatedLayer>(), errors: string[] = [];
+        for (let i = 0; i < ids.length; i += 64) {
+          const samples = await host.evaluateLayers(ids.slice(i, i + 64), now, compId);
+          if (!live || !sameFileProject(project)) return;
+          for (const sample of samples) {
+            if ('err' in sample) { errors.push(`${sample.id}: ${sample.err}`); continue; }
+            const layer = c.layers[sample.id];
+            if (!layer || !reg.hasNode(layer.type)) continue;
+            layers.set(sample.id, { id: sample.id, layer, node: reg.node(layer.type), props: sample.props, transform: sample.transform,
+              effects: [], masks: sample.masks, children: [], clip: null });
+          }
+        }
+        if (live && sameFileProject(project)) setRemote({ doc, projectId: project.id, docUrl: project.docUrl, compId, t: now, layers, error: errors[0] });
+      } catch (e) {
+        if (live && sameFileProject(project)) setRemote({ doc, projectId: project.id, docUrl: project.docUrl, compId, t: now, layers: new Map(), error: (e as Error).message });
+      }
+    })(); }, 40);
+    return () => { live = false; clearTimeout(timer); };
+  }, [doc, compId, now, isolated, projectId, docUrl, reg]);
+  const layerAt = (id: string): EvaluatedLayer | null => {
+    if (isolated) return currentRemote?.layers.get(id) ?? null;
+    return ev.layerAt(id, now, compId);
+  };
 
   useLayoutEffect(() => {
     stageRef.current!.prepend(preview.canvas);
@@ -173,21 +222,21 @@ export function Viewport({ bare = false, inset = INSET, overlay, intercept }: Vi
       let ok = true;
       for (let q = it.parent; q; q = parentOf(c, q)) { const pl = c.layers[q]; if (pl.visible === false || !layerActive(pl, c, now)) ok = false; }
       if (!ok) continue;
-      const g = geometry(ev, c, compId, it.id, now);
+      const g = geometry(layerAt, c, it.id, now);
       if (g && g.bounds.w * g.bounds.h < c.width * c.height * 0.98 && inside(g, p)) return it.id;
     }
     // full-frame layers last: they would always win
     for (const it of flatTree(c)) {
       const l = it.layer;
       if (l.visible === false || l.locked || l.children || l.type === 'audio' || !layerActive(l, c, now)) continue;
-      const g = geometry(ev, c, compId, it.id, now);
+      const g = geometry(layerAt, c, it.id, now);
       if (g && inside(g, p)) return it.id;
     }
     return null;
   };
 
   const selected = S.selection.value.filter((id) => c.layers[id]);
-  const geo = !bare && selected.length === 1 ? geometry(ev, c, compId, selected[0], now) : null;
+  const geo = !bare && selected.length === 1 ? geometry(layerAt, c, selected[0], now) : null;
   const [vertex, setVertexAt] = useState<number | null>(null);
   /** the path the selected vertex belongs to: a node's path property, or a mask's ('masks.<id>.path') */
   const [vertexPath, setVertexPath] = useState<string | null>(null);
@@ -441,7 +490,7 @@ export function Viewport({ bare = false, inset = INSET, overlay, intercept }: Vi
     if (!id) { if (!e.shiftKey) select([]); return; }
     if (e.shiftKey) { select(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]); return; }
     select([id]);
-    const g = geometry(ev, c, compId, id, now);
+    const g = geometry(layerAt, c, id, now);
     if (g) dragMove(e, id, g);
   };
 
@@ -489,7 +538,7 @@ export function Viewport({ bare = false, inset = INSET, overlay, intercept }: Vi
     return <g>{side(prev, 'grayscale(1) sepia(1) hue-rotate(-45deg) saturate(5)', 'p')}{side(next, 'grayscale(1) sepia(1) hue-rotate(60deg) saturate(4)', 'n')}</g>;
   };
 
-  const hoverGeo = hover ? geometry(ev, c, compId, hover, now) : null;
+  const hoverGeo = hover ? geometry(layerAt, c, hover, now) : null;
   const pending = S.proposal.value?.status === 'pending' && previewDoc.value;
   const handleR = (coarse ? 11 : 5) / scale;
   const grid = S.grid.value, safe = S.safe.value, onion = S.onion.value;
@@ -497,6 +546,7 @@ export function Viewport({ bare = false, inset = INSET, overlay, intercept }: Vi
   return (
     <div class={`viewport${bare ? ' bare' : ''}`} data-tour="viewport" ref={host} onWheel={onWheel} onPointerDownCapture={touchDown} onPointerMove={touchMove} onPointerUp={touchUp} onPointerCancel={touchUp} style={{ cursor: spaceDown ? 'grab' : undefined }}>
       {!bare && grading() && <Scopes />}
+      {!bare && currentRemote?.error && <div class="hint" style={{ position: 'absolute', top: 48, right: 12, zIndex: 4 }}>{t('viewport.isolatedUnavailable', { error: currentRemote.error })}</div>}
       {!bare && <div class="toolbar" data-tour="viewport-tools" onPointerDown={(e) => e.stopPropagation()}>
         <button class="zoom" onClick={zoomMenu} title={t('viewport.zoomCtrlWheel')}>{Math.round(scale * 100)} %</button>
         <span class="sep" />
@@ -520,7 +570,7 @@ export function Viewport({ bare = false, inset = INSET, overlay, intercept }: Vi
           </g>)}
           {onionSkin()}
           {hoverGeo && <polygon class="gizmo-hover" points={poly(outline(hoverGeo, c))} />}
-          {!bare && selected.length > 1 && selected.map((id) => { const g = geometry(ev, c, compId, id, now); return g && <polygon key={id} class="gizmo-box" points={poly(outline(g, c))} />; })}
+          {!bare && selected.length > 1 && selected.map((id) => { const g = geometry(layerAt, c, id, now); return g && <polygon key={id} class="gizmo-box" points={poly(outline(g, c))} />; })}
           {geo && (() => {
             const pts = outline(geo, c);
             const tr = geo.layer.transform;

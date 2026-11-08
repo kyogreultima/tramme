@@ -1406,6 +1406,7 @@
     "hdrUnavailable": "HDR : le canevas de ce navigateur ne peut pas encore le tenir, l'export reste en SDR"
   },
   "viewport": {
+    "isolatedUnavailable": "La sélection isolée n'a pas pu être calculée : {error}",
     "waveform": "Forme d'onde",
     "vectorscope": "Vectorscope",
     "socialSafeZoneReels": "Zone sûre réseaux (Reels, TikTok)",

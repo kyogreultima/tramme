@@ -5,7 +5,7 @@
 // registry carries — plugins/vocabulary.ts puts them there).
 
 import { toolOutput, type CheckContext, type NodeType, type PlacedLayer, type QualityIssue, type ToolContext, type ToolOutput } from '@tramme/core';
-import type { Ask, DrawPayload, DrawResult, FramePayload, FromWorker, PluginDecl, SandboxDoc, ToWorker } from './protocol.ts';
+import type { Ask, DrawPayload, DrawResult, FramePayload, FromWorker, LayerSample, PluginDecl, SandboxDoc, ToWorker } from './protocol.ts';
 
 /** the schema of a node without its code: what a check's samples may cross */
 const schemaOf = (n: NodeType) => ({ type: n.type, title: n.title, category: n.category, description: n.description, ai: n.ai, props: n.props, ...(n.container ? { container: true } : {}) });
@@ -120,6 +120,7 @@ export interface PluginHost {
   evaluateValue(address: string, t: number, compId: string): Promise<unknown>;
   /** values[address][time], sampled together in one isolated evaluator */
   evaluateSeries(addresses: string[], times: number[], compId: string): Promise<unknown[][]>;
+  evaluateLayers(ids: string[], t: number, compId: string): Promise<LayerSample[]>;
   /** stop: every call waiting is refused, with `reason` when there is one */
   dispose(reason?: string): void;
   /** disposed (its worker stopped): the next project's or call's sandbox is a new one */
@@ -295,6 +296,17 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
       else w.resolve(m.values);
       return;
     }
+    if (m.kind === 'evaluatedLayers') {
+      if (m.err !== undefined && (typeof m.err !== 'string' || m.err.length > 4096)) { invalid(); return; }
+      if (responseTooLarge(m.values) || responseTooLarge(m.err)) { timeout('sandbox response exceeds 8 MB'); return; }
+      const w = waits.get(m.call);
+      if (!w) return;
+      waits.delete(m.call);
+      if (m.err) w.reject(new Error(m.err));
+      else if (!Array.isArray(m.values)) w.reject(new Error('invalid sandbox layers'));
+      else w.resolve(m.values);
+      return;
+    }
     if (m.kind === 'progress') {
       if (!Number.isFinite(m.done) || !Number.isFinite(m.total) || (m.step !== undefined && (typeof m.step !== 'string' || m.step.length > 4096))) { invalid(); return; }
       const ctx = bridges.get(m.call);
@@ -410,6 +422,14 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
           typeof compId !== 'string' || compId.length > 256) throw new Error('invalid sandbox series');
       const values = await run({ kind: 'evaluateSeries', call: ++call, addresses, times, compId }) as unknown[][];
       if (!Array.isArray(values) || values.length !== addresses.length || values.some((row) => !Array.isArray(row) || row.length !== times.length)) throw new Error('invalid sandbox series response');
+      return values;
+    },
+    async evaluateLayers(ids, t, compId) {
+      if (!Array.isArray(ids) || !ids.length || ids.length > 64 || ids.some((id) => typeof id !== 'string' || id.length > 256) ||
+          !Number.isFinite(t) || typeof compId !== 'string' || compId.length > 256) throw new Error('invalid sandbox layers');
+      const values = await run({ kind: 'evaluateLayers', call: ++call, ids, t, compId }) as LayerSample[];
+      if (!Array.isArray(values) || values.length !== ids.length || values.some((value, i) => !value || value.id !== ids[i] ||
+          !('err' in value) && (!value.transform || !value.props || !Array.isArray(value.masks)))) throw new Error('invalid sandbox layers response');
       return values;
     },
     dispose(reason) {
