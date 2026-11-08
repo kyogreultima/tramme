@@ -255,6 +255,10 @@ describe('the plugin sandbox', () => {
     receive({ kind: 'ask', id: 1, call: 1, q: { kind: 'readText', path: '../secret.txt' } });
     receive({ kind: 'ask', id: 2, call: 1, q: { kind: 'writeFile', path: '/api/keys', data: { text: 'x' } } });
     receive({ kind: 'ask', id: 3, call: 1, q: { kind: 'fetch', url: 'file:///secret.txt' } });
+    receive({ kind: 'ask', id: 4, call: 1, q: { kind: 'readText', path: 'assets/%2e%2e/secret.txt' } });
+    receive({ kind: 'ask', id: 5, call: 1, q: { kind: 'writeFile', path: 'assets/safe%2f..%2fsecret.txt', data: { text: 'x' } } });
+    receive({ kind: 'ask', id: 6, call: 1, q: { kind: 'readText', path: 'assets/notes.txt?project=other' } });
+    receive({ kind: 'ask', id: 7, call: 1, q: { kind: 'writeFile', path: 'assets/notes.txt:stream', data: { text: 'x' } } });
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(readText).not.toHaveBeenCalled();
     expect(writeFile).not.toHaveBeenCalled();
@@ -262,6 +266,7 @@ describe('the plugin sandbox', () => {
     expect(sent).toContainEqual({ kind: 'answer', id: 1, err: 'invalid project path' });
     expect(sent).toContainEqual({ kind: 'answer', id: 2, err: 'invalid project path' });
     expect(sent).toContainEqual({ kind: 'answer', id: 3, err: 'invalid network request' });
+    for (const id of [4, 5, 6, 7]) expect(sent).toContainEqual({ kind: 'answer', id, err: 'invalid project path' });
     host.dispose();
     await expect(pending).rejects.toThrow('closed');
   });

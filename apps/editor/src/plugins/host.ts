@@ -10,7 +10,7 @@ import type { Ask, ClockSample, DrawPayload, DrawResult, FramePayload, FromWorke
 /** the schema of a node without its code: what a check's samples may cross */
 const schemaOf = (n: NodeType) => ({ type: n.type, title: n.title, category: n.category, description: n.description, ai: n.ai, props: n.props, ...(n.container ? { container: true } : {}) });
 const projectPath = (value: unknown): value is string => typeof value === 'string' && value.length > 0 && value.length <= 512 &&
-  !value.includes('\\') && !value.startsWith('/') && !/^[a-z][a-z0-9+.-]*:/i.test(value) &&
+  !/[\\%?#:\u0000-\u001f\u007f]/.test(value) && !value.startsWith('/') &&
   value.split('/').every((part) => part !== '' && part !== '.' && part !== '..');
 const RESPONSE_LIMIT = 8 * 1024 * 1024;
 const OUTBOUND_LIMIT = 64 * 1024 * 1024;
