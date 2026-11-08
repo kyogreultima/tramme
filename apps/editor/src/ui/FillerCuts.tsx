@@ -11,20 +11,28 @@ import { cutsOf, restoreInput, type FillerCut } from '../fillercuts.ts';
 import { timecode } from '../model.ts';
 import { t } from '../i18n/index.ts';
 import { Icon } from './icons.tsx';
+import { fileProject, sameFileProject, type FileProject } from '../files.ts';
 
 /** the fillers list (an asset of the project) being reviewed, if any */
 export const fillerCuts = signal<string | null>(null);
 
 export function FillerCutsPanel() {
   const id = fillerCuts.value, doc = S.doc.value, a = id ? doc.assets[id] : undefined;
-  const [list, setList] = useState<{ asset: string; cuts: FillerCut[] } | null>(null);
+  const projectId = S.project.value?.id, docUrl = S.docUrl.value;
+  const [loaded, setLoaded] = useState<{ project: FileProject; list: { asset: string; cuts: FillerCut[] } } | null>(null);
+  const list = loaded && sameFileProject(loaded.project) ? loaded.list : null;
   useEffect(() => {
-    setList(null);
+    setLoaded(null);
     if (!a) return;
+    const project = fileProject();
     let live = true;
-    api.readText(S.project.peek().id, a.src).then((r) => { if (live) setList(r ? cutsOf(r.text) : null); }).catch(() => {});
+    api.readText(project.id, a.src).then((r) => {
+      if (!live || !sameFileProject(project)) return;
+      const list = r ? cutsOf(r.text) : null;
+      setLoaded(list ? { project, list } : null);
+    }).catch(() => {});
     return () => { live = false; };
-  }, [a?.src]);
+  }, [a?.src, projectId, docUrl]);
   if (!id || !a) return null;
   const fps = doc.compositions[S.compId.value]?.fps ?? 30;
   const back = (n: number) => {
