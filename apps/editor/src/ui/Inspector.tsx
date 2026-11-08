@@ -9,6 +9,7 @@ import { assetData, preview } from '../preview.ts';
 import { sandboxedDoc } from '../installed.ts';
 import { pluginHost } from '../plugins/index.ts';
 import { ensureDeclared, ensureSandboxDoc, moduleItemsOf } from '../plugins/sandbox-draw.ts';
+import { fileProject, sameFileProject } from '../files.ts';
 import { prefs } from '../settings.ts';
 import { addModifierOps, editAtOps, fixedOps, folderOf, imagesIn, keyAtOps, keyIndexAt, keysOf, removeKeyOps, removeModifierOps, setAtOps, snap, freshId, cutEndOps, fmtSeconds } from '../model.ts';
 import { addressDef, componentOf, detachPlan, modsOf, modifierParams, paramDef } from '@tramme/core';
@@ -43,29 +44,31 @@ function PropRow({ ctx, label, def, path, address }: { ctx: Ctx; label: string; 
   const keys = keysOf(raw);
   const local = evalSafe(ctx.ev, address, ctx.t, ctx.compId);
   const needsRemote = ctx.isolated && !!local.error;
-  const [remote, setRemote] = useState<{ doc: TrammeDoc; compId: string; t: number; address: string; result: { v?: unknown; error?: string } } | null>(null);
+  const projectId = S.project.value?.id, docUrl = S.docUrl.value;
+  const [remote, setRemote] = useState<{ doc: TrammeDoc; projectId: string; docUrl: string; compId: string; t: number; address: string; result: { v?: unknown; error?: string } } | null>(null);
   useEffect(() => {
     if (!needsRemote) return;
     let live = true;
     const doc = ctx.doc, compId = ctx.compId, time = ctx.t;
+    const project = fileProject();
     const timer = setTimeout(() => { void (async () => {
       try {
         const renderer = preview.renderer;
         if (!renderer) throw new Error('preview is not ready');
-        const base = new URL(S.docUrl.peek(), location.href).href;
+        const base = new URL(project.docUrl, location.href).href;
         const host = pluginHost(base);
         await ensureDeclared(host, moduleItemsOf(doc, base));
-        if (!live) return;
+        if (!live || !sameFileProject(project)) return;
         ensureSandboxDoc(host, { doc, docUrl: base, loaded: (id) => { try { return renderer.assets.get(id); } catch { return null; } } });
         const v = await host.evaluateValue(address, time, compId);
-        if (live) setRemote({ doc, compId, t: time, address, result: { v } });
+        if (live && sameFileProject(project)) setRemote({ doc, projectId: project.id, docUrl: project.docUrl, compId, t: time, address, result: { v } });
       } catch (e) {
-        if (live) setRemote({ doc, compId, t: time, address, result: { error: (e as Error).message } });
+        if (live && sameFileProject(project)) setRemote({ doc, projectId: project.id, docUrl: project.docUrl, compId, t: time, address, result: { error: (e as Error).message } });
       }
     })(); }, 40);
     return () => { live = false; clearTimeout(timer); };
-  }, [ctx.doc, ctx.compId, ctx.t, address, needsRemote]);
-  const current = remote?.doc === ctx.doc && remote.compId === ctx.compId && remote.t === ctx.t && remote.address === address;
+  }, [ctx.doc, ctx.compId, ctx.t, address, needsRemote, projectId, docUrl]);
+  const current = remote?.doc === ctx.doc && remote.projectId === projectId && remote.docUrl === docUrl && remote.compId === ctx.compId && remote.t === ctx.t && remote.address === address;
   const pendingValue = needsRemote && !current;
   const { v, error } = current ? remote.result : needsRemote ? { v: undefined } : local;
   const value = v === undefined ? def.default : v;
