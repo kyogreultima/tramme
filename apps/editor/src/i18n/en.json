@@ -198,7 +198,6 @@
   },
   "importer": {
     "pluginIdNotFound": "plugin \"{id}\" not found in the archive",
-    "unreadablePluginIdError": "unreadable plugin \"{id}\": {error}",
     "thisFileIsNot": "this file is not a valid Tramme project",
     "theProjectSDocument": "the project's document is invalid",
     "thisJsonIsNeither": "this JSON is neither a Lottie animation nor a Tramme project",
@@ -225,7 +224,8 @@
     "kindTours": "guided tours",
     "codeExpressions": "{n} expression(s), for instance {address}",
     "codeYes": "Run it",
-    "codeRefused": "Import stopped: the project's code was not accepted"
+    "codeRefused": "Import stopped: the project's code was not accepted",
+    "codeNeedsSandbox": "Import stopped: an isolated worker is required to check this project's plugins"
   },
   "app": {
     "backToProjects": "Back to projects",

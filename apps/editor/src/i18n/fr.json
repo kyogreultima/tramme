@@ -198,7 +198,6 @@
   },
   "importer": {
     "pluginIdNotFound": "plugin « {id} » introuvable dans l'archive",
-    "unreadablePluginIdError": "plugin « {id} » illisible : {error}",
     "thisFileIsNot": "ce fichier n'est pas un projet Tramme valide",
     "theProjectSDocument": "le document du projet est invalide",
     "thisJsonIsNeither": "ce JSON n'est ni une animation Lottie ni un projet Tramme",
@@ -225,7 +224,8 @@
     "kindTours": "visites guidées",
     "codeExpressions": "{n} expression(s), par exemple {address}",
     "codeYes": "L'exécuter",
-    "codeRefused": "Import arrêté : le code du projet n'a pas été accepté"
+    "codeRefused": "Import arrêté : le code du projet n'a pas été accepté",
+    "codeNeedsSandbox": "Import arrêté : un worker isolé est nécessaire pour vérifier les plugins de ce projet"
   },
   "app": {
     "backToProjects": "Retour aux projets",
