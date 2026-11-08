@@ -6,8 +6,9 @@
 // the assistant runs them (use_tool), the user too (/ menu).
 
 import { ALL_FORMATS, CanvasSink, Input, UrlSource, type InputVideoTrack } from 'mediabunny';
-import { applyMat, following, grayFrame, invertMat, isTrack, layerClock, layerMatrix, matMul, pictureRect, pointer, trackId, type Evaluator, type Box, type Composition, type GrayFrame, type Mat2D, type Op, type ToolContext, type ToolType, type Track, type Vec2 } from '@tramme/core';
+import { applyMat, following, grayFrame, invertMat, isTrack, layerClock, layerMatrix, matMul, pictureRect, pointer, trackId, type Evaluator, type EvaluatedTransform, type Box, type Composition, type GrayFrame, type Mat2D, type Op, type ToolContext, type ToolType, type Track, type Vec2 } from '@tramme/core';
 import { editorEvaluator } from './evaluator.ts';
+import { sandboxedDoc } from './installed.ts';
 import { t } from './i18n/index.ts';
 import { freshId, parentOf, siblingsOf, slug } from './model.ts';
 import { canvas, CUT, distance, histogram, objectsIn, readJson } from './perception.ts';
@@ -36,22 +37,62 @@ export function parseRegion(v: string | unknown[]): Box {
 }
 
 /** a layer's matrix in the composition at time t: its own, then its parents' */
-function worldMatrix(ev: Evaluator, c: Composition, compId: string, id: string, at: number): Mat2D {
-  let m = layerMatrix(ev.layerAt(id, at, compId).transform);
-  for (let p = parentOf(c, id); p; p = parentOf(c, p)) m = matMul(layerMatrix(ev.layerAt(p, at, compId).transform), m);
+type GeometryLayer = { props: Record<string, unknown>; transform: EvaluatedTransform };
+function worldMatrix(read: (id: string) => GeometryLayer, c: Composition, id: string): Mat2D {
+  let m = layerMatrix(read(id).transform);
+  for (let p = parentOf(c, id); p; p = parentOf(c, p)) m = matMul(layerMatrix(read(p).transform), m);
   return m;
 }
 
 /** points of the composition at time t as a box of the video's picture (fractions), through where the video layer shows it */
 export function toPicture(ev: Evaluator, c: Composition, compId: string, videoId: string, at: number, points: Vec2[], picW: number, picH: number): Box {
-  const L = ev.layerAt(videoId, at, compId), [w, h] = L.props.size as Vec2, rect = pictureRect(String(L.props.fit), w, h, picW, picH, L.props.focus as Vec2 | undefined);
-  const inv = invertMat(worldMatrix(ev, c, compId, videoId, at));
+  return pictureBox((id) => ev.layerAt(id, at, compId), c, videoId, points, picW, picH);
+}
+
+function pictureBox(read: (id: string) => GeometryLayer, c: Composition, videoId: string, points: Vec2[], picW: number, picH: number): Box {
+  const L = read(videoId), [w, h] = L.props.size as Vec2, rect = pictureRect(String(L.props.fit), w, h, picW, picH, L.props.focus as Vec2 | undefined);
+  const inv = invertMat(worldMatrix(read, c, videoId));
   if (!inv) throw new Error(`${videoId} is flattened (a scale of 0)`);
   const uv = points.map((p) => applyMat(inv, p)).map(([x, y]) => [(x - rect.x) / rect.w, (y - rect.y) / rect.h]);
   const x0 = Math.max(0, Math.min(...uv.map((p) => p[0]))), y0 = Math.max(0, Math.min(...uv.map((p) => p[1])));
   const x1 = Math.min(1, Math.max(...uv.map((p) => p[0]))), y1 = Math.min(1, Math.max(...uv.map((p) => p[1])));
   if (x1 - x0 <= 0 || y1 - y0 <= 0) throw new Error('the frame is outside the picture of the video');
   return [x0, y0, x1 - x0, y1 - y0];
+}
+
+/** The tracked rectangle and its video, evaluated by the project worker when isolated. */
+export async function rectangleBox(ctx: ToolContext, rect: string, videoId: string, picW: number, picH: number): Promise<Box> {
+  const c = ctx.doc.compositions[ctx.compId], at = ctx.time;
+  if (!sandboxedDoc(ctx.doc) && !(await import('./settings.ts')).prefs.peek().sandboxPreview) {
+    const ev = editorEvaluator(ctx.doc, ctx.registry), L = ev.layerAt(rect, at, ctx.compId), [rw, rh] = L.props.size as Vec2;
+    const points = ([[-rw / 2, -rh / 2], [rw / 2, -rh / 2], [-rw / 2, rh / 2], [rw / 2, rh / 2]] as Vec2[]).map((p) => applyMat(worldMatrix((id) => ev.layerAt(id, at, ctx.compId), c, rect), p));
+    return toPicture(ev, c, ctx.compId, videoId, at, points, picW, picH);
+  }
+  const [{ fileProject, requireFileProject }, { preview }, { pluginHost }, { ensureDeclared, ensureSandboxDoc, moduleItemsOf }] = await Promise.all([
+    import('./files.ts'), import('./preview.ts'), import('./plugins/index.ts'), import('./plugins/sandbox-draw.ts'),
+  ]);
+  const project = fileProject(), renderer = preview.renderer;
+  if (!renderer) throw new Error('preview is not ready for isolated tracking geometry');
+  const base = new URL(project.docUrl, location.href).href, host = pluginHost(base);
+  await ensureDeclared(host, moduleItemsOf(ctx.doc, base));
+  requireFileProject(project);
+  ensureSandboxDoc(host, { doc: ctx.doc, docUrl: base, loaded: (id) => { try { return renderer.assets.get(id); } catch { return null; } } });
+  const ids = new Set<string>([rect, videoId]);
+  for (const id of [rect, videoId]) for (let p = parentOf(c, id); p; p = parentOf(c, p)) ids.add(p);
+  if (ids.size > 64) throw new Error('too many tracking geometry layers');
+  const samples = await host.evaluateLayers([...ids], at, ctx.compId);
+  requireFileProject(project);
+  const values = new Map(samples.map((sample) => [sample.id, sample]));
+  const read = (id: string): GeometryLayer => {
+    const value = values.get(id);
+    if (!value) throw new Error(`missing isolated tracking geometry: ${id}`);
+    if ('err' in value) throw new Error(value.err);
+    return value;
+  };
+  const [rw, rh] = read(rect).props.size as Vec2;
+  const matrix = worldMatrix(read, c, rect);
+  const points = ([[-rw / 2, -rh / 2], [rw / 2, -rh / 2], [-rw / 2, rh / 2], [rw / 2, rh / 2]] as Vec2[]).map((p) => applyMat(matrix, p));
+  return pictureBox(read, c, videoId, points, picW, picH);
 }
 
 /** the video layer a tool works on: the one given, the selected one, or the only one */
@@ -133,8 +174,7 @@ const track: ToolType<TrackArgs> = {
       // where the object is now, as fractions of the picture
       let box: Box, how: string, what = a.object ?? '';
       if (rect) {
-        const L = ev.layerAt(rect, now, ctx.compId), [rw, rh] = L.props.size as Vec2, m = worldMatrix(ev, c, ctx.compId, rect, now);
-        box = toPicture(ev, c, ctx.compId, videoId, now, ([[-rw / 2, -rh / 2], [rw / 2, -rh / 2], [-rw / 2, rh / 2], [rw / 2, rh / 2]] as Vec2[]).map((p) => applyMat(m, p)), W, H);
+        box = await rectangleBox(ctx, rect, videoId, W, H);
         how = `the rectangle "${rect}"`;
       } else if (a.region !== undefined) { box = parseRegion(a.region); how = 'the region given'; }
       else { const d = await detected(vt, t0, a.object!); box = d.box; what = d.label; how = `the ${d.label} found`; }
