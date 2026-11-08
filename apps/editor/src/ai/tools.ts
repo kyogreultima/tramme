@@ -350,7 +350,15 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
     const current = () => {
       if (S.project.peek()?.id !== projectId || S.docUrl.peek() !== docUrl) throw new Error('the project changed while the tool was running');
     };
-    const urlOf = (src: string) => { current(); return new URL(src, new URL(docUrl, location.href)).href; };
+    const urlOf = (src: string) => {
+      current();
+      const base = new URL(docUrl, location.href), root = new URL('./', base);
+      const url = new URL(src, base);
+      const projectFile = url.origin === root.origin && url.pathname.startsWith(root.pathname);
+      const ownedBlob = url.protocol === 'blob:' && url.origin === root.origin;
+      if (!projectFile && !ownedBlob) throw new Error(`${src}: asset must belong to this project`);
+      return url.href;
+    };
     const projectPath = (path: string) => {
       current();
       const bad = pathIssue(path);

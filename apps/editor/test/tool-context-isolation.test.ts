@@ -123,4 +123,27 @@ describe('tool project boundary', () => {
       vi.unstubAllGlobals();
     }
   });
+
+  it('refuses an asset URL outside the current project root', () => {
+    const project = newProject({ name: 'First', width: 64, height: 64, fps: 30, duration: 1 });
+    const previous = { project: S.project.peek(), docUrl: S.docUrl.peek() };
+    const runner = new ToolRunner();
+    try {
+      S.project.value = project.manifest;
+      S.docUrl.value = 'https://tramme.test/projects/first/document.tramme.json';
+      const doc = { ...project.doc, assets: {
+        local: { type: 'image', src: 'assets/photo.png' },
+        private: { type: 'image', src: 'https://tramme.test/api/private' },
+        sibling: { type: 'image', src: '../second/assets/photo.png' },
+      } } as TrammeDoc;
+      const context = (runner as unknown as { toolContext(doc: TrammeDoc, registry: Registry): ToolContext }).toolContext(doc, builtinRegistry());
+      expect(context.assetUrl('local')).toBe('https://tramme.test/projects/first/assets/photo.png');
+      expect(() => context.assetUrl('private')).toThrow('asset must belong to this project');
+      expect(() => context.assetUrl('sibling')).toThrow('asset must belong to this project');
+    } finally {
+      runner.dispose();
+      S.project.value = previous.project;
+      S.docUrl.value = previous.docUrl;
+    }
+  });
 });
