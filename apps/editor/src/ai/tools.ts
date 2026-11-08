@@ -164,21 +164,27 @@ export class ToolRunner {
   }
 
   private async mediaFrame(assetId: string, t: number): Promise<ToolResult> {
+    const project = fileProject();
     const a = this.liveDoc().assets[assetId];
     if (!a) return text(`unknown asset: ${assetId}`, true);
     let source: CanvasImageSource, w: number, h: number;
     if (a.type === 'image') {
       const img = await loadImage(this.urlOf(a.src));
+      requireFileProject(project);
       source = img; w = img.naturalWidth; h = img.naturalHeight;
     } else if (a.type === 'video') {
-      let v = this.videos.get(assetId);
-      if (!v) { v = VideoFrames.open(this.urlOf(a.src)); this.videos.set(assetId, v); }
+      const key = `${project.id}\0${project.docUrl}\0${assetId}`;
+      let v = this.videos.get(key);
+      if (!v) { v = VideoFrames.open(this.urlOf(a.src)); this.videos.set(key, v); }
       const frames = await v;
+      requireFileProject(project);
       await frames.request(t);
+      requireFileProject(project);
       const f = frames.frameAt(t);
       if (!f.image) return text(`no frame at ${t} s`, true);
       source = f.image; w = frames.width; h = frames.height;
     } else return text(`${assetId}: a video or an image is expected`, true);
+    requireFileProject(project);
     const url = jpegOf(source, w, h, Math.min(1, STILL_WIDTH / w));
     this.events.push({ type: 'item', item: { id: uid(), role: 'assistant', image: { url, caption: `${a.name ?? assetId}${a.type === 'video' ? ` · ${t.toFixed(2)} s` : ''}` } } });
     return { content: [{ type: 'image', data: url.slice(url.indexOf(',') + 1), mimeType: 'image/jpeg' }] };
@@ -263,15 +269,20 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
           return part === undefined ? text(`nothing at ${input.path} in the document`, true) : text(JSON.stringify(part));
         }
         case 'list_nodes': {
+          const project = fileProject();
           const reg = await this.registry(this.liveDoc());
+          requireFileProject(project);
           // the installed plugins' entries: tools by where they come from, the rest by the types they brought
           const installed = (section: string, name: string, from?: string) => (section === 'tools' ? !!from && (from.startsWith('installed:') || from.startsWith('packs:')) : installedTypes.has(`${section.slice(0, -1)}:${name}`));
           return text(Array.isArray(input.types) && input.types.length ? vocabularyDetail(reg, input.types.map(String)) : vocabularyIndex(reg, { query: typeof input.query === 'string' ? input.query : undefined, installed }));
         }
         case 'evaluate': {
+          const project = fileProject();
           const doc = this.liveDoc(), reg = await this.registry(doc);
+          requireFileProject(project);
           // the analyses and event lists reach the expressions that read them
           const data = await analyses(this.toolContext(doc, reg));
+          requireFileProject(project);
           return text(JSON.stringify(editorEvaluator(doc, reg, { data }).value(String(input.address), Number(input.t), input.compId ?? (this.scoped ? this.compOf(doc) : undefined))));
         }
         case 'render_still': return await this.still(Number(input.t), input.compId, input.caption);
@@ -320,7 +331,9 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
   }
 
   private async still(t: number, compId: string | undefined, caption?: string): Promise<ToolResult> {
+    const project = fileProject();
     const url = await this.stillUrl(t, compId);
+    requireFileProject(project);
     this.events.push({ type: 'item', item: { id: uid(), role: 'assistant', image: { url, caption: `${t.toFixed(2)} s${caption ? ` · ${caption}` : ''}` } } });
     return { content: [{ type: 'image', data: url.slice(url.indexOf(',') + 1), mimeType: 'image/jpeg' }] };
   }
@@ -405,7 +418,9 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
     return { content };
   }
 
-  private async propose(label: string, ops: Op[], current: () => boolean = () => true): Promise<ToolResult> {
+  private async propose(label: string, ops: Op[], current?: () => boolean): Promise<ToolResult> {
+    const project = fileProject();
+    current ??= () => sameFileProject(project);
     const changed = () => text('the project changed while the tool was running', true);
     if (!current()) return changed();
     if (!Array.isArray(ops) || !ops.length) return text('no operations', true);

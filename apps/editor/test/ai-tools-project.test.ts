@@ -62,4 +62,26 @@ describe('built-in assistant tool project boundary', () => {
       S.doc.value = previous.doc;
     }
   });
+
+  it('does not add a still rendered after navigation to the new conversation', async () => {
+    const previous = { project: S.project.peek(), docUrl: S.docUrl.peek(), doc: S.doc.peek() };
+    let finish!: (value: string) => void;
+    const runner = new ToolRunner();
+    vi.spyOn(runner as any, 'stillUrl').mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+    try {
+      open(first, 'first');
+      const pending = runner.run('render_still', { t: 0 });
+      open(second, 'second');
+      finish('data:image/jpeg;base64,AA==');
+      const result = await pending;
+      expect(result.isError).toBe(true);
+      expect(runner.events).toEqual([]);
+    } finally {
+      runner.dispose();
+      vi.restoreAllMocks();
+      S.project.value = previous.project;
+      S.docUrl.value = previous.docUrl;
+      S.doc.value = previous.doc;
+    }
+  });
 });
