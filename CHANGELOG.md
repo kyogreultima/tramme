@@ -71,6 +71,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Fixed
 
+- Pinning a layer to another layer now follows expression-driven corners from the isolated project worker when isolation is active.
 - Motion strips now read animated-property figures from the isolated project worker when project isolation is active.
 - Components made from isolated projects now take their frame from the evaluated picture in the project worker.
 - The mix report now draws picture motion from the isolated project worker when project isolation is active.

@@ -4,7 +4,7 @@
 
 import { quadBounds, sampleAt, pointer, type Op, type ToolContext, type ToolType, type Vec2 } from '@tramme/core';
 import { editorEvaluator } from './evaluator.ts';
-import { quadAt } from './pin.ts';
+import { quadAt } from './quad.ts';
 
 interface Box { x: number; y: number; w: number; h: number }
 

@@ -4,7 +4,7 @@
 // runs their tools and checks against a context whose every reach into the
 // project is a message answered by the page. Nothing here touches the DOM.
 
-import { Registry, type CheckContext, type CheckType, type EffectType, type ModifierType, type MotionReport, type NodeType, type PluginModule, type QualityIssue, type SoundCue, type ToolContext, type ToolOutput } from '@tramme/core';
+import { Registry, type CheckContext, type CheckType, type EffectType, type ModifierType, type MotionReport, type NodeType, type PluginModule, type Quad, type QualityIssue, type SoundCue, type ToolContext, type ToolOutput } from '@tramme/core';
 import type { Ask, CheckCtxData, ClockSample, DrawPayload, DrawResult, FramePayload, FromWorker, LayerSample, MotionSample, PlacedSample, PluginDecl, SandboxDoc, SchemaEffect, SchemaModifier, SchemaNode, ToWorker, ToolCtxData } from './protocol.ts';
 
 /** the sandbox id of an installed plugin (installed:<file>): the project's own plugins have the document's asset ids */
@@ -33,6 +33,7 @@ export interface SandboxDrawSide {
   sampleClock(layerId: string, compId: string, compTimes: number[], fileTimes: number[]): Promise<ClockSample>;
   pictureMotion(compId: string): Promise<MotionSample>;
   motionReport(compId: string, from: number, to: number): Promise<MotionReport>;
+  sampleQuads(layerId: string, compId: string, times: number[]): Promise<Quad[]>;
   samplePlaced(t: number, compId: string): Promise<PlacedSample[]>;
 }
 
@@ -244,6 +245,17 @@ export function startWorkerSide({ post, importModule, sandbox: makeSandbox }: Wo
         void sandbox.motionReport(m.compId, m.from, m.to)
           .then((value) => post({ kind: 'motionReport', call: m.call, value }))
           .catch((e: Error) => post({ kind: 'motionReport', call: m.call, err: e.message }));
+        return;
+      }
+      if (m.kind === 'sampleQuads') {
+        if (!sandbox) { post({ kind: 'sampledQuads', call: m.call, err: 'the sandbox cannot sample quads here' }); return; }
+        if (typeof m.layerId !== 'string' || m.layerId.length > 256 || typeof m.compId !== 'string' || m.compId.length > 256 ||
+            !Array.isArray(m.times) || !m.times.length || m.times.length > 512 || m.times.some((t) => !Number.isFinite(t))) {
+          post({ kind: 'sampledQuads', call: m.call, err: 'invalid sandbox quad request' }); return;
+        }
+        void sandbox.sampleQuads(m.layerId, m.compId, m.times)
+          .then((value) => post({ kind: 'sampledQuads', call: m.call, value }))
+          .catch((e: Error) => post({ kind: 'sampledQuads', call: m.call, err: e.message }));
         return;
       }
       if (m.kind === 'samplePlaced') {

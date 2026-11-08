@@ -5,7 +5,7 @@
 // a context bridged over these messages. Everything that crosses is plain
 // data: live objects (elements, Path2D, functions) stay on their own side.
 
-import type { CheckType, NodeType, EffectType, KitType, ModifierType, PluginMeta, PresetType, PromptType, ToolType, EvaluatedTransform, SoundCue, MediaClock, MotionReport } from '@tramme/core';
+import type { CheckType, NodeType, EffectType, KitType, ModifierType, PluginMeta, PresetType, PromptType, ToolType, EvaluatedTransform, SoundCue, MediaClock, MotionReport, Quad } from '@tramme/core';
 
 /** plain evaluated values used by selection geometry; node callbacks stay in the worker */
 export type LayerSample = { id: string; props: Record<string, unknown>; transform: EvaluatedTransform; masks: { id: string; props: Record<string, unknown> }[] } | { id: string; err: string };
@@ -186,6 +186,7 @@ export type ToWorker =
   | { kind: 'sampleClock'; call: number; compId: string; layerId: string; compTimes: number[]; fileTimes: number[] }
   | { kind: 'pictureMotion'; call: number; compId: string }
   | { kind: 'motionReport'; call: number; compId: string; from: number; to: number }
+  | { kind: 'sampleQuads'; call: number; compId: string; layerId: string; times: number[] }
   | { kind: 'samplePlaced'; call: number; t: number; compId: string }
   | { kind: 'export'; call: number; type: string; props: unknown }
   | { kind: 'abort'; call: number }
@@ -206,6 +207,7 @@ export type FromWorker =
   | { kind: 'sampledClock'; call: number; value?: ClockSample; err?: string }
   | { kind: 'pictureMotion'; call: number; value?: MotionSample; err?: string }
   | { kind: 'motionReport'; call: number; value?: MotionReport; err?: string }
+  | { kind: 'sampledQuads'; call: number; value?: Quad[]; err?: string }
   | { kind: 'sampledPlaced'; call: number; values?: PlacedSample[]; err?: string }
   | { kind: 'exported'; call: number; svg?: string; lottie?: unknown; err?: string }
   | { kind: 'ask'; id: number; call: number; q: Ask }

@@ -545,11 +545,16 @@ describe('the sandboxed drawing', () => {
       host.setDoc({ doc: project, docUrl: DOC_URL, images: {}, json: {}, fonts: [] });
       await expect(host.motionReport(project.root, 0, 0.5)).resolves.toMatchObject({ figures: expect.arrayContaining([expect.objectContaining({ address: 'box.radius' })]) });
       project.compositions[project.root].layers.box.props!.radius = { $expr: '3 + 4' };
+      project.compositions[project.root].layers.box.props!.size = { $expr: '[20 + t * 10, 20]' };
       project.compositions[project.root].layers.bed = { type: 'audio', in: 0, out: 1, props: { audio: 'music', start: 1, rate: { $expr: '2' } } } as never;
       host.setDoc({ doc: project, docUrl: DOC_URL, images: {}, json: {}, fonts: [] });
       await expect(host.sampleClock('bed', project.root, [0, 0.5], [2])).resolves.toMatchObject({ fileTimes: [1, 2], moments: [[0.5]] });
       const layers = await host.evaluateLayers(['box'], 0, project.root);
       expect(layers[0]).toMatchObject({ id: 'box', props: { radius: 7 }, transform: { opacity: 1 } });
+      const [first, second] = await host.sampleQuads('box', project.root, [0, 0.5]);
+      expect(first).toHaveLength(4);
+      expect(second[1][0] - second[0][0]).toBeGreaterThan(first[1][0] - first[0][0]);
+      await expect(host.sampleQuads('box', project.root, Array(513).fill(0))).rejects.toThrow('invalid sandbox quad request');
       await expect(host.samplePlaced(0, project.root)).resolves.toMatchObject([{ id: 'box', type: 'shape.rect', opacity: 1 }]);
       await expect(host.samplePlaced(Number.NaN, project.root)).rejects.toThrow('invalid sandbox placed sample');
       await expect(host.evaluateLayers(Array(65).fill('box'), 0, project.root)).rejects.toThrow('invalid sandbox layers');
@@ -610,6 +615,7 @@ describe('the sandboxed drawing', () => {
       sampleClock: async () => ({ clock: {}, fileTimes: [], moments: [] }),
       pictureMotion: async () => ({ times: [], motion: [] }),
       motionReport: async () => ({ figures: [] }),
+      sampleQuads: async () => [],
       samplePlaced: async () => [],
       renderFrame: async () => ({ err: 'not this test' }),
     };
@@ -640,6 +646,7 @@ describe('the sandboxed drawing', () => {
       sampleClock: async () => ({ clock: {}, fileTimes: [], moments: [] }),
       pictureMotion: async () => ({ times: [], motion: [] }),
       motionReport: async () => ({ figures: [] }),
+      sampleQuads: async () => [],
       samplePlaced: async () => [],
       renderFrame: async (p) => {
         if (!p.videos || !p.videos.clip) return { err: 'no video frame shipped' };
@@ -668,6 +675,7 @@ describe('the sandboxed drawing', () => {
       sampleClock: async () => ({ clock: {}, fileTimes: [], moments: [] }),
       pictureMotion: async () => ({ times: [], motion: [] }),
       motionReport: async () => ({ figures: [] }),
+      sampleQuads: async () => [],
       samplePlaced: async () => [],
       renderFrame: async (p) => { frames.push(p); return { bitmap, transfer: [bitmap] }; },
     }));
@@ -703,6 +711,7 @@ describe('the sandboxed drawing', () => {
       sampleClock: async () => ({ clock: {}, fileTimes: [], moments: [] }),
       pictureMotion: async () => ({ times: [0], motion: [Number.NaN] }),
       motionReport: async () => ({ figures: [{ address: 'box.radius', figures: { span: Number.NaN } }] }) as never,
+      sampleQuads: async () => [],
       samplePlaced: async () => [],
       renderFrame: async () => ({}),
     }));
@@ -715,6 +724,7 @@ describe('the sandboxed drawing', () => {
     await expect(host.sampleClock('bed', 'root', Array(513).fill(0), [])).rejects.toThrow('invalid sandbox clock request');
     await expect(host.pictureMotion('root')).rejects.toThrow('invalid sandbox picture motion response');
     await expect(host.motionReport('root', 0, 1)).rejects.toThrow('invalid sandbox motion report response');
+    await expect(host.sampleQuads('box', 'root', [0])).rejects.toThrow('invalid sandbox quad response');
   });
 
   it('the wrapper defers, then draws the picture over its bounds; a later frame keeps the last one', async () => {

@@ -15,6 +15,7 @@
 // frame (their decoding still happens there, for now).
 
 import { Evaluator, layerClock, motionReport as coreMotionReport, parseColor, pictureMotion as corePictureMotion, sampleAt, soundCues, type Host, type Instance, type NodeType, type PluginModule, type TrammeDoc } from '@tramme/core';
+import { quadAt } from '../quad.ts';
 import { builtinRegistry } from '@tramme/nodes';
 import { CanvasPool, Compositor, drawComposed, drawFrame, drawLayers, finishOf, subTimes } from '@tramme/render/src/index.ts';
 import { nodeContext, resizeNode } from '@tramme/render/src/gpu.ts';
@@ -300,6 +301,14 @@ export function makeSandboxDraw(modules: Map<string, PluginModule>): SandboxDraw
       for (const [id, mod] of modules) reg.use(mod, id);
       const evaluator = new Evaluator(doc, reg, { data: (id) => side.json.get(id) });
       return coreMotionReport(evaluator, compId, from, to, { limit: 6 });
+    },
+    async sampleQuads(layerId, compId, times) {
+      const doc = theDoc();
+      if (!doc || !doc.compositions[compId]?.layers[layerId]) throw new Error('unknown sandbox quad layer');
+      const reg = builtinRegistry().clone();
+      for (const [id, mod] of modules) reg.use(mod, id);
+      const evaluator = new Evaluator(doc, reg, { data: (id) => side.json.get(id) });
+      return times.map((at) => quadAt(evaluator, compId, layerId, at));
     },
     async samplePlaced(t, compId) {
       const doc = theDoc();
