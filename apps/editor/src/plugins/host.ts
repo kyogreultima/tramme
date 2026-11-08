@@ -552,6 +552,7 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
       const values = await run({ kind: 'samplePlaced', call: ++call, t, compId }) as PlacedSample[];
       if (!Array.isArray(values) || values.length > 4096 || values.some((v) => !v || typeof v.id !== 'string' || typeof v.name !== 'string' || typeof v.type !== 'string' ||
           !Number.isFinite(v.opacity) || (v.textSize !== undefined && !Number.isFinite(v.textSize)) ||
+          (v.hasText !== undefined && typeof v.hasText !== 'boolean') ||
           (v.box !== null && (!v.box || ![v.box.x, v.box.y, v.box.w, v.box.h].every(Number.isFinite))))) throw new Error('invalid sandbox placed sample response');
       return values;
     },

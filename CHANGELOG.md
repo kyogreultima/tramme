@@ -71,6 +71,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Fixed
 
+- Scene-form advice in the composition check now reads isolated projects through the project worker.
 - The critic now finds visible layer entrances through the isolated project worker when reviewing an isolated film.
 - Camera pushes in isolated projects now frame expression-driven layers and text using the project worker, including the camera's starting zoom and pan.
 - Pinning a layer to another layer now follows expression-driven corners from the isolated project worker when isolation is active.

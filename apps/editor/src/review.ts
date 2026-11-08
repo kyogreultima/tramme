@@ -10,7 +10,7 @@ import { pixelsOf, flowLines } from './flow.ts';
 import { analyses, canvas } from './perception.ts';
 import { masterText, soundReport } from './mixing.ts';
 import { FILM_PLAN_PATH, parsePlan } from './filmplan.ts';
-import { formLines } from './forms.ts';
+import { formLinesForReview } from './forms.ts';
 import { t } from './i18n/index.ts';
 import { prefs } from './settings.ts';
 
@@ -114,7 +114,7 @@ const check: ToolType<{ frames?: number }> = {
     const { lines, notice: shown } = issueReport(issues, ctx.doc, ctx.compId);
     const head = reportHead(issues);
     // the form each scene is built in: notes beside the issues, which the cap above does not count
-    const forms = formLines(ctx.doc, ctx.compId, parsePlan(await ctx.readText(FILM_PLAN_PATH).catch(() => null)), ctx.registry);
+    const forms = await formLinesForReview(ctx, parsePlan(await ctx.readText(FILM_PLAN_PATH).catch(() => null)));
     // the sound: its master, the picture of the mix, and the moments a human checks by ear
     const listen = sound.listen.map((x) => `${x.toFixed(2)} s`).join(', ');
     const heard = sound.master ? `\n${masterText(sound.master)} The picture of the mix shows the master's waveform and spectrogram over the motion of the picture, a line at each effect (heroes red): an effect away from a motion, two hits in one place, a hit with no body show there.${listen ? ` Ask the user to listen at ${listen}: you cannot hear, they do the final listen.` : ''}` : '';
