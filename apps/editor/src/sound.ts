@@ -10,6 +10,7 @@
 import { openverse } from './openverse.ts';
 import { analyseAudio, audioClips, isAudioAnalysis, layerClock, pointer, searchSounds, soundCues, soundFigures, soundFlaws, staticValue, variantsOf, volumeBlockKeys, type Layer, type Op, type SoundCue, type SoundEntry, type SoundFigures, type SoundRole, type SoundVisual, type ToolContext, type ToolType } from '@tramme/core';
 import { editorEvaluator } from './evaluator.ts';
+import { sandboxedDoc } from './installed.ts';
 import { musicCutPlan, type MusicCutPlan } from './music-plan.ts';
 import { musicSections } from './music-structure.ts';
 import { alignMusicBeats } from './music-alignment.ts';
@@ -253,12 +254,49 @@ const bedLayers = (ctx: ToolContext) => audioClips(ctx.doc, ctx.compId).filter((
  * had at each span's edges kept, the keys inside a span replaced. How a stop
  * before a hero and a build into it are written over a ducking already there.
  */
-function shapeOps(ctx: ToolContext, ids: string[], prop: string, spans: { from: number; to: number; keys: (base: (t: number) => number) => { t: number; v: number }[] }[], rest: number): Op[] {
-  const c = ctx.doc.compositions[ctx.compId], ev = editorEvaluator(ctx.doc, ctx.registry);
+type BedSpan = { from: number; to: number; keys: (base: (t: number) => number) => { t: number; v: number }[] };
+type BedSampler = (addresses: string[], times: number[]) => Promise<unknown[][]>;
+
+async function bedSamples(ctx: ToolContext, addresses: string[], times: number[]): Promise<unknown[][]> {
+  if (!sandboxedDoc(ctx.doc) && !prefs.peek().sandboxPreview) {
+    const ev = editorEvaluator(ctx.doc, ctx.registry);
+    return addresses.map((address) => times.map((at) => ev.value(address, at, ctx.compId)));
+  }
+  const [{ fileProject, requireFileProject }, { preview }, { pluginHost }, { ensureDeclared, ensureSandboxDoc, moduleItemsOf }] = await Promise.all([
+    import('./files.ts'), import('./preview.ts'), import('./plugins/index.ts'), import('./plugins/sandbox-draw.ts'),
+  ]);
+  const project = fileProject(), renderer = preview.renderer;
+  if (!renderer) throw new Error('preview is not ready for isolated sound evaluation');
+  const base = new URL(project.docUrl, location.href).href, host = pluginHost(base);
+  await ensureDeclared(host, moduleItemsOf(ctx.doc, base));
+  requireFileProject(project);
+  ensureSandboxDoc(host, { doc: ctx.doc, docUrl: base, loaded: (id) => { try { return renderer.assets.get(id); } catch { return null; } } });
+  const rows: unknown[][] = [];
+  for (let i = 0; i < addresses.length; i += 16) {
+    rows.push(...await host.evaluateSeries(addresses.slice(i, i + 16), times, ctx.compId));
+    requireFileProject(project);
+  }
+  return rows;
+}
+
+/** Sample the existing bed level before writing a stop or build over it. */
+export async function shapeOps(ctx: ToolContext, ids: string[], prop: string, spans: BedSpan[], rest: number, sample: BedSampler = (addresses, times) => bedSamples(ctx, addresses, times)): Promise<Op[]> {
+  const c = ctx.doc.compositions[ctx.compId];
+  if (!ids.length || !spans.length) return [];
+  const wanted = new Set<number>();
+  for (const s of spans) {
+    wanted.add(s.from); wanted.add(s.to);
+    for (const key of s.keys((at) => { wanted.add(at); return 0; })) wanted.add(key.t);
+  }
+  const times = [...wanted].sort((a, b) => a - b);
+  if (times.length > 512 || ids.length * times.length > 4096 || times.some((at) => !Number.isFinite(at))) throw new Error('too many sound bed samples');
+  const values = await sample(ids.map((id) => `${id}.${prop}`), times);
+  if (values.length !== ids.length || values.some((row) => !Array.isArray(row) || row.length !== times.length)) throw new Error('invalid sound bed samples');
   return ids.flatMap((id) => {
     const l = c.layers[id];
     if (!l) return [];
-    const base = (t: number) => { const v = ev.value(`${id}.${prop}`, t, ctx.compId); return typeof v === 'number' ? v : rest; };
+    const row = values[ids.indexOf(id)];
+    const base = (t: number) => { const v = row[times.indexOf(t)]; return typeof v === 'number' && Number.isFinite(v) ? v : rest; };
     const raw = l.props?.[prop] as { $k?: { t: number; v: number }[] } | number | undefined;
     let keys = (typeof raw === 'object' && raw?.$k ? raw.$k : []).map((k) => ({ ...k }));
     const added: { t: number; v: number }[] = [];
@@ -379,7 +417,7 @@ const sfx: ToolType<{ query?: string; sound?: string; at?: unknown; on?: string;
     const placed = place(ctx, stacks, moments, { gain, rate, align, vary, weight });
     // the bed makes room: on every moment asked for, or on the heroes among them
     const room = moments.filter((m) => (weight ?? m.weight) === 'hero' || (weight === undefined && !m.weight)).map((m) => m.t);
-    const bed = [...(stop ? stopOps(ctx, room) : []), ...(build ? buildOps(ctx, room) : [])];
+    const bed = [...(stop ? await stopOps(ctx, room) : []), ...(build ? await buildOps(ctx, room) : [])];
     const title = entries.map((e) => e!.title).join(' + ');
     return {
       ops: [...[...brought.values()].flatMap((b) => b.ops), ...placed.ops, ...bed], reload: [...brought.values()].flatMap((b) => b.reload), label: title,

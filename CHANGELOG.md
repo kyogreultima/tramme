@@ -71,6 +71,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Fixed
 
+- Sound effects that stop or build a music bed now read its animated level through the isolated project worker when isolation is active.
 - Live true-peak readings no longer show a spike created by the meter when screen and audio updates cross at different times.
 - Playback no longer adds the live limiter's automatic gain on top of the composition's loudness target, keeping a steady mix at its expected level.
 - The home page's top bar was squeezed against the top edge when the page was taller than the window; it keeps its height, now one value for every top bar.
