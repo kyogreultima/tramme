@@ -5,7 +5,7 @@
 // registry carries — plugins/vocabulary.ts puts them there).
 
 import { toolOutput, type CheckContext, type NodeType, type PlacedLayer, type QualityIssue, type SoundCue, type ToolContext, type ToolOutput } from '@tramme/core';
-import type { Ask, ClockSample, DrawPayload, DrawResult, FramePayload, FromWorker, LayerSample, PlacedSample, PluginDecl, SandboxDoc, ToWorker } from './protocol.ts';
+import type { Ask, ClockSample, DrawPayload, DrawResult, FramePayload, FromWorker, LayerSample, MotionSample, PlacedSample, PluginDecl, SandboxDoc, ToWorker } from './protocol.ts';
 
 /** the schema of a node without its code: what a check's samples may cross */
 const schemaOf = (n: NodeType) => ({ type: n.type, title: n.title, category: n.category, description: n.description, ai: n.ai, props: n.props, ...(n.container ? { container: true } : {}) });
@@ -123,6 +123,7 @@ export interface PluginHost {
   evaluateLayers(ids: string[], t: number, compId: string): Promise<LayerSample[]>;
   soundCues(compId: string): Promise<SoundCue[]>;
   sampleClock(layerId: string, compId: string, compTimes: number[], fileTimes: number[]): Promise<ClockSample>;
+  pictureMotion(compId: string): Promise<MotionSample>;
   samplePlaced(t: number, compId: string): Promise<PlacedSample[]>;
   /** stop: every call waiting is refused, with `reason` when there is one */
   dispose(reason?: string): void;
@@ -330,6 +331,16 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
       else w.resolve(m.value);
       return;
     }
+    if (m.kind === 'pictureMotion') {
+      if (m.err !== undefined && (typeof m.err !== 'string' || m.err.length > 4096)) { invalid(); return; }
+      if (responseTooLarge(m.value) || responseTooLarge(m.err)) { timeout('sandbox response exceeds 8 MB'); return; }
+      const w = waits.get(m.call);
+      if (!w) return;
+      waits.delete(m.call);
+      if (m.err) w.reject(new Error(m.err));
+      else w.resolve(m.value);
+      return;
+    }
     if (m.kind === 'sampledPlaced') {
       if (m.err !== undefined && (typeof m.err !== 'string' || m.err.length > 4096)) { invalid(); return; }
       if (responseTooLarge(m.values) || responseTooLarge(m.err)) { timeout('sandbox response exceeds 8 MB'); return; }
@@ -485,6 +496,14 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
           value.moments.reduce((sum, row) => sum + row.length, 0) > 4096 ||
           ['start', 'rate', 'loopEnd', 'rateElapsed'].some((key) => key in clock && !Number.isFinite(clock[key as keyof typeof clock])) ||
           ('loop' in clock && typeof clock.loop !== 'boolean')) throw new Error('invalid sandbox clock response');
+      return value;
+    },
+    async pictureMotion(compId) {
+      if (typeof compId !== 'string' || compId.length > 256) throw new Error('invalid sandbox picture motion request');
+      const value = await run({ kind: 'pictureMotion', call: ++call, compId }) as MotionSample;
+      if (!value || !Array.isArray(value.times) || !Array.isArray(value.motion) || value.times.length > 16384 ||
+          value.times.length !== value.motion.length || value.times.some((t) => !Number.isFinite(t)) ||
+          value.motion.some((v) => !Number.isFinite(v))) throw new Error('invalid sandbox picture motion response');
       return value;
     },
     async samplePlaced(t, compId) {

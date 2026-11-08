@@ -13,6 +13,7 @@
 
 import { audioClips, bandPowers, noiseFigures, NOISY_SNR, curveAt, integratedLoudness, loudnessSeries, pictureMotion, pointer, powerDb, soundFigures, soundMix, truePeak, type AudioClip, type Op, type QualityIssue, type SoundFigures, type ToolContext, type ToolType } from '@tramme/core';
 import { editorEvaluator } from './evaluator.ts';
+import { sandboxedDoc } from './installed.ts';
 import { mixComposition } from '@tramme/render';
 import { channelsOf, cuesOf, measure } from './sound.ts';
 import { canvas, caption, drawCurve, drawSpectrogram, drawWave, INK, mark } from './sound-pictures.ts';
@@ -307,7 +308,7 @@ export async function soundReport(ctx: ToolContext, opts: { image?: boolean } = 
   return {
     issues, listen,
     master: { lufs: +lufs.toFixed(1), truePeak: +tp.toFixed(1), target },
-    ...(opts.image ? { image: mixPicture(ctx, s.final, effects) } : {}),
+    ...(opts.image ? { image: await mixPicture(ctx, s.final, effects) } : {}),
   };
 }
 
@@ -322,13 +323,30 @@ function listenTimes(effects: Effect[], issues: QualityIssue[], duration: number
 }
 
 /** the mix drawn for the assistant: the master's waveform, its spectrogram, how much the picture moves, a line at each effect (heroes red, the others grey) */
-function mixPicture(ctx: ToolContext, final: AudioBuffer, effects: Effect[]): string {
+/** Motion for the mix picture, sampled where the project's expressions run. */
+export async function pictureMotionOf(ctx: ToolContext): Promise<{ times: number[]; motion: number[] }> {
+  if (!sandboxedDoc(ctx.doc) && !prefs.peek().sandboxPreview) return pictureMotion(editorEvaluator(ctx.doc, ctx.registry), ctx.compId);
+  const [{ fileProject, requireFileProject }, { preview }, { pluginHost }, { ensureDeclared, ensureSandboxDoc, moduleItemsOf }] = await Promise.all([
+    import('./files.ts'), import('./preview.ts'), import('./plugins/index.ts'), import('./plugins/sandbox-draw.ts'),
+  ]);
+  const project = fileProject(), renderer = preview.renderer;
+  if (!renderer) throw new Error('preview is not ready for isolated mix motion');
+  const base = new URL(project.docUrl, location.href).href, host = pluginHost(base);
+  await ensureDeclared(host, moduleItemsOf(ctx.doc, base));
+  requireFileProject(project);
+  ensureSandboxDoc(host, { doc: ctx.doc, docUrl: base, loaded: (id) => { try { return renderer.assets.get(id); } catch { return null; } } });
+  const result = await host.pictureMotion(ctx.compId);
+  requireFileProject(project);
+  return result;
+}
+
+async function mixPicture(ctx: ToolContext, final: AudioBuffer, effects: Effect[]): Promise<string> {
+  const motion = await pictureMotionOf(ctx);
   const c = ctx.doc.compositions[ctx.compId], W = 1100, { el, g } = canvas(W, 400), x0 = 8, w = W - 16;
   const d = final.getChannelData(0), px = (time: number) => x0 + (time / c.duration) * w;
   caption(g, `${c.name ?? ctx.compId} · ${c.duration.toFixed(1)} s`, x0, 14);
   drawWave(g, d, x0, 22, w, 90, '#d6dde0');
   drawSpectrogram(g, d, final.sampleRate, x0, 118, w, 170);
-  const motion = pictureMotion(editorEvaluator(ctx.doc, ctx.registry), ctx.compId);
   drawCurve(g, motion.motion, x0, 296, w, 70);
   caption(g, 'picture motion', x0, 392, INK.motion, '11px system-ui, sans-serif');
   for (const e of effects) if (e.hit !== null) mark(g, px(e.hit), 22, 344, e.clip.weight === 'hero' ? INK.hero : INK.support, e.name.slice(0, 22));

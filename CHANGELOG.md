@@ -71,6 +71,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Fixed
 
+- The mix report now draws picture motion from the isolated project worker when project isolation is active.
 - Video stabilization now follows expression-driven playback speed through the isolated project worker.
 - Sound beats, tracked video frames and callouts now follow expression-driven playback speed through the isolated project worker.
 - Sound cues for isolated projects now follow the picture through the project worker when placing effects, planning music and checking the mix.

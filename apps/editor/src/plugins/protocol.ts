@@ -13,6 +13,7 @@ export type LayerSample = { id: string; props: Record<string, unknown>; transfor
 export type PlacedSample = { id: string; name: string; type: string; box: { x: number; y: number; w: number; h: number } | null; opacity: number; locked?: boolean };
 /** file/composition time mapping for authoring tools; no evaluator callback crosses */
 export type ClockSample = { clock: MediaClock; fileTimes: number[]; moments: number[][] };
+export type MotionSample = { times: number[]; motion: number[] };
 
 /** a plugin as the sandbox sees it: its declarations, without any function */
 export interface PluginDecl {
@@ -183,6 +184,7 @@ export type ToWorker =
   | { kind: 'evaluateLayers'; call: number; ids: string[]; t: number; compId: string }
   | { kind: 'soundCues'; call: number; compId: string }
   | { kind: 'sampleClock'; call: number; compId: string; layerId: string; compTimes: number[]; fileTimes: number[] }
+  | { kind: 'pictureMotion'; call: number; compId: string }
   | { kind: 'samplePlaced'; call: number; t: number; compId: string }
   | { kind: 'export'; call: number; type: string; props: unknown }
   | { kind: 'abort'; call: number }
@@ -201,6 +203,7 @@ export type FromWorker =
   | { kind: 'evaluatedLayers'; call: number; values?: LayerSample[]; err?: string }
   | { kind: 'soundCues'; call: number; values?: SoundCue[]; err?: string }
   | { kind: 'sampledClock'; call: number; value?: ClockSample; err?: string }
+  | { kind: 'pictureMotion'; call: number; value?: MotionSample; err?: string }
   | { kind: 'sampledPlaced'; call: number; values?: PlacedSample[]; err?: string }
   | { kind: 'exported'; call: number; svg?: string; lottie?: unknown; err?: string }
   | { kind: 'ask'; id: number; call: number; q: Ask }
