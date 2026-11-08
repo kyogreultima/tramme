@@ -555,6 +555,9 @@ describe('the sandboxed drawing', () => {
       expect(first).toHaveLength(4);
       expect(second[1][0] - second[0][0]).toBeGreaterThan(first[1][0] - first[0][0]);
       await expect(host.sampleQuads('box', project.root, Array(513).fill(0))).rejects.toThrow('invalid sandbox quad request');
+      const issues = await host.qualityChecks(project.root);
+      expect(issues).toEqual(expect.any(Array));
+      expect(issues.some((issue) => issue.message.includes('expression evaluation is isolated'))).toBe(false);
       await expect(host.samplePlaced(0, project.root)).resolves.toMatchObject([{ id: 'box', type: 'shape.rect', opacity: 1 }]);
       await expect(host.samplePlaced(Number.NaN, project.root)).rejects.toThrow('invalid sandbox placed sample');
       await expect(host.evaluateLayers(Array(65).fill('box'), 0, project.root)).rejects.toThrow('invalid sandbox layers');
@@ -616,6 +619,7 @@ describe('the sandboxed drawing', () => {
       pictureMotion: async () => ({ times: [], motion: [] }),
       motionReport: async () => ({ figures: [] }),
       sampleQuads: async () => [],
+      qualityChecks: async () => [],
       samplePlaced: async () => [],
       renderFrame: async () => ({ err: 'not this test' }),
     };
@@ -647,6 +651,7 @@ describe('the sandboxed drawing', () => {
       pictureMotion: async () => ({ times: [], motion: [] }),
       motionReport: async () => ({ figures: [] }),
       sampleQuads: async () => [],
+      qualityChecks: async () => [],
       samplePlaced: async () => [],
       renderFrame: async (p) => {
         if (!p.videos || !p.videos.clip) return { err: 'no video frame shipped' };
@@ -676,6 +681,7 @@ describe('the sandboxed drawing', () => {
       pictureMotion: async () => ({ times: [], motion: [] }),
       motionReport: async () => ({ figures: [] }),
       sampleQuads: async () => [],
+      qualityChecks: async () => [],
       samplePlaced: async () => [],
       renderFrame: async (p) => { frames.push(p); return { bitmap, transfer: [bitmap] }; },
     }));
@@ -712,6 +718,7 @@ describe('the sandboxed drawing', () => {
       pictureMotion: async () => ({ times: [0], motion: [Number.NaN] }),
       motionReport: async () => ({ figures: [{ address: 'box.radius', figures: { span: Number.NaN } }] }) as never,
       sampleQuads: async () => [],
+      qualityChecks: async () => [{ check: 'bad', severity: 'fatal', message: 'bad' }] as never,
       samplePlaced: async () => [],
       renderFrame: async () => ({}),
     }));
@@ -725,6 +732,7 @@ describe('the sandboxed drawing', () => {
     await expect(host.pictureMotion('root')).rejects.toThrow('invalid sandbox picture motion response');
     await expect(host.motionReport('root', 0, 1)).rejects.toThrow('invalid sandbox motion report response');
     await expect(host.sampleQuads('box', 'root', [0])).rejects.toThrow('invalid sandbox quad response');
+    await expect(host.qualityChecks('root')).rejects.toThrow('invalid sandbox quality response');
   });
 
   it('the wrapper defers, then draws the picture over its bounds; a later frame keeps the last one', async () => {

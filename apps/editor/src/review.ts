@@ -3,7 +3,8 @@
 // are tools of the editor's vocabulary, run by the assistant before it sums
 // up (use_tool) or by the user from the / menu.
 
-import { groupIssues, likeness, pictureDiff, motionReport, REPORT_MAX, reportCounts, reportHead, reportLines, runChecks, type MotionReport, type QualityIssue, type ToolContext, type ToolType, type TrammeDoc } from '@tramme/core';
+import { groupIssues, likeness, pictureDiff, motionReport, REPORT_MAX, reportCounts, reportHead, reportLines, type MotionReport, type QualityIssue, type ToolContext, type ToolType, type TrammeDoc } from '@tramme/core';
+import { qualityChecksOf } from './isolated-checks.ts';
 import { editorEvaluator } from './evaluator.ts';
 import { sandboxedDoc } from './installed.ts';
 import { pixelsOf, flowLines } from './flow.ts';
@@ -107,7 +108,7 @@ const check: ToolType<{ frames?: number }> = {
   ai: { when: 'before summing up any change, and whenever the user asks if it looks right; read the issues, look at the sheet, fix what matters' },
   async run({ frames = 8 }, ctx) {
     const sound = await soundReport(ctx, { image: true });
-    const issues = [...await runChecks(ctx.doc, ctx.registry, ctx.compId, { data: await analyses(ctx), allowExpressions: !sandboxedDoc(ctx.doc) }), ...sound.issues];
+    const issues = [...await qualityChecksOf(ctx, ctx.compId, await analyses(ctx)), ...sound.issues];
     const times = keyTimes(ctx.doc, ctx.compId, issues, frames);
     const url = await sheet(ctx, times, Math.min(4, times.length), ctx.compId);
     const { warnings, notes } = reportCounts(issues);

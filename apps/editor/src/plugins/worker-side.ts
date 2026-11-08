@@ -34,6 +34,7 @@ export interface SandboxDrawSide {
   pictureMotion(compId: string): Promise<MotionSample>;
   motionReport(compId: string, from: number, to: number): Promise<MotionReport>;
   sampleQuads(layerId: string, compId: string, times: number[]): Promise<Quad[]>;
+  qualityChecks(compId: string): Promise<QualityIssue[]>;
   samplePlaced(t: number, compId: string): Promise<PlacedSample[]>;
 }
 
@@ -256,6 +257,14 @@ export function startWorkerSide({ post, importModule, sandbox: makeSandbox }: Wo
         void sandbox.sampleQuads(m.layerId, m.compId, m.times)
           .then((value) => post({ kind: 'sampledQuads', call: m.call, value }))
           .catch((e: Error) => post({ kind: 'sampledQuads', call: m.call, err: e.message }));
+        return;
+      }
+      if (m.kind === 'qualityChecks') {
+        if (!sandbox) { post({ kind: 'qualityChecked', call: m.call, err: 'the sandbox cannot check quality here' }); return; }
+        if (typeof m.compId !== 'string' || m.compId.length > 256) { post({ kind: 'qualityChecked', call: m.call, err: 'invalid sandbox quality request' }); return; }
+        void sandbox.qualityChecks(m.compId)
+          .then((values) => post({ kind: 'qualityChecked', call: m.call, values }))
+          .catch((e: Error) => post({ kind: 'qualityChecked', call: m.call, err: e.message }));
         return;
       }
       if (m.kind === 'samplePlaced') {

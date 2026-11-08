@@ -14,7 +14,7 @@
 // back. The page ships the document (setDoc) and each video asset's current
 // frame (their decoding still happens there, for now).
 
-import { Evaluator, layerClock, motionReport as coreMotionReport, parseColor, pictureMotion as corePictureMotion, sampleAt, soundCues, type Host, type Instance, type NodeType, type PluginModule, type TrammeDoc } from '@tramme/core';
+import { Evaluator, layerClock, motionReport as coreMotionReport, parseColor, pictureMotion as corePictureMotion, runChecks, sampleAt, soundCues, type Host, type Instance, type NodeType, type PluginModule, type TrammeDoc } from '@tramme/core';
 import { quadAt } from '../quad.ts';
 import { builtinRegistry } from '@tramme/nodes';
 import { CanvasPool, Compositor, drawComposed, drawFrame, drawLayers, finishOf, subTimes } from '@tramme/render/src/index.ts';
@@ -309,6 +309,17 @@ export function makeSandboxDraw(modules: Map<string, PluginModule>): SandboxDraw
       for (const [id, mod] of modules) reg.use(mod, id);
       const evaluator = new Evaluator(doc, reg, { data: (id) => side.json.get(id) });
       return times.map((at) => quadAt(evaluator, compId, layerId, at));
+    },
+    async qualityChecks(compId) {
+      const doc = theDoc();
+      const comp = doc?.compositions[compId];
+      if (!doc || !comp) throw new Error('unknown sandbox quality composition');
+      if (Math.ceil(comp.duration / 0.25) > 4096) throw new Error('too many sandbox quality samples');
+      const reg = builtinRegistry().clone();
+      for (const [id, mod] of modules) reg.use(mod, id);
+      const values = await runChecks(doc, reg, compId, { data: (id) => side.json.get(id) });
+      if (values.length > 4096) throw new Error('too many sandbox quality issues');
+      return values;
     },
     async samplePlaced(t, compId) {
       const doc = theDoc();

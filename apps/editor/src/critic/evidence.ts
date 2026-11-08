@@ -1,7 +1,8 @@
 // Bounded visual evidence: an overview across the whole film, details around
 // selected events and directed beats, the target, plan and measured facts.
 
-import { runChecks, sampleAt, type QualityIssue, type Registry, type ToolContext, type TrammeDoc } from '@tramme/core';
+import { sampleAt, type QualityIssue, type Registry, type ToolContext, type TrammeDoc } from '@tramme/core';
+import { qualityChecksOf } from '../isolated-checks.ts';
 import { editorEvaluator } from '../evaluator.ts';
 import { sandboxedDoc } from '../installed.ts';
 import { prefs } from '../settings.ts';
@@ -174,7 +175,7 @@ export interface Evidence {
 export async function gather(ctx: ToolContext, compId: string, checked?: QualityIssue[]): Promise<Evidence> {
   const doc = ctx.doc, comp = doc.compositions[compId];
   const plan = parsePlan(await ctx.readText(FILM_PLAN_PATH).catch(() => null));
-  const issues = checked ?? await runChecks(doc, ctx.registry, compId, { data: await analyses(ctx), allowExpressions: !sandboxedDoc(doc) });
+  const issues = checked ?? await qualityChecksOf(ctx, compId, await analyses(ctx));
   const moments = await momentsForEvidence(ctx, compId, issues);
   const directed = directedMoments(doc, compId, plan);
   const samples = reviewSamples(comp.duration, comp.fps, moments, directed);

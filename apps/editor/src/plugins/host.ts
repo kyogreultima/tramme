@@ -127,6 +127,7 @@ export interface PluginHost {
   motionReport(compId: string, from: number, to: number): Promise<MotionReport>;
   sampleQuads(layerId: string, compId: string, times: number[]): Promise<Quad[]>;
   samplePlaced(t: number, compId: string): Promise<PlacedSample[]>;
+  qualityChecks(compId: string): Promise<QualityIssue[]>;
   /** stop: every call waiting is refused, with `reason` when there is one */
   dispose(reason?: string): void;
   /** disposed (its worker stopped): the next project's or call's sandbox is a new one */
@@ -363,6 +364,16 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
       else w.resolve(m.value);
       return;
     }
+    if (m.kind === 'qualityChecked') {
+      if (m.err !== undefined && (typeof m.err !== 'string' || m.err.length > 4096)) { invalid(); return; }
+      if (responseTooLarge(m.values) || responseTooLarge(m.err)) { timeout('sandbox response exceeds 8 MB'); return; }
+      const w = waits.get(m.call);
+      if (!w) return;
+      waits.delete(m.call);
+      if (m.err) w.reject(new Error(m.err));
+      else w.resolve(m.values);
+      return;
+    }
     if (m.kind === 'sampledPlaced') {
       if (m.err !== undefined && (typeof m.err !== 'string' || m.err.length > 4096)) { invalid(); return; }
       if (responseTooLarge(m.values) || responseTooLarge(m.err)) { timeout('sandbox response exceeds 8 MB'); return; }
@@ -554,6 +565,19 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
           !Number.isFinite(v.opacity) || (v.textSize !== undefined && !Number.isFinite(v.textSize)) ||
           (v.hasText !== undefined && typeof v.hasText !== 'boolean') ||
           (v.box !== null && (!v.box || ![v.box.x, v.box.y, v.box.w, v.box.h].every(Number.isFinite))))) throw new Error('invalid sandbox placed sample response');
+      return values;
+    },
+    async qualityChecks(compId) {
+      if (typeof compId !== 'string' || compId.length > 256) throw new Error('invalid sandbox quality request');
+      const values = await run({ kind: 'qualityChecks', call: ++call, compId }) as QualityIssue[];
+      const validSay = (say: QualityIssue['say']) => say === undefined || (!!say && typeof say.text === 'string' && say.text.length <= 4096 &&
+        (say.params === undefined || (!!say.params && typeof say.params === 'object' && Object.keys(say.params).length <= 64 &&
+          Object.values(say.params).every((p) => typeof p === 'string' || Number.isFinite(p)))));
+      if (!Array.isArray(values) || values.length > 4096 || values.some((v) => !v || typeof v.check !== 'string' || v.check.length > 256 ||
+          (v.severity !== 'warning' && v.severity !== 'info') || typeof v.message !== 'string' || v.message.length > 4096 ||
+          (v.t !== undefined && !Number.isFinite(v.t)) || (v.rank !== undefined && !Number.isFinite(v.rank)) ||
+          (v.layers !== undefined && (!Array.isArray(v.layers) || v.layers.length > 256 || v.layers.some((id) => typeof id !== 'string' || id.length > 256))) ||
+          !validSay(v.say))) throw new Error('invalid sandbox quality response');
       return values;
     },
     dispose(reason) {
