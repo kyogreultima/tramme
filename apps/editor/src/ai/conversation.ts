@@ -20,6 +20,7 @@ import { away, notify } from '../notify.ts';
 import { turnBegins, turnEnds } from '../confirm.ts';
 import { preview } from '../preview.ts';
 import { t } from '../i18n/index.ts';
+import { fileProject, sameFileProject } from '../files.ts';
 
 /** a turn is under way */
 export const running = signal(false);
@@ -134,16 +135,23 @@ export async function runCommand(cmd: Command, input: Record<string, unknown>) {
 }
 
 /** shows the events of a turn (the assistant's, or a tool run alone) as they come, then saves the conversation */
-async function consume(start: (signal: AbortSignal) => AsyncGenerator<AiEvent>, auto: boolean) {
+export async function consume(start: (signal: AbortSignal) => AsyncGenerator<AiEvent>, auto: boolean) {
+  const project = fileProject();
   running.value = true;
   turnBegins(auto);
   turnStart.value = Date.now();
   streaming.value = null;
   controller = new AbortController();
-  const from = chat.peek().length, signal = controller.signal;
+  const turnController = controller;
+  const cancelIfChanged = () => {
+    if (!sameFileProject(project) && !turnController.signal.aborted) { turnController.abort(); stopAi(); }
+  };
+  const offProject = S.project.subscribe(cancelIfChanged), offDocUrl = S.docUrl.subscribe(cancelIfChanged);
+  const from = chat.peek().length, signal = turnController.signal;
   let error = '';
   try {
-    for await (const ev of start(controller.signal)) {
+    for await (const ev of start(signal)) {
+      if (!sameFileProject(project)) { cancelIfChanged(); break; }
       if (ev.type === 'text') { gather(ev.id, 'text', ev.delta); streaming.value = ev.id; continue; }
       if (ev.type === 'thinking') { gather(ev.id, 'thinking', ev.delta); continue; }
       // any other event comes after the words gathered before it
@@ -168,8 +176,19 @@ async function consume(start: (signal: AbortSignal) => AsyncGenerator<AiEvent>, 
       } else if (ev.type === 'error') { error = ev.message; chat.value = [...chat.value, { id: uid(), role: 'assistant', text: t('assistant.errorError', { error }) }]; }
     }
   } catch (e) {
-    if ((e as Error).name !== 'AbortError') { error = (e as Error).message; chat.value = [...chat.value, { id: uid(), role: 'assistant', text: t('assistant.errorError', { error }) }]; }
+    if (sameFileProject(project) && (e as Error).name !== 'AbortError') { error = (e as Error).message; chat.value = [...chat.value, { id: uid(), role: 'assistant', text: t('assistant.errorError', { error }) }]; }
   } finally {
+    offProject(); offDocUrl();
+    if (!sameFileProject(project)) {
+      if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
+      words.clear();
+      turnEnds();
+      running.value = false;
+      streaming.value = null;
+      controller = null;
+      paused.value = false;
+      return;
+    }
     flushWords();
     turnEnds();
     running.value = false;
