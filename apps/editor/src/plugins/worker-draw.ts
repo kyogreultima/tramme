@@ -14,7 +14,7 @@
 // back. The page ships the document (setDoc) and each video asset's current
 // frame (their decoding still happens there, for now).
 
-import { Evaluator, layerClock, parseColor, pictureMotion as corePictureMotion, sampleAt, soundCues, type Host, type Instance, type NodeType, type PluginModule, type TrammeDoc } from '@tramme/core';
+import { Evaluator, layerClock, motionReport as coreMotionReport, parseColor, pictureMotion as corePictureMotion, sampleAt, soundCues, type Host, type Instance, type NodeType, type PluginModule, type TrammeDoc } from '@tramme/core';
 import { builtinRegistry } from '@tramme/nodes';
 import { CanvasPool, Compositor, drawComposed, drawFrame, drawLayers, finishOf, subTimes } from '@tramme/render/src/index.ts';
 import { nodeContext, resizeNode } from '@tramme/render/src/gpu.ts';
@@ -292,6 +292,14 @@ export function makeSandboxDraw(modules: Map<string, PluginModule>): SandboxDraw
       const value = corePictureMotion(evaluator, compId);
       if (value.times.length > 16384) throw new Error('too many sandbox picture motion samples');
       return value;
+    },
+    async motionReport(compId, from, to) {
+      const doc = theDoc();
+      if (!doc || !doc.compositions[compId]) throw new Error('unknown sandbox composition');
+      const reg = builtinRegistry().clone();
+      for (const [id, mod] of modules) reg.use(mod, id);
+      const evaluator = new Evaluator(doc, reg, { data: (id) => side.json.get(id) });
+      return coreMotionReport(evaluator, compId, from, to, { limit: 6 });
     },
     async samplePlaced(t, compId) {
       const doc = theDoc();

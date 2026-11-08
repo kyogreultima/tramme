@@ -4,7 +4,7 @@
 // validated and proposed like any tool's (ai/tools.ts calls the wrappers the
 // registry carries — plugins/vocabulary.ts puts them there).
 
-import { toolOutput, type CheckContext, type NodeType, type PlacedLayer, type QualityIssue, type SoundCue, type ToolContext, type ToolOutput } from '@tramme/core';
+import { toolOutput, type CheckContext, type MotionReport, type NodeType, type PlacedLayer, type QualityIssue, type SoundCue, type ToolContext, type ToolOutput } from '@tramme/core';
 import type { Ask, ClockSample, DrawPayload, DrawResult, FramePayload, FromWorker, LayerSample, MotionSample, PlacedSample, PluginDecl, SandboxDoc, ToWorker } from './protocol.ts';
 
 /** the schema of a node without its code: what a check's samples may cross */
@@ -124,6 +124,7 @@ export interface PluginHost {
   soundCues(compId: string): Promise<SoundCue[]>;
   sampleClock(layerId: string, compId: string, compTimes: number[], fileTimes: number[]): Promise<ClockSample>;
   pictureMotion(compId: string): Promise<MotionSample>;
+  motionReport(compId: string, from: number, to: number): Promise<MotionReport>;
   samplePlaced(t: number, compId: string): Promise<PlacedSample[]>;
   /** stop: every call waiting is refused, with `reason` when there is one */
   dispose(reason?: string): void;
@@ -341,6 +342,16 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
       else w.resolve(m.value);
       return;
     }
+    if (m.kind === 'motionReport') {
+      if (m.err !== undefined && (typeof m.err !== 'string' || m.err.length > 4096)) { invalid(); return; }
+      if (responseTooLarge(m.value) || responseTooLarge(m.err)) { timeout('sandbox response exceeds 8 MB'); return; }
+      const w = waits.get(m.call);
+      if (!w) return;
+      waits.delete(m.call);
+      if (m.err) w.reject(new Error(m.err));
+      else w.resolve(m.value);
+      return;
+    }
     if (m.kind === 'sampledPlaced') {
       if (m.err !== undefined && (typeof m.err !== 'string' || m.err.length > 4096)) { invalid(); return; }
       if (responseTooLarge(m.values) || responseTooLarge(m.err)) { timeout('sandbox response exceeds 8 MB'); return; }
@@ -504,6 +515,17 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
       if (!value || !Array.isArray(value.times) || !Array.isArray(value.motion) || value.times.length > 16384 ||
           value.times.length !== value.motion.length || value.times.some((t) => !Number.isFinite(t)) ||
           value.motion.some((v) => !Number.isFinite(v))) throw new Error('invalid sandbox picture motion response');
+      return value;
+    },
+    async motionReport(compId, from, to) {
+      if (typeof compId !== 'string' || compId.length > 256 || !Number.isFinite(from) || !Number.isFinite(to) || to < from || to - from > 5) throw new Error('invalid sandbox motion report request');
+      const value = await run({ kind: 'motionReport', call: ++call, compId, from, to }) as MotionReport;
+      if (!value || !Array.isArray(value.figures) || value.figures.length > 6 || value.figures.some((entry) => {
+        const f = entry?.figures;
+        return !entry || typeof entry.address !== 'string' || entry.address.length > 256 || !f ||
+          ![f.span, f.change, f.travel, f.peak, f.peakAt, f.evenness, f.turns, f.overshoot].every(Number.isFinite) ||
+          (f.settle !== undefined && !Number.isFinite(f.settle));
+      })) throw new Error('invalid sandbox motion report response');
       return value;
     },
     async samplePlaced(t, compId) {

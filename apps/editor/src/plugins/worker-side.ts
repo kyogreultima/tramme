@@ -4,7 +4,7 @@
 // runs their tools and checks against a context whose every reach into the
 // project is a message answered by the page. Nothing here touches the DOM.
 
-import { Registry, type CheckContext, type CheckType, type EffectType, type ModifierType, type NodeType, type PluginModule, type QualityIssue, type SoundCue, type ToolContext, type ToolOutput } from '@tramme/core';
+import { Registry, type CheckContext, type CheckType, type EffectType, type ModifierType, type MotionReport, type NodeType, type PluginModule, type QualityIssue, type SoundCue, type ToolContext, type ToolOutput } from '@tramme/core';
 import type { Ask, CheckCtxData, ClockSample, DrawPayload, DrawResult, FramePayload, FromWorker, LayerSample, MotionSample, PlacedSample, PluginDecl, SandboxDoc, SchemaEffect, SchemaModifier, SchemaNode, ToWorker, ToolCtxData } from './protocol.ts';
 
 /** the sandbox id of an installed plugin (installed:<file>): the project's own plugins have the document's asset ids */
@@ -32,6 +32,7 @@ export interface SandboxDrawSide {
   soundCues(compId: string): Promise<SoundCue[]>;
   sampleClock(layerId: string, compId: string, compTimes: number[], fileTimes: number[]): Promise<ClockSample>;
   pictureMotion(compId: string): Promise<MotionSample>;
+  motionReport(compId: string, from: number, to: number): Promise<MotionReport>;
   samplePlaced(t: number, compId: string): Promise<PlacedSample[]>;
 }
 
@@ -233,6 +234,16 @@ export function startWorkerSide({ post, importModule, sandbox: makeSandbox }: Wo
         void sandbox.pictureMotion(m.compId)
           .then((value) => post({ kind: 'pictureMotion', call: m.call, value }))
           .catch((e: Error) => post({ kind: 'pictureMotion', call: m.call, err: e.message }));
+        return;
+      }
+      if (m.kind === 'motionReport') {
+        if (!sandbox) { post({ kind: 'motionReport', call: m.call, err: 'the sandbox cannot read motion figures here' }); return; }
+        if (typeof m.compId !== 'string' || m.compId.length > 256 || !Number.isFinite(m.from) || !Number.isFinite(m.to) || m.to < m.from || m.to - m.from > 5) {
+          post({ kind: 'motionReport', call: m.call, err: 'invalid sandbox motion report request' }); return;
+        }
+        void sandbox.motionReport(m.compId, m.from, m.to)
+          .then((value) => post({ kind: 'motionReport', call: m.call, value }))
+          .catch((e: Error) => post({ kind: 'motionReport', call: m.call, err: e.message }));
         return;
       }
       if (m.kind === 'samplePlaced') {

@@ -3,7 +3,7 @@
 // are tools of the editor's vocabulary, run by the assistant before it sums
 // up (use_tool) or by the user from the / menu.
 
-import { groupIssues, likeness, pictureDiff, motionReport, REPORT_MAX, reportCounts, reportHead, reportLines, runChecks, type QualityIssue, type ToolContext, type ToolType, type TrammeDoc } from '@tramme/core';
+import { groupIssues, likeness, pictureDiff, motionReport, REPORT_MAX, reportCounts, reportHead, reportLines, runChecks, type MotionReport, type QualityIssue, type ToolContext, type ToolType, type TrammeDoc } from '@tramme/core';
 import { editorEvaluator } from './evaluator.ts';
 import { sandboxedDoc } from './installed.ts';
 import { pixelsOf, flowLines } from './flow.ts';
@@ -12,8 +12,26 @@ import { masterText, soundReport } from './mixing.ts';
 import { FILM_PLAN_PATH, parsePlan } from './filmplan.ts';
 import { formLines } from './forms.ts';
 import { t } from './i18n/index.ts';
+import { prefs } from './settings.ts';
 
 const CELL = 360;
+
+/** Numeric motion figures for the strip, evaluated where project code runs. */
+export async function motionReportOf(ctx: ToolContext, from: number, to: number): Promise<MotionReport> {
+  if (!sandboxedDoc(ctx.doc) && !prefs.peek().sandboxPreview) return motionReport(editorEvaluator(ctx.doc, ctx.registry), ctx.compId, from, to, { limit: 6 });
+  const [{ fileProject, requireFileProject }, { preview }, { pluginHost }, { ensureDeclared, ensureSandboxDoc, moduleItemsOf }] = await Promise.all([
+    import('./files.ts'), import('./preview.ts'), import('./plugins/index.ts'), import('./plugins/sandbox-draw.ts'),
+  ]);
+  const project = fileProject(), renderer = preview.renderer;
+  if (!renderer) throw new Error('preview is not ready for isolated motion figures');
+  const base = new URL(project.docUrl, location.href).href, host = pluginHost(base);
+  await ensureDeclared(host, moduleItemsOf(ctx.doc, base));
+  requireFileProject(project);
+  ensureSandboxDoc(host, { doc: ctx.doc, docUrl: base, loaded: (id) => { try { return renderer.assets.get(id); } catch { return null; } } });
+  const report = await host.motionReport(ctx.compId, from, to);
+  requireFileProject(project);
+  return report;
+}
 
 /** pictures side by side, `cols` to a row, each w × h with its label in a corner (a JPEG data URL) */
 export function sheetOf(cells: { image: CanvasImageSource; label: string }[], w: number, h: number, cols: number): string {
@@ -127,7 +145,7 @@ const motion: ToolType<{ t: number; span?: number; steps?: number }> = {
     const images = await stills(ctx, times, ctx.compId);
     const url = sheetOf(images.map((image, i) => ({ image, label: `${times[i].toFixed(2)} s` })), CELL, Math.round((CELL * c.height) / c.width), Math.min(steps, 6));
     // the same evaluation the render uses, so the figures are the movement's
-    const report = motionReport(editorEvaluator(ctx.doc, ctx.registry), ctx.compId, from, to, { limit: 6 });
+    const report = await motionReportOf(ctx, from, to);
     const figs = report.figures.map(({ address, figures: f }) => {
       const pace = f.evenness > 0.92 ? 'constant speed (the linear tell: ease it)' : f.evenness > 0.6 ? 'eased' : 'strongly eased';
       const way = f.turns === 0 ? 'one way' : `${f.turns} turn(s)`;
