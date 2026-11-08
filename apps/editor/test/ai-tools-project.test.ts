@@ -84,4 +84,31 @@ describe('built-in assistant tool project boundary', () => {
       S.doc.value = previous.doc;
     }
   });
+
+  it('refuses oversized text before reading its body', async () => {
+    const previous = { project: S.project.peek(), docUrl: S.docUrl.peek(), doc: S.doc.peek() };
+    const cancel = vi.fn(async () => {});
+    const fetch = vi.fn(async () => ({
+      status: 200,
+      ok: true,
+      headers: new Headers({ 'content-length': String(8 * 1024 * 1024 + 1) }),
+      body: { cancel },
+    } as unknown as Response));
+    vi.stubGlobal('fetch', fetch);
+    const runner = new ToolRunner();
+    try {
+      open(first, 'first');
+      const result = await runner.run('read_file', { path: 'assets/large.json' });
+      expect(result.isError).toBe(true);
+      expect(result.content[0]).toMatchObject({ text: expect.stringContaining('exceeds 8 MB') });
+      expect(fetch.mock.calls).toHaveLength(1);
+      expect(cancel).toHaveBeenCalledOnce();
+    } finally {
+      runner.dispose();
+      vi.unstubAllGlobals();
+      S.project.value = previous.project;
+      S.docUrl.value = previous.docUrl;
+      S.doc.value = previous.doc;
+    }
+  });
 });

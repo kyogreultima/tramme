@@ -461,14 +461,14 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
     const bad = pathIssue(path);
     if (bad) return text(`${path}: ${bad}`, true);
     if (!TEXT_FILE.test(path) || path === MANIFEST || isChatPath(path)) return text('only .js, .mjs, .json, .svg and .md text files can be read', true);
-    const f = await api.readText(project.id, path);
+    const body = await readProjectText(project.id, path);
     requireFileProject(project);
-    if (!f) return text(`file not found: ${path}`, true);
-    if (offset === 0 && f.text.length <= READ_PART) return text(f.text);
-    if (offset >= f.text.length) return text(`${path} has ${f.text.length} characters: nothing from ${offset}`, true);
-    const end = Math.min(f.text.length, offset + READ_PART);
-    const more = end < f.text.length ? `; the rest from offset ${end}` : '; end of the file';
-    return text(`[${path}: characters ${offset} to ${end} of ${f.text.length}${more}]\n${f.text.slice(offset, end)}`);
+    if (body === null) return text(`file not found: ${path}`, true);
+    if (offset === 0 && body.length <= READ_PART) return text(body);
+    if (offset >= body.length) return text(`${path} has ${body.length} characters: nothing from ${offset}`, true);
+    const end = Math.min(body.length, offset + READ_PART);
+    const more = end < body.length ? `; the rest from offset ${end}` : '; end of the file';
+    return text(`[${path}: characters ${offset} to ${end} of ${body.length}${more}]\n${body.slice(offset, end)}`);
   }
 
   private async write(path: string, content: string): Promise<ToolResult> {
