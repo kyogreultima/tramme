@@ -535,6 +535,7 @@ describe('the sandboxed drawing', () => {
       const { host } = pair(new Map(), undefined, (modules) => makeSandboxDraw(modules));
       host.setDoc({ doc: project, docUrl: DOC_URL, images: {}, json: {}, fonts: [] });
       await expect(host.evaluateValue('box.radius', 0, project.root)).resolves.toBe(7);
+      await expect(host.evaluateSeries(['box.radius'], [0, 0.5, 1], project.root)).resolves.toEqual([[7, 7, 7]]);
       await expect(host.evaluateValue('$comp.unknown', 0, project.root)).rejects.toThrow();
     } finally { (globalThis as any).self = oldSelf; }
   });
@@ -586,6 +587,7 @@ describe('the sandboxed drawing', () => {
       },
       exportOf: async () => ({ err: 'not this test' }),
       evaluateValue: async () => 0,
+      evaluateSeries: async () => [[0]],
       renderFrame: async () => ({ err: 'not this test' }),
     };
     const { host } = pair(new Map([['blob:stars', plugin()]]), undefined, () => sandbox);
@@ -609,6 +611,7 @@ describe('the sandboxed drawing', () => {
         return { svg: node.export.svg?.(props), lottie: node.export.lottie?.(props) };
       },
       evaluateValue: async () => 0,
+      evaluateSeries: async () => [[0]],
       renderFrame: async (p) => {
         if (!p.videos || !p.videos.clip) return { err: 'no video frame shipped' };
         const b = { width: 100 } as unknown as ImageBitmap;
@@ -630,6 +633,7 @@ describe('the sandboxed drawing', () => {
       draw: async () => ({ results: [] }),
       exportOf: async () => ({}),
       evaluateValue: async () => 0,
+      evaluateSeries: async () => [[0]],
       renderFrame: async (p) => { frames.push(p); return { bitmap, transfer: [bitmap] }; },
     }));
     host.setDoc({ doc: { assets: {} }, docUrl: DOC_URL, images: {}, json: {}, fonts: [] });
@@ -646,6 +650,24 @@ describe('the sandboxed drawing', () => {
     // without the sandbox: a clear error
     const bare = pair(new Map());
     await expect(bare.host.renderFrame({ compId: 'root', t: 0, scale: 1, width: 100, height: 100 })).rejects.toThrow(/cannot render/);
+  });
+
+  it('samples property series in one bounded sandbox call', async () => {
+    const calls: unknown[] = [];
+    const { host } = pair(new Map([['blob:stars', plugin()]]), undefined, () => ({
+      setDoc: () => {},
+      draw: async () => ({ results: [] }),
+      exportOf: async () => ({}),
+      evaluateValue: async () => 0,
+      evaluateSeries: async (addresses, times, compId) => {
+        calls.push({ addresses, times, compId });
+        return addresses.map((_, i) => times.map((t) => i + t));
+      },
+      renderFrame: async () => ({}),
+    }));
+    expect(await host.evaluateSeries(['layer.x', 'layer.y'], [0, 0.5], 'root')).toEqual([[0, 0.5], [1, 1.5]]);
+    expect(calls).toEqual([{ addresses: ['layer.x', 'layer.y'], times: [0, 0.5], compId: 'root' }]);
+    await expect(host.evaluateSeries(['layer.x'], Array(513).fill(0), 'root')).rejects.toThrow('invalid sandbox series');
   });
 
   it('the wrapper defers, then draws the picture over its bounds; a later frame keeps the last one', async () => {

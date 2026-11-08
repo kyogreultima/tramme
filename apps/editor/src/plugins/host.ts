@@ -118,6 +118,8 @@ export interface PluginHost {
   renderFrame(payload: FramePayload): Promise<{ bitmap?: unknown; err?: string }>;
   /** an evaluated property, computed in the worker */
   evaluateValue(address: string, t: number, compId: string): Promise<unknown>;
+  /** values[address][time], sampled together in one isolated evaluator */
+  evaluateSeries(addresses: string[], times: number[], compId: string): Promise<unknown[][]>;
   /** stop: every call waiting is refused, with `reason` when there is one */
   dispose(reason?: string): void;
   /** disposed (its worker stopped): the next project's or call's sandbox is a new one */
@@ -282,6 +284,17 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
       else w.resolve(m.value);
       return;
     }
+    if (m.kind === 'evaluatedSeries') {
+      if (m.err !== undefined && (typeof m.err !== 'string' || m.err.length > 4096)) { invalid(); return; }
+      if (responseTooLarge(m.values) || responseTooLarge(m.err)) { timeout('sandbox response exceeds 8 MB'); return; }
+      const w = waits.get(m.call);
+      if (!w) return;
+      waits.delete(m.call);
+      if (m.err) w.reject(new Error(m.err));
+      else if (!Array.isArray(m.values)) w.reject(new Error('invalid sandbox series'));
+      else w.resolve(m.values);
+      return;
+    }
     if (m.kind === 'progress') {
       if (!Number.isFinite(m.done) || !Number.isFinite(m.total) || (m.step !== undefined && (typeof m.step !== 'string' || m.step.length > 4096))) { invalid(); return; }
       const ctx = bridges.get(m.call);
@@ -390,6 +403,14 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
     async evaluateValue(address, t, compId) {
       if (address.length > 4096 || compId.length > 4096 || !Number.isFinite(t)) throw new Error('invalid sandbox evaluation request');
       return run({ kind: 'evaluate', call: ++call, address, t, compId });
+    },
+    async evaluateSeries(addresses, times, compId) {
+      if (!Array.isArray(addresses) || !addresses.length || addresses.length > 16 || addresses.some((a) => typeof a !== 'string' || a.length > 256) ||
+          !Array.isArray(times) || !times.length || times.length > 512 || times.some((t) => !Number.isFinite(t)) || addresses.length * times.length > 4096 ||
+          typeof compId !== 'string' || compId.length > 256) throw new Error('invalid sandbox series');
+      const values = await run({ kind: 'evaluateSeries', call: ++call, addresses, times, compId }) as unknown[][];
+      if (!Array.isArray(values) || values.length !== addresses.length || values.some((row) => !Array.isArray(row) || row.length !== times.length)) throw new Error('invalid sandbox series response');
+      return values;
     },
     dispose(reason) {
       closed = true;

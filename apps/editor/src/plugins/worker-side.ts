@@ -27,6 +27,7 @@ export interface SandboxDrawSide {
   renderFrame(p: FramePayload): Promise<{ bitmap?: unknown; transfer?: Transferable[]; err?: string }>;
   /** evaluate one property without running its expression on the page */
   evaluateValue(address: string, t: number, compId: string): Promise<unknown>;
+  evaluateSeries(addresses: string[], times: number[], compId: string): Promise<unknown[][]>;
 }
 
 export interface WorkerSideOptions {
@@ -180,6 +181,16 @@ export function startWorkerSide({ post, importModule, sandbox: makeSandbox }: Wo
         void sandbox.evaluateValue(m.address, m.t, m.compId)
           .then((value) => post({ kind: 'evaluated', call: m.call, value }))
           .catch((e: Error) => post({ kind: 'evaluated', call: m.call, err: e.message }));
+        return;
+      }
+      if (m.kind === 'evaluateSeries') {
+        if (!sandbox) { post({ kind: 'evaluatedSeries', call: m.call, err: 'the sandbox cannot evaluate here' }); return; }
+        if (!Array.isArray(m.addresses) || !m.addresses.length || m.addresses.length > 16 || m.addresses.some((a) => typeof a !== 'string' || a.length > 256) ||
+            !Array.isArray(m.times) || !m.times.length || m.times.length > 512 || m.times.some((t) => !Number.isFinite(t)) || m.addresses.length * m.times.length > 4096 ||
+            typeof m.compId !== 'string' || m.compId.length > 256) { post({ kind: 'evaluatedSeries', call: m.call, err: 'invalid sandbox series' }); return; }
+        void sandbox.evaluateSeries(m.addresses, m.times, m.compId)
+          .then((values) => post({ kind: 'evaluatedSeries', call: m.call, values }))
+          .catch((e: Error) => post({ kind: 'evaluatedSeries', call: m.call, err: e.message }));
         return;
       }
       if (m.kind === 'export') {

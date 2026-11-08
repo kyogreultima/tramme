@@ -172,6 +172,7 @@ export type ToWorker =
   | { kind: 'draw'; call: number; payload: DrawPayload }
   | { kind: 'render'; call: number; payload: FramePayload }
   | { kind: 'evaluate'; call: number; address: string; t: number; compId: string }
+  | { kind: 'evaluateSeries'; call: number; addresses: string[]; times: number[]; compId: string }
   | { kind: 'export'; call: number; type: string; props: unknown }
   | { kind: 'abort'; call: number }
   | { kind: 'answer'; id: number; ok?: unknown; err?: string };
@@ -185,6 +186,7 @@ export type FromWorker =
   | { kind: 'drawn'; call: number; frame: number; results: DrawResult[] }
   | { kind: 'rendered'; call: number; bitmap?: unknown; err?: string }
   | { kind: 'evaluated'; call: number; value?: unknown; err?: string }
+  | { kind: 'evaluatedSeries'; call: number; values?: unknown[][]; err?: string }
   | { kind: 'exported'; call: number; svg?: string; lottie?: unknown; err?: string }
   | { kind: 'ask'; id: number; call: number; q: Ask }
   | { kind: 'progress'; call: number; done: number; total: number; step?: string };

@@ -653,6 +653,7 @@
     "editKeyframe": "Modifier la clé",
     "segmentCurve": "Courbe du segment",
     "selectAnAnimatedLayer": "Sélectionnez un calque animé pour voir ses courbes.",
+    "isolatedUnavailable": "La courbe isolée n'a pas pu être calculée : {error}",
     "normalizedValues": "Valeurs normalisées",
     "applyNameToThe": "Appliquer « {name} » aux segments sélectionnés",
     "selectAKeyframe": "Sélectionnez une clé"

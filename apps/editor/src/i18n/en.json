@@ -653,6 +653,7 @@
     "editKeyframe": "Edit keyframe",
     "segmentCurve": "Segment curve",
     "selectAnAnimatedLayer": "Select an animated layer to see its curves.",
+    "isolatedUnavailable": "The isolated curve could not be sampled: {error}",
     "normalizedValues": "Normalized values",
     "applyNameToThe": "Apply \"{name}\" to the selected segments",
     "selectAKeyframe": "Select a keyframe"

@@ -241,6 +241,14 @@ export function makeSandboxDraw(modules: Map<string, PluginModule>): SandboxDraw
       // postMessage cannot transfer functions or cyclic expression results.
       return structuredClone(value);
     },
+    async evaluateSeries(addresses, times, compId) {
+      const doc = theDoc();
+      if (!doc || !doc.compositions[compId]) throw new Error('unknown sandbox composition');
+      const reg = builtinRegistry().clone();
+      for (const [id, mod] of modules) reg.use(mod, id);
+      const evaluator = new Evaluator(doc, reg, { data: (id) => side.json.get(id) });
+      return structuredClone(addresses.map((address) => times.map((t) => evaluator.value(address, t, compId))));
+    },
     async renderFrame(p) {
       try { await fontsReady; return await renderFrame(p); }
       finally {
