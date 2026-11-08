@@ -16,7 +16,7 @@ import { uid } from './calls.ts';
 import { api, type AiEvent } from '../api.ts';
 import { describeOp, freshId } from '../model.ts';
 import { analyses, jpegOf, loadImage } from '../perception.ts';
-import { safeName } from '../files.ts';
+import { fileProject, requireFileProject, sameFileProject, safeName } from '../files.ts';
 import { transcriptFor, transcriptIdOf } from '../speech.ts';
 import { placeTemplate, TEMPLATES } from '../templates.ts';
 import { S } from '../state.ts';
@@ -126,14 +126,18 @@ export class ToolRunner {
 
   /** a transcript: of the asset itself (json), or of a sound or video (when missing, the user is asked to make it, if `ask`) */
   private async readTranscript(assetId: string, ask = true): Promise<{ t: Transcript; id: string }> {
+    const project = fileProject();
     const doc = this.liveDoc(), a = doc.assets[assetId];
     if (!a) throw new Error(`unknown asset: ${assetId}`);
     let id = assetId;
     if (a.type === 'audio' || a.type === 'video') id = await transcriptFor(assetId, ask);
     else if (a.type !== 'json') throw new Error(`${assetId}: a sound, a video or a transcript is expected`);
+    requireFileProject(project);
     const entry = S.doc.peek().assets[id] ?? doc.assets[id];
-    const r = await fetch(this.urlOf(entry.src), { cache: 'no-store' });
+    const url = new URL(entry.src, new URL(project.docUrl, location.href)).href;
+    const r = await fetch(url, { cache: 'no-store' });
     const t = await r.json();
+    requireFileProject(project);
     if (!isTranscript(t)) throw new Error(`${id} is not a transcript`);
     return { t, id };
   }
@@ -182,6 +186,7 @@ export class ToolRunner {
 
   /** an edit of a media: the parts kept laid end to end, the transcript remapped, the captions rewired */
   private async cut(input: any): Promise<ToolResult> {
+    const project = fileProject();
     const doc = this.liveDoc(), assetId = String(input.asset ?? ''), a = doc.assets[assetId];
     if (!a || (a.type !== 'video' && a.type !== 'audio')) return text('a sound or video asset is expected', true);
     const keeps = (input.keeps as { from: number; to: number }[]).map((k) => ({ from: Math.max(0, Number(k.from)), to: Number(k.to) })).filter((k) => k.to > k.from + 0.04);
@@ -217,10 +222,12 @@ export class ToolRunner {
     let note = '';
     try {
       const { t, id: srcId } = await this.readTranscript(assetId, false);
+      requireFileProject(project);
       const remapped = remapTranscript(t, keeps, at);
       const editId = `${transcriptIdOf(assetId)}-edit`.slice(0, 64);
       const path = `assets/transcripts/${safeName(`${assetId}-edit.json`)}`;
-      await api.write(S.project.peek().id, path, new Blob([JSON.stringify(remapped)], { type: 'application/json' }));
+      await api.write(project.id, path, new Blob([JSON.stringify(remapped)], { type: 'application/json' }));
+      requireFileProject(project);
       ops.push({ op: doc.assets[editId] ? 'replace' : 'add', path: pointer('assets', editId), value: { type: 'json', src: path, name: `Transcript · ${a.name ?? assetId} · edit` } });
       for (const [id, l] of Object.entries(c.layers)) {
         if (l.type === 'captions' && (l.props?.transcript === srcId || l.props?.transcript === editId)) {
@@ -232,8 +239,9 @@ export class ToolRunner {
       if (S.doc.peek().assets[editId]) this.events.push({ type: 'reload', assets: [editId] });
       note = ` Transcript of the edit: asset "${editId}" (${remapped.words.length} words, composition time); place the captions, keywords and titles with it.`;
     } catch (e) { note = ` (transcript of the edit not made: ${(e as Error).message})`; }
+    if (!sameFileProject(project)) return text('the project changed while the tool was running', true);
     const total = cursor - at;
-    const r = await this.propose(t('ai.editOfName', { name: a.name ?? assetId }), ops);
+    const r = await this.propose(t('ai.editOfName', { name: a.name ?? assetId }), ops, () => sameFileProject(project));
     if (r.isError) return r;
     return text(`Edit: ${keeps.length} passage(s), ${total.toFixed(2)} s kept, layers ${ids.join(', ')} from ${at.toFixed(2)} to ${cursor.toFixed(2)} s.${note}
 ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
@@ -280,7 +288,9 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
           return text('Proposal dropped.');
         }
         case 'list_files': {
-          const { files } = await api.info(S.project.peek().id);
+          const project = fileProject();
+          const { files } = await api.info(project.id);
+          requireFileProject(project);
           return text(files.map((f) => `${f.path}\t${f.size} bytes`).join('\n') || '(no files)');
         }
         case 'read_file': return await this.read(String(input.path ?? ''), Number(input.offset ?? 0));
@@ -431,11 +441,13 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
   }
 
   private async read(path: string, offset = 0): Promise<ToolResult> {
+    const project = fileProject();
     if (path === DOCUMENT) return text('read the document with get_document', true);
     const bad = pathIssue(path);
     if (bad) return text(`${path}: ${bad}`, true);
     if (!TEXT_FILE.test(path) || path === MANIFEST || isChatPath(path)) return text('only .js, .mjs, .json, .svg and .md text files can be read', true);
-    const f = await api.readText(S.project.peek().id, path);
+    const f = await api.readText(project.id, path);
+    requireFileProject(project);
     if (!f) return text(`file not found: ${path}`, true);
     if (offset === 0 && f.text.length <= READ_PART) return text(f.text);
     if (offset >= f.text.length) return text(`${path} has ${f.text.length} characters: nothing from ${offset}`, true);
@@ -445,11 +457,13 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
   }
 
   private async write(path: string, content: string): Promise<ToolResult> {
+    const project = fileProject();
     const bad = pathIssue(path);
     if (bad) return text(`${path}: ${bad}`, true);
     const ok = (/^plugins\/.+\.(js|mjs)$/i.test(path)) || (/^assets\/.+\.(json|svg)$/i.test(path));
     if (!ok) return text('allowed writes: plugins/*.js|mjs and assets/*.json|svg. The document changes through propose_changes.', true);
-    await api.write(S.project.peek().id, path, content, { type: /\.(js|mjs)$/i.test(path) ? 'text/javascript' : undefined });
+    await api.write(project.id, path, content, { type: /\.(js|mjs)$/i.test(path) ? 'text/javascript' : undefined });
+    requireFileProject(project);
     if (path.startsWith('plugins/')) this.wrotePlugins.add(path);
     // a plugin in use is loaded again in the preview
     const assets = Object.entries(S.doc.peek().assets).filter(([, a]) => srcPath(a.src) === path).map(([id]) => id);
