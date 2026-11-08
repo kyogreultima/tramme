@@ -104,6 +104,8 @@ Assistant text read budget (2026-11-08): the built-in `read_file` now uses the s
 
 Assistant transcript budget (2026-11-08): transcript JSON loaded for assistant tools now passes through a streamed 8 MiB limit before parsing. An oversized advertised response is cancelled; a test confirms it is refused before JSON decoding. The project identity is still checked after loading. Other media and graphics budgets remain open in step 4.
 
+Tool file capability paths (2026-11-08): the trusted tool context now validates `readText` and `fileUrl` paths against the project format before constructing a URL or fetching. It rejects traversal, absolute URLs and fragments even if a caller bypasses the sandbox bridge's path check. A test confirms that a traversal read sends no request. Other asset URL and external capabilities remain under step 3 review.
+
 Vector and CLI checks (2026-11-07): isolated browser SVG/Lottie export now reports that expression-bearing projects need raster export. CLI `export`, `check-export` and `check` refuse such expressions before native vector conversion or picture checks. Tests exercise all three CLI commands and the browser export's early refusal. Worker-backed vector values and checks remain open.
 
 Editor module transfer (2026-11-07): when isolated preview is enabled, the editor's preview, stills, raster export and thumbnail now load every project module through the bounded opaque host before drawing. This includes Free code modules that are not listed as plugins. Reloads and document changes refresh the worker's module list. The editor setting is still opt-in, and browser coverage of these paths remains before step 2 can close.

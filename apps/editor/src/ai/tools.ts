@@ -351,14 +351,20 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
       if (S.project.peek()?.id !== projectId || S.docUrl.peek() !== docUrl) throw new Error('the project changed while the tool was running');
     };
     const urlOf = (src: string) => { current(); return new URL(src, new URL(docUrl, location.href)).href; };
+    const projectPath = (path: string) => {
+      current();
+      const bad = pathIssue(path);
+      if (bad || path.includes('#')) throw new Error(`${path}: ${bad ?? 'invalid project path'}`);
+      return path;
+    };
     return {
       doc, compId, registry,
       time: S.time.peek(),
       selection: S.selection.peek().filter((id) => doc.compositions[compId].layers[id]),
       assetUrl: (id) => { current(); const a = doc.assets[id]; if (!a) throw new Error(`unknown asset: ${id}`); return urlOf(a.src); },
-      readText: async (path) => { current(); const value = await readProjectText(projectId, path); current(); return value; },
+      readText: async (path) => { const value = await readProjectText(projectId, projectPath(path)); current(); return value; },
       files: async () => { current(); const value = (await api.info(projectId)).files.map(({ path, size }) => ({ path, size })); current(); return value; },
-      fileUrl: (path) => urlOf(path),
+      fileUrl: (path) => urlOf(projectPath(path)),
       writeFile: async (path, data) => {
         current();
         const bad = pathIssue(path);

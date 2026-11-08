@@ -101,4 +101,26 @@ describe('tool project boundary', () => {
       S.doc.value = previous.doc;
     }
   });
+
+  it('refuses a file capability path outside the project', async () => {
+    const project = newProject({ name: 'First', width: 64, height: 64, fps: 30, duration: 1 });
+    const previous = { project: S.project.peek(), docUrl: S.docUrl.peek() };
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+    const runner = new ToolRunner();
+    try {
+      S.project.value = project.manifest;
+      S.docUrl.value = 'https://tramme.test/projects/first/document.tramme.json';
+      const context = (runner as unknown as { toolContext(doc: TrammeDoc, registry: Registry): ToolContext }).toolContext(project.doc, builtinRegistry());
+      expect(() => context.fileUrl('../private.json')).toThrow();
+      expect(() => context.fileUrl('https://tramme.test/api/private')).toThrow();
+      await expect(context.readText('../private.json')).rejects.toThrow();
+      expect(fetch).not.toHaveBeenCalled();
+    } finally {
+      runner.dispose();
+      S.project.value = previous.project;
+      S.docUrl.value = previous.docUrl;
+      vi.unstubAllGlobals();
+    }
+  });
 });
