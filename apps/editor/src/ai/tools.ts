@@ -22,12 +22,14 @@ import { placeTemplate, TEMPLATES } from '../templates.ts';
 import { S } from '../state.ts';
 import { t } from '../i18n/index.ts';
 import { readProjectText } from '../plugins/read-project-text.ts';
+import { readLimitedBody } from '../plugins/host.ts';
 
 const text =(s: string, isError = false): ToolResult => ({ content: [{ type: 'text', text: s }], isError });
 const STILL_WIDTH = 768;
 const TEXT_FILE = /\.(js|mjs|json|svg|md|markdown)$/i;
 /** a file read in parts of this many characters (about 15k tokens) */
 const READ_PART = 50_000;
+const MAX_TRANSCRIPT_BYTES = 8 * 1024 * 1024;
 
 /** what a scene builder may change: its own composition (and its takes), under a root it must leave alone; `tokens` are the existing tokens it may change */
 export interface Scope { comp: string; root: string; tokens: string[] }
@@ -136,7 +138,8 @@ export class ToolRunner {
     const entry = S.doc.peek().assets[id] ?? doc.assets[id];
     const url = new URL(entry.src, new URL(project.docUrl, location.href)).href;
     const r = await fetch(url, { cache: 'no-store' });
-    const t = await r.json();
+    if (!r.ok) throw new Error(`${id}: transcript could not be read (HTTP ${r.status})`);
+    const t = JSON.parse(new TextDecoder().decode(await readLimitedBody(r, MAX_TRANSCRIPT_BYTES, 'transcript')));
     requireFileProject(project);
     if (!isTranscript(t)) throw new Error(`${id} is not a transcript`);
     return { t, id };

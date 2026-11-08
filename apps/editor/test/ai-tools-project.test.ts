@@ -111,4 +111,30 @@ describe('built-in assistant tool project boundary', () => {
       S.doc.value = previous.doc;
     }
   });
+
+  it('refuses an oversized transcript before parsing JSON', async () => {
+    const previous = { project: S.project.peek(), docUrl: S.docUrl.peek(), doc: S.doc.peek() };
+    const cancel = vi.fn(async () => {});
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      status: 200,
+      ok: true,
+      headers: new Headers({ 'content-length': String(8 * 1024 * 1024 + 1) }),
+      body: { cancel },
+    } as unknown as Response)));
+    const runner = new ToolRunner();
+    try {
+      open(first, 'first');
+      S.doc.value = { ...first.doc, assets: { ...first.doc.assets, transcript: { type: 'json', src: 'assets/transcripts/large.json' } } };
+      const result = await runner.run('get_transcript', { asset: 'transcript' });
+      expect(result.isError).toBe(true);
+      expect(result.content[0]).toMatchObject({ text: expect.stringContaining('exceeds 8 MB') });
+      expect(cancel).toHaveBeenCalledOnce();
+    } finally {
+      runner.dispose();
+      vi.unstubAllGlobals();
+      S.project.value = previous.project;
+      S.docUrl.value = previous.docUrl;
+      S.doc.value = previous.doc;
+    }
+  });
 });
