@@ -71,6 +71,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Fixed
 
+- Video stabilization now follows expression-driven playback speed through the isolated project worker.
 - Sound beats, tracked video frames and callouts now follow expression-driven playback speed through the isolated project worker.
 - Sound cues for isolated projects now follow the picture through the project worker when placing effects, planning music and checking the mix.
 - Tracking an object from a drawn rectangle now places that frame using the isolated project's evaluated geometry.
