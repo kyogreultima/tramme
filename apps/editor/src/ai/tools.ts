@@ -4,7 +4,7 @@
 // project's text files, and the tools its plugins bring. The document itself
 // only changes through proposals the user applies.
 
-import { copiesFor, copyId, installedTypes } from '../installed.ts';
+import { copiesFor, copyId, installedTypes, sandboxedDoc } from '../installed.ts';
 import { applyOps, getAt, isTranscript, pointer, remapTranscript, silences, toolInputIssues, toolOutput, validate, type TrammeDoc, type Op, type Registry, type ToolContext, type Transcript } from '@tramme/core';
 import { editorEvaluator } from '../evaluator.ts';
 import { DOCUMENT, isChatPath, MANIFEST, pathIssue, srcPath } from '@tramme/project';
@@ -23,6 +23,10 @@ import { S } from '../state.ts';
 import { t } from '../i18n/index.ts';
 import { readProjectText } from '../plugins/read-project-text.ts';
 import { readLimitedBody } from '../plugins/host.ts';
+import { pluginHost } from '../plugins/index.ts';
+import { ensureDeclared, ensureSandboxDoc, moduleItemsOf } from '../plugins/sandbox-draw.ts';
+import { preview } from '../preview.ts';
+import { prefs } from '../settings.ts';
 
 const text =(s: string, isError = false): ToolResult => ({ content: [{ type: 'text', text: s }], isError });
 const STILL_WIDTH = 768;
@@ -286,7 +290,20 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
           // the analyses and event lists reach the expressions that read them
           const data = await analyses(this.toolContext(doc, reg));
           requireFileProject(project);
-          return text(JSON.stringify(editorEvaluator(doc, reg, { data }).value(String(input.address), Number(input.t), input.compId ?? (this.scoped ? this.compOf(doc) : undefined))));
+          const compId = input.compId ?? (this.scoped ? this.compOf(doc) : doc.root);
+          if (prefs.peek().sandboxPreview || sandboxedDoc(doc)) {
+            const renderer = preview.renderer;
+            if (!renderer) throw new Error('preview is not ready for isolated evaluation');
+            const base = new URL(project.docUrl, location.href).href;
+            const host = pluginHost(base);
+            await ensureDeclared(host, moduleItemsOf(doc, base));
+            requireFileProject(project);
+            ensureSandboxDoc(host, { doc, docUrl: base, loaded: (id) => { try { return renderer.assets.get(id) ?? data(id); } catch { return data(id); } } });
+            const value = await host.evaluateValue(String(input.address), Number(input.t), compId);
+            requireFileProject(project);
+            return text(JSON.stringify(value));
+          }
+          return text(JSON.stringify(editorEvaluator(doc, reg, { data }).value(String(input.address), Number(input.t), compId)));
         }
         case 'render_still': return await this.still(Number(input.t), input.compId, input.caption);
         case 'propose_changes': return await this.propose(String(input.label ?? 'Change'), input.ops as Op[]);
