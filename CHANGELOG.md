@@ -71,6 +71,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Fixed
 
+- Sound cues for isolated projects now follow the picture through the project worker when placing effects, planning music and checking the mix.
 - Tracking an object from a drawn rectangle now places that frame using the isolated project's evaluated geometry.
 - Sound effects that stop or build a music bed now read its animated level through the isolated project worker when isolation is active.
 - Live true-peak readings no longer show a spike created by the meter when screen and audio updates cross at different times.

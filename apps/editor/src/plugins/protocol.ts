@@ -5,7 +5,7 @@
 // a context bridged over these messages. Everything that crosses is plain
 // data: live objects (elements, Path2D, functions) stay on their own side.
 
-import type { CheckType, NodeType, EffectType, KitType, ModifierType, PluginMeta, PresetType, PromptType, ToolType, EvaluatedTransform } from '@tramme/core';
+import type { CheckType, NodeType, EffectType, KitType, ModifierType, PluginMeta, PresetType, PromptType, ToolType, EvaluatedTransform, SoundCue } from '@tramme/core';
 
 /** plain evaluated values used by selection geometry; node callbacks stay in the worker */
 export type LayerSample = { id: string; props: Record<string, unknown>; transform: EvaluatedTransform; masks: { id: string; props: Record<string, unknown> }[] } | { id: string; err: string };
@@ -179,6 +179,7 @@ export type ToWorker =
   | { kind: 'evaluate'; call: number; address: string; t: number; compId: string }
   | { kind: 'evaluateSeries'; call: number; addresses: string[]; times: number[]; compId: string }
   | { kind: 'evaluateLayers'; call: number; ids: string[]; t: number; compId: string }
+  | { kind: 'soundCues'; call: number; compId: string }
   | { kind: 'samplePlaced'; call: number; t: number; compId: string }
   | { kind: 'export'; call: number; type: string; props: unknown }
   | { kind: 'abort'; call: number }
@@ -195,6 +196,7 @@ export type FromWorker =
   | { kind: 'evaluated'; call: number; value?: unknown; err?: string }
   | { kind: 'evaluatedSeries'; call: number; values?: unknown[][]; err?: string }
   | { kind: 'evaluatedLayers'; call: number; values?: LayerSample[]; err?: string }
+  | { kind: 'soundCues'; call: number; values?: SoundCue[]; err?: string }
   | { kind: 'sampledPlaced'; call: number; values?: PlacedSample[]; err?: string }
   | { kind: 'exported'; call: number; svg?: string; lottie?: unknown; err?: string }
   | { kind: 'ask'; id: number; call: number; q: Ask }

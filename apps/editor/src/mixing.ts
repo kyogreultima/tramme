@@ -247,7 +247,7 @@ export async function soundReport(ctx: ToolContext, opts: { image?: boolean } = 
     }
   }
   // each effect: on its cue, heard over the bed
-  const effects = await effectsOf(ctx, s), cues = cuesOf(ctx);
+  const effects = await effectsOf(ctx, s), cues = await cuesOf(ctx);
   for (const e of effects) {
     if (e.hit === null) continue;
     const at = +e.hit.toFixed(2);

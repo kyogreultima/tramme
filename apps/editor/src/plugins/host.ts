@@ -4,7 +4,7 @@
 // validated and proposed like any tool's (ai/tools.ts calls the wrappers the
 // registry carries — plugins/vocabulary.ts puts them there).
 
-import { toolOutput, type CheckContext, type NodeType, type PlacedLayer, type QualityIssue, type ToolContext, type ToolOutput } from '@tramme/core';
+import { toolOutput, type CheckContext, type NodeType, type PlacedLayer, type QualityIssue, type SoundCue, type ToolContext, type ToolOutput } from '@tramme/core';
 import type { Ask, DrawPayload, DrawResult, FramePayload, FromWorker, LayerSample, PlacedSample, PluginDecl, SandboxDoc, ToWorker } from './protocol.ts';
 
 /** the schema of a node without its code: what a check's samples may cross */
@@ -121,6 +121,7 @@ export interface PluginHost {
   /** values[address][time], sampled together in one isolated evaluator */
   evaluateSeries(addresses: string[], times: number[], compId: string): Promise<unknown[][]>;
   evaluateLayers(ids: string[], t: number, compId: string): Promise<LayerSample[]>;
+  soundCues(compId: string): Promise<SoundCue[]>;
   samplePlaced(t: number, compId: string): Promise<PlacedSample[]>;
   /** stop: every call waiting is refused, with `reason` when there is one */
   dispose(reason?: string): void;
@@ -308,6 +309,16 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
       else w.resolve(m.values);
       return;
     }
+    if (m.kind === 'soundCues') {
+      if (m.err !== undefined && (typeof m.err !== 'string' || m.err.length > 4096)) { invalid(); return; }
+      if (responseTooLarge(m.values) || responseTooLarge(m.err)) { timeout('sandbox response exceeds 8 MB'); return; }
+      const w = waits.get(m.call);
+      if (!w) return;
+      waits.delete(m.call);
+      if (m.err) w.reject(new Error(m.err));
+      else w.resolve(m.values);
+      return;
+    }
     if (m.kind === 'sampledPlaced') {
       if (m.err !== undefined && (typeof m.err !== 'string' || m.err.length > 4096)) { invalid(); return; }
       if (responseTooLarge(m.values) || responseTooLarge(m.err)) { timeout('sandbox response exceeds 8 MB'); return; }
@@ -442,6 +453,13 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
       const values = await run({ kind: 'evaluateLayers', call: ++call, ids, t, compId }) as LayerSample[];
       if (!Array.isArray(values) || values.length !== ids.length || values.some((value, i) => !value || value.id !== ids[i] ||
           !('err' in value) && (!value.transform || !value.props || !Array.isArray(value.masks)))) throw new Error('invalid sandbox layers response');
+      return values;
+    },
+    async soundCues(compId) {
+      if (typeof compId !== 'string' || compId.length > 256) throw new Error('invalid sandbox sound cues');
+      const values = await run({ kind: 'soundCues', call: ++call, compId }) as SoundCue[];
+      if (!Array.isArray(values) || values.length > 4096 || values.some((v) => !v || !Number.isFinite(v.t) || typeof v.layer !== 'string' || v.layer.length > 256 ||
+          !Number.isFinite(v.strength) || !['cut', 'move', 'land', 'appear'].includes(v.kind) || !['hero', 'support'].includes(v.weight))) throw new Error('invalid sandbox sound cues response');
       return values;
     },
     async samplePlaced(t, compId) {

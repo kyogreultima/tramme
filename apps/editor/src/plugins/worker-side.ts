@@ -4,7 +4,7 @@
 // runs their tools and checks against a context whose every reach into the
 // project is a message answered by the page. Nothing here touches the DOM.
 
-import { Registry, type CheckContext, type CheckType, type EffectType, type ModifierType, type NodeType, type PluginModule, type QualityIssue, type ToolContext, type ToolOutput } from '@tramme/core';
+import { Registry, type CheckContext, type CheckType, type EffectType, type ModifierType, type NodeType, type PluginModule, type QualityIssue, type SoundCue, type ToolContext, type ToolOutput } from '@tramme/core';
 import type { Ask, CheckCtxData, DrawPayload, DrawResult, FramePayload, FromWorker, LayerSample, PlacedSample, PluginDecl, SandboxDoc, SchemaEffect, SchemaModifier, SchemaNode, ToWorker, ToolCtxData } from './protocol.ts';
 
 /** the sandbox id of an installed plugin (installed:<file>): the project's own plugins have the document's asset ids */
@@ -29,6 +29,7 @@ export interface SandboxDrawSide {
   evaluateValue(address: string, t: number, compId: string): Promise<unknown>;
   evaluateSeries(addresses: string[], times: number[], compId: string): Promise<unknown[][]>;
   evaluateLayers(ids: string[], t: number, compId: string): Promise<LayerSample[]>;
+  soundCues(compId: string): Promise<SoundCue[]>;
   samplePlaced(t: number, compId: string): Promise<PlacedSample[]>;
 }
 
@@ -202,6 +203,14 @@ export function startWorkerSide({ post, importModule, sandbox: makeSandbox }: Wo
         void sandbox.evaluateLayers(m.ids, m.t, m.compId)
           .then((values) => post({ kind: 'evaluatedLayers', call: m.call, values }))
           .catch((e: Error) => post({ kind: 'evaluatedLayers', call: m.call, err: e.message }));
+        return;
+      }
+      if (m.kind === 'soundCues') {
+        if (!sandbox) { post({ kind: 'soundCues', call: m.call, err: 'the sandbox cannot read sound cues here' }); return; }
+        if (typeof m.compId !== 'string' || m.compId.length > 256) { post({ kind: 'soundCues', call: m.call, err: 'invalid sandbox sound cues' }); return; }
+        void sandbox.soundCues(m.compId)
+          .then((values) => post({ kind: 'soundCues', call: m.call, values }))
+          .catch((e: Error) => post({ kind: 'soundCues', call: m.call, err: e.message }));
         return;
       }
       if (m.kind === 'samplePlaced') {

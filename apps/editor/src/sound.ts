@@ -56,7 +56,21 @@ export interface Moment { t: number; visual?: SoundVisual; weight?: 'hero' | 'su
 
 const cueCache = new WeakMap<object, Map<string, SoundCue[]>>();
 /** the cues of the composition, read from the timing of its picture (once per document) */
-export function cuesOf(ctx: ToolContext): SoundCue[] {
+export async function cuesOf(ctx: ToolContext): Promise<SoundCue[]> {
+  if (sandboxedDoc(ctx.doc) || prefs.peek().sandboxPreview) {
+    const [{ fileProject, requireFileProject }, { preview }, { pluginHost }, { ensureDeclared, ensureSandboxDoc, moduleItemsOf }] = await Promise.all([
+      import('./files.ts'), import('./preview.ts'), import('./plugins/index.ts'), import('./plugins/sandbox-draw.ts'),
+    ]);
+    const project = fileProject(), renderer = preview.renderer;
+    if (!renderer) throw new Error('preview is not ready for isolated sound cues');
+    const base = new URL(project.docUrl, location.href).href, host = pluginHost(base);
+    await ensureDeclared(host, moduleItemsOf(ctx.doc, base));
+    requireFileProject(project);
+    ensureSandboxDoc(host, { doc: ctx.doc, docUrl: base, loaded: (id) => { try { return renderer.assets.get(id); } catch { return null; } } });
+    const cues = await host.soundCues(ctx.compId);
+    requireFileProject(project);
+    return cues;
+  }
   let byComp = cueCache.get(ctx.doc);
   if (!byComp) { byComp = new Map(); cueCache.set(ctx.doc, byComp); }
   let list = byComp.get(ctx.compId);
@@ -86,7 +100,7 @@ export async function momentsOf(ctx: ToolContext, at: unknown, on: unknown, laye
   const words = listOf(on).map((w) => w.toLowerCase());
   const named = listOf(layers).filter((id) => c.layers[id]);
   const visual = (Object.entries(c.layers) as [string, Layer][]).filter(([id, l]) => (named.length ? named.includes(id) : l.type !== 'audio' && l.visible !== false));
-  const cued = (keep: (x: SoundCue) => boolean) => found.push(...cuesOf(ctx).filter((x) => keep(x) && (!named.length || named.includes(x.layer))).map((x) => ({ t: x.t, visual: x.kind, weight: x.weight })));
+  const cued = async (keep: (x: SoundCue) => boolean) => found.push(...(await cuesOf(ctx)).filter((x) => keep(x) && (!named.length || named.includes(x.layer))).map((x) => ({ t: x.t, visual: x.kind, weight: x.weight })));
   // where a layer plays a file: composition times of a time in that file (at the layer's speed, once per turn of a loop)
   const playing = (asset: string) => (Object.entries(c.layers) as [string, Layer][]).filter(([, l]) => (l.type === 'audio' || l.type === 'video') && staticValue(l.props?.[l.type]) === asset).map(([id]) => id);
   const ev = editorEvaluator(ctx.doc, ctx.registry);
@@ -97,13 +111,13 @@ export async function momentsOf(ctx: ToolContext, at: unknown, on: unknown, laye
   const read = words.some((w) => ['cuts', 'beats', 'bars'].includes(w)) ? await analyses(ctx) : () => undefined;
   const assets = Object.keys(ctx.doc.assets);
   for (const w of words) {
-    if (CUE_WORDS[w]) cued(CUE_WORDS[w]);
+    if (CUE_WORDS[w]) await cued(CUE_WORDS[w]);
     else if (w === 'now') push([ctx.time]);
     else if (w === 'entrances') push(visual.map(([, l]) => l.in ?? 0).filter((x) => named.length || x > 0));
     else if (w === 'exits') push(visual.map(([, l]) => l.out ?? c.duration).filter((x) => x < c.duration));
     else if (w === 'markers') push((c.markers ?? []).map((m) => m.t));
     else if (w === 'cuts') {
-      cued((x) => x.kind === 'cut');
+      await cued((x) => x.kind === 'cut');
       push((Object.values(c.layers) as Layer[]).filter((l) => l.type === 'video').map((l) => l.in ?? 0).filter((x) => x > 0));
       for (const id of assets.filter((a) => a.startsWith('shots-'))) {
         const s = read(id) as { source?: string; cuts?: number[] } | undefined;
@@ -466,7 +480,7 @@ const KIND_LABEL: Record<'sfx' | 'music' | 'voice', () => string> = { sfx: () =>
 export async function filmMusicPlan(ctx: ToolContext): Promise<MusicCutPlan> {
   const c = ctx.doc.compositions[ctx.compId];
   const [cuts, markers] = await Promise.all([momentsOf(ctx, undefined, 'cuts', undefined), momentsOf(ctx, undefined, 'markers', undefined)]);
-  const heroes = cuesOf(ctx).filter((cue) => cue.weight === 'hero');
+  const heroes = (await cuesOf(ctx)).filter((cue) => cue.weight === 'hero');
   return musicCutPlan(Math.max(3, c.duration), c.fps, [
     ...cuts.map(({ t }) => ({ t, kind: 'cut' as const })),
     ...markers.map(({ t }) => ({ t, kind: 'marker' as const })),
@@ -707,7 +721,7 @@ const cues: ToolType<{ layers?: unknown }> = {
   },
   async run({ layers }, ctx) {
     const c = ctx.doc.compositions[ctx.compId], named = listOf(layers);
-    const list = cuesOf(ctx).filter((x) => !named.length || named.includes(x.layer));
+    const list = (await cuesOf(ctx)).filter((x) => !named.length || named.includes(x.layer));
     if (!list.length) return { text: 'No cue: nothing moves, appears or cuts in the picture. Place sounds on times (at) or markers.', notice: t('sound.noCue') };
     const heroes = list.filter((x) => x.weight === 'hero').length;
     const name = (id: string) => (id && c.layers[id] ? c.layers[id].name ?? id : 'the frame');

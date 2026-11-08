@@ -537,6 +537,9 @@ describe('the sandboxed drawing', () => {
       host.setDoc({ doc: project, docUrl: DOC_URL, images: {}, json: {}, fonts: [] });
       await expect(host.evaluateValue('box.radius', 0, project.root)).resolves.toBe(7);
       await expect(host.evaluateSeries(['box.radius'], [0, 0.5, 1], project.root)).resolves.toEqual([[7, 7, 7]]);
+      project.compositions[project.root].markers = [{ id: 'cut-1', t: 0.5, kind: 'cut' }];
+      host.setDoc({ doc: project, docUrl: DOC_URL, images: {}, json: {}, fonts: [] });
+      await expect(host.soundCues(project.root)).resolves.toEqual(expect.arrayContaining([expect.objectContaining({ t: 0.5, kind: 'cut' })]));
       const layers = await host.evaluateLayers(['box'], 0, project.root);
       expect(layers[0]).toMatchObject({ id: 'box', props: { radius: 7 }, transform: { opacity: 1 } });
       await expect(host.samplePlaced(0, project.root)).resolves.toMatchObject([{ id: 'box', type: 'shape.rect', opacity: 1 }]);
@@ -595,6 +598,7 @@ describe('the sandboxed drawing', () => {
       evaluateValue: async () => 0,
       evaluateSeries: async () => [[0]],
       evaluateLayers: async () => [],
+      soundCues: async () => [],
       samplePlaced: async () => [],
       renderFrame: async () => ({ err: 'not this test' }),
     };
@@ -621,6 +625,7 @@ describe('the sandboxed drawing', () => {
       evaluateValue: async () => 0,
       evaluateSeries: async () => [[0]],
       evaluateLayers: async () => [],
+      soundCues: async () => [],
       samplePlaced: async () => [],
       renderFrame: async (p) => {
         if (!p.videos || !p.videos.clip) return { err: 'no video frame shipped' };
@@ -645,6 +650,7 @@ describe('the sandboxed drawing', () => {
       evaluateValue: async () => 0,
       evaluateSeries: async () => [[0]],
       evaluateLayers: async () => [],
+      soundCues: async () => [],
       samplePlaced: async () => [],
       renderFrame: async (p) => { frames.push(p); return { bitmap, transfer: [bitmap] }; },
     }));
@@ -676,12 +682,15 @@ describe('the sandboxed drawing', () => {
         return addresses.map((_, i) => times.map((t) => i + t));
       },
       evaluateLayers: async () => [],
+      soundCues: async () => [{ t: 0, kind: 'cut', layer: '', strength: Number.NaN, weight: 'hero' }],
       samplePlaced: async () => [],
       renderFrame: async () => ({}),
     }));
     expect(await host.evaluateSeries(['layer.x', 'layer.y'], [0, 0.5], 'root')).toEqual([[0, 0.5], [1, 1.5]]);
     expect(calls).toEqual([{ addresses: ['layer.x', 'layer.y'], times: [0, 0.5], compId: 'root' }]);
     await expect(host.evaluateSeries(['layer.x'], Array(513).fill(0), 'root')).rejects.toThrow('invalid sandbox series');
+    await expect(host.soundCues('root')).rejects.toThrow('invalid sandbox sound cues response');
+    await expect(host.soundCues('x'.repeat(257))).rejects.toThrow('invalid sandbox sound cues');
   });
 
   it('the wrapper defers, then draws the picture over its bounds; a later frame keeps the last one', async () => {
