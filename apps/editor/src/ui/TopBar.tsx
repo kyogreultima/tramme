@@ -303,17 +303,21 @@ function ExportPop({ anchor, onClose }: { anchor: HTMLElement; onClose: () => vo
 /** back to the projects, once the last changes are saved */
 async function leave(e: MouseEvent) {
   e.preventDefault();
-  try { await saveNow(); go('/'); } catch (x) { toast(t('common.couldNotSaveError', { error: (x as Error).message }), 'error'); }
+  const project = fileProject();
+  try { await saveNow(); if (sameFileProject(project)) go('/'); } catch (x) { if (sameFileProject(project)) toast(t('common.couldNotSaveError', { error: (x as Error).message }), 'error'); }
 }
 
-async function rename(value: string) {
+export async function rename(value: string) {
   const name = value.trim();
   if (!name || name === S.project.peek().name) return;
+  const project = fileProject();
   try {
-    S.project.value = await api.update(S.project.peek().id, { name });
+    const updated = await api.update(project.id, { name });
+    if (!sameFileProject(project)) return;
+    S.project.value = updated;
     document.title = `${name} · Tramme`;
     if (S.doc.peek().meta.title !== name) commit(t('topbar.projectName'), [{ op: 'replace', path: '/meta/title', value: name }]);
-  } catch (e) { toast(t('common.couldNotRenameError', { error: (e as Error).message }), 'error'); }
+  } catch (e) { if (sameFileProject(project)) toast(t('common.couldNotRenameError', { error: (e as Error).message }), 'error'); }
 }
 
 const FPS = [24, 25, 30, 50, 60];

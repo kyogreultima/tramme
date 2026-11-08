@@ -637,24 +637,29 @@ function Assets() {
   const relink = useRef<HTMLInputElement>(null);
   const offline = S.offline.value;
   // a copy of a shipped pack older than the editor's: offered its update, the way an installed plugin's copy is
-  const [updates, setUpdates] = useState<PackUpdate[]>([]);
+  const [loadedUpdates, setLoadedUpdates] = useState<{ project: FileProject; list: PackUpdate[] } | null>(null);
+  const updates = loadedUpdates && sameFileProject(loadedUpdates.project) ? loadedUpdates.list : [];
+  const projectId = S.project.value?.id, docUrl = S.docUrl.value;
   // read again only when the modules or their recorded versions change, not on every edit; a read overtaken by a newer one is dropped
   const modulesKey = JSON.stringify([Object.entries(doc.assets).filter(([, a]) => a.type === 'module').map(([id, a]) => [id, a.src]), doc.meta.installedCopies ?? null]);
   useEffect(() => {
+    const project = fileProject();
     let live = true;
     void (async () => {
       try {
         const packs = await shippedPacks();
+        if (!live || !sameFileProject(project)) return;
         const versions: Record<string, string> = {};
         for (const a of Object.values(doc.assets)) {
           if (a.type !== 'module' || !packBySrc(packs, a.src)) continue;
-          try { versions[a.src!] = manifestOf((await api.readText(S.project.peek().id, a.src!))?.text ?? '', a.src!).version; } catch { /* unread: no offer */ }
+          try { versions[a.src!] = manifestOf((await api.readText(project.id, a.src!))?.text ?? '', a.src!).version; } catch { /* unread: no offer */ }
+          if (!live || !sameFileProject(project)) return;
         }
-        if (live) setUpdates(packUpdates(doc, packs, versions));
+        if (live && sameFileProject(project)) setLoadedUpdates({ project, list: packUpdates(doc, packs, versions) });
       } catch { /* no packs: no offers */ }
     })();
     return () => { live = false; };
-  }, [modulesKey]);
+  }, [modulesKey, projectId, docUrl]);
   const byType = new Map<string, [string, Asset][]>();
   const shown = filterAssets(doc, filter, spoken);
   for (const e of shown) { if (!byType.has(e[1].type)) byType.set(e[1].type, []); byType.get(e[1].type)!.push(e); }
