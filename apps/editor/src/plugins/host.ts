@@ -236,7 +236,7 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
       return;
     }
     if (m.kind === 'loadFailed') {
-      if (typeof m.id !== 'string' || typeof m.url !== 'string' || typeof m.message !== 'string' || m.message.length > 4096) { invalid(); return; }
+      if (typeof m.id !== 'string' || m.id.length > 128 || typeof m.url !== 'string' || m.url.length > 4 * 1024 * 1024 || typeof m.message !== 'string' || m.message.length > 4096) { invalid(); return; }
       if (loads.get(m.id)?.url === m.url) loads.delete(m.id);
       answers.get(answerKey(m.id, m.url))?.reject(new Error(`plugin ${m.id}: ${m.message}`));
       answers.delete(answerKey(m.id, m.url));
@@ -643,7 +643,7 @@ export function browserHost(docUrl: string): PluginHost {
   };
   const onMessage = (event: MessageEvent) => {
     if (event.source !== frame.contentWindow || event.origin !== 'null') return;
-    if (event.data?.kind === 'failed') { dispose(event.data.reason); return; }
+    if (event.data?.kind === 'failed') { dispose(typeof event.data.reason === 'string' && event.data.reason.length <= 4096 ? event.data.reason : 'invalid sandbox startup failure'); return; }
     if (event.data?.kind === 'started') {
       clearTimeout(startupTimer);
       started = true;
@@ -651,8 +651,10 @@ export function browserHost(docUrl: string): PluginHost {
     }
     if (event.data?.kind === 'worker') {
       const message = event.data.data as FromWorker;
-      if (message?.kind === 'loaded') message.urls = message.urls.map((url) => urls.get(url) ?? url);
-      if (message?.kind === 'loadFailed') message.url = urls.get(message.url) ?? message.url;
+      if (message?.kind === 'loaded' && Array.isArray(message.urls) && message.urls.length <= 64 && message.urls.every((url) => typeof url === 'string' && url.length <= 4 * 1024 * 1024)) {
+        message.urls = message.urls.map((url) => urls.get(url) ?? url);
+      }
+      if (message?.kind === 'loadFailed' && typeof message.url === 'string' && message.url.length <= 4 * 1024 * 1024) message.url = urls.get(message.url) ?? message.url;
       receive(message);
     }
   };

@@ -71,6 +71,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Fixed
 
+- Malformed plugin-load messages from the isolated frame now stop that worker without throwing in the editor page.
 - Importing a project with plugins now stops clearly when an isolated worker is unavailable, without running the plugin in the editor page.
 - Composition and critic checks for isolated projects now evaluate their quality rules inside the project worker.
 - Scene-form advice in the composition check now reads isolated projects through the project worker.
