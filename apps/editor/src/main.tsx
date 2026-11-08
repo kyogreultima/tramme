@@ -25,6 +25,7 @@ import { SpacePage } from './ui/Space.tsx';
 import { Quick } from './ui/Quick.tsx';
 import { messageFor, refreshAccount, verifyEmail } from './accounts.ts';
 import { toast } from './state.ts';
+import { fileProject, sameFileProject } from './files.ts';
 import './theme/tokens.css';
 import './theme/base.css';
 import './theme/components.css';
@@ -55,18 +56,25 @@ function fail(title: string, message: string) {
 }
 
 /** the home screen's picture of the project, refreshed at most every 20 s after a save */
-let lastThumb = 0;
+let lastThumb = -Infinity;
+let lastThumbProject = '';
 async function thumbnail(force = false) {
+  const project = fileProject();
+  const key = `${project.id}\0${project.docUrl}`;
+  if (lastThumbProject !== key) { lastThumb = -Infinity; lastThumbProject = key; }
   if (!force && performance.now() - lastThumb < 20_000) return;
   lastThumb = performance.now();
   try {
     // where the user stands, or the middle of the main composition (the first frames are often empty)
     const c = S.doc.peek().compositions[S.doc.peek().root];
     const blob = await preview.thumbnail(S.time.peek() > 0 && S.compId.peek() === S.doc.peek().root ? S.time.peek() : c.duration / 2);
-    if (!blob) return;
-    const id = S.project.peek().id;
-    await api.write(id, 'thumbnail.webp', blob, { type: 'image/webp' });
-    if (S.project.peek().thumbnail !== 'thumbnail.webp') S.project.value = await api.update(id, { thumbnail: 'thumbnail.webp' });
+    if (!blob || !sameFileProject(project)) return;
+    await api.write(project.id, 'thumbnail.webp', blob, { type: 'image/webp' });
+    if (!sameFileProject(project)) return;
+    if (S.project.peek().thumbnail !== 'thumbnail.webp') {
+      const updated = await api.update(project.id, { thumbnail: 'thumbnail.webp' });
+      if (sameFileProject(project)) S.project.value = updated;
+    }
   } catch (e) { console.warn('[tramme] thumbnail:', (e as Error).message); }
 }
 
