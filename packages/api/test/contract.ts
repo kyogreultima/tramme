@@ -56,6 +56,16 @@ export function storageContract(name: string, makeBucket: () => Bucket) {
       expect((await call(path, { headers: { 'if-none-match': now } })).status).toBe(304);
     });
 
+    it('stores and reads the editor version index and snapshots', async () => {
+      const { call, create } = setup();
+      const m = await create();
+      for (const file of ['versions/index.json', 'versions/2026-11-09T07-40-00-000Z.json']) {
+        const path = `/api/projects/${m.id}/files/${file}`;
+        expect((await call(path, { method: 'PUT', body: '{}' })).status).toBe(200);
+        expect(await (await call(path)).text()).toBe('{}');
+      }
+    });
+
     it('reads a part of a file (Range), as the video layer seeks', async () => {
       const { call, create } = setup();
       const m = await create();

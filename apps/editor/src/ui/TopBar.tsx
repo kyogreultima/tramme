@@ -42,6 +42,7 @@ interface Done { blob: Blob; name: string; seconds: number; warnings: string[]; 
 /** the saved document itself is the current version; the snapshots live beside it */
 const VERSIONS_INDEX = 'versions/index.json';
 interface Snap { file: string; label: string; at: string }
+const validVersionFile = (file: unknown): file is string => typeof file === 'string' && /^versions\/(?!index\.json$)[a-z0-9][a-z0-9-]{0,80}\.json$/i.test(file);
 
 export async function listVersions(project: FileProject): Promise<Snap[]> {
   try {
@@ -49,7 +50,7 @@ export async function listVersions(project: FileProject): Promise<Snap[]> {
     requireFileProject(project);
     if (!r) return [];
     const j = JSON.parse(r.text) as { versions?: Snap[] };
-    return Array.isArray(j.versions) ? j.versions.slice(0, 30) : [];
+    return Array.isArray(j.versions) ? j.versions.filter((v): v is Snap => !!v && validVersionFile(v.file) && typeof v.label === 'string' && v.label.length <= 200 && typeof v.at === 'string' && v.at.length <= 64).slice(0, 30) : [];
   } catch { requireFileProject(project); return []; }
 }
 

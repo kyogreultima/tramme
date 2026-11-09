@@ -23,6 +23,9 @@ describe('project format', () => {
     expect(pathIssue('scenes/title/../other/index.html')).not.toBeNull();
     expect(pathIssue('scenes/title/remote.ts')).not.toBeNull();
     expect(pathIssue('thumbnail.webp')).toBeNull();
+    expect(pathIssue('versions/index.json')).toBeNull();
+    expect(pathIssue('versions/2026-11-09T07-40-00-000Z.json')).toBeNull();
+    expect(pathIssue('versions/../document.tramme.json')).not.toBeNull();
     expect(pathIssue('.tramme/chats/mfz1k2-ab12.json')).toBeNull();
     // a 3D model brought in with the sources (a folder holding .glb or .gltf files): allowed, a large .glb sent in parts
     expect(pathIssue('assets/sources/robot.glb')).toBeNull();
@@ -62,6 +65,16 @@ describe('project format', () => {
     const wrapped = zipSync(Object.fromEntries([...sample()].map(([k, v]) => [`My project/${k}`, v])));
     expect(checkProject(unpackProject(wrapped)).issues).toEqual([]);
     expect(() => unpackProject(enc('not a zip'))).toThrow(/archive/);
+  });
+
+  it('keeps version snapshots in a valid project archive', () => {
+    const files = sample();
+    files.set('versions/index.json', json({ versions: [] }));
+    files.set('versions/2026-11-09T07-40-00-000Z.json', json({ schema: 'tramme/1' }));
+    expect(checkProject(files).issues).toEqual([]);
+    const restored = unpackProject(packProject(files));
+    expect(restored.get('versions/index.json')).toEqual(files.get('versions/index.json'));
+    expect(restored.get('versions/2026-11-09T07-40-00-000Z.json')).toEqual(files.get('versions/2026-11-09T07-40-00-000Z.json'));
   });
 
   it('refuses excessive archive entries before inflating their contents', () => {

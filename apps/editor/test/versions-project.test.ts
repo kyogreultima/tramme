@@ -8,6 +8,28 @@ const { S } = await import('../src/state.ts');
 const { listVersions } = await import('../src/ui/TopBar.tsx');
 
 describe('version list project boundary', () => {
+  it('keeps only version snapshot paths from a stored index', async () => {
+    const project = newProject({ name: 'First', width: 64, height: 64, fps: 30, duration: 1 });
+    const previous = { project: S.project.peek(), docUrl: S.docUrl.peek(), doc: S.doc.peek() };
+    const read = vi.spyOn(api, 'readText').mockResolvedValue({ text: JSON.stringify({ versions: [
+      { file: 'versions/old.json', label: 'Old', at: '2026-11-09' },
+      { file: '../private.json', label: 'Private', at: '2026-11-09' },
+      { file: 'versions/index.json', label: 'Index', at: '2026-11-09' },
+      { file: 'assets/other.json', label: 'Other', at: '2026-11-09' },
+    ] }) } as never);
+    try {
+      S.project.value = project.manifest;
+      S.docUrl.value = 'https://tramme.test/projects/first/document.tramme.json';
+      S.doc.value = project.doc;
+      expect(await listVersions(fileProject())).toEqual([{ file: 'versions/old.json', label: 'Old', at: '2026-11-09' }]);
+    } finally {
+      read.mockRestore();
+      S.project.value = previous.project;
+      S.docUrl.value = previous.docUrl;
+      S.doc.value = previous.doc;
+    }
+  });
+
   it('rejects a version index returned after another project opens', async () => {
     const first = newProject({ name: 'First', width: 64, height: 64, fps: 30, duration: 1 });
     const second = newProject({ name: 'Second', width: 64, height: 64, fps: 30, duration: 1 });

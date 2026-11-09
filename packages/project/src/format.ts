@@ -106,6 +106,7 @@ const EXT: Record<string, string[]> = {
   plugins: ['js', 'mjs'],
   scenes: ['html', 'css', 'js', 'mjs', 'json', 'txt', 'svg', 'png', 'jpg', 'jpeg', 'webp', 'gif', 'avif', 'woff', 'woff2', 'ttf', 'otf', 'glb', 'gltf', 'bin', 'mp4', 'webm', 'wav', 'mp3', 'ogg'],
   renders: ['mp4', 'webm', 'mov', 'gif', 'png', 'zip', 'json', 'svg', 'wav'],
+  versions: ['json'],
 };
 
 export const MIME: Record<string, string> = {
