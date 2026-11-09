@@ -14,6 +14,7 @@ import { compareVersions, manifestOf } from '@tramme/project';
 import type { Command } from './ai/commands.ts';
 import { addMessages } from './i18n/index.ts';
 import type { Installed } from './installed.ts';
+import { readLimitedBody } from './plugins/host.ts';
 
 export interface PackCommand { name: string; title: string; description: string }
 
@@ -95,21 +96,24 @@ export function packUpdates(doc: TrammeDoc, packs: PackEntry[], versions: Record
 
 /** the ToolContext of a pack's tool: its data files, fetched from the editor's own origin */
 export function packContext(pack: PackEntry, ctx: ToolContext): ToolContext {
+  if (!/^[a-zA-Z0-9_-]+\.m?js$/.test(pack.file)) throw new Error('invalid pack module');
   const dir = `/plugins/${packStem(pack.file)}/`;
   return {
     ...ctx,
     packFile: async (path: string) => {
-      const clean = String(path).replace(/^\/+/, '');
-      if (!clean || clean.split('/').includes('..')) throw new Error(`packFile: "${path}" is outside the pack's folder`);
-      const res = await fetch(new URL(dir + clean, location.href));
+      if (typeof path !== 'string' || path.length < 1 || path.length > 512 || path.startsWith('/') ||
+          /[\\%?#:\u0000-\u001f\u007f]/.test(path) || path.split('/').some((part) => !part || part === '.' || part === '..'))
+        throw new Error('invalid pack file path');
+      const res = await fetch(new URL(dir + path, location.href));
       if (!res.ok) throw new Error(`the pack's file "${path}" is missing (HTTP ${res.status})`);
-      return res.text();
+      return new TextDecoder().decode(await readLimitedBody(res, 8 * 1024 * 1024, 'pack file'));
     },
   };
 }
 
 /** a pack as an installed plugin: its code fetched once, its manifest from the module's meta */
 export async function packAsInstalled(pack: PackEntry): Promise<Installed> {
+  if (!/^[a-zA-Z0-9_-]+\.m?js$/.test(pack.file)) throw new Error('invalid pack module');
   const url = `/plugins/${pack.file}`;
   const code = await fetch(url).then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.text(); });
   return {
