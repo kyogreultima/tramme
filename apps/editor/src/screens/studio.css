@@ -51,6 +51,10 @@
 .invite.making .invite-mark svg { animation: work 1.4s var(--ease) infinite; }
 .invite h2 { margin: 0; font-size: clamp(22px, 3vw, 32px); font-weight: 650; letter-spacing: -0.02em; }
 .invite p { margin: 0; max-width: 400px; color: var(--text-2); font-size: var(--fs-md); line-height: var(--lh-text); }
+/* while the first film is made, the words sit on a card of their own: the film behind them is any colour, black included */
+.invite.making { inset: auto; left: 50%; top: 50%; bottom: auto; right: auto; width: min(440px, calc(100% - 64px)); transform: translate(-50%, -50%); padding: 28px 32px 30px; border-radius: var(--r-lg); background: var(--float); backdrop-filter: blur(16px) saturate(1.4); -webkit-backdrop-filter: blur(16px) saturate(1.4); box-shadow: var(--shadow-2); }
+.invite.making h2 { color: var(--text); }
+.invite.making p { color: var(--text-2); }
 
 /* the notes pinned on the picture: the accent, ringed by the picture's light */
 .pins { position: absolute; inset: 0; z-index: 2; pointer-events: none; }

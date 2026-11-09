@@ -8,6 +8,10 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+### Fixed
+
+- While the assistant makes a first film, its message in the empty frame sits on a card you can read on any film, and the status pill above the film no longer touches it.
+
 ## [0.21.0] - 2026-11-09
 
 ### Added

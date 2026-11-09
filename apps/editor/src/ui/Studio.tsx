@@ -207,7 +207,7 @@ export function Studio() {
       <div class="studio-body" style={{ '--side-w': `${sideW}px` }}>
         <main class="studio-main">
           <section class={`studio-stage${busy ? ' working' : ''}${pending ? ' has-take' : ''}${studio.pinning.value ? ' pinning' : ''}${empty ? ' is-empty' : ''}`} data-tour="stage">
-            <Viewport bare inset={narrow ? [52, 12, 14, 12] : [60, 32, footH + 22, 32]} overlay={<Marks />} intercept={press} />
+            <Viewport bare inset={narrow ? [76, 12, 14, 12] : [84, 32, footH + 22, 32]} overlay={<Marks />} intercept={press} />
             {empty && <Invitation />}
             <div class="stage-top">{busy ? <WorkPill /> : pending ? <TakePill /> : null}</div>
             <div class="stage-foot" ref={foot}>
