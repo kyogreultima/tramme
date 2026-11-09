@@ -22,7 +22,7 @@ import { placeTemplate, TEMPLATES } from '../templates.ts';
 import { S } from '../state.ts';
 import { t } from '../i18n/index.ts';
 import { readProjectText } from '../plugins/read-project-text.ts';
-import { readLimitedBody } from '../plugins/host.ts';
+import { approvedProjectResource, readLimitedBody } from '../plugins/host.ts';
 import { pluginHost } from '../plugins/index.ts';
 import { ensureDeclared, ensureSandboxDoc, moduleItemsOf } from '../plugins/sandbox-draw.ts';
 import { preview } from '../preview.ts';
@@ -371,15 +371,13 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
       current();
       const base = new URL(docUrl, location.href), root = new URL('./', base);
       const url = new URL(src, base);
-      const projectFile = url.origin === root.origin && url.pathname.startsWith(root.pathname);
-      const ownedBlob = url.protocol === 'blob:' && url.origin === root.origin;
-      if (!projectFile && !ownedBlob) throw new Error(`${src}: asset must belong to this project`);
+      if (!approvedProjectResource(url, root.pathname, root.origin, root.protocol)) throw new Error(`${src}: asset must belong to this project`);
       return url.href;
     };
     const projectPath = (path: string) => {
       current();
       const bad = pathIssue(path);
-      if (bad || path.includes('#')) throw new Error(`${path}: ${bad ?? 'invalid project path'}`);
+      if (bad || /[%#]/.test(path)) throw new Error(`${path}: ${bad ?? 'invalid project path'}`);
       return path;
     };
     return {
@@ -392,7 +390,7 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
       fileUrl: (path) => urlOf(projectPath(path)),
       writeFile: async (path, data) => {
         current();
-        const bad = pathIssue(path);
+        const bad = pathIssue(path) ?? (path.includes('%') ? 'invalid project path' : null);
         const plugin = /^plugins\/.+\.(js|mjs)$/i.test(path);
         if (bad || (!path.startsWith('assets/') && !plugin)) throw new Error(`${path}: ${bad ?? 'a tool writes under assets/, or a plugin under plugins/'}`);
         // a computed video (a cut-out mask) may pass the single request limit: sent in parts

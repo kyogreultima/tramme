@@ -124,7 +124,7 @@ describe('tool project boundary', () => {
     }
   });
 
-  it('refuses an asset URL outside the current project root', () => {
+  it('refuses an asset URL outside the current project root', async () => {
     const project = newProject({ name: 'First', width: 64, height: 64, fps: 30, duration: 1 });
     const previous = { project: S.project.peek(), docUrl: S.docUrl.peek() };
     const runner = new ToolRunner();
@@ -135,11 +135,16 @@ describe('tool project boundary', () => {
         local: { type: 'image', src: 'assets/photo.png' },
         private: { type: 'image', src: 'https://tramme.test/api/private' },
         sibling: { type: 'image', src: '../second/assets/photo.png' },
+        encoded: { type: 'image', src: 'assets/safe%2f..%2f..%2f..%2fsecond/photo.png' },
       } } as TrammeDoc;
       const context = (runner as unknown as { toolContext(doc: TrammeDoc, registry: Registry): ToolContext }).toolContext(doc, builtinRegistry());
       expect(context.assetUrl('local')).toBe('https://tramme.test/projects/first/assets/photo.png');
       expect(() => context.assetUrl('private')).toThrow('asset must belong to this project');
       expect(() => context.assetUrl('sibling')).toThrow('asset must belong to this project');
+      expect(() => context.assetUrl('encoded')).toThrow('asset must belong to this project');
+      expect(() => context.fileUrl('assets/%2e%2e/secret.json')).toThrow('invalid project path');
+      await expect(context.readText('assets/%2e%2e/secret.json')).rejects.toThrow('invalid project path');
+      await expect(context.writeFile('assets/%2e%2e/secret.json', 'x')).rejects.toThrow('invalid project path');
     } finally {
       runner.dispose();
       S.project.value = previous.project;
