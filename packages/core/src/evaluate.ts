@@ -5,7 +5,7 @@
 // cycles are reported and the editor can show what drives what. Static
 // properties are cached across frames.
 
-import { componentOf, distributionCount, instanceProps, isPaletteRule, layoutBatch, paletteColor, paramDef, styleProps, type Instance, type Placement } from './components.ts';
+import { componentOf, distributionCount, sceneParamDef, sceneParams, instanceProps, isPaletteRule, layoutBatch, paletteColor, paramDef, styleProps, type Instance, type Placement } from './components.ts';
 import { applyMat, invertMat, layerMatrix } from './math.ts';
 import { audioReader, type AudioReader } from './analysis.ts';
 import { eventsReader, type EventsReader } from './events.ts';
@@ -262,6 +262,12 @@ export class Evaluator {
       const elapsed = this.integralOf(ctx, id, name);
       if (elapsed !== null) props[def.integral] = elapsed;
     }
+    // a web scene: its parameters at this instant (the value set, else the scene's default), for the capture to hand to the page
+    if (layer.type === 'webscene') {
+      const values: Record<string, unknown> = {};
+      for (const [name, p] of Object.entries(sceneParams(layer))) values[name] = layer.params?.[name] !== undefined ? this.read(ctx, `${id}.params.${name}`) : p.default;
+      props.$params = values;
+    }
     // an instance of a component: how it reads it, for the node to draw it so
     const inner = componentOf(this.doc, layer);
     if (inner && (inner.params || layer.overrides || layer.distribute)) {
@@ -433,6 +439,11 @@ export class Evaluator {
       throw new EvalError(address, 'unknown mask or mask property');
     }
     if (parts[1] === 'params' && parts.length === 3) {
+      if (layer.type === 'webscene') {
+        const s = sceneParams(layer)[parts[2]];
+        if (s) return { prop: layer.params?.[parts[2]], def: sceneParamDef(s, parts[2]) };
+        throw new EvalError(address, 'unknown parameter');
+      }
       const p = componentOf(this.doc, layer)?.params?.[parts[2]];
       if (p) return { prop: layer.params?.[parts[2]], def: paramDef(p) };
       throw new EvalError(address, 'unknown parameter');

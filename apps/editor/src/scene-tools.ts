@@ -3,7 +3,7 @@
 // nothing else; the document changes only through propose_changes.
 
 import { pathIssue, SceneSchema } from '@tramme/project';
-import type { ToolContext, ToolType } from '@tramme/core';
+import { pointer, staticValue, type Op, type ToolContext, type ToolType, type TrammeDoc } from '@tramme/core';
 
 const ID = /^[a-z0-9][a-z0-9-]{0,63}$/;
 /** the scene files a tool writes as text; pictures, fonts and media come from the user's assets */
@@ -30,6 +30,27 @@ function manifestOf(raw: string | null, path: string) {
   const parsed = SceneSchema.safeParse(json);
   if (!parsed.success) throw new Error(`${path}: ${parsed.error.issues.map((i) => `${i.path.join('.') || '/'} ${i.message}`).join('; ')}`);
   return parsed.data;
+}
+
+/**
+ * What brings the layers showing a scene up to date with its scene.json: their declared
+ * parameters (props.parameters) become the manifest's, and a value set for a parameter the
+ * manifest no longer declares is dropped. No operation when they already agree.
+ */
+export function sceneSyncOps(doc: TrammeDoc, folder: string, manifest: { parameters: Record<string, unknown> }): Op[] {
+  const ops: Op[] = [];
+  for (const [compId, comp] of Object.entries(doc.compositions)) {
+    for (const [id, layer] of Object.entries(comp.layers)) {
+      if (layer.type !== 'webscene' || staticValue(layer.props?.folder) !== folder) continue;
+      const base = pointer('compositions', compId, 'layers', id);
+      const declared = staticValue(layer.props?.parameters);
+      if (JSON.stringify(declared ?? {}) !== JSON.stringify(manifest.parameters)) {
+        ops.push({ op: layer.props && 'parameters' in layer.props ? 'replace' : 'add', path: `${base}/props/parameters`, value: manifest.parameters });
+      }
+      for (const name of Object.keys(layer.params ?? {})) if (!(name in manifest.parameters)) ops.push({ op: 'remove', path: pointer('compositions', compId, 'layers', id, 'params', name) });
+    }
+  }
+  return ops;
 }
 
 const sceneProblems = async (id: string, ctx: ToolContext, pending: Map<string, string> = new Map()): Promise<string[]> => {
@@ -69,7 +90,9 @@ const writeScene: ToolType<{ id: string; files: { path: string; content: string 
     if (problems.length) throw new Error(`nothing written: ${problems.join('; ')}`);
     const written: string[] = [];
     for (const [file, content] of pending) written.push(await ctx.writeFile(scenePath(input.id, file), content));
-    return { text: `Wrote ${written.join(', ')}. Add a web scene layer with props.folder "scenes/${input.id}" through propose_changes; export captures it.` };
+    const manifest = pending.has('scene.json') ? manifestOf(pending.get('scene.json')!, `scenes/${input.id}/scene.json`) : null;
+    const ops = manifest ? sceneSyncOps(ctx.doc, `scenes/${input.id}`, manifest) : [];
+    return { ops, label: `Scene ${input.id}`, text: `Wrote ${written.join(', ')}. Add a web scene layer with props.folder "scenes/${input.id}" through propose_changes; export captures it.${ops.length ? ` The layers showing it get its parameters (${ops.length} change${ops.length > 1 ? 's' : ''}).` : ''}` };
   },
 };
 
@@ -100,7 +123,8 @@ const editScene: ToolType<{ id: string; file: string; find: string; replace: str
       if (problems.length) throw new Error(`not changed: ${problems.join('; ')}`);
     }
     await ctx.writeFile(path, next);
-    return { text: `${path} changed (${body.length} → ${next.length} characters). Nothing else was touched.` };
+    const ops = input.file === 'scene.json' ? sceneSyncOps(ctx.doc, `scenes/${input.id}`, manifestOf(next, path)) : [];
+    return { ops, label: `Scene ${input.id}`, text: `${path} changed (${body.length} → ${next.length} characters). Nothing else was touched.` };
   },
 };
 
@@ -112,7 +136,10 @@ const checkScene: ToolType<{ id: string }> = {
   async run(input, ctx) {
     scenePath(input.id, 'scene.json');
     const problems = await sceneProblems(input.id, ctx);
-    return problems.length ? { text: `scenes/${input.id} has problems:\n${problems.map((p) => `- ${p}`).join('\n')}` } : { text: `scenes/${input.id} is well formed. The seek lint and the stills run with \`tramme check\` and the export.` };
+    if (problems.length) return { text: `scenes/${input.id} has problems:\n${problems.map((p) => `- ${p}`).join('\n')}` };
+    const path = scenePath(input.id, 'scene.json');
+    const ops = sceneSyncOps(ctx.doc, `scenes/${input.id}`, manifestOf(await ctx.readText(path), path));
+    return { ops, label: `Scene ${input.id}`, text: `scenes/${input.id} is well formed.${ops.length ? ' The parameters of the layers showing it are brought up to date.' : ''} The seek lint and the stills run with \`tramme check\` and the export.` };
   },
 };
 

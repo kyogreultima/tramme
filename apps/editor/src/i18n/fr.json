@@ -719,6 +719,11 @@
     "noProjectNamed": "Rien qui s'appelle « {query} »."
   },
   "inspector": {
+    "sceneParamsRead": "Lire les paramètres de la scène",
+    "sceneReadParams": "Lire les paramètres depuis scene.json",
+    "sceneParamsCurrent": "Les paramètres correspondent déjà à scene.json.",
+    "sceneManifestInvalid": "scene.json est illisible.",
+    "sceneNoParameters": "Cette scène ne déclare aucun paramètre (scene.json).",
     "sceneFiles": "Code de la scène",
     "sceneNoFiles": "Aucun fichier dans {folder}.",
     "sceneFile": "Fichier de la scène",
@@ -2060,6 +2065,8 @@
     "copies a scene that failed twice into two or three takes to rebuild differently, and keeps the best one afterwards: the others and the original are removed": "copie une scène qui a échoué deux fois en deux ou trois prises à refaire autrement, puis garde la meilleure : les autres et l’original sont supprimés",
     "Scene": "Scène",
     "Scene folder": "Dossier de scène",
+    "Scene parameters": "Paramètres de la scène",
+    "the parameters scene.json declares (name: type and default); their values are the layer params, animated like any property": "les paramètres que déclare scene.json (nom : type et valeur par défaut) ; leurs valeurs sont les params du calque, animés comme n’importe quelle propriété",
     "Scene size": "Taille de la scène",
     "its name, or the id of its composition": "son nom, ou l’identifiant de sa composition",
     "how many versions in all, the original included": "combien de versions en tout, l’original compris",

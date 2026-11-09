@@ -7,6 +7,7 @@ interface WebSceneProps {
   frames: string[];
   fps: number;
   size: Vec2;
+  parameters?: Record<string, unknown>;
 }
 
 let placeholder: ((folder: string) => string) | null = null;
@@ -24,6 +25,7 @@ export const webscene: NodeType<WebSceneProps> = {
     frames: { type: 'assets', default: [], assetType: 'image', label: 'Captured frames', animatable: false },
     fps: { type: 'number', default: 30, min: 1, label: 'Frame rate', animatable: false },
     size: { type: 'vec2', default: [1920, 1080], label: 'Scene size', unit: 'px' },
+    parameters: { type: 'json', default: {}, label: 'Scene parameters', animatable: false, description: 'the parameters scene.json declares (name: type and default); their values are the layer params, animated like any property' },
   },
   bounds: ({ size: [w, h] }) => ({ x: -w / 2, y: -h / 2, w, h }),
   render: {

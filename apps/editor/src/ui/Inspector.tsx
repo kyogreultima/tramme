@@ -12,7 +12,10 @@ import { ensureDeclared, ensureSandboxDoc, moduleItemsOf } from '../plugins/sand
 import { fileProject, sameFileProject } from '../files.ts';
 import { prefs } from '../settings.ts';
 import { addModifierOps, editAtOps, fixedOps, folderOf, imagesIn, keyAtOps, keyIndexAt, keysOf, removeKeyOps, removeModifierOps, setAtOps, snap, freshId, cutEndOps, fmtSeconds } from '../model.ts';
-import { addressDef, componentOf, detachPlan, modsOf, modifierParams, paramDef } from '@tramme/core';
+import { addressDef, componentOf, detachPlan, modsOf, modifierParams, paramDef, sceneParamDef, sceneParams } from '@tramme/core';
+import { SceneSchema } from '@tramme/project';
+import { readProjectText } from '../plugins/read-project-text.ts';
+import { sceneSyncOps } from '../scene-tools.ts';
 import { followTrackOps, tracksOf } from '../masks.ts';
 import { pickColor } from '../dropper.ts';
 import { SceneCode, sceneFolder } from './SceneCode.tsx';
@@ -236,6 +239,31 @@ function InstanceSection({ ctx, id }: { ctx: Ctx; id: string }) {
           </div>
         );
       })}
+    </Section>
+  );
+}
+
+/** a web scene's parameters: one row each, animated like any property; the scene.json is read again on demand */
+function SceneParams({ ctx, id }: { ctx: Ctx; id: string }) {
+  const layer = ctx.doc.compositions[ctx.compId].layers[id], lp = pointer('compositions', ctx.compId, 'layers', id);
+  const declared = Object.entries(sceneParams(layer)), folder = sceneFolder(staticValue(layer.props?.folder));
+  const read = async () => {
+    const project = S.project.value;
+    if (!project || !folder) return;
+    try {
+      const raw = await readProjectText(project.id, `${folder}/scene.json`);
+      const parsed = raw === null ? null : SceneSchema.safeParse(JSON.parse(raw));
+      if (!parsed?.success) { toast(t('inspector.sceneManifestInvalid'), 'error'); return; }
+      const ops = sceneSyncOps(S.doc.peek(), folder, parsed.data);
+      if (ops.length) commit(t('inspector.sceneParamsRead'), ops); else toast(t('inspector.sceneParamsCurrent'));
+    } catch { toast(t('inspector.sceneManifestInvalid'), 'error'); }
+  };
+  return (
+    <Section id="scene-params" title={t('inspector.parameters')} right={folder ? <button class="icon-btn sm" title={t('inspector.sceneReadParams')} onClick={read}><Icon name="download" /></button> : null}>
+      {declared.map(([name, p]) => (
+        <PropRow key={name} ctx={ctx} label={name} def={sceneParamDef(p, name)} path={`${lp}/params/${name}`} address={`${id}.params.${name}`} />
+      ))}
+      {!declared.length && <div class="prop-note">{t('inspector.sceneNoParameters')}</div>}
     </Section>
   );
 }
@@ -705,6 +733,7 @@ function LayerInspector({ ctx, id }: { ctx: Ctx; id: string }) {
         </Section>
       ) : null}
       {layer.type === 'comp' && <InstanceSection ctx={ctx} id={id} />}
+      {layer.type === 'webscene' && <SceneParams ctx={ctx} id={id} />}
       {layer.type === 'webscene' && S.project.value && sceneFolder(staticValue(layer.props?.folder)) && (
         <Section id="scene-code" title={t('inspector.sceneFiles')}>
           <SceneCode projectId={S.project.value.id} folder={sceneFolder(staticValue(layer.props?.folder))!} />

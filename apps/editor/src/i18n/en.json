@@ -719,6 +719,11 @@
     "noProjectNamed": "Nothing named “{query}”."
   },
   "inspector": {
+    "sceneParamsRead": "Read the scene parameters",
+    "sceneReadParams": "Read the parameters from scene.json",
+    "sceneParamsCurrent": "The parameters already match scene.json.",
+    "sceneManifestInvalid": "scene.json could not be read.",
+    "sceneNoParameters": "This scene declares no parameters (scene.json).",
     "sceneFiles": "Scene code",
     "sceneNoFiles": "No files found in {folder}.",
     "sceneFile": "Scene file",

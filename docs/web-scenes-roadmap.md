@@ -88,7 +88,8 @@ Assistant tools (2026-11-09): `write_scene` (whole files of `scenes/<id>/`, the 
 
 - [x] A code view of the scene.
 Code view (2026-11-09): selecting a `webscene` layer shows a "Scene code" section in the inspector: a file picker over the scene's text files (entry first) and their text, read only; changes go through the assistant's scene tools. Tests cover the folder rule, the listing, the read-only text and the empty and failing cases. **To check in the browser:** how the section looks beside the others, at the narrow inspector width.
-- [ ] The manifest's parameters appear in the generated inspector and can be animated like any property.
+- [x] The manifest's parameters appear in the generated inspector and can be animated like any property.
+Parameters (2026-11-09): a scene declares typed parameters in `scene.json`; the layer keeps a copy (`props.parameters`, an addition to the format) and their values in its `params`, which are ordinary properties: static, keyframed, linked or expressions. The inspector lists them as rows with keyframes, and a button reads them again from `scene.json`; the scene tools (`write_scene`, `edit_scene`, `check_scene`) keep every layer showing the scene in step and drop values the scene no longer declares. At export, Tramme evaluates the parameters at every frame and the page receives them before each capture: `register((t, params) => ...)` in the runtime, `window.__hf.setParams(values)` underneath. The values enter the cache key, so changing or animating one captures that scene again. Run for real: two colours give two different frames. The same contract serves the iframe preview.
 - [ ] A bar in the timeline, thumbnails.
 
 ### Step 8: media and brand

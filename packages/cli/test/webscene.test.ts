@@ -162,3 +162,36 @@ describe('project fonts and pictures in a scene', () => {
     expect(capture.mock.calls.length).toBe(2);
   });
 });
+
+describe('scene parameters in the capture', () => {
+  const declared = { size: { type: 'number', default: 10 }, title: { type: 'string', default: 'Hello' } };
+
+  it('are evaluated at every frame, animated or not, and handed to the capture', async () => {
+    const { doc, file } = project();
+    const layer = doc.compositions.main.layers.scene as unknown as { props: Record<string, unknown>; params: Record<string, unknown> };
+    layer.props.parameters = declared;
+    layer.params = { size: { $k: [{ t: 0, v: 0 }, { t: 5 / 6, v: 50 }] } };
+    const capture = fake();
+    (await prepareWebScenes(file, doc, capture)).cleanup();
+    const params = capture.mock.calls[0][0].params as { size: number; title: string }[];
+    expect(params).toHaveLength(6);
+    expect(params.map((p) => p.title)).toEqual(Array(6).fill('Hello'));
+    expect(params[0].size).toBe(0);
+    expect(params[5].size).toBeCloseTo(50, 5);
+    expect(params[2].size).toBeGreaterThan(params[1].size);
+  });
+
+  it('send nothing for a scene that declares none, and capture again when a value changes', async () => {
+    const { doc, file } = project();
+    const capture = fake();
+    (await prepareWebScenes(file, doc, capture)).cleanup();
+    expect(capture.mock.calls[0][0].params).toBeNull();
+    const layer = doc.compositions.main.layers.scene as unknown as { props: Record<string, unknown>; params?: Record<string, unknown> };
+    layer.props.parameters = declared;
+    (await prepareWebScenes(file, doc, capture)).cleanup();
+    layer.params = { title: 'Other' };
+    const again = await prepareWebScenes(file, doc, capture);
+    again.cleanup();
+    expect([again.captured, capture.mock.calls.length]).toEqual([1, 3]);
+  });
+});

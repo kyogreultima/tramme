@@ -1,18 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import type { ToolContext, ToolOutput } from '@tramme/core';
+import { applyOps, validate, type ToolContext, type ToolOutput, type TrammeDoc } from '@tramme/core';
+import { builtinRegistry } from '@tramme/nodes';
+import { newProject } from '@tramme/project';
 import { isSceneTextPath, SCENE_TOOLS } from '../src/scene-tools.ts';
 
 const [write, edit, check] = SCENE_TOOLS;
 const MANIFEST = JSON.stringify({ duration: 3, size: [1920, 1080], entry: 'index.html', parameters: {} });
 
-function project(files: Record<string, string> = {}) {
+function project(files: Record<string, string> = {}, doc: TrammeDoc = newProject({ name: 'S', width: 320, height: 180, fps: 10, duration: 2 }).doc) {
   const store = new Map(Object.entries(files)), writes: string[] = [];
   const ctx = {
+    doc,
     readText: async (path: string) => store.get(path) ?? null,
     writeFile: async (path: string, data: string) => { store.set(path, data); writes.push(path); return path; },
   } as unknown as ToolContext;
   const run = (tool: typeof write, input: unknown) => tool.run(input as never, ctx) as Promise<ToolOutput>;
-  return { store, writes, run };
+  return { store, writes, run, doc };
 }
 
 describe('the assistant\'s web scene tools', () => {
@@ -59,5 +62,23 @@ describe('the assistant\'s web scene tools', () => {
   it('is the only extra place the tool context reaches besides assets and plugins', () => {
     expect(isSceneTextPath('scenes/title/index.html')).toBe(true);
     for (const path of ['scenes/title/logo.png', 'scenes/Title/index.html', 'scenes/index.html', 'plugins/x.js', 'document.tramme.json', 'scenes/a/../../document.tramme.json']) expect(isSceneTextPath(path)).toBe(false);
+  });
+
+  it('brings the layers showing a scene up to date with its parameters, and drops values the scene no longer declares', async () => {
+    const doc = newProject({ name: 'S', width: 320, height: 180, fps: 10, duration: 2 }).doc;
+    doc.compositions.main.layers.scene = { type: 'webscene', name: 's', transform: { position: [160, 90] }, props: { folder: 'scenes/title', frames: [], fps: 10, size: [320, 180] }, params: { size: 3, gone: 1 } } as never;
+    doc.compositions.main.layers.other = { type: 'webscene', name: 'o', transform: { position: [0, 0] }, props: { folder: 'scenes/other', frames: [], fps: 10, size: [320, 180] } } as never;
+    doc.compositions.main.order = ['scene', 'other'];
+    const manifest = JSON.stringify({ duration: 3, size: [1920, 1080], entry: 'index.html', parameters: { size: { type: 'number', default: 10 } } });
+    const p = project({}, doc);
+    const out = await p.run(write, { id: 'title', files: [{ path: 'scene.json', content: manifest }, { path: 'index.html', content: '<p>x</p>' }] });
+    const { doc: next } = applyOps(doc, out.ops!);
+    const layer = next.compositions.main.layers.scene as unknown as { props: Record<string, unknown>; params: Record<string, unknown> };
+    expect(layer.props.parameters).toEqual({ size: { type: 'number', default: 10 } });
+    expect(layer.params).toEqual({ size: 3 });
+    expect((next.compositions.main.layers.other as unknown as { props: Record<string, unknown> }).props.parameters).toBeUndefined();
+    expect(validate(next, builtinRegistry())).toEqual([]);
+    const again = project(Object.fromEntries(p.store), next);
+    expect((await again.run(check, { id: 'title' })).ops).toEqual([]);
   });
 });

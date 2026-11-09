@@ -10,12 +10,13 @@ import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { mimeOf, SceneSchema } from '@tramme/project';
 import { CHROME } from './browser.ts';
-import type { TrammeDoc } from '@tramme/core';
+import { Evaluator, sceneParams, type Registry, type TrammeDoc } from '@tramme/core';
+import { builtinRegistry } from '@tramme/nodes';
 
 /** the frames of one scene, in order, as files on disk */
 export interface Capture { files: string[] }
 /** renders the scene folder to `<count>` alpha PNG files in `out` */
-export type SceneCapturer = (job: { dir: string; entry: string; size: [number, number]; fps: number; frames: number; out: string; css: string; projectDir: string }) => Promise<void>;
+export type SceneCapturer = (job: { dir: string; entry: string; size: [number, number]; fps: number; frames: number; out: string; css: string; projectDir: string; params: Record<string, number | string | boolean>[] | null }) => Promise<void>;
 
 export const FRAME_PATTERN = /^frame_\d{5,}\.png$/;
 const CACHE = 'renders/webscene';
@@ -118,30 +119,37 @@ export interface Prepared {
  * Makes sure every `webscene` layer that names a folder has its frames, and returns the
  * document to render. Layers that already list frames are left alone.
  */
-export async function prepareWebScenes(file: string, doc: TrammeDoc, capture: SceneCapturer): Promise<Prepared> {
+export async function prepareWebScenes(file: string, doc: TrammeDoc, capture: SceneCapturer, registry: Registry = builtinRegistry()): Promise<Prepared> {
   const projectDir = path.dirname(path.resolve(file));
   const needsFrames = (layer: { type: string; props?: Record<string, unknown> }) =>
     layer.type === 'webscene' && typeof layer.props?.folder === 'string' && layer.props.folder !== '' && !(Array.isArray(layer.props.frames) && layer.props.frames.length);
-  const layersOf = (d: TrammeDoc) => Object.values(d.compositions).flatMap((comp) => Object.values(comp.layers) as { type: string; props: Record<string, unknown> }[]);
-  if (!layersOf(doc).some(needsFrames)) return { file, cleanup: () => {}, captured: 0, reused: 0 };
+  type SceneLayer = { type: string; props: Record<string, unknown> };
+  const layersOf = (d: TrammeDoc) => Object.entries(d.compositions).flatMap(([compId, comp]) => Object.entries(comp.layers).map(([id, layer]) => ({ compId, id, layer: layer as unknown as SceneLayer })));
+  if (!layersOf(doc).some(({ layer }) => needsFrames(layer))) return { file, cleanup: () => {}, captured: 0, reused: 0 };
 
   const next = structuredClone(doc);
   const css = [tokenCss(doc.tokens), fontFaceCss(doc.assets)].filter(Boolean).join('\n');
   const fontFiles = Object.values(doc.assets).filter((a) => a.type === 'font').map((a) => a.src);
   let captured = 0, reused = 0;
   const done = new Map<string, string[]>();
-  for (const layer of layersOf(next)) {
+  const evaluator = new Evaluator(doc, registry);
+  for (const { compId, id: layerId, layer } of layersOf(next)) {
     if (!needsFrames(layer)) continue;
     const folder = layer.props.folder as string;
     const dir = path.resolve(projectDir, folder);
     if (!dir.startsWith(projectDir + path.sep) || !fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) throw new Error(`web scene folder not found in the project: ${folder}`);
     const size = layer.props.size as [number, number], fps = layer.props.fps as number;
     const manifest = SceneSchema.parse(JSON.parse(fs.readFileSync(path.join(dir, 'scene.json'), 'utf8')));
-    const key = sceneKey(dir, size, fps, css, { projectDir, files: assetsUsedBy(dir, fontFiles) });
+    const frames = Math.max(1, Math.ceil(manifest.duration * fps - 1e-6));
+    // the parameters at every frame: animated like any property, evaluated here and handed to the page before each capture
+    const declared = sceneParams(layer as never);
+    const params = Object.keys(declared).length
+      ? Array.from({ length: frames }, (_, i) => evaluator.layerAt(layerId, i / fps, compId).props.$params as Record<string, number | string | boolean>)
+      : null;
+    const key = sceneKey(dir, size, fps, `${css} ${params ? JSON.stringify(params) : ''}`, { projectDir, files: assetsUsedBy(dir, fontFiles) });
     let names = done.get(key);
     if (!names) {
       const out = path.join(projectDir, CACHE, key);
-      const frames = Math.max(1, Math.ceil(manifest.duration * fps - 1e-6));
       const have = () => fs.existsSync(out) ? fs.readdirSync(out).filter((n) => FRAME_PATTERN.test(n)).sort() : [];
       if (have().length === frames) reused++;
       else {
@@ -149,7 +157,7 @@ export async function prepareWebScenes(file: string, doc: TrammeDoc, capture: Sc
         const temp = `${out}.partial`;
         fs.rmSync(temp, { recursive: true, force: true });
         fs.mkdirSync(temp, { recursive: true });
-        await capture({ dir, entry: manifest.entry, size, fps, frames, out: temp, css, projectDir });
+        await capture({ dir, entry: manifest.entry, size, fps, frames, out: temp, css, projectDir, params });
         const got = fs.readdirSync(temp).filter((n) => FRAME_PATTERN.test(n));
         if (got.length !== frames) throw new Error(`web scene ${folder}: captured ${got.length} of ${frames} frames`);
         fs.rmSync(out, { recursive: true, force: true });
@@ -192,14 +200,18 @@ export async function serveScene(root: string, css: string, projectDir: string) 
 }
 
 /** the pinned @hyperframes/engine, driven by seek capture (its higher-level render freezes custom-seek scenes) */
-export const engineCapture: SceneCapturer = async ({ dir, entry, size, fps, frames, out, css, projectDir }) => {
+export const engineCapture: SceneCapturer = async ({ dir, entry, size, fps, frames, out, css, projectDir, params }) => {
   const engine = await import('@hyperframes/engine').catch(() => { throw new Error('web scenes need @hyperframes/engine, which is not installed (npm install)'); });
   const served = await serveScene(dir, css, projectDir);
   let session;
   try {
     session = await engine.createCaptureSession(served.url + (entry === 'index.html' ? '' : entry), out, { width: size[0], height: size[1], fps: { num: fps, den: 1 }, format: 'png', transparent: true }, null, CHROME ? { chromePath: CHROME } : {});
     await engine.initializeSession(session);
-    for (let frame = 0; frame < frames; frame++) await engine.captureFrame(session, frame, frame / fps);
+    for (let frame = 0; frame < frames; frame++) {
+      // the parameters of this instant first: the engine's own seek then draws with them
+      if (params) await session.page.evaluate((values) => (window as unknown as { __hf: { setParams(v: unknown): void } }).__hf.setParams(values), params[frame]);
+      await engine.captureFrame(session, frame, frame / fps);
+    }
   } finally {
     if (session) await engine.closeCaptureSession(session);
     await served.close();

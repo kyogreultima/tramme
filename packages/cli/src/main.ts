@@ -115,7 +115,7 @@ async function cmdStill(file: string) {
 async function cmdRender(file: string) {
   const doc = readDoc(file);
   // web scenes are captured to pictures first (and only again when their folder changed)
-  const scenes = await prepareWebScenes(file, doc, engineCapture);
+  const scenes = await prepareWebScenes(file, doc, engineCapture, await registryOf(file, doc).registry);
   if (scenes.captured || scenes.reused) console.log(`  web scenes: ${scenes.captured} captured, ${scenes.reused} reused from renders/webscene`);
   const s = await session(scenes.file).catch((error) => { scenes.cleanup(); throw error; });
   try {

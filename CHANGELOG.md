@@ -82,6 +82,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 - Plugin companion data now has file-count and byte limits, with reliable encoding for larger binary files.
 - Plugin packages now refuse encoded or URL-like data paths before their files are copied into a project.
 - Plugin backups now refuse unsafe installed-plugin names before creating an archive.
+- Web scenes have parameters: declared in the scene, shown as rows in the inspector, animated like any property and used by the export.
 - Selecting a web scene layer shows its code (read only) in the inspector.
 - The assistant now takes a project's palette from its first good generated picture.
 - A web scene layer without captured pictures now shows a labelled placeholder in the editor instead of breaking the preview.

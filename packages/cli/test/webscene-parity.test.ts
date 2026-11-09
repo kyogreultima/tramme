@@ -21,7 +21,7 @@ describe.skipIf(!CHROME)('web scene preview against export', () => {
     work = fs.mkdtempSync(path.join(os.tmpdir(), 'tramme-parity-'));
     const scene = path.join(work, 'scene');
     fs.cpSync(SCENE, scene, { recursive: true });
-    await engineCapture({ dir: scene, entry: 'index.html', size: [320, 180], fps: FPS, frames: FRAMES, out: path.join(work, 'export'), css: '', projectDir: work });
+    await engineCapture({ dir: scene, entry: 'index.html', size: [320, 180], fps: FPS, frames: FRAMES, out: path.join(work, 'export'), css: '', projectDir: work, params: null });
     served = await serveScene(scene, '', work);
     ({ browser, page } = await launch());
     await page.setViewport({ width: 320, height: 180, deviceScaleFactor: 1 });
