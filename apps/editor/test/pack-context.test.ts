@@ -1,9 +1,30 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
 import type { ToolContext } from '@tramme/core';
-import { packAsInstalled, packContext } from '../src/packs.ts';
+import { packAsInstalled, packContext, shippedPacks } from '../src/packs.ts';
 
 describe('shipped pack file capability', () => {
   afterEach(() => { vi.unstubAllGlobals(); });
+
+  it('bounds and checks the pack index before using its entries', async () => {
+    const cancel = vi.fn();
+    const oversized = new ReadableStream<Uint8Array>({
+      start(controller) { controller.enqueue(new Uint8Array(1024 * 1024 + 1)); }, cancel,
+    });
+    const fetch = vi.fn()
+      .mockResolvedValueOnce(new Response(oversized))
+      .mockResolvedValueOnce(new Response(JSON.stringify([{ file: '../private.js', name: 'Private' }])))
+      .mockResolvedValueOnce(new Response(readFileSync(new URL('../../../plugins/index.json', import.meta.url))));
+    vi.stubGlobal('fetch', fetch);
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      expect(await shippedPacks()).toEqual([]);
+      expect(cancel).toHaveBeenCalledOnce();
+      expect(await shippedPacks()).toEqual([]);
+      expect((await shippedPacks()).some((pack) => pack.file === 'icons.js')).toBe(true);
+      expect(fetch).toHaveBeenCalledTimes(3);
+    } finally { error.mockRestore(); }
+  });
 
   it('reads a pack file and refuses URL escape syntax before any request', async () => {
     const fetch = vi.fn(async () => new Response('pack data'));
