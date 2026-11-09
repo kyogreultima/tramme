@@ -71,6 +71,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Fixed
 
+- The source monitor no longer falls back to an unchecked media URL when its asset cannot be loaded.
 - Video layer and timeline placement now validate project media URLs before duration and sound probes.
 - Assistant media frames now refuse image and video URLs outside the current project's assets.
 - Transcript reads and media transcription now refuse source paths outside the open project's assets.

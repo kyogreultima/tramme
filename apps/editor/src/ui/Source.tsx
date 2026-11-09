@@ -14,6 +14,7 @@ import { assetLayer, insertLayer } from './LeftPanel.tsx';
 import { placeRange } from './timeline/place.ts';
 import { sourceOpen } from './timeline/assets-drag.ts';
 import { defaultTrackOf } from './timeline/tracks.ts';
+import { projectAssetUrl } from '../project-asset-url.ts';
 
 export function SourceMonitor() {
   const id = sourceOpen.value;
@@ -25,8 +26,11 @@ export function SourceMonitor() {
   // opened on a sub-clip, its range is the marks to begin with
   useEffect(() => { setMarks(a?.range ? { in: a.range[0], out: a.range[1] } : { in: null, out: null }); setNaming(null); }, [id]);
   if (!id || !a || !file || (file.type !== 'video' && file.type !== 'audio')) return null;
-  let url = '';
-  try { url = preview.renderer?.assets.url(media) ?? new URL(file.src, new URL(S.docUrl.peek(), location.href)).href; } catch { url = new URL(file.src, new URL(S.docUrl.peek(), location.href)).href; }
+  let url = '', urlError = '';
+  try {
+    const approved = projectAssetUrl(file.src, S.docUrl.peek());
+    try { url = preview.renderer?.assets.url(media) ?? approved; } catch { url = approved; }
+  } catch (e) { urlError = (e as Error).message; }
   const c = comp.value, fps = c.fps, now = () => Math.round((el.current?.currentTime ?? 0) * fps) / fps;
   const range = marks.in !== null && marks.out !== null && marks.out > marks.in ? [marks.in, marks.out] as [number, number] : null;
   const asked = () => { toast(t('source.needRange'), 'error'); };
@@ -53,7 +57,7 @@ export function SourceMonitor() {
   return (
     <div class="source-monitor" role="dialog" aria-label={t('source.title')} tabIndex={-1} onKeyDown={key}>
       <div class="source-head"><Icon name="film" size={13} /><span class="name">{a.name || id}</span><button class="icon-btn xs" title={t('source.close')} onClick={() => { sourceOpen.value = null; }}><Icon name="x" /></button></div>
-      {file.type === 'video'
+      {urlError ? <div role="alert" class="prop-note err">{urlError}</div> : file.type === 'video'
         ? <video ref={el} src={url} controls playsInline preload="metadata" />
         : <audio ref={el} src={url} controls preload="metadata" />}
       <div class="source-marks">
