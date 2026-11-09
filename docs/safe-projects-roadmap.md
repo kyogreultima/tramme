@@ -184,6 +184,8 @@ Direction panel project scope (2026-11-09): delayed brief, plan and source-list 
 
 Media bin and tag naming (2026-11-09): an open naming field now remembers its project and document URL. After navigation it is hidden, and even an old field event cannot tag or move an asset in the new project. A UI test presses Enter on the former field after a project switch and confirms no edit reaches the new document. Other editor-owned pending actions remain under step 3.
 
+Filler review asset path (2026-11-09): the filler-cut review panel now checks that its list is a validated file under the current project's assets before reading it. A UI test gives the list an escaping path and confirms that no file request starts. Other document-supplied media paths remain under step 3.
+
 Vector and CLI checks (2026-11-07): isolated browser SVG/Lottie export now reports that expression-bearing projects need raster export. CLI `export`, `check-export` and `check` refuse such expressions before native vector conversion or picture checks. Tests exercise all three CLI commands and the browser export's early refusal. Worker-backed vector values and checks remain open.
 
 Editor module transfer (2026-11-07): when isolated preview is enabled, the editor's preview, stills, raster export and thumbnail now load every project module through the bounded opaque host before drawing. This includes Free code modules that are not listed as plugins. Reloads and document changes refresh the worker's module list. The editor setting is still opt-in, and browser coverage of these paths remains before step 2 can close.

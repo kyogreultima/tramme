@@ -12,6 +12,7 @@ import { timecode } from '../model.ts';
 import { t } from '../i18n/index.ts';
 import { Icon } from './icons.tsx';
 import { fileProject, sameFileProject, type FileProject } from '../files.ts';
+import { projectAssetUrl } from '../project-asset-url.ts';
 
 /** the fillers list (an asset of the project) being reviewed, if any */
 export const fillerCuts = signal<string | null>(null);
@@ -25,6 +26,7 @@ export function FillerCutsPanel() {
     setLoaded(null);
     if (!a) return;
     const project = fileProject();
+    try { projectAssetUrl(a.src, project.docUrl); } catch { return; }
     let live = true;
     api.readText(project.id, a.src).then((r) => {
       if (!live || !sameFileProject(project)) return;
