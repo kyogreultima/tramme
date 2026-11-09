@@ -15,6 +15,7 @@ import { addModifierOps, editAtOps, fixedOps, folderOf, imagesIn, keyAtOps, keyI
 import { addressDef, componentOf, detachPlan, modsOf, modifierParams, paramDef } from '@tramme/core';
 import { followTrackOps, tracksOf } from '../masks.ts';
 import { pickColor } from '../dropper.ts';
+import { SceneCode, sceneFolder } from './SceneCode.tsx';
 import { ColorField, NumberField, openMenu, Popover, Select, Seg, TextInput, Toggle, type MenuItem } from './controls.tsx';
 import { Icon, kindColor, kindIcon } from './icons.tsx';
 import { mediaOf, transcribe, TranscribeButton } from './Transcribe.tsx';
@@ -704,6 +705,11 @@ function LayerInspector({ ctx, id }: { ctx: Ctx; id: string }) {
         </Section>
       ) : null}
       {layer.type === 'comp' && <InstanceSection ctx={ctx} id={id} />}
+      {layer.type === 'webscene' && S.project.value && sceneFolder(staticValue(layer.props?.folder)) && (
+        <Section id="scene-code" title={t('inspector.sceneFiles')}>
+          <SceneCode projectId={S.project.value.id} folder={sceneFolder(staticValue(layer.props?.folder))!} />
+        </Section>
+      )}
       {node && grouped(node.props, node.title).map(([g, schema]) => (
         <Section key={g} id={`${layer.type}.${g}`} title={tr(g)}>
           <SchemaRows ctx={ctx} schema={schema} basePath={`${lp}/props`} baseAddress={id} />

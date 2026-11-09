@@ -719,6 +719,12 @@
     "noProjectNamed": "Rien qui s'appelle « {query} »."
   },
   "inspector": {
+    "sceneFiles": "Code de la scène",
+    "sceneNoFiles": "Aucun fichier dans {folder}.",
+    "sceneFile": "Fichier de la scène",
+    "sceneCodeOf": "Code de {file}",
+    "sceneLoading": "Chargement…",
+    "sceneReadOnly": "Lecture seule. Demandez à l’assistant de modifier la scène.",
     "removeParameter": "Retirer le paramètre",
     "exposeAsParameter": "Exposer comme paramètre",
     "exposeName": "Exposer {name}",

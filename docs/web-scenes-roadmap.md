@@ -86,7 +86,8 @@ Assistant tools (2026-11-09): `write_scene` (whole files of `scenes/<id>/`, the 
 
 ### Step 7: editor
 
-- [ ] A code view of the scene.
+- [x] A code view of the scene.
+Code view (2026-11-09): selecting a `webscene` layer shows a "Scene code" section in the inspector: a file picker over the scene's text files (entry first) and their text, read only; changes go through the assistant's scene tools. Tests cover the folder rule, the listing, the read-only text and the empty and failing cases. **To check in the browser:** how the section looks beside the others, at the narrow inspector width.
 - [ ] The manifest's parameters appear in the generated inspector and can be animated like any property.
 - [ ] A bar in the timeline, thumbnails.
 
