@@ -173,9 +173,18 @@ export interface InstalledState { version: 1; disabled: string[] }
 
 /** every installed plugin's files (by their name in the storage) and their state, as one zip */
 export function packInstalled(files: Map<string, Uint8Array>, state: InstalledState): Uint8Array {
-  const entries: Zippable = { 'installed.json': new TextEncoder().encode(JSON.stringify(state)) };
-  for (const [k, v] of files) entries[`plugins/${k}`] = v;
-  return zipSync(entries);
+  if (files.size + 1 > PACKAGE_ENTRY_LIMIT) throw new Error('plugin backup has too many entries');
+  const stateBytes = new TextEncoder().encode(JSON.stringify(state));
+  const entries: Zippable = { 'installed.json': stateBytes };
+  let total = stateBytes.byteLength;
+  for (const [k, v] of files) {
+    total += v.byteLength;
+    if (total > PACKAGE_LIMIT * 2) throw new Error('plugin backup expanded data too large');
+    entries[`plugins/${k}`] = v;
+  }
+  const zip = zipSync(entries);
+  if (zip.byteLength > PACKAGE_LIMIT) throw new Error('plugin backup too large');
+  return zip;
 }
 
 export function unpackInstalled(zip: Uint8Array): { files: Map<string, Uint8Array>; state: InstalledState } {

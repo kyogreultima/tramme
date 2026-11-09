@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { zipSync } from 'fflate';
 import { asksMore, compareVersions, manifestOf, metaOfText, packInstalled, permissionsAdded, readPluginPackage, unpackInstalled, writePluginPackage } from '../src/index.ts';
 
 const charts = `// a chart pack
@@ -71,6 +72,14 @@ describe('the package and the backup', () => {
     const entries = new Map(Array.from({ length: 2000 }, (_, i) => [`data/${i}.txt`, new Uint8Array([i % 256])] as const));
     expect(() => readPluginPackage(writePluginPackage({ module: charts, files: entries }))).toThrow('plugin package has too many entries');
     const backupEntries = new Map(Array.from({ length: 2000 }, (_, i) => [`plugin${i}.js`, new Uint8Array([i % 256])] as const));
-    expect(() => unpackInstalled(packInstalled(backupEntries, { version: 1, disabled: [] }))).toThrow('plugin backup has too many entries');
+    const rawBackup = Object.fromEntries([...backupEntries].map(([name, bytes]) => [`plugins/${name}`, bytes]));
+    rawBackup['installed.json'] = new TextEncoder().encode('{"version":1,"disabled":[]}');
+    expect(() => unpackInstalled(zipSync(rawBackup))).toThrow('plugin backup has too many entries');
+    expect(() => packInstalled(backupEntries, { version: 1, disabled: [] })).toThrow('plugin backup has too many entries');
+  });
+
+  it('refuses oversized backup input before compressing it', () => {
+    const large = new Uint8Array(65 * 1024 * 1024);
+    expect(() => packInstalled(new Map([['a.js', large], ['b.js', large]]), { version: 1, disabled: [] })).toThrow('plugin backup expanded data too large');
   });
 });

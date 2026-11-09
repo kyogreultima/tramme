@@ -76,6 +76,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 - The editor now refuses an oversized or malformed built-in pack index before offering its tools.
 - Oversized plugin files and installed-plugin backups now stop before the editor reads them into memory.
 - Plugin packages and backups now stop at 2,000 archive entries; oversized packaged JavaScript stops before extraction.
+- Creating an installed-plugin backup now stops before compressing too many files or bytes.
 
 - The editor's common project file URLs and multipart uploads now reject invalid format paths before requests.
 - LLM provider routes now reject malformed encoded provider names with HTTP 400.
