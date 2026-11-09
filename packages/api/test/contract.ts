@@ -66,6 +66,14 @@ export function storageContract(name: string, makeBucket: () => Bucket) {
       }
     });
 
+    it('refuses malformed encoded project file paths', async () => {
+      const { call, create } = setup();
+      const m = await create();
+      for (const path of ['assets/%ZZ.json', 'assets/%E0%A4%A.json']) {
+        expect((await call(`/api/projects/${m.id}/files/${path}`)).status).toBe(400);
+      }
+    });
+
     it('reads a part of a file (Range), as the video layer seeks', async () => {
       const { call, create } = setup();
       const m = await create();

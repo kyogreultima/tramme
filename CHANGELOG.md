@@ -71,6 +71,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Fixed
 
+- Project file routes now reject malformed percent encoding with HTTP 400.
 - Project storage now accepts JSON version snapshots, and the editor rejects forged version-index paths.
 - Filler-cut review now validates its project asset path before reading the list.
 - An open media bin or tag naming field no longer edits assets after switching projects.

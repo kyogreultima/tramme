@@ -21,7 +21,7 @@
 //   GET    /api/sounds, /api/sounds/<name>      the sound library (GET, PUT with x-tramme-entry, DELETE a sound)
 
 import type { Bucket } from './bucket.ts';
-import { json } from './http.ts';
+import { HttpError, json } from './http.ts';
 import { deleteFromShelf, getFromShelf, listShelf, putOnShelf, SHELVES } from './library.ts';
 import { abortUpload, completeUpload, createProject, deleteFile, deleteProject, duplicateProject, exportProject, getFile, listProjects, projectInfo, putFile, startUpload, updateProject, uploadPart } from './projects.ts';
 
@@ -59,7 +59,9 @@ export async function storageRoute(req: Request, bucket: Bucket, url: URL): Prom
       if (uploadId && !action && m === 'DELETE') return abortUpload(bucket, id, uploadId, url);
     }
     else if (sub === 'files' && parts.length > 3) {
-      const path = parts.slice(3).map(decodeURIComponent).join('/');
+      let path: string;
+      try { path = parts.slice(3).map(decodeURIComponent).join('/'); }
+      catch { throw new HttpError(400, 'invalid encoded file path'); }
       if (m === 'GET' || m === 'HEAD') return getFile(bucket, id, path, req);
       if (m === 'PUT') return putFile(bucket, id, path, req);
       if (m === 'DELETE') return deleteFile(bucket, id, path);

@@ -188,6 +188,8 @@ Filler review asset path (2026-11-09): the filler-cut review panel now checks th
 
 Version storage paths (2026-11-09): the project format now admits the editor's `versions/*.json` snapshots and index, which storage previously refused. The UI filters index entries to version snapshot paths before a read, restore or deletion. Format, archive, storage-contract and editor tests cover valid snapshots and forged paths. Version creation and restore still require end-to-end testing; step 3 remains open.
 
+Malformed file URL encoding (2026-11-09): the storage route now rejects malformed percent encoding in project file URLs with HTTP 400 before invoking any bucket operation. The shared storage contract checks this for in-memory, personal IndexedDB and folder storage; the remaining end-to-end routing audit stays under step 3.
+
 Vector and CLI checks (2026-11-07): isolated browser SVG/Lottie export now reports that expression-bearing projects need raster export. CLI `export`, `check-export` and `check` refuse such expressions before native vector conversion or picture checks. Tests exercise all three CLI commands and the browser export's early refusal. Worker-backed vector values and checks remain open.
 
 Editor module transfer (2026-11-07): when isolated preview is enabled, the editor's preview, stills, raster export and thumbnail now load every project module through the bounded opaque host before drawing. This includes Free code modules that are not listed as plugins. Reloads and document changes refresh the worker's module list. The editor setting is still opt-in, and browser coverage of these paths remains before step 2 can close.
