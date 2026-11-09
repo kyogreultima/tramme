@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { newProject } from '@tramme/project';
-import { prepareWebScenes, sceneKey, type SceneCapturer } from '../src/webscene.ts';
+import { injectCss, prepareWebScenes, sceneKey, tokenCss, type SceneCapturer } from '../src/webscene.ts';
 
 const dirs: string[] = [];
 afterEach(() => { for (const dir of dirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true }); });
@@ -87,5 +87,44 @@ describe('web scene export', () => {
     const ok = await prepareWebScenes(file, doc, fake());
     ok.cleanup();
     expect(ok.captured).toBe(1);
+  });
+});
+
+describe('project tokens in a scene', () => {
+  const tokens = {
+    ink: { type: 'color', value: '#1C1917' },
+    pace: { type: 'number', value: 0.4 },
+    swift: { type: 'ease', value: [0.16, 1, 0.3, 1] },
+    label: { type: 'string', value: 'a </style><b> "x"' },
+    offset: { type: 'vec2', value: [4, -2] },
+    bad: { type: 'color', value: 'red; } body { display: none' },
+    'not valid': { type: 'number', value: 1 },
+    nan: { type: 'number', value: Number.NaN },
+  } as never;
+
+  it('become CSS variables, and nothing that is not plain data gets through', () => {
+    const css = tokenCss(tokens);
+    expect(css).toBe(':root {\n  --ink: #1C1917;\n  --label: "a \\3c /style>\\3c b> \\"x\\"";\n  --offset: 4 -2;\n  --pace: 0.4;\n  --swift: cubic-bezier(0.16, 1, 0.3, 1);\n}');
+    expect(css).not.toContain('display');
+    expect(tokenCss(undefined)).toBe('');
+  });
+
+  it('are put first in the scene\'s head, or at the start of a bare page', () => {
+    const css = ':root { --a: 1; }';
+    expect(injectCss('<!doctype html><html><head><title>t</title></head>', css)).toBe('<!doctype html><html><head><style id="tramme-tokens">:root { --a: 1; }</style><title>t</title></head>');
+    expect(injectCss('<p>x</p>', css)).toBe('<style id="tramme-tokens">:root { --a: 1; }</style><p>x</p>');
+    expect(injectCss('<p>x</p>', '')).toBe('<p>x</p>');
+  });
+
+  it('give the capture the style, and capture again when a token changes', async () => {
+    const { doc, file } = project();
+    doc.tokens = { ink: { type: 'color', value: '#111111' } } as never;
+    const capture = fake();
+    (await prepareWebScenes(file, doc, capture)).cleanup();
+    expect(capture.mock.calls[0][0].css).toBe(':root {\n  --ink: #111111;\n}');
+    doc.tokens = { ink: { type: 'color', value: '#222222' } } as never;
+    const again = await prepareWebScenes(file, doc, capture);
+    again.cleanup();
+    expect([again.captured, capture.mock.calls.length]).toEqual([1, 2]);
   });
 });
