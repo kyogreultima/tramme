@@ -128,7 +128,12 @@ export class ToolRunner {
 
   // ── video dressing ───────────────────────────────────────────
   private videos = new Map<string, Promise<VideoFrames>>();
-  private urlOf(src: string) { return new URL(src, new URL(S.docUrl.peek(), location.href)).href; }
+  private urlOf(src: string) {
+    if (pathIssue(src) || /[%#]/.test(src) || !src.startsWith('assets/')) throw new Error(`${src}: media must be a project asset`);
+    const base = new URL(S.docUrl.peek(), location.href), root = new URL('./', base), url = new URL(src, base);
+    if (!approvedProjectResource(url, root.pathname, root.origin, root.protocol)) throw new Error(`${src}: media must belong to this project`);
+    return url.href;
+  }
 
   /** a transcript: of the asset itself (json), or of a sound or video (when missing, the user is asked to make it, if `ask`) */
   private async readTranscript(assetId: string, ask = true): Promise<{ t: Transcript; id: string }> {

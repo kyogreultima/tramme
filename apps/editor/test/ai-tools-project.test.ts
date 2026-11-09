@@ -16,6 +16,30 @@ const open = (project: typeof first, slug: string) => {
 };
 
 describe('built-in assistant tool project boundary', () => {
+  it('refuses image and video frames outside project assets before opening media', async () => {
+    const previous = { project: S.project.peek(), docUrl: S.docUrl.peek(), doc: S.doc.peek() };
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+    const runner = new ToolRunner();
+    try {
+      open(first, 'first');
+      for (const type of ['image', 'video'] as const) {
+        for (const src of ['https://tramme.test/api/private', '../second/assets/clip.png', 'assets/%2e%2e/private.png']) {
+          S.doc.value = { ...first.doc, assets: { media: { type, src } } };
+          const result = await runner.run('media_frame', { asset: 'media', t: 0 });
+          expect(result.isError).toBe(true);
+        }
+      }
+      expect(fetch).not.toHaveBeenCalled();
+    } finally {
+      runner.dispose();
+      vi.unstubAllGlobals();
+      S.project.value = previous.project;
+      S.docUrl.value = previous.docUrl;
+      S.doc.value = previous.doc;
+    }
+  });
+
   it('refuses transcript assets that point outside project assets before fetch', async () => {
     const previous = { project: S.project.peek(), docUrl: S.docUrl.peek(), doc: S.doc.peek() };
     const fetch = vi.fn(async () => new Response('private'));

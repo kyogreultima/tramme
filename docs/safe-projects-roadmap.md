@@ -164,6 +164,8 @@ Plugin asset scope (2026-11-09): the editor's plugin tool context now lists, rea
 
 Transcription asset scope (2026-11-09): reading a transcript or starting media transcription now validates the asset path and decoded URL against the open project's `assets/` folder before opening the file. Focused tests refuse private API URLs, sibling-project paths and encoded traversal without issuing a fetch. Other editor media reads and end-to-end cross-project checks remain under step 3.
 
+Assistant media frames (2026-11-09): `media_frame` now checks image and video asset paths against the current project's `assets/` folder before opening an image or decoder. A focused test refuses private API URLs, sibling projects and encoded traversal for both media types before fetch. Other direct editor media readers remain under step 3.
+
 Vector and CLI checks (2026-11-07): isolated browser SVG/Lottie export now reports that expression-bearing projects need raster export. CLI `export`, `check-export` and `check` refuse such expressions before native vector conversion or picture checks. Tests exercise all three CLI commands and the browser export's early refusal. Worker-backed vector values and checks remain open.
 
 Editor module transfer (2026-11-07): when isolated preview is enabled, the editor's preview, stills, raster export and thumbnail now load every project module through the bounded opaque host before drawing. This includes Free code modules that are not listed as plugins. Reloads and document changes refresh the worker's module list. The editor setting is still opt-in, and browser coverage of these paths remains before step 2 can close.
