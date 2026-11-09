@@ -158,6 +158,8 @@ Decoded resource roots (2026-11-08): the host now checks a plugin module or font
 
 Tool context encoded paths (2026-11-09): built-in editor tools now use that decoded resource-root guard for asset URLs and refuse percent-encoded file paths before reading, writing or returning a file URL. A context test checks encoded traversal against each operation and confirms it is rejected. Remaining asset and file entry points still need an end-to-end cross-project audit under step 3.
 
+Assistant file commands (2026-11-09): `read_file` and `write_file`, plus their shared bounded text reader, now reject percent-encoded paths before issuing a project request. A focused test confirms neither fetch nor write starts for an encoded parent segment. Other project file entry points and server routing remain under step 3.
+
 Vector and CLI checks (2026-11-07): isolated browser SVG/Lottie export now reports that expression-bearing projects need raster export. CLI `export`, `check-export` and `check` refuse such expressions before native vector conversion or picture checks. Tests exercise all three CLI commands and the browser export's early refusal. Worker-backed vector values and checks remain open.
 
 Editor module transfer (2026-11-07): when isolated preview is enabled, the editor's preview, stills, raster export and thumbnail now load every project module through the bounded opaque host before drawing. This includes Free code modules that are not listed as plugins. Reloads and document changes refresh the worker's module list. The editor setting is still opt-in, and browser coverage of these paths remains before step 2 can close.

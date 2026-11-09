@@ -490,7 +490,7 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
   private async read(path: string, offset = 0): Promise<ToolResult> {
     const project = fileProject();
     if (path === DOCUMENT) return text('read the document with get_document', true);
-    const bad = pathIssue(path);
+    const bad = pathIssue(path) ?? (/%|#/.test(path) ? 'invalid project path' : null);
     if (bad) return text(`${path}: ${bad}`, true);
     if (!TEXT_FILE.test(path) || path === MANIFEST || isChatPath(path)) return text('only .js, .mjs, .json, .svg and .md text files can be read', true);
     const body = await readProjectText(project.id, path);
@@ -505,7 +505,7 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
 
   private async write(path: string, content: string): Promise<ToolResult> {
     const project = fileProject();
-    const bad = pathIssue(path);
+    const bad = pathIssue(path) ?? (/%|#/.test(path) ? 'invalid project path' : null);
     if (bad) return text(`${path}: ${bad}`, true);
     const ok = (/^plugins\/.+\.(js|mjs)$/i.test(path)) || (/^assets\/.+\.(json|svg)$/i.test(path));
     if (!ok) return text('allowed writes: plugins/*.js|mjs and assets/*.json|svg. The document changes through propose_changes.', true);

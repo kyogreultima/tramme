@@ -16,6 +16,29 @@ const open = (project: typeof first, slug: string) => {
 };
 
 describe('built-in assistant tool project boundary', () => {
+  it('refuses encoded file names before a read or write request', async () => {
+    const previous = { project: S.project.peek(), docUrl: S.docUrl.peek(), doc: S.doc.peek() };
+    const fetch = vi.fn(async () => new Response('private'));
+    const write = vi.spyOn(api, 'write');
+    vi.stubGlobal('fetch', fetch);
+    const runner = new ToolRunner();
+    try {
+      open(first, 'first');
+      const path = 'assets/%2e%2e/private.json';
+      expect((await runner.run('read_file', { path })).isError).toBe(true);
+      expect((await runner.run('write_file', { path, content: '{}' })).isError).toBe(true);
+      expect(fetch).not.toHaveBeenCalled();
+      expect(write).not.toHaveBeenCalled();
+    } finally {
+      runner.dispose();
+      vi.restoreAllMocks();
+      vi.unstubAllGlobals();
+      S.project.value = previous.project;
+      S.docUrl.value = previous.docUrl;
+      S.doc.value = previous.doc;
+    }
+  });
+
   it('refuses a delayed file listing from a closed project', async () => {
     const previous = { project: S.project.peek(), docUrl: S.docUrl.peek(), doc: S.doc.peek() };
     let finish!: (value: any) => void;
