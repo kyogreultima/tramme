@@ -21,6 +21,7 @@ import { comp, compIdOf, S, setRegistry, setTime, toast, viewDoc } from './state
 import { attachInstalled, attachIsolated, filterModule, onSandboxStopped, pluginHost, pluginToolHost } from './plugins/index.ts';
 import { copiesIn, copyId, counted, installed, installedFor, installedTypes, offIn, permitted, sandboxedDoc, stopped, STRIKES } from './installed.ts';
 import { bindSandbox, blitSandboxFrame, declarationsModule, ensureDeclared, ensureSandboxDoc, moduleItemsOf, resetSandbox, sandboxDeclaration, sandboxVideoFrames, type SandboxContext } from './plugins/sandbox-draw.ts';
+import { setWebScenePlaceholder } from '@tramme/nodes';
 import { t } from './i18n/index.ts';
 import { MASTER_METER_ID, previewMeters } from './audio-meters.ts';
 import { audioEffectsKey } from './audio-key.ts';
@@ -30,6 +31,7 @@ import { packAsInstalled, packBySrc, packContext, shippedPacks } from './packs.t
 import { syncPluginTours } from './tours/index.ts';
 // a stopped sandbox leaves the saved project and the open edits as they were; the next call starts a fresh one
 onSandboxStopped((reason) => toast(t('editor.pluginStopped', { reason }), 'error', 9000));
+setWebScenePlaceholder((folder) => t('viewport.websceneCaptured', { folder }));
 
 /** the slowest pace a media element takes (browsers refuse less): slower, it waits */
 const MIN_ELEMENT_RATE = 0.0625;

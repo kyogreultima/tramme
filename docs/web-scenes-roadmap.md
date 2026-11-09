@@ -66,6 +66,7 @@ The five seek prototypes now carry `scene.json`. The built-in-layer CLI prototyp
 - [ ] Iframe seeked to `t`; fallback on pre-rendered frames when the gap is too large.
 - [x] A parity test, preview against export, in the test suite with a PSNR threshold.
 Parity test (2026-11-09): `packages/cli/test/webscene-parity.test.ts` captures the CSS/SVG prototype with the engine and compares each frame with the same page seeked to `t` and screenshotted, by PSNR, with a 26 dB floor (measured 28.3 to 36.9 dB over six frames; it skips where no Chrome is found). It tests the page's seek contract, which an iframe preview uses; the editor's iframe itself is not built, so the first box of this step stays open.
+Editor stand-in (2026-11-09): until the iframe exists, a `webscene` layer with no captured frames draws a labelled stand-in in the editor ("its pictures are made when you export with tramme render") instead of failing the whole preview. `setWebScenePlaceholder` is set by the editor only; exports leave it unset, so a scene without frames is still an error there, never a blank or stand-in layer. The iframe overlay itself needs the editor's server to serve the scene runtime and project scene files into the opaque frame of step 5, so it waits for that.
 
 ### Step 5: isolated execution
 

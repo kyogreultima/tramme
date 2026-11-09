@@ -1408,6 +1408,7 @@
     "hdrUnavailable": "HDR : le canevas de ce navigateur ne peut pas encore le tenir, l'export reste en SDR"
   },
   "viewport": {
+    "websceneCaptured": "Scène web {folder} : ses images sont produites à l'export avec tramme render",
     "isolatedUnavailable": "La sélection isolée n'a pas pu être calculée : {error}",
     "waveform": "Forme d'onde",
     "vectorscope": "Vectorscope",

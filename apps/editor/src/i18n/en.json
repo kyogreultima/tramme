@@ -1408,6 +1408,7 @@
     "hdrUnavailable": "HDR: this browser's canvas cannot hold it yet, the export stays SDR"
   },
   "viewport": {
+    "websceneCaptured": "Web scene {folder}: its pictures are made when you export with tramme render",
     "isolatedUnavailable": "Isolated selection could not be calculated: {error}",
     "waveform": "Waveform",
     "vectorscope": "Vectorscope",
