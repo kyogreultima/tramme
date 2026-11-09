@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { newProject } from '@tramme/project';
-import { injectCss, prepareWebScenes, sceneKey, tokenCss, type SceneCapturer } from '../src/webscene.ts';
+import { assetsUsedBy, fontFaceCss, injectCss, prepareWebScenes, sceneKey, tokenCss, type SceneCapturer } from '../src/webscene.ts';
 
 const dirs: string[] = [];
 afterEach(() => { for (const dir of dirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true }); });
@@ -126,5 +126,39 @@ describe('project tokens in a scene', () => {
     const again = await prepareWebScenes(file, doc, capture);
     again.cleanup();
     expect([again.captured, capture.mock.calls.length]).toEqual([1, 2]);
+  });
+});
+
+describe('project fonts and pictures in a scene', () => {
+  it('declares the document fonts, served from the project\'s /assets/', () => {
+    const css = fontFaceCss({
+      a: { type: 'font', src: 'assets/fonts/Geist Sans.woff2', family: 'Geist', weight: '100 900' },
+      b: { type: 'font', src: 'assets/fonts/x.woff2', family: 'Evil"; } body { x', weight: '400' },
+      c: { type: 'font', src: '../outside.woff2', family: 'Out' },
+      d: { type: 'image', src: 'assets/p.png' },
+    } as never);
+    expect(css).toBe('@font-face { font-family: "Geist"; src: url("/assets/fonts/Geist%20Sans.woff2"); font-weight: 100 900; font-style: normal; font-display: block; }');
+  });
+
+  it('finds the project files a scene names, and only inside assets/', () => {
+    const { dir } = project();
+    const scene = path.join(dir, 'scenes', 'title');
+    fs.writeFileSync(path.join(scene, 'index.html'), '<img src="/assets/logo.png"><style>@font-face{src:url(/assets/fonts/a%20b.woff2)}</style><a href="/assets/../secret.png">');
+    expect(assetsUsedBy(scene, ['assets/fonts/doc.woff2', 'plugins/x.js'])).toEqual(['assets/fonts/a b.woff2', 'assets/fonts/doc.woff2', 'assets/logo.png']);
+  });
+
+  it('captures again when a picture the scene uses changes', async () => {
+    const { dir, doc, file } = project();
+    fs.mkdirSync(path.join(dir, 'assets'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'assets', 'logo.png'), 'one');
+    fs.writeFileSync(path.join(dir, 'scenes', 'title', 'index.html'), '<img src="/assets/logo.png">');
+    const capture = fake();
+    (await prepareWebScenes(file, doc, capture)).cleanup();
+    (await prepareWebScenes(file, doc, capture)).cleanup();
+    expect(capture.mock.calls.length).toBe(1);
+    expect(capture.mock.calls[0][0].projectDir).toBe(dir);
+    fs.writeFileSync(path.join(dir, 'assets', 'logo.png'), 'two');
+    (await prepareWebScenes(file, doc, capture)).cleanup();
+    expect(capture.mock.calls.length).toBe(2);
   });
 });

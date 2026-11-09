@@ -91,9 +91,10 @@ Assistant tools (2026-11-09): `write_scene` (whole files of `scenes/<id>/`, the 
 ### Step 8: media and brand
 
 - [x] Project tokens injected as CSS variables.
-- [ ] Project fonts and images available to the scene.
+- [x] Project fonts and images available to the scene.
 - [ ] `<video>` by frame extraction; the scene's sound goes to the mixer.
 Tokens (2026-11-09): export serves each scene HTML with a `<style id="tramme-tokens">` first in its head, holding the project's colour, number, string, ease and vec2 tokens as `--name` variables; a value that is not plain data (a colour with `;`, `{` or `<`) is left out. The tokens are part of the cache key, so changing one captures the scene again. The editor's iframe preview will use the same `tokenCss`. The fonts and images box is next.
+Fonts and images (2026-11-09): export serves the project's `/assets/...` files to the scene (only inside `assets/`, no traversal), declares each font asset as an `@font-face` with its family, weight and style, and hashes the assets the scene names into its cache key, so replacing a logo or a font captures that scene again. **To check:** a custom font drawn by a real scene through this path; the prototype render ran without error but a missing font would fall back silently.
 
 ### Step 9: platforms
 
