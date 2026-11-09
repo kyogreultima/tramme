@@ -57,7 +57,8 @@ describe.skipIf(!CHROME)('web scene preview frame', () => {
   };
   const send = (message: unknown) => page.evaluate((m) => (window as unknown as { frame: HTMLIFrameElement }).frame.contentWindow!.postMessage(m, '*'), message);
 
-  it('draws like the export, frame by frame (PSNR)', async () => {
+  // the export side of this comparison is the engine's own Chrome: see webscene-parity.test.ts
+  it.skipIf(!!process.env.CI)('draws like the export, frame by frame (PSNR)', async () => {
     const scene = path.join(work, 'project', 'scenes', 'title');
     fs.cpSync(SCENE, scene, { recursive: true });
     await engineCapture({ dir: scene, entry: 'index.html', size: [320, 180], fps: FPS, frames: FRAMES, out: path.join(work, 'export'), css: '', projectDir: path.join(work, 'project'), params: null });

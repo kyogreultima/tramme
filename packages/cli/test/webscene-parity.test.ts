@@ -13,7 +13,8 @@ import { engineCapture, serveScene } from '../src/webscene.ts';
 const SCENE = new URL('../../../bench/web-scenes/css-svg', import.meta.url);
 const FPS = 6, FRAMES = 6, MIN_PSNR = 26;
 
-describe.skipIf(!CHROME)('web scene preview against export', () => {
+// the engine drives its own Chrome, whose sandbox a CI runner often refuses: here it runs on a machine, not in the pipelines
+describe.skipIf(!CHROME || !!process.env.CI)('web scene preview against export', () => {
   let work: string, browser: Awaited<ReturnType<typeof launch>>['browser'], page: Awaited<ReturnType<typeof launch>>['page'];
   let served: Awaited<ReturnType<typeof serveScene>>;
 
