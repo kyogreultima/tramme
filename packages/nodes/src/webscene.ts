@@ -10,13 +10,13 @@ interface WebSceneProps {
   parameters?: Record<string, unknown>;
 }
 
-let placeholder: ((folder: string) => string) | null = null;
+let placeholder: ((folder: string) => string | null) | null = null;
 /**
  * The editor shows a labelled stand-in for a scene whose frames are not captured yet (they are
  * captured at export), instead of failing the whole preview. Exports leave this unset: a scene
  * without frames is an error there, never a blank or stand-in layer.
  */
-export function setWebScenePlaceholder(label: ((folder: string) => string) | null) { placeholder = label; }
+export function setWebScenePlaceholder(label: ((folder: string) => string | null) | null) { placeholder = label; }
 
 export const webscene: NodeType<WebSceneProps> = {
   type: 'webscene', title: 'Web scene', category: 'Media',
@@ -25,12 +25,14 @@ export const webscene: NodeType<WebSceneProps> = {
     frames: { type: 'assets', default: [], assetType: 'image', label: 'Captured frames', animatable: false },
     fps: { type: 'number', default: 30, min: 1, label: 'Frame rate', animatable: false },
     size: { type: 'vec2', default: [1920, 1080], label: 'Scene size', unit: 'px' },
-    parameters: { type: 'json', default: {}, label: 'Scene parameters', animatable: false, description: 'the parameters scene.json declares (name: type and default); their values are the layer params, animated like any property' },
+    parameters: { type: 'json', default: {}, label: 'Scene parameters', animatable: false, hidden: true, description: 'the parameters scene.json declares (name: type and default); their values are the layer params, animated like any property' },
   },
   bounds: ({ size: [w, h] }) => ({ x: -w / 2, y: -h / 2, w, h }),
   render: {
     canvas2d(ctx, p, host) {
       if (!p.frames.length && placeholder && p.size[0] > 0 && p.size[1] > 0) {
+        const label = placeholder(p.folder || '(unnamed)');
+        if (label === null) return; // the editor shows the live scene over the picture
         const [w, h] = p.size;
         ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
         ctx.fillRect(-w / 2, -h / 2, w, h);
@@ -38,7 +40,7 @@ export const webscene: NodeType<WebSceneProps> = {
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.font = `${Math.max(12, Math.round(Math.min(w, h) / 18))}px sans-serif`;
-        ctx.fillText(placeholder(p.folder || '(unnamed)'), 0, 0, w * 0.9);
+        ctx.fillText(label, 0, 0, w * 0.9);
         return;
       }
       if (!p.frames.length) throw new Error(`web scene ${p.folder || '(unnamed)'} has no captured frames`);

@@ -39,7 +39,9 @@ function base64(bytes: Uint8Array): string {
   for (let i = 0; i < bytes.length; i += 0x8000) out += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
   return btoa(out);
 }
-const dataUrl = (mime: string, bytes: Uint8Array) => `data:${mime};base64,${base64(bytes)}`;
+/** bytes as a data: URL */
+export const toDataUrl = (mime: string, bytes: Uint8Array) => `data:${mime};base64,${base64(bytes)}`;
+const dataUrl = toDataUrl;
 const jsUrl = (source: string) => dataUrl('text/javascript', new TextEncoder().encode(source));
 
 /** a path inside the project, normalised, or null when it leaves it */
@@ -174,6 +176,8 @@ export async function buildSceneFrame(input: SceneFrameInput): Promise<string> {
   });
 
   const head = [
+    // an iframe whose colour scheme differs from its page's is painted opaque: pin both to light so a scene stays transparent
+    '<meta name="color-scheme" content="light">',
     `<meta http-equiv="Content-Security-Policy" content="${SCENE_FRAME_CSP}">`,
     `<script type="importmap">${JSON.stringify({ imports }).replace(/</g, '\\u003c')}</script>`,
     input.css ? `<style id="tramme-tokens">${input.css.replace(/<\/style/gi, '<\\/style')}</style>` : '',

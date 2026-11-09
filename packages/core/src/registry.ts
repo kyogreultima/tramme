@@ -38,6 +38,8 @@ export interface PropDef {
   options?: readonly string[];
   /** asset props: accepted asset type */
   assetType?: string;
+  /** true: kept in the document but not offered as a row of the inspector (a property another section edits) */
+  hidden?: boolean;
   /** false: static only (no keyframes, expression or link) */
   animatable?: boolean;
   /** null accepted as a value (paint: no fill) */

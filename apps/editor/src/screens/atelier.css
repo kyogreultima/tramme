@@ -432,6 +432,9 @@
 
 /* ── inspector ─────────────────────────────────────────────── */
 .inspector { padding-bottom: 16px; }
+.scene-frames { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.scene-frame { position: absolute; left: 0; top: 0; transform-origin: 0 0; border: 0; background: transparent; color-scheme: light; pointer-events: none; }
+.scene-frame-problem { position: absolute; left: 8px; right: 8px; bottom: 8px; padding: 6px 8px; border-radius: var(--r-sm); background: var(--error-bg); color: var(--error-text); font: var(--fs-xs) var(--mono); white-space: pre-wrap; }
 .scene-code { display: flex; flex-direction: column; gap: 6px; padding: 4px 14px 10px; min-width: 0; }
 .scene-code pre { margin: 0; max-height: 280px; overflow: auto; padding: 8px; border-radius: var(--r-sm); background: var(--surface-2); color: var(--text-2); font: var(--fs-xs)/1.5 var(--mono); white-space: pre; tab-size: 2; user-select: text; }
 .scene-code pre:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }

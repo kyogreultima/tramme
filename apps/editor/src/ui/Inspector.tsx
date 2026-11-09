@@ -681,6 +681,7 @@ function SchemaRows({ ctx, schema, basePath, baseAddress, only }: { ctx: Ctx; sc
 function grouped(schema: PropSchema, fallback: string): [string, PropSchema][] {
   const out = new Map<string, PropSchema>();
   for (const [n, d] of Object.entries(schema)) {
+    if (d.hidden) continue;
     const g = d.group || fallback;
     if (!out.has(g)) out.set(g, {});
     out.get(g)![n] = d;

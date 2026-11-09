@@ -14,6 +14,7 @@ import type { ToolResult } from '@tramme/assistant';
 import { inputIssues, vocabularyDetail, vocabularyIndex } from './answers.ts';
 import { uid } from './calls.ts';
 import { isSceneTextPath } from '../scene-tools.ts';
+import { bumpScene } from '../webscene-preview.ts';
 import { api, type AiEvent } from '../api.ts';
 import { describeOp, freshId } from '../model.ts';
 import { analyses, jpegOf, loadImage } from '../perception.ts';
@@ -413,6 +414,8 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
         else await api.writeAny(projectId, path, data);
         current();
         if (plugin) this.wrotePlugins.add(path);
+        // a shown web scene builds its document again
+        if (isSceneTextPath(path)) bumpScene();
         return path;
       },
       renderStill: (t, id) => { current(); return this.stillUrl(t, id).then((value) => { current(); return value; }); },

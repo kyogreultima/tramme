@@ -19,5 +19,10 @@ describe('web scene stand-in', () => {
     try { draw(ctx, props, { t: 0 } as never); } finally { setWebScenePlaceholder(null); }
     expect(calls).toEqual(['fillRect:-160,-90,320,180', 'fillText:scene scenes/title,0,0,288']);
     expect(() => draw(ctx, props, { t: 0 } as never)).toThrow('has no captured frames');
+    // a scene the editor shows live is drawn as nothing
+    calls.length = 0;
+    setWebScenePlaceholder(() => null);
+    try { draw(ctx, props, { t: 0 } as never); } finally { setWebScenePlaceholder(null); }
+    expect(calls).toEqual([]);
   });
 });

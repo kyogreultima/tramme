@@ -24,6 +24,7 @@ import { m, t } from '../i18n/index.ts';
 import { picking, pixelAt } from '../dropper.ts';
 import { grading, Scopes } from './Scopes.tsx';
 import { Loader } from './Logo.tsx';
+import { WebSceneFrames } from './WebSceneFrames.tsx';
 
 /** a finger rather than a mouse: bigger handles */
 const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
@@ -557,6 +558,7 @@ export function Viewport({ bare = false, inset = INSET, overlay, intercept }: Vi
         <QualityButton />
       </div>}
       <div class={`stage${picking.value ? ' picking' : ''}`} ref={stageRef} style={{ left, top, width: sw, height: sh }} onPointerDown={onPointerDown} onPointerMove={onMove} onPointerLeave={() => setHover(null)}>
+        <WebSceneFrames doc={doc} compId={compId} now={now} scale={scale} projectId={projectId} layerAt={layerAt} />
         <svg class="overlay" ref={svgRef} viewBox={`0 0 ${c.width} ${c.height}`} preserveAspectRatio="none">
           {grid && <g>
             {[1, 2].map((i) => <line key={`v${i}`} class="grid-line" x1={(c.width * i) / 3} y1={0} x2={(c.width * i) / 3} y2={c.height} />)}

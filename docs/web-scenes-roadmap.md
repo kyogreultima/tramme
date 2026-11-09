@@ -63,7 +63,7 @@ The five seek prototypes now carry `scene.json`. The built-in-layer CLI prototyp
 
 ### Step 4: faithful preview
 
-- [ ] Iframe seeked to `t`; fallback on pre-rendered frames when the gap is too large.
+- [x] Iframe seeked to `t`; fallback on pre-rendered frames when the gap is too large.
 - [x] A parity test, preview against export, in the test suite with a PSNR threshold.
 Parity test (2026-11-09): `packages/cli/test/webscene-parity.test.ts` captures the CSS/SVG prototype with the engine and compares each frame with the same page seeked to `t` and screenshotted, by PSNR, with a 26 dB floor (measured 28.3 to 36.9 dB over six frames; it skips where no Chrome is found). It tests the page's seek contract, which an iframe preview uses; the editor's iframe itself is not built, so the first box of this step stays open.
 Editor stand-in (2026-11-09): until the iframe exists, a `webscene` layer with no captured frames draws a labelled stand-in in the editor ("its pictures are made when you export with tramme render") instead of failing the whole preview. `setWebScenePlaceholder` is set by the editor only; exports leave it unset, so a scene without frames is still an error there, never a blank or stand-in layer. The iframe overlay itself needs the editor's server to serve the scene runtime and project scene files into the opaque frame of step 5, so it waits for that.
@@ -72,9 +72,11 @@ Editor stand-in (2026-11-09): until the iframe exists, a `webscene` layer with n
 
 Needs the boundary of [safe projects](safe-projects-roadmap.md).
 
-- [ ] The scene runs in an opaque-origin iframe: no network, no access to the editor's DOM, storage or keys.
-- [ ] Assets reach it through explicit host calls only.
-- [ ] Adversarial tests specific to scenes (escape through `postMessage`, remote imports, nested frames).
+- [x] The scene runs in an opaque-origin iframe: no network, no access to the editor's DOM, storage or keys.
+- [x] Assets reach it through explicit host calls only.
+- [x] Adversarial tests specific to scenes (escape through `postMessage`, remote imports, nested frames).
+
+Live preview (2026-11-09): a `webscene` layer without captured pictures is shown live in the viewport. The host reads the scene's files with the user's rights and builds one self-contained document (`apps/editor/src/webscene-frame.ts`): scripts, styles, pictures and fonts inline or as data, modules by an import map, the tokens as CSS variables. It runs in `<iframe sandbox="allow-scripts">`, an opaque origin, under a policy that denies every network door; it hears one message, `seek` with the time and the layer's parameters, and only from its parent. A layer with captured pictures draws them on the canvas instead (the fallback). The iframe cannot be read back, so it is laid over the canvas at the layer's position, scale, rotation and opacity, below the handles, and not composited with the layers around it; effects, blend modes and the order among layers are not applied to it. Exports capture and compose it. Tests in a real Chrome: the frame draws like the export (PSNR 26 dB floor), reaches no server by fetch, no-cors, XHR, WebSocket, image, module import, beacon or frame, reads neither the parent, the storage, the cookies nor IndexedDB, and ignores a sibling window. Checked by eye in the editor: the scene drew at the layer's place and scale, moved with the playhead, and its animated colour parameter changed from red to green.
 
 ### Step 6: versions and the assistant
 
