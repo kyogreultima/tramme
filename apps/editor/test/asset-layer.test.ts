@@ -36,6 +36,14 @@ describe('a layer of a sub-clip', () => {
 });
 
 describe('a layer of a video asset', () => {
+  it('refuses a video outside project assets before reading its duration', async () => {
+    const read = vi.spyOn(perception, 'mediaDuration');
+    for (const src of ['http://localhost/api/private', '../other/assets/clip.mp4', 'assets/%2e%2e/private.mp4']) {
+      await expect(layerFromAsset('talk', { ...talk, src })).rejects.toThrow('project asset');
+    }
+    expect(read).not.toHaveBeenCalled();
+  });
+
   it('plays a 12-minute video whole in a 5-second project', async () => {
     vi.spyOn(perception, 'mediaDuration').mockResolvedValue(753.17);
     await layerFromAsset('talk', talk);

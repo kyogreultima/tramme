@@ -71,6 +71,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Fixed
 
+- Video layer and timeline placement now validate project media URLs before duration and sound probes.
 - Assistant media frames now refuse image and video URLs outside the current project's assets.
 - Transcript reads and media transcription now refuse source paths outside the open project's assets.
 - Plugin tools can now list, read and address only validated files under the current project's `assets/` folder.

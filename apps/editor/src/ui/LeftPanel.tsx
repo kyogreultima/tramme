@@ -28,6 +28,7 @@ import { askUser } from '../confirm.ts';
 import { assetWithHash, contentHash } from '../hash.ts';
 import { m, t, tr } from '../i18n/index.ts';
 import { listCommands } from '../ai/commands.ts';
+import { projectAssetUrl } from '../project-asset-url.ts';
 import { runCommand } from '../ai/conversation.ts';
 
 const tab = signal<'layers' | 'assets' | 'tokens'>('layers');
@@ -133,7 +134,7 @@ export async function assetLayer(id: string, a: Asset): Promise<{ layer: Layer; 
   if (a.type === 'image') return { layer: newLayer(doc, compId, reg.node('image'), { name: a.name || id, props: { image: id, size: [600, 600], fit: 'contain' } }), ops: [] };
   if (a.type === 'audio') return { layer: newLayer(doc, compId, reg.node('audio'), { name: a.name || id, props: { audio: id } }), ops: [] };
   if (a.type === 'video') {
-    const length = await mediaDuration(new URL(a.src, new URL(S.docUrl.peek(), location.href)).href);
+    const length = await mediaDuration(projectAssetUrl(a.src, S.docUrl.peek()));
     const l = newLayer(S.doc.peek(), compId, reg.node('video'), { name: a.name || id });
     return wholeFile(S.doc.peek(), compId, { ...l, props: { ...l.props, video: id } }, length);
   }

@@ -10,9 +10,10 @@ import { assetLayer } from '../LeftPanel.tsx';
 import { hasSound, mediaDuration } from '../../perception.ts';
 import { clipFromRange, mediaOf } from '../../subclips.ts';
 import { nestOps, newSequenceOps, placeClipOps, type Placement } from './place-ops.ts';
+import { projectAssetUrl } from '../../project-asset-url.ts';
 
 /** the file of an asset as the browser reads it */
-const urlOf = (a: Asset) => new URL(a.src, new URL(S.docUrl.peek(), location.href)).href;
+const urlOf = (a: Asset) => projectAssetUrl(a.src, S.docUrl.peek());
 
 /** what the preview must know of an asset to put it on a track: its layer, whether it has a sound, how long a sound is */
 async function placementOf(assetId: string, a: Asset, range?: [number, number]): Promise<Placement | null> {
