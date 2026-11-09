@@ -171,7 +171,7 @@ export async function prepareWebScenes(file: string, doc: TrammeDoc, capture: Sc
 }
 
 /** serves one scene folder, plus the seek runtime every scene imports from /vendor/scene-runtime.js */
-async function serveScene(root: string, css: string, projectDir: string) {
+export async function serveScene(root: string, css: string, projectDir: string) {
   const { build } = await import('esbuild');
   const runtimeEntry = fileURLToPath(new URL('../../project/src/scene-runtime.ts', import.meta.url));
   const runtime = (await build({ entryPoints: [runtimeEntry], bundle: true, format: 'esm', platform: 'browser', write: false })).outputFiles[0].text;

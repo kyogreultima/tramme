@@ -82,6 +82,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 - Plugin companion data now has file-count and byte limits, with reliable encoding for larger binary files.
 - Plugin packages now refuse encoded or URL-like data paths before their files are copied into a project.
 - Plugin backups now refuse unsafe installed-plugin names before creating an archive.
+- A test now compares a web scene's seeked page with its exported frames.
 - A web scene exported by the command line can use the project's fonts and pictures from its assets folder.
 - A web scene now sees the project's tokens (colours, numbers, curves) as CSS variables when exported.
 - The assistant can write, correct and check web scenes (`write_scene`, `edit_scene`, `check_scene`): a correction changes one file of one scene and nothing else.

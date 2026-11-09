@@ -64,7 +64,8 @@ The five seek prototypes now carry `scene.json`. The built-in-layer CLI prototyp
 ### Step 4: faithful preview
 
 - [ ] Iframe seeked to `t`; fallback on pre-rendered frames when the gap is too large.
-- [ ] A parity test, preview against export, in the test suite with a PSNR threshold.
+- [x] A parity test, preview against export, in the test suite with a PSNR threshold.
+Parity test (2026-11-09): `packages/cli/test/webscene-parity.test.ts` captures the CSS/SVG prototype with the engine and compares each frame with the same page seeked to `t` and screenshotted, by PSNR, with a 26 dB floor (measured 28.3 to 36.9 dB over six frames; it skips where no Chrome is found). It tests the page's seek contract, which an iframe preview uses; the editor's iframe itself is not built, so the first box of this step stays open.
 
 ### Step 5: isolated execution
 
