@@ -20,6 +20,7 @@ import { Icon, kindColor, kindIcon } from './icons.tsx';
 import { mediaOf, transcribe, TranscribeButton } from './Transcribe.tsx';
 import { transcribing, transcriptIdOf } from '../speech.ts';
 import { m, t, tr } from '../i18n/index.ts';
+import { projectAssetUrl } from '../project-asset-url.ts';
 
 const UNIT: Record<string, string> = { px: 'px', deg: '°', '%': '%', em: 'em', s: 's', x: '×', dB: 'dB' };
 
@@ -269,8 +270,11 @@ function PropCheck({ ctx, path, value }: { ctx: Ctx; path: string; value: unknow
 function AssetsField({ def, value, ctx, onCommit }: { def: PropDef; value: unknown; ctx: Ctx; onCommit: (v: unknown) => void }) {
   const ids = Array.isArray(value) ? (value as string[]) : [];
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
-  const base = new URL(S.docUrl.peek(), location.href);
-  const url = (id: string) => { const a = ctx.doc.assets[id]; return a ? new URL(a.src, base).href : ''; };
+  const url = (id: string) => {
+    const a = ctx.doc.assets[id];
+    if (!a) return '';
+    try { return projectAssetUrl(a.src, S.docUrl.peek()); } catch { return ''; }
+  };
   const kind = def.assetType ?? 'image';
   const folders = new Map<string, string[]>();
   for (const [id, a] of Object.entries(ctx.doc.assets)) if (a.type === kind) { const f = folderOf(a.src); folders.set(f, [...(folders.get(f) ?? []), id]); }
