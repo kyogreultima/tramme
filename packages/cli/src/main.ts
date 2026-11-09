@@ -32,6 +32,7 @@ import { docRegistry, filesRegistry } from './plugins.ts';
 import { readConfig, resolveMountedPath, Server } from './server.ts';
 import { checkProject, containsExpression, DOCUMENT, isChatPath, MANIFEST, newProject, packProject, unpackProject, LEGACIES, migrateProject } from '@tramme/project';
 import { lintSceneFiles, MAX_SCENE_SOURCE } from './scene-lint.ts';
+import { engineCapture, prepareWebScenes } from './webscene.ts';
 
 const [cmd, ...rest] = process.argv.slice(2);
 const pos: string[] = [];
@@ -113,7 +114,10 @@ async function cmdStill(file: string) {
 
 async function cmdRender(file: string) {
   const doc = readDoc(file);
-  const s = await session(file);
+  // web scenes are captured to pictures first (and only again when their folder changed)
+  const scenes = await prepareWebScenes(file, doc, engineCapture);
+  if (scenes.captured || scenes.reused) console.log(`  web scenes: ${scenes.captured} captured, ${scenes.reused} reused from renders/webscene`);
+  const s = await session(scenes.file).catch((error) => { scenes.cleanup(); throw error; });
   try {
     const format = (str('format') ?? 'mp4') as VideoFormat;
     if (!VIDEO_FORMATS.includes(format)) throw new Error(`unknown video format: ${format} (${VIDEO_FORMATS.join(', ')})`);
@@ -127,7 +131,7 @@ async function cmdRender(file: string) {
     console.log(`${r.frames} frames in ${r.seconds.toFixed(1)} s (${r.msPerFrame.toFixed(0)} ms/frame${'pages' in r ? `, ${r.pages} pages` : ''})${r.audio ? ', with sound' : ''} -> ${path.relative(process.cwd(), out)}`);
     console.log(`  per frame: ${formatParts(r.parts)}`);
     console.log(r.verification ? '  Delivery checked: decoded dimensions, cadence, frame count and duration match the render.' : '  Delivery check skipped: GIF and PNG sequences use different timing rules.');
-  } finally { await s.close(); }
+  } finally { await s.close(); scenes.cleanup(); }
 }
 
 function cmdCompare(ref: string, test: string) {

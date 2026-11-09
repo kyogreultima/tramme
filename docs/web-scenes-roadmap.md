@@ -54,10 +54,12 @@ The five seek prototypes now carry `scene.json`. The built-in-layer CLI prototyp
 
 ### Step 3: export
 
-- [ ] Alpha frames composed by the compositor (blend, effects, motion blur, finishing).
-- [ ] A cache keyed by the hash of the folder and the parameters: only the changed scene renders again.
+- [x] Alpha frames composed by the compositor (blend, effects, motion blur, finishing).
+- [x] A cache keyed by the hash of the folder and the parameters: only the changed scene renders again.
 - [ ] `ffprobe` bundled like `ffmpeg-static`; one Chrome for the CLI; the engine version pinned; the licence in the credits.
-- [ ] Works with `--pages n` (parallel export).
+- [x] Works with `--pages n` (parallel export).
+
+`tramme render` now captures every `webscene` layer that names a folder and lists no frames (2026-11-09). The pinned `@hyperframes/engine@0.9.13` is a dependency of `@tramme/cli`; its seek capture writes alpha PNGs into `renders/webscene/<key>/`, where the key hashes the folder's files, the size and the rate. A second render reuses them, and an edit to the folder captures that scene only. A derived document carries the frames, so blend, effects, motion blur and finishing treat the scene as a picture layer. Run for real on the CSS/SVG prototype: six distinct frames, byte-identical on a second render and with `--pages 2`. The bundled `ffprobe`, the single Chrome for the CLI and the licence in the credits (Apache-2.0) remain open; the engine still drives its own Chrome. **To check:** a scene using GSAP, Three.js or Lottie through this path, since their vendor files are served by the bench only.
 
 ### Step 4: faithful preview
 

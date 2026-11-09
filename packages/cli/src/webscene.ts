@@ -1,0 +1,133 @@
+// Export of web scenes: a `webscene` layer without captured frames is captured
+// from its scene folder before the render, once per (folder, size, rate), and
+// only again when the folder changes. The render then reads ordinary alpha PNG
+// files, so the compositor treats the scene like any picture layer.
+
+import fs from 'node:fs';
+import http from 'node:http';
+import path from 'node:path';
+import { createHash } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
+import { mimeOf, SceneSchema } from '@tramme/project';
+import type { TrammeDoc } from '@tramme/core';
+
+/** the frames of one scene, in order, as files on disk */
+export interface Capture { files: string[] }
+/** renders the scene folder to `<count>` alpha PNG files in `out` */
+export type SceneCapturer = (job: { dir: string; entry: string; size: [number, number]; fps: number; frames: number; out: string }) => Promise<void>;
+
+export const FRAME_PATTERN = /^frame_\d{5,}\.png$/;
+const CACHE = 'renders/webscene';
+
+/** a hash of every file of the folder (names and bytes) and of what changes the pictures; the same key means the same frames */
+export function sceneKey(dir: string, size: [number, number], fps: number): string {
+  const hash = createHash('sha256');
+  hash.update(JSON.stringify({ size, fps }));
+  const walk = (folder: string) => {
+    for (const entry of fs.readdirSync(folder, { withFileTypes: true }).sort((a, b) => (a.name < b.name ? -1 : 1))) {
+      const file = path.join(folder, entry.name);
+      if (entry.isSymbolicLink()) throw new Error(`scene symlink not allowed: ${path.relative(dir, file)}`);
+      if (entry.isDirectory()) { if (entry.name !== '.hyperframes') walk(file); continue; }
+      hash.update(`\0${path.relative(dir, file).replaceAll('\\', '/')}\0`);
+      hash.update(fs.readFileSync(file));
+    }
+  };
+  walk(dir);
+  return hash.digest('hex').slice(0, 24);
+}
+
+export interface Prepared {
+  /** the document to render: the original when it holds no scene to capture */
+  file: string;
+  /** removes what was written beside the project for this render */
+  cleanup: () => void;
+  captured: number;
+  reused: number;
+}
+
+/**
+ * Makes sure every `webscene` layer that names a folder has its frames, and returns the
+ * document to render. Layers that already list frames are left alone.
+ */
+export async function prepareWebScenes(file: string, doc: TrammeDoc, capture: SceneCapturer): Promise<Prepared> {
+  const projectDir = path.dirname(path.resolve(file));
+  const needsFrames = (layer: { type: string; props?: Record<string, unknown> }) =>
+    layer.type === 'webscene' && typeof layer.props?.folder === 'string' && layer.props.folder !== '' && !(Array.isArray(layer.props.frames) && layer.props.frames.length);
+  const layersOf = (d: TrammeDoc) => Object.values(d.compositions).flatMap((comp) => Object.values(comp.layers) as { type: string; props: Record<string, unknown> }[]);
+  if (!layersOf(doc).some(needsFrames)) return { file, cleanup: () => {}, captured: 0, reused: 0 };
+
+  const next = structuredClone(doc);
+  let captured = 0, reused = 0;
+  const done = new Map<string, string[]>();
+  for (const layer of layersOf(next)) {
+    if (!needsFrames(layer)) continue;
+    const folder = layer.props.folder as string;
+    const dir = path.resolve(projectDir, folder);
+    if (!dir.startsWith(projectDir + path.sep) || !fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) throw new Error(`web scene folder not found in the project: ${folder}`);
+    const size = layer.props.size as [number, number], fps = layer.props.fps as number;
+    const manifest = SceneSchema.parse(JSON.parse(fs.readFileSync(path.join(dir, 'scene.json'), 'utf8')));
+    const key = sceneKey(dir, size, fps);
+    let names = done.get(key);
+    if (!names) {
+      const out = path.join(projectDir, CACHE, key);
+      const frames = Math.max(1, Math.ceil(manifest.duration * fps - 1e-6));
+      const have = () => fs.existsSync(out) ? fs.readdirSync(out).filter((n) => FRAME_PATTERN.test(n)).sort() : [];
+      if (have().length === frames) reused++;
+      else {
+        // a half-written folder is never trusted: capture into a fresh one and move it in whole
+        const temp = `${out}.partial`;
+        fs.rmSync(temp, { recursive: true, force: true });
+        fs.mkdirSync(temp, { recursive: true });
+        await capture({ dir, entry: manifest.entry, size, fps, frames, out: temp });
+        const got = fs.readdirSync(temp).filter((n) => FRAME_PATTERN.test(n));
+        if (got.length !== frames) throw new Error(`web scene ${folder}: captured ${got.length} of ${frames} frames`);
+        fs.rmSync(out, { recursive: true, force: true });
+        fs.renameSync(temp, out);
+        captured++;
+      }
+      names = have();
+      done.set(key, names);
+    }
+    const ids = names.map((name, index) => {
+      const assetId = `webscene-${key}-${index}`;
+      next.assets[assetId] = { type: 'image', src: `${CACHE}/${key}/${name}` } as never;
+      return assetId;
+    });
+    layer.props.frames = ids;
+  }
+  const derived = path.join(projectDir, `.${path.basename(file).replace(/\.json$/, '')}.webscene.json`);
+  fs.writeFileSync(derived, JSON.stringify(next));
+  return { file: derived, cleanup: () => fs.rmSync(derived, { force: true }), captured, reused };
+}
+
+/** serves one scene folder, plus the seek runtime every scene imports from /vendor/scene-runtime.js */
+async function serveScene(root: string) {
+  const { build } = await import('esbuild');
+  const runtimeEntry = fileURLToPath(new URL('../../project/src/scene-runtime.ts', import.meta.url));
+  const runtime = (await build({ entryPoints: [runtimeEntry], bundle: true, format: 'esm', platform: 'browser', write: false })).outputFiles[0].text;
+  const server = http.createServer((request, response) => {
+    const pathname = decodeURIComponent(new URL(`http://localhost${request.url}`).pathname);
+    if (pathname === '/vendor/scene-runtime.js') { response.writeHead(200, { 'content-type': 'text/javascript' }).end(runtime); return; }
+    const file = path.resolve(root, pathname === '/' ? 'index.html' : pathname.replace(/^\/+/, ''));
+    if (!file.startsWith(root + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) { response.writeHead(404).end(); return; }
+    response.writeHead(200, { 'content-type': mimeOf(file) });
+    fs.createReadStream(file).pipe(response);
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  return { url: `http://127.0.0.1:${(server.address() as { port: number }).port}/`, close: () => new Promise<void>((resolve) => server.close(() => resolve())) };
+}
+
+/** the pinned @hyperframes/engine, driven by seek capture (its higher-level render freezes custom-seek scenes) */
+export const engineCapture: SceneCapturer = async ({ dir, entry, size, fps, frames, out }) => {
+  const engine = await import('@hyperframes/engine').catch(() => { throw new Error('web scenes need @hyperframes/engine, which is not installed (npm install)'); });
+  const served = await serveScene(dir);
+  let session;
+  try {
+    session = await engine.createCaptureSession(served.url + (entry === 'index.html' ? '' : entry), out, { width: size[0], height: size[1], fps: { num: fps, den: 1 }, format: 'png', transparent: true });
+    await engine.initializeSession(session);
+    for (let frame = 0; frame < frames; frame++) await engine.captureFrame(session, frame, frame / fps);
+  } finally {
+    if (session) await engine.closeCaptureSession(session);
+    await served.close();
+  }
+};
