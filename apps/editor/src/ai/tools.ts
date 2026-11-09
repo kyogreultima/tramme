@@ -402,6 +402,7 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
       selection: S.selection.peek().filter((id) => doc.compositions[compId].layers[id]),
       assetUrl: (id) => { current(); const a = doc.assets[id]; if (!a) throw new Error(`unknown asset: ${id}`); const url = urlOf(a.src); assetPath(a.src); return url; },
       readText: async (path) => { const value = await readProjectText(projectId, isSceneTextPath(path) ? projectPath(path) : assetPath(path)); current(); return value; },
+      folderFiles: async (folder) => { current(); const value = (await api.info(projectId)).files.filter(({ path }) => path.startsWith(`${folder}/`) && !pathIssue(path) && !/[%#]/.test(path)).map(({ path, size }) => ({ path, size })); current(); return value; },
       files: async () => { current(); const value = (await api.info(projectId)).files.filter(({ path }) => path.startsWith('assets/') && !pathIssue(path) && !/[%#]/.test(path)).map(({ path, size }) => ({ path, size })); current(); return value; },
       fileUrl: (path) => urlOf(assetPath(path)),
       writeFile: async (path, data) => {

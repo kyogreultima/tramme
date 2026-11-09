@@ -31,7 +31,7 @@ import { VIDEO_FORMATS, type VideoFormat } from './media.ts';
 import { docRegistry, filesRegistry } from './plugins.ts';
 import { readConfig, resolveMountedPath, Server } from './server.ts';
 import { checkProject, containsExpression, DOCUMENT, isChatPath, MANIFEST, newProject, packProject, unpackProject, LEGACIES, migrateProject } from '@tramme/project';
-import { lintSceneFiles, MAX_SCENE_SOURCE } from './scene-lint.ts';
+import { lintSceneFiles, MAX_SCENE_SOURCE } from '@tramme/project/src/scene-lint.ts';
 import { engineCapture, prepareWebScenes } from './webscene.ts';
 
 const [cmd, ...rest] = process.argv.slice(2);

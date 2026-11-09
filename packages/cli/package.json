@@ -8,7 +8,6 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@babel/parser": "^7.29.13",
     "@hyperframes/engine": "0.9.13",
     "@modelcontextprotocol/sdk": "^1.32.1",
     "cross-spawn": "^7.0.6",
