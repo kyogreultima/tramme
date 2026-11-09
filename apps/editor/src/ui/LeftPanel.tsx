@@ -674,10 +674,10 @@ function Assets() {
       ...(a.type === 'image' || a.type === 'audio' || a.type === 'video' || a.type === 'model' ? [{ label: t('panel.createALayer'), icon: 'plus' as const, onClick: () => use(id, a) }] : []),
       { label: t('panel.moveToBin'), icon: 'folder' as const, onClick: () => openMenu(e, [
         ...binsOf(doc).filter((b) => b !== a.bin).map((b): MenuItem => ({ label: b, icon: 'folder', onClick: () => commit(t('panel.moveToBin'), setBinOps(S.doc.peek(), [id], b)) })),
-        { label: t('panel.newBin'), icon: 'plus', onClick: () => { naming.value = { kind: 'bin', ids: [id] }; } },
+        { label: t('panel.newBin'), icon: 'plus', onClick: () => { naming.value = { kind: 'bin', ids: [id], project: fileProject() }; } },
         ...(a.bin ? [{ label: t('panel.takeOutOfBin'), icon: 'x' as const, onClick: () => commit(t('panel.takeOutOfBin'), setBinOps(S.doc.peek(), [id], '')) }] : []),
       ]) },
-      { label: t('panel.addTag'), icon: 'marker' as const, onClick: () => { naming.value = { kind: 'tag', ids: [id] }; } },
+      { label: t('panel.addTag'), icon: 'marker' as const, onClick: () => { naming.value = { kind: 'tag', ids: [id], project: fileProject() }; } },
       ...(a.tags ?? []).map((tag): MenuItem => ({ label: `#${tag} ×`, onClick: () => commit(t('panel.addTag'), removeTagOps(S.doc.peek(), [id], tag)) })),
       ...(a.type === 'json' && id.startsWith('fillers-') ? [{ label: t('fillers.review'), icon: 'cutTail' as const, onClick: () => { fillerCuts.value = id; } }] : []),
       ...(a.type === 'audio' || a.type === 'video' ? [{ label: t('source.openInSource'), icon: 'film' as const, onClick: () => { sourceOpen.value = id; } }] : []),

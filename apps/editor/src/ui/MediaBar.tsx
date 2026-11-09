@@ -11,9 +11,10 @@ import { addTagsOps, binsOf, normTag, setBinOps, tagsOf, type AssetFilter } from
 import { t } from '../i18n/index.ts';
 import { Icon } from './icons.tsx';
 import { pathIssue } from '@tramme/project';
+import { sameFileProject, type FileProject } from '../files.ts';
 
 /** a bin or a tag being named for these media (set by the media's menu) */
-export const naming = signal<{ kind: 'bin' | 'tag'; ids: string[] } | null>(null);
+export const naming = signal<{ kind: 'bin' | 'tag'; ids: string[]; project: FileProject } | null>(null);
 
 /** what is said in each transcribed clip, read once and kept (by the transcript's file) */
 const said = new Map<string, string>();
@@ -46,12 +47,12 @@ export function useSpoken(doc: TrammeDoc, active: boolean): (id: string) => stri
 }
 
 export function MediaBar({ doc, filter, onChange }: { doc: TrammeDoc; filter: AssetFilter; onChange: (f: AssetFilter) => void }) {
-  const bins = binsOf(doc), tags = tagsOf(doc), asking = naming.value;
+  const bins = binsOf(doc), tags = tagsOf(doc), pending = naming.value, asking = pending && sameFileProject(pending.project) ? pending : null;
   const [name, setName] = useState('');
   const loose = Object.values(doc.assets).some((a) => !a.bin);
   const done = (ok: boolean) => {
     const text = name.trim();
-    if (ok && text && asking) commit(asking.kind === 'bin' ? t('panel.moveToBin') : t('panel.addTag'), asking.kind === 'bin' ? setBinOps(S.doc.peek(), asking.ids, text) : addTagsOps(S.doc.peek(), asking.ids, [normTag(text)]));
+    if (ok && text && asking && sameFileProject(asking.project)) commit(asking.kind === 'bin' ? t('panel.moveToBin') : t('panel.addTag'), asking.kind === 'bin' ? setBinOps(S.doc.peek(), asking.ids, text) : addTagsOps(S.doc.peek(), asking.ids, [normTag(text)]));
     naming.value = null; setName('');
   };
   return (
