@@ -67,10 +67,13 @@ describe('the package and the backup', () => {
   });
 
   it('bounds package module size and archive entry counts before inflation', () => {
-    const large = writePluginPackage({ module: 'x'.repeat(1024 * 1024 + 1), files: new Map() });
+    const large = zipSync({ 'plugin.js': new TextEncoder().encode('x'.repeat(1024 * 1024 + 1)) });
     expect(() => readPluginPackage(large)).toThrow('plugin module too large');
     const entries = new Map(Array.from({ length: 2000 }, (_, i) => [`data/${i}.txt`, new Uint8Array([i % 256])] as const));
-    expect(() => readPluginPackage(writePluginPackage({ module: charts, files: entries }))).toThrow('plugin package has too many entries');
+    const rawPackage = Object.fromEntries(entries);
+    rawPackage['plugin.js'] = new TextEncoder().encode(charts);
+    expect(() => readPluginPackage(zipSync(rawPackage))).toThrow('plugin package has too many entries');
+    expect(() => writePluginPackage({ module: charts, files: entries })).toThrow('plugin package has too many entries');
     const backupEntries = new Map(Array.from({ length: 2000 }, (_, i) => [`plugin${i}.js`, new Uint8Array([i % 256])] as const));
     const rawBackup = Object.fromEntries([...backupEntries].map(([name, bytes]) => [`plugins/${name}`, bytes]));
     rawBackup['installed.json'] = new TextEncoder().encode('{"version":1,"disabled":[]}');
@@ -81,5 +84,12 @@ describe('the package and the backup', () => {
   it('refuses oversized backup input before compressing it', () => {
     const large = new Uint8Array(65 * 1024 * 1024);
     expect(() => packInstalled(new Map([['a.js', large], ['b.js', large]]), { version: 1, disabled: [] })).toThrow('plugin backup expanded data too large');
+  });
+
+  it('refuses oversized or unsafe package input before compression', () => {
+    expect(() => writePluginPackage({ module: 'x'.repeat(1024 * 1024 + 1), files: new Map() })).toThrow('plugin module too large');
+    expect(() => writePluginPackage({ module: charts, files: new Map([['../private', new Uint8Array([1])]]) })).toThrow('unsafe path');
+    const large = new Uint8Array(65 * 1024 * 1024);
+    expect(() => writePluginPackage({ module: charts, files: new Map([['a.bin', large], ['b.bin', large]]) })).toThrow('plugin package expanded data too large');
   });
 });

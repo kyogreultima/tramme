@@ -161,9 +161,20 @@ export function readPluginPackage(zip: Uint8Array): PluginPackage {
 }
 
 export function writePluginPackage(p: PluginPackage): Uint8Array {
-  const entries: Zippable = { 'plugin.js': new TextEncoder().encode(p.module) };
-  for (const [k, v] of p.files) entries[k] = v;
-  return zipSync(entries);
+  if (p.files.size + 1 > PACKAGE_ENTRY_LIMIT) throw new Error('plugin package has too many entries');
+  const module = new TextEncoder().encode(p.module);
+  if (module.byteLength > 1024 * 1024) throw new Error('plugin module too large');
+  const entries: Zippable = { 'plugin.js': module };
+  let total = module.byteLength;
+  for (const [k, v] of p.files) {
+    if (!safePath(k) || k === 'plugin.js') throw new Error(`unsafe path in the package: ${k}`);
+    total += v.byteLength;
+    if (total > PACKAGE_LIMIT * 2) throw new Error('plugin package expanded data too large');
+    entries[k] = v;
+  }
+  const zip = zipSync(entries);
+  if (zip.byteLength > PACKAGE_LIMIT) throw new Error('plugin package too large');
+  return zip;
 }
 
 // ── the backup of every installed plugin ─────────────────────
