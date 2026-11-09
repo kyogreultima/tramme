@@ -29,7 +29,9 @@ export const SHELVES = {
 } satisfies Record<string, Shelf>;
 
 function nameOf(shelf: Shelf, raw: string): string {
-  const name = decodeURIComponent(raw);
+  let name: string;
+  try { name = decodeURIComponent(raw); }
+  catch { throw new HttpError(400, `invalid encoded ${shelf.what} name`); }
   if (!shelf.name.test(name)) throw new HttpError(400, `invalid ${shelf.what} name "${name}": lower case letters, digits, - and _, then its extension`);
   return name;
 }
@@ -50,9 +52,10 @@ export async function listShelf(bucket: Bucket, shelf: Shelf) {
 }
 
 export async function getFromShelf(bucket: Bucket, shelf: Shelf, raw: string) {
-  const obj = await bucket.get(shelf.prefix + nameOf(shelf, raw));
-  if (!obj) throw new HttpError(404, `no ${shelf.what} "${decodeURIComponent(raw)}" in the library`);
-  return new Response(obj.body, { headers: { 'content-type': shelf.type(raw), 'cache-control': 'no-store' } });
+  const name = nameOf(shelf, raw);
+  const obj = await bucket.get(shelf.prefix + name);
+  if (!obj) throw new HttpError(404, `no ${shelf.what} "${name}" in the library`);
+  return new Response(obj.body, { headers: { 'content-type': shelf.type(name), 'cache-control': 'no-store' } });
 }
 
 export async function putOnShelf(bucket: Bucket, shelf: Shelf, raw: string, req: Request) {
@@ -69,6 +72,7 @@ export async function putOnShelf(bucket: Bucket, shelf: Shelf, raw: string, req:
 }
 
 export async function deleteFromShelf(bucket: Bucket, shelf: Shelf, raw: string) {
-  await bucket.delete(shelf.prefix + nameOf(shelf, raw));
-  return json({ deleted: decodeURIComponent(raw) });
+  const name = nameOf(shelf, raw);
+  await bucket.delete(shelf.prefix + name);
+  return json({ deleted: name });
 }

@@ -74,6 +74,17 @@ export function storageContract(name: string, makeBucket: () => Bucket) {
       }
     });
 
+    it('refuses malformed library names and serves encoded valid names with their MIME type', async () => {
+      const { call } = setup();
+      for (const route of ['/api/library/%ZZ.js', '/api/sounds/%ZZ.wav']) {
+        expect((await call(route)).status).toBe(400);
+      }
+      expect((await call('/api/sounds/whoosh.wav', { method: 'PUT', body: new Uint8Array([1]) })).status).toBe(200);
+      const sound = await call('/api/sounds/whoosh%2Ewav');
+      expect(sound.status).toBe(200);
+      expect(sound.headers.get('content-type')).toBe('audio/wav');
+    });
+
     it('reads a part of a file (Range), as the video layer seeks', async () => {
       const { call, create } = setup();
       const m = await create();
