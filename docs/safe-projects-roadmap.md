@@ -170,6 +170,8 @@ Track media placement (2026-11-09): adding a video layer or placing video and au
 
 Source monitor fallback (2026-11-09): opening a source now validates its asset URL before using the renderer's media URL or the browser's fallback URL. An invalid source shows an error without creating a video or audio element; a UI test covers a private API URL. Other direct editor media readers remain under step 3.
 
+Timeline sound sync (2026-11-09): the timeline's clip synchronization now supplies only validated project asset URLs to the audio decoder, matching the assistant tool's existing context guard. A focused test puts a private API URL in a video asset and confirms no decode begins. Other direct editor media readers remain under step 3.
+
 Vector and CLI checks (2026-11-07): isolated browser SVG/Lottie export now reports that expression-bearing projects need raster export. CLI `export`, `check-export` and `check` refuse such expressions before native vector conversion or picture checks. Tests exercise all three CLI commands and the browser export's early refusal. Worker-backed vector values and checks remain open.
 
 Editor module transfer (2026-11-07): when isolated preview is enabled, the editor's preview, stills, raster export and thumbnail now load every project module through the bounded opaque host before drawing. This includes Free code modules that are not listed as plugins. Reloads and document changes refresh the worker's module list. The editor setting is still opt-in, and browser coverage of these paths remains before step 2 can close.
