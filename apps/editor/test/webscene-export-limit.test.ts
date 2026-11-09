@@ -11,7 +11,7 @@ describe('browser web scene export', () => {
     doc.compositions.main.order = ['scene'];
     await expect(exportInBrowser(doc, 'https://tramme.test/project/document.tramme.json', 'png', {
       compId: 'main', registry: builtinRegistry(),
-    })).rejects.toThrow(/bench\/web-scenes/);
+    })).rejects.toThrow(/tramme render/);
   });
 
   it('refuses isolated vector export before evaluating an expression on the page', async () => {
