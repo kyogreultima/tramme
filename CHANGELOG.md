@@ -71,6 +71,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Fixed
 
+- Timeline sound sync now discards results returned after the open project or composition changes.
 - Inspector sequence thumbnails now omit media URLs outside the current project's assets.
 - Timeline sound sync now validates media asset URLs before decoding clips.
 - The source monitor no longer falls back to an unchecked media URL when its asset cannot be loaded.

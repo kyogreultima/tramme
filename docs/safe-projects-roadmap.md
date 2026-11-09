@@ -174,6 +174,8 @@ Timeline sound sync (2026-11-09): the timeline's clip synchronization now suppli
 
 Inspector asset previews (2026-11-09): sequence drawing thumbnails in the Inspector now use the validated project asset URL helper and leave an invalid image source empty. A UI test confirms that a document asset pointing to a private API route produces no such image URL. Other direct editor media readers remain under step 3.
 
+Timeline sync project switch (2026-11-09): after sound analysis, the timeline sync command now checks the captured project, document URL and composition before applying operations. A delayed-result test switches projects during analysis and confirms that the new document receives no old edit. Other delayed editor operations still need the step 3 audit.
+
 Vector and CLI checks (2026-11-07): isolated browser SVG/Lottie export now reports that expression-bearing projects need raster export. CLI `export`, `check-export` and `check` refuse such expressions before native vector conversion or picture checks. Tests exercise all three CLI commands and the browser export's early refusal. Worker-backed vector values and checks remain open.
 
 Editor module transfer (2026-11-07): when isolated preview is enabled, the editor's preview, stills, raster export and thumbnail now load every project module through the bounded opaque host before drawing. This includes Free code modules that are not listed as plugins. Reloads and document changes refresh the worker's module list. The editor setting is still opt-in, and browser coverage of these paths remains before step 2 can close.
