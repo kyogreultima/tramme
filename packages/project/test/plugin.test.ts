@@ -86,6 +86,11 @@ describe('the package and the backup', () => {
     expect(() => packInstalled(new Map([['a.js', large], ['b.js', large]]), { version: 1, disabled: [] })).toThrow('plugin backup expanded data too large');
   });
 
+  it('refuses unsafe installed-plugin names before backup compression', () => {
+    for (const name of ['../private.js', 'folder/plugin.js', 'plugin%2ejs', 'plugin#one.js'])
+      expect(() => packInstalled(new Map([[name, new Uint8Array([1])]]), { version: 1, disabled: [] })).toThrow('invalid plugin backup name');
+  });
+
   it('refuses oversized or unsafe package input before compression', () => {
     expect(() => writePluginPackage({ module: 'x'.repeat(1024 * 1024 + 1), files: new Map() })).toThrow('plugin module too large');
     expect(() => writePluginPackage({ module: charts, files: new Map([['../private', new Uint8Array([1])]]) })).toThrow('unsafe path');

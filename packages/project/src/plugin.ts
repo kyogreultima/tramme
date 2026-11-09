@@ -136,6 +136,7 @@ export interface PluginPackage { module: string; files: Map<string, Uint8Array> 
 
 const PACKAGE_LIMIT = 64 * 1024 * 1024;
 const PACKAGE_ENTRY_LIMIT = 2000;
+const installedName = (name: string) => /^[a-z0-9][a-z0-9_-]{0,62}\.(js|mjs)$/.test(name);
 const safePath = (p: string) => !!p && p.length <= 512 && !p.startsWith('/') &&
   !p.split('/').some((s) => !s || s === '.' || s === '..') && !/[\\%?#:*"<>|\u0000-\u001f\u007f]/.test(p);
 
@@ -190,6 +191,7 @@ export function packInstalled(files: Map<string, Uint8Array>, state: InstalledSt
   const entries: Zippable = { 'installed.json': stateBytes };
   let total = stateBytes.byteLength;
   for (const [k, v] of files) {
+    if (!installedName(k)) throw new Error(`invalid plugin backup name: ${k}`);
     total += v.byteLength;
     if (total > PACKAGE_LIMIT * 2) throw new Error('plugin backup expanded data too large');
     entries[`plugins/${k}`] = v;
@@ -210,7 +212,7 @@ export function unpackInstalled(zip: Uint8Array): { files: Map<string, Uint8Arra
     return !entry.name.endsWith('/');
   } });
   const files = new Map<string, Uint8Array>();
-  for (const [p, d] of Object.entries(raw)) if (p.startsWith('plugins/') && /^[a-z0-9][a-z0-9_-]{0,62}\.(js|mjs)$/.test(p.slice(8))) files.set(p.slice(8), d);
+  for (const [p, d] of Object.entries(raw)) if (p.startsWith('plugins/') && installedName(p.slice(8))) files.set(p.slice(8), d);
   let state: InstalledState = { version: 1, disabled: [] };
   try { const s = JSON.parse(new TextDecoder().decode(raw['installed.json'])); if (Array.isArray(s?.disabled)) state = { version: 1, disabled: s.disabled.filter((x: unknown) => typeof x === 'string') }; } catch { /* the files alone */ }
   return { files, state };
