@@ -1447,7 +1447,7 @@
     "encoderStalled": "l'encodeur vidéo ne répond plus ({s} s sans progrès)",
     "softwareEncoder": "l'encodeur vidéo matériel n'a plus répondu pendant {s} s : le film a été encodé à nouveau en logiciel",
     "exportCancelled": "export annulé",
-    "websceneDesktopOnly": "Le navigateur ne peut pas encore exporter les scènes web. Un prototype CLI est disponible dans bench/web-scenes.",
+    "websceneDesktopOnly": "Le navigateur ne peut pas exporter les scènes web. Exportez ce projet avec la ligne de commande : tramme render.",
     "isolatedVectorExpressions": "L'export vectoriel avec expressions n'est pas encore disponible en mode isolé. Utilisez un export raster pour ce projet.",
     "frameNeverReady": "l'image {frame} ({time} s) ne s'est jamais terminée : une image de vidéo ou de plugin n'est pas arrivée en {s} s. L'export est arrêté plutôt que fait avec une image fausse.",
     "noSoundLayerIn": "aucun calque son dans cette composition",
