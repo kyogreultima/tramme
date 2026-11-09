@@ -30,4 +30,4 @@ export function pluginToolHost(docUrl: string, id: string, url: string): PluginH
 }
 
 export { attachInstalled, attachIsolated, filterModule } from './vocabulary.ts';
-export { browserHost, type PluginHost } from './host.ts';
+export { browserHost, onSandboxStopped, type PluginHost } from './host.ts';

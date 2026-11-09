@@ -24,6 +24,13 @@ export function approvedProjectResource(url: URL, projectRoot: string, origin: s
   const normalized = new URL(path, origin);
   return normalized.origin === origin && normalized.pathname.startsWith(projectRoot);
 }
+const stopListeners = new Set<(reason: string) => void>();
+/** told when a sandbox stops for a reason (a deadline, a crash, a refused message), never for a deliberate close */
+export function onSandboxStopped(listen: (reason: string) => void): () => void {
+  stopListeners.add(listen);
+  return () => { stopListeners.delete(listen); };
+}
+
 const RESPONSE_LIMIT = 8 * 1024 * 1024;
 const OUTBOUND_LIMIT = 64 * 1024 * 1024;
 const GRAPHICS_LIMIT = 256 * 1024 * 1024;
@@ -593,7 +600,9 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
       return values;
     },
     dispose(reason) {
+      const wasOpen = !closed;
       closed = true;
+      if (wasOpen && reason) for (const listen of [...stopListeners]) { try { listen(reason); } catch { /* a listener never blocks the cleanup */ } }
       const e = new Error(reason ? `the plugin sandbox stopped: ${reason}` : 'the plugin sandbox is closed');
       for (const w of [...waits.values(), ...answers.values()]) w.reject(e);
       waits.clear();

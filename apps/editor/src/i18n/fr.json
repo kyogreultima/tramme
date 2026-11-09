@@ -239,6 +239,7 @@
   "editor": {
     "softwareGpu": "Aucune carte graphique ne dessine l'aperçu : c'est le processeur qui le fait, tout l'ordinateur peut ralentir. Vérifiez que l'accélération matérielle est active (réglages du navigateur) et que les pilotes graphiques sont à jour.",
     "installedRefused": "Un plugin installé n'a pas pu être chargé dans le bac à sable de ce projet : {error}. Ses outils sont indisponibles ici ; désactivez-le dans Réglages, Plugins.",
+    "pluginStopped": "Les plugins du projet se sont arrêtés : {reason}. Votre projet et vos modifications non enregistrées sont intacts. Réessayez pour démarrer un bac à sable neuf, ou retirez le plugin du projet pour l'ouvrir sans lui.",
     "pluginSandbox": "Les plugins du projet n'ont pas pu être chargés dans le bac à sable : {error}. Leurs outils et vérifications sont indisponibles ; les calques qu'ils apportent continuent de se dessiner.",
     "newLayerNameType": "nouveau calque « {name} » ({type})",
     "deleteName": "supprimer « {name} »",

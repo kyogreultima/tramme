@@ -82,6 +82,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 - Plugin companion data now has file-count and byte limits, with reliable encoding for larger binary files.
 - Plugin packages now refuse encoded or URL-like data paths before their files are copied into a project.
 - Plugin backups now refuse unsafe installed-plugin names before creating an archive.
+- When a plugin sandbox stops (a runaway script, a crash), the editor now says what stopped and that your project and unsaved edits are untouched.
 - Plugin isolation now documents its time and size limits, and says plainly that a memory cap is not one of them.
 - Installed plugins can no longer follow a network redirect outside an approved origin.
 

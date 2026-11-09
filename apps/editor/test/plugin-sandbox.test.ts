@@ -8,7 +8,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { newProject, type Manifest } from '@tramme/project';
 import { Registry, toolOutput, type Host, type PluginModule, type ToolContext, type CheckContext, type TrammeDoc } from '@tramme/core';
-import { connectHost, readLimitedBody, type PluginHost } from '../src/plugins/host.ts';
+import { connectHost, onSandboxStopped, readLimitedBody, type PluginHost } from '../src/plugins/host.ts';
 import { guardRealm, startWorkerSide, type SandboxDrawSide } from '../src/plugins/worker-side.ts';
 import { bindSandbox, declarationsModule, noteSandboxDeclaration, resetSandbox, primeSandboxExports, sandboxDeclaration, sandboxNode } from '../src/plugins/sandbox-draw.ts';
 import { RecordingPath2D } from '../src/plugins/recording-path.ts';
@@ -88,6 +88,19 @@ function toolCtx(doc: TrammeDoc, over: Partial<ToolContext> = {}): ToolContext &
 }
 
 describe('the plugin sandbox', () => {
+  it('tells listeners why it stopped, once, and stays quiet on a deliberate close', async () => {
+    const heard: string[] = [];
+    const off = onSandboxStopped((reason) => heard.push(reason));
+    const stopped = connectHost(() => {}, () => DOC_URL).host;
+    const pending = expect(stopped.renderFrame({ compId: 'main', t: 0, scale: 1, width: 10, height: 10 })).rejects.toThrow('the plugin sandbox stopped: render timed out');
+    stopped.dispose('render timed out');
+    stopped.dispose('again');
+    await pending;
+    connectHost(() => {}, () => DOC_URL).host.dispose();
+    off();
+    connectHost(() => {}, () => DOC_URL).host.dispose('after unsubscribing');
+    expect(heard).toEqual(['render timed out']);
+  });
   it('refuses invalid canvas dimensions before sending a render to the worker', async () => {
     const sent: unknown[] = [];
     const { host } = connectHost((message) => sent.push(message), () => DOC_URL);

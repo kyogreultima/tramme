@@ -18,7 +18,7 @@ import { audioClips, clipFileTime, curveAt, needsPitch, soundMix, type TrammeDoc
 import { editorRegistry } from './vocabulary.ts';
 import { clipChain, liveMaster, loadPitch, masterGainDb, mixTracks, playClip, Renderer } from '@tramme/render';
 import { comp, compIdOf, S, setRegistry, setTime, toast, viewDoc } from './state.ts';
-import { attachInstalled, attachIsolated, filterModule, pluginHost, pluginToolHost } from './plugins/index.ts';
+import { attachInstalled, attachIsolated, filterModule, onSandboxStopped, pluginHost, pluginToolHost } from './plugins/index.ts';
 import { copiesIn, copyId, counted, installed, installedFor, installedTypes, offIn, permitted, sandboxedDoc, stopped, STRIKES } from './installed.ts';
 import { bindSandbox, blitSandboxFrame, declarationsModule, ensureDeclared, ensureSandboxDoc, moduleItemsOf, resetSandbox, sandboxDeclaration, sandboxVideoFrames, type SandboxContext } from './plugins/sandbox-draw.ts';
 import { t } from './i18n/index.ts';
@@ -28,6 +28,8 @@ import { prefs } from './settings.ts';
 import { clockTime, scrubWindow, step, Runs, type Clock } from './playclock.ts';
 import { packAsInstalled, packBySrc, packContext, shippedPacks } from './packs.ts';
 import { syncPluginTours } from './tours/index.ts';
+// a stopped sandbox leaves the saved project and the open edits as they were; the next call starts a fresh one
+onSandboxStopped((reason) => toast(t('editor.pluginStopped', { reason }), 'error', 9000));
 
 /** the slowest pace a media element takes (browsers refuse less): slower, it waits */
 const MIN_ELEMENT_RATE = 0.0625;

@@ -68,6 +68,8 @@ CLI declaration input bound (2026-11-07): folder and archive plugin validation n
 
 Resource limits stated (2026-11-09): [plugin-isolation.md](plugin-isolation.md) now lists the deadlines, size bounds and pending-call cap the host enforces and says plainly what the platform cannot: a hard memory or CPU cap on a worker. The earlier "bounded memory" claim belongs to option (d), not to the chosen worker.
 
+Sandbox stop notice (2026-11-09): when the plugin sandbox stops for a reason (a deadline, a crash, a refused message), the editor shows what stopped and says the saved project and unsaved edits are untouched. The next call starts a fresh sandbox, which is the retry; the way to open without the plugin is to remove it from the project. The sandbox never touches the document, so no work is lost. A device test of a real runaway script remains open under step 6.
+
 Plugin-backup expansion (2026-11-06): the installed-plugin backup reader now refuses a compressed file over 64 MiB and a declared expanded total over 128 MiB before inflating entries. The project archive and single-plugin package readers already had expansion limits. Other import paths, total bridge message size, graphics allocations and recovery still keep step 4 open.
 
 Project archive entry bound (2026-11-07): `unpackProject` now refuses more than the project's 2,000-file limit while reading zip metadata, before inflating the excess entry. This closes the many-small-files gap left by the existing compressed and expanded byte limits. Other resource and recovery gates remain open.
@@ -291,7 +293,7 @@ Done when: malformed, forged or replayed messages cannot access another project,
 
 - [x] Add deadlines to loading, checks, tool calls and rendering. The host can terminate and recreate a non-responsive worker; cancellation must not depend on the script cooperating.
 - [x] Bound input sizes, archive expansion, messages, pending requests, canvas dimensions and graphics allocations. Enforce the resource limits available on each platform and state any limits the platform cannot enforce, rather than promising a hard memory cap it does not provide.
-- [ ] Preserve the user's saved project and unsaved editor work after a script crashes, loops forever or exceeds a budget. Explain which operation stopped and offer a safe retry or opening without that extension.
+- [x] Preserve the user's saved project and unsaved editor work after a script crashes, loops forever or exceeds a budget. Explain which operation stopped and offer a safe retry or opening without that extension.
 
 Done when: a faulty project cannot freeze the editor's main thread or trigger unbounded host-side work through its bridge.
 

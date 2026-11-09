@@ -239,6 +239,7 @@
   "editor": {
     "softwareGpu": "No graphics card is drawing the preview: the processor does it, the whole computer may slow down. Check that hardware acceleration is on (browser settings) and that the graphics drivers are up to date.",
     "installedRefused": "An installed plugin could not be loaded in this project's sandbox: {error}. Its tools are unavailable here; turn it off in Settings, Plugins.",
+    "pluginStopped": "The project's plugins stopped: {reason}. Your project and unsaved edits are untouched. Try again to start a fresh sandbox, or remove the plugin from the project to open it without.",
     "pluginSandbox": "The project's plugins could not be loaded in the sandbox: {error}. Their tools and checks are unavailable; the layers they bring still draw.",
     "newLayerNameType": "new layer \"{name}\" ({type})",
     "deleteName": "delete \"{name}\"",
