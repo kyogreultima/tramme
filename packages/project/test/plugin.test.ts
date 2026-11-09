@@ -64,4 +64,13 @@ describe('the package and the backup', () => {
     expect(changed).toBe(true);
     expect(() => unpackInstalled(edited)).toThrow(/entry too large/);
   });
+
+  it('bounds package module size and archive entry counts before inflation', () => {
+    const large = writePluginPackage({ module: 'x'.repeat(1024 * 1024 + 1), files: new Map() });
+    expect(() => readPluginPackage(large)).toThrow('plugin module too large');
+    const entries = new Map(Array.from({ length: 2000 }, (_, i) => [`data/${i}.txt`, new Uint8Array([i % 256])] as const));
+    expect(() => readPluginPackage(writePluginPackage({ module: charts, files: entries }))).toThrow('plugin package has too many entries');
+    const backupEntries = new Map(Array.from({ length: 2000 }, (_, i) => [`plugin${i}.js`, new Uint8Array([i % 256])] as const));
+    expect(() => unpackInstalled(packInstalled(backupEntries, { version: 1, disabled: [] }))).toThrow('plugin backup has too many entries');
+  });
 });

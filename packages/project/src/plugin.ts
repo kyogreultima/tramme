@@ -135,14 +135,21 @@ export function compareVersions(a: string, b: string): number {
 export interface PluginPackage { module: string; files: Map<string, Uint8Array> }
 
 const PACKAGE_LIMIT = 64 * 1024 * 1024;
+const PACKAGE_ENTRY_LIMIT = 2000;
 const safePath = (p: string) => !!p && !p.startsWith('/') && !p.split('/').some((s) => s === '..' || s === '') && !/[\\:*?"<>|]/.test(p);
 
 /** a .trammeplugin read and checked: its module (`plugin.js`, or its only .js at the top), its files under safe paths, not too large */
 export function readPluginPackage(zip: Uint8Array): PluginPackage {
   if (zip.byteLength > PACKAGE_LIMIT) throw new Error('plugin package too large');
   if (zip[0] !== 0x50 || zip[1] !== 0x4b) throw new Error('this file is not a .trammeplugin package (zip)');
-  let total = 0;
-  const raw = unzipSync(zip, { filter: (f) => { total += f.originalSize; if (total > PACKAGE_LIMIT * 2) throw new Error(`entry too large: ${f.name}`); return !f.name.endsWith('/'); } });
+  let total = 0, count = 0;
+  const raw = unzipSync(zip, { filter: (f) => {
+    if (++count > PACKAGE_ENTRY_LIMIT) throw new Error('plugin package has too many entries');
+    total += f.originalSize;
+    if (total > PACKAGE_LIMIT * 2) throw new Error(`entry too large: ${f.name}`);
+    if (!f.name.includes('/') && /\.m?js$/i.test(f.name) && f.originalSize > 1024 * 1024) throw new Error('plugin module too large');
+    return !f.name.endsWith('/');
+  } });
   const files = new Map<string, Uint8Array>();
   for (const [p, d] of Object.entries(raw)) { if (!safePath(p)) throw new Error(`unsafe path in the package: ${p}`); files.set(p, d); }
   const tops = [...files.keys()].filter((p) => !p.includes('/') && /\.m?js$/.test(p));
@@ -174,8 +181,9 @@ export function packInstalled(files: Map<string, Uint8Array>, state: InstalledSt
 export function unpackInstalled(zip: Uint8Array): { files: Map<string, Uint8Array>; state: InstalledState } {
   if (zip.byteLength > PACKAGE_LIMIT) throw new Error('plugin backup too large');
   if (zip[0] !== 0x50 || zip[1] !== 0x4b) throw new Error('this file is not a backup of plugins (zip)');
-  let total = 0;
+  let total = 0, count = 0;
   const raw = unzipSync(zip, { filter: (entry) => {
+    if (++count > PACKAGE_ENTRY_LIMIT) throw new Error('plugin backup has too many entries');
     total += entry.originalSize;
     if (total > PACKAGE_LIMIT * 2) throw new Error(`entry too large: ${entry.name}`);
     return !entry.name.endsWith('/');
