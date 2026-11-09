@@ -71,6 +71,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Fixed
 
+- Isolated plugin modules and fonts now stay inside the project folder even when their URLs contain encoded separators or dot segments.
 - Project plugin file requests now reject encoded traversal and ambiguous URL or Windows path characters before reading or writing.
 - Repeated project-module reloads now release temporary encoded source URLs once the isolated worker answers.
 - Malformed plugin-load messages from the isolated frame now stop that worker without throwing in the editor page.

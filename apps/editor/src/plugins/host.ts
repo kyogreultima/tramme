@@ -12,6 +12,18 @@ const schemaOf = (n: NodeType) => ({ type: n.type, title: n.title, category: n.c
 const projectPath = (value: unknown): value is string => typeof value === 'string' && value.length > 0 && value.length <= 512 &&
   !/[\\%?#:\u0000-\u001f\u007f]/.test(value) && !value.startsWith('/') &&
   value.split('/').every((part) => part !== '' && part !== '.' && part !== '..');
+/** A resource path must stay inside the project even after URL decoding by a server. */
+export function approvedProjectResource(url: URL, projectRoot: string, origin: string, protocol: string): boolean {
+  if (url.protocol === 'blob:') return url.origin === origin;
+  if (!projectRoot || url.origin !== origin || url.protocol !== protocol || url.username || url.password) return false;
+  let path = url.pathname;
+  try {
+    for (let i = 0; i < 8 && path.includes('%'); i++) path = decodeURIComponent(path);
+  } catch { return false; }
+  if (path.includes('%') || /[\\?#:\u0000-\u001f\u007f]/.test(path)) return false;
+  const normalized = new URL(path, origin);
+  return normalized.origin === origin && normalized.pathname.startsWith(projectRoot);
+}
 const RESPONSE_LIMIT = 8 * 1024 * 1024;
 const OUTBOUND_LIMIT = 64 * 1024 * 1024;
 const GRAPHICS_LIMIT = 256 * 1024 * 1024;
@@ -619,11 +631,7 @@ export function browserHost(docUrl: string): PluginHost {
   const urls = new Map<string, string>();
   const fontBytes = new Map<string, Promise<ArrayBuffer>>();
   const projectRoot = docUrl ? new URL('./', new URL(docUrl, location.href)).pathname : '';
-  const approved = (url: URL) => {
-    const projectFile = projectRoot && url.protocol === location.protocol && url.pathname.startsWith(projectRoot);
-    const ownedBlob = url.protocol === 'blob:' && url.origin === location.origin;
-    return url.origin === location.origin && !!(projectFile || ownedBlob);
-  };
+  const approved = (url: URL) => approvedProjectResource(url, projectRoot, location.origin, location.protocol);
   const post = (m: ToWorker) => {
     if (responseTooLarge(m, OUTBOUND_LIMIT)) throw new Error('sandbox message exceeds 64 MB');
     if (graphicsTooLarge(m)) throw new Error('sandbox graphics exceed 256 MB');
