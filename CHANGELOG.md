@@ -74,6 +74,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 - Built-in pack tools now refuse data paths outside their own folder and stop reading a pack data file above 8 MiB.
 - The editor now refuses a shipped pack module larger than 1 MiB before loading it.
 - The editor now refuses an oversized or malformed built-in pack index before offering its tools.
+- Oversized plugin files and installed-plugin backups now stop before the editor reads them into memory.
 
 - The editor's common project file URLs and multipart uploads now reject invalid format paths before requests.
 - LLM provider routes now reject malformed encoded provider names with HTTP 400.

@@ -9,7 +9,7 @@ import { Registry, type PluginModule, type TrammeDoc } from '@tramme/core';
 import { connectHost } from '../src/plugins/host.ts';
 import { startWorkerSide } from '../src/plugins/worker-side.ts';
 import { attachInstalled } from '../src/plugins/vocabulary.ts';
-import { copiesFor, counted, installedTypes, offIn, permitted, sandboxedDoc, stopped, STRIKES, typesOf, type Installed } from '../src/installed.ts';
+import { candidateOf, copiesFor, counted, installedTypes, offIn, permitted, restoreBackup, sandboxedDoc, stopped, STRIKES, typesOf, type Installed } from '../src/installed.ts';
 import { prefs } from '../src/settings.ts';
 import type { ToolContext } from '@tramme/core';
 
@@ -34,6 +34,14 @@ const plugin = (over: Partial<Installed> = {}): Installed => ({
 });
 
 describe('installed plugins in a project', () => {
+  it('refuses oversized selected plugins and backups before reading their bytes', async () => {
+    const read = vi.fn(async () => { throw new Error('file was read'); });
+    const file = (name: string, size: number) => ({ name, size, text: read, arrayBuffer: read }) as unknown as File;
+    await expect(candidateOf(file('plugin.js', 1024 * 1024 + 1))).rejects.toThrow('plugin module too large');
+    await expect(candidateOf(file('plugin.trammeplugin', 64 * 1024 * 1024 + 1))).rejects.toThrow('plugin package too large');
+    await expect(restoreBackup(file('plugins.zip', 64 * 1024 * 1024 + 1))).rejects.toThrow('plugin backup too large');
+    expect(read).not.toHaveBeenCalled();
+  });
   it('runs installed tools in separate workers for their permission contexts', async () => {
     const first: PluginModule = { tools: [{ name: 'first.tool', description: 'first', run: () => 'first' }] };
     const second: PluginModule = { tools: [{ name: 'second.tool', description: 'second', run: () => 'second' }] };

@@ -166,8 +166,13 @@ export interface Candidate { file: string; code: string; files: Map<string, Uint
 /** a picked or dropped file as a candidate: a .js module or a .trammeplugin package */
 export async function candidateOf(f: File): Promise<Candidate> {
   let code: string, files = new Map<string, Uint8Array>();
-  if (/\.trammeplugin$/i.test(f.name)) ({ module: code, files } = readPluginPackage(new Uint8Array(await f.arrayBuffer())));
-  else if (/\.m?js$/i.test(f.name)) code = await f.text();
+  if (/\.trammeplugin$/i.test(f.name)) {
+    if (f.size > 64 * 1024 * 1024) throw new Error('plugin package too large');
+    ({ module: code, files } = readPluginPackage(new Uint8Array(await f.arrayBuffer())));
+  } else if (/\.m?js$/i.test(f.name)) {
+    if (f.size > 1024 * 1024) throw new Error('plugin module too large');
+    code = await f.text();
+  }
   else throw new Error(`${f.name}: a .js module or a .trammeplugin package is expected`);
   const manifest = manifestOf(code, f.name);
   // the same plugin (its id) installed already: an update, kept under its file name
@@ -369,6 +374,7 @@ export function backup(): Blob {
 
 /** a backup put back: its plugins installed (an installed one of a newer version kept), its off ones turned off */
 export async function restoreBackup(f: File): Promise<number> {
+  if (f.size > 64 * 1024 * 1024) throw new Error('plugin backup too large');
   const { files, state } = unpackInstalled(new Uint8Array(await f.arrayBuffer()));
   let n = 0;
   for (const [name, data] of files) {
