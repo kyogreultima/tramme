@@ -11,7 +11,7 @@ import { clickSelect, comp, commit, draft, cancelDraft, S, select, selectAll, se
 import { animatedProps, contentEnd, crossfadeOps, flatTree, freshId, keysOf, layerName, parentOf, parseTime, propPath, rawProp, rulerLabel, shiftLayerOps, snap, splitLayerOps, subtree, timecode, topLayers, trimInOps, type TreeItem } from '../model.ts';
 import { bandOf, longPress, noBrowserMenu, openMenu, Seg, useSize } from './controls.tsx';
 import { Icon, kindColor, kindIcon } from './icons.tsx';
-import { fileLength, preview } from '../preview.ts';
+import { assetData, fileLength, preview } from '../preview.ts';
 import { Tabs } from './timeline/Tabs.tsx';
 import { Mixer } from './Mixer.tsx';
 import { recording, toggleVoiceover } from '../voiceover-run.ts';
@@ -445,6 +445,7 @@ export function Timeline() {
       onPointerDown={(e) => dragClip(e, id, 'move')} onDblClick={() => setTime(a)}>
       {l.type === 'audio' && <ClipWave layer={l} from={a} seconds={b - a} width={(b - a) * k} />}
       {l.type === 'video' && !S.playing.value && <ClipFilm layer={l} from={a} seconds={b - a} width={(b - a) * k} />}
+      {l.type === 'webscene' && !S.playing.value && <SceneFilm layer={l} from={a} seconds={b - a} width={(b - a) * k} />}
       {(l.type === 'audio' || l.type === 'video') && (b - a) * k > 60 && <ClipFades compId={compId} id={id} layer={l} seconds={b - a} k={k} />}
       <TransitionBand compId={compId} id={id} layer={l} k={k} />
       {(b - a) * k > 60 && <span class="label">{layerName(id, l)}</span>}
@@ -583,6 +584,29 @@ function ClipWave({ layer, from, seconds, width }: { layer: Layer; from: number;
   if (typeof asset !== 'string') return null;
   const rate = Number(staticValue(layer.props?.rate) ?? 1) || 1, offset = Number(staticValue(layer.props?.start) ?? 0) + (from - (layer.in ?? 0)) * rate;
   return <Wave class="wave" asset={asset} offset={offset} seconds={seconds} rate={rate} width={width} />;
+}
+
+/** a web scene's captured pictures along its bar, one every 64 px (a scene not captured yet has none to show) */
+function SceneFilm({ layer, from, seconds, width }: { layer: Layer; from: number; seconds: number; width: number }) {
+  void filmVersion.value;
+  const canvas = useRef<HTMLCanvasElement>(null);
+  const frames = staticValue(layer.props?.frames), fps = Number(staticValue(layer.props?.fps) ?? 30) || 30;
+  const slots = Math.min(Math.ceil(width / FILM_W), Math.floor(8192 / FILM_W));
+  const ok = Array.isArray(frames) && frames.length > 0 && width >= 60 && slots > 0;
+  useLayoutEffect(() => {
+    const c = canvas.current;
+    if (!c || !ok) return;
+    const g = c.getContext('2d')!;
+    g.clearRect(0, 0, c.width, c.height);
+    for (let i = 0; i < slots; i++) {
+      const mid = from + ((i + 0.5) * seconds) / slots;
+      const id = frames[Math.max(0, Math.min(frames.length - 1, Math.floor(mid * fps + 1e-6)))];
+      const picture = typeof id === 'string' ? assetData(id) as CanvasImageSource | undefined : undefined;
+      if (picture) g.drawImage(picture, i * FILM_W, 0, FILM_W, FILM_H);
+    }
+  });
+  if (!ok) return null;
+  return <canvas ref={canvas} class="film" width={slots * FILM_W} height={FILM_H} aria-hidden="true" />;
 }
 
 /** a thumbnail of the file every 64 px of the clip: the video seen at a glance, decoded in the background */

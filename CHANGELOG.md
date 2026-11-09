@@ -82,6 +82,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 - Plugin companion data now has file-count and byte limits, with reliable encoding for larger binary files.
 - Plugin packages now refuse encoded or URL-like data paths before their files are copied into a project.
 - Plugin backups now refuse unsafe installed-plugin names before creating an archive.
+- The timeline bar of a captured web scene shows its pictures as thumbnails.
 - Web scenes can hold videos and sound: the export extracts the pictures, follows the playhead and adds the sound to the film.
 - The assistant changes a web scene as a take you can accept, reject or undo, and checks its scripts for what would break the export.
 - A web scene shows live in the editor, inside a sealed frame, and follows the playhead and its animated parameters.
