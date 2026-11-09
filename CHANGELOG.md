@@ -8,6 +8,8 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-11-09
+
 ### Added
 
 - The isolated asset loader never imports a module into the trusted page; CLI Free code layers now load and initialize their modules inside the opaque worker.
@@ -768,7 +770,8 @@ First public release.
 
 - Cloudflare Worker serving the editor and the API, projects stored in R2, access protected by Cloudflare Access.
 
-[Unreleased]: ../../compare/v0.20.0...HEAD
+[Unreleased]: ../../compare/v0.21.0...HEAD
+[0.21.0]: ../../compare/v0.20.0...v0.21.0
 [0.20.0]: ../../compare/v0.19.0...v0.20.0
 [0.19.0]: ../../compare/v0.18.0...v0.19.0
 [0.18.0]: ../../compare/v0.17.1...v0.18.0
