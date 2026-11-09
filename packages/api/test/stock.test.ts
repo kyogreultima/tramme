@@ -23,6 +23,13 @@ const ask = (reach: Reach, path: string) => providersAnswer(new Request(`https:/
 afterEach(() => vi.unstubAllGlobals());
 
 describe('the stock route', () => {
+  it('refuses a malformed encoded LLM provider before an upstream call', async () => {
+    const s = stubFetch();
+    const res = await providersAnswer(new Request('https://tramme.test/api/llm/%ZZ/chat/completions', { method: 'POST' }), s.reach());
+    expect(res.status).toBe(400);
+    expect(s.calls).toEqual([]);
+  });
+
   it('is a provider route, and Pexels is a keyed provider', () => {
     expect(PROVIDER_ROUTES).toContain('stock');
     expect(KEYED_PROVIDERS.pexels.origin).toBe('https://api.pexels.com');

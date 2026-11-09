@@ -71,6 +71,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Fixed
 
+- LLM provider routes now reject malformed encoded provider names with HTTP 400.
 - Plugin and sound libraries now reject malformed encoded names and use decoded names for MIME types.
 - Project file routes now reject malformed percent encoding with HTTP 400.
 - Project storage now accepts JSON version snapshots, and the editor rejects forged version-index paths.
