@@ -334,8 +334,9 @@ export const tools = [{
     //   doc: the document with the pending proposal applied (read only); compId: the composition the user is on;
     //   time: the editor's current time (s); selection: ids of the selected layers; registry: the document's vocabulary
     //   assetUrl(id): absolute URL of an asset's file; fileUrl(path): the same for any project file
-    //   readText(path): a text file of the project, or null; files(): every file of the project (path, size)
-    //   writeFile(path, data): under assets/ (computed data), or a plugin under plugins/ (.js, .mjs); returns the path
+    //   readText(path): a text file of the project (assets/, or a web scene's under scenes/<id>/), or null; files(): every file of the project (path, size)
+    //   folderFiles?(folder): the files of a web scene's folder (scenes/<id>), whatever their type; absent in the command line
+    //   writeFile(path, data): under assets/ (computed data), a plugin under plugins/ (.js, .mjs), or a web scene's text file under scenes/<id>/; returns the path
     //   renderStill(t, compId?): a JPEG data URL of a frame, pending proposal included
     //   transcript(assetId, { ask }?): the transcript of a sound or video asset (the user is asked to make it when missing)
     //   signal: aborted when the user stops the turn; progress(done, total, step?): how far a long tool is

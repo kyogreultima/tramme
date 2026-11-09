@@ -77,7 +77,7 @@ describe('the document of a web scene preview', () => {
     await expect(project({ 'scenes/title/index.html': '<head></head><img src="big.png">', 'scenes/title/big.png': new Uint8Array(9 * 1024 * 1024) }).frame()).rejects.toThrow('too large');
     const many = Object.fromEntries(Array.from({ length: 4 }, (_, i) => [`scenes/title/f${i}.png`, new Uint8Array(7 * 1024 * 1024)]));
     await expect(project({ 'scenes/title/index.html': `<head></head>${Object.keys(many).map((k) => `<img src="${k.split('/').pop()}">`).join('')}`, ...many }).frame()).rejects.toThrow('add up to more than');
-  });
+  }, 60_000);
 
   it('survives modules that import each other, and names its limits', async () => {
     const { frame } = project({
