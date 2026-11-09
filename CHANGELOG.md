@@ -78,6 +78,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 - Plugin packages and backups now stop at 2,000 archive entries; oversized packaged JavaScript stops before extraction.
 - Creating an installed-plugin backup now stops before compressing too many files or bytes.
 - Creating a plugin package now checks its file paths and size limits before compression.
+- Installed plugins now skip oversized stored modules, and library reads stop when a file exceeds its limit.
 
 - The editor's common project file URLs and multipart uploads now reject invalid format paths before requests.
 - LLM provider routes now reject malformed encoded provider names with HTTP 400.

@@ -9,7 +9,8 @@ import { Registry, type PluginModule, type TrammeDoc } from '@tramme/core';
 import { connectHost } from '../src/plugins/host.ts';
 import { startWorkerSide } from '../src/plugins/worker-side.ts';
 import { attachInstalled } from '../src/plugins/vocabulary.ts';
-import { candidateOf, copiesFor, counted, installedTypes, offIn, permitted, restoreBackup, sandboxedDoc, stopped, STRIKES, typesOf, type Installed } from '../src/installed.ts';
+import { candidateOf, copiesFor, counted, installedTypes, offIn, permitted, refreshInstalled, restoreBackup, sandboxedDoc, stopped, storageKind, STRIKES, typesOf, type Installed } from '../src/installed.ts';
+import { api } from '../src/api.ts';
 import { prefs } from '../src/settings.ts';
 import type { ToolContext } from '@tramme/core';
 
@@ -34,6 +35,16 @@ const plugin = (over: Partial<Installed> = {}): Installed => ({
 });
 
 describe('installed plugins in a project', () => {
+  it('skips an oversized stored plugin before reading it', async () => {
+    const before = storageKind.peek();
+    storageKind.value = 'server';
+    const list = vi.spyOn(api, 'library').mockResolvedValue([{ name: 'large.js', size: 1024 * 1024 + 1, modified: '' }]);
+    const read = vi.spyOn(api, 'libraryGet');
+    try {
+      await refreshInstalled();
+      expect(read).not.toHaveBeenCalled();
+    } finally { list.mockRestore(); read.mockRestore(); storageKind.value = before; }
+  });
   it('refuses oversized selected plugins and backups before reading their bytes', async () => {
     const read = vi.fn(async () => { throw new Error('file was read'); });
     const file = (name: string, size: number) => ({ name, size, text: read, arrayBuffer: read }) as unknown as File;

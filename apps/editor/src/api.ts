@@ -14,6 +14,7 @@ import { vaultOrigin } from './mode.ts';
 import { desktopFetch, tauri } from './tauri.ts';
 import { vaultFetch } from './vault/link.ts';
 import type { FileKind } from './sources.ts';
+import { readLimitedBody } from './plugins/host.ts';
 
 export interface ChatItem {
   id: string;
@@ -161,10 +162,10 @@ export const api = {
 
   // ── the plugin library, shared by the projects ─────────────────
   library: () => call<{ name: string; size: number; modified: string }[]>('/api/library'),
-  async libraryGet(name: string): Promise<string> {
+  async libraryGet(name: string, limit = LIMITS.file): Promise<string> {
     const r = await fetch(`/api/library/${encodeURIComponent(name)}`, { cache: 'no-store' });
     if (!r.ok) throw new ApiError(r.status, `no plugin "${name}" in the library (HTTP ${r.status})`);
-    return r.text();
+    return new TextDecoder().decode(await readLimitedBody(r, limit, 'library file'));
   },
   libraryPut: (name: string, code: string) => call<{ name: string; size: number }>(`/api/library/${encodeURIComponent(name)}`, { method: 'PUT', headers: { 'content-type': 'text/javascript' }, body: code }),
   libraryDelete: (name: string) => call<unknown>(`/api/library/${encodeURIComponent(name)}`, { method: 'DELETE' }),

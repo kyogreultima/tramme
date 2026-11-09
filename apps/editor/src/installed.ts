@@ -11,7 +11,7 @@
 import { signal } from '@preact/signals';
 import { PROVIDER_ROUTES, recordBucket } from '@tramme/api';
 import { applyOps, type Op, type ToolContext, type TrammeDoc } from '@tramme/core';
-import { compareVersions, manifestOf, packInstalled, permissionsAdded, readPluginPackage, unpackInstalled, type PluginManifest } from '@tramme/project';
+import { compareVersions, LIMITS, manifestOf, packInstalled, permissionsAdded, readPluginPackage, unpackInstalled, type PluginManifest } from '@tramme/project';
 import { api, reach } from './api.ts';
 import { folderRecords, type DirHandle } from './local/folder.ts';
 import { personal } from './mode.ts';
@@ -119,8 +119,14 @@ async function listFiles(): Promise<{ name: string; size: number; modified: stri
   try { return await api.library(); } catch { return []; }
 }
 async function readFile(name: string): Promise<string> {
-  if (storageKind.value === 'folder') { const o = await folderBucket().get(name); if (!o || !('arrayBuffer' in o)) throw new Error(`no plugin "${name}"`); return new TextDecoder().decode(await o.arrayBuffer()); }
-  return api.libraryGet(name);
+  const limit = COMPANION.test(name) ? LIMITS.file : 1024 * 1024;
+  if (storageKind.value === 'folder') {
+    const o = await folderBucket().get(name);
+    if (!o || !('arrayBuffer' in o)) throw new Error(`no plugin "${name}"`);
+    if (o.size > limit) throw new Error(`plugin file too large: ${name}`);
+    return new TextDecoder().decode(await o.arrayBuffer());
+  }
+  return api.libraryGet(name, limit);
 }
 async function writeFile(name: string, code: string): Promise<void> {
   if (storageKind.value === 'folder') { await folderBucket().put(name, code, { httpMetadata: { contentType: 'text/javascript' } }); return; }
@@ -151,6 +157,7 @@ export async function refreshInstalled(): Promise<void> {
   for (const f of list) {
     // what the library keeps besides plugins (components, references) is not a plugin
     if (COMPANION.test(f.name) || isKept(f.name)) continue;
+    if (f.size > 1024 * 1024) continue;
     try {
       const code = await readFile(f.name);
       const files = names.has(companionOf(f.name)) ? filesOf(await readFile(companionOf(f.name))) : new Map();
