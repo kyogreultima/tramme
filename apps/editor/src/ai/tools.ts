@@ -13,6 +13,7 @@ import { Stills } from '../frames.ts';
 import type { ToolResult } from '@tramme/assistant';
 import { inputIssues, vocabularyDetail, vocabularyIndex } from './answers.ts';
 import { uid } from './calls.ts';
+import { isSceneTextPath } from '../scene-tools.ts';
 import { api, type AiEvent } from '../api.ts';
 import { describeOp, freshId } from '../model.ts';
 import { analyses, jpegOf, loadImage } from '../perception.ts';
@@ -399,14 +400,14 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
       time: S.time.peek(),
       selection: S.selection.peek().filter((id) => doc.compositions[compId].layers[id]),
       assetUrl: (id) => { current(); const a = doc.assets[id]; if (!a) throw new Error(`unknown asset: ${id}`); const url = urlOf(a.src); assetPath(a.src); return url; },
-      readText: async (path) => { const value = await readProjectText(projectId, assetPath(path)); current(); return value; },
+      readText: async (path) => { const value = await readProjectText(projectId, isSceneTextPath(path) ? projectPath(path) : assetPath(path)); current(); return value; },
       files: async () => { current(); const value = (await api.info(projectId)).files.filter(({ path }) => path.startsWith('assets/') && !pathIssue(path) && !/[%#]/.test(path)).map(({ path, size }) => ({ path, size })); current(); return value; },
       fileUrl: (path) => urlOf(assetPath(path)),
       writeFile: async (path, data) => {
         current();
         const bad = pathIssue(path) ?? (path.includes('%') ? 'invalid project path' : null);
         const plugin = /^plugins\/.+\.(js|mjs)$/i.test(path);
-        if (bad || (!path.startsWith('assets/') && !plugin)) throw new Error(`${path}: ${bad ?? 'a tool writes under assets/, or a plugin under plugins/'}`);
+        if (bad || (!path.startsWith('assets/') && !plugin && !isSceneTextPath(path))) throw new Error(`${path}: ${bad ?? 'a tool writes under assets/, a plugin under plugins/, or a web scene text file under scenes/<id>/'}`);
         // a computed video (a cut-out mask) may pass the single request limit: sent in parts
         if (typeof data === 'string') await api.write(projectId, path, new Blob([data], { type: plugin ? 'text/javascript' : /\.json$/i.test(path) ? 'application/json' : 'text/plain' }));
         else await api.writeAny(projectId, path, data);

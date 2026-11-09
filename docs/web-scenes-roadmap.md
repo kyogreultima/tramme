@@ -59,7 +59,7 @@ The five seek prototypes now carry `scene.json`. The built-in-layer CLI prototyp
 - [ ] `ffprobe` bundled like `ffmpeg-static`; one Chrome for the CLI; the engine version pinned; the licence in the credits.
 - [x] Works with `--pages n` (parallel export).
 
-`tramme render` now captures every `webscene` layer that names a folder and lists no frames (2026-11-09). The pinned `@hyperframes/engine@0.9.13` is a dependency of `@tramme/cli`; its seek capture writes alpha PNGs into `renders/webscene/<key>/`, where the key hashes the folder's files, the size and the rate. A second render reuses them, and an edit to the folder captures that scene only. A derived document carries the frames, so blend, effects, motion blur and finishing treat the scene as a picture layer. Run for real on the CSS/SVG prototype: six distinct frames, byte-identical on a second render and with `--pages 2`. The bundled `ffprobe`, the single Chrome for the CLI and the licence in the credits (Apache-2.0) remain open; the engine still drives its own Chrome. **To check:** a scene using GSAP, Three.js or Lottie through this path, since their vendor files are served by the bench only.
+`tramme render` now captures every `webscene` layer that names a folder and lists no frames (2026-11-09). The pinned `@hyperframes/engine@0.9.13` is a dependency of `@tramme/cli`; its seek capture writes alpha PNGs into `renders/webscene/<key>/`, where the key hashes the folder's files, the size and the rate. A second render reuses them, and an edit to the folder captures that scene only. A derived document carries the frames, so blend, effects, motion blur and finishing treat the scene as a picture layer. Run for real on the CSS/SVG prototype: six distinct frames, byte-identical on a second render and with `--pages 2`. The licence is now credited in `THIRD_PARTY_NOTICES.md`. The bundled `ffprobe` (not needed until scene video, step 8), the single Chrome for the CLI remain open; the engine still drives its own Chrome. **To check:** a scene using GSAP, Three.js or Lottie through this path, since their vendor files are served by the bench only.
 
 ### Step 4: faithful preview
 
@@ -78,8 +78,9 @@ Needs the boundary of [safe projects](safe-projects-roadmap.md).
 
 - [ ] Tools `write_scene`, `edit_scene` (patch one file) and `check_scene` (lint and stills).
 - [ ] Every change is a take, comparable and undoable per scene.
-- [ ] Guidance for writing a web scene (structure, the seek contract, what to avoid), in the assistant's prompt.
-- [ ] "Fix the title of scene 3" changes that scene's files and nothing else (tested).
+- [x] Guidance for writing a web scene (structure, the seek contract, what to avoid), in the assistant's prompt.
+- [x] "Fix the title of scene 3" changes that scene's files and nothing else (tested).
+Assistant tools (2026-11-09): `write_scene` (whole files of `scenes/<id>/`, the manifest checked first, nothing written if it fails), `edit_scene` (one file, a text that must occur once) and `check_scene` (manifest and entry) are tools of the editor's vocabulary with their `ai` notes, and the assistant's prompt carries the seek contract. The tool context now reads and writes text files under `scenes/<id>/` (html, css, js, mjs, json, svg, txt) besides `assets/` and `plugins/`. A test edits scene 3 of three and verifies every other file is untouched. The first box stays open: `check_scene` does not yet run the seek lint or stills, because the lint parses with Babel (over 1 MB in the editor) and a still needs the isolated frame of step 5; `tramme check` runs the lint. Takes per scene (the second box) wait for the same frame.
 
 ### Step 7: editor
 

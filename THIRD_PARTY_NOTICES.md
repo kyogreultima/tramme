@@ -44,6 +44,7 @@ The packs carry their data in the repository (`plugins/<pack>/`), read at author
 | Package | License | Use |
 |---|---|---|
 | [puppeteer-core](https://github.com/puppeteer/puppeteer) | Apache-2.0 | Headless Chrome for offline rendering |
+| [@hyperframes/engine](https://github.com/heygen-com/hyperframes) | Apache-2.0 | Frame capture of web scenes (pinned to 0.9.13) |
 | [ffmpeg-static](https://github.com/eugeneware/ffmpeg-static) | GPL-3.0-or-later | Downloads an ffmpeg binary for video encoding |
 | [ws](https://github.com/websockets/ws) | MIT | Frame transfer from the render page |
 | [pngjs](https://github.com/pngjs/pngjs) | MIT | Image comparisons |
