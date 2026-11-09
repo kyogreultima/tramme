@@ -136,7 +136,8 @@ export interface PluginPackage { module: string; files: Map<string, Uint8Array> 
 
 const PACKAGE_LIMIT = 64 * 1024 * 1024;
 const PACKAGE_ENTRY_LIMIT = 2000;
-const safePath = (p: string) => !!p && !p.startsWith('/') && !p.split('/').some((s) => s === '..' || s === '') && !/[\\:*?"<>|]/.test(p);
+const safePath = (p: string) => !!p && p.length <= 512 && !p.startsWith('/') &&
+  !p.split('/').some((s) => !s || s === '.' || s === '..') && !/[\\%?#:*"<>|\u0000-\u001f\u007f]/.test(p);
 
 /** a .trammeplugin read and checked: its module (`plugin.js`, or its only .js at the top), its files under safe paths, not too large */
 export function readPluginPackage(zip: Uint8Array): PluginPackage {

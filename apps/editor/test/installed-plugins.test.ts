@@ -37,13 +37,15 @@ const plugin = (over: Partial<Installed> = {}): Installed => ({
 describe('installed plugins in a project', () => {
   it('bounds companion files and encodes large binary data without argument overflow', () => {
     const bytes = new Uint8Array(100_000).fill(42);
-    expect(filesOf(filesModule(new Map([['fonts/large.woff2', bytes]]))).get('fonts/large.woff2')).toEqual(bytes);
+    const decoded = filesOf(filesModule(new Map([['fonts/large.woff2', bytes]]))).get('fonts/large.woff2');
+    expect(decoded?.byteLength).toBe(bytes.byteLength);
+    expect(decoded?.every((value) => value === 42)).toBe(true);
     expect(() => filesModule(new Map([['../private', bytes]]))).toThrow('invalid plugin file path');
     expect(() => filesOf('export const files = {"../private":"Kg=="};')).toThrow('invalid plugin file path');
     const many = new Map(Array.from({ length: 2001 }, (_, i) => [`data/${i}.txt`, new Uint8Array([1])] as const));
     expect(() => filesModule(many)).toThrow('plugin has too many files');
-    const large = new Uint8Array(65 * 1024 * 1024);
-    expect(() => filesModule(new Map([['a.bin', large], ['b.bin', large]]))).toThrow('plugin files too large');
+    const tooLarge = { byteLength: 128 * 1024 * 1024 + 1 } as Uint8Array;
+    expect(() => filesModule(new Map([['too-large.bin', tooLarge]]))).toThrow('plugin files too large');
   });
   it('skips an oversized stored plugin before reading it', async () => {
     const before = storageKind.peek();

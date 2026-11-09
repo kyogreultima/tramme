@@ -89,6 +89,10 @@ describe('the package and the backup', () => {
   it('refuses oversized or unsafe package input before compression', () => {
     expect(() => writePluginPackage({ module: 'x'.repeat(1024 * 1024 + 1), files: new Map() })).toThrow('plugin module too large');
     expect(() => writePluginPackage({ module: charts, files: new Map([['../private', new Uint8Array([1])]]) })).toThrow('unsafe path');
+    for (const path of ['%2e%2e/private', 'data/./file', 'data#fragment', 'data?query']) {
+      expect(() => writePluginPackage({ module: charts, files: new Map([[path, new Uint8Array([1])]]) })).toThrow('unsafe path');
+      expect(() => readPluginPackage(zipSync({ 'plugin.js': new TextEncoder().encode(charts), [path]: new Uint8Array([1]) }))).toThrow('unsafe path');
+    }
     const large = new Uint8Array(65 * 1024 * 1024);
     expect(() => writePluginPackage({ module: charts, files: new Map([['a.bin', large], ['b.bin', large]]) })).toThrow('plugin package expanded data too large');
   });
