@@ -1,12 +1,34 @@
 // @vitest-environment happy-dom
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { newProject } from '@tramme/project';
 
-const { transcriptFor, transcriptions } = await import('../src/speech.ts');
+const { transcriptFor, transcribeAsset, transcriptions } = await import('../src/speech.ts');
 const { answer, question } = await import('../src/confirm.ts');
 const { S } = await import('../src/state.ts');
 
 describe('transcription project boundary', () => {
+  it('refuses media outside project assets before opening a transcription source', async () => {
+    const project = newProject({ name: 'First', width: 64, height: 64, fps: 30, duration: 1 });
+    const previous = { project: S.project.peek(), docUrl: S.docUrl.peek(), doc: S.doc.peek() };
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+    try {
+      S.project.value = project.manifest;
+      S.docUrl.value = 'https://tramme.test/projects/first/document.tramme.json';
+      for (const src of ['https://tramme.test/api/private', '../second/assets/clip.mp4', 'assets/%2e%2e/private.mp4']) {
+        S.doc.value = { ...project.doc, assets: { clip: { type: 'video', src } } };
+        await expect(transcribeAsset('clip')).rejects.toThrow('project asset');
+      }
+      expect(fetch).not.toHaveBeenCalled();
+      expect(transcriptions.peek()).toEqual([]);
+    } finally {
+      vi.unstubAllGlobals();
+      S.project.value = previous.project;
+      S.docUrl.value = previous.docUrl;
+      S.doc.value = previous.doc;
+    }
+  });
+
   it('does not start transcription in a newly opened project after a prompt', async () => {
     const first = newProject({ name: 'First', width: 64, height: 64, fps: 30, duration: 1 });
     const second = newProject({ name: 'Second', width: 64, height: 64, fps: 30, duration: 1 });

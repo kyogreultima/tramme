@@ -11,6 +11,7 @@
 import { signal } from '@preact/signals';
 import { ALL_FORMATS, AudioBufferSink, Input, UrlSource } from 'mediabunny';
 import { asrWords, mergeChunks, pointer, spokenLanguage, transcriptIdOf, type Transcript, type TranscriptWord, type WhisperParts } from '@tramme/core';
+import { pathIssue } from '@tramme/project';
 import { aiStatus, companionLink, refreshStatus } from './ai/index.ts';
 import { reach } from './api.ts';
 import { safeName, takenPaths, upload } from './files.ts';
@@ -20,6 +21,7 @@ import { chosenModel } from './settings.ts';
 import { madeBy } from './models.ts';
 import { commit, S, toast } from './state.ts';
 import { m, t } from './i18n/index.ts';
+import { approvedProjectResource } from './plugins/host.ts';
 
 const CHUNK = 28, STEP = 26, RATE = 16000;
 
@@ -203,8 +205,10 @@ async function transcribe(assetId: string, language?: string): Promise<string> {
   const job = { id: assetId, name: a.name || assetId, done: 0, total: 1, stage: m('speech.preparing') };
   transcriptions.value = [...transcriptions.peek().filter((j) => j.id !== assetId), job];
   try {
-    const url = new URL(a.src, new URL(docUrl, location.href)).href;
-    const tr = await transcribeUrl(url, { language, onProgress: (done, total, stage) => { transcriptions.value = transcriptions.peek().map((j) => (j.id === assetId ? { ...j, done, total, stage } : j)); } });
+    if (pathIssue(a.src) || /[%#]/.test(a.src) || !a.src.startsWith('assets/')) throw new Error(`${assetId}: transcription source must be a project asset`);
+    const base = new URL(docUrl, location.href), root = new URL('./', base), url = new URL(a.src, base);
+    if (!approvedProjectResource(url, root.pathname, root.origin, root.protocol)) throw new Error(`${assetId}: transcription source must belong to this project`);
+    const tr = await transcribeUrl(url.href, { language, onProgress: (done, total, stage) => { transcriptions.value = transcriptions.peek().map((j) => (j.id === assetId ? { ...j, done, total, stage } : j)); } });
     requireProject(stamp);
     tr.source = assetId;
     const name = safeName(`${(a.src.split('/').pop() ?? assetId).replace(/\.[^.]+$/, '')}.json`);

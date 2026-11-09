@@ -71,6 +71,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Fixed
 
+- Transcript reads and media transcription now refuse source paths outside the open project's assets.
 - Plugin tools can now list, read and address only validated files under the current project's `assets/` folder.
 - Assistant file commands now refuse encoded project paths before starting a read or write.
 - Built-in tools now reject encoded cross-project asset URLs and encoded file paths before a read or write.

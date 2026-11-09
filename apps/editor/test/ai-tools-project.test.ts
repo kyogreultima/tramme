@@ -16,6 +16,28 @@ const open = (project: typeof first, slug: string) => {
 };
 
 describe('built-in assistant tool project boundary', () => {
+  it('refuses transcript assets that point outside project assets before fetch', async () => {
+    const previous = { project: S.project.peek(), docUrl: S.docUrl.peek(), doc: S.doc.peek() };
+    const fetch = vi.fn(async () => new Response('private'));
+    vi.stubGlobal('fetch', fetch);
+    const runner = new ToolRunner();
+    try {
+      open(first, 'first');
+      for (const src of ['https://tramme.test/api/private', '../second/assets/transcript.json', '.tramme/chats/index.json', 'assets/%2e%2e/private.json']) {
+        S.doc.value = { ...first.doc, assets: { transcript: { type: 'json', src } } };
+        const result = await runner.run('get_transcript', { asset: 'transcript' });
+        expect(result.isError).toBe(true);
+      }
+      expect(fetch).not.toHaveBeenCalled();
+    } finally {
+      runner.dispose();
+      vi.unstubAllGlobals();
+      S.project.value = previous.project;
+      S.docUrl.value = previous.docUrl;
+      S.doc.value = previous.doc;
+    }
+  });
+
   it('refuses encoded file names before a read or write request', async () => {
     const previous = { project: S.project.peek(), docUrl: S.docUrl.peek(), doc: S.doc.peek() };
     const fetch = vi.fn(async () => new Response('private'));

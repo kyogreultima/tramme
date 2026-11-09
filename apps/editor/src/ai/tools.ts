@@ -140,8 +140,12 @@ export class ToolRunner {
     else if (a.type !== 'json') throw new Error(`${assetId}: a sound, a video or a transcript is expected`);
     requireFileProject(project);
     const entry = S.doc.peek().assets[id] ?? doc.assets[id];
-    const url = new URL(entry.src, new URL(project.docUrl, location.href)).href;
-    const r = await fetch(url, { cache: 'no-store' });
+    const path = entry?.src;
+    if (!path || pathIssue(path) || /[%#]/.test(path) || !path.startsWith('assets/')) throw new Error(`${id}: transcript must be a project asset`);
+    const base = new URL(project.docUrl, location.href), root = new URL('./', base);
+    const url = new URL(path, base);
+    if (!approvedProjectResource(url, root.pathname, root.origin, root.protocol)) throw new Error(`${id}: transcript must belong to this project`);
+    const r = await fetch(url.href, { cache: 'no-store' });
     if (!r.ok) throw new Error(`${id}: transcript could not be read (HTTP ${r.status})`);
     const t = JSON.parse(new TextDecoder().decode(await readLimitedBody(r, MAX_TRANSCRIPT_BYTES, 'transcript')));
     requireFileProject(project);
