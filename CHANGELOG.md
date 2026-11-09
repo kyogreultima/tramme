@@ -84,6 +84,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 - Plugin backups now refuse unsafe installed-plugin names before creating an archive.
 - A web scene layer without captured pictures now shows a labelled placeholder in the editor instead of breaking the preview.
 - The browser editor's message about web scenes now points to the command line (`tramme render`).
+- The desktop app now keeps web scene folders in its projects (scenes/), as the web editor and the command line do.
 - A test now compares a web scene's seeked page with its exported frames.
 - A web scene exported by the command line can use the project's fonts and pictures from its assets folder.
 - A web scene now sees the project's tokens (colours, numbers, curves) as CSS variables when exported.
