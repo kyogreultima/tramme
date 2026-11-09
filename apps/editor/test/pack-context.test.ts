@@ -33,4 +33,15 @@ describe('shipped pack file capability', () => {
     expect(cancel).toHaveBeenCalledOnce();
     expect(fetch).toHaveBeenCalledOnce();
   });
+
+  it('caps a pack module before decoding it into the trusted editor', async () => {
+    const cancel = vi.fn();
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) { controller.enqueue(new Uint8Array(1024 * 1024 + 1)); },
+      cancel,
+    });
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(body)));
+    await expect(packAsInstalled({ file: 'icons.js', name: 'Icons' })).rejects.toThrow('pack module exceeds 1 MB');
+    expect(cancel).toHaveBeenCalledOnce();
+  });
 });

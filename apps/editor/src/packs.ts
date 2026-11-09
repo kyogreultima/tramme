@@ -115,7 +115,9 @@ export function packContext(pack: PackEntry, ctx: ToolContext): ToolContext {
 export async function packAsInstalled(pack: PackEntry): Promise<Installed> {
   if (!/^[a-zA-Z0-9_-]+\.m?js$/.test(pack.file)) throw new Error('invalid pack module');
   const url = `/plugins/${pack.file}`;
-  const code = await fetch(url).then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.text(); });
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const code = new TextDecoder().decode(await readLimitedBody(response, 1024 * 1024, 'pack module'));
   return {
     file: pack.file,
     manifest: manifestOf(code, pack.file),
