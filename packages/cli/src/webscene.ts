@@ -9,6 +9,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { mimeOf, SceneSchema } from '@tramme/project';
+import { CHROME } from './browser.ts';
 import type { TrammeDoc } from '@tramme/core';
 
 /** the frames of one scene, in order, as files on disk */
@@ -196,7 +197,7 @@ export const engineCapture: SceneCapturer = async ({ dir, entry, size, fps, fram
   const served = await serveScene(dir, css, projectDir);
   let session;
   try {
-    session = await engine.createCaptureSession(served.url + (entry === 'index.html' ? '' : entry), out, { width: size[0], height: size[1], fps: { num: fps, den: 1 }, format: 'png', transparent: true });
+    session = await engine.createCaptureSession(served.url + (entry === 'index.html' ? '' : entry), out, { width: size[0], height: size[1], fps: { num: fps, den: 1 }, format: 'png', transparent: true }, null, CHROME ? { chromePath: CHROME } : {});
     await engine.initializeSession(session);
     for (let frame = 0; frame < frames; frame++) await engine.captureFrame(session, frame, frame / fps);
   } finally {
