@@ -1461,6 +1461,7 @@
     "encoderStalled": "the video encoder stopped answering ({s} s without progress)",
     "softwareEncoder": "the hardware video encoder stopped answering for {s} s: the film was encoded again in software",
     "exportCancelled": "export cancelled",
+    "websceneDesktopApp": "The desktop app cannot export web scenes yet. Export this project from the command line: tramme render \"<the project's folder in Documents/Tramme>\".",
     "websceneDesktopOnly": "The browser cannot export web scenes. Export this project with the command line: tramme render.",
     "isolatedVectorExpressions": "Vector export with expressions is unavailable in isolated mode. Use raster export for this project.",
     "frameNeverReady": "frame {frame} ({time} s) never finished: a video frame or a plugin picture did not come in {s} s. The export is stopped rather than made with a wrong picture.",

@@ -64,3 +64,52 @@ describe('scene parameters', () => {
     expect(scene.params).toEqual({ a: 1 });
   });
 });
+
+describe('scene video', () => {
+  const element = (dataset: Record<string, string> = {}) => {
+    const el = { dataset, muted: false, currentTime: 0, duration: 4, poster: '', paused: false, loaded: 0, removed: [] as string[],
+      pause() { this.paused = true; }, load() { this.loaded++; }, removeAttribute(name: string) { this.removed.push(name); } };
+    return el;
+  };
+
+  it('seeks the browser\'s own decoder when no pictures were extracted (the editor preview)', () => {
+    const scene = sceneController(5), el = element({ start: '1' });
+    scene.video(el);
+    scene.seek(0.5);
+    expect(el.currentTime).toBe(0);
+    scene.seek(3);
+    expect(el.currentTime).toBe(2);
+    scene.seek(5);
+    expect(el.currentTime).toBe(4);
+    expect([el.muted, el.paused]).toEqual([true, true]);
+  });
+
+  it('shows the extracted picture of the time asked as the element\'s poster, once it has arrived', async () => {
+    const loads: string[] = [];
+    class FakeImage { naturalWidth = 8; naturalHeight = 6; onload: (() => void) | null = null; onerror: (() => void) | null = null;
+      set src(value: string) { loads.push(value); queueMicrotask(() => this.onload?.()); } }
+    (globalThis as unknown as { Image: unknown }).Image = FakeImage;
+    try {
+      const scene = sceneController(2), el = element({ frames: '/__media/0/', fps: '10', frameCount: '10', start: '0.5' });
+      scene.video(el);
+      expect(el.removed).toContain('src');
+      scene.seek(0.2);
+      await scene.ready();
+      expect(el.poster).toBe('/__media/0/000000.jpg');
+      scene.seek(0.85);
+      expect(el.poster).toBe('/__media/0/000000.jpg');
+      await scene.ready();
+      expect(el.poster).toBe('/__media/0/000003.jpg');
+      scene.seek(1.95);
+      await scene.ready();
+      expect(el.poster).toBe('/__media/0/000009.jpg');
+      scene.seek(0.85);
+      expect(el.poster).toBe('/__media/0/000003.jpg');
+      expect(loads).toEqual(['/__media/0/000000.jpg', '/__media/0/000003.jpg', '/__media/0/000009.jpg']);
+    } finally { delete (globalThis as unknown as { Image?: unknown }).Image; }
+  });
+
+  it('needs the rate and the count with its pictures', () => {
+    expect(() => sceneController(1).video(element({ frames: '/__media/0/' }))).toThrow('data-fps and data-frame-count');
+  });
+});

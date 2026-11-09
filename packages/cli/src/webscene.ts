@@ -10,6 +10,7 @@ import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { fontFaceCss, injectCss, isAssetFile, mimeOf, SceneSchema, tokenCss } from '@tramme/project';
 import { CHROME } from './browser.ts';
+import { annotateVideos, extractFrames, probeMedia, scanSceneMedia } from './webscene-media.ts';
 import { Evaluator, sceneParams, type Registry, type TrammeDoc } from '@tramme/core';
 import { builtinRegistry } from '@tramme/nodes';
 
@@ -131,26 +132,49 @@ export async function prepareWebScenes(file: string, doc: TrammeDoc, capture: Sc
       return assetId;
     });
     layer.props.frames = ids;
+    // the sound of the scene's media goes to the film as ordinary audio layers: the mixer treats it like any other sound
+    const comp = next.compositions[compId];
+    for (const item of scanSceneMedia(fs.readFileSync(path.join(dir, manifest.entry), 'utf8'), folder).filter((m) => !m.muted)) {
+      const info = await probeMedia(path.join(projectDir, item.path));
+      const end = Math.min(comp.duration, item.start + info.duration);
+      if (!info.audio || end <= item.start) continue;
+      const assetId = `webscene-media-${key}-${item.index}`;
+      next.assets[assetId] = { type: item.tag === 'video' ? 'video' : 'audio', src: item.path } as never;
+      comp.layers[`${assetId}-sound`] = { type: 'audio', name: `Sound of ${folder}`, in: item.start, out: end, props: { audio: assetId, start: 0 } } as never;
+      comp.order.unshift(`${assetId}-sound`);
+    }
   }
   const derived = path.join(projectDir, `.${path.basename(file).replace(/\.json$/, '')}.webscene.json`);
   fs.writeFileSync(derived, JSON.stringify(next));
   return { file: derived, cleanup: () => fs.rmSync(derived, { force: true }), captured, reused };
 }
 
+/** a scene video as extracted pictures: its place among the page's media, the folder, how many, at what rate */
+export interface ServedVideo { index: number; dir: string; count: number; fps: number }
+
 /** serves one scene folder, plus the seek runtime every scene imports from /vendor/scene-runtime.js */
-export async function serveScene(root: string, css: string, projectDir: string) {
+export async function serveScene(root: string, css: string, projectDir: string, media: ServedVideo[] = []) {
   const { build } = await import('esbuild');
   const runtimeEntry = fileURLToPath(new URL('../../project/src/scene-runtime.ts', import.meta.url));
   const runtime = (await build({ entryPoints: [runtimeEntry], bundle: true, format: 'esm', platform: 'browser', write: false })).outputFiles[0].text;
   const server = http.createServer((request, response) => {
     const pathname = decodeURIComponent(new URL(`http://localhost${request.url}`).pathname);
     if (pathname === '/vendor/scene-runtime.js') { response.writeHead(200, { 'content-type': 'text/javascript' }).end(runtime); return; }
+    // the pictures extracted from the scene's videos
+    const frame = /^\/__media\/(\d+)\/(\d{6}\.jpg)$/.exec(pathname);
+    if (frame) {
+      const video = media.find((m) => m.index === Number(frame[1])), file = video ? path.join(video.dir, frame[2]) : '';
+      if (!video || !fs.existsSync(file)) { response.writeHead(404).end(); return; }
+      response.writeHead(200, { 'content-type': 'image/jpeg' });
+      fs.createReadStream(file).pipe(response);
+      return;
+    }
     // the project's own fonts and pictures, by the same /assets/ path the document uses
     const shared = pathname.startsWith('/assets/') && isAssetFile(pathname.slice(1)) ? path.resolve(projectDir, pathname.slice(1)) : null;
     const file = shared ?? path.resolve(root, pathname === '/' ? 'index.html' : pathname.replace(/^\/+/, ''));
     if (!file.startsWith((shared ? path.resolve(projectDir, 'assets') : root) + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) { response.writeHead(404).end(); return; }
     response.writeHead(200, { 'content-type': mimeOf(file) });
-    if (/.html?$/i.test(file)) response.end(injectCss(fs.readFileSync(file, 'utf8'), css));
+    if (/\.html?$/i.test(file)) response.end(injectCss(annotateVideos(fs.readFileSync(file, 'utf8'), media), css));
     else fs.createReadStream(file).pipe(response);
   });
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -160,18 +184,38 @@ export async function serveScene(root: string, css: string, projectDir: string) 
 /** the pinned @hyperframes/engine, driven by seek capture (its higher-level render freezes custom-seek scenes) */
 export const engineCapture: SceneCapturer = async ({ dir, entry, size, fps, frames, out, css, projectDir, params }) => {
   const engine = await import('@hyperframes/engine').catch(() => { throw new Error('web scenes need @hyperframes/engine, which is not installed (npm install)'); });
-  const served = await serveScene(dir, css, projectDir);
-  let session;
+  // the videos of the page, extracted to pictures at the scene's rate; removed when the capture is done
+  const entryFile = path.join(dir, entry), extractDir = `${out}.media`;
+  const videos = fs.existsSync(entryFile) ? scanSceneMedia(fs.readFileSync(entryFile, 'utf8'), path.relative(projectDir, dir).split(path.sep).join('/')).filter((m) => m.tag === 'video') : [];
+  const extracted: ServedVideo[] = [];
   try {
-    session = await engine.createCaptureSession(served.url + (entry === 'index.html' ? '' : entry), out, { width: size[0], height: size[1], fps: { num: fps, den: 1 }, format: 'png', transparent: true }, null, CHROME ? { chromePath: CHROME } : {});
-    await engine.initializeSession(session);
-    for (let frame = 0; frame < frames; frame++) {
-      // the parameters of this instant first: the engine's own seek then draws with them
-      if (params) await session.page.evaluate((values) => (window as unknown as { __hf: { setParams(v: unknown): void } }).__hf.setParams(values), params[frame]);
-      await engine.captureFrame(session, frame, frame / fps);
+    for (const video of videos) {
+      const target = path.join(extractDir, String(video.index));
+      extracted.push({ index: video.index, dir: target, count: await extractFrames(path.join(projectDir, video.path), fps, target), fps });
+    }
+    const served = await serveScene(dir, css, projectDir, extracted);
+    let session;
+    try {
+      session = await engine.createCaptureSession(served.url + (entry === 'index.html' ? '' : entry), out, { width: size[0], height: size[1], fps: { num: fps, den: 1 }, format: 'png', transparent: true }, null, CHROME ? { chromePath: CHROME } : {});
+      await engine.initializeSession(session);
+      for (let frame = 0; frame < frames; frame++) {
+        // the parameters of this instant first, and the pictures of its videos (which arrive after the
+        // seek asks for them): the engine's own seek then draws with them
+        if (params || extracted.length) {
+          await session.page.evaluate(async (values, time) => {
+            const hf = (window as unknown as { __hf: { setParams(v: unknown): void; seek(t: number): void; ready(): Promise<void> } }).__hf;
+            if (values) hf.setParams(values);
+            hf.seek(time);
+            await hf.ready();
+          }, params ? params[frame] : null, frame / fps);
+        }
+        await engine.captureFrame(session, frame, frame / fps);
+      }
+    } finally {
+      if (session) await engine.closeCaptureSession(session);
+      await served.close();
     }
   } finally {
-    if (session) await engine.closeCaptureSession(session);
-    await served.close();
+    fs.rmSync(extractDir, { recursive: true, force: true });
   }
 };
