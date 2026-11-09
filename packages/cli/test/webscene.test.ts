@@ -3,7 +3,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { newProject } from '@tramme/project';
-import { assetsUsedBy, fontFaceCss, injectCss, prepareWebScenes, sceneKey, tokenCss, type SceneCapturer } from '../src/webscene.ts';
+import { fontFaceCss, injectCss, tokenCss } from '@tramme/project';
+import { assetsUsedBy, prepareWebScenes, sceneKey, type SceneCapturer } from '../src/webscene.ts';
 
 const dirs: string[] = [];
 afterEach(() => { for (const dir of dirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true }); });

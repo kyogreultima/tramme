@@ -8,7 +8,7 @@ import http from 'node:http';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { mimeOf, SceneSchema } from '@tramme/project';
+import { fontFaceCss, injectCss, isAssetFile, mimeOf, SceneSchema, tokenCss } from '@tramme/project';
 import { CHROME } from './browser.ts';
 import { Evaluator, sceneParams, type Registry, type TrammeDoc } from '@tramme/core';
 import { builtinRegistry } from '@tramme/nodes';
@@ -21,49 +21,7 @@ export type SceneCapturer = (job: { dir: string; entry: string; size: [number, n
 export const FRAME_PATTERN = /^frame_\d{5,}\.png$/;
 const CACHE = 'renders/webscene';
 
-const NUMBER = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n);
-const SAFE_CSS = /^[^;{}<>\\\n]{1,200}$/;
-
-/** the project's tokens as CSS custom properties (--name), so a scene draws with the project's palette, curves and numbers; a value that is not plain data is left out */
-export function tokenCss(tokens: TrammeDoc['tokens'] | undefined): string {
-  const lines: string[] = [];
-  for (const [name, token] of Object.entries(tokens ?? {}).sort(([a], [b]) => (a < b ? -1 : 1))) {
-    if (!/^[a-zA-Z_][a-zA-Z0-9_-]{0,63}$/.test(name)) continue;
-    const v = token.value;
-    let css: string | null = null;
-    if (token.type === 'color' && typeof v === 'string' && SAFE_CSS.test(v)) css = v;
-    else if (token.type === 'number' && NUMBER(v)) css = String(v);
-    else if (token.type === 'string' && typeof v === 'string' && v.length <= 200) css = JSON.stringify(v).replaceAll('<', '\\3c ');
-    else if (token.type === 'ease' && Array.isArray(v) && v.length === 4 && v.every(NUMBER)) css = `cubic-bezier(${v.join(', ')})`;
-    else if (token.type === 'vec2' && Array.isArray(v) && v.length === 2 && v.every(NUMBER)) css = v.join(' ');
-    if (css !== null) lines.push(`  --${name}: ${css};`);
-  }
-  return lines.length ? `:root {\n${lines.join('\n')}\n}` : '';
-}
-
-/** the scene's HTML with the token style first in its head (or at its start), so the scene's own styles can read and override it */
-export function injectCss(html: string, css: string): string {
-  if (!css) return html;
-  const style = `<style id="tramme-tokens">${css}</style>`;
-  const head = /<head[^>]*>/i.exec(html);
-  return head ? html.slice(0, head.index + head[0].length) + style + html.slice(head.index + head[0].length) : style + html;
-}
-
 const FILE_URL = /\/assets\/[A-Za-z0-9_%.\-/]+\.[A-Za-z0-9]{2,5}/g;
-const isAssetFile = (file: string) => file.startsWith('assets/') && !file.split('/').some((part) => part === '' || part === '.' || part === '..') && !/[\\:]/.test(file);
-
-/** @font-face rules for the document's font assets, served from the project's /assets/ */
-export function fontFaceCss(assets: TrammeDoc['assets'] | undefined): string {
-  const rules: string[] = [];
-  for (const asset of Object.values(assets ?? {})) {
-    if (asset.type !== 'font' || !asset.family || !/^[\w .-]{1,64}$/.test(asset.family) || !isAssetFile(asset.src)) continue;
-    const weight = asset.weight && /^\d{1,4}( \d{1,4})?$/.test(asset.weight) ? asset.weight : '400';
-    const style = asset.style === 'italic' ? 'italic' : 'normal';
-    rules.push(`@font-face { font-family: "${asset.family}"; src: url("/${encodeURI(asset.src)}"); font-weight: ${weight}; font-style: ${style}; font-display: block; }`);
-  }
-  return rules.join('\n');
-}
-
 /** the project files a scene names as /assets/..., read from its text files, so the cache notices when one changes */
 export function assetsUsedBy(dir: string, fonts: string[] = []): string[] {
   const found = new Set(fonts.filter(isAssetFile));
@@ -146,7 +104,7 @@ export async function prepareWebScenes(file: string, doc: TrammeDoc, capture: Sc
     const params = Object.keys(declared).length
       ? Array.from({ length: frames }, (_, i) => evaluator.layerAt(layerId, i / fps, compId).props.$params as Record<string, number | string | boolean>)
       : null;
-    const key = sceneKey(dir, size, fps, `${css} ${params ? JSON.stringify(params) : ''}`, { projectDir, files: assetsUsedBy(dir, fontFiles) });
+    const key = sceneKey(dir, size, fps, `${css}|params|${params ? JSON.stringify(params) : ''}`, { projectDir, files: assetsUsedBy(dir, fontFiles) });
     let names = done.get(key);
     if (!names) {
       const out = path.join(projectDir, CACHE, key);
