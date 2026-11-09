@@ -10,34 +10,39 @@ import { api } from '../api.ts';
 import { addTagsOps, binsOf, normTag, setBinOps, tagsOf, type AssetFilter } from '../bins.ts';
 import { t } from '../i18n/index.ts';
 import { Icon } from './icons.tsx';
+import { pathIssue } from '@tramme/project';
 
 /** a bin or a tag being named for these media (set by the media's menu) */
 export const naming = signal<{ kind: 'bin' | 'tag'; ids: string[] } | null>(null);
 
 /** what is said in each transcribed clip, read once and kept (by the transcript's file) */
 const said = new Map<string, string>();
+let saidProject = '';
+const projectStamp = () => `${S.project.peek()?.id ?? ''}\n${S.docUrl.peek()}`;
 
 /** the words said in the clips, loaded while a search is typed: a clip's id gives its text once its transcript is read */
 export function useSpoken(doc: TrammeDoc, active: boolean): (id: string) => string | undefined {
   const [, bump] = useState(0);
+  const stamp = projectStamp();
+  if (saidProject !== stamp) { said.clear(); saidProject = stamp; }
   useEffect(() => {
     if (!active) return;
     let live = true;
     const project = S.project.peek()?.id;
     for (const id of Object.keys(doc.assets)) {
       const tr = doc.assets[transcriptIdOf(id)];
-      if (!tr || said.has(tr.src) || !project) continue;
+      if (!tr || said.has(tr.src) || !project || !tr.src.startsWith('assets/') || pathIssue(tr.src) || /[%#]/.test(tr.src)) continue;
       said.set(tr.src, '');
       api.readText(project, tr.src).then((r) => {
-        if (!r) return;
+        if (!r || !live || projectStamp() !== stamp || saidProject !== stamp) return;
         const json = JSON.parse(r.text);
         said.set(tr.src, isTranscript(json) ? transcriptText(json) : '');
-        if (live) bump((n) => n + 1);
+        bump((n) => n + 1);
       }).catch(() => { /* a transcript that cannot be read is not searched */ });
     }
     return () => { live = false; };
-  }, [doc.assets, active]);
-  return (id) => { const tr = doc.assets[transcriptIdOf(id)]; return tr ? said.get(tr.src) || undefined : undefined; };
+  }, [doc.assets, active, stamp]);
+  return (id) => { if (projectStamp() !== stamp) return undefined; const tr = doc.assets[transcriptIdOf(id)]; return tr ? said.get(tr.src) || undefined : undefined; };
 }
 
 export function MediaBar({ doc, filter, onChange }: { doc: TrammeDoc; filter: AssetFilter; onChange: (f: AssetFilter) => void }) {
