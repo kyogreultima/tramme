@@ -79,6 +79,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 - Creating an installed-plugin backup now stops before compressing too many files or bytes.
 - Creating a plugin package now checks its file paths and size limits before compression.
 - Installed plugins now skip oversized stored modules, and library reads stop when a file exceeds its limit.
+- Plugin companion data now has file-count and byte limits, with reliable encoding for larger binary files.
 
 - The editor's common project file URLs and multipart uploads now reject invalid format paths before requests.
 - LLM provider routes now reject malformed encoded provider names with HTTP 400.

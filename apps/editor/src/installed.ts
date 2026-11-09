@@ -138,12 +138,41 @@ async function removeFile(name: string): Promise<void> {
 }
 
 /** a plugin's own files as a module of data (so every storage, made for modules, keeps them) */
-const filesModule = (files: Map<string, Uint8Array>) => `// the files of a plugin's package, kept beside it by tramme\nexport const files = ${JSON.stringify(Object.fromEntries([...files].map(([k, v]) => [k, btoa(String.fromCharCode(...v))])))};\n`;
-function filesOf(code: string): Map<string, Uint8Array> {
+const filePath = (path: string) => !!path && path.length <= 512 && !path.startsWith('/') &&
+  !/[\\%?#:\u0000-\u001f\u007f]/.test(path) && path.split('/').every((part) => !!part && part !== '.' && part !== '..');
+const PLUGIN_FILES_LIMIT = 128 * 1024 * 1024;
+export function filesModule(files: Map<string, Uint8Array>): string {
+  if (files.size > 2000) throw new Error('plugin has too many files');
+  let total = 0;
+  const encoded: Record<string, string> = Object.create(null);
+  for (const [path, bytes] of files) {
+    if (!filePath(path)) throw new Error(`invalid plugin file path: ${path}`);
+    total += bytes.byteLength;
+    if (total > PLUGIN_FILES_LIMIT) throw new Error('plugin files too large');
+    let binary = '';
+    for (let i = 0; i < bytes.length; i += 8192) binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
+    encoded[path] = btoa(binary);
+  }
+  const source = `// the files of a plugin's package, kept beside it by tramme\nexport const files = ${JSON.stringify(encoded)};\n`;
+  if (source.length > LIMITS.file) throw new Error('plugin files too large');
+  return source;
+}
+export function filesOf(code: string): Map<string, Uint8Array> {
   const m = /export const files = (\{[\s\S]*\});/.exec(code);
   if (!m) return new Map();
-  const o = JSON.parse(m[1]) as Record<string, string>;
-  return new Map(Object.entries(o).map(([k, b]) => [k, Uint8Array.from(atob(b), (c) => c.charCodeAt(0))]));
+  const parsed: unknown = JSON.parse(m[1]);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('invalid plugin files');
+  const entries = Object.entries(parsed);
+  if (entries.length > 2000) throw new Error('plugin has too many files');
+  let total = 0;
+  const files = new Map<string, Uint8Array>();
+  for (const [path, value] of entries) {
+    if (!filePath(path) || typeof value !== 'string') throw new Error(`invalid plugin file path: ${path}`);
+    total += Math.floor(value.length * 3 / 4);
+    if (total > PLUGIN_FILES_LIMIT) throw new Error('plugin files too large');
+    files.set(path, Uint8Array.from(atob(value), (c) => c.charCodeAt(0)));
+  }
+  return files;
 }
 
 /** a file of the library that is data, not a plugin: a component or a reference */

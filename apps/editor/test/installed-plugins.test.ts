@@ -9,7 +9,7 @@ import { Registry, type PluginModule, type TrammeDoc } from '@tramme/core';
 import { connectHost } from '../src/plugins/host.ts';
 import { startWorkerSide } from '../src/plugins/worker-side.ts';
 import { attachInstalled } from '../src/plugins/vocabulary.ts';
-import { candidateOf, copiesFor, counted, installedTypes, offIn, permitted, refreshInstalled, restoreBackup, sandboxedDoc, stopped, storageKind, STRIKES, typesOf, type Installed } from '../src/installed.ts';
+import { candidateOf, copiesFor, counted, filesModule, filesOf, installedTypes, offIn, permitted, refreshInstalled, restoreBackup, sandboxedDoc, stopped, storageKind, STRIKES, typesOf, type Installed } from '../src/installed.ts';
 import { api } from '../src/api.ts';
 import { prefs } from '../src/settings.ts';
 import type { ToolContext } from '@tramme/core';
@@ -35,6 +35,16 @@ const plugin = (over: Partial<Installed> = {}): Installed => ({
 });
 
 describe('installed plugins in a project', () => {
+  it('bounds companion files and encodes large binary data without argument overflow', () => {
+    const bytes = new Uint8Array(100_000).fill(42);
+    expect(filesOf(filesModule(new Map([['fonts/large.woff2', bytes]]))).get('fonts/large.woff2')).toEqual(bytes);
+    expect(() => filesModule(new Map([['../private', bytes]]))).toThrow('invalid plugin file path');
+    expect(() => filesOf('export const files = {"../private":"Kg=="};')).toThrow('invalid plugin file path');
+    const many = new Map(Array.from({ length: 2001 }, (_, i) => [`data/${i}.txt`, new Uint8Array([1])] as const));
+    expect(() => filesModule(many)).toThrow('plugin has too many files');
+    const large = new Uint8Array(65 * 1024 * 1024);
+    expect(() => filesModule(new Map([['a.bin', large], ['b.bin', large]]))).toThrow('plugin files too large');
+  });
   it('skips an oversized stored plugin before reading it', async () => {
     const before = storageKind.peek();
     storageKind.value = 'server';
