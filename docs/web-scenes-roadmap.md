@@ -114,6 +114,7 @@ Browser limit (2026-11-07): a visual export containing a `webscene` now stops wi
 Missing capture failure (2026-11-07): the built-in `webscene` node now throws a named error when its frame list is empty or its capture frame rate is invalid, instead of silently exporting a blank layer. Ordinary capture preparation in CLI and desktop remains step 3 and step 9 work.
 
 - [ ] CLI and desktop first (Chrome sidecar on desktop).
+Desktop decision (2026-11-09): the CLI half is done. The desktop half waits for a build machine: a Tauri sidecar that carries Node, the bundled CLI, the pinned engine, ffmpeg and esbuild's binary, uses the machine's Chrome or Edge, and is started by an Export button on the project's folder (`Documents/Tramme/<project>`). It changes what the installer ships and can only be checked with a full Tauri build on a clean machine, so it is not started. Until then the desktop app says it cannot export web scenes and points to `tramme render`.
 - [x] Web editor: export reserved to desktop and CLI, written in Known limits, with a clear message where a web scene is exported from the web editor. Decided (2026-11-05): no rendering service for now, which would be a server to run; one can be added later if wanted.
 Web editor message (2026-11-09): the browser's refusal now tells the user to export with `tramme render`, and Known limits says web scenes export from the command line and not yet from the desktop app. The first box (desktop, Chrome sidecar) stays open.
 
