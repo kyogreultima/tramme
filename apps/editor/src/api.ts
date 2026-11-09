@@ -6,7 +6,7 @@
 // the keys of the system keychain put back by the app (tauri.ts).
 
 import type { TrammeDoc, Op } from '@tramme/core';
-import { isMedia, LIMITS, type Manifest } from '@tramme/project';
+import { isMedia, LIMITS, pathIssue, type Manifest } from '@tramme/project';
 import type { KeyedProvider, KeyStatus, Voice } from '@tramme/api';
 import type { Usage } from '@tramme/assistant';
 export type { Voice };
@@ -128,7 +128,11 @@ async function call<T>(path: string, init?: RequestInit, go: typeof reach = fetc
 
 const jsonInit = (method: string, body: unknown): RequestInit => ({ method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
 const P = (id: string) => `/api/projects/${encodeURIComponent(id)}`;
-const filePath = (path: string) => path.split('/').map(encodeURIComponent).join('/');
+const filePath = (path: string) => {
+  const bad = pathIssue(path);
+  if (bad) throw new Error(`${path}: ${bad}`);
+  return path.split('/').map(encodeURIComponent).join('/');
+};
 
 export const api = {
   /** what the server offers; in personal mode and in the desktop app, what is connected comes from where the keys are */
@@ -233,6 +237,7 @@ export const api = {
    * parts sent three at a time (R2 multipart). Progress in bytes.
    */
   async writeAny(id: string, path: string, blob: Blob, onProgress?: (sent: number, total: number) => void): Promise<{ path: string; size: number; etag: string; modified: string }> {
+    filePath(path);
     if (blob.size <= LIMITS.file || !isMedia(path)) {
       const r = await api.write(id, path, blob);
       onProgress?.(blob.size, blob.size);

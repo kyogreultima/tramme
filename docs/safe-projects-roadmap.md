@@ -194,6 +194,8 @@ Library name encoding (2026-11-09): plugin and sound library names now decode on
 
 Provider name encoding (2026-11-09): the LLM route now refuses a malformed encoded provider segment with HTTP 400 before selecting a provider or making any upstream request. A route test confirms no provider fetch. Provider grants and other API capabilities remain under step 3.
 
+Editor file URL guard (2026-11-09): the editor's common file URL builder and multipart upload entry now reject paths outside the project format before issuing a request. A focused test covers read, write and upload refusals for parent traversal and URL-like paths while preserving document, chat and version files. The server still validates paths independently; cross-project and document-supplied URLs remain under step 3.
+
 Vector and CLI checks (2026-11-07): isolated browser SVG/Lottie export now reports that expression-bearing projects need raster export. CLI `export`, `check-export` and `check` refuse such expressions before native vector conversion or picture checks. Tests exercise all three CLI commands and the browser export's early refusal. Worker-backed vector values and checks remain open.
 
 Editor module transfer (2026-11-07): when isolated preview is enabled, the editor's preview, stills, raster export and thumbnail now load every project module through the bounded opaque host before drawing. This includes Free code modules that are not listed as plugins. Reloads and document changes refresh the worker's module list. The editor setting is still opt-in, and browser coverage of these paths remains before step 2 can close.
