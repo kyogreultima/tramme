@@ -11,18 +11,19 @@ import { hasSound, mediaDuration } from '../../perception.ts';
 import { clipFromRange, mediaOf } from '../../subclips.ts';
 import { nestOps, newSequenceOps, placeClipOps, type Placement } from './place-ops.ts';
 import { projectAssetUrl } from '../../project-asset-url.ts';
-
-/** the file of an asset as the browser reads it */
-const urlOf = (a: Asset) => projectAssetUrl(a.src, S.docUrl.peek());
+import { fileProject, sameFileProject } from '../../files.ts';
 
 /** what the preview must know of an asset to put it on a track: its layer, whether it has a sound, how long a sound is */
 async function placementOf(assetId: string, a: Asset, range?: [number, number]): Promise<Placement | null> {
+  const project = fileProject(), compId = S.compId.peek();
   const media = mediaOf(S.doc.peek(), assetId);
   const built = await assetLayer(range ? media : assetId, range ? S.doc.peek().assets[media] : a);
   if (!built) return null;
+  if (!sameFileProject(project) || S.compId.peek() !== compId) return null;
   const layer: Layer = range ? clipFromRange(built.layer, range[0], range[1]) : built.layer;
-  const withSound = a.type === 'video' && await hasSound(urlOf(a));
-  const length = a.type === 'audio' && layer.out === undefined ? (await mediaDuration(urlOf(a))) || undefined : undefined;
+  const withSound = a.type === 'video' && await hasSound(projectAssetUrl(a.src, project.docUrl));
+  const length = a.type === 'audio' && layer.out === undefined ? (await mediaDuration(projectAssetUrl(a.src, project.docUrl))) || undefined : undefined;
+  if (!sameFileProject(project) || S.compId.peek() !== compId) return null;
   return { layer, withSound, length };
 }
 

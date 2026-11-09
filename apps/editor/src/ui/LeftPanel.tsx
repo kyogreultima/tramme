@@ -118,13 +118,15 @@ export function insertLayer(layer: Layer, base?: string, extra: Op[] = []) {
  * long as its file, and the composition lengthens to hold it (one undo step).
  */
 export async function layerFromAsset(id: string, a: Asset) {
+  const project = fileProject(), compId = S.compId.peek();
   const built = await assetLayer(id, a);
+  if (!sameFileProject(project) || S.compId.peek() !== compId) { toast(t('common.projectChangedDuringFile'), 'error'); return; }
   if (built) insertLayer(built.layer, id, built.ops);
 }
 
 /** the layer an asset becomes, and what must change with it (a video's composition lengthened to hold it); null for an asset that is no layer */
 export async function assetLayer(id: string, a: Asset): Promise<{ layer: Layer; ops: Op[] } | null> {
-  const doc = S.doc.peek(), compId = S.compId.peek(), reg = S.registry.peek();
+  const project = fileProject(), doc = S.doc.peek(), compId = S.compId.peek(), reg = S.registry.peek();
   // a sub-clip plays its media from the start of its range, as long as the range: nothing to read in the file
   if (a.of !== undefined && a.range && (a.type === 'video' || a.type === 'audio')) {
     const l = newLayer(doc, compId, reg.node(a.type), { name: a.name || id });
@@ -134,9 +136,10 @@ export async function assetLayer(id: string, a: Asset): Promise<{ layer: Layer; 
   if (a.type === 'image') return { layer: newLayer(doc, compId, reg.node('image'), { name: a.name || id, props: { image: id, size: [600, 600], fit: 'contain' } }), ops: [] };
   if (a.type === 'audio') return { layer: newLayer(doc, compId, reg.node('audio'), { name: a.name || id, props: { audio: id } }), ops: [] };
   if (a.type === 'video') {
-    const length = await mediaDuration(projectAssetUrl(a.src, S.docUrl.peek()));
-    const l = newLayer(S.doc.peek(), compId, reg.node('video'), { name: a.name || id });
-    return wholeFile(S.doc.peek(), compId, { ...l, props: { ...l.props, video: id } }, length);
+    const length = await mediaDuration(projectAssetUrl(a.src, project.docUrl));
+    if (!sameFileProject(project) || S.compId.peek() !== compId) return null;
+    const l = newLayer(doc, compId, reg.node('video'), { name: a.name || id });
+    return wholeFile(doc, compId, { ...l, props: { ...l.props, video: id } }, length);
   }
   if (a.type === 'model' && reg.hasNode('model.3d')) { const l = newLayer(doc, compId, reg.node('model.3d'), { name: a.name || id }); return { layer: { ...l, props: { ...l.props, source: id } }, ops: [] }; }
   return null;

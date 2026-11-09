@@ -15,6 +15,7 @@ import { placeRange } from './timeline/place.ts';
 import { sourceOpen } from './timeline/assets-drag.ts';
 import { defaultTrackOf } from './timeline/tracks.ts';
 import { projectAssetUrl } from '../project-asset-url.ts';
+import { fileProject, sameFileProject } from '../files.ts';
 
 export function SourceMonitor() {
   const id = sourceOpen.value;
@@ -41,7 +42,9 @@ export function SourceMonitor() {
   };
   const addLayer = async () => {
     if (!range) return asked();
+    const project = fileProject(), compId = S.compId.peek();
     const built = await assetLayer(media, file);
+    if (!sameFileProject(project) || S.compId.peek() !== compId) { toast(t('common.projectChangedDuringFile'), 'error'); return; }
     if (built) insertLayer(clipFromRange(built.layer, range[0], range[1]), media, built.ops);
   };
   const save = (name: string) => {
