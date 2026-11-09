@@ -71,6 +71,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Fixed
 
+- The Direction panel now discards delayed project reads and brief writes after navigation, and validates image paths.
 - Media search no longer reuses transcript words across projects with the same file path.
 - Media placement now discards delayed duration and sound probes after a project or composition switch.
 - Timeline sound sync now discards results returned after the open project or composition changes.
