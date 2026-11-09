@@ -380,14 +380,19 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
       if (bad || /[%#]/.test(path)) throw new Error(`${path}: ${bad ?? 'invalid project path'}`);
       return path;
     };
+    const assetPath = (path: string) => {
+      projectPath(path);
+      if (!path.startsWith('assets/')) throw new Error(`${path}: tools can read project assets only`);
+      return path;
+    };
     return {
       doc, compId, registry,
       time: S.time.peek(),
       selection: S.selection.peek().filter((id) => doc.compositions[compId].layers[id]),
-      assetUrl: (id) => { current(); const a = doc.assets[id]; if (!a) throw new Error(`unknown asset: ${id}`); return urlOf(a.src); },
-      readText: async (path) => { const value = await readProjectText(projectId, projectPath(path)); current(); return value; },
-      files: async () => { current(); const value = (await api.info(projectId)).files.map(({ path, size }) => ({ path, size })); current(); return value; },
-      fileUrl: (path) => urlOf(projectPath(path)),
+      assetUrl: (id) => { current(); const a = doc.assets[id]; if (!a) throw new Error(`unknown asset: ${id}`); const url = urlOf(a.src); assetPath(a.src); return url; },
+      readText: async (path) => { const value = await readProjectText(projectId, assetPath(path)); current(); return value; },
+      files: async () => { current(); const value = (await api.info(projectId)).files.filter(({ path }) => path.startsWith('assets/') && !pathIssue(path) && !/[%#]/.test(path)).map(({ path, size }) => ({ path, size })); current(); return value; },
+      fileUrl: (path) => urlOf(assetPath(path)),
       writeFile: async (path, data) => {
         current();
         const bad = pathIssue(path) ?? (path.includes('%') ? 'invalid project path' : null);

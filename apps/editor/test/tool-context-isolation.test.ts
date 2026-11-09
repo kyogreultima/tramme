@@ -3,12 +3,44 @@ import { describe, expect, it, vi } from 'vitest';
 import { newProject } from '@tramme/project';
 import { builtinRegistry } from '@tramme/nodes';
 import { Registry, type ToolContext, type TrammeDoc } from '@tramme/core';
+import { api } from '../src/api.ts';
 
 await import('../src/ai/index.ts');
 const { ToolRunner } = await import('../src/ai/tools.ts');
 const { S } = await import('../src/state.ts');
 
 describe('tool project boundary', () => {
+  it('gives a plugin only asset files, not project conversations or metadata', async () => {
+    const project = newProject({ name: 'First', width: 64, height: 64, fps: 30, duration: 1 });
+    const previous = { project: S.project.peek(), docUrl: S.docUrl.peek() };
+    const fetch = vi.fn(async () => new Response('asset text'));
+    vi.stubGlobal('fetch', fetch);
+    const info = vi.spyOn(api, 'info').mockResolvedValue({ files: [
+      { path: 'assets/notes.json', size: 10 },
+      { path: '.tramme/chats/index.json', size: 20 },
+      { path: 'document.tramme.json', size: 30 },
+    ] } as Awaited<ReturnType<typeof api.info>>);
+    const runner = new ToolRunner();
+    try {
+      S.project.value = project.manifest;
+      S.docUrl.value = 'https://tramme.test/projects/first/document.tramme.json';
+      const doc = { ...project.doc, assets: { private: { type: 'image', src: '.tramme/chats/index.json' } } } as TrammeDoc;
+      const context = (runner as unknown as { toolContext(doc: TrammeDoc, registry: Registry): ToolContext }).toolContext(doc, builtinRegistry());
+      expect(await context.files()).toEqual([{ path: 'assets/notes.json', size: 10 }]);
+      await expect(context.readText('.tramme/chats/index.json')).rejects.toThrow('assets only');
+      expect(() => context.fileUrl('document.tramme.json')).toThrow('assets only');
+      expect(() => context.assetUrl('private')).toThrow('assets only');
+      expect(fetch).not.toHaveBeenCalled();
+      expect(await context.readText('assets/notes.json')).toBe('asset text');
+    } finally {
+      runner.dispose();
+      info.mockRestore();
+      S.project.value = previous.project;
+      S.docUrl.value = previous.docUrl;
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('refuses a worker capability after the open project changes', async () => {
     const first = newProject({ name: 'First', width: 64, height: 64, fps: 30, duration: 1 });
     const second = newProject({ name: 'Second', width: 64, height: 64, fps: 30, duration: 1 });
