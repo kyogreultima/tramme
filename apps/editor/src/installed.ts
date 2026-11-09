@@ -285,7 +285,7 @@ export function permitted(ctx: ToolContext, p: Installed): ToolContext {
         if (PROVIDER_ROUTES.includes(route) && providers.includes(route)) return reach(u.pathname + u.search, init as RequestInit);
         throw new Error(`${name} did not declare the provider route "${route}" (meta.permissions.providers)`);
       }
-      if (origins.includes(u.origin)) return fetch(u.href, { ...(init as RequestInit), credentials: 'omit' });
+      if (origins.includes(u.origin)) return fetch(u.href, { ...(init as RequestInit), credentials: 'omit', redirect: 'error' });
       throw new Error(`${name} did not declare ${u.origin} (meta.permissions.network)`);
     },
     writeFile: (path, data) => (write(path) ? ctx.writeFile(path, data) : Promise.reject(new Error(`${name} writes under assets/ and the paths it declared only (meta.permissions.files), not ${path}`))),

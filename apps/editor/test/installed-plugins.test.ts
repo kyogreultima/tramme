@@ -150,6 +150,11 @@ describe('installed plugins in a project', () => {
     await expect(c.fetch!('https://elsewhere.test/x')).rejects.toThrow(/did not declare https:\/\/elsewhere.test/);
     await expect(c.fetch!('/api/claude/messages')).rejects.toThrow(/provider route "claude"/);
     await expect(permitted(ctx, plugin()).fetch!('https://api.example.com/')).rejects.toThrow(/meta.permissions.network/);
+    const network = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('ok'));
+    try {
+      await c.fetch!('https://api.example.com/forecast', { redirect: 'follow', credentials: 'include' } as never);
+      expect(network).toHaveBeenCalledWith('https://api.example.com/forecast', expect.objectContaining({ redirect: 'error', credentials: 'omit' }));
+    } finally { network.mockRestore(); }
 
     const stops: string[] = [];
     const fail = () => counted(p, () => Promise.reject(new Error('boom')), (x) => stops.push(x.manifest.name));

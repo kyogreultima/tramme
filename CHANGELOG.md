@@ -82,6 +82,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 - Plugin companion data now has file-count and byte limits, with reliable encoding for larger binary files.
 - Plugin packages now refuse encoded or URL-like data paths before their files are copied into a project.
 - Plugin backups now refuse unsafe installed-plugin names before creating an archive.
+- Installed plugins can no longer follow a network redirect outside an approved origin.
 
 - The editor's common project file URLs and multipart uploads now reject invalid format paths before requests.
 - LLM provider routes now reject malformed encoded provider names with HTTP 400.
