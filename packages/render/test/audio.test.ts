@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest';
 import { audioClips, type AudioClip, type TrammeDoc } from '@tramme/core';
 import { newProject } from '@tramme/project';
-import { clipChain } from '../src/audio.ts';
+import { audioEffectChain, clipChain } from '../src/audio.ts';
 
 const withSound = (sound: Record<string, unknown>): TrammeDoc => {
   const { doc } = newProject({ name: 'T', width: 100, height: 100, fps: 30, duration: 2 });
@@ -63,6 +63,15 @@ const clip = (sound: Partial<AudioClip>): AudioClip => ({
 });
 
 describe('clipChain', () => {
+  it('honours positive track-cut frequencies and treats zero as a disabled filter', () => {
+    for (const kind of ['lowCut', 'highCut'] as const) {
+      const positive = mockCtx(), zero = mockCtx(), out = { connect: () => {} } as never;
+      audioEffectChain(positive.ctx, [{ kind, frequency: 1 }], out);
+      expect(positive.filters[0].frequency.value).toBe(1);
+      expect(audioEffectChain(zero.ctx, [{ kind, frequency: 0 }], out)).toBe(out);
+      expect(zero.filters).toHaveLength(0);
+    }
+  });
   it('pans a clip that has a pan, and builds no panner for a centred one', () => {
     const centred = mockCtx();
     clipChain(centred.ctx, clip({}), { connect: () => {} } as never, 0, 0);

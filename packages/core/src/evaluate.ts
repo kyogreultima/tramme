@@ -5,7 +5,7 @@
 // cycles are reported and the editor can show what drives what. Static
 // properties are cached across frames.
 
-import { componentOf, distributionCount, instanceProps, isPaletteRule, layoutBatch, paletteColor, paramDef, styleProps, type Instance, type Placement } from './components.ts';
+import { componentOf, distributionCount, sceneParamDef, sceneParams, instanceProps, isPaletteRule, layoutBatch, paletteColor, paramDef, styleProps, type Instance, type Placement } from './components.ts';
 import { applyMat, invertMat, layerMatrix } from './math.ts';
 import { audioReader, type AudioReader } from './analysis.ts';
 import { eventsReader, type EventsReader } from './events.ts';
@@ -113,12 +113,15 @@ export function nestedTime(p: NestedTiming, t: number, layerIn: number, duration
 export interface EvaluatorOptions {
   /** the loaded content of a JSON asset (analyses), when the caller has it: the renderer does */
   data?(assetId: string): unknown;
+  /** false on a trusted page that mirrors an isolated project's values */
+  allowExpressions?: boolean;
 }
 
 export class Evaluator {
   readonly doc: TrammeDoc;
   readonly registry: Registry;
   private data?: (assetId: string) => unknown;
+  private allowExpressions: boolean;
   /** address -> addresses it read, from the last evaluations */
   readonly deps = new Map<string, Set<string>>();
   /** fixed values, by composition then address */
@@ -128,6 +131,7 @@ export class Evaluator {
     this.doc = doc;
     this.registry = registry;
     this.data = opts.data;
+    this.allowExpressions = opts.allowExpressions ?? true;
   }
 
   /**
@@ -257,6 +261,12 @@ export class Evaluator {
       if (!def.integral) continue;
       const elapsed = this.integralOf(ctx, id, name);
       if (elapsed !== null) props[def.integral] = elapsed;
+    }
+    // a web scene: its parameters at this instant (the value set, else the scene's default), for the capture to hand to the page
+    if (layer.type === 'webscene') {
+      const values: Record<string, unknown> = {};
+      for (const [name, p] of Object.entries(sceneParams(layer))) values[name] = layer.params?.[name] !== undefined ? this.read(ctx, `${id}.params.${name}`) : p.default;
+      props.$params = values;
     }
     // an instance of a component: how it reads it, for the node to draw it so
     const inner = componentOf(this.doc, layer);
@@ -428,8 +438,13 @@ export class Evaluator {
       if (mk && def) return { prop: mk.props?.[parts[3]], def };
       throw new EvalError(address, 'unknown mask or mask property');
     }
-    if (parts[1] === 'params') {
-      const p = parts.length === 3 ? componentOf(this.doc, layer)?.params?.[parts[2]] : undefined;
+    if (parts[1] === 'params' && parts.length === 3) {
+      if (layer.type === 'webscene') {
+        const s = sceneParams(layer)[parts[2]];
+        if (s) return { prop: layer.params?.[parts[2]], def: sceneParamDef(s, parts[2]) };
+        throw new EvalError(address, 'unknown parameter');
+      }
+      const p = componentOf(this.doc, layer)?.params?.[parts[2]];
       if (p) return { prop: layer.params?.[parts[2]], def: paramDef(p) };
       throw new EvalError(address, 'unknown parameter');
     }
@@ -598,6 +613,7 @@ export class Evaluator {
   }
 
   private runExpr(ctx: FrameCtx, address: string, src: string, value: unknown, def: PropDef, at?: { index: number; count: number; row: unknown }): unknown {
+    if (!this.allowExpressions) throw new EvalError(address, 'expression evaluation is isolated from this page');
     const { comp } = ctx;
     const tokens = this.doc.tokens;
     const [index, count] = at ? [at.index, at.count] : ctx.inst?.rank ?? (address[0] === '$' ? [0, 1] : this.rank(comp, address.split('.')[0]));

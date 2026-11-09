@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { applyOps, type Composition, type TrammeDoc } from '@tramme/core';
-import { addBusOps, faderMoveOps, trackBusOps, trackPanOps, trackVolumeOps } from '../src/ui/timeline/mixer.ts';
+import { applyOps, History, type AudioEffect, type Composition, type TrammeDoc } from '@tramme/core';
+import { addBusOps, addTrackEffectOps, addVolumeBlockOps, bypassTrackEffectOps, duckTrackOps, faderMoveOps, moveTrackEffectOps, removeTrackEffectOps, resizeVolumeBlockOps, setTrackEffectOps, trackBusOps, trackPanOps, trackVolumeOps } from '../src/ui/timeline/mixer.ts';
 
 const seq = (): Composition => ({
   name: 'Seq', kind: 'sequence', width: 640, height: 360, fps: 30, duration: 10, background: null,
@@ -9,6 +9,96 @@ const seq = (): Composition => ({
 });
 const doc = (c: Composition) => ({ schema: 'tramme/1', meta: { title: 't' }, tokens: {}, assets: {}, root: 'main', compositions: { main: c } }) as TrammeDoc;
 const run = (c: Composition, ops: ReturnType<typeof trackVolumeOps>) => applyOps(doc(c), ops).doc.compositions.main;
+
+describe('editable volume blocks', () => {
+  it('draws a four-keyframe dip on a sound track without replacing its fader', () => {
+    const c = seq(), initial = doc(c), history = new History(initial);
+    const ops = addVolumeBlockOps(c, 'main', 'A2', 3, 5, -12, 0.15, 0.5);
+    expect(ops).toHaveLength(1);
+    history.apply({ label: 'Volume dip', ops });
+    const track = history.doc.compositions.main.tracks![2];
+    expect(track.volume).toEqual(c.tracks![2].volume);
+    expect(track.volumeBlocks?.[0].keys).toEqual([{ t: 2.85, v: 0 }, { t: 3, v: -12 }, { t: 5, v: -12 }, { t: 5.5, v: 0 }]);
+    expect(history.undo()).toEqual(initial);
+  });
+
+  it('moves the same block as one object and refuses invalid ranges or locked tracks', () => {
+    const c = seq(), added = run(c, addVolumeBlockOps(c, 'main', 'A1', 3, 5, -10, 0.2, 0.4));
+    const block = added.tracks![1].volumeBlocks![0];
+    const changed = run(added, resizeVolumeBlockOps(added, 'main', 'A1', block.id, 4, 6, -14, 0.2, 0.4));
+    expect(changed.tracks![1].volumeBlocks?.[0].keys).toEqual([{ t: 3.8, v: 0 }, { t: 4, v: -14 }, { t: 6, v: -14 }, { t: 6.4, v: 0 }]);
+    expect(added.tracks![1].volumeBlocks?.[0].keys[1].v).toBe(-10);
+    expect(addVolumeBlockOps(c, 'main', 'A1', 5, 3, -12, 0.2, 0.4)).toEqual([]);
+    c.tracks![1].locked = true;
+    expect(addVolumeBlockOps(c, 'main', 'A1', 3, 5, -12, 0.2, 0.4)).toEqual([]);
+  });
+});
+
+it('marks an audio track to duck under another sound track, and can clear the link', () => {
+  const c = seq();
+  expect(run(c, duckTrackOps(c, 'main', 'A1', 'A2')).tracks![1].duckUnder).toBe('A2');
+  expect(duckTrackOps(c, 'main', 'A1', 'V1')).toEqual([]);
+  expect(duckTrackOps(c, 'main', 'A1', 'B1')).toEqual([]);
+  expect(duckTrackOps(c, 'main', 'A1', 'A1')).toEqual([]);
+  c.tracks![1].duckUnder = 'A2';
+  expect(run(c, duckTrackOps(c, 'main', 'A1', null)).tracks![1].duckUnder).toBeUndefined();
+});
+
+describe('an ordered track effect chain', () => {
+  const compressor: AudioEffect = { kind: 'compressor', amount: 0.5 };
+  const filter: AudioEffect = { kind: 'lowCut', frequency: 80 };
+  const chained = () => { const c = seq(); c.tracks![1].effects = [compressor, filter]; return c; };
+
+  it('adds at a chosen position and removes the last entry without keeping an empty field', () => {
+    const added = run(chained(), addTrackEffectOps(chained(), 'main', 'A1', { kind: 'reverb', wet: 0.2 }, 1));
+    expect(added.tracks![1].effects).toEqual([compressor, { kind: 'reverb', wet: 0.2 }, filter]);
+    const c = seq(); c.tracks![1].effects = [compressor];
+    expect(run(c, removeTrackEffectOps(c, 'main', 'A1', 0)).tracks![1].effects).toBeUndefined();
+  });
+
+  it('moves, bypasses and replaces only the addressed effect, without mutating the input', () => {
+    const c = chained();
+    expect(run(c, moveTrackEffectOps(c, 'main', 'A1', 0, 1)).tracks![1].effects).toEqual([filter, compressor]);
+    expect(run(c, bypassTrackEffectOps(c, 'main', 'A1', 1, true)).tracks![1].effects).toEqual([compressor, { ...filter, bypass: true }]);
+    expect(run(c, setTrackEffectOps(c, 'main', 'A1', 0, { kind: 'compressor', amount: 0.8 })).tracks![1].effects).toEqual([{ kind: 'compressor', amount: 0.8 }, filter]);
+    expect(c.tracks![1].effects).toEqual([compressor, filter]);
+  });
+
+  it('writes each action as one undoable entry, on a track or a bus', () => {
+    for (const track of ['A1', 'B1']) {
+      const c = chained();
+      const initial = doc(c), history = new History(initial);
+      history.apply({ label: 'Effect', ops: addTrackEffectOps(c, 'main', track, filter) });
+      expect(history.doc.compositions.main.tracks!.find((item) => item.id === track)!.effects).toEqual(track === 'A1' ? [compressor, filter, filter] : [filter]);
+      expect(history.undo()).toEqual(initial);
+    }
+    for (const ops of [
+      removeTrackEffectOps(chained(), 'main', 'A1', 0),
+      moveTrackEffectOps(chained(), 'main', 'A1', 0, 1),
+      bypassTrackEffectOps(chained(), 'main', 'A1', 0, true),
+      setTrackEffectOps(chained(), 'main', 'A1', 0, { kind: 'compressor', amount: 0.8 }),
+    ]) {
+      const initial = doc(chained()), history = new History(initial);
+      expect(ops).toHaveLength(1);
+      history.apply({ label: 'Effect', ops });
+      expect(history.undo()).toEqual(initial);
+    }
+  });
+
+  it('refuses invalid, missing and locked targets, and leaves no-op settings alone', () => {
+    const c = chained(); c.tracks![2].locked = true;
+    for (const track of ['V1', 'A2', 'gone']) expect(addTrackEffectOps(c, 'main', track, filter)).toEqual([]);
+    expect(addTrackEffectOps(c, 'main', 'A1', { kind: 'compressor', amount: 2 })).toEqual([]);
+    expect(addTrackEffectOps(c, 'main', 'A1', filter, 99)).toEqual([]);
+    expect(removeTrackEffectOps(c, 'main', 'A1', -1)).toEqual([]);
+    expect(moveTrackEffectOps(c, 'main', 'A1', 0, 99)).toEqual([]);
+    expect(setTrackEffectOps(c, 'main', 'A1', 0, compressor)).toEqual([]);
+    expect(bypassTrackEffectOps(c, 'main', 'A1', 0, false)).toEqual([]);
+    const same = chained();
+    same.tracks![1].effects![0] = { amount: 0.5, kind: 'compressor', bypass: false };
+    expect(setTrackEffectOps(same, 'main', 'A1', 0, compressor)).toEqual([]);
+  });
+});
 
 describe('a fader moved while the film plays', () => {
   it('is written as keyframes on the volume of the track, in one operation', () => {

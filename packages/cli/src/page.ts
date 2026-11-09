@@ -1,6 +1,6 @@
 // Runtime page driven by the CLI through Puppeteer: loads one document,
 // validates it, loads its assets and exposes window.TRAMME.
-//   /__tramme/?doc=/project/film.tramme.json[&comp=main][&sandbox=0]
+//   /__tramme/?doc=/project/film.tramme.json[&comp=main]
 // With plugins in the project, the whole frame is evaluated and drawn in the
 // plugin sandbox's worker (docs/evaluator-sandbox.md): the page ships the
 // document and each video asset's decoded frame, and one picture comes back.
@@ -8,30 +8,45 @@
 import type { TrammeDoc } from '@tramme/core';
 import { builtinRegistry } from '@tramme/nodes';
 import { addParts, encodeWav, formatParts, mixComposition, noParts, perFrame, Renderer, type FrameParts, type RenderOptions } from '@tramme/render';
-import { blitSandboxFrame, ensureDeclared, ensureSandboxDoc, pluginItemsOf, sandboxVideoFrames } from '../../../apps/editor/src/plugins/sandbox-draw.ts';
+import { blitSandboxFrame, declarationsModule, ensureDeclared, ensureSandboxDoc, sandboxDeclaration, sandboxVideoFrames } from '../../../apps/editor/src/plugins/sandbox-draw.ts';
 import { browserHost, type PluginHost } from '../../../apps/editor/src/plugins/host.ts';
+import { containsExpression } from '@tramme/project';
 
 const q = new URLSearchParams(location.search);
 const docUrl = new URL(q.get('doc') || '', location.href).href;
-const sandboxOn = q.get('sandbox') !== '0';
 let renderer: Renderer;
 let currentDoc: TrammeDoc | null = null;
 let sandbox: PluginHost | null = null;
+const needsIsolation = (doc: TrammeDoc) => Object.values(doc.assets).some((asset) => asset.type === 'module') || containsExpression(doc);
+const moduleItemsOf = (doc: TrammeDoc) => Object.entries(doc.assets).filter(([, asset]) => asset.type === 'module').map(([id, asset]) => ({ id, url: new URL(asset.src, docUrl).href }));
 
 async function init() {
   const r = await fetch(docUrl);
   if (!r.ok) throw new Error(`document not found: ${docUrl}`);
   currentDoc = (await r.json()) as TrammeDoc;
-  renderer = await Renderer.open(currentDoc, builtinRegistry(), docUrl, document.getElementById('out') as HTMLCanvasElement, { compId: q.get('comp') || currentDoc.root });
+  const isolated = needsIsolation(currentDoc);
+  if (isolated) {
+    sandbox = browserHost(docUrl);
+    await ensureDeclared(sandbox, moduleItemsOf(currentDoc));
+  }
+  renderer = await Renderer.open(currentDoc, builtinRegistry(), docUrl, document.getElementById('out') as HTMLCanvasElement, {
+    compId: q.get('comp') || currentDoc.root,
+    sandboxModules: isolated,
+    sandboxDeclarations: isolated ? (id) => {
+      const decl = sandboxDeclaration(id);
+      if (!decl) throw new Error(`plugin declaration missing: ${id}`);
+      return declarationsModule(decl, id);
+    } : undefined,
+  });
 }
 
-/** the sandbox host, when the document carries plugins and the flag is not off */
+/** the sandbox host whenever project code (plugins or expressions) can run */
 async function sandboxReady(): Promise<PluginHost | null> {
   const doc = currentDoc;
-  if (!sandboxOn || !doc || !(doc.plugins ?? []).length) return null;
+  if (!doc || !needsIsolation(doc)) return null;
   sandbox ??= browserHost(docUrl);
   // the document's plugins loaded in the worker first (a url it knows is not loaded again), as the editor does
-  await ensureDeclared(sandbox, pluginItemsOf(doc, docUrl));
+  await ensureDeclared(sandbox, moduleItemsOf(doc));
   ensureSandboxDoc(sandbox, {
     doc, docUrl,
     loaded: (id) => { try { return renderer.assets.get(id); } catch { return null; } },
@@ -73,8 +88,14 @@ const api = {
   },
   /** switch to another version of the document (validated, new assets loaded) */
   async load(doc: TrammeDoc, compId?: string) {
-    currentDoc = doc;
+    const isolated = needsIsolation(doc);
+    if (isolated !== renderer.sandboxModules) throw new Error('document isolation mode changed; open a new render page');
+    if (isolated) {
+      sandbox ??= browserHost(docUrl);
+      await ensureDeclared(sandbox, moduleItemsOf(doc));
+    }
     await renderer.setDoc(doc, { compId: compId || doc.root });
+    currentDoc = doc;
     return api.info();
   },
   /** PNG of one frame as a data URL; maxWidth scales it down (previews for the assistant) */

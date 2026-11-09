@@ -2,7 +2,7 @@
 
 How the assistant writes real web (HTML, CSS, JS, GSAP, Three.js) inside one layer of a film, with the freedom [HyperFrames](https://github.com/heygen-com/hyperframes) gives, and keeps what Tramme already has: a structured document, undo, takes to compare, and a correction that touches one part only.
 
-Status: **planned, not started.** Step 0 decides the rest. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
+Status: **in progress (22 open, 10 done).** Step 0's prototypes and step 1's format are complete. Step 2 has a static determinism linter, readable CLI checks and browser-tested seek adapters. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
 
 ## Why
 
@@ -19,7 +19,7 @@ The freedom goes in one layer, not in the whole format. Making HTML the source o
 
 ## What the test showed
 
-A scene with GSAP, flexbox, an animated SVG stroke, a CSS gradient and a rotation, rendered twice with `hyperframes@0.9.13` (`render --format png-sequence`, 1280x720, 30 fps, 90 frames): **90 of 90 frames identical byte for byte**, PNG with transparency, 16 to 20 s with one worker, Chrome start included. Not tested: Three.js, Lottie, `<video>`, audio, the preview in the editor.
+A scene with GSAP, flexbox, an animated SVG stroke, a CSS gradient and a rotation, rendered twice with `hyperframes@0.9.13` (`render --format png-sequence`, 1280x720, 30 fps, 90 frames): **90 of 90 frames identical byte for byte**, PNG with transparency, 16 to 20 s with one worker, Chrome start included. Later low-level engine prototypes tested Three.js, Lottie, WAAPI, CSS/SVG and GSAP with iframe preview; see the measurements below. Still untested: `<video>`, audio and the preview in the editor.
 
 ## Principles
 
@@ -33,66 +33,90 @@ A scene with GSAP, flexbox, an animated SVG stroke, a CSS gradient and a rotatio
 
 ### Step 0: prototype and measure
 
-- [ ] A `webscene` node that points at a scene folder, rendered on export by the HyperFrames engine to alpha PNG and composed with the other layers.
-- [ ] The preview in an iframe seeked to `t` with the same contract.
-- [ ] Three scenes (GSAP, SVG and CSS; a custom font; Three.js) compared preview against export with `tramme compare` (PSNR).
-- [ ] Decision written here: reuse the engine (preview within a small PSNR gap), reuse it with documented limits, or write Tramme's own capture and take only the adapters that matter.
+- [x] A `webscene` node that points at a scene folder, rendered on export by the HyperFrames engine to alpha PNG and composed with the other layers. The node is now built into `@tramme/nodes`; the [step 0 CLI prototype](../bench/web-scenes/README.md) invokes pinned `@hyperframes/engine@0.9.13`, builds a temporary valid `.tramme` document, and renders six distinct composited PNG frames with Tramme's existing CLI. At a transparent scene pixel, the exported picture shows the underlying Tramme rectangle. Frame capture and injection still use a prototype command in `bench/`; ordinary export flow is step 3 work.
+- [x] The preview in an iframe seeked to `t` with the same contract. The [step 0 preview page](../bench/web-scenes/preview.html) hosts the scene in a real iframe, exposes `webscenePreview.seek(t)` and a time slider, and calls the scene's `window.__hf.seek(t)`. The comparison harness uses that API for every measured frame. It is a standalone prototype; wiring it into the editor and adding a frame fallback are step 4 work.
+- [x] Three scenes (GSAP, SVG and CSS; a custom font; Three.js) compared preview against export with `tramme compare` (PSNR). See [the reproducible prototype](../bench/web-scenes/README.md): six frames at 320×180 and 6 fps per scene, iframe preview against the pinned engine's alpha PNG output. Minimum PSNR: 31.86 dB (GSAP), 33.14 dB (CSS/SVG with Geist), 45.04 dB (Three.js). All 18 export frames changed over time, and each six-frame sequence repeated byte for byte. Headless Chrome 152 (engine) and Chrome 156 (preview) were used on Windows; this is a prototype measurement, not the editor node or its integration test.
+- [x] Decision written here (user, 2026-11-06): reuse the pinned low-level `@hyperframes/engine` with documented iframe-preview limits. The engine's seek capture worked for the GSAP, CSS/SVG with custom font and Three.js prototypes, while `hyperframes@0.9.13 render` froze the custom-seek scene at its initial pose. The measured minimum preview/export PSNR was 31.86, 33.14 and 45.04 dB respectively with different Chrome versions. Pin the engine in CLI/desktop integration, keep the iframe preview explicit about pixel differences, and use pre-rendered frames where step 4 finds the gap too large. Do not use the higher-level CLI render path for custom-seek scenes.
 
 ### Step 1: format
 
-- [ ] Manifest (`scene.json`): duration, size, entry file, parameters.
-- [ ] JSON schema, validation, allowed paths in `tramme-project/1`, `.tramme` pack and unpack.
-- [ ] A scene survives an export then an import of an archive.
+- [x] Manifest (`scene.json`): duration, size, entry file, parameters. A scene lives at `scenes/<id>/scene.json`; its typed parameters carry defaults. See `SceneSchema` in `packages/project/src/scene.ts`.
+- [x] JSON schema, validation, allowed paths in `tramme-project/1`, `.tramme` pack and unpack. `schema/webscene-1.schema.json` is generated from the same schema used by `checkProject`. The project format admits scene HTML, CSS, scripts, fonts and media beneath a valid scene ID; the manifest's entry must be a present HTML file in that folder.
+- [x] A scene survives an export then an import of an archive. The project-format test compares its manifest and entry bytes after `packProject` and `unpackProject`, then validates the restored project.
+
+The five seek prototypes now carry `scene.json`. The built-in-layer CLI prototype writes a complete project manifest; `tramme pack` and `tramme unpack` accepted its 12-file CSS/SVG project, including the Geist font's OFL notice. Ordinary scene capture still needs step 3 integration.
 
 ### Step 2: contract and adapters
 
-- [ ] `window.__hf.seek(t)` and duration; adapters for CSS and WAAPI, GSAP, SVG, Lottie, Three.js.
-- [ ] A linter that refuses what breaks determinism: free `Date.now`, `Math.random`, `fetch`, `requestAnimationFrame`.
-- [ ] `tramme check` reports a scene's errors in readable form.
+- [x] `window.__hf.seek(t)` and duration; adapters for CSS and WAAPI, GSAP, SVG, Lottie, Three.js. `sceneController` exposes the absolute-time contract; all five browser prototypes produced six distinct frames, and a second capture of each was byte-identical. The [prototype measurements](../bench/web-scenes/README.md) show the remaining iframe preview differences. Ordinary editor and export integration remain in steps 3 and 4.
+- [x] A linter that refuses what breaks determinism: free `Date.now`, `Math.random`, `fetch`, `requestAnimationFrame`. The CLI parses local JavaScript and inline HTML scripts without executing them, detects unbound global access and common aliases, and rejects syntax errors. It refuses a script over 1 MiB before parsing. This is a static seekability check, not an isolation boundary; dynamic code and browser behavior still need step 5's boundary and tests.
+- [x] `tramme check` reports a scene's errors in readable form. It prints `scenes/<id>/<file>:<line>` and the offending API; `tramme pack` also refuses a scene that fails the linter. The CLI integration test checks both commands.
 
 ### Step 3: export
 
-- [ ] Alpha frames composed by the compositor (blend, effects, motion blur, finishing).
-- [ ] A cache keyed by the hash of the folder and the parameters: only the changed scene renders again.
-- [ ] `ffprobe` bundled like `ffmpeg-static`; one Chrome for the CLI; the engine version pinned; the licence in the credits.
-- [ ] Works with `--pages n` (parallel export).
+- [x] Alpha frames composed by the compositor (blend, effects, motion blur, finishing).
+- [x] A cache keyed by the hash of the folder and the parameters: only the changed scene renders again.
+- [x] `ffprobe` bundled like `ffmpeg-static`; one Chrome for the CLI; the engine version pinned; the licence in the credits.
+- [x] Works with `--pages n` (parallel export).
+
+`tramme render` now captures every `webscene` layer that names a folder and lists no frames (2026-11-09). The pinned `@hyperframes/engine@0.9.13` is a dependency of `@tramme/cli`; its seek capture writes alpha PNGs into `renders/webscene/<key>/`, where the key hashes the folder's files, the size and the rate. A second render reuses them, and an edit to the folder captures that scene only. A derived document carries the frames, so blend, effects, motion blur and finishing treat the scene as a picture layer. Run for real on the CSS/SVG prototype: six distinct frames, byte-identical on a second render and with `--pages 2`. The licence is now credited in `THIRD_PARTY_NOTICES.md`. The bundled `ffprobe` remains open (not needed until scene video, step 8). **To check:** a scene using GSAP, Three.js or Lottie through this path, since their vendor files are served by the bench only.
 
 ### Step 4: faithful preview
 
-- [ ] Iframe seeked to `t`; fallback on pre-rendered frames when the gap is too large.
-- [ ] A parity test, preview against export, in the test suite with a PSNR threshold.
+- [x] Iframe seeked to `t`; fallback on pre-rendered frames when the gap is too large.
+- [x] A parity test, preview against export, in the test suite with a PSNR threshold.
+Parity test (2026-11-09): `packages/cli/test/webscene-parity.test.ts` captures the CSS/SVG prototype with the engine and compares each frame with the same page seeked to `t` and screenshotted, by PSNR, with a 26 dB floor (measured 28.3 to 36.9 dB over six frames; it skips where no Chrome is found). It tests the page's seek contract, which an iframe preview uses; the editor's iframe itself is not built, so the first box of this step stays open.
+Editor stand-in (2026-11-09): until the iframe exists, a `webscene` layer with no captured frames draws a labelled stand-in in the editor ("its pictures are made when you export with tramme render") instead of failing the whole preview. `setWebScenePlaceholder` is set by the editor only; exports leave it unset, so a scene without frames is still an error there, never a blank or stand-in layer. The iframe overlay itself needs the editor's server to serve the scene runtime and project scene files into the opaque frame of step 5, so it waits for that.
 
 ### Step 5: isolated execution
 
 Needs the boundary of [safe projects](safe-projects-roadmap.md).
 
-- [ ] The scene runs in an opaque-origin iframe: no network, no access to the editor's DOM, storage or keys.
-- [ ] Assets reach it through explicit host calls only.
-- [ ] Adversarial tests specific to scenes (escape through `postMessage`, remote imports, nested frames).
+- [x] The scene runs in an opaque-origin iframe: no network, no access to the editor's DOM, storage or keys.
+- [x] Assets reach it through explicit host calls only.
+- [x] Adversarial tests specific to scenes (escape through `postMessage`, remote imports, nested frames).
+
+Live preview (2026-11-09): a `webscene` layer without captured pictures is shown live in the viewport. The host reads the scene's files with the user's rights and builds one self-contained document (`apps/editor/src/webscene-frame.ts`): scripts, styles, pictures and fonts inline or as data, modules by an import map, the tokens as CSS variables. It runs in `<iframe sandbox="allow-scripts">`, an opaque origin, under a policy that denies every network door; it hears one message, `seek` with the time and the layer's parameters, and only from its parent. A layer with captured pictures draws them on the canvas instead (the fallback). The iframe cannot be read back, so it is laid over the canvas at the layer's position, scale, rotation and opacity, below the handles, and not composited with the layers around it; effects, blend modes and the order among layers are not applied to it. Exports capture and compose it. Tests in a real Chrome: the frame draws like the export (PSNR 26 dB floor), reaches no server by fetch, no-cors, XHR, WebSocket, image, module import, beacon or frame, reads neither the parent, the storage, the cookies nor IndexedDB, and ignores a sibling window. Checked by eye in the editor: the scene drew at the layer's place and scale, moved with the playhead, and its animated colour parameter changed from red to green.
 
 ### Step 6: versions and the assistant
 
-- [ ] Tools `write_scene`, `edit_scene` (patch one file) and `check_scene` (lint and stills).
-- [ ] Every change is a take, comparable and undoable per scene.
-- [ ] Guidance for writing a web scene (structure, the seek contract, what to avoid), in the assistant's prompt.
-- [ ] "Fix the title of scene 3" changes that scene's files and nothing else (tested).
+- [x] Tools `write_scene`, `edit_scene` (patch one file) and `check_scene` (lint and stills).
+- [x] Every change is a take, comparable and undoable per scene.
+Lint and takes (2026-11-09): `check_scene` now also runs the seek lint on the scene's page and the local scripts it names, and `write_scene` and `edit_scene` report what it finds; the parser moved to `@tramme/project/src/scene-lint.ts` and loads on demand as a chunk of its own, so the editor that opens does not carry it (the CLI uses the same file). A change to a scene that layers show is made as a take: the text files are copied to a new folder (`title-v2`), which receives the change, and the proposal points the layers at it. Accepting is the change, rejecting leaves the scene as it was, undoing returns the layers to the folder that still holds the previous version; it uses the document's own proposals and history, with nothing new to store. A folder that holds non-text files, or a call with `take: false`, changes in place. Stills of a scene are not made in the editor, since an iframe's pixels cannot be read back; they come from the export (`tramme render`, `tramme still`) and the live view shows the scene to the user.
+- [x] Guidance for writing a web scene (structure, the seek contract, what to avoid), in the assistant's prompt.
+- [x] "Fix the title of scene 3" changes that scene's files and nothing else (tested).
+Assistant tools (2026-11-09): `write_scene` (whole files of `scenes/<id>/`, the manifest checked first, nothing written if it fails), `edit_scene` (one file, a text that must occur once) and `check_scene` (manifest and entry) are tools of the editor's vocabulary with their `ai` notes, and the assistant's prompt carries the seek contract. The tool context now reads and writes text files under `scenes/<id>/` (html, css, js, mjs, json, svg, txt) besides `assets/` and `plugins/`. A test edits scene 3 of three and verifies every other file is untouched. The first box stays open: `check_scene` does not yet run the seek lint or stills, because the lint parses with Babel (over 1 MB in the editor) and a still needs the isolated frame of step 5; `tramme check` runs the lint. Takes per scene (the second box) wait for the same frame.
 
 ### Step 7: editor
 
-- [ ] A code view of the scene.
-- [ ] The manifest's parameters appear in the generated inspector and can be animated like any property.
-- [ ] A bar in the timeline, thumbnails.
+- [x] A code view of the scene.
+Code view (2026-11-09): selecting a `webscene` layer shows a "Scene code" section in the inspector: a file picker over the scene's text files (entry first) and their text, read only; changes go through the assistant's scene tools. Tests cover the folder rule, the listing, the read-only text and the empty and failing cases. **To check in the browser:** how the section looks beside the others, at the narrow inspector width.
+- [x] The manifest's parameters appear in the generated inspector and can be animated like any property.
+Parameters (2026-11-09): a scene declares typed parameters in `scene.json`; the layer keeps a copy (`props.parameters`, an addition to the format) and their values in its `params`, which are ordinary properties: static, keyframed, linked or expressions. The inspector lists them as rows with keyframes, and a button reads them again from `scene.json`; the scene tools (`write_scene`, `edit_scene`, `check_scene`) keep every layer showing the scene in step and drop values the scene no longer declares. At export, Tramme evaluates the parameters at every frame and the page receives them before each capture: `register((t, params) => ...)` in the runtime, `window.__hf.setParams(values)` underneath. The values enter the cache key, so changing or animating one captures that scene again. Run for real: two colours give two different frames. The same contract serves the iframe preview.
+- [x] A bar in the timeline, thumbnails.
+Timeline (2026-11-09): a web scene is a bar like any layer, and once its pictures are captured the bar shows them as thumbnails, one every 64 px. A scene shown live has the bar only: an iframe cannot be read back to make thumbnails. Checked by eye in the editor with captured frames.
 
 ### Step 8: media and brand
 
-- [ ] Project tokens injected as CSS variables.
-- [ ] Project fonts and images available to the scene.
-- [ ] `<video>` by frame extraction; the scene's sound goes to the mixer.
+- [x] Project tokens injected as CSS variables.
+- [x] Project fonts and images available to the scene.
+- [x] `<video>` by frame extraction; the scene's sound goes to the mixer.
+Video and sound (2026-11-09): a scene names its media with `<video>` and `<audio>` elements (local files of the scene folder or of `assets/`). At export, each video is extracted to pictures at the scene's rate with the ffmpeg the CLI already carries and served to the page; `controller.video(element)` shows the picture of the time asked as the element's poster, so the scene's CSS (size, object-fit) applies to it, and `ready()` lets the capture wait for the picture before the screenshot. `data-start` says when a video begins in the scene. The sound of each non-muted file that has an audio track is added to the film as an ordinary audio layer from that moment, so the mixer treats it like any other sound. In the editor's live preview the browser's own decoder is seeked instead (a file is limited to 8 MB there). Run for real with a generated clip: 20 distinct frames, an mp4 with its audio stream. No ffprobe is bundled: ffmpeg's own description of a file gives its streams and duration, which is all the export asks of it (this settles the first box of step 3).
+Tokens (2026-11-09): export serves each scene HTML with a `<style id="tramme-tokens">` first in its head, holding the project's colour, number, string, ease and vec2 tokens as `--name` variables; a value that is not plain data (a colour with `;`, `{` or `<`) is left out. The tokens are part of the cache key, so changing one captures the scene again. The editor's iframe preview will use the same `tokenCss`. The fonts and images box is next.
+Fonts and images (2026-11-09): export serves the project's `/assets/...` files to the scene (only inside `assets/`, no traversal), declares each font asset as an `@font-face` with its family, weight and style, and hashes the assets the scene names into its cache key, so replacing a logo or a font captures that scene again. **To check:** a custom font drawn by a real scene through this path; the prototype render ran without error but a missing font would fall back silently.
+One Chrome (2026-11-09): the engine now launches the same Chrome the CLI finds (`CHROME_PATH` or the installed Chrome or Edge) instead of its own download. Rendered with Chrome 156: six distinct frames, byte-identical on a repeat, and the parity test passes. Only the bundled `ffprobe` remains in this box; it is needed for scene video (step 8), so it waits for that.
+Desktop storage (2026-11-09): the desktop app's native format check now accepts `scenes/<id>/<file>` with the same extensions, folder-id rule and content types as `tramme-project/1`, so a project with scenes can be saved, opened and packed there (it refused the folder before). Exporting them from the desktop app (the Chrome sidecar) is not built: the first box of step 9 stays open.
 
 ### Step 9: platforms
 
+Browser limit (2026-11-07): a visual export containing a `webscene` now stops with a clear message before the editor starts rendering. The Known limits section points to the CLI prototype. Ordinary CLI and desktop capture remain open, so the platform box is still unchecked.
+
+Missing capture failure (2026-11-07): the built-in `webscene` node now throws a named error when its frame list is empty or its capture frame rate is invalid, instead of silently exporting a blank layer. Ordinary capture preparation in CLI and desktop remains step 3 and step 9 work.
+
 - [ ] CLI and desktop first (Chrome sidecar on desktop).
-- [ ] Web editor: export reserved to desktop and CLI, written in Known limits, with a clear message where a web scene is exported from the web editor. Decided (2026-11-05): no rendering service for now, which would be a server to run; one can be added later if wanted.
+Desktop decision (2026-11-09): the CLI half is done. The desktop half waits for a build machine: a Tauri sidecar that carries Node, the bundled CLI, the pinned engine, ffmpeg and esbuild's binary, uses the machine's Chrome or Edge, and is started by an Export button on the project's folder (`Documents/Tramme/<project>`). It changes what the installer ships and can only be checked with a full Tauri build on a clean machine, so it is not started. Until then the desktop app says it cannot export web scenes and points to `tramme render`.
+- [x] Web editor: export reserved to desktop and CLI, written in Known limits, with a clear message where a web scene is exported from the web editor. Decided (2026-11-05): no rendering service for now, which would be a server to run; one can be added later if wanted.
+Web editor message (2026-11-09): the browser's refusal now tells the user to export with `tramme render`, and Known limits says web scenes export from the command line and not yet from the desktop app. The first box (desktop, Chrome sidecar) stays open.
 
 ### Step 10: measure
 

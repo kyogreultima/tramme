@@ -8,13 +8,141 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-11-09
+
 ### Added
 
+- The isolated asset loader never imports a module into the trusted page; CLI Free code layers now load and initialize their modules inside the opaque worker.
+- CLI stills and raster exports now route expression-only projects through the opaque sandbox, including nested instance expressions.
+- All five web-scene prototypes now carry `scene.json`; the CLI composite produces a project that packs and unpacks with its font licence.
+- `webscene` is now a built-in node; the six-frame CLI composition prototype no longer needs a project plugin.
+- Isolated video assets now refuse oversized frame dimensions and release replaced decoders.
+- Isolated projects now refuse an asset inventory above 4,096 entries before loading files.
+- Isolated projects now cap retained decoded images at 256 MiB and release replaced image bitmaps.
+- Isolated image assets now have a 32 MiB compressed-file limit before browser decoding.
+- Isolated font, JSON and LUT asset loads now stop at bounded response sizes and cancel oversized streams.
+- The CLI project server now confines static files to their mount and refuses project configuration that overrides `/project/`.
+- Web scenes now share an absolute-time `window.__hf` runtime with browser-tested CSS, WAAPI, SVG, GSAP, Lottie and Three.js seek adapters.
+- Web scenes now have a validated `scene.json` manifest, published JSON Schema, approved project paths and archive round-trip coverage.
+- CLI scene checks now name nondeterministic browser APIs by file and line, and project packing refuses those scenes.
+- Isolated model rendering now receives bounded, approved `.glb` bytes through the host instead of fetching from the sandbox worker.
+- CLI plugin exports now load declarations before creating the renderer, keeping project modules out of the trusted browser page and removing its `sandbox=0` escape.
+- The isolated renderer now refuses assets and video proxies outside the current project folder before loading them.
+- Asset loading now runs at most eight requests concurrently and refuses oversized isolated images before bitmap creation.
+- Sandbox messages now budget decoded bitmap surfaces separately and preserve the page's copy of document images.
+- Isolation checks now exercise project code at module import and additional browser network APIs in Chrome and Edge, before any tool or drawing call.
+- Failed plugin attachments can be retried after repair, and storyboard stills report sandbox attachment errors.
+- Sandbox capability replies now reject oversized data before it crosses the worker bridge.
+- Page-to-sandbox calls and document snapshots now have a 64 MiB plain-data budget.
+- A repeatable web-scene prototype now measures iframe preview against alpha PNG capture for GSAP, CSS/SVG with a custom font, and Three.js.
+- The web-scene prototype can now capture a folder and composite its transparent frames as a Tramme plugin layer in a CLI export.
+- The web-scene prototype now has a seekable iframe preview with a time slider and measured parity against captured frames.
+- Web-scene development will use the pinned low-level HyperFrames engine for CLI and desktop, with documented preview differences.
+- The isolated renderer now keeps at most two reusable full-frame canvases after a frame, releasing excess surfaces instead of retaining them in memory.
+- Sandbox renders now refuse invalid sizes or a canvas side above the editor's 8,192-pixel project limit before allocating the frame.
+- Project extensions now run tools and checks in separate isolated workers per plugin. One extension cannot use another extension's active call to borrow its network grant; updating a plugin replaces its worker.
+- An approved plugin network request now stops reading a response above 64 MB instead of buffering it without a limit.
+- The project host now stops reading an oversized plugin module or font as soon as its byte limit is crossed, even when the server keeps sending data.
+- The isolated project worker now coalesces document updates during startup and stops if more than 128 messages queue; a project host also refuses more than 64 distinct plugin modules.
+- The experimental sandbox preview option now also selects isolated picture rendering for stills and raster exports of projects that contain expressions but no plugins.
+- The sandbox host now stops a project extension that returns more than 8 MB of nested plain data in one result, before passing that result into the editor.
+- Malformed sandbox declarations and draw results now stop the isolated worker and report an invalid response instead of breaking the editor page.
+- Project tools and checks now have at most 16 simultaneous requests to the host; repeated request IDs cannot repeat a project file operation.
+- Restoring an installed-plugin backup now refuses a file over 64 MB or entries declaring more than 128 MB expanded in total before decompressing them.
+- The project sandbox now refuses a 65th simultaneous call and project plugin modules larger than 1 MB before transferring them to its worker.
+- The plugin host now rejects unknown bridge requests, project path escapes and malformed or oversized file/network requests before calling the editor's capabilities.
+- A project extension that hangs during load, checks, tools, rendering or vector export now stops after a deadline. The isolated frame is released and the next attempt starts a new one.
+- Sandboxed plugin drawing now receives project font bytes from the trusted host, in document order, and waits for the face to load before drawing. A font URL outside the project is refused before any request.
+- CLI archive and folder validation now obtains plugin declarations from an opaque browser worker; project modules no longer initialize inside Node. A looping module is stopped after a deadline, and Node-only plugin behavior fails closed until its browser bridge is available.
+- Plugin workers now start inside an opaque-origin iframe with a network-denying policy in the web editor, desktop app and CLI; the host supplies their code and local plugin modules. The broader safe-projects gate remains open while other execution paths and desktop webviews are checked.
+- The `duck` tool now creates the same editable four-keyframe track blocks as drawing a dip; sounds outside a track retain their existing layer gain automation.
+- A sound track can now duck under another track's voice clips without a transcript. The mix follows clip moves and mute changes; the source is chosen from the mixer's **D** control.
+- Sound tracks now have editable volume dips: arm **D** in the timeline, drag a range, then click its block to adjust the range, depth and slopes. The dip adds to the existing fader, is undoable as one edit and is heard in preview and exports.
+- Generated music now keeps its proposed tempo, section plan, provider request mode and measured beat alignment beside the saved file. Providers without structured music use a prompt bed and the same beat check.
+- Music generation now checks the received score's beats against the film's cuts before placing it. When a speed change of at most 2% improves alignment, playback keeps the original pitch; the tool reports the counts before and after.
+- Music generation now sends film-shaped instrumental sections with an explicit tempo and exact section lengths to ElevenLabs Music v2.5. Invalid plans are rejected before the provider call.
+- Music generation now reads the film's length, cuts, markers and hero moments before its paid request. `/music-plan` shows the proposed tempo and how many cuts land on its beats without making a sound.
+- Mixer strips now show their ordered effect chains. You can open an insert's settings, bypass or move it, and add voice cleanup, music under voice, telephone or big room presets. The `/chain` command and assistant can propose the same edits with the full chain shown before applying it.
+- Delay and distortion can be placed anywhere in a track or bus chain. Echoes use milliseconds or notes at an explicitly chosen composition tempo, with bounded feedback; distortion has drive, tone and wet controls. Existing telephone, radio, megaphone and echo voices keep their sound through the same processors.
+- Ordered track and bus effects now process their combined sources in playback, scrubbing and every export, preserving source files and the existing per-clip settings. Changing a chain refreshes its live sound and loudness measurement.
+- Projects can keep ordered, bypassable audio-effect settings on sound tracks and buses, with each edit undoable in one step.
+- The mixer master now shows live three-second loudness, true peak and clipping before the personal listening volume, alongside the composition's target. Its stopped-film measurement remains available, and the assistant reads the same master levels.
+- Live meters on mixer tracks and buses show peak, RMS and a held peak during playback, with a clipping indicator that stays lit until reset. Closing the mixer releases its analysers; the assistant can read and reset the same meters with `meters`.
 - The desktop app has accounts: sign up, sign in and your space, like the web app. Its calls go to the accounts backend of the environment it was built for (the beta app to the beta, the stable one to production), the session is kept in the system keychain, and sign-in with Google or GitHub is not offered in the app yet.
 - A beta build of the desktop app, "Tramme Beta": it installs beside Tramme, and the beta site offers it.
 
 ### Fixed
 
+- Built-in pack tools now refuse data paths outside their own folder and stop reading a pack data file above 8 MiB.
+- The editor now refuses a shipped pack module larger than 1 MiB before loading it.
+- The editor now refuses an oversized or malformed built-in pack index before offering its tools.
+- Oversized plugin files and installed-plugin backups now stop before the editor reads them into memory.
+- Plugin packages and backups now stop at 2,000 archive entries; oversized packaged JavaScript stops before extraction.
+- Creating an installed-plugin backup now stops before compressing too many files or bytes.
+- Creating a plugin package now checks its file paths and size limits before compression.
+- Installed plugins now skip oversized stored modules, and library reads stop when a file exceeds its limit.
+- Plugin companion data now has file-count and byte limits, with reliable encoding for larger binary files.
+- Plugin packages now refuse encoded or URL-like data paths before their files are copied into a project.
+- Plugin backups now refuse unsafe installed-plugin names before creating an archive.
+- The timeline bar of a captured web scene shows its pictures as thumbnails.
+- Web scenes can hold videos and sound: the export extracts the pictures, follows the playhead and adds the sound to the film.
+- The assistant changes a web scene as a take you can accept, reject or undo, and checks its scripts for what would break the export.
+- A web scene shows live in the editor, inside a sealed frame, and follows the playhead and its animated parameters.
+- Web scenes have parameters: declared in the scene, shown as rows in the inspector, animated like any property and used by the export.
+- Selecting a web scene layer shows its code (read only) in the inspector.
+- The assistant now takes a project's palette from its first good generated picture.
+- A web scene layer without captured pictures now shows a labelled placeholder in the editor instead of breaking the preview.
+- The browser editor's message about web scenes now points to the command line (`tramme render`).
+- The desktop app now keeps web scene folders in its projects (scenes/), as the web editor and the command line do.
+- A test now compares a web scene's seeked page with its exported frames.
+- A web scene exported by the command line can use the project's fonts and pictures from its assets folder.
+- A web scene now sees the project's tokens (colours, numbers, curves) as CSS variables when exported.
+- The assistant can write, correct and check web scenes (`write_scene`, `edit_scene`, `check_scene`): a correction changes one file of one scene and nothing else.
+- `tramme render` now exports web scenes: it captures each scene folder to transparent pictures, composes them like any layer, and re-captures only a scene whose folder changed.
+- When a plugin sandbox stops (a runaway script, a crash), the editor now says what stopped and that your project and unsaved edits are untouched.
+- Plugin isolation now documents its time and size limits, and says plainly that a memory cap is not one of them.
+- Installed plugins can no longer follow a network redirect outside an approved origin.
+
+- The editor's common project file URLs and multipart uploads now reject invalid format paths before requests.
+- LLM provider routes now reject malformed encoded provider names with HTTP 400.
+- Plugin and sound libraries now reject malformed encoded names and use decoded names for MIME types.
+- Project file routes now reject malformed percent encoding with HTTP 400.
+- Project storage now accepts JSON version snapshots, and the editor rejects forged version-index paths.
+- Filler-cut review now validates its project asset path before reading the list.
+- An open media bin or tag naming field no longer edits assets after switching projects.
+- The Direction panel now discards delayed project reads and brief writes after navigation, and validates image paths.
+- Media search no longer reuses transcript words across projects with the same file path.
+- Media placement now discards delayed duration and sound probes after a project or composition switch.
+- Timeline sound sync now discards results returned after the open project or composition changes.
+- Inspector sequence thumbnails now omit media URLs outside the current project's assets.
+- Timeline sound sync now validates media asset URLs before decoding clips.
+- The source monitor no longer falls back to an unchecked media URL when its asset cannot be loaded.
+- Video layer and timeline placement now validate project media URLs before duration and sound probes.
+- Assistant media frames now refuse image and video URLs outside the current project's assets.
+- Transcript reads and media transcription now refuse source paths outside the open project's assets.
+- Plugin tools can now list, read and address only validated files under the current project's `assets/` folder.
+- Assistant file commands now refuse encoded project paths before starting a read or write.
+- Built-in tools now reject encoded cross-project asset URLs and encoded file paths before a read or write.
+- Isolated plugin modules and fonts now stay inside the project folder even when their URLs contain encoded separators or dot segments.
+- Project plugin file requests now reject encoded traversal and ambiguous URL or Windows path characters before reading or writing.
+- Repeated project-module reloads now release temporary encoded source URLs once the isolated worker answers.
+- Malformed plugin-load messages from the isolated frame now stop that worker without throwing in the editor page.
+- Importing a project with plugins now stops clearly when an isolated worker is unavailable, without running the plugin in the editor page.
+- Composition and critic checks for isolated projects now evaluate their quality rules inside the project worker.
+- Scene-form advice in the composition check now reads isolated projects through the project worker.
+- The critic now finds visible layer entrances through the isolated project worker when reviewing an isolated film.
+- Camera pushes in isolated projects now frame expression-driven layers and text using the project worker, including the camera's starting zoom and pan.
+- Pinning a layer to another layer now follows expression-driven corners from the isolated project worker when isolation is active.
+- Motion strips now read animated-property figures from the isolated project worker when project isolation is active.
+- Components made from isolated projects now take their frame from the evaluated picture in the project worker.
+- The mix report now draws picture motion from the isolated project worker when project isolation is active.
+- Video stabilization now follows expression-driven playback speed through the isolated project worker.
+- Sound beats, tracked video frames and callouts now follow expression-driven playback speed through the isolated project worker.
+- Sound cues for isolated projects now follow the picture through the project worker when placing effects, planning music and checking the mix.
+- Tracking an object from a drawn rectangle now places that frame using the isolated project's evaluated geometry.
+- Sound effects that stop or build a music bed now read its animated level through the isolated project worker when isolation is active.
+- Live true-peak readings no longer show a spike created by the meter when screen and audio updates cross at different times.
+- Playback no longer adds the live limiter's automatic gain on top of the composition's loudness target, keeping a steady mix at its expected level.
 - The home page's top bar was squeezed against the top edge when the page was taller than the window; it keeps its height, now one value for every top bar.
 - The icons of the phones' apps sit on a white tile, not a dark one; the desktop icons stay the mark alone.
 
@@ -642,7 +770,8 @@ First public release.
 
 - Cloudflare Worker serving the editor and the API, projects stored in R2, access protected by Cloudflare Access.
 
-[Unreleased]: ../../compare/v0.20.0...HEAD
+[Unreleased]: ../../compare/v0.21.0...HEAD
+[0.21.0]: ../../compare/v0.20.0...v0.21.0
 [0.20.0]: ../../compare/v0.19.0...v0.20.0
 [0.19.0]: ../../compare/v0.18.0...v0.19.0
 [0.18.0]: ../../compare/v0.17.1...v0.18.0

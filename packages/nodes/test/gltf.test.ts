@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { decompose, parseGltf, sampleChannel } from '../src/gltf.ts';
+import { model as modelNode } from '../src/model.ts';
 
 /** builds a GLB: a JSON chunk and a binary chunk, 4-byte aligned */
 function glb(json: object, bin: ArrayBuffer): ArrayBuffer {
@@ -129,5 +130,15 @@ describe('a .glb file read as a model', () => {
 
   it('says what is wrong with a file it cannot draw', () => {
     expect(() => parseGltf(new TextEncoder().encode('{"asset":{}}').buffer as ArrayBuffer)).toThrow(/glTF|not supported/);
+  });
+
+  it('loads the bytes supplied by the host without fetching from the sandbox', async () => {
+    const fetcher = vi.fn();
+    vi.stubGlobal('fetch', fetcher);
+    try {
+      const bytes = glb(json, bin as ArrayBuffer);
+      await modelNode.load!({ source: 'mesh' } as never, { asset: () => bytes } as never);
+      expect(fetcher).not.toHaveBeenCalled();
+    } finally { vi.unstubAllGlobals(); }
   });
 });

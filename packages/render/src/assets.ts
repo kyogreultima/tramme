@@ -9,6 +9,32 @@ import { VideoFrames } from './video.ts';
 const SVG_RASTER = 2048;
 /** how long the page's own fonts (its CSS) are waited for once the document's are loaded */
 const FONTS_WAIT_MS = 3000;
+const MODEL_LIMIT = 32 * 1024 * 1024;
+const FONT_LIMIT = 16 * 1024 * 1024;
+const DATA_LIMIT = 8 * 1024 * 1024;
+const IMAGE_LIMIT = 32 * 1024 * 1024;
+const MAX_ACTIVE_ASSETS = 8;
+const MAX_IMAGE_PIXELS = 16 * 1024 * 1024;
+const MAX_RETAINED_IMAGE_PIXELS = 64 * 1024 * 1024;
+const MAX_PROJECT_ASSETS = 4096;
+
+async function boundedBytes(response: Response, limit: number, label: string): Promise<ArrayBuffer> {
+  const declared = Number(response.headers.get('content-length'));
+  if (declared > limit) { void response.body?.cancel(); throw new Error(`${label} exceeds ${limit / 1048576} MB`); }
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error(`${label} requires a streamed response`);
+  const chunks: Uint8Array[] = []; let size = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > limit) { void reader.cancel(); throw new Error(`${label} exceeds ${limit / 1048576} MB`); }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(size); let at = 0;
+  for (const chunk of chunks) { bytes.set(chunk, at); at += chunk.byteLength; }
+  return bytes.buffer as ArrayBuffer;
+}
 
 /** the proportions of an SVG from its viewBox (1:1 when it has none) */
 export function viewBoxSize(svg: string): [number, number] {
@@ -43,7 +69,7 @@ export class AssetStore {
   private version = 0;
   /** a font of the page stayed loading past FONTS_WAIT_MS: not waited for again */
   private pageFontsStuck = false;
-  /** the sandbox owns the project's plugin modules: sync skips them, their code never loads here */
+  /** the sandbox owns project code: no module asset is imported by the trusted page */
   sandboxModules = false;
   /** a video with a proxy plays its proxy (the editor's preview, when its setting asks); exports always read the original */
   useProxies = false;
@@ -51,6 +77,17 @@ export class AssetStore {
   readonly offline = new Map<string, string>();
   /** what each failed asset was when it failed: it is not asked for again until it changes or is reloaded */
   private failed = new Map<string, string>();
+
+  private imagePixels(entry: Asset, value: unknown): number {
+    if (entry.type !== 'image' || !value || typeof value !== 'object') return 0;
+    const image = value as { width?: number; height?: number };
+    return Number(image.width) * Number(image.height) || 0;
+  }
+
+  private release(entry: Asset, value: unknown): void {
+    if (entry.type === 'image') (value as { close?: () => void } | null)?.close?.();
+    if (entry.type === 'video') (value as { dispose?: () => void } | null)?.dispose?.();
+  }
 
   /** what a loaded asset is kept under: its entry, and for a video with a proxy, which of the two plays */
   private keyOf(a: Asset): string {
@@ -85,18 +122,30 @@ export class AssetStore {
 
   has(id: string) { return this.loaded.has(id); }
 
+  private assertProjectUrl(url: string): void {
+    if (!this.sandboxModules) return;
+    const target = new URL(url), base = new URL(this.base);
+    const root = new URL('./', base);
+    const projectFile = target.origin === base.origin && target.pathname.startsWith(root.pathname);
+    const localBlob = target.protocol === 'blob:' && target.origin === base.origin;
+    if (!projectFile && !localBlob) throw new Error('asset must belong to this project');
+  }
+
   /** load what the document needs and is not loaded yet; `reload` forces some ids (a module edited on disk) */
   async sync(doc: TrammeDoc, reload: string[] = [], tolerate = false): Promise<void> {
+    const entries = Object.entries(doc.assets);
+    if (this.sandboxModules && entries.length > MAX_PROJECT_ASSETS) throw new Error(`isolated project exceeds ${MAX_PROJECT_ASSETS} assets`);
     this.doc = doc;
-    for (const id of this.loaded.keys()) if (!doc.assets[id]) this.loaded.delete(id);
+    for (const [id, old] of this.loaded) if (!doc.assets[id]) { this.release(old.entry, old.value); this.loaded.delete(id); }
     for (const id of [...this.offline.keys()]) if (!doc.assets[id]) { this.offline.delete(id); this.failed.delete(id); }
     const refused: string[] = [];
     if (reload.length) this.version++;
-    await Promise.all(Object.entries(doc.assets).map(async ([id, a]) => {
+    for (let start = 0; start < entries.length; start += MAX_ACTIVE_ASSETS) await Promise.all(entries.slice(start, start + MAX_ACTIVE_ASSETS).map(async ([id, a]) => {
       // a sub-clip is a range of another asset, no file of its own
-      if (a.of !== undefined) { this.loaded.delete(id); return; }
-      // the sandbox owns the project's plugin modules: their code never loads here
-      if (this.sandboxModules && a.type === 'module' && (doc.plugins || []).includes(id)) { this.loaded.delete(id); return; }
+      if (a.of !== undefined) { const old = this.loaded.get(id); if (old) this.release(old.entry, old.value); this.loaded.delete(id); return; }
+      // A non-plugin module can be an unused asset or a Free code layer. Neither
+      // may import into the trusted page while isolation is selected.
+      if (this.sandboxModules && a.type === 'module') { const old = this.loaded.get(id); if (old) this.release(old.entry, old.value); this.loaded.delete(id); return; }
       const have = this.loaded.get(id);
       if (have && !reload.includes(id)) {
         const key = this.keyOf(a);
@@ -106,10 +155,20 @@ export class AssetStore {
       const key = this.keyOf(a);
       if (tolerate && this.failed.get(id) === key && !reload.includes(id)) return;
       try {
-        this.loaded.set(id, { key, entry: a, value: await this.load(id, a) });
+        const value = await this.load(id, a);
+        if (this.sandboxModules && a.type === 'image') {
+          const retained = [...this.loaded.entries()].reduce((sum, [otherId, old]) => sum + (otherId === id ? 0 : this.imagePixels(old.entry, old.value)), 0);
+          if (retained + this.imagePixels(a, value) > MAX_RETAINED_IMAGE_PIXELS) {
+            this.release(a, value);
+            throw new Error('images exceed 256 MB of retained decoded pixels');
+          }
+        }
+        if (have) this.release(have.entry, have.value);
+        this.loaded.set(id, { key, entry: a, value });
         this.offline.delete(id); this.failed.delete(id);
       } catch (e) {
         const why = `asset "${id}" (${a.src}): ${(e as Error).message}`;
+        if (have) this.release(have.entry, have.value);
         this.loaded.delete(id);
         if (!tolerate) { refused.push(why); return; }
         this.offline.set(id, (e as Error).message); this.failed.set(id, key);
@@ -126,41 +185,79 @@ export class AssetStore {
 
   private async load(id: string, a: Asset): Promise<unknown> {
     const url = this.url(id);
+    this.assertProjectUrl(url);
     switch (a.type) {
       case 'image': {
         // an ImageBitmap, not the <img>: Chrome resamples an <img> with its
         // own filter when it is scaled down, a bitmap like any canvas pixels
-        const img = new Image();
-        img.src = url;
-        await img.decode();
-        try { return await createImageBitmap(img); } catch (e) { if (!/svg/i.test((e as Error).message)) throw e; }
-        return svgBitmap(url);
+        let source = url;
+        if (this.sandboxModules) {
+          const response = await fetch(url);
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          source = URL.createObjectURL(new Blob([await boundedBytes(response, IMAGE_LIMIT, 'image')], { type: response.headers.get('content-type') || 'application/octet-stream' }));
+        }
+        try {
+          const img = new Image();
+          img.src = source;
+          await img.decode();
+          if (this.sandboxModules && (!img.naturalWidth || !img.naturalHeight || img.naturalWidth > 8192 || img.naturalHeight > 8192 || img.naturalWidth * img.naturalHeight > MAX_IMAGE_PIXELS)) {
+            throw new Error('image exceeds 8192 pixels per side or 16 million pixels total');
+          }
+          try { return await createImageBitmap(img); } catch (e) { if (!/svg/i.test((e as Error).message)) throw e; }
+          return await svgBitmap(source);
+        } finally { if (source !== url) URL.revokeObjectURL(source); }
       }
       case 'font': {
         const r = await fetch(url);
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         const family = a.family || id;
-        const face = new FontFace(family, await r.arrayBuffer(), { weight: a.weight || '400', style: a.style || 'normal' });
+        const bytes = this.sandboxModules ? await boundedBytes(r, FONT_LIMIT, 'font') : await r.arrayBuffer();
+        const face = new FontFace(family, bytes, { weight: a.weight || '400', style: a.style || 'normal' });
         await face.load();
         document.fonts.add(face);
         return family;
       }
       case 'module':
         return import(/* @vite-ignore */ this.version ? `${url}${url.includes('?') ? '&' : '?'}v=${this.version}` : url);
+      case 'model': {
+        const r = await fetch(url, { credentials: 'same-origin' });
+        if (!r.ok) throw new Error(`model: HTTP ${r.status}`);
+        const declared = Number(r.headers.get('content-length'));
+        if (declared > MODEL_LIMIT) { void r.body?.cancel(); throw new Error('model exceeds 32 MB'); }
+        const reader = r.body?.getReader();
+        if (!reader) {
+          const bytes = await r.arrayBuffer();
+          if (bytes.byteLength > MODEL_LIMIT) throw new Error('model exceeds 32 MB');
+          return bytes;
+        }
+        const chunks: Uint8Array[] = []; let size = 0;
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          size += value.byteLength;
+          if (size > MODEL_LIMIT) { void reader.cancel(); throw new Error('model exceeds 32 MB'); }
+          chunks.push(value);
+        }
+        const bytes = new Uint8Array(size); let at = 0;
+        for (const chunk of chunks) { bytes.set(chunk, at); at += chunk.byteLength; }
+        return bytes.buffer;
+      }
       case 'video': {
         const proxy = this.proxyOf(a);
         const cache = this.useProxies && (!!proxy || Object.values(this.doc.assets).some((asset) => asset.type === 'video' && asset.proxy === id));
-        return VideoFrames.open(proxy ? this.url(proxy) : url, { cache });
+        const source = proxy ? this.url(proxy) : url;
+        this.assertProjectUrl(source);
+        return VideoFrames.open(source, { cache, maxPixels: this.sandboxModules ? MAX_IMAGE_PIXELS : undefined });
       }
       case 'json': {
         const r = await fetch(url);
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json();
+        return this.sandboxModules ? JSON.parse(new TextDecoder().decode(await boundedBytes(r, DATA_LIMIT, 'JSON'))) : r.json();
       }
       case 'lut': {
         const r = await fetch(url);
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return parseCube(await r.text());
+        return parseCube(this.sandboxModules ? new TextDecoder().decode(await boundedBytes(r, DATA_LIMIT, 'LUT')) : await r.text());
       }
       case 'audio': {
         // a sound is decoded by the mixer when it plays: here only its presence is checked, a byte asked for

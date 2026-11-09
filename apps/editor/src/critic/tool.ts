@@ -5,7 +5,8 @@
 // agrees. It counts its rounds and each scene's failures within the turn, and
 // asks for takes of a scene that fails twice.
 
-import { pointer, runChecks, likeness, type Op, type ToolContext, type ToolType } from '@tramme/core';
+import { pointer, likeness, type Op, type ToolContext, type ToolType } from '@tramme/core';
+import { qualityChecksOf } from '../isolated-checks.ts';
 import { criticSystem, NO_USAGE, addUsage, parseVerdict, type Usage } from '@tramme/assistant';
 import { loadReferences, type Reference } from '../references/catalogue.ts';
 import { consult, seesPictures, type ConsultRequest, type Via } from '../ai/consult.ts';
@@ -97,7 +98,7 @@ const critique: ToolType<Input> = {
     if (!ctx.doc.compositions[id]) throw new Error(`unknown composition: ${id}`);
     const limit = host.rounds();
     const plan = parsePlan(await ctx.readText(FILM_PLAN_PATH).catch(() => null));
-    const issues = await runChecks(ctx.doc, ctx.registry, id, { data: await analyses(ctx) });
+    const issues = await qualityChecksOf(ctx, id, await analyses(ctx));
     const beats = { data: await analyses(ctx), analysisIds: Object.keys(ctx.doc.assets).filter((a) => /^analysis-/.test(a)) };
     const found = doneIssues(ctx.doc, id, ctx.registry, plan, issues, beats);
     const measured = found.filter((i) => i.blocking);

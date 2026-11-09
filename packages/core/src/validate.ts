@@ -8,7 +8,7 @@ import { compileExpr } from './expr.ts';
 import { pointer } from './ops.ts';
 import { asExpr, asKeyframed, asLink, propKind, staticValue } from './props.ts';
 import { CAMERA_SCHEMA, MASK_SCHEMA, MOTION_BLUR_SCHEMA, SOUND_MIX_SCHEMA, TRANSFORM_SCHEMA, type PropDef, type PropSchema, type Registry } from './registry.ts';
-import { addressDef, componentOf, PARAM_TYPES, paramDef, paramFits } from './components.ts';
+import { addressDef, componentOf, PARAM_TYPES, paramDef, paramFits, sceneParamDef, sceneParams } from './components.ts';
 import { DocSchema } from './schema.ts';
 import type { Composition, TrammeDoc } from './types.ts';
 
@@ -141,8 +141,17 @@ class Checker {
     (comp.tracks || []).forEach((t, i) => {
       if (tracks.has(t.id)) this.err(pointer(...base, 'tracks', i, 'id'), `duplicate track id "${t.id}"`);
       tracks.add(t.id);
+      if (t.effects !== undefined && t.kind !== 'audio') this.err(pointer(...base, 'tracks', i, 'effects'), 'only a sound track has audio effects');
+      t.effects?.forEach((effect, index) => {
+        if (effect.kind === 'delay' && !effect.bypass && typeof effect.time === 'string' && !isNum(comp.sound?.tempo)) this.err(pointer(...base, 'tracks', i, 'effects', index, 'time'), 'a composition tempo is required for an active note delay');
+      });
     });
     (comp.tracks || []).forEach((t, i) => {
+      if (t.volumeBlocks !== undefined && t.kind !== 'audio') this.err(pointer(...base, 'tracks', i, 'volumeBlocks'), 'only a sound track has volume blocks');
+      if (t.duckUnder !== undefined) {
+        const source = comp.tracks!.find((x) => x.id === t.duckUnder);
+        if (t.kind !== 'audio' || t.bus || !source || source.kind !== 'audio' || source.bus || source.id === t.id) this.err(pointer(...base, 'tracks', i, 'duckUnder'), 'duck source must be another sound track');
+      }
       if (t.to === undefined) return;
       const bus = comp.tracks!.find((x) => x.id === t.to);
       if (!bus || !bus.bus || t.bus || t.kind !== 'audio') this.err(pointer(...base, 'tracks', i, 'to'), t.kind !== 'audio' ? 'only a sound track feeds a bus' : t.bus ? 'a bus does not feed another bus' : `"${t.to}" is not a bus (a sound track with bus: true)`);
@@ -248,6 +257,15 @@ class Checker {
   instance(cid: string, lid: string, lp: string) {
     const layer = this.doc.compositions[cid].layers[lid];
     if (!layer.params && !layer.overrides && !layer.distribute) return;
+    if (layer.type === 'webscene') {
+      const declared = sceneParams(layer);
+      if (layer.overrides || layer.distribute) this.err(lp + (layer.overrides ? '/overrides' : '/distribute'), 'a web scene takes parameter values only');
+      for (const [name, v] of Object.entries(layer.params || {})) {
+        if (!declared[name]) { this.err(`${lp}/params/${name}`, `the scene declares no parameter "${name}" (props.parameters)`); continue; }
+        this.prop(cid, `${lp}/params/${name}`, sceneParamDef(declared[name], name), v);
+      }
+      return;
+    }
     const inner = componentOf(this.doc, layer);
     if (!inner) return this.err(lp + (layer.type === 'comp' ? '/props/comp' : '/type'), 'parameters and overrides belong to a comp layer holding a composition');
     const innerId = String(staticValue(layer.props?.comp));

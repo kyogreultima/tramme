@@ -3,15 +3,36 @@
 // are tools of the editor's vocabulary, run by the assistant before it sums
 // up (use_tool) or by the user from the / menu.
 
-import { Evaluator, groupIssues, likeness, pictureDiff, motionReport, REPORT_MAX, reportCounts, reportHead, reportLines, runChecks, type QualityIssue, type ToolContext, type ToolType, type TrammeDoc } from '@tramme/core';
+import { groupIssues, likeness, pictureDiff, motionReport, REPORT_MAX, reportCounts, reportHead, reportLines, type MotionReport, type QualityIssue, type ToolContext, type ToolType, type TrammeDoc } from '@tramme/core';
+import { qualityChecksOf } from './isolated-checks.ts';
+import { editorEvaluator } from './evaluator.ts';
+import { sandboxedDoc } from './installed.ts';
 import { pixelsOf, flowLines } from './flow.ts';
 import { analyses, canvas } from './perception.ts';
 import { masterText, soundReport } from './mixing.ts';
 import { FILM_PLAN_PATH, parsePlan } from './filmplan.ts';
-import { formLines } from './forms.ts';
+import { formLinesForReview } from './forms.ts';
 import { t } from './i18n/index.ts';
+import { prefs } from './settings.ts';
 
 const CELL = 360;
+
+/** Numeric motion figures for the strip, evaluated where project code runs. */
+export async function motionReportOf(ctx: ToolContext, from: number, to: number): Promise<MotionReport> {
+  if (!sandboxedDoc(ctx.doc) && !prefs.peek().sandboxPreview) return motionReport(editorEvaluator(ctx.doc, ctx.registry), ctx.compId, from, to, { limit: 6 });
+  const [{ fileProject, requireFileProject }, { preview }, { pluginHost }, { ensureDeclared, ensureSandboxDoc, moduleItemsOf }] = await Promise.all([
+    import('./files.ts'), import('./preview.ts'), import('./plugins/index.ts'), import('./plugins/sandbox-draw.ts'),
+  ]);
+  const project = fileProject(), renderer = preview.renderer;
+  if (!renderer) throw new Error('preview is not ready for isolated motion figures');
+  const base = new URL(project.docUrl, location.href).href, host = pluginHost(base);
+  await ensureDeclared(host, moduleItemsOf(ctx.doc, base));
+  requireFileProject(project);
+  ensureSandboxDoc(host, { doc: ctx.doc, docUrl: base, loaded: (id) => { try { return renderer.assets.get(id); } catch { return null; } } });
+  const report = await host.motionReport(ctx.compId, from, to);
+  requireFileProject(project);
+  return report;
+}
 
 /** pictures side by side, `cols` to a row, each w × h with its label in a corner (a JPEG data URL) */
 export function sheetOf(cells: { image: CanvasImageSource; label: string }[], w: number, h: number, cols: number): string {
@@ -87,14 +108,14 @@ const check: ToolType<{ frames?: number }> = {
   ai: { when: 'before summing up any change, and whenever the user asks if it looks right; read the issues, look at the sheet, fix what matters' },
   async run({ frames = 8 }, ctx) {
     const sound = await soundReport(ctx, { image: true });
-    const issues = [...await runChecks(ctx.doc, ctx.registry, ctx.compId, { data: await analyses(ctx) }), ...sound.issues];
+    const issues = [...await qualityChecksOf(ctx, ctx.compId, await analyses(ctx)), ...sound.issues];
     const times = keyTimes(ctx.doc, ctx.compId, issues, frames);
     const url = await sheet(ctx, times, Math.min(4, times.length), ctx.compId);
     const { warnings, notes } = reportCounts(issues);
     const { lines, notice: shown } = issueReport(issues, ctx.doc, ctx.compId);
     const head = reportHead(issues);
     // the form each scene is built in: notes beside the issues, which the cap above does not count
-    const forms = formLines(ctx.doc, ctx.compId, parsePlan(await ctx.readText(FILM_PLAN_PATH).catch(() => null)), ctx.registry);
+    const forms = await formLinesForReview(ctx, parsePlan(await ctx.readText(FILM_PLAN_PATH).catch(() => null)));
     // the sound: its master, the picture of the mix, and the moments a human checks by ear
     const listen = sound.listen.map((x) => `${x.toFixed(2)} s`).join(', ');
     const heard = sound.master ? `\n${masterText(sound.master)} The picture of the mix shows the master's waveform and spectrogram over the motion of the picture, a line at each effect (heroes red): an effect away from a motion, two hits in one place, a hit with no body show there.${listen ? ` Ask the user to listen at ${listen}: you cannot hear, they do the final listen.` : ''}` : '';
@@ -125,7 +146,7 @@ const motion: ToolType<{ t: number; span?: number; steps?: number }> = {
     const images = await stills(ctx, times, ctx.compId);
     const url = sheetOf(images.map((image, i) => ({ image, label: `${times[i].toFixed(2)} s` })), CELL, Math.round((CELL * c.height) / c.width), Math.min(steps, 6));
     // the same evaluation the render uses, so the figures are the movement's
-    const report = motionReport(new Evaluator(ctx.doc, ctx.registry), ctx.compId, from, to, { limit: 6 });
+    const report = await motionReportOf(ctx, from, to);
     const figs = report.figures.map(({ address, figures: f }) => {
       const pace = f.evenness > 0.92 ? 'constant speed (the linear tell: ease it)' : f.evenness > 0.6 ? 'eased' : 'strongly eased';
       const way = f.turns === 0 ? 'one way' : `${f.turns} turn(s)`;

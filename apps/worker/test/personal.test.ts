@@ -26,6 +26,18 @@ function setup(vars: Partial<Env> = {}) {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('personal mode: the editor\'s address', () => {
+  it('serves the project frame with an enforced CSP only on the editor host', async () => {
+    const call = setup();
+    for (const path of ['/project-sandbox.html', '/project-sandbox']) {
+      const response = await call(`${APP}${path}`);
+      expect(response.status).toBe(200);
+      expect(response.headers.get('content-security-policy')).toContain("sandbox allow-scripts; default-src 'none'");
+      expect(response.headers.get('content-security-policy')).toContain("connect-src 'none'");
+      expect(response.headers.get('cache-control')).toBe('no-store');
+    }
+    expect((await call(`${VAULT}/project-sandbox.html`)).status).toBe(404);
+  });
+
   it('says the mode and where the vault is, and keeps nothing', async () => {
     const call = setup();
     const config = await (await call(`${APP}/api/config`)).json() as Record<string, unknown>;

@@ -1,7 +1,13 @@
 // Bounded visual evidence: an overview across the whole film, details around
 // selected events and directed beats, the target, plan and measured facts.
 
-import { Evaluator, runChecks, sampleAt, type QualityIssue, type Registry, type ToolContext, type TrammeDoc } from '@tramme/core';
+import { sampleAt, type QualityIssue, type Registry, type ToolContext, type TrammeDoc } from '@tramme/core';
+import { qualityChecksOf } from '../isolated-checks.ts';
+import { editorEvaluator } from '../evaluator.ts';
+import { sandboxedDoc } from '../installed.ts';
+import { prefs } from '../settings.ts';
+import { samplePlacedTimes } from '../isolated-placed.ts';
+import type { PlacedSample } from '../plugins/protocol.ts';
 import { analyses } from '../perception.ts';
 import { sheetOf, stills } from '../review.ts';
 import { filmTime, scenesOf, sceneAt } from '../scenes.ts';
@@ -65,7 +71,7 @@ const NOT_ART = new Set(['text', 'captions', 'video', 'audio', 'sound']);
  * entrance and the middle of each coverage gap (`issues` are what the checks
  * gave). Merged when closer than 0.4 s and capped at 12, the cuts kept first.
  */
-export function momentsOf(doc: TrammeDoc, compId: string, registry: Registry, issues: QualityIssue[] = []): Moment[] {
+export function momentsOf(doc: TrammeDoc, compId: string, registry: Registry, issues: QualityIssue[] = [], placed?: Map<number, PlacedSample[]>): Moment[] {
   const comp = doc.compositions[compId];
   if (!comp) return [];
   const scenes = scenesOf(doc, compId), where = (t: number) => sceneAt(scenes, t)?.name ?? '';
@@ -74,11 +80,13 @@ export function momentsOf(doc: TrammeDoc, compId: string, registry: Registry, is
   for (const m of comp.markers ?? []) if (m.kind === 'hero') found.push({ t: m.t, why: `hero: ${m.label || m.id}`, scene: where(m.t), rank: 1 });
   for (const i of issues) if (i.check === 'coverage') found.push({ t: +((i.t ?? 0) + (i.rank ?? 0) / 2).toFixed(2), why: `the speaker alone for ${Math.round(i.rank ?? 0)} s`, scene: where((i.t ?? 0) + (i.rank ?? 0) / 2), rank: 2 });
 
-  const ev = new Evaluator(doc, registry), area = comp.width * comp.height;
+  const ev = placed ? null : editorEvaluator(doc, registry), area = comp.width * comp.height;
   /** whether the layer, a moment after it enters, covers enough of the frame (found in the root's placed layers by its id, nested ones by the end of theirs) */
   const big = (layerId: string, at: number) => {
-    const sample = sampleAt(ev, compId, Math.min(Math.max(0, at), comp.duration - 0.01));
-    return sample.layers.some((p) => (p.id === layerId || p.id.endsWith(`/${layerId}`)) && p.opacity > 0.3 && p.box && (p.box.w * p.box.h) / area >= BIG);
+    const time = Math.min(Math.max(0, at), comp.duration - 0.01);
+    const layers = placed ? placed.get(time) : sampleAt(ev!, compId, time).layers;
+    if (!layers) throw new Error('missing isolated entrance sample');
+    return layers.some((p) => (p.id === layerId || p.id.endsWith(`/${layerId}`)) && p.opacity > 0.3 && p.box && (p.box.w * p.box.h) / area >= BIG);
   };
   const talking = Object.values(comp.layers).some((l) => l.type === 'video' && (l.out ?? comp.duration) - (l.in ?? 0) >= comp.duration * 0.6);
   if (talking) {
@@ -107,6 +115,24 @@ export function momentsOf(doc: TrammeDoc, compId: string, registry: Registry, is
   const others = kept.filter((m) => m.rank !== 0).sort((a, b) => a.t - b.t);
   const out = kept.length > MOST ? [...spread(cuts, MOST), ...spread(others, MOST - Math.min(cuts.length, MOST))] : kept;
   return out.sort((a, b) => a.t - b.t).map(({ t, why, scene }) => ({ t, why, scene }));
+}
+
+/** Gather every possible entrance size in the project worker before choosing review moments. */
+export async function momentsForEvidence(ctx: ToolContext, compId: string, issues: QualityIssue[] = []): Promise<Moment[]> {
+  if (!sandboxedDoc(ctx.doc) && !prefs.peek().sandboxPreview) return momentsOf(ctx.doc, compId, ctx.registry, issues);
+  const comp = ctx.doc.compositions[compId];
+  if (!comp) return [];
+  const scenes = scenesOf(ctx.doc, compId);
+  const candidates = [
+    ...Object.values(comp.layers).map((l) => (l.in ?? 0) + 0.4),
+    ...scenes.flatMap((s) => Object.values((s.comp ? ctx.doc.compositions[s.comp] : comp)?.layers ?? {})
+      .map((l) => filmTime(ctx.doc, compId, s, l.in ?? 0))
+      .filter((at): at is number => at !== null)
+      .map((at) => at + 0.4)),
+  ];
+  const times = [...new Set(candidates.map((at) => Math.min(Math.max(0, at), comp.duration - 0.01)))];
+  const samples = await samplePlacedTimes(ctx, compId, times);
+  return momentsOf(ctx.doc, compId, ctx.registry, issues, new Map(times.map((at, i) => [at, samples[i]])));
 }
 
 /** the format, the length, the scenes with their times and kinds, and how much sound there is */
@@ -149,8 +175,8 @@ export interface Evidence {
 export async function gather(ctx: ToolContext, compId: string, checked?: QualityIssue[]): Promise<Evidence> {
   const doc = ctx.doc, comp = doc.compositions[compId];
   const plan = parsePlan(await ctx.readText(FILM_PLAN_PATH).catch(() => null));
-  const issues = checked ?? await runChecks(doc, ctx.registry, compId, { data: await analyses(ctx) });
-  const moments = momentsOf(doc, compId, ctx.registry, issues);
+  const issues = checked ?? await qualityChecksOf(ctx, compId, await analyses(ctx));
+  const moments = await momentsForEvidence(ctx, compId, issues);
   const directed = directedMoments(doc, compId, plan);
   const samples = reviewSamples(comp.duration, comp.fps, moments, directed);
   const times = samples.map((s) => s.times);

@@ -84,9 +84,17 @@ const HEADERS = `/assets/*
   Cache-Control: ${dev ? 'no-cache' : 'public, max-age=31536000, immutable'}
 /sw.js
   Cache-Control: no-cache
+/scene-runtime.js
+  Cache-Control: no-cache
 /plugin-worker.js
   Cache-Control: no-cache
   Content-Security-Policy: default-src 'none'; script-src 'self' blob: 'unsafe-eval'; connect-src 'self'; img-src 'self' data: blob:; font-src 'self' data:; style-src 'unsafe-inline'
+/project-sandbox.html
+  Cache-Control: no-store
+  Content-Security-Policy: sandbox allow-scripts; default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' data:; worker-src data:; connect-src 'none'; img-src data: blob:; font-src data: blob:; style-src 'unsafe-inline'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'
+/project-sandbox
+  Cache-Control: no-store
+  Content-Security-Policy: sandbox allow-scripts; default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' data:; worker-src data:; connect-src 'none'; img-src data: blob:; font-src data: blob:; style-src 'unsafe-inline'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'
 /*
   X-Content-Type-Options: nosniff
   Referrer-Policy: same-origin
@@ -175,9 +183,9 @@ const workerOptions = (shell: string[], build: string): esbuild.BuildOptions => 
 function shellOf(meta: esbuild.Metafile): { shell: string[]; build: string } {
   const bundles = Object.keys(meta.outputs).map((p) => `/${path.relative(DIST, path.resolve(ROOT, p)).split(path.sep).join('/')}`).filter((p) => !/\.(map|txt)$/.test(p) && !p.startsWith('/assets/vault-'));
   const icons = fs.readdirSync(ICONS).map((f) => `/icons/${f}`);
-  const shell = ['/', '/manifest.webmanifest', '/icon.svg', '/plugin-worker.js', ...icons, ...bundles.sort()];
+  const shell = ['/', '/manifest.webmanifest', '/icon.svg', '/plugin-worker.js', '/scene-runtime.js', '/project-sandbox.html', ...icons, ...bundles.sort()];
   // the bundles' names carry their hash; the sandbox's file does not: its bytes are counted in
-  const hash = createHash('sha256').update(shell.join('\n')).update(fs.readFileSync(path.join(DIST, 'plugin-worker.js'))).digest('hex').slice(0, 12);
+  const hash = createHash('sha256').update(shell.join('\n')).update(fs.readFileSync(path.join(DIST, 'plugin-worker.js'))).update(fs.readFileSync(path.join(DIST, 'scene-runtime.js'))).digest('hex').slice(0, 12);
   return { shell, build: hash };
 }
 
@@ -188,11 +196,18 @@ const sandboxOptions: esbuild.BuildOptions = {
   minify: !dev && !process.env.TRAMME_NOMINIFY, sourcemap: 'linked', logLevel: 'warning', legalComments: 'none',
 };
 
+/** the seek runtime web scenes import, a file of its own: the live preview puts it in each scene's document */
+const sceneRuntimeOptions: esbuild.BuildOptions = {
+  entryPoints: [path.join(ROOT, 'packages/project/src/scene-runtime.ts')], outfile: path.join(DIST, 'scene-runtime.js'),
+  bundle: true, format: 'esm', platform: 'browser', target: 'chrome120', minify: !dev && !process.env.TRAMME_NOMINIFY, logLevel: 'warning', legalComments: 'none',
+};
+
 // empty the folder rather than removing it (a running `wrangler dev` watches it)
 fs.mkdirSync(DIST, { recursive: true });
 for (const f of fs.readdirSync(DIST)) fs.rmSync(path.join(DIST, f), { recursive: true, force: true });
 fs.mkdirSync(path.join(DIST, 'assets'), { recursive: true });
 fs.writeFileSync(path.join(DIST, '_headers'), HEADERS);
+fs.copyFileSync(path.join(HERE, 'project-sandbox.html'), path.join(DIST, 'project-sandbox.html'));
 // installable as an app (a phone's home screen, a computer's): opens full screen, in the editor's colours,
 // with the icons each system asks for; the launch screen is white, the colour of the icons' tile (scripts/app-icons.ts)
 fs.writeFileSync(path.join(DIST, 'icon.svg'), ICON);
@@ -246,7 +261,7 @@ function personalDevConfig(): string {
 
 if (!dev) {
   const t0 = performance.now();
-  const [r] = await Promise.all([esbuild.build(options), esbuild.build(sandboxOptions)]);
+  const [r] = await Promise.all([esbuild.build(options), esbuild.build(sandboxOptions), esbuild.build(sceneRuntimeOptions)]);
   writePage(r.metafile!);
   // the service worker last: it names the files just written
   const { shell, build } = shellOf(r.metafile!);
@@ -261,8 +276,9 @@ if (!dev) {
   // in dev the service worker keeps nothing: the files change at every save
   const sw = await esbuild.context(workerOptions([], 'dev'));
   const sandbox = await esbuild.context(sandboxOptions);
-  await Promise.all([ctx.rebuild(), sw.rebuild(), sandbox.rebuild()]);
-  await Promise.all([ctx.watch(), sw.watch(), sandbox.watch()]);
+  const sceneRuntime = await esbuild.context(sceneRuntimeOptions);
+  await Promise.all([ctx.rebuild(), sw.rebuild(), sandbox.rebuild(), sceneRuntime.rebuild()]);
+  await Promise.all([ctx.watch(), sw.watch(), sandbox.watch(), sceneRuntime.watch()]);
   const port = process.env.PORT ?? '8787';
   // TRAMME_STATE: projects stored elsewhere (trials beside a running `npm run dev`)
   const state = process.env.TRAMME_STATE ?? '.wrangler/state';

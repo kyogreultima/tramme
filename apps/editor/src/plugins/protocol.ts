@@ -5,7 +5,15 @@
 // a context bridged over these messages. Everything that crosses is plain
 // data: live objects (elements, Path2D, functions) stay on their own side.
 
-import type { CheckType, NodeType, EffectType, KitType, PluginMeta, PresetType, PromptType, ToolType } from '@tramme/core';
+import type { CheckType, NodeType, EffectType, KitType, ModifierType, PluginMeta, PresetType, PromptType, ToolType, EvaluatedTransform, SoundCue, MediaClock, MotionReport, Quad, QualityIssue } from '@tramme/core';
+
+/** plain evaluated values used by selection geometry; node callbacks stay in the worker */
+export type LayerSample = { id: string; props: Record<string, unknown>; transform: EvaluatedTransform; masks: { id: string; props: Record<string, unknown> }[] } | { id: string; err: string };
+/** placed layer data for area selection; node callbacks and raw properties stay in the worker */
+export type PlacedSample = { id: string; name: string; type: string; box: { x: number; y: number; w: number; h: number } | null; opacity: number; locked?: boolean; textSize?: number; hasText?: boolean };
+/** file/composition time mapping for authoring tools; no evaluator callback crosses */
+export type ClockSample = { clock: MediaClock; fileTimes: number[]; moments: number[][] };
+export type MotionSample = { times: number[]; motion: number[] };
 
 /** a plugin as the sandbox sees it: its declarations, without any function */
 export interface PluginDecl {
@@ -59,7 +67,9 @@ export interface SchemaEffect {
 export interface SchemaModifier {
   type: string;
   title: string;
-  params?: Record<string, unknown>;
+  description: string;
+  ai?: ModifierType['ai'];
+  params: ModifierType['params'];
 }
 
 /** what a tool run ships across: the document and its moment, the project's base */
@@ -100,8 +110,10 @@ export interface SandboxDoc {
   images: Record<string, unknown>;
   /** the parsed json assets */
   json: Record<string, unknown>;
-  /** the fonts, loaded in the sandbox's own realm */
-  fonts: { url: string; family: string; weight?: string }[];
+  /** approved model bytes, copied into the worker with the document */
+  models?: Record<string, ArrayBuffer>;
+  /** approved font bytes supplied by the host; the worker cannot fetch URLs */
+  fonts: { url: string; family: string; weight?: string; data?: ArrayBuffer }[];
 }
 
 /** one sandboxed layer to draw for a frame */
@@ -167,6 +179,16 @@ export type ToWorker =
   | { kind: 'doc'; doc: SandboxDoc }
   | { kind: 'draw'; call: number; payload: DrawPayload }
   | { kind: 'render'; call: number; payload: FramePayload }
+  | { kind: 'evaluate'; call: number; address: string; t: number; compId: string }
+  | { kind: 'evaluateSeries'; call: number; addresses: string[]; times: number[]; compId: string }
+  | { kind: 'evaluateLayers'; call: number; ids: string[]; t: number; compId: string }
+  | { kind: 'soundCues'; call: number; compId: string }
+  | { kind: 'sampleClock'; call: number; compId: string; layerId: string; compTimes: number[]; fileTimes: number[] }
+  | { kind: 'pictureMotion'; call: number; compId: string }
+  | { kind: 'motionReport'; call: number; compId: string; from: number; to: number }
+  | { kind: 'sampleQuads'; call: number; compId: string; layerId: string; times: number[] }
+  | { kind: 'qualityChecks'; call: number; compId: string }
+  | { kind: 'samplePlaced'; call: number; t: number; compId: string }
   | { kind: 'export'; call: number; type: string; props: unknown }
   | { kind: 'abort'; call: number }
   | { kind: 'answer'; id: number; ok?: unknown; err?: string };
@@ -179,6 +201,16 @@ export type FromWorker =
   | { kind: 'result'; call: number; ok?: unknown; err?: string }
   | { kind: 'drawn'; call: number; frame: number; results: DrawResult[] }
   | { kind: 'rendered'; call: number; bitmap?: unknown; err?: string }
+  | { kind: 'evaluated'; call: number; value?: unknown; err?: string }
+  | { kind: 'evaluatedSeries'; call: number; values?: unknown[][]; err?: string }
+  | { kind: 'evaluatedLayers'; call: number; values?: LayerSample[]; err?: string }
+  | { kind: 'soundCues'; call: number; values?: SoundCue[]; err?: string }
+  | { kind: 'sampledClock'; call: number; value?: ClockSample; err?: string }
+  | { kind: 'pictureMotion'; call: number; value?: MotionSample; err?: string }
+  | { kind: 'motionReport'; call: number; value?: MotionReport; err?: string }
+  | { kind: 'sampledQuads'; call: number; value?: Quad[]; err?: string }
+  | { kind: 'qualityChecked'; call: number; values?: QualityIssue[]; err?: string }
+  | { kind: 'sampledPlaced'; call: number; values?: PlacedSample[]; err?: string }
   | { kind: 'exported'; call: number; svg?: string; lottie?: unknown; err?: string }
   | { kind: 'ask'; id: number; call: number; q: Ask }
   | { kind: 'progress'; call: number; done: number; total: number; step?: string };

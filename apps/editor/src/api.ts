@@ -6,7 +6,7 @@
 // the keys of the system keychain put back by the app (tauri.ts).
 
 import type { TrammeDoc, Op } from '@tramme/core';
-import { isMedia, LIMITS, type Manifest } from '@tramme/project';
+import { isMedia, LIMITS, pathIssue, type Manifest } from '@tramme/project';
 import type { KeyedProvider, KeyStatus, Voice } from '@tramme/api';
 import type { Usage } from '@tramme/assistant';
 export type { Voice };
@@ -14,6 +14,7 @@ import { vaultOrigin } from './mode.ts';
 import { desktopFetch, tauri } from './tauri.ts';
 import { vaultFetch } from './vault/link.ts';
 import type { FileKind } from './sources.ts';
+import { readLimitedBody } from './plugins/host.ts';
 
 export interface ChatItem {
   id: string;
@@ -128,7 +129,11 @@ async function call<T>(path: string, init?: RequestInit, go: typeof reach = fetc
 
 const jsonInit = (method: string, body: unknown): RequestInit => ({ method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
 const P = (id: string) => `/api/projects/${encodeURIComponent(id)}`;
-const filePath = (path: string) => path.split('/').map(encodeURIComponent).join('/');
+const filePath = (path: string) => {
+  const bad = pathIssue(path);
+  if (bad) throw new Error(`${path}: ${bad}`);
+  return path.split('/').map(encodeURIComponent).join('/');
+};
 
 export const api = {
   /** what the server offers; in personal mode and in the desktop app, what is connected comes from where the keys are */
@@ -157,10 +162,10 @@ export const api = {
 
   // ── the plugin library, shared by the projects ─────────────────
   library: () => call<{ name: string; size: number; modified: string }[]>('/api/library'),
-  async libraryGet(name: string): Promise<string> {
+  async libraryGet(name: string, limit = LIMITS.file): Promise<string> {
     const r = await fetch(`/api/library/${encodeURIComponent(name)}`, { cache: 'no-store' });
     if (!r.ok) throw new ApiError(r.status, `no plugin "${name}" in the library (HTTP ${r.status})`);
-    return r.text();
+    return new TextDecoder().decode(await readLimitedBody(r, limit, 'library file'));
   },
   libraryPut: (name: string, code: string) => call<{ name: string; size: number }>(`/api/library/${encodeURIComponent(name)}`, { method: 'PUT', headers: { 'content-type': 'text/javascript' }, body: code }),
   libraryDelete: (name: string) => call<unknown>(`/api/library/${encodeURIComponent(name)}`, { method: 'DELETE' }),
@@ -172,7 +177,7 @@ export const api = {
   soundDelete: (name: string) => call<{ deleted: string }>(api.soundUrl(name), { method: 'DELETE' }),
   soundPut: (name: string, data: Blob, entry: unknown) => call<{ name: string; size: number }>(api.soundUrl(name), { method: 'PUT', headers: { 'content-type': data.type || 'application/octet-stream', 'x-tramme-entry': JSON.stringify(entry) }, body: data }),
   /** a sound effect, a music bed or a voice-over made by a provider with the user's key */
-  async generate(ask: { kind: 'sfx' | 'music' | 'voice'; prompt: string; duration?: number; voice?: string; style?: string; model?: string; provider?: string }, signal?: AbortSignal): Promise<MadeSound> {
+  async generate(ask: { kind: 'sfx' | 'music' | 'voice'; prompt: string; duration?: number; voice?: string; style?: string; model?: string; provider?: string; plan?: import('./music-structure.ts').MusicStructure }, signal?: AbortSignal): Promise<MadeSound> {
     const r = await answered(await reach('/api/generate', { ...jsonInit('POST', ask), signal }));
     return { blob: await r.blob(), provider: r.headers.get('x-tramme-provider') ?? '', model: r.headers.get('x-tramme-model') ?? '', voice: r.headers.get('x-tramme-voice') ?? undefined };
   },
@@ -233,6 +238,7 @@ export const api = {
    * parts sent three at a time (R2 multipart). Progress in bytes.
    */
   async writeAny(id: string, path: string, blob: Blob, onProgress?: (sent: number, total: number) => void): Promise<{ path: string; size: number; etag: string; modified: string }> {
+    filePath(path);
     if (blob.size <= LIMITS.file || !isMedia(path)) {
       const r = await api.write(id, path, blob);
       onProgress?.(blob.size, blob.size);

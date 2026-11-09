@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { newProject } from '@tramme/project';
 import type { PluginModule } from '@tramme/core';
-import { blitSandboxFrame, ensureSandboxDoc, resetSandbox, sandboxVideoFrames } from '../src/plugins/sandbox-draw.ts';
+import { blitSandboxFrame, ensureSandboxDoc, moduleItemsOf, resetSandbox, sandboxVideoFrames } from '../src/plugins/sandbox-draw.ts';
 import type { Renderer } from '@tramme/render';
 import { makeSandboxDraw } from '../src/plugins/worker-draw.ts';
 import type { PluginHost } from '../src/plugins/host.ts';
@@ -54,6 +54,39 @@ afterEach(() => vi.unstubAllGlobals());
 const project = () => newProject({ name: 'Video regression', width: 1920, height: 1080, fps: 24, duration: 30 }).doc;
 
 describe('sandbox document assets', () => {
+  it('loads Free code modules alongside plugin modules for isolated rendering', () => {
+    const doc = project();
+    doc.assets.code = { type: 'module', src: 'code/draw.js' };
+    doc.assets.plugin = { type: 'module', src: 'plugins/effect.js' };
+    doc.assets.reference = { type: 'image', src: 'assets/reference.png' };
+    doc.plugins = ['plugin'];
+    expect(moduleItemsOf(doc, 'https://tramme.test/project/document.tramme.json')).toEqual([
+      { id: 'code', url: 'https://tramme.test/project/code/draw.js' },
+      { id: 'plugin', url: 'https://tramme.test/project/plugins/effect.js' },
+    ]);
+  });
+
+  it('copies loaded model bytes into the worker and refreshes them after an edit', async () => {
+    const doc = project();
+    doc.assets.mesh = { type: 'model', src: 'assets/mesh.glb' };
+    const received: ArrayBuffer[] = [];
+    const mod: PluginModule = { nodes: [{
+      type: 'test.model-bytes', title: 'Model bytes', category: 'Test', props: {},
+      render: { canvas2d: (_ctx, _props, host) => { received.push(host.asset<ArrayBuffer>('mesh')); } },
+    }] };
+    const side = makeSandboxDraw(new Map([['model-bytes', mod]]));
+    const host = { setDoc: (d) => side.setDoc(d) } as PluginHost;
+    const first = new Uint8Array([1, 2]).buffer;
+    ensureSandboxDoc(host, { doc, docUrl: 'https://tramme.test/doc.json', loaded: () => first });
+    const payload = { frame: 0, comp: { width: 1920, height: 1080, fps: 24, duration: 30 }, layers: [], items: [{ id: 'mesh', type: 'test.model-bytes', props: {}, t: 0, frame: 0 }] };
+    expect((await side.draw(payload)).results[0]).toMatchObject({ ok: true });
+    expect(received.at(-1)).toBe(first);
+    const second = new Uint8Array([3, 4]).buffer;
+    ensureSandboxDoc(host, { doc, docUrl: 'https://tramme.test/doc.json', loaded: () => second });
+    expect((await side.draw(payload)).results[0]).toMatchObject({ ok: true });
+    expect(received.at(-1)).toBe(second);
+  });
+
   const picture = { width: 200, height: 100 };
   const pictureNode: PluginModule = { nodes: [{
     type: 'test.picture', title: 'Picture', category: 'Test', props: {},

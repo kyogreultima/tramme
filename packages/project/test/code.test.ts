@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest';
 import type { TrammeDoc } from '@tramme/core';
 import { newProject } from '../src/format.ts';
-import { codeInventory } from '../src/code.ts';
+import { codeInventory, containsExpression } from '../src/code.ts';
 
 const doc = (): TrammeDoc => {
   const { doc } = newProject({ name: 'Test', width: 100, height: 100, fps: 30, duration: 2 });
@@ -66,5 +66,15 @@ describe('codeInventory', () => {
     const inv = codeInventory(d, new Map());
     expect(inv.expressions).toBe(2);
     expect(inv.addresses[0]).toBe(`/compositions/${d.root}/background`);
+  });
+
+  it('detects nested expressions that also need the isolated renderer', () => {
+    const d = doc();
+    expect(containsExpression(d)).toBe(false);
+    d.compositions[d.root].layers.nested = {
+      type: 'comp', transform: {}, props: { comp: 'other' },
+      distribute: { params: { spin: { $expr: 'time * 45' } } },
+    } as never;
+    expect(containsExpression(d)).toBe(true);
   });
 });

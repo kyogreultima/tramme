@@ -3,7 +3,12 @@
 // one form, and when a scene is built in another kind than the film plan gave
 // it. The kinds are the film plan's (filmplan.ts).
 
-import { Evaluator, sampleAt, type PlacedLayer, type Registry, type TrammeDoc } from '@tramme/core';
+import { sampleAt, type Registry, type ToolContext, type TrammeDoc } from '@tramme/core';
+import { editorEvaluator } from './evaluator.ts';
+import { sandboxedDoc } from './installed.ts';
+import { samplePlacedTimes } from './isolated-placed.ts';
+import { prefs } from './settings.ts';
+import type { PlacedSample } from './plugins/protocol.ts';
 import { builtinRegistry } from '@tramme/nodes';
 import { planIssues, type FilmPlan, type PictureKind, type PlanScene } from './filmplan.ts';
 import { scenesOf, type Scene } from './scenes.ts';
@@ -22,7 +27,7 @@ const kindOfType = (type: string): PictureKind | null =>
     : type === 'model.3d' || type === 'solid.3d' ? '3d' : type.startsWith('map.') ? 'map' : null;
 
 /** the share of the frame a placed layer covers (a layer with no bounds counts for a twentieth) */
-function share(p: PlacedLayer, w: number, h: number): number {
+function share(p: Pick<PlacedSample, 'box'>, w: number, h: number): number {
   if (!p.box) return 0.05;
   const x = Math.max(0, Math.min(w, p.box.x + p.box.w) - Math.max(0, p.box.x)), y = Math.max(0, Math.min(h, p.box.y + p.box.h) - Math.max(0, p.box.y));
   return (x * y) / (w * h);
@@ -33,7 +38,15 @@ export function formOf(doc: TrammeDoc, compId: string, opts: { registry?: Regist
   const comp = doc.compositions[compId];
   if (!comp) return NONE;
   let sample;
-  try { sample = sampleAt(new Evaluator(doc, opts.registry ?? builtinRegistry()), compId, Math.min(opts.at ?? comp.duration / 2, Math.max(0, comp.duration - 1e-3))); } catch { return NONE; }
+  try { sample = sampleAt(editorEvaluator(doc, opts.registry ?? builtinRegistry()), compId, Math.min(opts.at ?? comp.duration / 2, Math.max(0, comp.duration - 1e-3))); } catch { return NONE; }
+  return formOfPlaced(doc, compId, sample.layers.map((p) => ({ id: p.id, name: p.layer.name ?? p.id, type: p.layer.type, box: p.box,
+    opacity: p.opacity, textSize: p.textSize, hasText: !!p.text?.trim() })));
+}
+
+/** Classify a scene from plain placed values, including worker samples. */
+export function formOfPlaced(doc: TrammeDoc, compId: string, layers: PlacedSample[]): Form {
+  const comp = doc.compositions[compId];
+  if (!comp) return NONE;
   const area = new Map<PictureKind, { area: number; why: Set<string> }>();
   const add = (kind: PictureKind, a: number, why: string) => {
     const e = area.get(kind) ?? { area: 0, why: new Set<string>() };
@@ -41,12 +54,12 @@ export function formOf(doc: TrammeDoc, compId: string, opts: { registry?: Regist
     area.set(kind, e);
   };
   let biggestText = 0, textArea = 0;
-  for (const p of sample.layers) {
+  for (const p of layers) {
     if (p.opacity < 0.05) continue;
-    const type = p.layer.type, a = share(p, comp.width, comp.height), kind = kindOfType(type);
+    const type = p.type, a = share(p, comp.width, comp.height), kind = kindOfType(type);
     if (kind) add(kind, a, type);
     else if (type === 'image' || type === 'video') add(a >= PHOTO_SHARE ? 'photo' : 'object', a, `${type} over ${Math.round(a * 100)} % of the frame`);
-    else if (type === 'text' && p.text?.trim()) { biggestText = Math.max(biggestText, (p.textSize ?? 0) / comp.height); textArea += a; }
+    else if (type === 'text' && p.hasText) { biggestText = Math.max(biggestText, (p.textSize ?? 0) / comp.height); textArea += a; }
   }
   if (biggestText >= TYPE_SHARE) add('type', textArea, `text ${Math.round(biggestText * 100)} % of the frame's height`);
   const [best] = [...area].sort((x, y) => y[1].area - x[1].area);
@@ -63,6 +76,29 @@ export function formLines(doc: TrammeDoc, compId: string, plan: FilmPlan | null,
   const scenes = scenesOf(doc, compId);
   if (scenes.length < 2) return [];
   const forms = scenes.map((s) => (s.comp ? formOf(doc, s.comp, { registry }) : formOf(doc, compId, { registry, at: (s.from + s.to) / 2 })));
+  return linesForForms(scenes, forms, plan);
+}
+
+/** The check's scene-form lines, using isolated placement when enabled. */
+export async function formLinesForReview(ctx: ToolContext, plan: FilmPlan | null): Promise<string[]> {
+  if (!sandboxedDoc(ctx.doc) && !prefs.peek().sandboxPreview) return formLines(ctx.doc, ctx.compId, plan, ctx.registry);
+  const scenes = scenesOf(ctx.doc, ctx.compId);
+  if (scenes.length < 2) return [];
+  if (scenes.length > 512) throw new Error('too many isolated scene forms');
+  const specs = scenes.map((s) => {
+    const id = s.comp ?? ctx.compId, comp = ctx.doc.compositions[id];
+    return { id, at: Math.min(s.comp ? comp.duration / 2 : (s.from + s.to) / 2, Math.max(0, comp.duration - 1e-3)) };
+  });
+  const forms: Form[] = Array(scenes.length);
+  for (const id of new Set(specs.map((s) => s.id))) {
+    const positions = specs.map((s, i) => s.id === id ? i : -1).filter((i) => i >= 0);
+    const samples = await samplePlacedTimes(ctx, id, positions.map((i) => specs[i].at));
+    positions.forEach((i, j) => { forms[i] = formOfPlaced(ctx.doc, id, samples[j]); });
+  }
+  return linesForForms(scenes, forms, plan);
+}
+
+function linesForForms(scenes: Scene[], forms: Form[], plan: FilmPlan | null): string[] {
   const out: string[] = [];
   for (let i = 0; i < scenes.length;) {
     let j = i + 1;

@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Web scene preview prototype</title>
+<style>
+  html, body { margin: 0; background: transparent; color: white; font: 12px system-ui; }
+  iframe { display: block; width: 320px; height: 180px; border: 0; }
+  .controls { display: flex; width: 320px; box-sizing: border-box; gap: 8px; align-items: center; padding: 8px; background: #101820; }
+  input { flex: 1; }
+</style>
+<iframe id="scene" src="/" title="Seekable web scene"></iframe>
+<div class="controls"><input id="time" type="range" min="0" max="1" step="0.001" value="0"><output id="readout">0.000 s</output></div>
+<script>
+  const frame = document.getElementById('scene');
+  const slider = document.getElementById('time');
+  const readout = document.getElementById('readout');
+  const preview = window.webscenePreview = {
+    readyState: false,
+    async seek(t) {
+      if (!this.readyState) throw new Error('scene preview is not ready');
+      const duration = frame.contentWindow.__hf.duration;
+      const clamped = Math.max(0, Math.min(duration, t));
+      frame.contentWindow.__hf.seek(clamped);
+      slider.max = String(duration);
+      slider.value = String(clamped);
+      readout.value = `${clamped.toFixed(3)} s`;
+    },
+  };
+  frame.addEventListener('load', async () => {
+    await frame.contentDocument.fonts.ready;
+    preview.readyState = true;
+    await preview.seek(0);
+  }, { once: true });
+  slider.addEventListener('input', () => { void preview.seek(Number(slider.value)); });
+</script>

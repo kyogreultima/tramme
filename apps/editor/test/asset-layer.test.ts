@@ -36,6 +36,29 @@ describe('a layer of a sub-clip', () => {
 });
 
 describe('a layer of a video asset', () => {
+  it('does not insert a video layer after a different project opens during the duration read', async () => {
+    const next = newProject({ name: 'Next', width: 64, height: 64, fps: 30, duration: 1 });
+    let finish!: (length: number) => void;
+    vi.spyOn(perception, 'mediaDuration').mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+    const pending = layerFromAsset('talk', talk);
+    S.project.value = next.manifest;
+    S.docUrl.value = 'http://localhost/api/projects/next/files/document.json';
+    S.doc.value = next.doc;
+    S.compId.value = next.doc.root;
+    finish(20);
+    await pending;
+    expect(S.doc.peek()).toBe(next.doc);
+    expect(Object.values(S.doc.peek().compositions[next.doc.root].layers)).toHaveLength(0);
+  });
+
+  it('refuses a video outside project assets before reading its duration', async () => {
+    const read = vi.spyOn(perception, 'mediaDuration');
+    for (const src of ['http://localhost/api/private', '../other/assets/clip.mp4', 'assets/%2e%2e/private.mp4']) {
+      await expect(layerFromAsset('talk', { ...talk, src })).rejects.toThrow('project asset');
+    }
+    expect(read).not.toHaveBeenCalled();
+  });
+
   it('plays a 12-minute video whole in a 5-second project', async () => {
     vi.spyOn(perception, 'mediaDuration').mockResolvedValue(753.17);
     await layerFromAsset('talk', talk);

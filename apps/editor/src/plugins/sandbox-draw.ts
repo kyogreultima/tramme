@@ -10,6 +10,7 @@
 
 import type { EffectType, Handle, Host, ModifierType, NodeType, PluginModule, Rect, Registry, TrammeDoc } from '@tramme/core';
 import { Evaluator } from '@tramme/core';
+import { sandboxedDoc } from '../installed.ts';
 import type { Renderer } from '@tramme/render';
 import type { PluginHost } from './host.ts';
 import type { PluginDecl, SandboxDoc, SchemaModifier, SchemaNode } from './protocol.ts';
@@ -178,12 +179,12 @@ async function request(host: Host, type: string, props: unknown, previousFrame?:
 let documents = new WeakMap<PluginHost, SandboxDoc>();
 /** make sure the sandbox holds the document and its assets (idempotent) */
 export function ensureSandboxDoc(host: PluginHost, doc: SandboxContext) {
-  const images: Record<string, unknown> = {}, json: Record<string, unknown> = {};
+  const images: Record<string, unknown> = {}, json: Record<string, unknown> = {}, models: Record<string, ArrayBuffer> = {};
   const fonts: SandboxDoc['fonts'] = [];
   for (const [id, a] of Object.entries(doc.doc.assets)) {
-    if (a.type === 'image' || a.type === 'json') {
+    if (a.type === 'image' || a.type === 'json' || a.type === 'model') {
       const v = doc.loaded(id);
-      if (v != null) (a.type === 'image' ? images : json)[id] = v;
+      if (v != null) (a.type === 'image' ? images : a.type === 'model' ? models : json)[id] = v;
     } else if (a.type === 'font') {
       fonts.push({ url: new URL(a.src, doc.docUrl).href, family: a.family ?? id, weight: a.weight });
     }
@@ -193,8 +194,8 @@ export function ensureSandboxDoc(host: PluginHost, doc: SandboxContext) {
   // reload or a decode finishing), and each worker needs its own snapshot.
   const previous = documents.get(host);
   const same = (a: Record<string, unknown>, b: Record<string, unknown>) => Object.keys(a).length === Object.keys(b).length && Object.keys(a).every((id) => a[id] === b[id]);
-  if (previous?.doc === doc.doc && previous.docUrl === doc.docUrl && same(previous.images, images) && same(previous.json, json)) return;
-  const snapshot = { doc: doc.doc, docUrl: doc.docUrl, images, json, fonts };
+  if (previous?.doc === doc.doc && previous.docUrl === doc.docUrl && same(previous.images, images) && same(previous.json, json) && same(previous.models ?? {}, models)) return;
+  const snapshot = { doc: doc.doc, docUrl: doc.docUrl, images, json, models, fonts };
   host.setDoc(snapshot);
   documents.set(host, snapshot);
 }
@@ -211,9 +212,10 @@ export function resetSandbox() {
   declareCache.clear();
 }
 
-/** the sandbox's requests for a document's plugins: id and url (the asset's own, resolved against the document) */
-export function pluginItemsOf(doc: TrammeDoc, docUrl: string): { id: string; url: string }[] {
-  return (doc.plugins ?? []).map((id) => ({ id, url: new URL(String(doc.assets[id]?.src ?? ''), docUrl).href })).filter((p) => !!p.url);
+/** Every project module needed by isolated rendering, including Free code assets. */
+export function moduleItemsOf(doc: TrammeDoc, docUrl: string): { id: string; url: string }[] {
+  return Object.entries(doc.assets).filter(([, asset]) => asset.type === 'module')
+    .map(([id, asset]) => ({ id, url: new URL(asset.src, docUrl).href }));
 }
 
 /**
@@ -264,7 +266,7 @@ export async function primeSandboxExports(doc: TrammeDoc, registry: Registry, t:
   const e = env;
   if (!e) return;
   const h = e.host();
-  const evaluator = new Evaluator(doc, registry);
+  const evaluator = new Evaluator(doc, registry, { allowExpressions: !sandboxedDoc(doc) });
   const jobs: Promise<void>[] = [];
   for (const [cid, comp] of Object.entries(doc.compositions)) {
     for (const [id, layer] of Object.entries(comp.layers)) {

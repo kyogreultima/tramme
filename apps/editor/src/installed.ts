@@ -11,7 +11,7 @@
 import { signal } from '@preact/signals';
 import { PROVIDER_ROUTES, recordBucket } from '@tramme/api';
 import { applyOps, type Op, type ToolContext, type TrammeDoc } from '@tramme/core';
-import { compareVersions, manifestOf, packInstalled, permissionsAdded, readPluginPackage, unpackInstalled, type PluginManifest } from '@tramme/project';
+import { compareVersions, LIMITS, manifestOf, packInstalled, permissionsAdded, readPluginPackage, unpackInstalled, type PluginManifest } from '@tramme/project';
 import { api, reach } from './api.ts';
 import { folderRecords, type DirHandle } from './local/folder.ts';
 import { personal } from './mode.ts';
@@ -119,8 +119,14 @@ async function listFiles(): Promise<{ name: string; size: number; modified: stri
   try { return await api.library(); } catch { return []; }
 }
 async function readFile(name: string): Promise<string> {
-  if (storageKind.value === 'folder') { const o = await folderBucket().get(name); if (!o || !('arrayBuffer' in o)) throw new Error(`no plugin "${name}"`); return new TextDecoder().decode(await o.arrayBuffer()); }
-  return api.libraryGet(name);
+  const limit = COMPANION.test(name) ? LIMITS.file : 1024 * 1024;
+  if (storageKind.value === 'folder') {
+    const o = await folderBucket().get(name);
+    if (!o || !('arrayBuffer' in o)) throw new Error(`no plugin "${name}"`);
+    if (o.size > limit) throw new Error(`plugin file too large: ${name}`);
+    return new TextDecoder().decode(await o.arrayBuffer());
+  }
+  return api.libraryGet(name, limit);
 }
 async function writeFile(name: string, code: string): Promise<void> {
   if (storageKind.value === 'folder') { await folderBucket().put(name, code, { httpMetadata: { contentType: 'text/javascript' } }); return; }
@@ -132,12 +138,41 @@ async function removeFile(name: string): Promise<void> {
 }
 
 /** a plugin's own files as a module of data (so every storage, made for modules, keeps them) */
-const filesModule = (files: Map<string, Uint8Array>) => `// the files of a plugin's package, kept beside it by tramme\nexport const files = ${JSON.stringify(Object.fromEntries([...files].map(([k, v]) => [k, btoa(String.fromCharCode(...v))])))};\n`;
-function filesOf(code: string): Map<string, Uint8Array> {
+const filePath = (path: string) => !!path && path.length <= 512 && !path.startsWith('/') &&
+  !/[\\%?#:\u0000-\u001f\u007f]/.test(path) && path.split('/').every((part) => !!part && part !== '.' && part !== '..');
+const PLUGIN_FILES_LIMIT = 128 * 1024 * 1024;
+export function filesModule(files: Map<string, Uint8Array>): string {
+  if (files.size > 2000) throw new Error('plugin has too many files');
+  let total = 0;
+  const encoded: Record<string, string> = Object.create(null);
+  for (const [path, bytes] of files) {
+    if (!filePath(path)) throw new Error(`invalid plugin file path: ${path}`);
+    total += bytes.byteLength;
+    if (total > PLUGIN_FILES_LIMIT) throw new Error('plugin files too large');
+    let binary = '';
+    for (let i = 0; i < bytes.length; i += 8192) binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
+    encoded[path] = btoa(binary);
+  }
+  const source = `// the files of a plugin's package, kept beside it by tramme\nexport const files = ${JSON.stringify(encoded)};\n`;
+  if (source.length > LIMITS.file) throw new Error('plugin files too large');
+  return source;
+}
+export function filesOf(code: string): Map<string, Uint8Array> {
   const m = /export const files = (\{[\s\S]*\});/.exec(code);
   if (!m) return new Map();
-  const o = JSON.parse(m[1]) as Record<string, string>;
-  return new Map(Object.entries(o).map(([k, b]) => [k, Uint8Array.from(atob(b), (c) => c.charCodeAt(0))]));
+  const parsed: unknown = JSON.parse(m[1]);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('invalid plugin files');
+  const entries = Object.entries(parsed);
+  if (entries.length > 2000) throw new Error('plugin has too many files');
+  let total = 0;
+  const files = new Map<string, Uint8Array>();
+  for (const [path, value] of entries) {
+    if (!filePath(path) || typeof value !== 'string') throw new Error(`invalid plugin file path: ${path}`);
+    total += Math.floor(value.length * 3 / 4);
+    if (total > PLUGIN_FILES_LIMIT) throw new Error('plugin files too large');
+    files.set(path, Uint8Array.from(atob(value), (c) => c.charCodeAt(0)));
+  }
+  return files;
 }
 
 /** a file of the library that is data, not a plugin: a component or a reference */
@@ -151,6 +186,7 @@ export async function refreshInstalled(): Promise<void> {
   for (const f of list) {
     // what the library keeps besides plugins (components, references) is not a plugin
     if (COMPANION.test(f.name) || isKept(f.name)) continue;
+    if (f.size > 1024 * 1024) continue;
     try {
       const code = await readFile(f.name);
       const files = names.has(companionOf(f.name)) ? filesOf(await readFile(companionOf(f.name))) : new Map();
@@ -166,8 +202,13 @@ export interface Candidate { file: string; code: string; files: Map<string, Uint
 /** a picked or dropped file as a candidate: a .js module or a .trammeplugin package */
 export async function candidateOf(f: File): Promise<Candidate> {
   let code: string, files = new Map<string, Uint8Array>();
-  if (/\.trammeplugin$/i.test(f.name)) ({ module: code, files } = readPluginPackage(new Uint8Array(await f.arrayBuffer())));
-  else if (/\.m?js$/i.test(f.name)) code = await f.text();
+  if (/\.trammeplugin$/i.test(f.name)) {
+    if (f.size > 64 * 1024 * 1024) throw new Error('plugin package too large');
+    ({ module: code, files } = readPluginPackage(new Uint8Array(await f.arrayBuffer())));
+  } else if (/\.m?js$/i.test(f.name)) {
+    if (f.size > 1024 * 1024) throw new Error('plugin module too large');
+    code = await f.text();
+  }
   else throw new Error(`${f.name}: a .js module or a .trammeplugin package is expected`);
   const manifest = manifestOf(code, f.name);
   // the same plugin (its id) installed already: an update, kept under its file name
@@ -244,7 +285,7 @@ export function permitted(ctx: ToolContext, p: Installed): ToolContext {
         if (PROVIDER_ROUTES.includes(route) && providers.includes(route)) return reach(u.pathname + u.search, init as RequestInit);
         throw new Error(`${name} did not declare the provider route "${route}" (meta.permissions.providers)`);
       }
-      if (origins.includes(u.origin)) return fetch(u.href, { ...(init as RequestInit), credentials: 'omit' });
+      if (origins.includes(u.origin)) return fetch(u.href, { ...(init as RequestInit), credentials: 'omit', redirect: 'error' });
       throw new Error(`${name} did not declare ${u.origin} (meta.permissions.network)`);
     },
     writeFile: (path, data) => (write(path) ? ctx.writeFile(path, data) : Promise.reject(new Error(`${name} writes under assets/ and the paths it declared only (meta.permissions.files), not ${path}`))),
@@ -320,7 +361,7 @@ export const copiesIn = (doc: TrammeDoc): Record<string, string> => {
  * that carries a copy of an installed plugin (code from outside the project
  * the user did not write).
  */
-export const sandboxedDoc = (doc: TrammeDoc): boolean => (doc.plugins ?? []).length > 0 && (prefs.peek().sandboxPreview || Object.keys(copiesIn(doc)).length > 0);
+export const sandboxedDoc = (doc: TrammeDoc): boolean => prefs.peek().sandboxPreview || ((doc.plugins ?? []).length > 0 && Object.keys(copiesIn(doc)).length > 0);
 
 /** the operations that copy a plugin into a project (beside the ones that made it needed), and the files to write first */
 export function copyOps(doc: TrammeDoc, p: Installed): { ops: Op[]; files: [string, Blob][] } {
@@ -369,6 +410,7 @@ export function backup(): Blob {
 
 /** a backup put back: its plugins installed (an installed one of a newer version kept), its off ones turned off */
 export async function restoreBackup(f: File): Promise<number> {
+  if (f.size > 64 * 1024 * 1024) throw new Error('plugin backup too large');
   const { files, state } = unpackInstalled(new Uint8Array(await f.arrayBuffer()));
   let n = 0;
   for (const [name, data] of files) {

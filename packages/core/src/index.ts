@@ -9,6 +9,7 @@ export * from './ops.ts';
 export * from './edit.ts';
 export * from './path.ts';
 export * from './schema.ts';
+export * from './audio-effects.ts';
 export * from './validate.ts';
 export * from './format.ts';
 export * from './modifiers.ts';

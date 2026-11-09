@@ -33,6 +33,28 @@ export function paramFits(from: string, to: PropType): boolean {
   return from === to || (from === 'color' && to === 'paint') || ((from === 'string' || from === 'text') && (to === 'string' || to === 'text'));
 }
 
+/** a web scene's parameter, as its scene.json declares it and the layer keeps it (props.parameters) */
+export interface SceneParameter { type: 'number' | 'string' | 'boolean' | 'color'; default: number | string | boolean }
+
+const SCENE_PARAM_TYPES: Record<SceneParameter['type'], PropType> = { number: 'number', string: 'string', boolean: 'bool', color: 'color' };
+const SCENE_PARAM_NAME = /^[a-zA-Z_][a-zA-Z0-9_-]{0,63}$/;
+
+/** the parameters a web scene layer declares, those well formed only: the layer's `params` give them values, animated like any property */
+export function sceneParams(layer: Layer): Record<string, SceneParameter> {
+  const declared = layer.type === 'webscene' ? staticValue(layer.props?.parameters) : null;
+  const out: Record<string, SceneParameter> = {};
+  if (!declared || typeof declared !== 'object' || Array.isArray(declared)) return out;
+  for (const [name, p] of Object.entries(declared as Record<string, unknown>)) {
+    const d = p as Partial<SceneParameter> | null;
+    if (!SCENE_PARAM_NAME.test(name) || !d || typeof d !== 'object' || !d.type || !(d.type in SCENE_PARAM_TYPES) || typeof d.default !== (d.type === 'color' ? 'string' : d.type)) continue;
+    out[name] = { type: d.type, default: d.default! };
+  }
+  return out;
+}
+
+/** the property definition of a scene parameter */
+export const sceneParamDef = (p: SceneParameter, name: string): PropDef => ({ type: SCENE_PARAM_TYPES[p.type], default: p.default, label: name });
+
 /** the property definition of a parameter: its type, its default, its options */
 export function paramDef(p: ComponentParam): PropDef {
   return { type: p.type as PropType, default: p.default ?? null, nullable: true, label: p.label, description: p.description, ...(p.options ? { options: p.options } : {}) };
@@ -66,7 +88,9 @@ export function addressDef(doc: TrammeDoc, registry: Registry, comp: Composition
   }
   if (a === 'masks') return (layer.masks || []).some((m) => m.id === b) ? MASK_SCHEMA[c] ?? null : null;
   if (a === 'params') {
-    const p = c === undefined ? componentOf(doc, layer)?.params?.[b] : undefined;
+    if (c !== undefined) return null;
+    if (layer.type === 'webscene') { const s = sceneParams(layer)[b]; return s ? sceneParamDef(s, b) : null; }
+    const p = componentOf(doc, layer)?.params?.[b];
     return p ? paramDef(p) : null;
   }
   if (b !== undefined || !registry.hasNode(layer.type)) return null;

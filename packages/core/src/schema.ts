@@ -5,6 +5,7 @@
 
 import { z } from 'zod';
 import { SCHEMA_VERSION } from './types.ts';
+import { AudioEffectSchema } from './audio-effects.ts';
 
 const finite = z.number().refine(Number.isFinite, 'finite number expected');
 const id = z.string().regex(/^[A-Za-z0-9_-]+$/, 'id: letters, digits, _ and - only');
@@ -139,9 +140,12 @@ const sequenceTrack = z.strictObject({
   muted: z.boolean().optional(),
   magnetic: z.boolean().optional(),
   volume: prop.optional(),
+  volumeBlocks: z.array(z.strictObject({ id, keys: z.array(z.strictObject({ t: finite, v: finite })).length(4) })).optional(),
+  duckUnder: id.optional(),
   pan: z.number().min(-1).max(1).optional(),
   bus: z.boolean().optional(),
   to: id.optional(),
+  effects: z.array(AudioEffectSchema).optional(),
   height: finite.optional(),
 });
 
@@ -158,7 +162,7 @@ const composition = z.strictObject({
   camera: z.strictObject({ pan: prop.optional(), zoom: prop.optional(), perspective: prop.optional(), focus: prop.optional(), blur: prop.optional() }).optional(),
   markers: z.array(marker).optional(),
   effects: z.array(effect).optional(),
-  sound: z.strictObject({ loudness: prop.optional(), room: prop.optional() }).optional(),
+  sound: z.strictObject({ loudness: prop.optional(), room: prop.optional(), tempo: z.number().min(20).max(300).nullable().optional() }).optional(),
   layers: z.record(id, layer),
   order: z.array(id),
   params: z.record(id, param).optional(),

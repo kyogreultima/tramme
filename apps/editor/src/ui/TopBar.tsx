@@ -7,7 +7,7 @@ import { DOCUMENT } from '@tramme/project';
 import { api } from '../api.ts';
 import { confirmWith } from '../confirm.ts';
 import { saveBlob } from '../download.ts';
-import { safeName, takenPaths, upload } from '../files.ts';
+import { fileProject, requireFileProject, sameFileProject, safeName, takenPaths, upload, type FileProject } from '../files.ts';
 import { canRedo, canUndo, comp, commit, redo, redoLabel, S, saveNow, toast, undo, undoLabel } from '../state.ts';
 import { ago, contentEnd, fmtSeconds, snap } from '../model.ts';
 import { shortsOf } from '../shorts.ts';
@@ -16,6 +16,7 @@ import { PublishPanel } from './PublishPanel.tsx';
 import { hdrCapability } from '../hdr.ts';
 import { ExportQueueList } from './ExportQueueList.tsx';
 import { exportQueue } from '../export-queue.ts';
+import { exportProject, requireExportProject, sameExportProject, waitExportProject, type ExportProject } from '../export-project.ts';
 import { exportRangeOf, frameSpan } from '../exportspan.ts';
 import { VIDEO, WEB_FORMATS, type WebFormat } from '../formats.ts';
 import { Icon } from './icons.tsx';
@@ -35,37 +36,48 @@ const FORMATS: [string, string, number, number][] = [
   ['4k', '16:9 · 3840×2160', 3840, 2160],
 ];
 
-interface Done { blob: Blob; name: string; seconds: number; warnings: string[]; saved?: string }
+interface Done { blob: Blob; name: string; seconds: number; warnings: string[]; project: ExportProject; saved?: string }
 
 // ── the project's versions: named points one can come back to ──
 /** the saved document itself is the current version; the snapshots live beside it */
 const VERSIONS_INDEX = 'versions/index.json';
 interface Snap { file: string; label: string; at: string }
+const validVersionFile = (file: unknown): file is string => typeof file === 'string' && /^versions\/(?!index\.json$)[a-z0-9][a-z0-9-]{0,80}\.json$/i.test(file);
 
-async function listVersions(): Promise<Snap[]> {
+export async function listVersions(project: FileProject): Promise<Snap[]> {
   try {
-    const r = await api.readText(S.project.peek().id, VERSIONS_INDEX);
+    const r = await api.readText(project.id, VERSIONS_INDEX);
+    requireFileProject(project);
     if (!r) return [];
     const j = JSON.parse(r.text) as { versions?: Snap[] };
-    return Array.isArray(j.versions) ? j.versions.slice(0, 30) : [];
-  } catch { return []; }
+    return Array.isArray(j.versions) ? j.versions.filter((v): v is Snap => !!v && validVersionFile(v.file) && typeof v.label === 'string' && v.label.length <= 200 && typeof v.at === 'string' && v.at.length <= 64).slice(0, 30) : [];
+  } catch { requireFileProject(project); return []; }
 }
 
 function VersionsPop({ anchor, onClose }: { anchor: HTMLElement; onClose: () => void }) {
+  const [project] = useState(fileProject);
   const [list, setList] = useState<Snap[] | null>(null);
   const [busy, setBusy] = useState(false);
-  useEffect(() => { listVersions().then(setList); }, []);
+  useEffect(() => {
+    let live = true;
+    listVersions(project).then((versions) => { if (live && sameFileProject(project)) setList(versions); }).catch(() => {});
+    return () => { live = false; };
+  }, []);
   // the state is saved first: the snapshot says exactly what the user sees
   const create = async () => {
+    if (!sameFileProject(project)) return;
     setBusy(true);
     try {
       await saveNow();
-      const id = S.project.peek().id, now = new Date();
+      requireFileProject(project);
+      const id = project.id, now = new Date();
       const file = `versions/${now.toISOString().replace(/[:.]/g, '-')}.json`;
       await api.write(id, file, stringifyDoc(S.doc.peek() as TrammeDoc), { type: 'application/json' });
-      const prev = await listVersions();
+      requireFileProject(project);
+      const prev = await listVersions(project);
       const next = [{ file, label: now.toLocaleString(locale, { dateStyle: 'medium', timeStyle: 'short' }), at: now.toISOString() }, ...prev].slice(0, 30);
       await api.write(id, VERSIONS_INDEX, JSON.stringify({ versions: next }), { type: 'application/json' });
+      requireFileProject(project);
       // a version pushed out by the cap is deleted with its index row: the file would otherwise stay forever
       await Promise.all(prev.filter((v) => !next.some((n) => n.file === v.file)).map((v) => api.removeFile(id, v.file).catch(() => {})));
       setList(next);
@@ -75,24 +87,31 @@ function VersionsPop({ anchor, onClose }: { anchor: HTMLElement; onClose: () => 
   };
   // the document of the snapshot becomes the document: the page reloads on it
   const restore = async (v: Snap) => {
+    if (!sameFileProject(project)) return;
     if (!await confirmWith(t('topbar.restoreVersion'), t('topbar.restoreVersionBody', { label: v.label }), t('topbar.restore'))) return;
+    if (!sameFileProject(project)) return;
     setBusy(true);
     try {
-      const id = S.project.peek().id, r = await api.readText(id, v.file);
+      const id = project.id, r = await api.readText(id, v.file);
+      requireFileProject(project);
       if (!r) throw new Error(`${v.file}: missing`);
       JSON.parse(r.text) as TrammeDoc;
       await api.write(id, DOCUMENT, r.text, { type: 'application/json' });
+      requireFileProject(project);
       // the reloaded page must not be asked to save what it is only starting to read: the write above is the state of record
       S.save.value = 'saved';
       location.reload();
     } catch (e) { toast((e as Error).message, 'error'); setBusy(false); }
   };
   const remove = async (v: Snap) => {
+    if (!sameFileProject(project)) return;
     try {
-      const id = S.project.peek().id;
+      const id = project.id;
       await api.removeFile(id, v.file);
-      const next = (await listVersions()).filter((x) => x.file !== v.file);
+      requireFileProject(project);
+      const next = (await listVersions(project)).filter((x) => x.file !== v.file);
       await api.write(id, VERSIONS_INDEX, JSON.stringify({ versions: next }), { type: 'application/json' });
+      requireFileProject(project);
       setList(next);
     } catch (e) { toast((e as Error).message, 'error'); }
   };
@@ -157,40 +176,49 @@ function ExportPop({ anchor, onClose }: { anchor: HTMLElement; onClose: () => vo
   const trim = () => commit(t('topbar.trimToContent'), [{ op: 'replace', path: pointer('compositions', S.compId.peek(), 'duration'), value: end }]);
   const run = async () => {
     const t0 = performance.now(), at = S.time.peek();
+    const project = exportProject(), doc = S.doc.peek(), base = new URL(project.docUrl, location.href).href;
+    const compId = S.compId.peek(), registry = S.registry.peek(), format = expFormat.value;
     expAbort.current = new AbortController();
     expState.value = { done: 0, total: VIDEO.has(expFormat.value) ? frameSpan(c.fps, c.duration, range).f1 - frameSpan(c.fps, c.duration, range).f0 : 1 };
     try {
       const { exportInBrowser } = await import('../webexport.ts');
-      const r = await exportInBrowser(S.doc.peek(), new URL(S.docUrl.peek(), location.href).href, expFormat.value, {
-        compId: S.compId.peek(), registry: S.registry.peek(), t: at, signal: expAbort.current.signal,
+      requireExportProject(project);
+      const r = await waitExportProject(project, exportInBrowser(doc, base, format, {
+        compId, registry, t: at, signal: expAbort.current.signal,
         samples: expSamples.value === 'doc' ? undefined : Number(expSamples.value),
         depth: expDeep.value && deepable && deepLabel ? 10 : 8, range,
-        onProgress: (done, total) => { if (done % 3 === 0 || done === total) expState.value = { done, total }; },
-      });
+        onProgress: (done, total) => { if (sameExportProject(project) && (done % 3 === 0 || done === total)) expState.value = { done, total }; },
+      }));
       const stem = safeName(S.project.peek().name);
-      const name = expFormat.value === 'svg' ? `${stem}_${at.toFixed(2)}.svg` : `${stem}.${r.ext}`;
-      expState.value = { blob: r.blob, name, seconds: (performance.now() - t0) / 1000, warnings: r.warnings };
+      const name = format === 'svg' ? `${stem}_${at.toFixed(2)}.svg` : `${stem}.${r.ext}`;
+      expState.value = { blob: r.blob, name, seconds: (performance.now() - t0) / 1000, warnings: r.warnings, project };
     } catch (e) {
       expState.value = (e as Error).name === 'AbortError' ? null : { error: (e as Error).message };
     } finally { expAbort.current = null; }
   };
   // all the shorts, one after another for the memory's sake, each named after its title
   const exportAll = async () => {
+    const project = exportProject(), doc = S.doc.peek(), base = new URL(project.docUrl, location.href).href;
+    const registry = S.registry.peek(), format = expFormat.value;
+    const exportShorts = shortsOf(doc);
     expStop.current = false;
     expAbort.current = new AbortController();
     try {
       const { exportInBrowser } = await import('../webexport.ts');
-      for (let i = 0; i < shorts.length; i++) {
+      requireExportProject(project);
+      for (let i = 0; i < exportShorts.length; i++) {
+        requireExportProject(project);
         if (expStop.current) break;
-        const { id: cid, name } = shorts[i];
-        expBatch.value = { i: i + 1, n: shorts.length, name };
+        const { id: cid, name } = exportShorts[i];
+        expBatch.value = { i: i + 1, n: exportShorts.length, name };
         expState.value = null;
-        const r = await exportInBrowser(S.doc.peek(), new URL(S.docUrl.peek(), location.href).href, expFormat.value, {
-          compId: cid, registry: S.registry.peek(), signal: expAbort.current.signal,
+        const r = await waitExportProject(project, exportInBrowser(doc, base, format, {
+          compId: cid, registry, signal: expAbort.current.signal,
           samples: expSamples.value === 'doc' ? undefined : Number(expSamples.value),
-        });
+        }));
         const file = `${safeName(name)}.${r.ext}`;
         await saveBlob(r.blob, file);
+        requireExportProject(project);
         try { await upload(await takenPaths(), `renders/${name.replace(/\.png\.zip$/, '.zip')}`, r.blob); } catch { /* the file is on disk anyway */ }
       }
     } catch (e) {
@@ -206,7 +234,9 @@ function ExportPop({ anchor, onClose }: { anchor: HTMLElement; onClose: () => vo
   // a copy in the project's renders/ folder (kept out of .tramme archives)
   const keep = async (done: Done) => {
     try {
+      requireExportProject(done.project);
       const path = await upload(await takenPaths(), `renders/${done.name.replace(/\.png\.zip$/, '.zip').replace(/\.lottie\.json$/, '.json')}`, done.blob);
+      requireExportProject(done.project);
       expState.value = { ...done, saved: path };
     } catch (e) { toast(t('topbar.couldNotSaveTo', { error: (e as Error).message }), 'error'); }
   };
@@ -274,17 +304,21 @@ function ExportPop({ anchor, onClose }: { anchor: HTMLElement; onClose: () => vo
 /** back to the projects, once the last changes are saved */
 async function leave(e: MouseEvent) {
   e.preventDefault();
-  try { await saveNow(); go('/'); } catch (x) { toast(t('common.couldNotSaveError', { error: (x as Error).message }), 'error'); }
+  const project = fileProject();
+  try { await saveNow(); if (sameFileProject(project)) go('/'); } catch (x) { if (sameFileProject(project)) toast(t('common.couldNotSaveError', { error: (x as Error).message }), 'error'); }
 }
 
-async function rename(value: string) {
+export async function rename(value: string) {
   const name = value.trim();
   if (!name || name === S.project.peek().name) return;
+  const project = fileProject();
   try {
-    S.project.value = await api.update(S.project.peek().id, { name });
+    const updated = await api.update(project.id, { name });
+    if (!sameFileProject(project)) return;
+    S.project.value = updated;
     document.title = `${name} · Tramme`;
     if (S.doc.peek().meta.title !== name) commit(t('topbar.projectName'), [{ op: 'replace', path: '/meta/title', value: name }]);
-  } catch (e) { toast(t('common.couldNotRenameError', { error: (e as Error).message }), 'error'); }
+  } catch (e) { if (sameFileProject(project)) toast(t('common.couldNotRenameError', { error: (e as Error).message }), 'error'); }
 }
 
 const FPS = [24, 25, 30, 50, 60];

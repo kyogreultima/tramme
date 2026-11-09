@@ -14,12 +14,13 @@
 // back. The page ships the document (setDoc) and each video asset's current
 // frame (their decoding still happens there, for now).
 
-import { Evaluator, parseColor, type Host, type Instance, type NodeType, type PluginModule, type TrammeDoc } from '@tramme/core';
+import { Evaluator, layerClock, motionReport as coreMotionReport, parseColor, pictureMotion as corePictureMotion, runChecks, sampleAt, soundCues, type Host, type Instance, type NodeType, type PluginModule, type TrammeDoc } from '@tramme/core';
+import { quadAt } from '../quad.ts';
 import { builtinRegistry } from '@tramme/nodes';
 import { CanvasPool, Compositor, drawComposed, drawFrame, drawLayers, finishOf, subTimes } from '@tramme/render/src/index.ts';
 import { nodeContext, resizeNode } from '@tramme/render/src/gpu.ts';
 import { RecordingPath2D } from './recording-path.ts';
-import type { DrawPayload, DrawResult, FramePayload, SandboxDoc } from './protocol.ts';
+import type { DrawPayload, DrawResult, FramePayload, LayerSample, SandboxDoc } from './protocol.ts';
 import type { SandboxDrawSide } from './worker-side.ts';
 
 const MAX_PIXELS = 2048;
@@ -27,7 +28,7 @@ const FALLING_AREA = { x: -60, y: -60, w: 120, h: 120 };
 
 /** a canvas pool for a worker: OffscreenCanvases instead of document canvases */
 class WorkerPool extends CanvasPool {
-  constructor() { super(false); }
+  constructor() { super(false, 2); }
   protected override make(): HTMLCanvasElement {
     return new OffscreenCanvas(300, 150) as unknown as HTMLCanvasElement;
   }
@@ -38,15 +39,19 @@ interface DocSide {
   docUrl: string;
   images: Map<string, unknown>;
   json: Map<string, unknown>;
+  models: Map<string, ArrayBuffer>;
   fonts: Set<string>;
 }
 
 export function makeSandboxDraw(modules: Map<string, PluginModule>): SandboxDrawSide {
-  const side: DocSide = { doc: null, docUrl: '', images: new Map(), json: new Map(), fonts: new Set() };
+  const side: DocSide = { doc: null, docUrl: '', images: new Map(), json: new Map(), models: new Map(), fonts: new Set() };
   const self_ = self as unknown as { fonts: { add(f: unknown): void } };
   const pool = new WorkerPool();
   let output: OffscreenCanvas | null = null;
   let compositor: Compositor | null = null;
+  const fontLoads = new Map<string, Promise<void>>();
+  let fontsReady: Promise<void> = Promise.resolve();
+  const preparedCode = new Set<string>();
 
   const nodeOf = (type: string): NodeType | null => {
     for (const mod of modules.values()) {
@@ -74,10 +79,15 @@ export function makeSandboxDraw(modules: Map<string, PluginModule>): SandboxDraw
     asset: ((id: string) => {
       if (side.images.has(id)) return side.images.get(id);
       if (side.json.has(id)) return side.json.get(id);
+      if (side.models.has(id)) return side.models.get(id);
       const a = assetInfo(id);
       if (a.type === 'font') return a.family ?? id;
       if (a.type === 'video') throw new Error('host.asset: video frames do not cross the sandbox (a video is read by its own layer)');
-      if (a.type === 'module') throw new Error('host.asset: module namespaces do not cross the sandbox');
+      if (a.type === 'module') {
+        const mod = modules.get(id);
+        if (!mod) throw new Error(`host.asset: module "${id}" was not loaded in the sandbox`);
+        return mod;
+      }
       throw new Error(`host.asset: the asset "${id}" (${String(a.type)}) is not in the sandbox`);
     }) as Host['asset'],
     assetInfo: (id) => assetInfo(id) as never,
@@ -98,6 +108,7 @@ export function makeSandboxDraw(modules: Map<string, PluginModule>): SandboxDraw
   const sandboxAsset = (id: string, videos: Map<string, unknown>) => {
     if (side.images.has(id)) return side.images.get(id);
     if (side.json.has(id)) return side.json.get(id);
+    if (side.models.has(id)) return side.models.get(id);
     const a = assetInfo(id);
     if (a.type === 'font') return a.family ?? id;
     if (a.type === 'video') {
@@ -105,7 +116,11 @@ export function makeSandboxDraw(modules: Map<string, PluginModule>): SandboxDraw
       const frame = videos.get(id) as ImageBitmap | undefined;
       return { width: frame?.width ?? 0, height: frame?.height ?? 0, duration: Number(a.duration ?? 0), frameAt: () => ({ image: frame ?? null, exact: true }), request: () => {} };
     }
-    if (a.type === 'module') throw new Error('host.asset: module namespaces do not cross the sandbox');
+    if (a.type === 'module') {
+      const mod = modules.get(id);
+      if (!mod) throw new Error(`host.asset: module "${id}" was not loaded in the sandbox`);
+      return mod;
+    }
     throw new Error(`host.asset: the asset "${id}" (${String(a.type)}) is not in the sandbox`);
   };
 
@@ -168,6 +183,17 @@ export function makeSandboxDraw(modules: Map<string, PluginModule>): SandboxDraw
     };
     let scaleX = 1, scaleY = 1;
     try {
+      // The trusted renderer skips Free code's load hook in isolated mode.
+      // Run each module's init here, once for each document snapshot.
+      for (const [cid, scene] of Object.entries(doc.compositions)) for (const [id, layer] of Object.entries(scene.layers)) {
+        if (layer.type !== 'code') continue;
+        const key = `${cid}/${id}`;
+        if (preparedCode.has(key)) continue;
+        const t = layer.in ?? 0;
+        const evaluated = evaluator.layerAt(id, t, cid);
+        await reg.node('code').load?.(evaluated.props, hostAt({ t, frame: Math.round(t * scene.fps) }, cid)(id));
+        preparedCode.add(key);
+      }
       const w = Math.max(8, Math.round(comp.width * p.scale / 8) * 8), h = Math.max(2, Math.round(comp.height * p.scale / 2) * 2);
       scaleX = w / comp.width; scaleY = h / comp.height;
       // One GPU context per sandbox: a context per frame exhausts Chrome's
@@ -206,8 +232,107 @@ export function makeSandboxDraw(modules: Map<string, PluginModule>): SandboxDraw
   };
 
   return {
+    async evaluateValue(address, t, compId) {
+      const doc = theDoc();
+      if (!doc || !doc.compositions[compId]) throw new Error('unknown sandbox composition');
+      const reg = builtinRegistry().clone();
+      for (const [id, mod] of modules) reg.use(mod, id);
+      const evaluator = new Evaluator(doc, reg, { data: (id) => side.json.get(id) });
+      const value = evaluator.value(address, t, compId);
+      // postMessage cannot transfer functions or cyclic expression results.
+      return structuredClone(value);
+    },
+    async evaluateSeries(addresses, times, compId) {
+      const doc = theDoc();
+      if (!doc || !doc.compositions[compId]) throw new Error('unknown sandbox composition');
+      const reg = builtinRegistry().clone();
+      for (const [id, mod] of modules) reg.use(mod, id);
+      const evaluator = new Evaluator(doc, reg, { data: (id) => side.json.get(id) });
+      return structuredClone(addresses.map((address) => times.map((t) => evaluator.value(address, t, compId))));
+    },
+    async evaluateLayers(ids, t, compId): Promise<LayerSample[]> {
+      const doc = theDoc();
+      if (!doc || !doc.compositions[compId]) throw new Error('unknown sandbox composition');
+      const reg = builtinRegistry().clone();
+      for (const [id, mod] of modules) reg.use(mod, id);
+      const evaluator = new Evaluator(doc, reg, { data: (id) => side.json.get(id) });
+      return ids.map((id): LayerSample => {
+        try {
+          const layer = evaluator.layerAt(id, t, compId);
+          return structuredClone({ id, props: layer.props, transform: layer.transform, masks: layer.masks });
+        } catch (e) { return { id, err: (e as Error).message.slice(0, 512) }; }
+      });
+    },
+    async soundCues(compId) {
+      const doc = theDoc();
+      if (!doc || !doc.compositions[compId]) throw new Error('unknown sandbox composition');
+      const reg = builtinRegistry().clone();
+      for (const [id, mod] of modules) reg.use(mod, id);
+      const evaluator = new Evaluator(doc, reg, { data: (id) => side.json.get(id) });
+      const values = soundCues(evaluator, compId);
+      if (values.length > 4096) throw new Error('too many sandbox sound cues');
+      return values;
+    },
+    async sampleClock(layerId, compId, compTimes, fileTimes) {
+      const doc = theDoc();
+      if (!doc || !doc.compositions[compId]?.layers[layerId]) throw new Error('unknown sandbox layer clock');
+      const reg = builtinRegistry().clone();
+      for (const [id, mod] of modules) reg.use(mod, id);
+      const evaluator = new Evaluator(doc, reg, { data: (id) => side.json.get(id) });
+      const sampled = layerClock(evaluator, compId, layerId);
+      const moments = fileTimes.map((t) => sampled.moments(t));
+      if (moments.reduce((sum, row) => sum + row.length, 0) > 4096) throw new Error('too many sandbox clock moments');
+      return { clock: sampled.clock, fileTimes: compTimes.map((t) => sampled.fileTime(t)), moments };
+    },
+    async pictureMotion(compId) {
+      const doc = theDoc();
+      if (!doc || !doc.compositions[compId]) throw new Error('unknown sandbox composition');
+      const reg = builtinRegistry().clone();
+      for (const [id, mod] of modules) reg.use(mod, id);
+      const evaluator = new Evaluator(doc, reg, { data: (id) => side.json.get(id) });
+      const value = corePictureMotion(evaluator, compId);
+      if (value.times.length > 16384) throw new Error('too many sandbox picture motion samples');
+      return value;
+    },
+    async motionReport(compId, from, to) {
+      const doc = theDoc();
+      if (!doc || !doc.compositions[compId]) throw new Error('unknown sandbox composition');
+      const reg = builtinRegistry().clone();
+      for (const [id, mod] of modules) reg.use(mod, id);
+      const evaluator = new Evaluator(doc, reg, { data: (id) => side.json.get(id) });
+      return coreMotionReport(evaluator, compId, from, to, { limit: 6 });
+    },
+    async sampleQuads(layerId, compId, times) {
+      const doc = theDoc();
+      if (!doc || !doc.compositions[compId]?.layers[layerId]) throw new Error('unknown sandbox quad layer');
+      const reg = builtinRegistry().clone();
+      for (const [id, mod] of modules) reg.use(mod, id);
+      const evaluator = new Evaluator(doc, reg, { data: (id) => side.json.get(id) });
+      return times.map((at) => quadAt(evaluator, compId, layerId, at));
+    },
+    async qualityChecks(compId) {
+      const doc = theDoc();
+      const comp = doc?.compositions[compId];
+      if (!doc || !comp) throw new Error('unknown sandbox quality composition');
+      if (Math.ceil(comp.duration / 0.25) > 4096) throw new Error('too many sandbox quality samples');
+      const reg = builtinRegistry().clone();
+      for (const [id, mod] of modules) reg.use(mod, id);
+      const values = await runChecks(doc, reg, compId, { data: (id) => side.json.get(id) });
+      if (values.length > 4096) throw new Error('too many sandbox quality issues');
+      return values;
+    },
+    async samplePlaced(t, compId) {
+      const doc = theDoc();
+      if (!doc || !doc.compositions[compId]) throw new Error('unknown sandbox composition');
+      const reg = builtinRegistry().clone();
+      for (const [id, mod] of modules) reg.use(mod, id);
+      const evaluator = new Evaluator(doc, reg, { data: (id) => side.json.get(id) });
+      const layers = sampleAt(evaluator, compId, t).layers;
+      if (layers.length > 4096) throw new Error('sandbox placed sample exceeds 4096 layers');
+      return structuredClone(layers.map((p) => ({ id: p.id, name: p.layer.name ?? p.id, type: p.layer.type, box: p.box, opacity: p.opacity, locked: p.layer.locked, textSize: p.textSize, hasText: !!p.text?.trim() })));
+    },
     async renderFrame(p) {
-      try { return await renderFrame(p); }
+      try { await fontsReady; return await renderFrame(p); }
       finally {
         // These are the worker's copies; the page closes its own copies.
         for (const frame of Object.values(p.videos ?? {})) (frame as { close?(): void }).close?.();
@@ -215,21 +340,26 @@ export function makeSandboxDraw(modules: Map<string, PluginModule>): SandboxDraw
     },
     setDoc(d: SandboxDoc) {
       side.doc = d.doc as Record<string, unknown>;
+      preparedCode.clear();
       side.docUrl = d.docUrl;
       for (const [id, image] of side.images) if (image !== d.images[id]) (image as { close?(): void }).close?.();
       side.images = new Map(Object.entries(d.images ?? {}));
       side.json = new Map(Object.entries(d.json ?? {}));
-      for (const f of d.fonts ?? []) {
-        if (side.fonts.has(f.url)) continue;
-        side.fonts.add(f.url);
-        void fetch(f.url).then((r) => r.arrayBuffer()).then((data) => {
-          const face = new FontFace(f.family, data, { weight: f.weight ?? '400' });
-          return face.load();
-        }).then((face) => self_.fonts.add(face)).catch(() => {});
-      }
+      side.models = new Map(Object.entries(d.models ?? {}));
+      fontsReady = Promise.all((d.fonts ?? []).map((f) => {
+        let pending = fontLoads.get(f.url);
+        if (pending) return pending;
+        if (!f.data) return Promise.reject(new Error(`font bytes missing: ${f.url}`));
+        const face = new FontFace(f.family, f.data, { weight: f.weight ?? '400' });
+        pending = face.load().then((loaded) => { self_.fonts.add(loaded); side.fonts.add(f.url); }).catch((error) => { fontLoads.delete(f.url); throw error; });
+        fontLoads.set(f.url, pending);
+        return pending;
+      })).then(() => {});
+      void fontsReady.catch(() => {});
     },
 
     async draw(payload: DrawPayload) {
+      await fontsReady;
       const results = await Promise.all(payload.items.map(async (item): Promise<DrawResult> => {
         const node = nodeOf(item.type);
         if (!node) return { id: item.id, ok: false, err: `unknown node type: ${item.type}` };
@@ -281,6 +411,7 @@ export function makeSandboxDraw(modules: Map<string, PluginModule>): SandboxDraw
     },
 
     async exportOf(type: string, props: unknown) {
+      await fontsReady;
       const node = nodeOf(type);
       if (!node?.export) return { err: node ? `${type} has no vector export` : `unknown node type: ${type}` };
       try {

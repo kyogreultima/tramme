@@ -86,17 +86,7 @@ async function registryOf(doc: TrammeDoc, files: Map<string, Uint8Array>, sandbo
     }
     return reg;
   }
-  // no sandbox (tests without a browser): the page imports, behind the ask
-  for (const id of doc.plugins || []) {
-    const path = srcPath(doc.assets[id]?.src ?? '');
-    const data = path ? files.get(path) : undefined;
-    if (!data) throw new ImportError(t('importer.pluginIdNotFound', { id }));
-    const url = URL.createObjectURL(new Blob([data as BlobPart], { type: 'text/javascript' }));
-    try { reg.use(await import(/* @vite-ignore */ url), id); }
-    catch (e) { throw new ImportError(t('importer.unreadablePluginIdError', { id, error: (e as Error).message })); }
-    finally { URL.revokeObjectURL(url); }
-  }
-  return reg;
+  throw new ImportError(t('importer.codeNeedsSandbox'));
 }
 
 /** what a plugin's declarations give the page's registry: every schema the validation reads, no function of the plugin's */

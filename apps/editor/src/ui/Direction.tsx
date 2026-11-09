@@ -18,6 +18,8 @@ import { resolveColor } from './controls.tsx';
 import { Icon } from './icons.tsx';
 import { TranscribeButton } from './Transcribe.tsx';
 import { t } from '../i18n/index.ts';
+import { fileProject, requireFileProject, sameFileProject } from '../files.ts';
+import { projectAssetUrl } from '../project-asset-url.ts';
 
 /** words to finish in the direction bar */
 function prefill(words: string) { studio.panel.value = 'notes'; draft.value = words; }
@@ -37,7 +39,7 @@ function BriefField({ label, hint, value, rows, onSave }: { label: string; hint:
 }
 
 export function Direction() {
-  const doc = S.doc.value, project = S.project.value.id, busy = running.value;
+  const doc = S.doc.value, project = S.project.value.id, docUrl = S.docUrl.value, busy = running.value;
   const [brief, setBrief] = useState<Brief | null>(null);
   const [plan, setPlan] = useState<FilmPlan | null>(null);
   const [sources, setSources] = useState<Source[]>([]);
@@ -46,16 +48,25 @@ export function Direction() {
   // read again when the assistant is done (it may have written the brief)
   useEffect(() => {
     if (busy) return;
-    api.readText(project, BRIEF_PATH).then((f) => setBrief(parseBrief(f?.text))).catch(() => setBrief(null));
-    api.readText(project, FILM_PLAN_PATH).then((f) => setPlan(parsePlan(f?.text))).catch(() => setPlan(null));
-    api.info(project).then((i) => setSources(sourcesOf(S.doc.peek(), i.files))).catch(() => setSources([]));
-  }, [busy, project, doc.assets]);
+    const opened = fileProject();
+    let live = true;
+    const current = () => live && sameFileProject(opened);
+    api.readText(project, BRIEF_PATH).then((f) => { if (current()) setBrief(parseBrief(f?.text)); }).catch(() => { if (current()) setBrief(null); });
+    api.readText(project, FILM_PLAN_PATH).then((f) => { if (current()) setPlan(parsePlan(f?.text)); }).catch(() => { if (current()) setPlan(null); });
+    api.info(project).then((i) => { if (current()) setSources(sourcesOf(doc, i.files)); }).catch(() => { if (current()) setSources([]); });
+    return () => { live = false; };
+  }, [busy, project, docUrl, doc.assets]);
 
   const save = async (input: BriefInput) => {
+    const opened = fileProject();
     try {
+      if (opened.id !== project || opened.docUrl !== docUrl) throw new Error(t('common.projectChangedDuringFile'));
+      requireFileProject(opened);
       const prev = parseBrief((await api.readText(project, BRIEF_PATH))?.text);
+      requireFileProject(opened);
       const next = briefOf(S.doc.peek(), prev, input);
       await api.write(project, BRIEF_PATH, JSON.stringify(next, null, 1), { type: 'application/json' });
+      requireFileProject(opened);
       if (!S.doc.peek().assets.brief) commit(t('brief.written'), [briefOp(S.doc.peek(), BRIEF_PATH)]);
       setBrief(next);
       setSaved(true);
@@ -65,13 +76,14 @@ export function Direction() {
 
   const colors = Object.entries(doc.tokens ?? {}).filter(([, tk]) => tk.type === 'color').map(([name, tk]) => [name, resolveColor(String(tk.value), doc.tokens)] as const);
   const fonts = [...new Set(Object.values(doc.assets).filter((a) => a.type === 'font').map((a) => String((a as { family?: string }).family ?? a.name ?? '')).filter(Boolean))];
+  const safeImageUrl = (path: string) => { try { projectAssetUrl(path, docUrl); return api.fileUrl(project, path); } catch { return ''; } };
 
   return (
     <div class="direction">
       {plan && (
         <section class="dir-section dir-plan">
           <div class="dir-head"><h4>{t('studio.direction.plan')}</h4></div>
-          {plan.target && <img class="dir-target" src={api.fileUrl(project, plan.target)} alt={t('studio.direction.target')} loading="lazy" />}
+          {plan.target && safeImageUrl(plan.target) && <img class="dir-target" src={safeImageUrl(plan.target)} alt={t('studio.direction.target')} loading="lazy" />}
           <p class="dir-idea">{plan.idea}</p>
           <ul class="dir-scenes">{plan.scenes.map((s) => <li key={s.id}><span>{s.name}</span><span class="dir-kind">{t(KIND_LABEL[s.kind])}</span></li>)}</ul>
           <div class="dir-actions">
@@ -102,7 +114,7 @@ export function Direction() {
         {sources.length > 0
           ? <div class="dir-sources">{sources.map((s) => (
             <span key={s.ref} class={`dir-source ${s.kind}`} title={s.path}>
-              {s.kind === 'image' ? <img src={api.fileUrl(project, s.path)} alt="" loading="lazy" /> : <Icon name={s.kind === 'video' ? 'film' : s.kind === 'audio' ? 'audio' : 'doc'} />}
+              {s.kind === 'image' && safeImageUrl(s.path) ? <img src={safeImageUrl(s.path)} alt="" loading="lazy" /> : <Icon name={s.kind === 'video' ? 'film' : s.kind === 'audio' ? 'audio' : 'doc'} />}
               <span>{s.name}</span>
               {(s.kind === 'audio' || s.kind === 'video') && s.asset && <TranscribeButton asset={s.asset} small />}
             </span>

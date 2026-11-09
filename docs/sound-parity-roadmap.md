@@ -1,5 +1,7 @@
 # Sound parity roadmap
 
+Status: steps 1 to 6 built against fake providers; 25 boxes done, 4 open. A paid score still needs a listening and beat check on the user's quota. Step 7's first-take voice flow is outside the agent execution queue.
+
 What Raylight's Sound page ([raylight.app/sound](https://www.raylight.app/sound)) offers and Tramme does not yet, and the steps that close the gap. Read with [sound-roadmap.md](sound-roadmap.md), which this continues: its steps 1 to 9 are done, and nothing here replaces them.
 
 Source of the comparison: the product's marketing page only. It names no model, no limit and no price, so what follows matches the features it describes, not how they are built.
@@ -16,7 +18,7 @@ Already in Tramme (checked in the code, not assumed):
 | Multitrack timeline, cut, move, adjust | tracks, clips, `Mixer.tsx` |
 | Faders, pan, bus, master | strips with fader (automatable by playing), pan, mute, solo, buses, master with a loudness target (`apps/editor/src/ui/Mixer.tsx`, `timeline/mixer.ts`) |
 | EQ, compressor, reverb, filter | three-band EQ, compressor, reverb, low and high cut, per clip |
-| Distortion, delay | only inside the voice looks (telephone, radio, megaphone, echo), not as free effects |
+| Distortion, delay | ordered track/bus inserts and the same processors in the historical voice looks |
 | Volume automation, ducking | keyframed `gain`, `duck` tool from a transcript |
 | Export with the mix | one mixer for the preview, the browser exports and the command line |
 
@@ -49,38 +51,55 @@ Same as [sound-roadmap.md](sound-roadmap.md#principles), restated for what is ne
 
 The smallest step, and the most visible.
 
-- [ ] A level per strip while playing: peak and RMS from an `AnalyserNode` on each track's output in the preview, read on `requestAnimationFrame`, with a peak hold.
-- [ ] A master meter: peak, short-term loudness (3 s), true peak, with the composition's target drawn on it. The offline measure stays for a stopped film.
-- [ ] A clip indicator that stays lit until clicked, and a number in dB under each meter.
-- [ ] No cost when the mixer is closed: the analysers exist only while the panel is shown.
-- [ ] Test: a known sine through a track reads the expected level within 0.5 dB; a silent track reads the floor.
+- [x] A level per strip while playing: peak and RMS from an `AnalyserNode` on each track's output in the preview, read on `requestAnimationFrame`, with a peak hold.
+  - Stereo channels are measured separately, including opposite phases; buses sum their tracks. The `meters` tool reads the same levels and resets the same clipping latch.
+- [x] A master meter: peak, short-term loudness (3 s), true peak, with the composition's target drawn on it. The offline measure stays for a stopped film.
+  - The master is tapped after the loudness gain and limiter, before the personal preview volume. Its bounded three-second window uses the same BS.1770 and 4× true-peak measurement as `check`; repeated animation frames add no duplicate samples, and a gap beyond the analyser's history starts a fresh window. The `meters` tool returns these readings under `$master`. A steady stereo 1 kHz sine agrees with the offline check within 0.5 LU in Chrome. To check on a device: master levels during playback in WebView2 and WKWebView.
+  - The live limiter's automatic makeup gain is compensated. A real preview with a -23 LUFS target measures -23.0 LUFS and -23.0 dBTP even with the personal listening volume at zero.
+- [x] A clip indicator that stays lit until clicked, and a number in dB under each meter.
+  - Every strip, including the master, keeps its clipping latch across stopping playback and closing the mixer. Starting another project clears it.
+- [x] No cost when the mixer is closed: the analysers exist only while the panel is shown.
+- [x] Test: a known sine through a track reads the expected level within 0.5 dB; a silent track reads the floor.
+  - Chrome reads a mono and opposite-phase stereo 1 kHz sine at -6.02 dBFS peak and -9.04 dBFS RMS; silence reads -80 dBFS. Lifecycle, clipping across stop/close, and assistant access have regression tests. To check on a device: live playback and panel lifecycle in WebView2 and WKWebView.
 
 Done when: playing a film moves every strip's meter, and the master agrees with `check` within 0.5 LU.
 
 ### Step 2. Effects on the track
 
-- [ ] An `effects` list on a sound track (`packages/core`): each entry a `kind`, its parameters and a `bypass`. The schema (`schema/tramme-1.schema.json`) and `docs/document.md` follow.
-- [ ] The existing per-clip fields (`eqLow`, `eqMid`, `eqHigh`, `compress`, `reverb`, `lowCut`, `highCut`) keep working; a track's chain runs after the clips are summed, so a voice track is treated once.
-- [ ] The mixer builds the chain in order, one node per effect, in the preview and every export (`playClip`, `mixComposition`).
-- [ ] Operations to add, remove, reorder, bypass and set an effect (`timeline/mixer.ts`), each undoable as one entry.
-- [ ] A chain on a bus applies to every track it collects.
+- [x] An `effects` list on a sound track (`packages/core`): each entry a `kind`, its parameters and a `bypass`. The schema (`schema/tramme-1.schema.json`) and `docs/document.md` follow.
+  - Ordered EQ, compressor, reverb and low/high-cut settings are strict, finite data, on sound tracks and buses. The exported schema is regenerated. Mixer controls remain in step 4.
+- [x] The existing per-clip fields (`eqLow`, `eqMid`, `eqHigh`, `compress`, `reverb`, `lowCut`, `highCut`) keep working; a track's chain runs after the clips are summed, so a voice track is treated once.
+  - A Chrome PCM regression compares the old mixer with the new path, including clip processing, fades, track/bus gains, pan and the shared room. A summed-track compressor is compared with a single summed source.
+- [x] The mixer builds the chain in order, one node per effect, in the preview and every export (`playClip`, `mixComposition`).
+  - `mixTracks` is shared by playback, scrubbing and `mixComposition` (browser and CLI exports); `audioEffectChain` uses the same EQ/compressor constructors as clips. Bypass is compared with the old mix, reorder changes the actual PCM, and export PCM matches preview scheduling. Chain/routing changes invalidate live audio and the loudness cache, including moving a clip between tracks. To check on a device: listen to the same chain in preview, MP4 and CLI on WebView2/WKWebView.
+- [x] Operations to add, remove, reorder, bypass and set an effect (`timeline/mixer.ts`), each undoable as one entry.
+  - The existing track lock applies; invalid indices/settings and no-op changes write nothing. Each operation and its undo are tested on the real document history. The `/` menu and effect controls are step 4.
+- [x] A chain on a bus applies to every track it collects.
+  - A rendered regression checks two tracks through one bus filter. No-effects projects keep the original single shared-room path.
 
 Done when: a compressor then an EQ on a voice track sounds the same in the preview, the MP4 and the command line, and reordering them changes the sound.
 
 ### Step 3. Delay and distortion
 
-- [ ] `delay`: time (milliseconds, or a note value that follows the composition's tempo), feedback, wet, with the feedback capped so it cannot run away.
-- [ ] `distortion`: drive, tone, wet, on the `WaveShaperNode` the voice looks already use; the voice looks become presets of the same effects instead of their own code.
-- [ ] Both bypassable, both in the chain of step 2.
+- [x] `delay`: time (milliseconds, or a note value that follows the composition's tempo), feedback, wet, with the feedback capped so it cannot run away.
+  - 3–16000 ms or whole to thirty-second notes, with an explicitly set `sound.tempo` (20–300 BPM, no default). Feedback is limited to 0.95 in both the schema and the renderer. Wet adds an echo to the dry signal; native feedback timing preserves the old echo. The first reflection, repeat levels, note timing at two tempos and the unchecked feedback cap are rendered in Chrome tests.
+- [x] `distortion`: drive, tone, wet, on the `WaveShaperNode` the voice looks already use; the voice looks become presets of the same effects instead of their own code.
+  - Drive shapes the same tanh curve, tone optionally low-passes it, and wet crossfades with the original. Telephone, radio, megaphone and echo are shared effect presets; their clip names and preset chains match the independently frozen old PCM within 0.000001.
+- [x] Both bypassable, both in the chain of step 2.
+  - Both use the shared playback/export graph on tracks and buses. A bypassed note delay needs no tempo; changing a tempo invalidates playback and loudness caches. To check on a device: listen to delay tails, distortion and historical voice looks in WebView2 and WKWebView.
 
 Done when: the voice looks (telephone, radio, megaphone, echo) are written as chains and sound the same as before; a regression test compares their rendered output.
 
 ### Step 4. The chain in the interface
 
-- [ ] A strip shows its chain as a row of small slots; a click opens an effect's controls, a drag reorders, a toggle bypasses.
-- [ ] A start from presets: voice cleanup (low cut, compressor, de-ess EQ), music under voice, telephone, big room.
-- [ ] The `/` menu and the assistant reach the same operations (`use_tool`), and the assistant's proposal shows the chain it would add before applying it.
-- [ ] Keyboard use and focus order checked; every control has a label in both languages.
+- [x] A strip shows its chain as a row of small slots; a click opens an effect's controls, a drag reorders, a toggle bypasses.
+  - Each strip and bus shows its inserts in order. Controls derive their bounds from the strict effect schema; a note delay offers notes only after an explicit tempo. Edits, bypass and reordering use the existing one-step undo operations. A Chrome interaction run verifies settings, bypass, drag and responsive widths.
+- [x] A start from presets: voice cleanup (low cut, compressor, de-ess EQ), music under voice, telephone, big room.
+  - The add menu offers the four named chains and individual processors. A preset appends as one undoable edit, preserving existing inserts. Voice cleanup is two clicks from a strip; the telephone preset uses the same processors as the historic voice look.
+- [x] The `/` menu and the assistant reach the same operations (`use_tool`), and the assistant's proposal shows the chain it would add before applying it.
+  - `chain` lists, adds, appends a preset, edits, moves, bypasses and removes, through the same pure mixer operations. It refuses invalid/locked targets and active note delays without a tempo. The proposal card names the track and shows every processor and parameter without truncating the chain.
+- [x] Keyboard use and focus order checked; every control has a label in both languages.
+  - Alt + Left/Right reorders a focused slot; Tab stays in the open dialog and Escape returns focus to its trigger. The interface labels are English and French. To check on a device: drag and keyboard focus in WebView2 and WKWebView; touch screen scrolling of long chains.
 
 Done when: a user builds "clean voice" in four clicks, and the assistant does the same from one sentence and shows what it did.
 
@@ -88,19 +107,27 @@ Done when: a user builds "clean voice" in four clicks, and the assistant does th
 
 The one step that changes how a sound is made.
 
-- [ ] Read the cut before asking for music: the composition's length, its cuts (`momentsOf`: `cuts`, `markers`), its hero cues (`soundCues`) and a tempo chosen so most cuts land on a beat.
-- [ ] Ask the provider for the structure, not only a mood: sections whose lengths follow the picture (a calm opening, a rise before the reveal, the hit on the end card), with the tempo and the duration in the request.
-- [ ] After generation, measure how many cuts land within a frame of a beat (`beats` analysis); when too few, retime by whole bars, or stretch within a small limit, before the user hears it.
-- [ ] Keep the prompt, the tempo and the section plan beside the file, as the other generated sounds do.
-- [ ] Fall back to the current path (a bed, then alignment) when the provider cannot take a structure.
+- [x] Read the cut before asking for music: the composition's length, its cuts (`momentsOf`: `cuts`, `markers`), its hero cues (`soundCues`) and a tempo chosen so most cuts land on a beat.
+  - `music-plan` shows length, cuts, markers, hero cues, candidate tempo and count of cuts within one frame of the beat grid without calling a provider. Music generation reads the same plan before paid consent and uses the composition length when no duration was given. A six-cut sequence regression aligns all six. An empty film leaves tempo unset. The provider request and post-generation check follow in the remaining boxes.
+- [x] Ask the provider for the structure, not only a mood: sections whose lengths follow the picture (a calm opening, a rise before the reveal, the hit on the end card), with the tempo and the duration in the request.
+  - `generate-sound` divides the film at its cuts, markers and hero cues into 3–120 s instrumental sections, carries the proposed BPM in each section and sends their exact durations as an ElevenLabs Music v2.5 `composition_plan`. The API validates section bounds, count and total duration before a provider call. Hydracept still receives its prompt. Contract tests use a fake provider; a paid provider result has not yet been heard or measured.
+- [x] After generation, measure how many cuts land within a frame of a beat (`beats` analysis); when too few, retime by whole bars, or stretch within a small limit, before the user hears it.
+  - The received audio is resampled to the same 16 kHz mono input as `beats`; the count is measured against actual detected beats within one film frame. A speed correction of at most 2% is chosen only when it improves the count, and `keepPitch` preserves the notes in preview and export. The tool reports both counts and the applied speed, including when no steady pulse was found. A six-cut synthetic beat regression reaches six after correction. No real paid provider output has been checked; an arbitrary provider score may still fail the five-of-six goal and is reported honestly.
+- [x] Keep the prompt, the tempo and the section plan beside the file, as the other generated sounds do.
+  - The generated sound's `.sound.json` keeps the prompt and provider as before, plus `music.tempo`, `music.sectionPlan`, `music.requestMode` and the actual `music.beatCheck` counts and speed.
+- [x] Fall back to the current path (a bed, then alignment) when the provider cannot take a structure.
+  - Hydracept receives the prompt and duration as a music bed, without the unsupported `compositionPlan`; the same post-generation beat check and small correction then run. The route is covered by a fake provider job. Hydracept caps music at 300 s; the tool reports any cuts the returned score cannot cover.
 
 Done when: on a film with six cuts, at least five land on a beat without the user moving anything, and the check reports it.
 
 ### Step 6. Drawn ducking and volume blocks
 
-- [ ] Drag a range on a track to draw a dip: the editor writes the keyframes (down ramp, hold, up ramp) from a depth and a slope, and the range stays editable as one object.
-- [ ] A voice track can be marked as the one to duck under: the music's dip follows its clips without a transcript.
-- [ ] The existing `duck` tool and these blocks write the same keyframes, so both can be edited by hand afterwards.
+- [x] Drag a range on a track to draw a dip: the editor writes the keyframes (down ramp, hold, up ramp) from a depth and a slope, and the range stays editable as one object.
+  - Arm **D** on a sound track and drag a range: four relative dB keys are kept as one `volumeBlocks` entry, additive to the track fader and shared by playback and exports. Click the drawn block to edit its range, depth and two slopes or remove it; one edit is one undo step. The mixer reroutes live audio after the block changes. Browser QA covers drawing, editing, undo and 1280/390 px layouts. A voice track source and the existing `duck` tool's shared keys are the next two boxes.
+- [x] A voice track can be marked as the one to duck under: the music's dip follows its clips without a transcript.
+  - The mixer's **D** menu links a sound track to another sound track. The mixer computes a -12 dB dip from the linked track's audible clip ranges, merging close or overlapping clips; it recomputes after a clip moves or its source is muted, and clears the link if the source track is deleted. No transcript or saved stale keyframes are needed. Core audio tests cover movement and muting; browser QA covers the selection and narrow layout.
+- [x] The existing `duck` tool and these blocks write the same keyframes, so both can be edited by hand afterwards.
+  - For sounds on an audio track, `duck` writes editable `volumeBlocks` using the same four-keyframe function as the timeline. The two-drag regression compares every key against two transcript stretches. A sound without a track keeps its historical layer gain automation, editable through its keyframes. The tool deduplicates multiple target layers on one track and replaces an automatic voice link when explicit blocks are requested, avoiding a doubled dip.
 
 Done when: a ducking drawn in two drags is identical, keyframe for keyframe, to what `duck` writes for the same range.
 

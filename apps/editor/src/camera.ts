@@ -2,8 +2,8 @@
 // figure) and come back, keyed on the composition camera, with the framing
 // kept readable. A pure function frames the detail; the tool keys the move.
 
-import { Evaluator, quadBounds, sampleAt, pointer, type Op, type ToolContext, type ToolType, type Vec2 } from '@tramme/core';
-import { quadAt } from './pin.ts';
+import { quadBounds, pointer, type Op, type ToolContext, type ToolType, type Vec2 } from '@tramme/core';
+import { samplePushScene } from './isolated-quads.ts';
 
 interface Box { x: number; y: number; w: number; h: number }
 
@@ -57,15 +57,15 @@ const pushIn: ToolType<Input> = {
     const comp = ctx.doc.compositions[ctx.compId];
     if (!comp.layers[a.layer]) throw new Error(`${a.layer}: no such layer in the composition`);
     const none = (why: string) => ({ ops: [] as Op[], text: `${a.layer} ${why}: nothing was proposed.` });
-    const ev = new Evaluator(ctx.doc, ctx.registry);
     let target: Box;
-    try { target = quadBounds(quadAt(ev, ctx.compId, a.layer, a.at)); } catch (e) { return none(`cannot be pushed onto at ${a.at.toFixed(2)} s (${(e as Error).message})`); }
+    let scene: Awaited<ReturnType<typeof samplePushScene>>;
+    try { scene = await samplePushScene(ctx, a.layer, a.at); target = quadBounds(scene.quad); } catch (e) { return none(`cannot be pushed onto at ${a.at.toFixed(2)} s (${(e as Error).message})`); }
     // the smallest text inside the detail, so it reads when the camera is there
-    const inside = sampleAt(ev, ctx.compId, a.at).layers.filter((p) => p.textSize && p.textSize > 0 && p.box && p.box.x + p.box.w / 2 >= target.x && p.box.x + p.box.w / 2 <= target.x + target.w && p.box.y + p.box.h / 2 >= target.y && p.box.y + p.box.h / 2 <= target.y + target.h);
+    const inside = scene.placed.filter((p) => p.textSize && p.textSize > 0 && p.box && p.box.x + p.box.w / 2 >= target.x && p.box.x + p.box.w / 2 <= target.x + target.w && p.box.y + p.box.h / 2 >= target.y && p.box.y + p.box.h / 2 <= target.y + target.h);
     const smallest = inside.length ? Math.min(...inside.map((p) => p.textSize!)) : undefined;
     const framing = pushFraming(target, comp, { fill: a.fill ?? 0.6, minText: Math.round(Math.min(comp.width, comp.height) * 0.03), smallest });
     if (!framing) return none('is off the frame, or already larger than it');
-    const cam = ev.frame(a.at, ctx.compId).camera, z0 = cam?.zoom ?? 1, p0 = cam?.pan ?? [0, 0];
+    const z0 = scene.camera.zoom, p0 = scene.camera.pan;
     const length = Math.max(0.5, (framing.zoom - z0) / SPEED), hold = a.hold ?? 1.2, back = a.back ?? true;
     const token = (n: string) => ctx.doc.tokens?.[n]?.type === 'ease';
     const ease = { out: token('out') ? '@out' : [0.16, 1, 0.3, 1], in: token('in') ? '@in' : [0.7, 0, 0.84, 0] };

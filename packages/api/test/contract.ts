@@ -56,6 +56,35 @@ export function storageContract(name: string, makeBucket: () => Bucket) {
       expect((await call(path, { headers: { 'if-none-match': now } })).status).toBe(304);
     });
 
+    it('stores and reads the editor version index and snapshots', async () => {
+      const { call, create } = setup();
+      const m = await create();
+      for (const file of ['versions/index.json', 'versions/2026-11-09T07-40-00-000Z.json']) {
+        const path = `/api/projects/${m.id}/files/${file}`;
+        expect((await call(path, { method: 'PUT', body: '{}' })).status).toBe(200);
+        expect(await (await call(path)).text()).toBe('{}');
+      }
+    });
+
+    it('refuses malformed encoded project file paths', async () => {
+      const { call, create } = setup();
+      const m = await create();
+      for (const path of ['assets/%ZZ.json', 'assets/%E0%A4%A.json']) {
+        expect((await call(`/api/projects/${m.id}/files/${path}`)).status).toBe(400);
+      }
+    });
+
+    it('refuses malformed library names and serves encoded valid names with their MIME type', async () => {
+      const { call } = setup();
+      for (const route of ['/api/library/%ZZ.js', '/api/sounds/%ZZ.wav']) {
+        expect((await call(route)).status).toBe(400);
+      }
+      expect((await call('/api/sounds/whoosh.wav', { method: 'PUT', body: new Uint8Array([1]) })).status).toBe(200);
+      const sound = await call('/api/sounds/whoosh%2Ewav');
+      expect(sound.status).toBe(200);
+      expect(sound.headers.get('content-type')).toBe('audio/wav');
+    });
+
     it('reads a part of a file (Range), as the video layer seeks', async () => {
       const { call, create } = setup();
       const m = await create();

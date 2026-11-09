@@ -16,6 +16,7 @@ import { confirmWith } from '../confirm.ts';
 import { saveBlob } from '../download.ts';
 import { commit, S, toast } from '../state.ts';
 import { t } from '../i18n/index.ts';
+import { fileProject, requireFileProject } from '../files.ts';
 import { Toggle } from './controls.tsx';
 import { Icon } from './icons.tsx';
 import { Row, Section } from './SettingsRows.tsx';
@@ -64,8 +65,13 @@ function setInProject(id: string, on: boolean) {
 
 /** the installed version put in the open project in place of its copy (asked per project, never done alone) */
 async function useInProject(p: Installed) {
+  const project = fileProject();
   const doc = S.doc.peek(), { ops, files } = copyOps(doc, p);
-  for (const [path, blob] of files) await api.write(S.project.peek().id, path, blob, blob.type ? { type: blob.type } : {});
+  for (const [path, blob] of files) {
+    requireFileProject(project);
+    await api.write(project.id, path, blob, blob.type ? { type: blob.type } : {});
+  }
+  requireFileProject(project);
   if (commit(t('plugins.usedHere', { name: p.manifest.name, version: p.manifest.version }), ops)) await preview.reload([copyId(p)]);
 }
 

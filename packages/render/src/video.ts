@@ -29,6 +29,12 @@ export const fetchVideoRange: typeof fetch = async (input, init) => {
   return copy;
 };
 
+export function assertVideoDimensions(width: number, height: number, maxPixels: number): void {
+  if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width < 1 || height < 1 || width > 8192 || height > 8192 || width * height > maxPixels) {
+    throw new Error('video exceeds 8192 pixels per side or 16 million pixels total');
+  }
+}
+
 export class VideoFrames implements VideoAsset {
   width = 0;
   height = 0;
@@ -44,17 +50,20 @@ export class VideoFrames implements VideoAsset {
     this.input = new Input({ source: blob ? new BlobSource(blob) : new UrlSource(url, { fetchFn: fetchVideoRange }), formats: ALL_FORMATS });
   }
 
-  static async open(url: string, options: { cache?: boolean } = {}): Promise<VideoFrames> {
+  static async open(url: string, options: { cache?: boolean; maxPixels?: number } = {}): Promise<VideoFrames> {
     const v = new VideoFrames(url, options.cache ? await previewVideoBlob(url) : null);
-    const track = await v.input.getPrimaryVideoTrack();
-    if (!track) throw new Error('no video track');
-    if (!(await track.canDecode())) throw new Error(`video codec not supported by this browser (${track.codec ?? 'unknown'})`);
-    v.width = track.displayWidth;
-    v.height = track.displayHeight;
-    v.duration = await v.input.computeDuration();
-    v.hasAudio = !!(await v.input.getPrimaryAudioTrack());
-    v.pool = new ReaderPool(() => readerOf(track));
-    return v;
+    try {
+      const track = await v.input.getPrimaryVideoTrack();
+      if (!track) throw new Error('no video track');
+      if (options.maxPixels) assertVideoDimensions(track.displayWidth, track.displayHeight, options.maxPixels);
+      if (!(await track.canDecode())) throw new Error(`video codec not supported by this browser (${track.codec ?? 'unknown'})`);
+      v.width = track.displayWidth;
+      v.height = track.displayHeight;
+      v.duration = await v.input.computeDuration();
+      v.hasAudio = !!(await v.input.getPrimaryAudioTrack());
+      v.pool = new ReaderPool(() => readerOf(track));
+      return v;
+    } catch (error) { v.input.dispose(); throw error; }
   }
 
   /** decoders opened so far (a read starting somewhere: a seek) */

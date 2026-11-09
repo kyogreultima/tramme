@@ -4,11 +4,14 @@
 // N at once by a layout and rules, an instance detached into plain layers.
 // The assistant reaches them through use_tool, the user through the / menu.
 
-import { defineComponentPlan, detachPlan, Evaluator, pointer, sampleComposition, type Distribution, type Layout, type Op, type ToolContext, type ToolType, type TrammeDoc, type Vec2 } from '@tramme/core';
+import { defineComponentPlan, detachPlan, pointer, sampleComposition, type Distribution, type Layout, type Op, type ToolContext, type ToolType, type TrammeDoc, type Vec2 } from '@tramme/core';
+import { editorEvaluator } from './evaluator.ts';
+import { sandboxedDoc } from './installed.ts';
 import { freshId, slug } from './model.ts';
 import { api } from './api.ts';
 import { libraryList, refreshLibrary } from './library.ts';
 import { t } from './i18n/index.ts';
+import { prefs } from './settings.ts';
 
 /** an object argument, or the same written as JSON (the / menu's text field) */
 function objectArg<T>(v: unknown, what: string): T | undefined {
@@ -20,14 +23,35 @@ function objectArg<T>(v: unknown, what: string): T | undefined {
 }
 
 /** where layers are drawn over the composition's whole length (their children included), padded: the component's frame */
-function drawnBox(ctx: ToolContext, ids: string[]): { x: number; y: number; w: number; h: number } | undefined {
+export async function drawnBox(ctx: ToolContext, ids: string[]): Promise<{ x: number; y: number; w: number; h: number } | undefined> {
   const c = ctx.doc.compositions[ctx.compId], inside = new Set<string>();
   const take = (id: string) => { inside.add(id); for (const ch of c.layers[id]?.children ?? []) take(ch); };
   ids.forEach(take);
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   const step = Math.max(1 / c.fps, Math.min(0.25, c.duration / 40));
-  for (const s of sampleComposition(new Evaluator(ctx.doc, ctx.registry), ctx.compId, step)) {
-    for (const p of s.layers) {
+  const times: number[] = [];
+  for (let i = 0; i * step < c.duration - 1e-6; i++) times.push(+(i * step).toFixed(6));
+  const isolated = sandboxedDoc(ctx.doc) || prefs.peek().sandboxPreview;
+  if (isolated && times.length > 512) throw new Error('too many component frame samples');
+  let placed: (at: number) => Promise<{ id: string; box: { x: number; y: number; w: number; h: number } | null }[]>;
+  if (!isolated) {
+    const ev = editorEvaluator(ctx.doc, ctx.registry);
+    const samples = sampleComposition(ev, ctx.compId, step);
+    placed = async (at) => samples[Math.round(at / step)]?.layers ?? [];
+  } else {
+    const [{ fileProject, requireFileProject }, { preview }, { pluginHost }, { ensureDeclared, ensureSandboxDoc, moduleItemsOf }] = await Promise.all([
+      import('./files.ts'), import('./preview.ts'), import('./plugins/index.ts'), import('./plugins/sandbox-draw.ts'),
+    ]);
+    const project = fileProject(), renderer = preview.renderer;
+    if (!renderer) throw new Error('preview is not ready for isolated component bounds');
+    const base = new URL(project.docUrl, location.href).href, host = pluginHost(base);
+    await ensureDeclared(host, moduleItemsOf(ctx.doc, base));
+    requireFileProject(project);
+    ensureSandboxDoc(host, { doc: ctx.doc, docUrl: base, loaded: (id) => { try { return renderer.assets.get(id); } catch { return null; } } });
+    placed = async (at) => { const values = await host.samplePlaced(at, ctx.compId); requireFileProject(project); return values; };
+  }
+  for (const at of times) {
+    for (const p of await placed(at)) {
       if (!inside.has(p.id) || !p.box) continue;
       x0 = Math.min(x0, p.box.x); y0 = Math.min(y0, p.box.y); x1 = Math.max(x1, p.box.x + p.box.w); y1 = Math.max(y1, p.box.y + p.box.h);
     }
@@ -58,13 +82,13 @@ const defineComponent: ToolType<{ name: string; layers?: string[]; params?: Para
     avoid: 'parameters for what never varies; a component of one plain layer with nothing exposed',
     example: { name: 'card', params: [{ name: 'title', targets: ['title.text'] }, { name: 'color', targets: ['plate.fill'] }] },
   },
-  run(a, ctx) {
+  async run(a, ctx) {
     if (!a.name?.trim()) throw new Error('define_component: a name is expected');
     const ids = a.layers?.length ? a.layers : ctx.selection;
     if (!ids.length) throw new Error('define_component: select layers or pass their ids');
     const id = freshId(ctx.doc.compositions, slug(a.name) || 'component');
     const params = Object.fromEntries((objectArg<ParamArg[]>(a.params, 'params') ?? []).map((p) => [p.name, { targets: p.targets, type: p.type, default: p.default, label: p.label }]));
-    const plan = defineComponentPlan(ctx.doc, ctx.registry, ctx.compId, ids, { id, name: a.name.trim(), box: drawnBox(ctx, ids), params });
+    const plan = defineComponentPlan(ctx.doc, ctx.registry, ctx.compId, ids, { id, name: a.name.trim(), box: await drawnBox(ctx, ids), params });
     if ('error' in plan) throw new Error(`define_component: ${plan.error}`);
     const names = Object.keys(params);
     return {

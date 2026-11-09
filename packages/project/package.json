@@ -1,11 +1,12 @@
 {
   "name": "@tramme/project",
-  "version": "0.20.0",
+  "version": "0.21.0",
   "license": "FSL-1.1-ALv2",
   "private": true,
   "type": "module",
-  "exports": { ".": "./src/index.ts" },
+  "exports": { ".": "./src/index.ts", "./src/*": "./src/*" },
   "dependencies": {
+    "@babel/parser": "^7.29.13",
     "@tramme/core": "*",
     "fflate": "^0.8.3",
     "zod": "^4.6.5"

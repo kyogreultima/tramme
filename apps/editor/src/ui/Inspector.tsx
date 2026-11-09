@@ -5,16 +5,26 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { Evaluator, getAt, pointer, propKind, staticValue, sheetIssues, TRANSFORM_SCHEMA, MOTION_BLUR_SCHEMA, CAMERA_SCHEMA, SOUND_MIX_SCHEMA, type TrammeDoc, type Op, type Paint, type Prop, type PropDef, type PropSchema, type Token, MASK_SCHEMA, curveTable, type PathValue } from '@tramme/core';
 import { comp, commit, draft, cancelDraft, S, viewDoc, select, toast, uiTime } from '../state.ts';
-import { assetData } from '../preview.ts';
+import { assetData, preview } from '../preview.ts';
+import { sandboxedDoc } from '../installed.ts';
+import { pluginHost } from '../plugins/index.ts';
+import { ensureDeclared, ensureSandboxDoc, moduleItemsOf } from '../plugins/sandbox-draw.ts';
+import { fileProject, sameFileProject } from '../files.ts';
+import { prefs } from '../settings.ts';
 import { addModifierOps, editAtOps, fixedOps, folderOf, imagesIn, keyAtOps, keyIndexAt, keysOf, removeKeyOps, removeModifierOps, setAtOps, snap, freshId, cutEndOps, fmtSeconds } from '../model.ts';
-import { addressDef, componentOf, detachPlan, modsOf, modifierParams, paramDef } from '@tramme/core';
+import { addressDef, componentOf, detachPlan, modsOf, modifierParams, paramDef, sceneParamDef, sceneParams } from '@tramme/core';
+import { SceneSchema } from '@tramme/project';
+import { readProjectText } from '../plugins/read-project-text.ts';
+import { sceneSyncOps } from '../scene-tools.ts';
 import { followTrackOps, tracksOf } from '../masks.ts';
 import { pickColor } from '../dropper.ts';
+import { SceneCode, sceneFolder } from './SceneCode.tsx';
 import { ColorField, NumberField, openMenu, Popover, Select, Seg, TextInput, Toggle, type MenuItem } from './controls.tsx';
 import { Icon, kindColor, kindIcon } from './icons.tsx';
 import { mediaOf, transcribe, TranscribeButton } from './Transcribe.tsx';
 import { transcribing, transcriptIdOf } from '../speech.ts';
 import { m, t, tr } from '../i18n/index.ts';
+import { projectAssetUrl } from '../project-asset-url.ts';
 
 const UNIT: Record<string, string> = { px: 'px', deg: '°', '%': '%', em: 'em', s: 's', x: '×', dB: 'dB' };
 
@@ -25,6 +35,7 @@ interface Ctx {
   fps: number;
   ev: Evaluator;
   tokens: Record<string, Token>;
+  isolated: boolean;
 }
 
 function evalSafe(ev: Evaluator, address: string, t: number, compId: string): { v?: unknown; error?: string } {
@@ -36,24 +47,54 @@ function PropRow({ ctx, label, def, path, address }: { ctx: Ctx; label: string; 
   const raw = getAt(ctx.doc, path) as Prop | undefined;
   const kind = raw === undefined ? 'static' : propKind(raw);
   const keys = keysOf(raw);
-  const { v, error } = evalSafe(ctx.ev, address, ctx.t, ctx.compId);
+  const local = evalSafe(ctx.ev, address, ctx.t, ctx.compId);
+  const needsRemote = ctx.isolated && !!local.error;
+  const projectId = S.project.value?.id, docUrl = S.docUrl.value;
+  const [remote, setRemote] = useState<{ doc: TrammeDoc; projectId: string; docUrl: string; compId: string; t: number; address: string; result: { v?: unknown; error?: string } } | null>(null);
+  useEffect(() => {
+    if (!needsRemote) return;
+    let live = true;
+    const doc = ctx.doc, compId = ctx.compId, time = ctx.t;
+    const project = fileProject();
+    const timer = setTimeout(() => { void (async () => {
+      try {
+        const renderer = preview.renderer;
+        if (!renderer) throw new Error('preview is not ready');
+        const base = new URL(project.docUrl, location.href).href;
+        const host = pluginHost(base);
+        await ensureDeclared(host, moduleItemsOf(doc, base));
+        if (!live || !sameFileProject(project)) return;
+        ensureSandboxDoc(host, { doc, docUrl: base, loaded: (id) => { try { return renderer.assets.get(id); } catch { return null; } } });
+        const v = await host.evaluateValue(address, time, compId);
+        if (live && sameFileProject(project)) setRemote({ doc, projectId: project.id, docUrl: project.docUrl, compId, t: time, address, result: { v } });
+      } catch (e) {
+        if (live && sameFileProject(project)) setRemote({ doc, projectId: project.id, docUrl: project.docUrl, compId, t: time, address, result: { error: (e as Error).message } });
+      }
+    })(); }, 40);
+    return () => { live = false; clearTimeout(timer); };
+  }, [ctx.doc, ctx.compId, ctx.t, address, needsRemote, projectId, docUrl]);
+  const current = remote?.doc === ctx.doc && remote.projectId === projectId && remote.docUrl === docUrl && remote.compId === ctx.compId && remote.t === ctx.t && remote.address === address;
+  const pendingValue = needsRemote && !current;
+  const { v, error } = current ? remote.result : needsRemote ? { v: undefined } : local;
   const value = v === undefined ? def.default : v;
   const here = keyIndexAt(keys, ctx.t, ctx.fps);
   const tKey = snap(ctx.t, ctx.fps);
   const animatable = def.animatable !== false;
 
-  const live = (x: unknown) => draft(editAtOps(ctx.doc, path, x, ctx.t, ctx.fps));
-  const set = (x: unknown) => commit(`${label}`, editAtOps(ctx.doc, path, x, ctx.t, ctx.fps));
+  const live = (x: unknown) => { if (!pendingValue) draft(editAtOps(ctx.doc, path, x, ctx.t, ctx.fps)); };
+  const set = (x: unknown) => { if (!pendingValue) commit(`${label}`, editAtOps(ctx.doc, path, x, ctx.t, ctx.fps)); };
   const setRaw = (p: Prop | undefined, what: string) =>
     commit(what, p === undefined ? (raw === undefined ? [] : [{ op: 'remove', path }]) : setAtOps(ctx.doc, path, p));
 
   const toggleKey = () => {
+    if (pendingValue) return;
     if (!keys) commit(t('inspector.animateName', { name: label }), setAtOps(ctx.doc, path, { $k: [{ t: tKey, v: value }] }));
     else if (here >= 0) commit(t('inspector.deleteTheKeyframeOf', { name: label }), removeKeyOps(ctx.doc, path, here));
     else commit(t('inspector.keyframeOfName', { name: label }), keyAtOps(ctx.doc, path, tKey, value, ctx.fps));
   };
 
   const menu = (e: MouseEvent) => {
+    if (pendingValue) return;
     const items: MenuItem[] = [];
     if (animatable) {
       if (keys) {
@@ -98,7 +139,7 @@ function PropRow({ ctx, label, def, path, address }: { ctx: Ctx; label: string; 
   return (
     <div class={`prop${cls}`}>
       {animatable ? (
-        <button class={`kbtn${keys ? ' has' : ''}${here >= 0 ? ' here' : ''}`} title={keys ? (here >= 0 ? t('common.deleteKeyframe') : t('inspector.addAKeyframeHere')) : t('inspector.animate')} onClick={toggleKey}>
+        <button class={`kbtn${keys ? ' has' : ''}${here >= 0 ? ' here' : ''}`} disabled={pendingValue} title={keys ? (here >= 0 ? t('common.deleteKeyframe') : t('inspector.addAKeyframeHere')) : t('inspector.animate')} onClick={toggleKey}>
           <svg viewBox="0 0 10 10"><path d="M5 .8 9.2 5 5 9.2.8 5z" fill={keys ? 'none' : 'none'} stroke="currentColor" stroke-width="1.3" /></svg>
         </button>
       ) : <span />}
@@ -112,25 +153,25 @@ function PropRow({ ctx, label, def, path, address }: { ctx: Ctx; label: string; 
             if (hex) set(hex);
           } : undefined} />
           : kind === 'expression'
-            ? <span class="prop-note">{short(value)}</span>
-            : <span class="prop-note">{short(value)}</span>}
+            ? <span class="prop-note">{pendingValue ? '…' : short(value)}</span>
+            : <span class="prop-note">{pendingValue ? '…' : short(value)}</span>}
       </div>
-      <button class={`icon-btn xs more${kind !== 'static' ? ' on' : ''}`} title={t('inspector.options')} onClick={menu}><Icon name="more" /></button>
+      <button class={`icon-btn xs more${kind !== 'static' ? ' on' : ''}`} disabled={pendingValue} title={t('inspector.options')} onClick={menu}><Icon name="more" /></button>
       {(kind === 'expression' || (kind === 'keyframes' && (raw as any).$expr !== undefined)) && (
         <div class="prop-extra">
           <TextInput code value={(raw as any).$expr} onCommit={(src) => setRaw({ ...(raw as object), $expr: src } as Prop, t('inspector.expressionOfName', { name: label }))} />
-          {error ? <div class="prop-note err">{error}</div> : <div class="prop-note">= {short(value)}</div>}
+          {error ? <div class="prop-note err">{error}</div> : <div class="prop-note">= {pendingValue ? '…' : short(value)}</div>}
         </div>
       )}
       {kind === 'link' && (
         <div class="prop-extra">
           <LinkField ctx={ctx} def={def} value={(raw as any).$link} onCommit={(a) => setRaw({ $link: a } as Prop, t('inspector.linkOfName', { name: label }))} />
-          {error ? <div class="prop-note err">{error}</div> : <div class="prop-note">= {short(value)}</div>}
+          {error ? <div class="prop-note err">{error}</div> : <div class="prop-note">= {pendingValue ? '…' : short(value)}</div>}
         </div>
       )}
       {modsOf(raw) && <ModStack ctx={ctx} path={path} raw={raw} label={label} />}
       {error && editable && <div class="prop-extra"><div class="prop-note err">{error}</div></div>}
-      {!error && <PropCheck ctx={ctx} path={path} value={value} />}
+      {!error && !pendingValue && <PropCheck ctx={ctx} path={path} value={value} />}
     </div>
   );
 }
@@ -202,6 +243,31 @@ function InstanceSection({ ctx, id }: { ctx: Ctx; id: string }) {
   );
 }
 
+/** a web scene's parameters: one row each, animated like any property; the scene.json is read again on demand */
+function SceneParams({ ctx, id }: { ctx: Ctx; id: string }) {
+  const layer = ctx.doc.compositions[ctx.compId].layers[id], lp = pointer('compositions', ctx.compId, 'layers', id);
+  const declared = Object.entries(sceneParams(layer)), folder = sceneFolder(staticValue(layer.props?.folder));
+  const read = async () => {
+    const project = S.project.value;
+    if (!project || !folder) return;
+    try {
+      const raw = await readProjectText(project.id, `${folder}/scene.json`);
+      const parsed = raw === null ? null : SceneSchema.safeParse(JSON.parse(raw));
+      if (!parsed?.success) { toast(t('inspector.sceneManifestInvalid'), 'error'); return; }
+      const ops = sceneSyncOps(S.doc.peek(), folder, parsed.data);
+      if (ops.length) commit(t('inspector.sceneParamsRead'), ops); else toast(t('inspector.sceneParamsCurrent'));
+    } catch { toast(t('inspector.sceneManifestInvalid'), 'error'); }
+  };
+  return (
+    <Section id="scene-params" title={t('inspector.parameters')} right={folder ? <button class="icon-btn sm" title={t('inspector.sceneReadParams')} onClick={read}><Icon name="download" /></button> : null}>
+      {declared.map(([name, p]) => (
+        <PropRow key={name} ctx={ctx} label={name} def={sceneParamDef(p, name)} path={`${lp}/params/${name}`} address={`${id}.params.${name}`} />
+      ))}
+      {!declared.length && <div class="prop-note">{t('inspector.sceneNoParameters')}</div>}
+    </Section>
+  );
+}
+
 /** a composition's parameters, when it exposes some: each with where it lands, removable */
 function ParamsSection({ ctx }: { ctx: Ctx }) {
   const c = ctx.doc.compositions[ctx.compId], params = Object.entries(c.params ?? {});
@@ -233,8 +299,11 @@ function PropCheck({ ctx, path, value }: { ctx: Ctx; path: string; value: unknow
 function AssetsField({ def, value, ctx, onCommit }: { def: PropDef; value: unknown; ctx: Ctx; onCommit: (v: unknown) => void }) {
   const ids = Array.isArray(value) ? (value as string[]) : [];
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
-  const base = new URL(S.docUrl.peek(), location.href);
-  const url = (id: string) => { const a = ctx.doc.assets[id]; return a ? new URL(a.src, base).href : ''; };
+  const url = (id: string) => {
+    const a = ctx.doc.assets[id];
+    if (!a) return '';
+    try { return projectAssetUrl(a.src, S.docUrl.peek()); } catch { return ''; }
+  };
   const kind = def.assetType ?? 'image';
   const folders = new Map<string, string[]>();
   for (const [id, a] of Object.entries(ctx.doc.assets)) if (a.type === kind) { const f = folderOf(a.src); folders.set(f, [...(folders.get(f) ?? []), id]); }
@@ -612,6 +681,7 @@ function SchemaRows({ ctx, schema, basePath, baseAddress, only }: { ctx: Ctx; sc
 function grouped(schema: PropSchema, fallback: string): [string, PropSchema][] {
   const out = new Map<string, PropSchema>();
   for (const [n, d] of Object.entries(schema)) {
+    if (d.hidden) continue;
     const g = d.group || fallback;
     if (!out.has(g)) out.set(g, {});
     out.get(g)![n] = d;
@@ -664,6 +734,12 @@ function LayerInspector({ ctx, id }: { ctx: Ctx; id: string }) {
         </Section>
       ) : null}
       {layer.type === 'comp' && <InstanceSection ctx={ctx} id={id} />}
+      {layer.type === 'webscene' && <SceneParams ctx={ctx} id={id} />}
+      {layer.type === 'webscene' && S.project.value && sceneFolder(staticValue(layer.props?.folder)) && (
+        <Section id="scene-code" title={t('inspector.sceneFiles')}>
+          <SceneCode projectId={S.project.value.id} folder={sceneFolder(staticValue(layer.props?.folder))!} />
+        </Section>
+      )}
       {node && grouped(node.props, node.title).map(([g, schema]) => (
         <Section key={g} id={`${layer.type}.${g}`} title={tr(g)}>
           <SchemaRows ctx={ctx} schema={schema} basePath={`${lp}/props`} baseAddress={id} />
@@ -762,11 +838,31 @@ function SpeechSection({ asset }: { asset: string }) {
 
 /** the drawn masks of a layer: add (a rectangle over the layer, to edit in the viewport), toggle, remove, reorder, their props */
 function MasksSection({ ctx, base, id, masks }: { ctx: Ctx; base: string; id: string; masks: import('@tramme/core').Mask[] }) {
-  const add = () => {
+  const add = async () => {
     const mid = freshId(Object.fromEntries(masks.map((x) => [x.id, 1])), 'mask');
     // a rectangle over what the layer draws, when it knows its bounds
     let b: { x: number; y: number; w: number; h: number } | null = null;
-    try { const L = ctx.ev.layerAt(id, ctx.t, ctx.compId); b = L.node.bounds?.(L.props, {} as never) ?? null; } catch { /* the default rectangle */ }
+    if (ctx.isolated) {
+      const project = fileProject();
+      try {
+        const renderer = preview.renderer;
+        if (!renderer) throw new Error('preview is not ready');
+        const docUrl = new URL(project.docUrl, location.href).href, host = pluginHost(docUrl);
+        await ensureDeclared(host, moduleItemsOf(ctx.doc, docUrl));
+        if (!sameFileProject(project) || viewDoc.peek() !== ctx.doc) return;
+        ensureSandboxDoc(host, { doc: ctx.doc, docUrl, loaded: (asset) => { try { return renderer.assets.get(asset); } catch { return null; } } });
+        const [sample] = await host.evaluateLayers([id], ctx.t, ctx.compId);
+        if (!sameFileProject(project) || viewDoc.peek() !== ctx.doc || S.compId.peek() !== ctx.compId || uiTime.peek() !== ctx.t) return;
+        if (!sample || 'err' in sample) throw new Error(sample?.err ?? 'missing layer');
+        const node = S.registry.peek().node(ctx.doc.compositions[ctx.compId].layers[id].type);
+        b = node.bounds?.(sample.props, {} as never) ?? null;
+      } catch (e) {
+        if (sameFileProject(project)) toast(t('inspector.maskBoundsUnavailable', { error: (e as Error).message }));
+        return;
+      }
+    } else {
+      try { const L = ctx.ev.layerAt(id, ctx.t, ctx.compId); b = L.node.bounds?.(L.props, {} as never) ?? null; } catch { /* the default rectangle */ }
+    }
     const path = b ? { v: [[b.x, b.y], [b.x + b.w, b.y], [b.x + b.w, b.y + b.h], [b.x, b.y + b.h]], closed: true } : MASK_SCHEMA.path.default;
     const value = { id: mid, props: { path } };
     commit(t('inspector.addAMask'), masks.length ? [{ op: 'add', path: `${base}/masks/-`, value }] : [{ op: 'add', path: `${base}/masks`, value: [value] }]);
@@ -872,8 +968,9 @@ function CompInspector({ ctx }: { ctx: Ctx }) {
 export function Inspector() {
   const doc = viewDoc.value, c = comp.value, now = uiTime.value, reg = S.registry.value;
   const compId = S.compId.value;
-  const ev = useMemo(() => new Evaluator(doc, reg, { data: assetData }), [doc, reg]);
-  const ctx: Ctx = { doc, compId, t: now, fps: c.fps, ev, tokens: doc.tokens };
+  const isolated = prefs.value.sandboxPreview || sandboxedDoc(doc);
+  const ev = useMemo(() => new Evaluator(doc, reg, { data: assetData, allowExpressions: !isolated }), [doc, reg, isolated]);
+  const ctx: Ctx = { doc, compId, t: now, fps: c.fps, ev, tokens: doc.tokens, isolated };
   const sel = S.selection.value.filter((id) => c.layers[id]);
   if (sel.length > 1) {
     return (

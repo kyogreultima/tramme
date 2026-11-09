@@ -15,6 +15,8 @@ import * as esbuild from 'esbuild';
 import { WebSocketServer } from 'ws';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
+const PROJECT_SANDBOX = fs.readFileSync(path.join(HERE, '../../../apps/editor/project-sandbox.html'), 'utf8');
+const PROJECT_SANDBOX_CSP = "sandbox allow-scripts; default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' data:; worker-src data:; connect-src 'none'; img-src data: blob:; font-src data: blob:; style-src 'unsafe-inline'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'";
 
 export const MIME: Record<string, string> = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8',
@@ -31,6 +33,24 @@ const PAGE = `<!doctype html>
 
 export interface ProjectConfig { dir: string; mounts: [string, string][] }
 
+/** Resolve a project URL without following a link outside its selected mount. */
+export function resolveMountedPath(config: ProjectConfig, urlPath: string): string | null {
+  for (const [prefix, dir] of config.mounts) {
+    if (urlPath.startsWith(prefix)) {
+      const root = path.resolve(dir);
+      const file = path.resolve(root, urlPath.slice(prefix.length));
+      const within = (base: string, candidate: string) => {
+        const rel = path.relative(base, candidate);
+        return rel === '' || (rel !== '..' && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel));
+      };
+      if (!within(root, file)) return null;
+      if (fs.existsSync(file) && !within(fs.realpathSync(root), fs.realpathSync(file))) return null;
+      return file;
+    }
+  }
+  return null;
+}
+
 /** mounts of tramme.config.json beside the document (paths relative to that file) */
 export function readConfig(docFile: string): ProjectConfig {
   const dir = path.dirname(docFile);
@@ -39,7 +59,13 @@ export function readConfig(docFile: string): ProjectConfig {
   const mounts: [string, string][] = [['/project/', dir]];
   if (fs.existsSync(f)) {
     const cfg = JSON.parse(fs.readFileSync(f, 'utf8'));
-    for (const [prefix, rel] of Object.entries<string>(cfg.mounts || {})) mounts.push([prefix.endsWith('/') ? prefix : prefix + '/', path.resolve(dir, rel)]);
+    for (const [prefix, rel] of Object.entries<string>(cfg.mounts || {})) {
+      const mounted = prefix.endsWith('/') ? prefix : `${prefix}/`;
+      if (!mounted.startsWith('/') || mounted.includes('\\') || mounted.split('/').some((part) => part === '.' || part === '..') || mounted.startsWith('/project/') || mounted.startsWith('/__tramme/')) {
+        throw new Error(`invalid or reserved project mount: ${prefix}`);
+      }
+      mounts.push([mounted, path.resolve(dir, rel)]);
+    }
   }
   // longest prefix first
   mounts.sort((a, b) => b[0].length - a[0].length);
@@ -93,7 +119,7 @@ export class Server {
    * Bundle an entry with esbuild and serve its outputs under /__tramme/<name>/
    * (main.js, main.css...). watch: rebuild on change (editor development).
    */
-  async bundle(name: string, entry: string, { watch = false } = {}) {
+  async bundle(name: string, entry: string, { watch = false, minify = false, sourcemap = true } = {}) {
     const store = (r: esbuild.BuildResult) => {
       for (const f of r.outputFiles || []) {
         const ext = path.extname(f.path);
@@ -101,8 +127,8 @@ export class Server {
       }
     };
     const options: esbuild.BuildOptions = {
-      entryPoints: [entry], bundle: true, format: 'esm', platform: 'browser', target: 'chrome120',
-      outdir: path.join(HERE, '.out', name), write: false, sourcemap: 'inline', logLevel: 'error',
+      entryPoints: [entry], bundle: true, minify, format: 'esm', platform: 'browser', target: 'chrome120',
+      outdir: path.join(HERE, '.out', name), write: false, sourcemap: sourcemap ? 'inline' : false, logLevel: 'error',
       jsx: 'automatic', jsxImportSource: 'preact', loader: { '.ttf': 'file', '.woff2': 'file' },
     };
     if (!watch) { store(await esbuild.build(options)); return; }
@@ -115,7 +141,7 @@ export class Server {
   async start(port = 0): Promise<number> {
     await this.bundle('render', path.join(HERE, 'page.ts'));
     // the plugin sandbox's worker (shared with the editor), at the fixed address its host creates
-    await this.bundle('sandbox', path.join(HERE, '../../../apps/editor/src/plugins/worker.ts'));
+    await this.bundle('sandbox', path.join(HERE, '../../../apps/editor/src/plugins/worker.ts'), { minify: true, sourcemap: false });
     this.files.set('/plugin-worker.js', this.files.get('/__tramme/sandbox/worker.js')!);
     await new Promise<void>((resolve, reject) => {
       this.http.once('error', reject);
@@ -132,13 +158,7 @@ export class Server {
 
   /** filesystem path behind a URL path, or null outside every mount */
   resolve(urlPath: string): string | null {
-    for (const [prefix, dir] of this.config.mounts) {
-      if (urlPath.startsWith(prefix)) {
-        const f = path.join(dir, urlPath.slice(prefix.length));
-        return f.startsWith(dir) ? f : null;
-      }
-    }
-    return null;
+    return resolveMountedPath(this.config, urlPath);
   }
 
   private async handle(req: http.IncomingMessage, res: http.ServerResponse) {
@@ -146,6 +166,10 @@ export class Server {
     for (const h of this.handlers) if (await h(req, res, url)) return;
     if (url.pathname === '/__tramme/' || url.pathname === '/__tramme/index.html') {
       res.writeHead(200, { 'content-type': MIME['.html'], 'cache-control': 'no-store' }); res.end(PAGE); return;
+    }
+    if (url.pathname === '/project-sandbox.html') {
+      res.writeHead(200, { 'content-type': MIME['.html'], 'cache-control': 'no-store', 'content-security-policy': PROJECT_SANDBOX_CSP });
+      res.end(PROJECT_SANDBOX); return;
     }
     if (url.pathname === '/favicon.ico') { res.writeHead(204); res.end(); return; }
     const built = this.files.get(url.pathname);

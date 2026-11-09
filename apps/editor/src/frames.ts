@@ -7,8 +7,8 @@ import { effect, signal } from '@preact/signals';
 import type { TrammeDoc } from '@tramme/core';
 import { Renderer } from '@tramme/render';
 import { editorRegistry } from './vocabulary.ts';
-import { attachIsolated, filterModule, pluginHost } from './plugins/index.ts';
-import { declarationsModule, ensureDeclared, ensureSandboxDoc, pluginItemsOf, sandboxDeclaration, sandboxVideoFrames } from './plugins/sandbox-draw.ts';
+import { attachIsolated, filterModule, pluginHost, pluginToolHost } from './plugins/index.ts';
+import { declarationsModule, ensureDeclared, ensureSandboxDoc, moduleItemsOf, sandboxDeclaration, sandboxVideoFrames } from './plugins/sandbox-draw.ts';
 import { prefs } from './settings.ts';
 import { sandboxedDoc } from './installed.ts';
 import { S } from './state.ts';
@@ -28,17 +28,18 @@ export class Stills {
     if (!this.renderer) {
       // the flag: the sandbox owns the plugins' modules, the registry takes its declarations
       const sandboxed = sandboxedDoc(doc);
-      if (sandboxed) await ensureDeclared(pluginHost(base), pluginItemsOf(doc, base));
+      if (sandboxed) await ensureDeclared(pluginHost(base), moduleItemsOf(doc, base));
       this.renderer = await Renderer.open(doc, editorRegistry(), base, this.canvas, { compId: id, raster: 'gpu', proxies, pluginModule: sandboxed ? undefined : filterModule, sandboxModules: sandboxed, sandboxDeclarations: sandboxed ? (pid) => declarationsModule(sandboxDeclaration(pid)!, pid) : undefined });
     }
     // the same version again: its simulations stay computed
     else if (doc !== this.doc || id !== this.compId || this.renderer.assets.useProxies !== proxies) {
       this.renderer.assets.useProxies = proxies;
+      if (sandboxedDoc(doc)) await ensureDeclared(pluginHost(base), moduleItemsOf(doc, base));
       await this.renderer.setDoc(doc, { compId: id, trusted: true });
     }
     this.doc = doc; this.compId = id;
     // a proposal may add a plugin: its tools join as sandbox-backed entries
-    if ((doc.plugins ?? []).length) await attachIsolated(this.renderer.registry, pluginHost(base), doc, (pid) => this.renderer!.assets.url(pid)).catch((e) => console.error('[plugins]', (e as Error).message));
+    if ((doc.plugins ?? []).length) await attachIsolated(this.renderer.registry, pluginHost(base), doc, (pid) => this.renderer!.assets.url(pid), undefined, (id, url) => pluginToolHost(base, id, url));
     return this.renderer;
   }
 
@@ -123,7 +124,8 @@ class Frames {
         if (w.doc !== this.current || this.cache.has(w.key) || !w.doc.compositions[w.compId]) continue;
         let url: string;
         try { url = await this.stills.still(w.doc, w.t, w.compId, this.width, 0.78); }
-        catch { continue; }
+        catch (e) { S.renderError.value = `storyboard: ${(e as Error).message}`; continue; }
+        if (S.renderError.peek()?.startsWith('storyboard:')) S.renderError.value = null;
         this.cache.set(w.key, url);
         this.last.set(w.where, url);
         // the oldest frames go first when there are many

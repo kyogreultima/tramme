@@ -4,6 +4,8 @@
 // compositions) are maps keyed by id, so a patch path stays valid while
 // other items are added, removed or reordered. Order lives in explicit arrays.
 
+import type { AudioEffect } from './audio-effects.ts';
+
 export const SCHEMA_VERSION = 'tramme/1';
 /** the same format under the tool's former names (trame, before that emotion); read, then saved as tramme/1 */
 export const LEGACY_SCHEMA_VERSIONS = ['trame/1', 'emotion/1'];
@@ -29,6 +31,9 @@ export interface Keyframe<T = unknown> {
   /** ease towards the next keyframe (default linear) */
   ease?: EaseSpec;
 }
+
+/** One editable gain dip, relative to the track fader. */
+export interface VolumeBlock { id: string; keys: Keyframe<number>[] }
 
 /** a modifier of the stack applied after the value is computed (see modifiers.ts) */
 export interface ModifierSpec { type: string; [param: string]: unknown }
@@ -275,12 +280,18 @@ export interface SequenceTrack {
   magnetic?: boolean;
   /** sound tracks: the fader, in dB over the gain of each sound on the track (animatable: its keys are the automation) */
   volume?: Prop<number>;
+  /** editable dips on the track; each group carries four relative dB keyframes and adds to the fader */
+  volumeBlocks?: VolumeBlock[];
+  /** sound track whose audible clips automatically lower this track, without needing a transcript */
+  duckUnder?: string;
   /** sound tracks: where the track sits between left (-1) and right (1) */
   pan?: number;
   /** this track is a bus: it holds no sound, its volume, pan and mute apply to the tracks that feed it */
   bus?: boolean;
   /** the bus (a track with `bus`) this track feeds */
   to?: string;
+  /** ordered audio processors after this sound track's clips are summed; also available on a bus */
+  effects?: AudioEffect[];
   /** lane height in the timeline, px */
   height?: number;
 }
@@ -305,7 +316,7 @@ export interface Composition {
   /** finishing effects applied to the whole frame */
   effects?: Effect[];
   /** how its sound is finished: the master's loudness (LUFS, null: as mixed) and the share of the room the effects have in common */
-  sound?: { loudness?: number | null; room?: number };
+  sound?: { loudness?: number | null; room?: number; tempo?: number | null };
   layers: Record<string, Layer>;
   /** root stack, bottom to top */
   order: string[];

@@ -80,7 +80,7 @@ pub fn is_chat_path(path: &str) -> bool {
         && name.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
 }
 
-const EXT: [(&str, &[&str]); 3] = [
+const EXT: [(&str, &[&str]); 4] = [
     (
         "assets",
         &[
@@ -90,11 +90,22 @@ const EXT: [(&str, &[&str]); 3] = [
         ],
     ),
     ("plugins", &["js", "mjs"]),
+    (
+        "scenes",
+        &[
+            "html", "css", "js", "mjs", "json", "txt", "svg", "png", "jpg", "jpeg", "webp", "gif",
+            "avif", "woff", "woff2", "ttf", "otf", "glb", "gltf", "bin", "mp4", "webm", "wav", "mp3",
+            "ogg",
+        ],
+    ),
     ("renders", &["mp4", "webm", "mov", "gif", "png", "zip", "json", "svg", "wav"]),
 ];
 
 pub fn mime_of(path: &str) -> &'static str {
     match extension(path).as_str() {
+        "html" => "text/html; charset=utf-8",
+        "css" => "text/css; charset=utf-8",
+        "txt" => "text/plain; charset=utf-8",
         "json" => "application/json; charset=utf-8",
         "js" | "mjs" => "text/javascript; charset=utf-8",
         "png" => "image/png",
@@ -134,6 +145,13 @@ fn extension(path: &str) -> String {
 }
 
 /// why a path cannot be a file of a project, or None when it can
+fn is_scene_id(id: &str) -> bool {
+    let mut chars = id.chars();
+    id.len() <= 64
+        && chars.next().is_some_and(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
+        && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+}
+
 pub fn path_issue(path: &str) -> Option<String> {
     if path.is_empty() || path.len() > 300 {
         return Some("empty or too long path".into());
@@ -156,11 +174,15 @@ pub fn path_issue(path: &str) -> Option<String> {
     if is_thumbnail(path) {
         return None;
     }
+    // a web scene is a folder of its own: scenes/<id>/<file>, the id a lowercase slug
+    if parts[0] == "scenes" && (parts.len() < 3 || !is_scene_id(parts[1])) {
+        return Some("invalid scene folder".into());
+    }
     let Some((place, allowed)) = EXT.iter().find(|(p, _)| *p == parts[0]) else {
-        return Some("location not allowed by the format (assets/, plugins/, renders/)".into());
+        return Some("location not allowed by the format (assets/, plugins/, scenes/, renders/)".into());
     };
     if parts.len() < 2 {
-        return Some("location not allowed by the format (assets/, plugins/, renders/)".into());
+        return Some("location not allowed by the format (assets/, plugins/, scenes/, renders/)".into());
     }
     let ext = extension(path);
     if allowed.contains(&ext.as_str()) {
@@ -340,6 +362,12 @@ mod tests {
         assert!(path_issue("assets/x.exe").is_some());
         assert!(path_issue("plugins/tool.mjs").is_none());
         assert!(path_issue("plugins/tool.wasm").is_some());
+        assert!(path_issue("scenes/title/scene.json").is_none());
+        assert!(path_issue("scenes/title/fonts/a.woff2").is_none());
+        assert!(path_issue("scenes/title/x.exe").is_some());
+        assert!(path_issue("scenes/scene.json").is_some());
+        assert!(path_issue("scenes/Title/scene.json").is_some());
+        assert!(path_issue("scenes/-a/scene.json").is_some());
         assert!(path_issue("renders/x.mp4").is_none());
         assert!(path_issue("renders/x.svg").is_none());
         assert!(path_issue("renders/renders/x.png").is_none());

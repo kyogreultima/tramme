@@ -11,6 +11,7 @@
 import { signal } from '@preact/signals';
 import { ALL_FORMATS, AudioBufferSink, Input, UrlSource } from 'mediabunny';
 import { asrWords, mergeChunks, pointer, spokenLanguage, transcriptIdOf, type Transcript, type TranscriptWord, type WhisperParts } from '@tramme/core';
+import { pathIssue } from '@tramme/project';
 import { aiStatus, companionLink, refreshStatus } from './ai/index.ts';
 import { reach } from './api.ts';
 import { safeName, takenPaths, upload } from './files.ts';
@@ -20,6 +21,7 @@ import { chosenModel } from './settings.ts';
 import { madeBy } from './models.ts';
 import { commit, S, toast } from './state.ts';
 import { m, t } from './i18n/index.ts';
+import { approvedProjectResource } from './plugins/host.ts';
 
 const CHUNK = 28, STEP = 26, RATE = 16000;
 
@@ -161,12 +163,15 @@ export { transcriptIdOf };
  */
 /** transcriptions under way: asking again waits for the same one */
 const running = new Map<string, Promise<string>>();
+const projectStamp = () => `${S.project.peek()?.id ?? ''}\n${S.docUrl.peek()}`;
+const requireProject = (stamp: string) => { if (projectStamp() !== stamp) throw new Error(t('transcribe.projectChanged')); };
 
 export function transcribeAsset(assetId: string, language?: string): Promise<string> {
-  let job = running.get(assetId);
+  const key = `${projectStamp()}\n${assetId}`;
+  let job = running.get(key);
   if (!job) {
-    job = transcribe(assetId, language).finally(() => running.delete(assetId));
-    running.set(assetId, job);
+    job = transcribe(assetId, language).finally(() => running.delete(key));
+    running.set(key, job);
   }
   return job;
 }
@@ -181,25 +186,36 @@ export const transcribing = (assetId: string) => transcriptions.value.some((j) =
  * when they say no, it is told to do without.
  */
 export async function transcriptFor(assetId: string, ask: boolean): Promise<string> {
+  const stamp = projectStamp();
   const id = transcriptIdOf(assetId), a = S.doc.peek().assets[assetId];
   if (S.doc.peek().assets[id]) return id;
-  const job = running.get(assetId);
-  if (job) return job;
-  if (ask && await askUser(t('transcribe.askTitle'), t('transcribe.askText', { name: a?.name || assetId }), t('transcribe.action'))) return transcribeAsset(assetId);
+  const job = running.get(`${stamp}\n${assetId}`);
+  if (job) { const result = await job; requireProject(stamp); return result; }
+  if (ask && await askUser(t('transcribe.askTitle'), t('transcribe.askText', { name: a?.name || assetId }), t('transcribe.action'))) {
+    requireProject(stamp);
+    return transcribeAsset(assetId);
+  }
   throw new Error(`"${assetId}" is not transcribed and the user starts transcriptions themselves (the Transcribe button on the media): ${ask ? 'they declined for now' : 'ask them to'}, or work without what is said`);
 }
 
 async function transcribe(assetId: string, language?: string): Promise<string> {
+  const stamp = projectStamp(), docUrl = S.docUrl.peek();
   const doc = S.doc.peek(), a = doc.assets[assetId];
   if (!a || (a.type !== 'video' && a.type !== 'audio')) throw new Error(t('speech.aSoundOrA'));
   const job = { id: assetId, name: a.name || assetId, done: 0, total: 1, stage: m('speech.preparing') };
   transcriptions.value = [...transcriptions.peek().filter((j) => j.id !== assetId), job];
   try {
-    const url = new URL(a.src, new URL(S.docUrl.peek(), location.href)).href;
-    const tr = await transcribeUrl(url, { language, onProgress: (done, total, stage) => { transcriptions.value = transcriptions.peek().map((j) => (j.id === assetId ? { ...j, done, total, stage } : j)); } });
+    if (pathIssue(a.src) || /[%#]/.test(a.src) || !a.src.startsWith('assets/')) throw new Error(`${assetId}: transcription source must be a project asset`);
+    const base = new URL(docUrl, location.href), root = new URL('./', base), url = new URL(a.src, base);
+    if (!approvedProjectResource(url, root.pathname, root.origin, root.protocol)) throw new Error(`${assetId}: transcription source must belong to this project`);
+    const tr = await transcribeUrl(url.href, { language, onProgress: (done, total, stage) => { transcriptions.value = transcriptions.peek().map((j) => (j.id === assetId ? { ...j, done, total, stage } : j)); } });
+    requireProject(stamp);
     tr.source = assetId;
     const name = safeName(`${(a.src.split('/').pop() ?? assetId).replace(/\.[^.]+$/, '')}.json`);
-    const path = await upload(await takenPaths(), `assets/transcripts/${name}`, new Blob([JSON.stringify(tr)], { type: 'application/json' }));
+    const taken = await takenPaths();
+    requireProject(stamp);
+    const path = await upload(taken, `assets/transcripts/${name}`, new Blob([JSON.stringify(tr)], { type: 'application/json' }));
+    requireProject(stamp);
     const id = transcriptIdOf(assetId), had = !!S.doc.peek().assets[id];
     commit(t('common.transcriptOfName', { name: a.name || assetId }), [{ op: had ? 'replace' : 'add', path: pointer('assets', id), value: { type: 'json', src: path, name: `${t('speech.transcript')} · ${a.name || assetId}`, ...(tr.madeBy ? { madeBy: tr.madeBy } : {}) } }]);
     toast(t('speech.transcriptReadyNWords', { n: tr.words.length, language: tr.language ?? t('speech.languageDetected') }));

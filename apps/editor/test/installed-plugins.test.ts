@@ -9,11 +9,13 @@ import { Registry, type PluginModule, type TrammeDoc } from '@tramme/core';
 import { connectHost } from '../src/plugins/host.ts';
 import { startWorkerSide } from '../src/plugins/worker-side.ts';
 import { attachInstalled } from '../src/plugins/vocabulary.ts';
-import { copiesFor, counted, installedTypes, offIn, permitted, stopped, STRIKES, typesOf, type Installed } from '../src/installed.ts';
+import { candidateOf, copiesFor, counted, filesModule, filesOf, installedTypes, offIn, permitted, refreshInstalled, restoreBackup, sandboxedDoc, stopped, storageKind, STRIKES, typesOf, type Installed } from '../src/installed.ts';
+import { api } from '../src/api.ts';
+import { prefs } from '../src/settings.ts';
 import type { ToolContext } from '@tramme/core';
 
-const host = (fixtures: Map<string, PluginModule>) => {
-  const side = startWorkerSide({ post: (m) => queueMicrotask(() => receive(m)), importModule: async (url) => fixtures.get(url)! });
+const host = (fixtures: Map<string, PluginModule>, onImport?: (url: string) => void) => {
+  const side = startWorkerSide({ post: (m) => queueMicrotask(() => receive(m)), importModule: async (url) => { onImport?.(url); return fixtures.get(url)!; } });
   const { host, receive } = connectHost((m) => queueMicrotask(() => side.receive(m)), () => 'https://tramme.test/p1/document.tramme.json');
   return host;
 };
@@ -33,6 +35,65 @@ const plugin = (over: Partial<Installed> = {}): Installed => ({
 });
 
 describe('installed plugins in a project', () => {
+  it('bounds companion files and encodes large binary data without argument overflow', () => {
+    const bytes = new Uint8Array(100_000).fill(42);
+    const decoded = filesOf(filesModule(new Map([['fonts/large.woff2', bytes]]))).get('fonts/large.woff2');
+    expect(decoded?.byteLength).toBe(bytes.byteLength);
+    expect(decoded?.every((value) => value === 42)).toBe(true);
+    expect(() => filesModule(new Map([['../private', bytes]]))).toThrow('invalid plugin file path');
+    expect(() => filesOf('export const files = {"../private":"Kg=="};')).toThrow('invalid plugin file path');
+    const many = new Map(Array.from({ length: 2001 }, (_, i) => [`data/${i}.txt`, new Uint8Array([1])] as const));
+    expect(() => filesModule(many)).toThrow('plugin has too many files');
+    const tooLarge = { byteLength: 128 * 1024 * 1024 + 1 } as Uint8Array;
+    expect(() => filesModule(new Map([['too-large.bin', tooLarge]]))).toThrow('plugin files too large');
+  });
+  it('skips an oversized stored plugin before reading it', async () => {
+    const before = storageKind.peek();
+    storageKind.value = 'server';
+    const list = vi.spyOn(api, 'library').mockResolvedValue([{ name: 'large.js', size: 1024 * 1024 + 1, modified: '' }]);
+    const read = vi.spyOn(api, 'libraryGet');
+    try {
+      await refreshInstalled();
+      expect(read).not.toHaveBeenCalled();
+    } finally { list.mockRestore(); read.mockRestore(); storageKind.value = before; }
+  });
+  it('refuses oversized selected plugins and backups before reading their bytes', async () => {
+    const read = vi.fn(async () => { throw new Error('file was read'); });
+    const file = (name: string, size: number) => ({ name, size, text: read, arrayBuffer: read }) as unknown as File;
+    await expect(candidateOf(file('plugin.js', 1024 * 1024 + 1))).rejects.toThrow('plugin module too large');
+    await expect(candidateOf(file('plugin.trammeplugin', 64 * 1024 * 1024 + 1))).rejects.toThrow('plugin package too large');
+    await expect(restoreBackup(file('plugins.zip', 64 * 1024 * 1024 + 1))).rejects.toThrow('plugin backup too large');
+    expect(read).not.toHaveBeenCalled();
+  });
+  it('runs installed tools in separate workers for their permission contexts', async () => {
+    const first: PluginModule = { tools: [{ name: 'first.tool', description: 'first', run: () => 'first' }] };
+    const second: PluginModule = { tools: [{ name: 'second.tool', description: 'second', run: () => 'second' }] };
+    const shared = host(new Map([['blob:first', first], ['blob:second', second]]));
+    const imports: string[] = [];
+    const single = new Map([
+      ['installed:first', host(new Map([['blob:first', first]]), (url) => imports.push(url))],
+      ['installed:second', host(new Map([['blob:second', second]]), (url) => imports.push(url))],
+    ]);
+    const registry = new Registry();
+    await attachInstalled(registry, shared, [
+      { id: 'installed:first', url: 'blob:first', name: 'First' },
+      { id: 'installed:second', url: 'blob:second', name: 'Second' },
+    ], { hostFor: (id) => single.get(id)! });
+    const { doc } = newProject({ name: 'T', width: 100, height: 100, fps: 30, duration: 1 });
+    const ctx = { doc, compId: doc.root, time: 0, selection: [], signal: new AbortController().signal } as unknown as ToolContext;
+    expect(await registry.tool('first.tool').tool.run({}, ctx)).toMatchObject({ text: 'first' });
+    expect(await registry.tool('second.tool').tool.run({}, ctx)).toMatchObject({ text: 'second' });
+    expect(imports.sort()).toEqual(['blob:first', 'blob:second']);
+  });
+  it('selects the sandboxed picture path for an expression-only project when opted in', () => {
+    const { doc } = newProject({ name: 'Expression', width: 100, height: 100, fps: 30, duration: 1 });
+    doc.compositions[doc.root].background = { $expr: '"#ff0000"' };
+    const previous = prefs.peek();
+    try {
+      prefs.value = { ...previous, sandboxPreview: true };
+      expect(sandboxedDoc(doc)).toBe(true);
+    } finally { prefs.value = previous; }
+  });
   it('bring their tools, workflows, kits, presets and nodes, never a name the project has', async () => {
     const reg = new Registry();
     reg.use({ tools: [{ name: 'shared', description: 'the project one', run: () => 'project' }] }, 'own');
@@ -89,6 +150,11 @@ describe('installed plugins in a project', () => {
     await expect(c.fetch!('https://elsewhere.test/x')).rejects.toThrow(/did not declare https:\/\/elsewhere.test/);
     await expect(c.fetch!('/api/claude/messages')).rejects.toThrow(/provider route "claude"/);
     await expect(permitted(ctx, plugin()).fetch!('https://api.example.com/')).rejects.toThrow(/meta.permissions.network/);
+    const network = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('ok'));
+    try {
+      await c.fetch!('https://api.example.com/forecast', { redirect: 'follow', credentials: 'include' } as never);
+      expect(network).toHaveBeenCalledWith('https://api.example.com/forecast', expect.objectContaining({ redirect: 'error', credentials: 'omit' }));
+    } finally { network.mockRestore(); }
 
     const stops: string[] = [];
     const fail = () => counted(p, () => Promise.reject(new Error('boom')), (x) => stops.push(x.manifest.name));

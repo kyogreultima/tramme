@@ -90,3 +90,13 @@ The picked path, one shippable step at a time:
 3. **Stage 2 — render-time code, only when untrusted plugins must draw (done).** Every node draws in the worker: the engine sends the evaluated props, the frame's numbers, the simulation state computed on the page and the other layers' evaluated data, and one picture comes back per layer, transferred, drawn over the layer's bounds. The geometry crosses as data with it: the outline is built in the sandbox with a recording Path2D and arrives as SVG path data (rebuilt on the page for clips and the viewport), the handles as plain values, and a node's vector export (`svg`, `lottie`) is computed in the sandbox and primed before a conversion reads it. The first pass of a frame defers, so stills and exports keep waiting for the exact picture, and the preview draws the last picture while the fresh one crosses. Still on the page, documented: the module's load, the modifiers, the Canvas2D effects (their pixels would pay a round trip per effect, and stacked effects would need a batched pipeline contract), the stepping of simulations, and the command line's Node rights. Those all wait for one architectural decision — the evaluator and the effect pipeline moving into the worker, priced in [evaluator-sandbox.md](evaluator-sandbox.md) — not for five more patches.
 
 The stages compose: each one is shippable alone, none is undone by the next, and the declaration half of every plugin (schemas, kits, presets, prompts, tours, GLSL) never needs to move at all.
+
+## Limits of the worker
+
+What the host enforces, the same in the browser, on the desktop and in the CLI (all three host the worker in the same sandboxed frame):
+
+- Time: the frame must start within 10 seconds; a plugin loads within 15; checks, drawing, frames and vector exports finish within 30; tools within 120. A timeout terminates the worker and the next call gets a fresh one, whether or not the script cooperates.
+- Size: a project module is at most 1 MiB, at most 64 plugins load, a worker answer is at most 8 MiB (64 MiB for a fetch body), a message to the worker at most 64 MiB, its graphics at most 256 MiB, a canvas at most 8192 pixels a side. Archive, package and backup readers refuse oversized or over-expanding input before inflating it.
+- Concurrency: at most 64 calls wait at once; the next is refused.
+
+What no web platform lets the host enforce: a hard memory cap or a CPU quota on a worker. A script can allocate until the browser or the webview reclaims the tab or kills the process, and it can use a core until its deadline ends it. The size limits above bound what crosses the boundary, not what the worker allocates inside it. Only the deadline and the size limits are promised; a memory cap is not.

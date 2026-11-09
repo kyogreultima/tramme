@@ -6,10 +6,15 @@
 // the playhead.
 
 import { signal } from '@preact/signals';
-import { useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { Evaluator, getAt, modsOf, resolveTokens, sampleKeyframes, type Bezier, type EaseSpec, type Keyframe, type Op, type PropType } from '@tramme/core';
 import { comp, commit, draft, cancelDraft, S, setTime, viewDoc, uiTime } from '../state.ts';
-import { assetData } from '../preview.ts';
+import { assetData, preview } from '../preview.ts';
+import { pluginHost } from '../plugins/index.ts';
+import { ensureDeclared, ensureSandboxDoc, moduleItemsOf } from '../plugins/sandbox-draw.ts';
+import { fileProject, sameFileProject } from '../files.ts';
+import { sandboxedDoc } from '../installed.ts';
+import { prefs } from '../settings.ts';
 import { animatedProps, keysOf, layerName, propPath, rulerLabel, snap, timecode } from '../model.ts';
 import { bandOf, noBrowserMenu } from './controls.tsx';
 import { Icon } from './icons.tsx';
@@ -63,6 +68,7 @@ const num = (v: unknown, i: number) => (Array.isArray(v) ? Number(v[i]) : Number
 
 export function GraphEditor() {
   const c = comp.value, doc = viewDoc.value, now = uiTime.value, compId = S.compId.value;
+  const projectId = S.project.value?.id, docUrl = S.docUrl.value;
   const host = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 600, h: 240 });
   const [band, setBand] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
@@ -104,8 +110,50 @@ export function GraphEditor() {
   // modifiers keep moving after the last key (springs settle, loops repeat): show the whole composition
   if (shown.some((ch) => ch.modified)) { ta = 0; tb = c.duration; }
   const tp = (tb - ta) * 0.08; ta = Math.max(0, ta - tp); tb = Math.min(c.duration, tb + tp);
-  const ev = useMemo(() => new Evaluator(doc, reg, { data: assetData }), [doc, reg]);
-  const finalValue = (ch: Channel, tt: number) => { try { return num(ev.value(`${ch.layer}.${ch.prop}`, tt, compId), ch.comp); } catch { return NaN; } };
+  const isolated = prefs.value.sandboxPreview || sandboxedDoc(doc);
+  const ev = useMemo(() => new Evaluator(doc, reg, { data: assetData, allowExpressions: !isolated }), [doc, reg, isolated]);
+  const pathN = Math.min(300, Math.max(40, Math.round((size.w - 72) / 3)));
+  const addresses = [...new Set(shown.filter((ch) => ch.modified).map((ch) => `${ch.layer}.${ch.prop}`))];
+  const seriesKey = JSON.stringify([ta, tb, pathN, addresses]);
+  const [remote, setRemote] = useState<{ doc: typeof doc; projectId: string; docUrl: string; key: string; values: Map<string, Map<string, unknown>>; error?: string } | null>(null);
+  const currentRemote = remote?.doc === doc && remote.projectId === projectId && remote.docUrl === docUrl && remote.key === seriesKey ? remote : null;
+  useEffect(() => {
+    if (!isolated || !addresses.length) return;
+    const project = fileProject();
+    let live = true;
+    const timer = setTimeout(() => { void (async () => {
+      try {
+        const renderer = preview.renderer;
+        if (!renderer) throw new Error('preview is not ready');
+        const base = new URL(project.docUrl, location.href).href;
+        const host = pluginHost(base);
+        await ensureDeclared(host, moduleItemsOf(doc, base));
+        if (!live || !sameFileProject(project)) return;
+        ensureSandboxDoc(host, { doc, docUrl: base, loaded: (id) => { try { return renderer.assets.get(id); } catch { return null; } } });
+        const times = [...new Set([
+          ...Array.from({ length: 121 }, (_, i) => ta + ((tb - ta) * i) / 120),
+          ...Array.from({ length: pathN + 1 }, (_, i) => ta + ((tb - ta) * i) / pathN),
+        ])];
+        const values = new Map<string, Map<string, unknown>>();
+        for (let i = 0; i < addresses.length; i += 8) {
+          const chunk = addresses.slice(i, i + 8);
+          const rows = await host.evaluateSeries(chunk, times, compId);
+          if (!live || !sameFileProject(project)) return;
+          for (let j = 0; j < chunk.length; j++) values.set(chunk[j], new Map(times.map((time, k) => [time.toFixed(9), rows[j]?.[k]])));
+        }
+        if (live && sameFileProject(project)) setRemote({ doc, projectId: project.id, docUrl: project.docUrl, key: seriesKey, values });
+      } catch (e) {
+        if (live && sameFileProject(project)) setRemote({ doc, projectId: project.id, docUrl: project.docUrl, key: seriesKey, values: new Map(), error: (e as Error).message });
+      }
+    })(); }, 40);
+    return () => { live = false; clearTimeout(timer); };
+  }, [doc, compId, seriesKey, isolated, projectId, docUrl]);
+  const finalValue = (ch: Channel, tt: number) => {
+    try {
+      const value = isolated ? currentRemote?.values.get(`${ch.layer}.${ch.prop}`)?.get(tt.toFixed(9)) : ev.value(`${ch.layer}.${ch.prop}`, tt, compId);
+      return num(value, ch.comp);
+    } catch { return NaN; }
+  };
   const range = (ch: Channel): [number, number] => {
     const vs: number[] = [];
     for (let i = 0; i <= 120; i++) {
@@ -136,7 +184,7 @@ export function GraphEditor() {
 
   /** the final motion, modifiers included, as the engine renders it */
   const finalPath = (ch: Channel) => {
-    const n = Math.max(40, Math.round((W - padL - padR) / 3));
+    const n = pathN;
     let d = '';
     for (let i = 0; i <= n; i++) {
       const tt = ta + ((tb - ta) * i) / n;
@@ -268,6 +316,7 @@ export function GraphEditor() {
         <><div class="empty" style={{ height: '100%' }}><Icon name="curve" />{t('curves.selectAnAnimatedLayer')}</div><SpeedPresets empty /></>
       ) : (
         <>
+          {isolated && currentRemote?.error && <div class="hint" style={{ position: 'absolute', top: 4, right: 8, zIndex: 2 }}>{t('curves.isolatedUnavailable', { error: currentRemote.error })}</div>}
           <svg onPointerDown={bgDown}>
             {band && <rect class="lasso" x={band.x} y={band.y} width={band.w} height={band.h} />}
             {Array.from({ length: Math.floor((tb - ta) / tStep) + 2 }, (_, i) => Math.ceil(ta / tStep) * tStep + i * tStep).filter((x) => x <= tb).map((x) => (

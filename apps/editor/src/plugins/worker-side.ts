@@ -4,8 +4,8 @@
 // runs their tools and checks against a context whose every reach into the
 // project is a message answered by the page. Nothing here touches the DOM.
 
-import { Registry, type CheckContext, type CheckType, type EffectType, type ModifierType, type NodeType, type PluginModule, type QualityIssue, type ToolContext, type ToolOutput } from '@tramme/core';
-import type { Ask, CheckCtxData, DrawPayload, DrawResult, FramePayload, FromWorker, PluginDecl, SandboxDoc, SchemaEffect, SchemaModifier, SchemaNode, ToWorker, ToolCtxData } from './protocol.ts';
+import { Registry, type CheckContext, type CheckType, type EffectType, type ModifierType, type MotionReport, type NodeType, type PluginModule, type Quad, type QualityIssue, type SoundCue, type ToolContext, type ToolOutput } from '@tramme/core';
+import type { Ask, CheckCtxData, ClockSample, DrawPayload, DrawResult, FramePayload, FromWorker, LayerSample, MotionSample, PlacedSample, PluginDecl, SandboxDoc, SchemaEffect, SchemaModifier, SchemaNode, ToWorker, ToolCtxData } from './protocol.ts';
 
 /** the sandbox id of an installed plugin (installed:<file>): the project's own plugins have the document's asset ids */
 export const INSTALLED = 'installed:';
@@ -25,6 +25,17 @@ export interface SandboxDrawSide {
   exportOf(type: string, props: unknown): Promise<{ svg?: string; lottie?: unknown; err?: string }>;
   /** a whole composition evaluated and drawn here (the evaluator's move); the picture may be transferred */
   renderFrame(p: FramePayload): Promise<{ bitmap?: unknown; transfer?: Transferable[]; err?: string }>;
+  /** evaluate one property without running its expression on the page */
+  evaluateValue(address: string, t: number, compId: string): Promise<unknown>;
+  evaluateSeries(addresses: string[], times: number[], compId: string): Promise<unknown[][]>;
+  evaluateLayers(ids: string[], t: number, compId: string): Promise<LayerSample[]>;
+  soundCues(compId: string): Promise<SoundCue[]>;
+  sampleClock(layerId: string, compId: string, compTimes: number[], fileTimes: number[]): Promise<ClockSample>;
+  pictureMotion(compId: string): Promise<MotionSample>;
+  motionReport(compId: string, from: number, to: number): Promise<MotionReport>;
+  sampleQuads(layerId: string, compId: string, times: number[]): Promise<Quad[]>;
+  qualityChecks(compId: string): Promise<QualityIssue[]>;
+  samplePlaced(t: number, compId: string): Promise<PlacedSample[]>;
 }
 
 export interface WorkerSideOptions {
@@ -38,7 +49,7 @@ export interface WorkerSideOptions {
 
 const schemaNode = (n: NodeType): SchemaNode => ({ type: n.type, title: n.title, category: n.category, description: n.description, ai: n.ai, props: n.props, ...(n.container ? { container: true } : {}), ...(n.path ? { hasPath: true } : {}), ...(n.handles ? { hasHandles: true } : {}), ...(n.export ? { hasExport: true } : {}) });
 const schemaEffect = (e: EffectType): SchemaEffect => ({ type: e.type, title: e.title, category: e.category, description: e.description, ai: e.ai, props: e.props, stage: e.stage });
-const schemaModifier = (m: ModifierType): SchemaModifier => ({ type: m.type, title: m.title, ...(m.params ? { params: m.params } : {}) });
+const schemaModifier = (m: ModifierType): SchemaModifier => ({ type: m.type, title: m.title, description: m.description, ai: m.ai, params: m.params });
 
 /**
  * The vocabulary as a sandboxed tool may read it: schemas and notes, never
@@ -171,6 +182,97 @@ export function startWorkerSide({ post, importModule, sandbox: makeSandbox }: Wo
           const r: { bitmap?: unknown; transfer?: Transferable[]; err?: string } = await sandbox.renderFrame(m.payload).catch((e: Error) => ({ err: e.message }));
           post({ kind: 'rendered', call: m.call, ...r }, r.transfer);
         })();
+        return;
+      }
+      if (m.kind === 'evaluate') {
+        if (!sandbox) { post({ kind: 'evaluated', call: m.call, err: 'the sandbox cannot evaluate here' }); return; }
+        void sandbox.evaluateValue(m.address, m.t, m.compId)
+          .then((value) => post({ kind: 'evaluated', call: m.call, value }))
+          .catch((e: Error) => post({ kind: 'evaluated', call: m.call, err: e.message }));
+        return;
+      }
+      if (m.kind === 'evaluateSeries') {
+        if (!sandbox) { post({ kind: 'evaluatedSeries', call: m.call, err: 'the sandbox cannot evaluate here' }); return; }
+        if (!Array.isArray(m.addresses) || !m.addresses.length || m.addresses.length > 16 || m.addresses.some((a) => typeof a !== 'string' || a.length > 256) ||
+            !Array.isArray(m.times) || !m.times.length || m.times.length > 512 || m.times.some((t) => !Number.isFinite(t)) || m.addresses.length * m.times.length > 4096 ||
+            typeof m.compId !== 'string' || m.compId.length > 256) { post({ kind: 'evaluatedSeries', call: m.call, err: 'invalid sandbox series' }); return; }
+        void sandbox.evaluateSeries(m.addresses, m.times, m.compId)
+          .then((values) => post({ kind: 'evaluatedSeries', call: m.call, values }))
+          .catch((e: Error) => post({ kind: 'evaluatedSeries', call: m.call, err: e.message }));
+        return;
+      }
+      if (m.kind === 'evaluateLayers') {
+        if (!sandbox) { post({ kind: 'evaluatedLayers', call: m.call, err: 'the sandbox cannot evaluate here' }); return; }
+        if (!Array.isArray(m.ids) || !m.ids.length || m.ids.length > 64 || m.ids.some((id) => typeof id !== 'string' || id.length > 256) ||
+            !Number.isFinite(m.t) || typeof m.compId !== 'string' || m.compId.length > 256) { post({ kind: 'evaluatedLayers', call: m.call, err: 'invalid sandbox layers' }); return; }
+        void sandbox.evaluateLayers(m.ids, m.t, m.compId)
+          .then((values) => post({ kind: 'evaluatedLayers', call: m.call, values }))
+          .catch((e: Error) => post({ kind: 'evaluatedLayers', call: m.call, err: e.message }));
+        return;
+      }
+      if (m.kind === 'soundCues') {
+        if (!sandbox) { post({ kind: 'soundCues', call: m.call, err: 'the sandbox cannot read sound cues here' }); return; }
+        if (typeof m.compId !== 'string' || m.compId.length > 256) { post({ kind: 'soundCues', call: m.call, err: 'invalid sandbox sound cues' }); return; }
+        void sandbox.soundCues(m.compId)
+          .then((values) => post({ kind: 'soundCues', call: m.call, values }))
+          .catch((e: Error) => post({ kind: 'soundCues', call: m.call, err: e.message }));
+        return;
+      }
+      if (m.kind === 'sampleClock') {
+        if (!sandbox) { post({ kind: 'sampledClock', call: m.call, err: 'the sandbox cannot sample a clock here' }); return; }
+        if (typeof m.layerId !== 'string' || m.layerId.length > 256 || typeof m.compId !== 'string' || m.compId.length > 256 ||
+            !Array.isArray(m.compTimes) || !Array.isArray(m.fileTimes) || m.compTimes.length + m.fileTimes.length > 512 ||
+            m.compTimes.some((t) => !Number.isFinite(t)) || m.fileTimes.some((t) => !Number.isFinite(t))) {
+          post({ kind: 'sampledClock', call: m.call, err: 'invalid sandbox clock request' }); return;
+        }
+        void sandbox.sampleClock(m.layerId, m.compId, m.compTimes, m.fileTimes)
+          .then((value) => post({ kind: 'sampledClock', call: m.call, value }))
+          .catch((e: Error) => post({ kind: 'sampledClock', call: m.call, err: e.message }));
+        return;
+      }
+      if (m.kind === 'pictureMotion') {
+        if (!sandbox) { post({ kind: 'pictureMotion', call: m.call, err: 'the sandbox cannot read picture motion here' }); return; }
+        if (typeof m.compId !== 'string' || m.compId.length > 256) { post({ kind: 'pictureMotion', call: m.call, err: 'invalid sandbox picture motion request' }); return; }
+        void sandbox.pictureMotion(m.compId)
+          .then((value) => post({ kind: 'pictureMotion', call: m.call, value }))
+          .catch((e: Error) => post({ kind: 'pictureMotion', call: m.call, err: e.message }));
+        return;
+      }
+      if (m.kind === 'motionReport') {
+        if (!sandbox) { post({ kind: 'motionReport', call: m.call, err: 'the sandbox cannot read motion figures here' }); return; }
+        if (typeof m.compId !== 'string' || m.compId.length > 256 || !Number.isFinite(m.from) || !Number.isFinite(m.to) || m.to < m.from || m.to - m.from > 5) {
+          post({ kind: 'motionReport', call: m.call, err: 'invalid sandbox motion report request' }); return;
+        }
+        void sandbox.motionReport(m.compId, m.from, m.to)
+          .then((value) => post({ kind: 'motionReport', call: m.call, value }))
+          .catch((e: Error) => post({ kind: 'motionReport', call: m.call, err: e.message }));
+        return;
+      }
+      if (m.kind === 'sampleQuads') {
+        if (!sandbox) { post({ kind: 'sampledQuads', call: m.call, err: 'the sandbox cannot sample quads here' }); return; }
+        if (typeof m.layerId !== 'string' || m.layerId.length > 256 || typeof m.compId !== 'string' || m.compId.length > 256 ||
+            !Array.isArray(m.times) || !m.times.length || m.times.length > 512 || m.times.some((t) => !Number.isFinite(t))) {
+          post({ kind: 'sampledQuads', call: m.call, err: 'invalid sandbox quad request' }); return;
+        }
+        void sandbox.sampleQuads(m.layerId, m.compId, m.times)
+          .then((value) => post({ kind: 'sampledQuads', call: m.call, value }))
+          .catch((e: Error) => post({ kind: 'sampledQuads', call: m.call, err: e.message }));
+        return;
+      }
+      if (m.kind === 'qualityChecks') {
+        if (!sandbox) { post({ kind: 'qualityChecked', call: m.call, err: 'the sandbox cannot check quality here' }); return; }
+        if (typeof m.compId !== 'string' || m.compId.length > 256) { post({ kind: 'qualityChecked', call: m.call, err: 'invalid sandbox quality request' }); return; }
+        void sandbox.qualityChecks(m.compId)
+          .then((values) => post({ kind: 'qualityChecked', call: m.call, values }))
+          .catch((e: Error) => post({ kind: 'qualityChecked', call: m.call, err: e.message }));
+        return;
+      }
+      if (m.kind === 'samplePlaced') {
+        if (!sandbox) { post({ kind: 'sampledPlaced', call: m.call, err: 'the sandbox cannot sample here' }); return; }
+        if (!Number.isFinite(m.t) || typeof m.compId !== 'string' || m.compId.length > 256) { post({ kind: 'sampledPlaced', call: m.call, err: 'invalid sandbox placed sample' }); return; }
+        void sandbox.samplePlaced(m.t, m.compId)
+          .then((values) => post({ kind: 'sampledPlaced', call: m.call, values }))
+          .catch((e: Error) => post({ kind: 'sampledPlaced', call: m.call, err: e.message }));
         return;
       }
       if (m.kind === 'export') {

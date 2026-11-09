@@ -81,6 +81,18 @@ describe('readArchive', () => {
     expect(ask.mock.calls[0][0].plugins).toEqual([{ id: 'stars', path: 'plugins/stars.js', size: PLUGIN.length, kinds: ['nodes'] }]);
   });
 
+  it('refuses an accepted plugin when no isolated worker is available', async () => {
+    const oldWorker = globalThis.Worker;
+    try {
+      (globalThis as { Worker?: typeof Worker }).Worker = undefined;
+      const data = archiveOf(withCode([50, 50], ['stars']), { 'plugins/stars.js': PLUGIN });
+      const err = await readArchive(data, async () => true).catch((e) => e);
+      expect(err).toBeInstanceOf(ImportError);
+      expect(err.message).toMatch(/isolated worker/i);
+      expect((globalThis as Record<string, unknown>).__trammePluginLoaded).toBeUndefined();
+    } finally { (globalThis as { Worker?: typeof Worker }).Worker = oldWorker; }
+  });
+
   it('validates a plugin in the sandbox: the page never imports it, even when accepted', async () => {
     const decls = new Map([['stars', {
       id: 'stars', meta: { name: 'stars', api: 1 }, tools: [], checks: [],

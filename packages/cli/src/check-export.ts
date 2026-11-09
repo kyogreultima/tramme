@@ -10,6 +10,7 @@ import { createRequire } from 'node:module';
 import { upgradeDoc, type TrammeDoc } from '@tramme/core';
 import { toLottie, toSvg } from '@tramme/interop';
 import { fileAssetReader } from '@tramme/interop/node';
+import { containsExpression } from '@tramme/project';
 import { launch, openDoc } from './browser.ts';
 import { compareFiles } from './compare.ts';
 import { docRegistry } from './plugins.ts';
@@ -20,6 +21,7 @@ const EXPORTABLE = (type: string) => type.startsWith('shape.') || ['text', 'text
 
 export async function checkExport(file: string, format: 'lottie' | 'svg', times: number[], outDir: string, compId?: string) {
   const doc: TrammeDoc = upgradeDoc(JSON.parse(fs.readFileSync(file, 'utf8')));
+  if (containsExpression(doc)) throw new Error('vector comparison with expressions requires an isolated renderer');
   const cfg = readConfig(path.resolve(file));
   const server = new Server(cfg);
   const resolve = (u: string) => server.resolve(u);

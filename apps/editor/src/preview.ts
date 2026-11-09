@@ -16,21 +16,29 @@ export const previewInfo = signal({ scale: 1, still: 1, motion: 0.5 });
 import { effect, signal } from '@preact/signals';
 import { audioClips, clipFileTime, curveAt, needsPitch, soundMix, type TrammeDoc, type EvaluatedFrame } from '@tramme/core';
 import { editorRegistry } from './vocabulary.ts';
-import { clipChain, loadPitch, masterGainDb, mixBus, playClip, Renderer } from '@tramme/render';
+import { clipChain, liveMaster, loadPitch, masterGainDb, mixTracks, playClip, Renderer } from '@tramme/render';
 import { comp, compIdOf, S, setRegistry, setTime, toast, viewDoc } from './state.ts';
-import { attachInstalled, attachIsolated, filterModule, pluginHost } from './plugins/index.ts';
+import { attachInstalled, attachIsolated, filterModule, onSandboxStopped, pluginHost, pluginToolHost } from './plugins/index.ts';
 import { copiesIn, copyId, counted, installed, installedFor, installedTypes, offIn, permitted, sandboxedDoc, stopped, STRIKES } from './installed.ts';
-import { bindSandbox, blitSandboxFrame, declarationsModule, ensureDeclared, ensureSandboxDoc, pluginItemsOf, resetSandbox, sandboxDeclaration, sandboxVideoFrames, type SandboxContext } from './plugins/sandbox-draw.ts';
+import { bindSandbox, blitSandboxFrame, declarationsModule, ensureDeclared, ensureSandboxDoc, moduleItemsOf, resetSandbox, sandboxDeclaration, sandboxVideoFrames, type SandboxContext } from './plugins/sandbox-draw.ts';
+import { setWebScenePlaceholder } from '@tramme/nodes';
+import { liveScenes } from './webscene-preview.ts';
 import { t } from './i18n/index.ts';
+import { MASTER_METER_ID, previewMeters } from './audio-meters.ts';
+import { audioEffectsKey } from './audio-key.ts';
 import { prefs } from './settings.ts';
 import { clockTime, scrubWindow, step, Runs, type Clock } from './playclock.ts';
 import { packAsInstalled, packBySrc, packContext, shippedPacks } from './packs.ts';
 import { syncPluginTours } from './tours/index.ts';
+// a stopped sandbox leaves the saved project and the open edits as they were; the next call starts a fresh one
+onSandboxStopped((reason) => toast(t('editor.pluginStopped', { reason }), 'error', 9000));
+setWebScenePlaceholder((folder) => (liveScenes.has(folder) ? null : t('viewport.websceneCaptured', { folder })));
 
 /** the slowest pace a media element takes (browsers refuse less): slower, it waits */
 const MIN_ELEMENT_RATE = 0.0625;
 
 class Preview {
+  readonly meters = previewMeters;
   readonly canvas: HTMLCanvasElement;
   renderer: Renderer | null = null;
   private applied: TrammeDoc | null = null;
@@ -42,6 +50,7 @@ class Preview {
   private master: GainNode | null = null;
   /** the master of the exports, as near as a live playback gets: their loudness gain (measured ahead, kept per mix), then a limiter */
   private level: GainNode | null = null;
+  private meterOut: GainNode | null = null;
   private levels = new Map<string, Promise<number>>();
   /** this playback's way in to the level: cut on stop, so the buses of a playback do not outlive it */
   private playOut: GainNode | null = null;
@@ -82,6 +91,7 @@ class Preview {
   }
 
   async start() {
+    this.meters.clear(true);
     // a new project on the same page: what crossed for the old one is dropped
     resetSandbox();
     // every sandboxed draw goes through the open project's sandbox, fed with this preview's document and assets
@@ -101,7 +111,7 @@ class Preview {
       const doc0 = S.doc.peek();
       const sandboxed = sandboxedDoc(doc0);
       // the sandbox's declarations are needed before the renderer opens: it registers from them, and the modules never load on the page
-      if (sandboxed) await ensureDeclared(pluginHost(new URL(S.docUrl.peek(), location.href).href), pluginItemsOf(doc0, new URL(S.docUrl.peek(), location.href).href));
+      if (sandboxed) await ensureDeclared(pluginHost(new URL(S.docUrl.peek(), location.href).href), moduleItemsOf(doc0, new URL(S.docUrl.peek(), location.href).href));
       this.renderer = await Renderer.open(doc0, editorRegistry(), new URL(S.docUrl.peek(), location.href).href, this.canvas, { compId: compIdOf(doc0), raster: 'gpu', scale: S.previewScale.peek(), preserve: false, isolate: true, proxies: prefs.peek().proxies, pluginModule: filterModule, sandboxModules: sandboxed, sandboxDeclarations: (id) => declarationsModule(sandboxDeclaration(id)!, id) });
       this.applied = doc0;
       await this.attachPlugins();
@@ -122,8 +132,16 @@ class Preview {
       lastT = t;
       this.invalidate();
     });
-    // a solo changed while playing: the sound starts again with it
-    effect(() => { void S.solo.value; if (S.playing.value) this.play(); else this.stopAudio(); });
+    // A chain/routing edit or solo changes the live graph. Picture edits and
+    // fader drafts leave it running instead of repeatedly cutting the sound.
+    let audioKey = '';
+    effect(() => {
+      const playing = S.playing.value, solo = [...S.solo.value].sort(), doc = viewDoc.value;
+      void S.compId.value;
+      if (!playing) { audioKey = ''; this.stopAudio(); return; }
+      const key = JSON.stringify([solo, audioEffectsKey(doc, compIdOf(doc))]);
+      if (key !== audioKey) { audioKey = key; this.play(); }
+    });
     effect(() => { void S.previewScale.value; void prefs.value; this.invalidate(); });
     effect(() => { const p = prefs.value; if (this.master) this.master.gain.value = p.previewMuted ? 0 : p.previewVolume; });
     let seenInstalled = installed.peek(), seenStopped = 0;
@@ -160,7 +178,8 @@ class Preview {
     const mine = installedFor(doc);
     if (!(doc.plugins ?? []).length && !mine.length && !packs.length) return;
     try {
-      await attachIsolated(r.registry, pluginHost(new URL(S.docUrl.peek(), location.href).href), doc, (id) => {
+      const base = new URL(S.docUrl.peek(), location.href).href;
+      await attachIsolated(r.registry, pluginHost(base), doc, (id) => {
         const url = r.assets.url(id);
         // an edited plugin file: a fresh url, so the sandbox imports it again
         return reload.includes(id) ? `${url}${url.includes('?') ? '&' : '?'}pw=${++this.bust}` : url;
@@ -171,7 +190,7 @@ class Preview {
         // a copy of one of the editor's packs reads the pack's own data
         const pack = packBySrc(packs, doc.assets[id]?.src);
         return pack ? packContext(pack, ctx) : ctx;
-      });
+      }, (id, url) => pluginToolHost(base, id, url));
     } catch (e) {
       toast(t('editor.pluginSandbox', { error: (e as Error).message }), 'error', 9000);
     }
@@ -182,6 +201,7 @@ class Preview {
         brought: (id, key) => installedTypes.set(key, byId.get(id)!),
         context: (id, ctx) => permitted(ctx, byId.get(id)!),
         around: (id, run) => counted(byId.get(id)!, run, (p) => toast(t('plugins.stopped', { name: p.manifest.name, n: STRIKES }), 'error', 9000)),
+        hostFor: (id, url) => pluginToolHost(new URL(S.docUrl.peek(), location.href).href, id, url),
       });
     } catch (e) {
       toast(t('editor.installedRefused', { error: (e as Error).message }), 'error', 9000);
@@ -202,6 +222,7 @@ class Preview {
       await attachInstalled(r.registry, pluginHost(new URL(S.docUrl.peek(), location.href).href), list, {
         brought: (id, key) => { const p = byId.get(id); if (p) installedTypes.set(key, p); },
         context: (id, ctx) => { const p = byId.get(id); const pack = p && entryOf.get(p.file); return pack ? packContext(pack, ctx) : ctx; },
+        hostFor: (id, url) => pluginToolHost(new URL(S.docUrl.peek(), location.href).href, id, url),
       });
     } catch (e) {
       console.error('[packs]', e);
@@ -231,7 +252,7 @@ class Preview {
       const sandboxed = sandboxedDoc(doc), base = new URL(S.docUrl.peek(), location.href).href;
       const reload = sandboxed !== this.renderer.sandboxModules ? (doc.plugins ?? []) : [];
       this.renderer.sandboxModules = this.renderer.assets.sandboxModules = sandboxed;
-      if (sandboxed) await ensureDeclared(pluginHost(base), pluginItemsOf(doc, base));
+      if (sandboxed) await ensureDeclared(pluginHost(base), moduleItemsOf(doc, base));
       await this.renderer.setDoc(doc, { compId, trusted: doc === S.draft.peek(), fresh, reload });
       this.applied = doc;
       await this.attachPlugins();
@@ -252,6 +273,16 @@ class Preview {
   /** load a module asset again (a plugin edited on disk) */
   async reload(assetIds: string[]) {
     if (!this.renderer) return;
+    if (this.renderer.sandboxModules) {
+      const base = new URL(S.docUrl.peek(), location.href).href;
+      // A saved edit can keep the same asset URL. Discard the worker's module
+      // cache so the next load reads the new source and declarations.
+      if (assetIds.some((id) => this.applied!.assets[id]?.type === 'module')) {
+        pluginHost(base).dispose('project module changed');
+        resetSandbox();
+      }
+      await ensureDeclared(pluginHost(base), moduleItemsOf(this.applied!, base));
+    }
     await this.renderer.setDoc(this.applied!, { compId: compIdOf(this.applied!), reload: assetIds });
     await this.attachPlugins(assetIds);
     setRegistry(this.renderer.registry);
@@ -286,6 +317,23 @@ class Preview {
   async thumbnail(t: number, width = 480): Promise<Blob | null> {
     const r = this.renderer;
     if (!r) return null;
+    if (r.sandboxModules) {
+      const doc = this.applied;
+      if (!doc) return null;
+      const base = new URL(S.docUrl.peek(), location.href).href;
+      const host = pluginHost(base);
+      await ensureDeclared(host, moduleItemsOf(doc, base));
+      ensureSandboxDoc(host, { doc, docUrl: base, loaded: (id) => { try { return r.assets.get(id); } catch { return null; } } });
+      const scale = Math.min(1, width / r.comp.width);
+      const videos = await sandboxVideoFrames(r, doc, t);
+      const picture = await host.renderFrame({ compId: r.compId, t, scale, width: r.comp.width, height: r.comp.height, videos });
+      if (picture.err || !picture.bitmap) throw new Error(picture.err ?? 'no picture from the sandbox');
+      const small = document.createElement('canvas');
+      small.width = Math.round(r.comp.width * scale); small.height = Math.round(r.comp.height * scale);
+      try { small.getContext('2d')!.drawImage(picture.bitmap as ImageBitmap, 0, 0, small.width, small.height); }
+      finally { (picture.bitmap as ImageBitmap).close(); }
+      return new Promise((res) => small.toBlob(res, 'image/webp', 0.82));
+    }
     // every video frame exact, then drawn once more right before reading (the canvas keeps nothing between tasks)
     await r.renderComplete(t);
     r.render(t);
@@ -512,9 +560,10 @@ class Preview {
     // the mixer of the exports: filters, gain curves, fades, reverb and the shared room sound the same here
     this.playOut = ctx.createGain();
     this.playOut.connect(this.level!);
-    const bus = mixBus(ctx, soundMix(doc.compositions[compId]), this.playOut);
+    this.meters.source(MASTER_METER_ID, ctx, this.meterOut!);
+    const output = mixTracks(ctx, doc, compId, this.playOut, (id, node) => this.meters.source(id, ctx, node));
     sounds.forEach((c, i) => {
-      const src = bufs[i] && playClip(ctx, c, bufs[i]!, bus(c), startAt, from);
+      const src = bufs[i] && playClip(ctx, c, bufs[i]!, output(c), startAt, from);
       if (src) this.sources.push(src);
     });
     // a video's sound streams from its file (never decoded whole): one element per cut, started and stopped on the clock
@@ -524,7 +573,7 @@ class Preview {
       el.playbackRate = Math.max(MIN_ELEMENT_RATE, c.rate);
       // the pitch goes with the speed, as in the exports, unless the layer keeps it: the browser does it for an element
       el.preservesPitch = c.keepPitch;
-      ctx.createMediaElementSource(el).connect(clipChain(ctx, { ...c, keepPitch: false }, bus(c), startAt, from));
+      ctx.createMediaElementSource(el).connect(clipChain(ctx, { ...c, keepPitch: false }, output(c), startAt, from));
       const skip = Math.max(0, from - c.at);
       // the element is timed like the file: the seek lands at the file's time (the pace included), wrapped into a loop it is past
       const looping = c.loopStart !== undefined && c.loopEnd !== undefined && c.loopEnd > c.loopStart;
@@ -567,10 +616,15 @@ class Preview {
     // the drag is a gesture: the sound can start before the first playback
     this.ensureAudio();
     void this.audio!.resume();
+    const scrubOut = this.audio!.createGain();
+    scrubOut.connect(this.level ?? this.master!);
+    const output = mixTracks(this.audio!, doc, compIdOf(doc), scrubOut);
+    const cleanup = setTimeout(() => { scrubOut.disconnect(); this.timers = this.timers.filter((timer) => timer !== cleanup); }, (w.dur + 0.03) * 1000);
+    this.timers.push(cleanup);
     for (const c of clips) {
       void this.buffer(this.renderer.assets.url(c.asset)).then((buf) => {
         if (!buf || !this.audio || S.playing.peek()) return;
-        const src = playClip(this.audio, c, buf, this.level ?? this.master!, this.audio.currentTime + 0.005, w.from);
+        const src = playClip(this.audio, c, buf, output(c), this.audio.currentTime + 0.005, w.from);
         if (!src) return;
         this.sources.push(src);
         // a scrub's window is short-lived: it leaves the list once it has played, so a long drag keeps none
@@ -587,16 +641,15 @@ class Preview {
     this.master = this.audio.createGain();
     this.master.connect(this.audio.destination);
     this.master.gain.value = prefs.peek().previewMuted ? 0 : prefs.peek().previewVolume;
-    const limiter = this.audio.createDynamicsCompressor();
-    limiter.threshold.value = -1.5; limiter.knee.value = 0; limiter.ratio.value = 20; limiter.attack.value = 0.002; limiter.release.value = 0.08;
-    this.level = this.audio.createGain();
-    this.level.connect(limiter).connect(this.master);
+    const chain = liveMaster(this.audio, this.master);
+    this.level = chain.input;
+    this.meterOut = chain.output;
   }
 
   /** the loudness gain of the master for this mix: measured once per mix (in the background the first time), then set on the level */
   private levelOf(doc: TrammeDoc, compId: string) {
     const r = this.renderer!, clips = audioClips(doc, compId);
-    const key = JSON.stringify([soundMix(doc.compositions[compId]), clips]);
+    const key = JSON.stringify([audioEffectsKey(doc, compId), soundMix(doc.compositions[compId]), clips]);
     let p = this.levels.get(key);
     if (!p) {
       // Video audio streams during playback. Measuring its complete mix here
@@ -613,6 +666,7 @@ class Preview {
 
   private stopAudio() {
     this.runs.cancel();
+    this.meters.clear();
     this.playOut?.disconnect();
     this.playOut = null;
     for (const s of this.sources) { try { s.stop(); } catch { /* not started */ } }

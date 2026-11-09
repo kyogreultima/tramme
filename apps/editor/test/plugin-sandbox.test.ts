@@ -8,10 +8,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { newProject, type Manifest } from '@tramme/project';
 import { Registry, toolOutput, type Host, type PluginModule, type ToolContext, type CheckContext, type TrammeDoc } from '@tramme/core';
-import { connectHost, type PluginHost } from '../src/plugins/host.ts';
+import { connectHost, onSandboxStopped, readLimitedBody, type PluginHost } from '../src/plugins/host.ts';
 import { guardRealm, startWorkerSide, type SandboxDrawSide } from '../src/plugins/worker-side.ts';
 import { bindSandbox, declarationsModule, noteSandboxDeclaration, resetSandbox, primeSandboxExports, sandboxDeclaration, sandboxNode } from '../src/plugins/sandbox-draw.ts';
 import { RecordingPath2D } from '../src/plugins/recording-path.ts';
+import { makeSandboxDraw } from '../src/plugins/worker-draw.ts';
+import { prefs } from '../src/settings.ts';
+import { readProjectText } from '../src/plugins/read-project-text.ts';
 import type { DrawPayload, DrawResult, SandboxDoc } from '../src/plugins/protocol.ts';
 import { attachIsolated, filterModule } from '../src/plugins/vocabulary.ts';
 
@@ -85,6 +88,268 @@ function toolCtx(doc: TrammeDoc, over: Partial<ToolContext> = {}): ToolContext &
 }
 
 describe('the plugin sandbox', () => {
+  it('tells listeners why it stopped, once, and stays quiet on a deliberate close', async () => {
+    const heard: string[] = [];
+    const off = onSandboxStopped((reason) => heard.push(reason));
+    const stopped = connectHost(() => {}, () => DOC_URL).host;
+    const pending = expect(stopped.renderFrame({ compId: 'main', t: 0, scale: 1, width: 10, height: 10 })).rejects.toThrow('the plugin sandbox stopped: render timed out');
+    stopped.dispose('render timed out');
+    stopped.dispose('again');
+    await pending;
+    connectHost(() => {}, () => DOC_URL).host.dispose();
+    off();
+    connectHost(() => {}, () => DOC_URL).host.dispose('after unsubscribing');
+    expect(heard).toEqual(['render timed out']);
+  });
+  it('refuses invalid canvas dimensions before sending a render to the worker', async () => {
+    const sent: unknown[] = [];
+    const { host } = connectHost((message) => sent.push(message), () => DOC_URL);
+    await expect(host.renderFrame({ compId: 'main', t: 0, scale: 1, width: 100_000, height: 10 })).rejects.toThrow('sandbox canvas exceeds 8192 pixels');
+    await expect(host.renderFrame({ compId: 'main', t: 0, scale: Number.POSITIVE_INFINITY, width: 10, height: 10 })).rejects.toThrow('invalid sandbox canvas');
+    await expect(host.draw({ frame: 0, comp: { width: 100_000, height: 10, duration: 1, fps: 30 }, layers: [], items: [] })).rejects.toThrow('sandbox canvas exceeds 8192 pixels');
+    expect(sent).toEqual([]);
+    host.dispose();
+  });
+  it('cancels an oversized module stream without waiting for its body to finish', async () => {
+    let cancelled = false;
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) { controller.enqueue(new Uint8Array(1024 * 1024 + 1)); },
+      cancel() { cancelled = true; },
+    });
+    await expect(readLimitedBody(new Response(body), 1024 * 1024, 'plugin module')).rejects.toThrow('plugin module exceeds 1 MB');
+    expect(cancelled).toBe(true);
+  });
+  it('cancels an oversized project text read before buffering its whole response', async () => {
+    let cancelled = false;
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) { controller.enqueue(new Uint8Array(8 * 1024 * 1024 + 1)); },
+      cancel() { cancelled = true; },
+    });
+    const fetch = vi.fn(async (_url: string) => new Response(body));
+    vi.stubGlobal('fetch', fetch);
+    try {
+      await expect(readProjectText('project-1', 'assets/notes.json')).rejects.toThrow('project text exceeds 8 MB');
+      expect(cancelled).toBe(true);
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(fetch.mock.calls[0][0]).toContain('/files/assets/notes.json');
+    } finally { vi.unstubAllGlobals(); }
+  });
+  it('reads a bounded project text file and preserves missing-file behavior', async () => {
+    let calls = 0;
+    const fetch = vi.fn(async (_url: string) => ++calls === 1 ? new Response('notes') : new Response(null, { status: 404 }));
+    vi.stubGlobal('fetch', fetch);
+    try {
+      await expect(readProjectText('project-1', 'assets/notes.json')).resolves.toBe('notes');
+      await expect(readProjectText('project-1', 'assets/missing.json')).resolves.toBeNull();
+    } finally { vi.unstubAllGlobals(); }
+  });
+  it('refuses a batch of more than 64 plugin modules before sending it', async () => {
+    const sent: unknown[] = [];
+    const { host } = connectHost((message) => sent.push(message), () => DOC_URL);
+    const plugins = Array.from({ length: 65 }, (_, i) => ({ id: `plugin-${i}`, url: `plugin-${i}.js` }));
+    await expect(host.ensure(plugins)).rejects.toThrow('too many project plugins');
+    expect(sent).toEqual([]);
+    host.dispose();
+  });
+  it('stops on a malformed worker declaration instead of trusting its shape', async () => {
+    const { host, receive } = connectHost(() => {}, () => DOC_URL);
+    const pending = host.ensure([{ id: 'bad', url: 'bad.js' }]);
+    expect(() => receive({ kind: 'loaded', plugins: null, urls: [] } as never)).not.toThrow();
+    await expect(pending).rejects.toThrow('invalid sandbox response');
+    expect(host.closed()).toBe(true);
+  });
+  it('stops on a malformed draw result instead of resolving it as picture data', async () => {
+    const { host, receive } = connectHost(() => {}, () => DOC_URL);
+    const pending = host.draw({ frame: 0, comp: { width: 10, height: 10, duration: 1, fps: 30 }, layers: [], items: [] });
+    receive({ kind: 'drawn', call: 1, frame: 0, results: null } as never);
+    await expect(pending).rejects.toThrow('invalid sandbox response');
+    expect(host.closed()).toBe(true);
+  });
+  it('stops on an oversized nested tool result before giving it to the editor', async () => {
+    const { host, receive } = connectHost(() => {}, () => DOC_URL);
+    const pending = host.runTool('fake', {}, toolCtx(doc().doc));
+    receive({ kind: 'result', call: 1, ok: { text: 'x'.repeat(9 * 1024 * 1024) } });
+    await expect(pending).rejects.toThrow('sandbox response exceeds 8 MB');
+    expect(host.closed()).toBe(true);
+  });
+  it('limits pending calls before accepting another worker request', async () => {
+    const sent: unknown[] = [];
+    const { host } = connectHost((message) => sent.push(message), () => DOC_URL);
+    const payload: DrawPayload = { frame: 0, comp: { width: 10, height: 10, duration: 1, fps: 30 }, layers: [], items: [] };
+    const pending = Array.from({ length: 64 }, () => host.draw(payload).catch(() => {}));
+    const overflow = host.draw(payload);
+    host.dispose();
+    await expect(overflow).rejects.toThrow('too many pending sandbox calls');
+    await Promise.all(pending);
+    expect(sent).toHaveLength(64);
+  });
+  it('limits unanswered bridge requests from one running tool', async () => {
+    const sent: unknown[] = [];
+    const { host, receive } = connectHost((message) => sent.push(message), () => DOC_URL);
+    const readText = vi.fn(() => new Promise<string>(() => {}));
+    const pending = host.runTool('fake', {}, toolCtx(doc().doc, { readText }));
+    for (let id = 1; id <= 17; id++) receive({ kind: 'ask', id, call: 1, q: { kind: 'readText', path: 'assets/sky.txt' } });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(readText).toHaveBeenCalledTimes(16);
+    expect(sent).toContainEqual({ kind: 'answer', id: 17, err: 'too many pending sandbox requests' });
+    host.dispose();
+    await expect(pending).rejects.toThrow('closed');
+  });
+  it('refuses an oversized file answer before posting it to the sandbox', async () => {
+    const sent: unknown[] = [];
+    const { host, receive } = connectHost((message) => sent.push(message), () => DOC_URL);
+    const pending = host.runTool('fake', {}, toolCtx(doc().doc, { readText: async () => 'x'.repeat(8 * 1024 * 1024 + 1) }));
+    receive({ kind: 'ask', id: 1, call: 1, q: { kind: 'readText', path: 'assets/large.txt' } });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(sent).toContainEqual({ kind: 'answer', id: 1, err: 'sandbox answer exceeds 8 MB' });
+    expect(sent).not.toContainEqual(expect.objectContaining({ kind: 'answer', id: 1, ok: expect.any(String) }));
+    host.dispose();
+    await expect(pending).rejects.toThrow('closed');
+  });
+  it('refuses oversized outbound calls and document snapshots before posting', async () => {
+    const sent: unknown[] = [];
+    const { host } = connectHost((message) => sent.push(message), () => DOC_URL);
+    const huge = new ArrayBuffer(64 * 1024 * 1024 + 1);
+    await expect(host.runTool('fake', { huge }, toolCtx(doc().doc))).rejects.toThrow('sandbox message exceeds 64 MB');
+    expect(() => host.setDoc({ doc: {}, docUrl: DOC_URL, images: {}, json: { huge }, fonts: [] })).toThrow('sandbox message exceeds 64 MB');
+    expect(sent).toHaveLength(0);
+  });
+  it('bounds bitmap memory separately from plain-data messages in both directions', async () => {
+    class Bitmap { width = 8192; height = 8192; }
+    vi.stubGlobal('ImageBitmap', Bitmap);
+    try {
+      const sent: unknown[] = [];
+      const { host, receive } = connectHost((message) => sent.push(message), () => DOC_URL);
+      const a = new Bitmap() as unknown as ImageBitmap, b = new Bitmap() as unknown as ImageBitmap;
+      expect(() => host.setDoc({ doc: {}, docUrl: DOC_URL, images: { a, b }, json: {}, fonts: [] })).toThrow('sandbox graphics exceed 256 MB');
+      expect(sent).toHaveLength(0);
+      const pending = host.draw({ frame: 0, comp: { width: 64, height: 64, fps: 1, duration: 1 }, layers: [], items: [] });
+      receive({ kind: 'drawn', call: 1, frame: 0, results: [
+        { id: 'a', ok: true, bitmap: a, area: { x: 0, y: 0, w: 1, h: 1 } },
+        { id: 'b', ok: true, bitmap: b, area: { x: 0, y: 0, w: 1, h: 1 } },
+      ] });
+      await expect(pending).rejects.toThrow('sandbox response exceeds its data or graphics budget');
+    } finally { vi.unstubAllGlobals(); }
+  });
+  it('rejects a replayed bridge request id without repeating the file read', async () => {
+    const sent: unknown[] = [];
+    const { host, receive } = connectHost((message) => sent.push(message), () => DOC_URL);
+    const readText = vi.fn(async () => 'project data');
+    const pending = host.runTool('fake', {}, toolCtx(doc().doc, { readText }));
+    receive({ kind: 'ask', id: 1, call: 1, q: { kind: 'readText', path: 'assets/sky.txt' } });
+    receive({ kind: 'ask', id: 1, call: 1, q: { kind: 'readText', path: 'assets/sky.txt' } });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(readText).toHaveBeenCalledTimes(1);
+    expect(sent).toContainEqual({ kind: 'answer', id: 1, err: 'invalid sandbox request id' });
+    host.dispose();
+    await expect(pending).rejects.toThrow('closed');
+  });
+  it('rejects an unknown worker request instead of reading check data', async () => {
+    const sent: unknown[] = [];
+    const { host, receive } = connectHost((message) => sent.push(message), () => DOC_URL);
+    const read = vi.fn(() => 'private');
+    const ctx = { doc: {}, compId: 'root', comp: {}, registry: new Registry(), evaluator: undefined, samples: [], step: 1, data: read } as unknown as CheckContext;
+    const pending = host.runCheck('fake', ctx);
+    receive({ kind: 'ask', id: 1, call: 1, q: { kind: 'unknown', assetId: 'secret' } } as never);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(read).not.toHaveBeenCalled();
+    expect(sent).toContainEqual({ kind: 'answer', id: 1, err: 'unknown worker request' });
+    host.dispose();
+    await expect(pending).rejects.toThrow('closed');
+  });
+
+  it('rejects paths that leave the project before invoking host file capabilities', async () => {
+    const sent: unknown[] = [];
+    const { host, receive } = connectHost((message) => sent.push(message), () => DOC_URL);
+    const readText = vi.fn(async () => 'private');
+    const writeFile = vi.fn(async () => 'written');
+    const fetch = vi.fn(async () => new Response('private'));
+    const pending = host.runTool('fake', {}, toolCtx(doc().doc, { readText, writeFile, fetch }));
+    receive({ kind: 'ask', id: 1, call: 1, q: { kind: 'readText', path: '../secret.txt' } });
+    receive({ kind: 'ask', id: 2, call: 1, q: { kind: 'writeFile', path: '/api/keys', data: { text: 'x' } } });
+    receive({ kind: 'ask', id: 3, call: 1, q: { kind: 'fetch', url: 'file:///secret.txt' } });
+    receive({ kind: 'ask', id: 4, call: 1, q: { kind: 'readText', path: 'assets/%2e%2e/secret.txt' } });
+    receive({ kind: 'ask', id: 5, call: 1, q: { kind: 'writeFile', path: 'assets/safe%2f..%2fsecret.txt', data: { text: 'x' } } });
+    receive({ kind: 'ask', id: 6, call: 1, q: { kind: 'readText', path: 'assets/notes.txt?project=other' } });
+    receive({ kind: 'ask', id: 7, call: 1, q: { kind: 'writeFile', path: 'assets/notes.txt:stream', data: { text: 'x' } } });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(readText).not.toHaveBeenCalled();
+    expect(writeFile).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+    expect(sent).toContainEqual({ kind: 'answer', id: 1, err: 'invalid project path' });
+    expect(sent).toContainEqual({ kind: 'answer', id: 2, err: 'invalid project path' });
+    expect(sent).toContainEqual({ kind: 'answer', id: 3, err: 'invalid network request' });
+    for (const id of [4, 5, 6, 7]) expect(sent).toContainEqual({ kind: 'answer', id, err: 'invalid project path' });
+    host.dispose();
+    await expect(pending).rejects.toThrow('closed');
+  });
+  it('cancels an oversized approved network response before forwarding it to a tool', async () => {
+    const sent: unknown[] = [];
+    const { host, receive } = connectHost((message) => sent.push(message), () => DOC_URL);
+    let cancelled = false;
+    const fetch = vi.fn(async () => new Response(new ReadableStream<Uint8Array>({
+      cancel() { cancelled = true; },
+    }), { headers: { 'content-length': String(64 * 1024 * 1024 + 1) } }));
+    const pending = host.runTool('fake', {}, toolCtx(doc().doc, { fetch }));
+    receive({ kind: 'ask', id: 1, call: 1, q: { kind: 'fetch', url: 'https://service.example.com/data' } });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(sent).toContainEqual({ kind: 'answer', id: 1, err: 'network response exceeds 64 MB' });
+    expect(cancelled).toBe(true);
+    host.dispose();
+    await expect(pending).rejects.toThrow('closed');
+  });
+  it('keeps the approved network response budget above the ordinary data budget', async () => {
+    const sent: unknown[] = [];
+    const { host, receive } = connectHost((message) => sent.push(message), () => DOC_URL);
+    const body = new Uint8Array(8 * 1024 * 1024 + 1);
+    const pending = host.runTool('fake', {}, toolCtx(doc().doc, { fetch: async () => new Response(body) }));
+    receive({ kind: 'ask', id: 1, call: 1, q: { kind: 'fetch', url: 'https://service.example.com/data' } });
+    for (let i = 0; i < 20 && !sent.some((m) => (m as { kind?: string }).kind === 'answer'); i++) await new Promise((resolve) => setTimeout(resolve, 0));
+    const reply = sent.find((m) => (m as { kind?: string }).kind === 'answer') as { ok?: { body: ArrayBuffer }; err?: string } | undefined;
+    expect(reply?.err).toBeUndefined();
+    expect(reply?.ok?.body.byteLength).toBe(body.byteLength);
+    host.dispose();
+    await expect(pending).rejects.toThrow('closed');
+  });
+  it('terminates a plugin load that never answers', async () => {
+    vi.useFakeTimers();
+    try {
+      const { host } = connectHost(() => {}, () => DOC_URL);
+      const rejected = expect(host.ensure([{ id: 'slow', url: 'blob:slow' }])).rejects.toThrow('plugin slow load timed out');
+      await vi.advanceTimersByTimeAsync(15_001);
+      await rejected;
+      expect(host.closed()).toBe(true);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('terminates a drawing call that never answers', async () => {
+    vi.useFakeTimers();
+    try {
+      const { host } = connectHost(() => {}, () => DOC_URL);
+      const rejected = expect(host.draw({ frame: 0, comp: { width: 10, height: 10, duration: 1, fps: 30 }, layers: [], items: [] })).rejects.toThrow('draw call timed out');
+      await vi.advanceTimersByTimeAsync(30_001);
+      await rejected;
+      expect(host.closed()).toBe(true);
+    } finally { vi.useRealTimers(); }
+  });
+  it('terminates unanswered checks, tools, whole frames and vector exports', async () => {
+    vi.useFakeTimers();
+    try {
+      const cases = [
+        { kind: 'check', ms: 30_001, start: (host: PluginHost) => host.runCheck('slow', { doc: doc().doc, compId: 'root', comp: {}, samples: [], step: 1 } as unknown as CheckContext) },
+        { kind: 'tool', ms: 120_001, start: (host: PluginHost) => host.runTool('slow', {}, toolCtx(doc().doc)) },
+        { kind: 'render', ms: 30_001, start: (host: PluginHost) => host.renderFrame({ compId: 'root', t: 0, scale: 1, width: 10, height: 10 }) },
+        { kind: 'export', ms: 30_001, start: (host: PluginHost) => host.exportOf('slow', {}) },
+      ];
+      for (const test of cases) {
+        const { host } = connectHost(() => {}, () => DOC_URL);
+        const rejected = expect(test.start(host)).rejects.toThrow(`${test.kind} call timed out`);
+        await vi.advanceTimersByTimeAsync(test.ms);
+        await rejected;
+        expect(host.closed()).toBe(true);
+      }
+    } finally { vi.useRealTimers(); }
+  });
   it('tells the page what a plugin declares, without its code', async () => {
     const { host } = pair(new Map([['blob:stars', plugin()]]));
     const decls = await host.ensure([{ id: 'stars', url: 'blob:stars' }]);
@@ -119,6 +384,25 @@ describe('the plugin sandbox', () => {
     expect(out.ops).toHaveLength(1);
     expect(ctx.wrote).toEqual([['assets/stars.json', '{"count":12,"read":"night"}']]);
     expect(progress).toHaveBeenCalledWith(1, 2, 'placing');
+  });
+  it('runs each project plugin tool in a worker containing only that plugin', async () => {
+    const a: PluginModule = { tools: [{ name: 'a.tool', description: 'A', run: () => 'A' }] };
+    const b: PluginModule = { tools: [{ name: 'b.tool', description: 'B', run: () => 'B' }] };
+    const shared = pair(new Map([['blob:a', a], ['blob:b', b]])).host;
+    const imports: string[] = [];
+    const dedicated = new Map([
+      ['a', pair(new Map([['blob:a', a]]), (url) => imports.push(url)).host],
+      ['b', pair(new Map([['blob:b', b]]), (url) => imports.push(url)).host],
+    ]);
+    const { doc: d } = doc();
+    d.plugins = ['a', 'b'];
+    d.assets.a = { type: 'module', src: 'plugins/a.js' };
+    d.assets.b = { type: 'module', src: 'plugins/b.js' };
+    const reg = new Registry();
+    await attachIsolated(reg, shared, d, (id) => `blob:${id}`, undefined, (id) => dedicated.get(id)!);
+    expect(toolOutput(await reg.tool('a.tool').tool.run({}, toolCtx(d))).text).toBe('A');
+    expect(toolOutput(await reg.tool('b.tool').tool.run({}, toolCtx(d))).text).toBe('B');
+    expect(imports.sort()).toEqual(['blob:a', 'blob:b']);
   });
 
   it('keeps a plugin that the sandbox cannot load out of the vocabulary', async () => {
@@ -208,8 +492,11 @@ describe('the plugin sandbox', () => {
     const reg = new Registry();
     await expect(attachIsolated(reg, host, d, (id) => `blob:${id}`)).rejects.toThrow(/plugin ghost: no such module/);
     expect(reg.hasTool('sky.stars')).toBe(true);
-    // said once: the next edit of the document does not ask the same file again
+    // A failed load stays visible and can be retried after its source is repaired.
+    await expect(attachIsolated(reg, host, d, (id) => `blob:${id}`)).rejects.toThrow(/plugin ghost: no such module/);
+    fixtures.set('blob:ghost', { tools: [{ name: 'ghost.tool', description: 'repaired', run: () => 'ok' }] });
     await expect(attachIsolated(reg, host, d, (id) => `blob:${id}`)).resolves.toBeUndefined();
+    expect(reg.hasTool('ghost.tool')).toBe(true);
   });
 
   it('refuses what waits when the sandbox stops, with the reason', async () => {
@@ -257,6 +544,78 @@ describe('the plugin sandbox', () => {
 describe('the sandboxed drawing', () => {
   beforeEach(() => resetSandbox());
 
+  it('evaluates an expression through the worker protocol', async () => {
+    const oldSelf = (globalThis as any).self;
+    (globalThis as any).self = { fonts: { add() {} } };
+    try {
+      const project = doc().doc;
+      project.compositions[project.root].layers.box = { type: 'shape.rect', props: { radius: { $expr: '3 + 4' } } } as never;
+      project.compositions[project.root].order.push('box');
+      const { host } = pair(new Map(), undefined, (modules) => makeSandboxDraw(modules));
+      host.setDoc({ doc: project, docUrl: DOC_URL, images: {}, json: {}, fonts: [] });
+      await expect(host.evaluateValue('box.radius', 0, project.root)).resolves.toBe(7);
+      await expect(host.evaluateSeries(['box.radius'], [0, 0.5, 1], project.root)).resolves.toEqual([[7, 7, 7]]);
+      project.compositions[project.root].markers = [{ id: 'cut-1', t: 0.5, kind: 'cut' }];
+      host.setDoc({ doc: project, docUrl: DOC_URL, images: {}, json: {}, fonts: [] });
+      await expect(host.soundCues(project.root)).resolves.toEqual(expect.arrayContaining([expect.objectContaining({ t: 0.5, kind: 'cut' })]));
+      await expect(host.pictureMotion(project.root)).resolves.toMatchObject({ times: expect.any(Array), motion: expect.any(Array) });
+      project.compositions[project.root].layers.box.props!.radius = { $expr: 't * 10' };
+      host.setDoc({ doc: project, docUrl: DOC_URL, images: {}, json: {}, fonts: [] });
+      await expect(host.motionReport(project.root, 0, 0.5)).resolves.toMatchObject({ figures: expect.arrayContaining([expect.objectContaining({ address: 'box.radius' })]) });
+      project.compositions[project.root].layers.box.props!.radius = { $expr: '3 + 4' };
+      project.compositions[project.root].layers.box.props!.size = { $expr: '[20 + t * 10, 20]' };
+      project.compositions[project.root].layers.bed = { type: 'audio', in: 0, out: 1, props: { audio: 'music', start: 1, rate: { $expr: '2' } } } as never;
+      host.setDoc({ doc: project, docUrl: DOC_URL, images: {}, json: {}, fonts: [] });
+      await expect(host.sampleClock('bed', project.root, [0, 0.5], [2])).resolves.toMatchObject({ fileTimes: [1, 2], moments: [[0.5]] });
+      const layers = await host.evaluateLayers(['box'], 0, project.root);
+      expect(layers[0]).toMatchObject({ id: 'box', props: { radius: 7 }, transform: { opacity: 1 } });
+      const [first, second] = await host.sampleQuads('box', project.root, [0, 0.5]);
+      expect(first).toHaveLength(4);
+      expect(second[1][0] - second[0][0]).toBeGreaterThan(first[1][0] - first[0][0]);
+      await expect(host.sampleQuads('box', project.root, Array(513).fill(0))).rejects.toThrow('invalid sandbox quad request');
+      const issues = await host.qualityChecks(project.root);
+      expect(issues).toEqual(expect.any(Array));
+      expect(issues.some((issue) => issue.message.includes('expression evaluation is isolated'))).toBe(false);
+      await expect(host.samplePlaced(0, project.root)).resolves.toMatchObject([{ id: 'box', type: 'shape.rect', opacity: 1 }]);
+      await expect(host.samplePlaced(Number.NaN, project.root)).rejects.toThrow('invalid sandbox placed sample');
+      await expect(host.evaluateLayers(Array(65).fill('box'), 0, project.root)).rejects.toThrow('invalid sandbox layers');
+      await expect(host.evaluateValue('$comp.unknown', 0, project.root)).rejects.toThrow();
+    } finally { (globalThis as any).self = oldSelf; }
+  });
+
+  it('waits for a supplied font before drawing the first frame', async () => {
+    const oldSelf = (globalThis as any).self, oldFace = (globalThis as any).FontFace;
+    let finish!: () => void;
+    const added: unknown[] = [];
+    (globalThis as any).self = { fonts: { add: (face: unknown) => added.push(face) } };
+    (globalThis as any).FontFace = class {
+      constructor(_family: string, _data: ArrayBuffer) {}
+      load() { return new Promise((resolve) => { finish = () => resolve(this); }); }
+    };
+    try {
+      const draw = makeSandboxDraw(new Map());
+      draw.setDoc({ doc: { assets: {} }, docUrl: DOC_URL, images: {}, json: {}, fonts: [{ url: `${DOC_URL}/font`, family: 'Test', data: new ArrayBuffer(4) }] });
+      let settled = false;
+      const frame = draw.draw({ frame: 0, comp: { width: 10, height: 10, duration: 1, fps: 30 }, layers: [], items: [] }).then((result) => { settled = true; return result; });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(settled).toBe(false);
+      finish();
+      expect((await frame).results).toEqual([]);
+      expect(added).toHaveLength(1);
+    } finally { (globalThis as any).self = oldSelf; (globalThis as any).FontFace = oldFace; }
+  });
+
+  it('refuses the frame when a supplied font cannot load', async () => {
+    const oldSelf = (globalThis as any).self, oldFace = (globalThis as any).FontFace;
+    (globalThis as any).self = { fonts: { add() {} } };
+    (globalThis as any).FontFace = class { load() { return Promise.reject(new Error('bad font')); } };
+    try {
+      const draw = makeSandboxDraw(new Map());
+      draw.setDoc({ doc: { assets: {} }, docUrl: DOC_URL, images: {}, json: {}, fonts: [{ url: `${DOC_URL}/bad`, family: 'Bad', data: new ArrayBuffer(4) }] });
+      await expect(draw.draw({ frame: 0, comp: { width: 10, height: 10, duration: 1, fps: 30 }, layers: [], items: [] })).rejects.toThrow('bad font');
+    } finally { (globalThis as any).self = oldSelf; (globalThis as any).FontFace = oldFace; }
+  });
+
   it('draws a frame in the sandbox and hands the pictures to the page', async () => {
     const docs: SandboxDoc[] = [], payloads: DrawPayload[] = [];
     const bitmap = { width: 20, height: 20 } as unknown as ImageBitmap;
@@ -270,6 +629,16 @@ describe('the sandboxed drawing', () => {
         };
       },
       exportOf: async () => ({ err: 'not this test' }),
+      evaluateValue: async () => 0,
+      evaluateSeries: async () => [[0]],
+      evaluateLayers: async () => [],
+      soundCues: async () => [],
+      sampleClock: async () => ({ clock: {}, fileTimes: [], moments: [] }),
+      pictureMotion: async () => ({ times: [], motion: [] }),
+      motionReport: async () => ({ figures: [] }),
+      sampleQuads: async () => [],
+      qualityChecks: async () => [],
+      samplePlaced: async () => [],
       renderFrame: async () => ({ err: 'not this test' }),
     };
     const { host } = pair(new Map([['blob:stars', plugin()]]), undefined, () => sandbox);
@@ -292,6 +661,16 @@ describe('the sandboxed drawing', () => {
         if (!node?.export) return { err: `${type} has no vector export` };
         return { svg: node.export.svg?.(props), lottie: node.export.lottie?.(props) };
       },
+      evaluateValue: async () => 0,
+      evaluateSeries: async () => [[0]],
+      evaluateLayers: async () => [],
+      soundCues: async () => [],
+      sampleClock: async () => ({ clock: {}, fileTimes: [], moments: [] }),
+      pictureMotion: async () => ({ times: [], motion: [] }),
+      motionReport: async () => ({ figures: [] }),
+      sampleQuads: async () => [],
+      qualityChecks: async () => [],
+      samplePlaced: async () => [],
       renderFrame: async (p) => {
         if (!p.videos || !p.videos.clip) return { err: 'no video frame shipped' };
         const b = { width: 100 } as unknown as ImageBitmap;
@@ -312,6 +691,16 @@ describe('the sandboxed drawing', () => {
       setDoc: () => {},
       draw: async () => ({ results: [] }),
       exportOf: async () => ({}),
+      evaluateValue: async () => 0,
+      evaluateSeries: async () => [[0]],
+      evaluateLayers: async () => [],
+      soundCues: async () => [],
+      sampleClock: async () => ({ clock: {}, fileTimes: [], moments: [] }),
+      pictureMotion: async () => ({ times: [], motion: [] }),
+      motionReport: async () => ({ figures: [] }),
+      sampleQuads: async () => [],
+      qualityChecks: async () => [],
+      samplePlaced: async () => [],
       renderFrame: async (p) => { frames.push(p); return { bitmap, transfer: [bitmap] }; },
     }));
     host.setDoc({ doc: { assets: {} }, docUrl: DOC_URL, images: {}, json: {}, fonts: [] });
@@ -328,6 +717,40 @@ describe('the sandboxed drawing', () => {
     // without the sandbox: a clear error
     const bare = pair(new Map());
     await expect(bare.host.renderFrame({ compId: 'root', t: 0, scale: 1, width: 100, height: 100 })).rejects.toThrow(/cannot render/);
+  });
+
+  it('samples property series in one bounded sandbox call', async () => {
+    const calls: unknown[] = [];
+    const { host } = pair(new Map([['blob:stars', plugin()]]), undefined, () => ({
+      setDoc: () => {},
+      draw: async () => ({ results: [] }),
+      exportOf: async () => ({}),
+      evaluateValue: async () => 0,
+      evaluateSeries: async (addresses, times, compId) => {
+        calls.push({ addresses, times, compId });
+        return addresses.map((_, i) => times.map((t) => i + t));
+      },
+      evaluateLayers: async () => [],
+      soundCues: async () => [{ t: 0, kind: 'cut', layer: '', strength: Number.NaN, weight: 'hero' }],
+      sampleClock: async () => ({ clock: {}, fileTimes: [], moments: [] }),
+      pictureMotion: async () => ({ times: [0], motion: [Number.NaN] }),
+      motionReport: async () => ({ figures: [{ address: 'box.radius', figures: { span: Number.NaN } }] }) as never,
+      sampleQuads: async () => [],
+      qualityChecks: async () => [{ check: 'bad', severity: 'fatal', message: 'bad' }] as never,
+      samplePlaced: async () => [],
+      renderFrame: async () => ({}),
+    }));
+    expect(await host.evaluateSeries(['layer.x', 'layer.y'], [0, 0.5], 'root')).toEqual([[0, 0.5], [1, 1.5]]);
+    expect(calls).toEqual([{ addresses: ['layer.x', 'layer.y'], times: [0, 0.5], compId: 'root' }]);
+    await expect(host.evaluateSeries(['layer.x'], Array(513).fill(0), 'root')).rejects.toThrow('invalid sandbox series');
+    await expect(host.soundCues('root')).rejects.toThrow('invalid sandbox sound cues response');
+    await expect(host.soundCues('x'.repeat(257))).rejects.toThrow('invalid sandbox sound cues');
+    await expect(host.sampleClock('bed', 'root', [0], [])).rejects.toThrow('invalid sandbox clock response');
+    await expect(host.sampleClock('bed', 'root', Array(513).fill(0), [])).rejects.toThrow('invalid sandbox clock request');
+    await expect(host.pictureMotion('root')).rejects.toThrow('invalid sandbox picture motion response');
+    await expect(host.motionReport('root', 0, 1)).rejects.toThrow('invalid sandbox motion report response');
+    await expect(host.sampleQuads('box', 'root', [0])).rejects.toThrow('invalid sandbox quad response');
+    await expect(host.qualityChecks('root')).rejects.toThrow('invalid sandbox quality response');
   });
 
   it('the wrapper defers, then draws the picture over its bounds; a later frame keeps the last one', async () => {
@@ -434,6 +857,21 @@ describe('the sandboxed drawing', () => {
     expect(exported).toEqual([{ radius: 5 }]);
     expect(reg.node('sky.moon').export!.svg!({ radius: 5 })).toBe('<circle r="5"/>');
     expect(reg.node('sky.moon').export!.lottie!({ radius: 5 })).toEqual([{ radius: 5 }]);
+  });
+
+  it('refuses a vector preflight expression in an isolated document', async () => {
+    const fakeHost = { exportOf: async () => ({ svg: '<circle/>' }) } as unknown as PluginHost;
+    bindSandbox({ host: () => fakeHost, context: () => null });
+    const { doc: d } = doc();
+    d.compositions[d.root].layers.moon = { type: 'sky.moon', props: { radius: { $expr: `({}).constructor.constructor('globalThis.__vectorLeak = true; return 5')()` } } } as never;
+    d.compositions[d.root].order = ['moon'];
+    const reg = new Registry().register({ ...sandboxNode(plugin().nodes![0]) });
+    const previous = prefs.peek();
+    prefs.value = { ...previous, sandboxPreview: true };
+    try {
+      await expect(primeSandboxExports(d, reg, 0)).rejects.toThrow('expression evaluation is isolated from this page');
+      expect((globalThis as any).__vectorLeak).toBeUndefined();
+    } finally { prefs.value = previous; }
   });
 });
 

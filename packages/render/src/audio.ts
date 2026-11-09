@@ -6,12 +6,27 @@
 // composition's loudness, its true peak held under -1 dBTP. Also: the WAV
 // encoder, and the synth that turns a sound's code into samples.
 
-import { audioClips, clipFileTime, curveAt, gainAt, gainMoves, needsPitch, pitchRatio, integratedLoudness, master, soundMix, type AudioClip, type SoundMix, type TrammeDoc } from '@tramme/core';
+import { audioClips, clipFileTime, curveAt, delayTimeSeconds, gainAt, gainMoves, needsPitch, pitchRatio, integratedLoudness, master, soundMix, type AudioClip, type AudioEffect, type SoundMix, type TrammeDoc } from '@tramme/core';
 import { loadPitch } from './pitch.ts';
 
 export const MIX_RATE = 48000;
 /** samples of a moving gain per second */
 const GAIN_RATE = 100;
+
+/** Live loudness gain and limiter, before the personal preview volume. */
+export function liveMaster(ctx: BaseAudioContext, out: AudioNode): { input: GainNode; output: GainNode } {
+  const input = ctx.createGain(), limiter = ctx.createDynamicsCompressor(), output = ctx.createGain();
+  limiter.threshold.value = -1.5; limiter.knee.value = 0; limiter.ratio.value = 20;
+  limiter.attack.value = 0.002; limiter.release.value = 0.08;
+  // Web Audio's compressor adds automatic makeup gain: the reciprocal of
+  // its full-range compression gain, raised to 0.6. Cancel it for this
+  // zero-knee limiter so quiet audio retains the loudness gain we measured.
+  // https://www.w3.org/TR/webaudio/#computing-the-makeup-gain
+  const fullRangeDb = limiter.threshold.value * (1 - 1 / limiter.ratio.value);
+  output.gain.value = Math.pow(10, fullRangeDb * 0.6 / 20);
+  input.connect(limiter).connect(output).connect(out);
+  return { input, output };
+}
 
 /** a seeded random generator in [0, 1): the same sounds on every machine */
 export function seeded(seed: number): () => number {
@@ -63,6 +78,110 @@ export function mixBus(ctx: BaseAudioContext, mix: SoundMix, out: AudioNode): (c
   return (c) => (c.role === 'effect' ? fx : out);
 }
 
+function eqStages(ctx: BaseAudioContext, low: number, mid: number, frequency: number, q: number, high: number): AudioNode[] {
+  const nodes: AudioNode[] = [];
+  if (low) { const node = ctx.createBiquadFilter(); node.type = 'lowshelf'; node.frequency.value = 120; node.gain.value = low; nodes.push(node); }
+  if (mid) { const node = ctx.createBiquadFilter(); node.type = 'peaking'; node.frequency.value = frequency; node.Q.value = q; node.gain.value = mid; nodes.push(node); }
+  if (high) { const node = ctx.createBiquadFilter(); node.type = 'highshelf'; node.frequency.value = 8000; node.gain.value = high; nodes.push(node); }
+  return nodes;
+}
+
+function compressor(ctx: BaseAudioContext, amount: number): DynamicsCompressorNode {
+  const node = ctx.createDynamicsCompressor();
+  node.threshold.value = -12 - 18 * amount; node.knee.value = 24; node.ratio.value = 2 + 10 * amount;
+  node.attack.value = 0.004; node.release.value = 0.15;
+  return node;
+}
+
+/** Ordered, non-destructive inserts; flat and bypassed settings allocate no nodes. */
+export function audioEffectChain(ctx: BaseAudioContext, effects: readonly AudioEffect[], out: AudioNode, tempo?: number | null): AudioNode {
+  let next = out;
+  for (const effect of [...effects].reverse()) {
+    if (effect.bypass) continue;
+    let nodes: AudioNode[] = [];
+    if (effect.kind === 'eq') nodes = eqStages(ctx, effect.low, effect.mid, effect.midFreq, effect.midQ, effect.high);
+    else if (effect.kind === 'lowCut' || effect.kind === 'highCut') {
+      if (effect.frequency) { const node = ctx.createBiquadFilter(); node.type = effect.kind === 'lowCut' ? 'highpass' : 'lowpass'; node.frequency.value = effect.frequency; nodes.push(node); }
+    } else if (effect.kind === 'compressor') {
+      if (effect.amount) nodes.push(compressor(ctx, effect.amount));
+    } else if (effect.kind === 'delay' && effect.wet) {
+      const seconds = delayTimeSeconds(effect.time, tempo);
+      const input = ctx.createGain(), output = ctx.createGain(), delay = ctx.createDelay(Math.max(1, seconds + 1 / ctx.sampleRate)), back = ctx.createGain(), wet = ctx.createGain();
+      delay.delayTime.value = seconds;
+      back.gain.value = Number.isFinite(effect.feedback) ? Math.max(0, Math.min(0.95, effect.feedback)) : 0;
+      wet.gain.value = effect.wet;
+      input.connect(output);
+      input.connect(delay);
+      // Preserve native feedback timing, including the render-quantum cycle delay.
+      if (back.gain.value) delay.connect(back).connect(delay);
+      delay.connect(wet).connect(output);
+      output.connect(next);
+      next = input;
+      continue;
+    } else if (effect.kind === 'distortion' && effect.wet) {
+      const input = ctx.createGain(), output = ctx.createGain(), dry = ctx.createGain(), wet = ctx.createGain();
+      dry.gain.value = 1 - effect.wet; wet.gain.value = effect.wet;
+      input.connect(dry).connect(output);
+      let processed: AudioNode = input.connect(shaper(ctx, effect.drive));
+      if (effect.tone) { const tone = ctx.createBiquadFilter(); tone.type = 'lowpass'; tone.frequency.value = effect.tone; processed = processed.connect(tone); }
+      processed.connect(wet).connect(output);
+      output.connect(next);
+      next = input;
+      continue;
+    } else if (effect.kind === 'reverb' && effect.wet) {
+      const input = ctx.createGain(), output = ctx.createGain(), send = ctx.createGain(), convolution = ctx.createConvolver();
+      send.gain.value = effect.wet;
+      convolution.buffer = room(ctx);
+      input.connect(output);
+      input.connect(send).connect(convolution).connect(output);
+      output.connect(next);
+      next = input;
+      continue;
+    }
+    if (nodes.length) { nodes.reduce((a, b) => a.connect(b)); nodes.at(-1)!.connect(next); next = nodes[0]; }
+  }
+  return next;
+}
+
+/** The shared track/bus routing of preview, scrubbing and every export.
+ * Clip gains/pan retain their existing audioClips semantics. A callback taps
+ * outputs for live meters, without participating in the sound path. */
+export function mixTracks(ctx: BaseAudioContext, doc: TrammeDoc, compId: string, out: AudioNode, tap?: (id: string, node: AudioNode) => void): (clip: AudioClip) => AudioNode {
+  const comp = doc.compositions[compId], tracks = comp.tracks ?? [], mix = soundMix(comp);
+  if (!tracks.some((track) => track.effects?.some((effect) => !effect.bypass))) {
+    // Keep the old single shared room and summing path for existing projects.
+    const bus = mixBus(ctx, mix, out), outputs = new Map<string, GainNode>();
+    return (clip) => {
+      const track = tracks.find((track) => track.id === comp.layers[clip.layerId]?.track);
+      if (!track) return bus(clip);
+      const key = `${track.id}:${clip.role}`;
+      let node = outputs.get(key);
+      if (!node) {
+        node = ctx.createGain(); node.connect(bus(clip)); outputs.set(key, node);
+        tap?.(track.id, node);
+        if (track.to) tap?.(track.to, node);
+      }
+      return node;
+    };
+  }
+  const inputs = new Map(tracks.map((track) => [track.id, ctx.createGain()]));
+  for (const track of tracks) {
+    const output = ctx.createGain();
+    output.connect(!track.bus && track.to ? inputs.get(track.to) ?? out : out);
+    inputs.get(track.id)!.connect(audioEffectChain(ctx, track.effects ?? [], output, comp.sound?.tempo));
+    tap?.(track.id, output);
+  }
+  const rooms = new Map<string, (clip: AudioClip) => AudioNode>();
+  let untracked: ((clip: AudioClip) => AudioNode) | undefined;
+  return (clip) => {
+    const id = comp.layers[clip.layerId]?.track;
+    if (!id || !inputs.has(id)) return (untracked ??= mixBus(ctx, mix, out))(clip);
+    let route = rooms.get(id);
+    if (!route) { route = mixBus(ctx, mix, inputs.get(id)!); rooms.set(id, route); }
+    return route(clip);
+  };
+}
+
 /**
  * The chain of one clip into `out`: filters, then its gain, the reverb beside
  * it. `from` is the composition time played at `startAt` (time of the
@@ -91,19 +210,9 @@ export function clipChain(ctx: BaseAudioContext, clip: AudioClip, out: AudioNode
   }
   if (clip.highCut > 0) { const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = clip.highCut; stages.push(f); }
   // the equaliser: one biquad per band set, nothing at 0 dB (an uneq'd clip builds the same chain as before)
-  if (clip.eqLow !== 0) { const f = ctx.createBiquadFilter(); f.type = 'lowshelf'; f.frequency.value = 120; f.gain.value = clip.eqLow; stages.push(f); }
-  if (clip.eqMid !== 0) { const f = ctx.createBiquadFilter(); f.type = 'peaking'; f.frequency.value = clip.eqMidFreq; f.Q.value = 0.9; f.gain.value = clip.eqMid; stages.push(f); }
-  if (clip.eqHigh !== 0) { const f = ctx.createBiquadFilter(); f.type = 'highshelf'; f.frequency.value = 8000; f.gain.value = clip.eqHigh; stages.push(f); }
+  stages.push(...eqStages(ctx, clip.eqLow, clip.eqMid, clip.eqMidFreq, 0.9, clip.eqHigh));
   // the compressor: the loud moments brought down (a voice kept level), harder as `compress` grows
-  if (clip.compress > 0) {
-    const f = ctx.createDynamicsCompressor(), a = clip.compress;
-    f.threshold.value = -12 - 18 * a;
-    f.knee.value = 24;
-    f.ratio.value = 2 + 10 * a;
-    f.attack.value = 0.004;
-    f.release.value = 0.15;
-    stages.push(f);
-  }
+  if (clip.compress > 0) stages.push(compressor(ctx, clip.compress));
   const gain = ctx.createGain();
   stages.push(gain);
   stages.reduce((a, b) => (outOf.get(a) ?? a).connect(b));
@@ -130,15 +239,22 @@ function shaper(ctx: BaseAudioContext, drive: number): WaveShaperNode {
   return w;
 }
 
-/** a band of the voice kept (a small speaker), optionally pushed at its middle */
-function band(ctx: BaseAudioContext, lo: number, hi: number, push = 0): AudioNode[] {
-  const h = ctx.createBiquadFilter(), l = ctx.createBiquadFilter();
-  h.type = 'highpass'; h.frequency.value = lo; l.type = 'lowpass'; l.frequency.value = hi;
-  if (!push) return [h, l];
-  const p = ctx.createBiquadFilter();
-  p.type = 'peaking'; p.frequency.value = Math.sqrt(lo * hi); p.Q.value = 1.2; p.gain.value = push;
-  return [h, p, l];
+function speakerEffects(lo: number, hi: number, push: number, drive: number): AudioEffect[] {
+  return [
+    { kind: 'lowCut', frequency: lo },
+    { kind: 'eq', low: 0, mid: push, midFreq: Math.sqrt(lo * hi), midQ: 1.2, high: 0 },
+    { kind: 'highCut', frequency: hi },
+    { kind: 'distortion', drive, tone: 0, wet: 1 },
+  ];
 }
+
+/** The historical voice looks, expressed with the same inserts as a track. */
+export const VOICE_EFFECTS: Readonly<Record<'telephone' | 'radio' | 'megaphone' | 'echo', readonly AudioEffect[]>> = Object.freeze({
+  telephone: Object.freeze(speakerEffects(300, 3400, 3, 1.5).map((effect) => Object.freeze(effect))),
+  radio: Object.freeze(speakerEffects(500, 5000, 4, 2.5).map((effect) => Object.freeze(effect))),
+  megaphone: Object.freeze(speakerEffects(700, 3500, 8, 5).map((effect) => Object.freeze(effect))),
+  echo: Object.freeze([Object.freeze({ kind: 'delay' as const, time: 280, feedback: 0.38, wet: 0.55 })]),
+});
 
 /**
  * A clip's voice: the pitch moved (the worklet, loaded in the context
@@ -160,10 +276,12 @@ function voiceStages(ctx: BaseAudioContext, clip: AudioClip, stages: AudioNode[]
       stages.push(node);
     } catch { /* the worklet not loaded in this context: the pitch stays as it is */ }
   }
+  if (Object.hasOwn(VOICE_EFFECTS, clip.voice)) {
+    const output = ctx.createGain(), input = audioEffectChain(ctx, VOICE_EFFECTS[clip.voice as keyof typeof VOICE_EFFECTS], output);
+    stages.push(input);
+    outOf.set(input, output);
+  }
   switch (clip.voice) {
-    case 'telephone': stages.push(...band(ctx, 300, 3400, 3), shaper(ctx, 1.5)); break;
-    case 'radio': stages.push(...band(ctx, 500, 5000, 4), shaper(ctx, 2.5)); break;
-    case 'megaphone': stages.push(...band(ctx, 700, 3500, 8), shaper(ctx, 5)); break;
     case 'robot': {
       // the voice times a 50 Hz sine: a ring modulation, metallic
       const ring = ctx.createGain(), osc = ctx.createOscillator();
@@ -173,18 +291,6 @@ function voiceStages(ctx: BaseAudioContext, clip: AudioClip, stages: AudioNode[]
       osc.start(startAt + Math.max(0, clip.at - from));
       osc.stop(startAt + Math.max(0, end - from) + 0.1);
       stages.push(ring);
-      break;
-    }
-    case 'echo': {
-      // what comes in goes on, and again a quarter of a second later, each time a third quieter
-      const input = ctx.createGain(), output = ctx.createGain(), delay = ctx.createDelay(1), back = ctx.createGain(), wet = ctx.createGain();
-      delay.delayTime.value = 0.28; back.gain.value = 0.38; wet.gain.value = 0.55;
-      input.connect(output);
-      input.connect(delay);
-      delay.connect(back).connect(delay);
-      delay.connect(wet).connect(output);
-      stages.push(input);
-      outOf.set(input, output);
       break;
     }
   }
@@ -243,7 +349,7 @@ export async function mixComposition(doc: TrammeDoc, compId: string, url: (asset
   const ctx = new OfflineAudioContext(2, Math.max(1, Math.ceil((b - a) * MIX_RATE)), MIX_RATE);
   // the pitch worklet, before any chain asks for it
   if (clips.some(needsPitch)) await loadPitch(ctx).catch(() => {});
-  const bus = mixBus(ctx, mix, ctx.destination);
+  const bus = mixTracks(ctx, doc, compId, ctx.destination);
   const decoded = new Map<string, Promise<AudioBuffer | null>>();
   for (const c of clips) {
     let p = decoded.get(c.asset);

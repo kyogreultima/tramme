@@ -82,6 +82,54 @@ const ENVELOPE_RATE = 50;
 const num = (v: unknown, d: number) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
+/** Four gain keys shared by a drawn dip and transcript-driven ducking. */
+export function volumeBlockKeys(from: number, to: number, depth: number, attack: number, release: number, duration: number): Keyframe<number>[] | null {
+  if (![from, to, depth, attack, release, duration].every(Number.isFinite) || from < attack || to <= from || to + release > duration || depth < -40 || depth > -1 || attack < 0.02 || attack > 2 || release < 0.05 || release > 4) return null;
+  const at = (t: number, v: number) => ({ t: +t.toFixed(3), v: +v.toFixed(2) });
+  return [at(from - attack, 0), at(from, depth), at(to, depth), at(to + release, 0)];
+}
+
+/** Audible clip ranges on a designated voice track, with parents' visibility and trims applied. */
+function voiceRanges(comp: Composition, trackId: string, doc: TrammeDoc): [number, number][] {
+  const voiceTrack = comp.tracks?.find((t) => t.id === trackId && t.kind === 'audio' && !t.bus);
+  if (!voiceTrack || voiceTrack.muted || voiceTrack.hidden) return [];
+  const parent = new Map<string, string>();
+  for (const [id, layer] of Object.entries(comp.layers)) for (const child of layer.children ?? []) parent.set(child, id);
+  const spans: [number, number][] = [];
+  for (const [id, layer] of Object.entries(comp.layers)) {
+    if (layer.track !== trackId || (layer.type !== 'audio' && layer.type !== 'video') || layer.visible === false || (layer.type === 'video' && staticValue(layer.props?.muted) === true)) continue;
+    const asset = staticValue(layer.props?.[layer.type]);
+    if (typeof asset !== 'string' || !doc.assets[asset]) continue;
+    let start = layer.in ?? 0, end = Math.min(layer.out ?? comp.duration, comp.duration), hidden = false;
+    for (let p = parent.get(id); p; p = parent.get(p)) {
+      const group = comp.layers[p];
+      hidden ||= group.visible === false;
+      start = Math.max(start, group.in ?? 0);
+      end = Math.min(end, group.out ?? comp.duration);
+    }
+    if (!hidden && end > start) spans.push([start, end]);
+  }
+  spans.sort((a, b) => a[0] - b[0]);
+  const merged: [number, number][] = [];
+  for (const [start, end] of spans) {
+    const last = merged.at(-1);
+    if (last && start <= last[1] + 0.6) last[1] = Math.max(last[1], end);
+    else merged.push([start, end]);
+  }
+  return merged;
+}
+
+/** A voice clip's four relative dB keys, including clips touching the film edges. */
+function automaticDuckKeys(start: number, end: number, duration: number): Keyframe<number>[] {
+  const regular = volumeBlockKeys(start, end, -12, 0.15, 0.5, duration);
+  if (regular) return regular;
+  const keys: Keyframe<number>[] = [];
+  if (start > 0) keys.push({ t: Math.max(0, +(start - 0.15).toFixed(3)), v: start < 0.15 ? -12 : 0 });
+  keys.push({ t: start, v: -12 }, { t: end, v: -12 });
+  if (end < duration) keys.push({ t: Math.min(duration, +(end + 0.5).toFixed(3)), v: 0 });
+  return keys.filter((key, i) => i === 0 || key.t > keys[i - 1].t);
+}
+
 /** the mixer's say over a layer: the faders of its track and of the bus it feeds (a still part in dB, the moving ones as curves), and the pan */
 function trackMixer(comp: Composition, layer: Layer, at: number, end: number, doc: TrammeDoc): { db: number; curves: [number, number][][]; pan: number } {
   const own = comp.tracks?.find((t) => t.id === layer.track);
@@ -91,6 +139,16 @@ function trackMixer(comp: Composition, layer: Layer, at: number, end: number, do
   for (const t of chain) {
     const moving = envelopeOf(t.volume, at, end, doc);
     if (moving) curves.push(moving); else db += num(staticValue(t.volume), 0);
+    for (const block of t.volumeBlocks ?? []) {
+      const dip = envelopeOf({ $k: block.keys }, at, end, doc);
+      if (dip) curves.push(dip);
+    }
+    if (t.duckUnder && t.id === own?.id) {
+      for (const [voiceStart, voiceEnd] of voiceRanges(comp, t.duckUnder, doc)) {
+        const dip = envelopeOf({ $k: automaticDuckKeys(voiceStart, voiceEnd, comp.duration) }, at, end, doc);
+        if (dip) curves.push(dip);
+      }
+    }
     pan += t.pan ?? 0;
   }
   return { db, curves, pan: clamp(pan, -1, 1) };

@@ -29,8 +29,10 @@ import { formatParts } from '@tramme/render/src/timing.ts';
 import { defaultPages, renderAudio, renderVideo } from './jobs.ts';
 import { VIDEO_FORMATS, type VideoFormat } from './media.ts';
 import { docRegistry, filesRegistry } from './plugins.ts';
-import { readConfig, Server } from './server.ts';
-import { checkProject, DOCUMENT, isChatPath, MANIFEST, newProject, packProject, unpackProject, LEGACIES, migrateProject } from '@tramme/project';
+import { readConfig, resolveMountedPath, Server } from './server.ts';
+import { checkProject, containsExpression, DOCUMENT, isChatPath, MANIFEST, newProject, packProject, unpackProject, LEGACIES, migrateProject } from '@tramme/project';
+import { lintSceneFiles, MAX_SCENE_SOURCE } from '@tramme/project/src/scene-lint.ts';
+import { engineCapture, prepareWebScenes } from './webscene.ts';
 
 const [cmd, ...rest] = process.argv.slice(2);
 const pos: string[] = [];
@@ -71,7 +73,7 @@ async function session(docFile: string) {
 /** the document's vocabulary, its plugins loaded from its folder and mounts */
 function registryOf(file: string, doc: TrammeDoc) {
   const cfg = readConfig(path.resolve(file));
-  const resolve = (u: string) => { for (const [prefix, dir] of cfg.mounts) if (u.startsWith(prefix)) return path.join(dir, u.slice(prefix.length)); return null; };
+  const resolve = (u: string) => resolveMountedPath(cfg, u);
   return { registry: docRegistry(doc, cfg.dir, resolve), resolve, dir: cfg.dir };
 }
 
@@ -85,8 +87,13 @@ async function cmdValidate(file: string) {
 
 async function cmdCheck(file: string) {
   const doc = readDoc(file);
+  if (containsExpression(doc)) throw new Error('picture checks with expressions require an isolated evaluator');
   const { checkReport } = await import('./check.ts');
-  console.log(await checkReport(doc, await registryOf(file, doc).registry, str('comp')));
+  const project = registryOf(file, doc);
+  console.log(await checkReport(doc, await project.registry, str('comp')));
+  const issues = lintSceneFiles(readSceneScripts(project.dir));
+  for (const issue of issues) console.log(`  ${issue.path}:${issue.line} : ${issue.message}`);
+  if (issues.length) throw new Error(`${issues.length} scene issue(s)`);
 }
 
 async function cmdStill(file: string) {
@@ -107,7 +114,10 @@ async function cmdStill(file: string) {
 
 async function cmdRender(file: string) {
   const doc = readDoc(file);
-  const s = await session(file);
+  // web scenes are captured to pictures first (and only again when their folder changed)
+  const scenes = await prepareWebScenes(file, doc, engineCapture, await registryOf(file, doc).registry);
+  if (scenes.captured || scenes.reused) console.log(`  web scenes: ${scenes.captured} captured, ${scenes.reused} reused from renders/webscene`);
+  const s = await session(scenes.file).catch((error) => { scenes.cleanup(); throw error; });
   try {
     const format = (str('format') ?? 'mp4') as VideoFormat;
     if (!VIDEO_FORMATS.includes(format)) throw new Error(`unknown video format: ${format} (${VIDEO_FORMATS.join(', ')})`);
@@ -121,7 +131,7 @@ async function cmdRender(file: string) {
     console.log(`${r.frames} frames in ${r.seconds.toFixed(1)} s (${r.msPerFrame.toFixed(0)} ms/frame${'pages' in r ? `, ${r.pages} pages` : ''})${r.audio ? ', with sound' : ''} -> ${path.relative(process.cwd(), out)}`);
     console.log(`  per frame: ${formatParts(r.parts)}`);
     console.log(r.verification ? '  Delivery checked: decoded dimensions, cadence, frame count and duration match the render.' : '  Delivery check skipped: GIF and PNG sequences use different timing rules.');
-  } finally { await s.close(); }
+  } finally { await s.close(); scenes.cleanup(); }
 }
 
 function cmdCompare(ref: string, test: string) {
@@ -153,6 +163,7 @@ function cmdCompare(ref: string, test: string) {
 async function cmdExport(file: string) {
   const doc = readDoc(file);
   const format = str('format');
+  if ((format === 'lottie' || format === 'svg') && containsExpression(doc)) throw new Error('vector export with expressions requires an isolated renderer; use raster export');
   const { registry, resolve, dir } = registryOf(file, doc);
   const compId = str('comp') ?? doc.root;
   const readAsset = fileAssetReader(doc, dir, resolve);
@@ -214,10 +225,31 @@ function readFolder(dir: string): Map<string, Uint8Array> {
   return migrateProject(files);
 }
 
+/** only the small script/text files of scenes: checking must not read a film's large media */
+function readSceneScripts(dir: string): Map<string, Uint8Array> {
+  const files = new Map<string, Uint8Array>(), root = path.join(dir, 'scenes');
+  if (!fs.existsSync(root)) return files;
+  const walk = (folder: string) => {
+    for (const entry of fs.readdirSync(path.join(dir, folder), { withFileTypes: true })) {
+      const relative = `${folder}/${entry.name}`.replaceAll('\\', '/');
+      if (entry.isSymbolicLink()) throw new Error(`scene symlink not allowed: ${relative}`);
+      if (entry.isDirectory()) walk(relative);
+      else if (/\.(html|js|mjs)$/i.test(relative)) {
+        const file = path.join(dir, relative);
+        if (fs.statSync(file).size > MAX_SCENE_SOURCE) throw new Error(`scene script exceeds 1 MB: ${relative}`);
+        files.set(relative, new Uint8Array(fs.readFileSync(file)));
+      }
+    }
+  };
+  walk('scenes');
+  return files;
+}
+
 /** structure (format) then meaning (registry with the project's own plugins) of a project's files */
 async function reportProject(files: Map<string, Uint8Array>, label: string) {
   const { issues, doc } = checkProject(files);
   const all = [...issues];
+  all.push(...lintSceneFiles(files).map((i) => ({ path: `${i.path}:${i.line}`, message: i.message })));
   if (doc && !issues.length) {
     try { all.push(...validate(doc, await filesRegistry(doc, files)).map((i) => ({ path: `${DOCUMENT}${i.path}`, message: i.message }))); }
     catch (e) { all.push({ path: `${DOCUMENT}/plugins`, message: (e as Error).message }); }

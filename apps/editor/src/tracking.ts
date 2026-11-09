@@ -6,7 +6,10 @@
 // the assistant runs them (use_tool), the user too (/ menu).
 
 import { ALL_FORMATS, CanvasSink, Input, UrlSource, type InputVideoTrack } from 'mediabunny';
-import { applyMat, Evaluator, following, grayFrame, invertMat, isTrack, layerClock, layerMatrix, matMul, pictureRect, pointer, trackId, type Box, type Composition, type GrayFrame, type Mat2D, type Op, type ToolContext, type ToolType, type Track, type Vec2 } from '@tramme/core';
+import { applyMat, following, grayFrame, invertMat, isTrack, layerMatrix, matMul, pictureRect, pointer, trackId, type Evaluator, type EvaluatedTransform, type Box, type Composition, type GrayFrame, type Mat2D, type Op, type ToolContext, type ToolType, type Track, type Vec2 } from '@tramme/core';
+import { editorEvaluator } from './evaluator.ts';
+import { sampleLayerClock } from './isolated-clock.ts';
+import { sandboxedDoc } from './installed.ts';
 import { t } from './i18n/index.ts';
 import { freshId, parentOf, siblingsOf, slug } from './model.ts';
 import { canvas, CUT, distance, histogram, objectsIn, readJson } from './perception.ts';
@@ -35,22 +38,62 @@ export function parseRegion(v: string | unknown[]): Box {
 }
 
 /** a layer's matrix in the composition at time t: its own, then its parents' */
-function worldMatrix(ev: Evaluator, c: Composition, compId: string, id: string, at: number): Mat2D {
-  let m = layerMatrix(ev.layerAt(id, at, compId).transform);
-  for (let p = parentOf(c, id); p; p = parentOf(c, p)) m = matMul(layerMatrix(ev.layerAt(p, at, compId).transform), m);
+type GeometryLayer = { props: Record<string, unknown>; transform: EvaluatedTransform };
+function worldMatrix(read: (id: string) => GeometryLayer, c: Composition, id: string): Mat2D {
+  let m = layerMatrix(read(id).transform);
+  for (let p = parentOf(c, id); p; p = parentOf(c, p)) m = matMul(layerMatrix(read(p).transform), m);
   return m;
 }
 
 /** points of the composition at time t as a box of the video's picture (fractions), through where the video layer shows it */
 export function toPicture(ev: Evaluator, c: Composition, compId: string, videoId: string, at: number, points: Vec2[], picW: number, picH: number): Box {
-  const L = ev.layerAt(videoId, at, compId), [w, h] = L.props.size as Vec2, rect = pictureRect(String(L.props.fit), w, h, picW, picH, L.props.focus as Vec2 | undefined);
-  const inv = invertMat(worldMatrix(ev, c, compId, videoId, at));
+  return pictureBox((id) => ev.layerAt(id, at, compId), c, videoId, points, picW, picH);
+}
+
+function pictureBox(read: (id: string) => GeometryLayer, c: Composition, videoId: string, points: Vec2[], picW: number, picH: number): Box {
+  const L = read(videoId), [w, h] = L.props.size as Vec2, rect = pictureRect(String(L.props.fit), w, h, picW, picH, L.props.focus as Vec2 | undefined);
+  const inv = invertMat(worldMatrix(read, c, videoId));
   if (!inv) throw new Error(`${videoId} is flattened (a scale of 0)`);
   const uv = points.map((p) => applyMat(inv, p)).map(([x, y]) => [(x - rect.x) / rect.w, (y - rect.y) / rect.h]);
   const x0 = Math.max(0, Math.min(...uv.map((p) => p[0]))), y0 = Math.max(0, Math.min(...uv.map((p) => p[1])));
   const x1 = Math.min(1, Math.max(...uv.map((p) => p[0]))), y1 = Math.min(1, Math.max(...uv.map((p) => p[1])));
   if (x1 - x0 <= 0 || y1 - y0 <= 0) throw new Error('the frame is outside the picture of the video');
   return [x0, y0, x1 - x0, y1 - y0];
+}
+
+/** The tracked rectangle and its video, evaluated by the project worker when isolated. */
+export async function rectangleBox(ctx: ToolContext, rect: string, videoId: string, picW: number, picH: number): Promise<Box> {
+  const c = ctx.doc.compositions[ctx.compId], at = ctx.time;
+  if (!sandboxedDoc(ctx.doc) && !(await import('./settings.ts')).prefs.peek().sandboxPreview) {
+    const ev = editorEvaluator(ctx.doc, ctx.registry), L = ev.layerAt(rect, at, ctx.compId), [rw, rh] = L.props.size as Vec2;
+    const points = ([[-rw / 2, -rh / 2], [rw / 2, -rh / 2], [-rw / 2, rh / 2], [rw / 2, rh / 2]] as Vec2[]).map((p) => applyMat(worldMatrix((id) => ev.layerAt(id, at, ctx.compId), c, rect), p));
+    return toPicture(ev, c, ctx.compId, videoId, at, points, picW, picH);
+  }
+  const [{ fileProject, requireFileProject }, { preview }, { pluginHost }, { ensureDeclared, ensureSandboxDoc, moduleItemsOf }] = await Promise.all([
+    import('./files.ts'), import('./preview.ts'), import('./plugins/index.ts'), import('./plugins/sandbox-draw.ts'),
+  ]);
+  const project = fileProject(), renderer = preview.renderer;
+  if (!renderer) throw new Error('preview is not ready for isolated tracking geometry');
+  const base = new URL(project.docUrl, location.href).href, host = pluginHost(base);
+  await ensureDeclared(host, moduleItemsOf(ctx.doc, base));
+  requireFileProject(project);
+  ensureSandboxDoc(host, { doc: ctx.doc, docUrl: base, loaded: (id) => { try { return renderer.assets.get(id); } catch { return null; } } });
+  const ids = new Set<string>([rect, videoId]);
+  for (const id of [rect, videoId]) for (let p = parentOf(c, id); p; p = parentOf(c, p)) ids.add(p);
+  if (ids.size > 64) throw new Error('too many tracking geometry layers');
+  const samples = await host.evaluateLayers([...ids], at, ctx.compId);
+  requireFileProject(project);
+  const values = new Map(samples.map((sample) => [sample.id, sample]));
+  const read = (id: string): GeometryLayer => {
+    const value = values.get(id);
+    if (!value) throw new Error(`missing isolated tracking geometry: ${id}`);
+    if ('err' in value) throw new Error(value.err);
+    return value;
+  };
+  const [rw, rh] = read(rect).props.size as Vec2;
+  const matrix = worldMatrix(read, c, rect);
+  const points = ([[-rw / 2, -rh / 2], [rw / 2, -rh / 2], [-rw / 2, rh / 2], [rw / 2, rh / 2]] as Vec2[]).map((p) => applyMat(matrix, p));
+  return pictureBox(read, c, videoId, points, picW, picH);
 }
 
 /** the video layer a tool works on: the one given, the selected one, or the only one */
@@ -60,6 +103,17 @@ export function videoLayer(ctx: ToolContext, wanted?: string): string {
   if (!id) throw new Error(videos.length ? `which video? Select it or name it (${videos.join(', ')})` : 'the composition has no video layer');
   if (c.layers[id]?.type !== 'video') throw new Error(`${id} is not a video layer`);
   return id;
+}
+
+/** The video's file span at the selected time, including one loop turn. */
+export async function trackClockWindow(ctx: ToolContext, videoId: string, from: number, to: number): Promise<{ t0: number; lo: number; hi: number }> {
+  const { clock, fileTimes: [t0, first, last] } = await sampleLayerClock(ctx, videoId, [ctx.time, from, to], []);
+  const wraps = (x: number, back: boolean) => back ? x > t0 : x < t0;
+  return {
+    t0,
+    lo: clock.loop && wraps(first, true) ? clock.start! : first,
+    hi: clock.loop && wraps(last, false) ? clock.loopEnd! : last,
+  };
 }
 
 /** an object named, found by the detector in the picture at file time t: its box (fractions) and its label */
@@ -111,16 +165,14 @@ const track: ToolType<TrackArgs> = {
     const c = compOf(ctx), videoId = videoLayer(ctx, a.video), vl = c.layers[videoId], asset = String(vl.props?.video ?? '');
     if (!ctx.doc.assets[asset]) throw new Error(`${videoId} plays no video file`);
     const vin = vl.in ?? 0, vout = vl.out ?? c.duration, now = ctx.time;
-    const ev = new Evaluator(ctx.doc, ctx.registry), clock = layerClock(ev, ctx.compId, videoId);
-    const from = Math.max(vin, a.from ?? vin), to = Math.min(vout, a.to ?? vout), every = a.every ?? 0.1, file = clock.fileTime;
+    const from = Math.max(vin, a.from ?? vin), to = Math.min(vout, a.to ?? vout), every = a.every ?? 0.1;
     if (now < from || now > to) throw new Error(`track: the current time (${r(now)} s) is outside the span followed (${r(from)} to ${r(to)} s of "${videoId}"): put the playhead where the object shows`);
     const rect = a.rectangle ?? (a.region === undefined && !a.object ? ctx.selection.find((id) => c.layers[id]?.type === 'shape.rect') : undefined);
     if (rect && c.layers[rect]?.type !== 'shape.rect') throw new Error(`${rect} is not a rectangle`);
     if (!rect && a.region === undefined && !a.object) throw new Error('track: frame the object first: draw a rectangle over it at the current time and select it, or give its region or what it is');
     // looks every `every` seconds of the file, the current time among them, over the file the span plays (at its speed);
     // a looped section is followed once: a turn of the loop is a jump back, the span stops at its ends
-    const t0 = file(now), wraps = (x: number, back: boolean) => (back ? x > t0 : x < t0);
-    const lo = clock.clock.loop && wraps(file(from), true) ? clock.clock.start! : file(from), hi = clock.clock.loop && wraps(file(to), false) ? clock.clock.loopEnd! : file(to);
+    const { t0, lo, hi } = await trackClockWindow(ctx, videoId, from, to);
     const before = Math.floor((t0 - lo) / every + 1e-9), after = Math.floor((hi - t0) / every + 1e-9);
     const times = Array.from({ length: before + after + 1 }, (_, i) => +(t0 + (i - before) * every).toFixed(4));
     if (times.length > 3000) throw new Error(`track: ${times.length} looks are too many: follow a shorter span (from, to) or look less often (every)`);
@@ -132,8 +184,7 @@ const track: ToolType<TrackArgs> = {
       // where the object is now, as fractions of the picture
       let box: Box, how: string, what = a.object ?? '';
       if (rect) {
-        const L = ev.layerAt(rect, now, ctx.compId), [rw, rh] = L.props.size as Vec2, m = worldMatrix(ev, c, ctx.compId, rect, now);
-        box = toPicture(ev, c, ctx.compId, videoId, now, ([[-rw / 2, -rh / 2], [rw / 2, -rh / 2], [-rw / 2, rh / 2], [rw / 2, rh / 2]] as Vec2[]).map((p) => applyMat(m, p)), W, H);
+        box = await rectangleBox(ctx, rect, videoId, W, H);
         how = `the rectangle "${rect}"`;
       } else if (a.region !== undefined) { box = parseRegion(a.region); how = 'the region given'; }
       else { const d = await detected(vt, t0, a.object!); box = d.box; what = d.label; how = `the ${d.label} found`; }
@@ -165,15 +216,15 @@ const track: ToolType<TrackArgs> = {
         s = steps.next();
       }
       const boxes = s.value.map((f) => (f ? ([f.box.x / sw, f.box.y / sh, f.box.w / sw, f.box.h / sh].map((x) => Math.round(x * 1e4) / 1e4) as Box) : null));
+      const mapped = (await sampleLayerClock(ctx, videoId, [], times)).moments;
       const name = slug(a.name || what || 'object').slice(0, 24) || 'object', id = trackId(asset, name);
       const data: Track = { version: 1, kind: 'track', source: asset, name, width: W, height: H, frames: times.map((at, i) => ({ t: at, box: boxes[i] })) };
+      const seen = mapped.filter((_, i) => boxes[i]).flat().sort((x, y) => x - y).map(r), share = Math.round((100 * times.filter((_, i) => boxes[i]).length) / times.length);
+      const image = strip(kept, boxes, (i) => `${(mapped[i]?.[0] ?? vin).toFixed(2)} s`);
       const path = await ctx.writeFile(`assets/tracks/${asset}-${name}.json`, JSON.stringify(data));
       // a track started from an object named was found by the detector first
       const had = ctx.doc.assets[id], entry = { type: 'json' as const, src: path, name: `Track · ${name}`, ...(!rect && a.region === undefined ? { madeBy: [madeBy(chosenModel('detection'))] } : {}) };
       // what was seen, in composition time (at the layer's speed, once per turn of a loop)
-      const comp = clock.moments;
-      const seen = times.filter((_, i) => boxes[i]).flatMap(comp).sort((x, y) => x - y).map(r), share = Math.round((100 * times.filter((_, i) => boxes[i]).length) / times.length);
-      const image = strip(kept, boxes, (i) => `${(comp(times[i])[0] ?? vin).toFixed(2)} s`);
       return {
         ops: had?.type === 'json' && had.src === entry.src ? [] : [{ op: had ? 'replace' : 'add', path: pointer('assets', id), value: entry }],
         reload: had ? [id] : [],
@@ -216,9 +267,10 @@ const callout: ToolType<CalloutArgs> = {
     const tr = data, playing = Object.keys(c.layers).filter((lid) => c.layers[lid].type === 'video' && c.layers[lid].props?.video === tr.source);
     const videoId = a.video ?? ctx.selection.find((s) => playing.includes(s)) ?? playing[0];
     if (!videoId || !playing.includes(videoId)) throw new Error(`no video layer of this composition plays ${tr.source ?? 'the file tracked'}${a.video ? ` ("${a.video}" plays another one)` : ''}`);
-    const vl = c.layers[videoId], vin = vl.in ?? 0, vout = vl.out ?? c.duration, clock = layerClock(new Evaluator(ctx.doc, ctx.registry), ctx.compId, videoId);
+    const vl = c.layers[videoId], vout = vl.out ?? c.duration;
     // when the object shows, in composition time, while its layer plays (at its speed, a speed curve inverted, once per turn of a loop)
-    const seen = tr.frames.filter((f) => f.box).flatMap((f) => clock.moments(f.t)).sort((x, y) => x - y);
+    const visible = tr.frames.filter((f) => f.box).map((f) => f.t);
+    const seen = (await sampleLayerClock(ctx, videoId, [], visible)).moments.flat().sort((x, y) => x - y);
     if (!seen.length && a.at === undefined) throw new Error(`the object of ${id} is never seen while "${videoId}" plays`);
     const step = tr.frames.length > 1 ? (tr.frames.at(-1)!.t - tr.frames[0].t) / (tr.frames.length - 1) : 0.1;
     const at = r(a.at ?? Math.min(...seen)), end = r(Math.min(vout, a.duration ? at + a.duration : Math.max(...seen) + step));

@@ -186,7 +186,7 @@ function smoothed(props: Record<string, unknown>) {
   };
 }
 
-let dir = '', server: Server, close: () => Promise<void>, still: (kind: string, t: number) => Promise<(x: number, y: number) => Pixel>, mix: (kind: string) => Promise<string>;
+let dir = '', server: Server, close: () => Promise<void>, page: import('puppeteer-core').Page, still: (kind: string, t: number) => Promise<(x: number, y: number) => Pixel>, mix: (kind: string) => Promise<string>;
 
 describe.skipIf(!CHROME)('effects, rendered', () => {
   beforeAll(async () => {
@@ -224,7 +224,9 @@ describe.skipIf(!CHROME)('effects, rendered', () => {
     fs.writeFileSync(path.join(dir, 'badges-wave.tramme.json'), JSON.stringify(row));
     server = new Server(readConfig(path.join(dir, 'crossfade.tramme.json')));
     const port = await server.start();
-    const { browser, page } = await launch();
+    const launched = await launch();
+    const { browser } = launched;
+    page = launched.page;
     close = async () => { await browser.close(); server.close(); };
     still = async (kind, t) => {
       await openDoc(page, port, `/project/${kind}.tramme.json`);
@@ -356,7 +358,13 @@ describe.skipIf(!CHROME)('effects, rendered', () => {
   }, 120_000);
 
   it('draws a distribution: each instance at its place, its colour from the palette', async () => {
-    const f = await still('badges-row', 0.5);
+    let sandboxRequests = 0;
+    const onRequest = (request: import('puppeteer-core').HTTPRequest) => { if (new URL(request.url()).pathname === '/project-sandbox.html') sandboxRequests++; };
+    page.on('request', onRequest);
+    let f: Awaited<ReturnType<typeof still>>;
+    try { f = await still('badges-row', 0.5); }
+    finally { page.off('request', onRequest); }
+    expect(sandboxRequests).toBeGreaterThan(0);
     expect(near(f(60, 90), RED)).toBe(true);
     expect(near(f(160, 90), [0, 255, 0])).toBe(true);
     expect(near(f(260, 90), BLUE)).toBe(true);

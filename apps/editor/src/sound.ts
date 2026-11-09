@@ -8,7 +8,13 @@
 // the exports.
 
 import { openverse } from './openverse.ts';
-import { audioClips, Evaluator, isAudioAnalysis, layerClock, pointer, searchSounds, soundCues, soundFigures, soundFlaws, staticValue, variantsOf, type Layer, type Op, type SoundCue, type SoundEntry, type SoundFigures, type SoundRole, type SoundVisual, type ToolContext, type ToolType } from '@tramme/core';
+import { analyseAudio, audioClips, isAudioAnalysis, pointer, searchSounds, soundCues, soundFigures, soundFlaws, staticValue, variantsOf, volumeBlockKeys, type Layer, type Op, type SoundCue, type SoundEntry, type SoundFigures, type SoundRole, type SoundVisual, type ToolContext, type ToolType } from '@tramme/core';
+import { editorEvaluator } from './evaluator.ts';
+import { sampleLayerClock } from './isolated-clock.ts';
+import { sandboxedDoc } from './installed.ts';
+import { musicCutPlan, type MusicCutPlan } from './music-plan.ts';
+import { musicSections } from './music-structure.ts';
+import { alignMusicBeats } from './music-alignment.ts';
 import { encodeWav, renderSynth, SYNTH_MAX } from '@tramme/render';
 import { api } from './api.ts';
 import { payFor } from './confirm.ts';
@@ -51,11 +57,25 @@ export interface Moment { t: number; visual?: SoundVisual; weight?: 'hero' | 'su
 
 const cueCache = new WeakMap<object, Map<string, SoundCue[]>>();
 /** the cues of the composition, read from the timing of its picture (once per document) */
-export function cuesOf(ctx: ToolContext): SoundCue[] {
+export async function cuesOf(ctx: ToolContext): Promise<SoundCue[]> {
+  if (sandboxedDoc(ctx.doc) || prefs.peek().sandboxPreview) {
+    const [{ fileProject, requireFileProject }, { preview }, { pluginHost }, { ensureDeclared, ensureSandboxDoc, moduleItemsOf }] = await Promise.all([
+      import('./files.ts'), import('./preview.ts'), import('./plugins/index.ts'), import('./plugins/sandbox-draw.ts'),
+    ]);
+    const project = fileProject(), renderer = preview.renderer;
+    if (!renderer) throw new Error('preview is not ready for isolated sound cues');
+    const base = new URL(project.docUrl, location.href).href, host = pluginHost(base);
+    await ensureDeclared(host, moduleItemsOf(ctx.doc, base));
+    requireFileProject(project);
+    ensureSandboxDoc(host, { doc: ctx.doc, docUrl: base, loaded: (id) => { try { return renderer.assets.get(id); } catch { return null; } } });
+    const cues = await host.soundCues(ctx.compId);
+    requireFileProject(project);
+    return cues;
+  }
   let byComp = cueCache.get(ctx.doc);
   if (!byComp) { byComp = new Map(); cueCache.set(ctx.doc, byComp); }
   let list = byComp.get(ctx.compId);
-  if (!list) { list = soundCues(new Evaluator(ctx.doc, ctx.registry), ctx.compId); byComp.set(ctx.compId, list); }
+  if (!list) { list = soundCues(editorEvaluator(ctx.doc, ctx.registry), ctx.compId); byComp.set(ctx.compId, list); }
   return list;
 }
 
@@ -81,33 +101,31 @@ export async function momentsOf(ctx: ToolContext, at: unknown, on: unknown, laye
   const words = listOf(on).map((w) => w.toLowerCase());
   const named = listOf(layers).filter((id) => c.layers[id]);
   const visual = (Object.entries(c.layers) as [string, Layer][]).filter(([id, l]) => (named.length ? named.includes(id) : l.type !== 'audio' && l.visible !== false));
-  const cued = (keep: (x: SoundCue) => boolean) => found.push(...cuesOf(ctx).filter((x) => keep(x) && (!named.length || named.includes(x.layer))).map((x) => ({ t: x.t, visual: x.kind, weight: x.weight })));
+  const cued = async (keep: (x: SoundCue) => boolean) => found.push(...(await cuesOf(ctx)).filter((x) => keep(x) && (!named.length || named.includes(x.layer))).map((x) => ({ t: x.t, visual: x.kind, weight: x.weight })));
   // where a layer plays a file: composition times of a time in that file (at the layer's speed, once per turn of a loop)
   const playing = (asset: string) => (Object.entries(c.layers) as [string, Layer][]).filter(([, l]) => (l.type === 'audio' || l.type === 'video') && staticValue(l.props?.[l.type]) === asset).map(([id]) => id);
-  const ev = new Evaluator(ctx.doc, ctx.registry);
-  const inFile = (asset: string, fileTimes: number[]) => playing(asset).flatMap((id) => {
-    const { moments } = layerClock(ev, ctx.compId, id);
-    return fileTimes.flatMap(moments);
-  });
+  const inFile = async (asset: string, fileTimes: number[]) => (await Promise.all(playing(asset).map(async (id) =>
+    (await sampleLayerClock(ctx, id, [], fileTimes)).moments.flat(),
+  ))).flat();
   const read = words.some((w) => ['cuts', 'beats', 'bars'].includes(w)) ? await analyses(ctx) : () => undefined;
   const assets = Object.keys(ctx.doc.assets);
   for (const w of words) {
-    if (CUE_WORDS[w]) cued(CUE_WORDS[w]);
+    if (CUE_WORDS[w]) await cued(CUE_WORDS[w]);
     else if (w === 'now') push([ctx.time]);
     else if (w === 'entrances') push(visual.map(([, l]) => l.in ?? 0).filter((x) => named.length || x > 0));
     else if (w === 'exits') push(visual.map(([, l]) => l.out ?? c.duration).filter((x) => x < c.duration));
     else if (w === 'markers') push((c.markers ?? []).map((m) => m.t));
     else if (w === 'cuts') {
-      cued((x) => x.kind === 'cut');
+      await cued((x) => x.kind === 'cut');
       push((Object.values(c.layers) as Layer[]).filter((l) => l.type === 'video').map((l) => l.in ?? 0).filter((x) => x > 0));
       for (const id of assets.filter((a) => a.startsWith('shots-'))) {
         const s = read(id) as { source?: string; cuts?: number[] } | undefined;
-        if (s?.source && Array.isArray(s.cuts)) push(inFile(s.source, s.cuts));
+        if (s?.source && Array.isArray(s.cuts)) push(await inFile(s.source, s.cuts));
       }
     } else if (w === 'beats' || w === 'bars') {
       for (const id of assets.filter((a) => a.startsWith('analysis-'))) {
         const a = read(id);
-        if (isAudioAnalysis(a) && a.source) push(inFile(a.source, w === 'bars' ? a.downbeats : a.beats));
+        if (isAudioAnalysis(a) && a.source) push(await inFile(a.source, w === 'bars' ? a.downbeats : a.beats));
       }
     } else throw new Error(`unknown moment "${w}": ${MOMENTS.join(', ')}, or times in seconds`);
   }
@@ -142,6 +160,17 @@ export async function measure(data: Blob): Promise<{ buffer: AudioBuffer; figure
 
 export const channelsOf = (b: AudioBuffer) => Array.from({ length: b.numberOfChannels }, (_, c) => b.getChannelData(c));
 const wavBlob = (b: AudioBuffer) => new Blob([encodeWav(b) as BlobPart], { type: 'audio/wav' });
+
+/** Match the existing beats tool's mono 16 kHz input using the browser's resampler. */
+async function generatedBeats(buffer: AudioBuffer): Promise<number[]> {
+  const rate = 16000;
+  const ctx = new OfflineAudioContext(1, Math.max(1, Math.ceil(buffer.duration * rate)), rate);
+  const source = ctx.createBufferSource();
+  source.buffer = buffer;
+  source.connect(ctx.destination);
+  source.start();
+  return analyseAudio((await ctx.startRendering()).getChannelData(0), rate).beats;
+}
 
 /** a sound of the library brought into the project: its file copied (with where it comes from and its license), or its code rendered */
 async function bring(ctx: ToolContext, e: SoundEntry): Promise<ProjectSound> {
@@ -196,7 +225,7 @@ function soundGroup(ctx: ToolContext, taken: Record<string, unknown>, ops: Op[])
  * gives the layer what it underlines and its weight. The layers go in the
  * Sound group.
  */
-function place(ctx: ToolContext, sounds: Placement[][], moments: Moment[], o: { gain: number; rate?: number; align?: 'peak' | 'start'; vary: boolean; weight?: 'hero' | 'support' }): { ops: Op[]; layers: string[] } {
+function place(ctx: ToolContext, sounds: Placement[][], moments: Moment[], o: { gain: number; rate?: number; keepPitch?: boolean; align?: 'peak' | 'start'; vary: boolean; weight?: 'hero' | 'support' }): { ops: Op[]; layers: string[] } {
   const c = ctx.doc.compositions[ctx.compId], taken: Record<string, unknown> = { ...c.layers };
   const ops: Op[] = [], layers: string[] = [];
   if (!moments.length) return { ops, layers };
@@ -204,7 +233,7 @@ function place(ctx: ToolContext, sounds: Placement[][], moments: Moment[], o: { 
   moments.forEach((m, i) => {
     const stack = sounds[i % sounds.length];
     const nudge = o.vary && sounds.length === 1 && moments.length > 1 ? 1 + ((((i * 0.618034) % 1) - 0.5) * 0.08) : 1;
-    const rate = +((o.rate ?? 1) * nudge).toFixed(3);
+    const rate = +((o.rate ?? 1) * nudge).toFixed(o.keepPitch ? 4 : 3);
     const weight = o.weight ?? m.weight;
     stack.forEach((s, k) => {
       const align = o.align ?? (FROM_START.has(s.kind) ? 'start' : 'peak');
@@ -218,6 +247,7 @@ function place(ctx: ToolContext, sounds: Placement[][], moments: Moment[], o: { 
       layers.push(id);
       const props: Record<string, unknown> = { audio: s.asset, start: +start.toFixed(4), gain: +(o.gain - STACK_DB * k).toFixed(1) };
       if (rate !== 1) props.rate = rate;
+      if (o.keepPitch && rate !== 1) props.keepPitch = true;
       if (ROLE[s.kind]) props.role = ROLE[s.kind];
       if (weight === 'hero') props.weight = 'hero';
       if (m.visual) props.visual = m.visual;
@@ -237,12 +267,49 @@ const bedLayers = (ctx: ToolContext) => audioClips(ctx.doc, ctx.compId).filter((
  * had at each span's edges kept, the keys inside a span replaced. How a stop
  * before a hero and a build into it are written over a ducking already there.
  */
-function shapeOps(ctx: ToolContext, ids: string[], prop: string, spans: { from: number; to: number; keys: (base: (t: number) => number) => { t: number; v: number }[] }[], rest: number): Op[] {
-  const c = ctx.doc.compositions[ctx.compId], ev = new Evaluator(ctx.doc, ctx.registry);
+type BedSpan = { from: number; to: number; keys: (base: (t: number) => number) => { t: number; v: number }[] };
+type BedSampler = (addresses: string[], times: number[]) => Promise<unknown[][]>;
+
+async function bedSamples(ctx: ToolContext, addresses: string[], times: number[]): Promise<unknown[][]> {
+  if (!sandboxedDoc(ctx.doc) && !prefs.peek().sandboxPreview) {
+    const ev = editorEvaluator(ctx.doc, ctx.registry);
+    return addresses.map((address) => times.map((at) => ev.value(address, at, ctx.compId)));
+  }
+  const [{ fileProject, requireFileProject }, { preview }, { pluginHost }, { ensureDeclared, ensureSandboxDoc, moduleItemsOf }] = await Promise.all([
+    import('./files.ts'), import('./preview.ts'), import('./plugins/index.ts'), import('./plugins/sandbox-draw.ts'),
+  ]);
+  const project = fileProject(), renderer = preview.renderer;
+  if (!renderer) throw new Error('preview is not ready for isolated sound evaluation');
+  const base = new URL(project.docUrl, location.href).href, host = pluginHost(base);
+  await ensureDeclared(host, moduleItemsOf(ctx.doc, base));
+  requireFileProject(project);
+  ensureSandboxDoc(host, { doc: ctx.doc, docUrl: base, loaded: (id) => { try { return renderer.assets.get(id); } catch { return null; } } });
+  const rows: unknown[][] = [];
+  for (let i = 0; i < addresses.length; i += 16) {
+    rows.push(...await host.evaluateSeries(addresses.slice(i, i + 16), times, ctx.compId));
+    requireFileProject(project);
+  }
+  return rows;
+}
+
+/** Sample the existing bed level before writing a stop or build over it. */
+export async function shapeOps(ctx: ToolContext, ids: string[], prop: string, spans: BedSpan[], rest: number, sample: BedSampler = (addresses, times) => bedSamples(ctx, addresses, times)): Promise<Op[]> {
+  const c = ctx.doc.compositions[ctx.compId];
+  if (!ids.length || !spans.length) return [];
+  const wanted = new Set<number>();
+  for (const s of spans) {
+    wanted.add(s.from); wanted.add(s.to);
+    for (const key of s.keys((at) => { wanted.add(at); return 0; })) wanted.add(key.t);
+  }
+  const times = [...wanted].sort((a, b) => a - b);
+  if (times.length > 512 || ids.length * times.length > 4096 || times.some((at) => !Number.isFinite(at))) throw new Error('too many sound bed samples');
+  const values = await sample(ids.map((id) => `${id}.${prop}`), times);
+  if (values.length !== ids.length || values.some((row) => !Array.isArray(row) || row.length !== times.length)) throw new Error('invalid sound bed samples');
   return ids.flatMap((id) => {
     const l = c.layers[id];
     if (!l) return [];
-    const base = (t: number) => { const v = ev.value(`${id}.${prop}`, t, ctx.compId); return typeof v === 'number' ? v : rest; };
+    const row = values[ids.indexOf(id)];
+    const base = (t: number) => { const v = row[times.indexOf(t)]; return typeof v === 'number' && Number.isFinite(v) ? v : rest; };
     const raw = l.props?.[prop] as { $k?: { t: number; v: number }[] } | number | undefined;
     let keys = (typeof raw === 'object' && raw?.$k ? raw.$k : []).map((k) => ({ ...k }));
     const added: { t: number; v: number }[] = [];
@@ -363,7 +430,7 @@ const sfx: ToolType<{ query?: string; sound?: string; at?: unknown; on?: string;
     const placed = place(ctx, stacks, moments, { gain, rate, align, vary, weight });
     // the bed makes room: on every moment asked for, or on the heroes among them
     const room = moments.filter((m) => (weight ?? m.weight) === 'hero' || (weight === undefined && !m.weight)).map((m) => m.t);
-    const bed = [...(stop ? stopOps(ctx, room) : []), ...(build ? buildOps(ctx, room) : [])];
+    const bed = [...(stop ? await stopOps(ctx, room) : []), ...(build ? await buildOps(ctx, room) : [])];
     const title = entries.map((e) => e!.title).join(' + ');
     return {
       ops: [...[...brought.values()].flatMap((b) => b.ops), ...placed.ops, ...bed], reload: [...brought.values()].flatMap((b) => b.reload), label: title,
@@ -408,6 +475,27 @@ const synth: ToolType<{ name: string; code: string; duration: number; seed?: num
 /** what the user is asked to pay for, in their words */
 const KIND_LABEL: Record<'sfx' | 'music' | 'voice', () => string> = { sfx: () => t('sound.kindSfx'), music: () => t('sound.kindMusic'), voice: () => t('sound.kindVoice') };
 
+/** The same film reading shown on demand and used before a paid music call. */
+export async function filmMusicPlan(ctx: ToolContext): Promise<MusicCutPlan> {
+  const c = ctx.doc.compositions[ctx.compId];
+  const [cuts, markers] = await Promise.all([momentsOf(ctx, undefined, 'cuts', undefined), momentsOf(ctx, undefined, 'markers', undefined)]);
+  const heroes = (await cuesOf(ctx)).filter((cue) => cue.weight === 'hero');
+  return musicCutPlan(Math.max(3, c.duration), c.fps, [
+    ...cuts.map(({ t }) => ({ t, kind: 'cut' as const })),
+    ...markers.map(({ t }) => ({ t, kind: 'marker' as const })),
+    ...heroes.map(({ t }) => ({ t, kind: 'hero' as const })),
+  ]);
+}
+
+export const musicPlanTool: ToolType = {
+  name: 'music-plan', title: 'Read the cut for music', description: 'reads film length, cuts, markers and hero moments; finds a beat grid before asking for music',
+  ai: { when: 'before asking a provider to write music for the current cut; read the selected tempo and which cuts actually land on its beats', avoid: 'claiming every cut aligns when the reported count is lower, or requesting a paid music generation merely to inspect the film' },
+  run: async (_input, ctx) => {
+    const plan = await filmMusicPlan(ctx);
+    return { text: JSON.stringify(plan), notice: plan.tempo == null ? t('sound.musicPlanUnset', { cuts: plan.cuts.length }) : t('sound.musicPlanReady', { cuts: plan.cuts.length, aligned: plan.aligned, tempo: plan.tempo }) };
+  },
+};
+
 const generateSound: ToolType<{ kind: 'sfx' | 'music' | 'voice'; prompt: string; name?: string; duration?: number; voice?: string; style?: string; provider?: string; at?: unknown; on?: string; layers?: unknown; gain?: number; align?: 'peak' | 'start'; keep?: boolean }> = {
   name: 'generate-sound', title: 'Have a sound made', description: 'has a provider make a sound effect, a music bed or a voice-over (the server\'s keys), saves it in the project with what made it and places it',
   input: {
@@ -438,19 +526,25 @@ const generateSound: ToolType<{ kind: 'sfx' | 'music' | 'voice'; prompt: string;
     }
     // the ElevenLabs voice model of the settings (the newest by default); the others have one model
     const model = kind === 'voice' && p.voiceModel ? p.voiceModel : undefined;
+    // Read the picture and shape the provider's sections before asking to spend a generation.
+    const film = kind === 'music' ? await filmMusicPlan(ctx) : null;
+    if (film && duration === undefined) duration = film.duration;
+    const plan = film ? musicSections({ ...film, duration: duration! }, prompt) : undefined;
     // it costs money: the user says yes first, or the turn's allowance does (Sound settings)
     await payFor(t('sound.paidTitle'), t('sound.paidText', { kind: KIND_LABEL[kind](), prompt: clip(prompt, 140) }), t('sound.paidYes'), 'use the library or synth');
-    const made = await api.generate({ kind, prompt, duration, voice, style, model, provider }, ctx.signal);
-    const { buffer, figures } = await measure(made.blob);
-    const label = name ?? `${kind}-${prompt.toLowerCase().split(/\s+/).slice(0, 4).join('-')}`;
-    const record = { kind, prompt, provider: made.provider, model: made.model, voice: made.voice, style, duration };
-    const kept = await keepFile(ctx, label, made.blob, label, figures, record);
+    const made = await api.generate({ kind, prompt, duration, voice, style, model, provider, plan }, ctx.signal);
     const times = await timesOf(ctx, { at, on: on ?? (at === undefined ? 'now' : undefined), layers });
-    const placed = place(ctx, [[{ asset: kept.asset, title: label, figures, kind: kind === 'sfx' ? 'sfx' : kind }]], times, { gain: gain ?? (kind === 'music' ? p.musicDb : kind === 'voice' ? 0 : p.effectsDb), align, vary: false });
+    const { buffer, figures } = await measure(made.blob);
+    const musicAlignment = film ? alignMusicBeats(film, await generatedBeats(buffer), times[0]?.t ?? 0) : null;
+    const label = name ?? `${kind}-${prompt.toLowerCase().split(/\s+/).slice(0, 4).join('-')}`;
+    const record = { kind, prompt, provider: made.provider, model: made.model, voice: made.voice, style, duration,
+      ...(film ? { music: { tempo: film.tempo, sectionPlan: plan, requestMode: made.provider === 'elevenlabs' ? 'composition_plan' : 'prompt_bed', beatCheck: musicAlignment } } : {}) };
+    const kept = await keepFile(ctx, label, made.blob, label, figures, record);
+    const placed = place(ctx, [[{ asset: kept.asset, title: label, figures, kind: kind === 'sfx' ? 'sfx' : kind }]], times, { gain: gain ?? (kind === 'music' ? p.musicDb : kind === 'voice' ? 0 : p.effectsDb), rate: musicAlignment?.rate, keepPitch: musicAlignment?.keepPitch, align, vary: false });
     if (keep) await keepInLibrary(label, made.blob, { kind: kind === 'sfx' ? 'sfx' : kind, title: label, tags: prompt.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2).slice(0, 8), figures, prompt, provider: made.provider });
     return {
       ops: [...kept.ops, ...placed.ops], reload: kept.reload, label: `Sound ${label}`,
-      text: `${kind} made by ${made.provider} (${made.model}${made.voice ? `, voice ${made.voice}` : ''}), saved as asset ${kept.asset} with its prompt: ${figuresText(figures)}. ${placedText(placed, times)}${keep ? ' Kept in the library.' : ''}${kind === 'music' ? ' Duck it under a voice with duck.' : ''}`,
+      text: `${kind} made by ${made.provider} (${made.model}${made.voice ? `, voice ${made.voice}` : ''}), saved as asset ${kept.asset} with its prompt: ${figuresText(figures)}. ${placedText(placed, times)}${film ? ` Film read: ${film.cuts.length} cuts, ${film.aligned} on the proposed ${film.tempo ?? 'unset'} BPM grid.` : ''}${musicAlignment ? ` Heard beats: ${musicAlignment.before}/${musicAlignment.total} cuts within one frame before correction, ${musicAlignment.after}/${musicAlignment.total} after${musicAlignment.keepPitch ? ` a pitch-preserving ${musicAlignment.rate.toFixed(4)}× speed change` : ' no speed change'}.` : ''}${keep ? ' Kept in the library.' : ''}${kind === 'music' ? ' Duck it under a voice with duck.' : ''}`,
       images: [{ url: waveform(buffer, figures, label), caption: label }],
       notice: t('sound.made', { name: label, provider: made.provider, model: made.model }),
     };
@@ -538,10 +632,26 @@ const duck: ToolType<{ layers?: unknown; under?: string; depth?: number; attack?
     const voiceLayers = new Set((Object.entries(c.layers) as [string, Layer][]).filter(([, l]) => source && staticValue(l.props?.[l.type]) === source).map(([id]) => id));
     const targets = listOf(layers).length ? listOf(layers) : (Object.entries(c.layers) as [string, Layer][]).filter(([id, l]) => l.type === 'audio' && !voiceLayers.has(id)).map(([id]) => id);
     if (!targets.length) throw new Error('no sound to duck: give its layers');
-    const ops: Op[] = [];
+    const ops: Op[] = [], writtenTracks = new Set<string>();
     for (const id of targets) {
       const l = c.layers[id];
       if (!l || (l.type !== 'audio' && l.type !== 'video')) throw new Error(`${id} is not a sound layer`);
+      const trackIndex = c.tracks?.findIndex((track) => track.id === l.track && track.kind === 'audio' && !track.bus && !track.locked) ?? -1;
+      const blockKeys = trackIndex >= 0 ? spans.map(([start, end]) => volumeBlockKeys(start, end, depth, attack, release, c.duration)) : [];
+      if (trackIndex >= 0 && blockKeys.every((keys) => keys !== null)) {
+        const track = c.tracks![trackIndex];
+        if (writtenTracks.has(track.id)) continue;
+        writtenTracks.add(track.id);
+        const blocks = [...(track.volumeBlocks ?? [])];
+        let n = 1;
+        for (const keys of blockKeys) {
+          while (blocks.some((block) => block.id === `dip-${n}`)) n++;
+          blocks.push({ id: `dip-${n++}`, keys: keys! });
+        }
+        if (track.duckUnder) ops.push({ op: 'remove', path: pointer('compositions', ctx.compId, 'tracks', trackIndex, 'duckUnder') });
+        ops.push({ op: 'add', path: pointer('compositions', ctx.compId, 'tracks', trackIndex, 'volumeBlocks'), value: blocks });
+        continue;
+      }
       // the layer's own gain (a voice played with its cleaned copy has its share taken back)
       const clip = audioClips(ctx.doc, ctx.compId).find((x) => x.layerId === id);
       const base = Number((clip?.gainDb ?? 0) - (clip?.share ?? 0));
@@ -610,7 +720,7 @@ const cues: ToolType<{ layers?: unknown }> = {
   },
   async run({ layers }, ctx) {
     const c = ctx.doc.compositions[ctx.compId], named = listOf(layers);
-    const list = cuesOf(ctx).filter((x) => !named.length || named.includes(x.layer));
+    const list = (await cuesOf(ctx)).filter((x) => !named.length || named.includes(x.layer));
     if (!list.length) return { text: 'No cue: nothing moves, appears or cuts in the picture. Place sounds on times (at) or markers.', notice: t('sound.noCue') };
     const heroes = list.filter((x) => x.weight === 'hero').length;
     const name = (id: string) => (id && c.layers[id] ? c.layers[id].name ?? id : 'the frame');
@@ -722,4 +832,4 @@ const credits: ToolType<Record<string, never>> = {
   },
 };
 
-export const SOUND_TOOLS: ToolType[] = [cues, sfx, soundFind, synth, generateSound, voices, duck, soundKeep, credits];
+export const SOUND_TOOLS: ToolType[] = [cues, sfx, soundFind, synth, generateSound, musicPlanTool, voices, duck, soundKeep, credits];

@@ -1,8 +1,15 @@
 {
+  "audioEffects": {
+    "chain": "Effect chain", "add": "Add effect", "addPreset": "Add effect preset", "change": "Change effect", "move": "Move effect", "remove": "Remove effect", "bypass": "Bypass effect", "close": "Close effect controls", "reorderHint": "Drag or press Alt + Left/Right to reorder", "presets": "Start from a preset", "effects": "Individual effects",
+    "eq": "EQ", "compressor": "Compressor", "reverb": "Reverb", "lowCut": "Low cut", "highCut": "High cut", "delay": "Delay", "distortion": "Distortion",
+    "voiceCleanup": "Voice cleanup", "musicUnderVoice": "Music under voice", "telephone": "Telephone", "bigRoom": "Big room",
+    "low": "Low (dB)", "mid": "Mid (dB)", "midFreq": "Mid frequency (Hz)", "midQ": "Mid Q", "high": "High (dB)", "amount": "Amount", "frequency": "Frequency (Hz)", "wet": "Wet", "time": "Time", "feedback": "Feedback", "drive": "Drive", "tone": "Tone (Hz)", "timeUnit": "Time unit", "milliseconds": "Milliseconds", "tempo": "Tempo (BPM)", "tempoUnset": "Not set", "tempoNeeded": "Set a tempo to enable this note delay"
+  },
   "common": {
     "pickInViewport": "Pick in the viewport (Escape: cancel)",
     "companionHttpStatus": "companion: HTTP {status}",
     "companion": "Companion",
+    "projectChangedDuringFile": "The project changed during the file operation.",
     "server": "Server",
     "unknown": "unknown",
     "transcriptOfName": "Transcript of {name}",
@@ -132,6 +139,8 @@
     "paidYes": "Make it",
     "kindSfx": "a sound effect",
     "kindMusic": "a music bed",
+    "musicPlanReady": "Film read: {cuts} cuts, {aligned} on the proposed beat grid, tempo {tempo} BPM.",
+    "musicPlanUnset": "Film read: {cuts} cuts; no tempo proposed without a cut.",
     "kindVoice": "a voice-over"
   },
   "image": {
@@ -189,7 +198,6 @@
   },
   "importer": {
     "pluginIdNotFound": "plugin \"{id}\" not found in the archive",
-    "unreadablePluginIdError": "unreadable plugin \"{id}\": {error}",
     "thisFileIsNot": "this file is not a valid Tramme project",
     "theProjectSDocument": "the project's document is invalid",
     "thisJsonIsNeither": "this JSON is neither a Lottie animation nor a Tramme project",
@@ -216,7 +224,8 @@
     "kindTours": "guided tours",
     "codeExpressions": "{n} expression(s), for instance {address}",
     "codeYes": "Run it",
-    "codeRefused": "Import stopped: the project's code was not accepted"
+    "codeRefused": "Import stopped: the project's code was not accepted",
+    "codeNeedsSandbox": "Import stopped: an isolated worker is required to check this project's plugins"
   },
   "app": {
     "backToProjects": "Back to projects",
@@ -230,6 +239,7 @@
   "editor": {
     "softwareGpu": "No graphics card is drawing the preview: the processor does it, the whole computer may slow down. Check that hardware acceleration is on (browser settings) and that the graphics drivers are up to date.",
     "installedRefused": "An installed plugin could not be loaded in this project's sandbox: {error}. Its tools are unavailable here; turn it off in Settings, Plugins.",
+    "pluginStopped": "The project's plugins stopped: {reason}. Your project and unsaved edits are untouched. Try again to start a fresh sandbox, or remove the plugin from the project to open it without.",
     "pluginSandbox": "The project's plugins could not be loaded in the sandbox: {error}. Their tools and checks are unavailable; the layers they bring still draw.",
     "newLayerNameType": "new layer \"{name}\" ({type})",
     "deleteName": "delete \"{name}\"",
@@ -644,6 +654,7 @@
     "editKeyframe": "Edit keyframe",
     "segmentCurve": "Segment curve",
     "selectAnAnimatedLayer": "Select an animated layer to see its curves.",
+    "isolatedUnavailable": "The isolated curve could not be sampled: {error}",
     "normalizedValues": "Normalized values",
     "applyNameToThe": "Apply \"{name}\" to the selected segments",
     "selectAKeyframe": "Select a keyframe"
@@ -708,6 +719,17 @@
     "noProjectNamed": "Nothing named “{query}”."
   },
   "inspector": {
+    "sceneParamsRead": "Read the scene parameters",
+    "sceneReadParams": "Read the parameters from scene.json",
+    "sceneParamsCurrent": "The parameters already match scene.json.",
+    "sceneManifestInvalid": "scene.json could not be read.",
+    "sceneNoParameters": "This scene declares no parameters (scene.json).",
+    "sceneFiles": "Scene code",
+    "sceneNoFiles": "No files found in {folder}.",
+    "sceneFile": "Scene file",
+    "sceneCodeOf": "Code of {file}",
+    "sceneLoading": "Loading…",
+    "sceneReadOnly": "Read only. Ask the assistant to change the scene.",
     "removeParameter": "Remove the parameter",
     "exposeAsParameter": "Expose as a parameter",
     "exposeName": "Expose {name}",
@@ -734,6 +756,7 @@
     "maskIntersect": "Intersect",
     "masks": "Masks",
     "addAMask": "Add a mask",
+    "maskBoundsUnavailable": "The isolated mask bounds could not be calculated: {error}",
     "noMasks": "No masks.",
     "enableMask": "Enable the mask",
     "disableMask": "Disable the mask",
@@ -1300,6 +1323,17 @@
     "trackVolume": "Track volume",
     "trackPan": "Track pan",
     "automateVolume": "Automate the volume",
+    "drawVolumeDip": "Draw a volume dip on this track",
+    "editVolumeDip": "Edit volume dip",
+    "volumeDip": "Volume dip",
+    "dipDepth": "Depth (dB)",
+    "dipAttack": "Down in (s)",
+    "dipRelease": "Back in (s)",
+    "dipFrom": "Dip from (s)",
+    "dipTo": "Dip to (s)",
+    "removeVolumeDip": "Remove volume dip",
+    "duckUnderTrack": "Duck under voice track",
+    "noDuckTrack": "No voice track",
     "writeAutomation": "Write the fader's moves while the film plays",
     "feedsBus": "Bus this track feeds",
     "noBus": "No bus",
@@ -1312,6 +1346,12 @@
     "measuring": "Measuring…",
     "noSoundToMeasure": "There is no sound to measure",
     "noSoundTracks": "No sound track yet: the mixer shows the tracks of a sequence",
+    "peakLevel": "Peak level",
+    "peakHold": "Held peak",
+    "shortTermLoudness": "Short-term (3 s)",
+    "truePeak": "True peak",
+    "resetClip": "Reset clipping indicator",
+    "clipIndicator": "Clip",
     "recordVoiceover": "Record a voice-over",
     "recordHint": "Record a voice-over from the playhead: headphones advised, a press ends it, Escape drops it",
     "voiceTake": "Voice-over {n}",
@@ -1331,6 +1371,7 @@
     "tenBit": "10 bits",
     "tenBitUnavailable": "This browser cannot encode 10-bit video at this size: the export stays at 8 bits",
     "couldNotSaveTo": "Could not save to the project: {error}",
+    "projectChangedDuringExport": "The project changed during export.",
     "blur": "Blur",
     "documentSetting": "Document setting",
     "noBlurFast": "No blur (fast)",
@@ -1378,6 +1419,10 @@
     "hdrUnavailable": "HDR: this browser's canvas cannot hold it yet, the export stays SDR"
   },
   "viewport": {
+    "sceneLive": "Live preview of the web scene {folder}",
+    "sceneProblem": "Web scene {folder}: {problem}",
+    "websceneCaptured": "Web scene {folder}: its pictures are made when you export with tramme render",
+    "isolatedUnavailable": "Isolated selection could not be calculated: {error}",
     "waveform": "Waveform",
     "vectorscope": "Vectorscope",
     "socialSafeZoneReels": "Social safe zone (Reels, TikTok)",
@@ -1416,6 +1461,9 @@
     "encoderStalled": "the video encoder stopped answering ({s} s without progress)",
     "softwareEncoder": "the hardware video encoder stopped answering for {s} s: the film was encoded again in software",
     "exportCancelled": "export cancelled",
+    "websceneDesktopApp": "The desktop app cannot export web scenes yet. Export this project from the command line: tramme render \"<the project's folder in Documents/Tramme>\".",
+    "websceneDesktopOnly": "The browser cannot export web scenes. Export this project with the command line: tramme render.",
+    "isolatedVectorExpressions": "Vector export with expressions is unavailable in isolated mode. Use raster export for this project.",
     "frameNeverReady": "frame {frame} ({time} s) never finished: a video frame or a plugin picture did not come in {s} s. The export is stopped rather than made with a wrong picture.",
     "noSoundLayerIn": "no sound layer in this composition",
     "pngFailed": "PNG failed",
@@ -1636,6 +1684,7 @@
     "removeRetouch": "Remove",
     "retouchPinsOnly": "About what I marked.",
     "reviewTitle": "Which layers do you mean?",
+    "areaUnavailable": "Area selection could not read the picture: {error}",
     "reviewTap": "Tap a layer on the picture to add it, or a name below to drop it.",
     "reviewNone": "Nothing found there. Tap a layer on the picture to add it.",
     "reviewTooMany": "{n} layers: too many. Draw a narrower line, or use it as a hint.",
@@ -1750,7 +1799,8 @@
     "notYet": "Not transcribed. Transcribe it to place captions on the words and let the assistant read what is said.",
     "readyHint": "Transcribed: the captions and the assistant can use the words.",
     "askTitle": "Transcribe the speech?",
-    "askText": "The assistant needs what is said in {name}. Transcribe it now?"
+    "askText": "The assistant needs what is said in {name}. Transcribe it now?",
+    "projectChanged": "The project changed during transcription."
   },
   "removebg": {
     "reading": "reading the subject",

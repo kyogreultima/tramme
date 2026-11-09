@@ -182,6 +182,18 @@ describe('hydracept jobs', () => {
     expect(run.type).toBe('audio/mpeg');
   });
 
+  it('uses the prompt bed route when the chosen music provider cannot accept sections', async () => {
+    const calls = stubHydraceptJob(MP3, 'audio/mpeg');
+    const plan = { chunks: [{ text: '[Intro] Quiet opening', duration_ms: 12000, positive_styles: ['piano'], negative_styles: ['vocals'], context_adherence: 'high' }] };
+    const req = new Request('http://x/api/generate', { method: 'POST', body: JSON.stringify({ kind: 'music', provider: 'hydracept', prompt: 'quiet piano', duration: 12, plan }) });
+    const response = await generate(req, { keys: await keys(), fetch: out });
+    expect(response.status).toBe(200);
+    expect(response.headers.get('x-tramme-provider')).toBe('hydracept');
+    const job = calls.find((c) => c.url.includes('/audio.music.generate.v1/jobs') && c.method === 'POST');
+    expect(job?.body?.input).toMatchObject({ prompt: 'quiet piano', durationMs: 12000, forceInstrumental: true });
+    expect(job?.body?.input).not.toHaveProperty('compositionPlan');
+  });
+
   it('clamps Hydracept music to the 300 s contract', async () => {
     const calls = stubHydraceptJob(MP3, 'audio/mpeg');
     await hydraceptMusic(media.hydracept, { prompt: 'long bed', duration: 600 }, out);

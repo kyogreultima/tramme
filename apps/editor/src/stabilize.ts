@@ -5,7 +5,8 @@
 // start the path again, so a stabilised edit does not drift across a cut.
 
 import { ALL_FORMATS, CanvasSink, Input, UrlSource } from 'mediabunny';
-import { corrections, coverZoom, frameMotion, grayFrame, layerClock, Evaluator, pointer, type GrayFrame, type Motion, type Stabilization, type ToolType } from '@tramme/core';
+import { corrections, coverZoom, frameMotion, grayFrame, pointer, type GrayFrame, type Motion, type Stabilization, type ToolContext, type ToolType } from '@tramme/core';
+import { sampleLayerClock } from './isolated-clock.ts';
 import { canvas, CUT, distance, histogram } from './perception.ts';
 import { compOf, r } from './recipes.ts';
 import { videoLayer } from './tracking.ts';
@@ -17,6 +18,12 @@ const LOOK = 320;
 const RATE = 30;
 
 interface StabilizeArgs { video?: string; strength?: number; lock?: boolean }
+
+/** The two file times the video layer covers, including animated playback speed. */
+export async function stabilizeFileSpan(ctx: ToolContext, videoId: string, from: number, to: number): Promise<[number, number]> {
+  const { fileTimes: [first, last] } = await sampleLayerClock(ctx, videoId, [from, to], []);
+  return [Math.min(first, last), Math.max(first, last)];
+}
 
 const stabilize: ToolType<StabilizeArgs> = {
   name: 'stabilize', title: 'Stabilise a video', description: "takes the camera's shake out of a video: its path read from the footage, smoothed (or locked still), the picture moved back and zoomed just enough to hide its edges",
@@ -32,7 +39,6 @@ const stabilize: ToolType<StabilizeArgs> = {
   async run(a, ctx) {
     const c = compOf(ctx), videoId = videoLayer(ctx, a.video), vl = c.layers[videoId], asset = String(vl.props?.video ?? '');
     if (!ctx.doc.assets[asset]) throw new Error(`${videoId} plays no video file`);
-    const clock = layerClock(new Evaluator(ctx.doc, ctx.registry), ctx.compId, videoId);
     const vin = vl.in ?? 0, vout = vl.out ?? c.duration;
     const input = new Input({ source: new UrlSource(ctx.assetUrl(asset)), formats: ALL_FORMATS });
     try {
@@ -40,7 +46,7 @@ const stabilize: ToolType<StabilizeArgs> = {
       if (!vt) throw new Error('this file has no picture');
       const W = vt.displayWidth, H = vt.displayHeight, stats = await vt.computePacketStats(120);
       // the part of the file the layer plays, a look a frame (30 a second at most)
-      const f0 = Math.min(clock.fileTime(vin), clock.fileTime(vout)), f1 = Math.max(clock.fileTime(vin), clock.fileTime(vout));
+      const [f0, f1] = await stabilizeFileSpan(ctx, videoId, vin, vout);
       const step = 1 / Math.min(RATE, Math.max(1, stats.averagePacketRate || RATE));
       const times = Array.from({ length: Math.max(2, Math.floor((f1 - f0) / step) + 1) }, (_, i) => +(f0 + i * step).toFixed(4));
       if (times.length > 9000) throw new Error(`stabilize: ${times.length} frames are too many at once: cut the video into shorter layers first`);

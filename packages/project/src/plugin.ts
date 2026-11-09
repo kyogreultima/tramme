@@ -135,14 +135,23 @@ export function compareVersions(a: string, b: string): number {
 export interface PluginPackage { module: string; files: Map<string, Uint8Array> }
 
 const PACKAGE_LIMIT = 64 * 1024 * 1024;
-const safePath = (p: string) => !!p && !p.startsWith('/') && !p.split('/').some((s) => s === '..' || s === '') && !/[\\:*?"<>|]/.test(p);
+const PACKAGE_ENTRY_LIMIT = 2000;
+const installedName = (name: string) => /^[a-z0-9][a-z0-9_-]{0,62}\.(js|mjs)$/.test(name);
+const safePath = (p: string) => !!p && p.length <= 512 && !p.startsWith('/') &&
+  !p.split('/').some((s) => !s || s === '.' || s === '..') && !/[\\%?#:*"<>|\u0000-\u001f\u007f]/.test(p);
 
 /** a .trammeplugin read and checked: its module (`plugin.js`, or its only .js at the top), its files under safe paths, not too large */
 export function readPluginPackage(zip: Uint8Array): PluginPackage {
   if (zip.byteLength > PACKAGE_LIMIT) throw new Error('plugin package too large');
   if (zip[0] !== 0x50 || zip[1] !== 0x4b) throw new Error('this file is not a .trammeplugin package (zip)');
-  let total = 0;
-  const raw = unzipSync(zip, { filter: (f) => { total += f.originalSize; if (total > PACKAGE_LIMIT * 2) throw new Error(`entry too large: ${f.name}`); return !f.name.endsWith('/'); } });
+  let total = 0, count = 0;
+  const raw = unzipSync(zip, { filter: (f) => {
+    if (++count > PACKAGE_ENTRY_LIMIT) throw new Error('plugin package has too many entries');
+    total += f.originalSize;
+    if (total > PACKAGE_LIMIT * 2) throw new Error(`entry too large: ${f.name}`);
+    if (!f.name.includes('/') && /\.m?js$/i.test(f.name) && f.originalSize > 1024 * 1024) throw new Error('plugin module too large');
+    return !f.name.endsWith('/');
+  } });
   const files = new Map<string, Uint8Array>();
   for (const [p, d] of Object.entries(raw)) { if (!safePath(p)) throw new Error(`unsafe path in the package: ${p}`); files.set(p, d); }
   const tops = [...files.keys()].filter((p) => !p.includes('/') && /\.m?js$/.test(p));
@@ -154,9 +163,20 @@ export function readPluginPackage(zip: Uint8Array): PluginPackage {
 }
 
 export function writePluginPackage(p: PluginPackage): Uint8Array {
-  const entries: Zippable = { 'plugin.js': new TextEncoder().encode(p.module) };
-  for (const [k, v] of p.files) entries[k] = v;
-  return zipSync(entries);
+  if (p.files.size + 1 > PACKAGE_ENTRY_LIMIT) throw new Error('plugin package has too many entries');
+  const module = new TextEncoder().encode(p.module);
+  if (module.byteLength > 1024 * 1024) throw new Error('plugin module too large');
+  const entries: Zippable = { 'plugin.js': module };
+  let total = module.byteLength;
+  for (const [k, v] of p.files) {
+    if (!safePath(k) || k === 'plugin.js') throw new Error(`unsafe path in the package: ${k}`);
+    total += v.byteLength;
+    if (total > PACKAGE_LIMIT * 2) throw new Error('plugin package expanded data too large');
+    entries[k] = v;
+  }
+  const zip = zipSync(entries);
+  if (zip.byteLength > PACKAGE_LIMIT) throw new Error('plugin package too large');
+  return zip;
 }
 
 // ── the backup of every installed plugin ─────────────────────
@@ -166,16 +186,33 @@ export interface InstalledState { version: 1; disabled: string[] }
 
 /** every installed plugin's files (by their name in the storage) and their state, as one zip */
 export function packInstalled(files: Map<string, Uint8Array>, state: InstalledState): Uint8Array {
-  const entries: Zippable = { 'installed.json': new TextEncoder().encode(JSON.stringify(state)) };
-  for (const [k, v] of files) entries[`plugins/${k}`] = v;
-  return zipSync(entries);
+  if (files.size + 1 > PACKAGE_ENTRY_LIMIT) throw new Error('plugin backup has too many entries');
+  const stateBytes = new TextEncoder().encode(JSON.stringify(state));
+  const entries: Zippable = { 'installed.json': stateBytes };
+  let total = stateBytes.byteLength;
+  for (const [k, v] of files) {
+    if (!installedName(k)) throw new Error(`invalid plugin backup name: ${k}`);
+    total += v.byteLength;
+    if (total > PACKAGE_LIMIT * 2) throw new Error('plugin backup expanded data too large');
+    entries[`plugins/${k}`] = v;
+  }
+  const zip = zipSync(entries);
+  if (zip.byteLength > PACKAGE_LIMIT) throw new Error('plugin backup too large');
+  return zip;
 }
 
 export function unpackInstalled(zip: Uint8Array): { files: Map<string, Uint8Array>; state: InstalledState } {
+  if (zip.byteLength > PACKAGE_LIMIT) throw new Error('plugin backup too large');
   if (zip[0] !== 0x50 || zip[1] !== 0x4b) throw new Error('this file is not a backup of plugins (zip)');
-  const raw = unzipSync(zip);
+  let total = 0, count = 0;
+  const raw = unzipSync(zip, { filter: (entry) => {
+    if (++count > PACKAGE_ENTRY_LIMIT) throw new Error('plugin backup has too many entries');
+    total += entry.originalSize;
+    if (total > PACKAGE_LIMIT * 2) throw new Error(`entry too large: ${entry.name}`);
+    return !entry.name.endsWith('/');
+  } });
   const files = new Map<string, Uint8Array>();
-  for (const [p, d] of Object.entries(raw)) if (p.startsWith('plugins/') && /^[a-z0-9][a-z0-9_-]{0,62}\.(js|mjs)$/.test(p.slice(8))) files.set(p.slice(8), d);
+  for (const [p, d] of Object.entries(raw)) if (p.startsWith('plugins/') && installedName(p.slice(8))) files.set(p.slice(8), d);
   let state: InstalledState = { version: 1, disabled: [] };
   try { const s = JSON.parse(new TextDecoder().decode(raw['installed.json'])); if (Array.isArray(s?.disabled)) state = { version: 1, disabled: s.disabled.filter((x: unknown) => typeof x === 'string') }; } catch { /* the files alone */ }
   return { files, state };

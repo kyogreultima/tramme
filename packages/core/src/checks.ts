@@ -882,8 +882,8 @@ const repeated: CheckType = {
 export const BUILTIN_CHECKS: CheckType[] = [textSize, textTime, safeZone, overlap, crossing, overSubject, overDetail, textContrast, coverage, crowd, stillness, linearTravel, springSettle, twinMotion, abruptEntrance, straightTravel, uniformStagger, repeated, sequenceCheck];
 
 /** every check of the registry on one composition, the failures of a check reported as issues */
-export async function runChecks(doc: TrammeDoc, registry: Registry, compId = doc.root, { step = 0.25, only, data = () => undefined }: { step?: number; only?: string[]; data?: (assetId: string) => unknown } = {}): Promise<QualityIssue[]> {
-  const evaluator = new Evaluator(doc, registry, { data });
+export async function runChecks(doc: TrammeDoc, registry: Registry, compId = doc.root, { step = 0.25, only, data = () => undefined, allowExpressions = true }: { step?: number; only?: string[]; data?: (assetId: string) => unknown; allowExpressions?: boolean } = {}): Promise<QualityIssue[]> {
+  const evaluator = new Evaluator(doc, registry, { data, allowExpressions });
   const comp = evaluator.comp(compId);
   const ctx: CheckContext = { doc, compId, comp, registry, evaluator, samples: sampleComposition(evaluator, compId, step), step, data };
   const out: QualityIssue[] = [];

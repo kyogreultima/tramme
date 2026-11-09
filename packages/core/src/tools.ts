@@ -48,6 +48,8 @@ export interface ToolContext {
   packFile?(path: string): Promise<string>;
   /** the files of the project (path, bytes), the ones the document does not reference included (documents brought in) */
   files(): Promise<{ path: string; size: number }[]>;
+  /** the files of a web scene's folder (scenes/<id>), whatever their type; absent in the command line */
+  folderFiles?(folder: string): Promise<{ path: string; size: number }[]>;
   /** absolute URL of a file of the project */
   fileUrl(path: string): string;
   /** writes a file under assets/ (data the tool computed) or a plugin under plugins/ (.js, .mjs) and returns its path; a new file is declared as an asset by the tool's operations */

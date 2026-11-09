@@ -16,7 +16,7 @@
 
 import { claude, claudeConfig } from './claude.ts';
 import { generate, soundConfig, voices } from './generate.ts';
-import { failure, json } from './http.ts';
+import { failure, HttpError, json } from './http.ts';
 export { ELEVEN_VOICE_MODELS, type Voice } from './generate.ts';
 export { HYDRACEPT_VOICE_MODELS } from './hydracept.ts';
 import { generateImage, imageConfig } from './images.ts';
@@ -42,7 +42,12 @@ export const providersConfig = (keys: Keys) => ({ claude: claudeConfig(keys), ll
 export async function providerRoute(req: Request, reach: Reach, parts: string[]): Promise<Response | null> {
   const m = req.method;
   if (parts[0] === 'claude') return claude(req, reach, parts.slice(1).join('/'));
-  if (parts[0] === 'llm' && parts[1]) return llm(req, reach, decodeURIComponent(parts[1]), parts.slice(2).join('/'));
+  if (parts[0] === 'llm' && parts[1]) {
+    let provider: string;
+    try { provider = decodeURIComponent(parts[1]); }
+    catch { throw new HttpError(400, 'invalid encoded provider name'); }
+    return llm(req, reach, provider, parts.slice(2).join('/'));
+  }
   if (parts[0] === 'models' && m === 'GET') return models(reach);
   if (parts[0] === 'generate' && m === 'POST') return generate(req, reach);
   if (parts[0] === 'voices' && m === 'GET') return voices(req, reach);

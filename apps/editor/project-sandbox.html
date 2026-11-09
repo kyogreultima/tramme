@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' data:; worker-src data:; connect-src 'none'; img-src data: blob:; font-src data: blob:; style-src 'unsafe-inline'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"><title>Tramme project sandbox</title></head>
+<body><script>
+// This document is served with an opaque origin and a network-denying CSP.
+// The trusted parent sends the worker bundle; this frame never fetches code.
+let worker = null;
+function transfers(value) {
+  const out = [], seen = new Set(), stack = [value];
+  while (stack.length && seen.size < 10000) {
+    const item = stack.pop();
+    if (!item || typeof item !== 'object' || seen.has(item)) continue;
+    seen.add(item);
+    if (typeof ImageBitmap !== 'undefined' && item instanceof ImageBitmap) { out.push(item); continue; }
+    if (Array.isArray(item)) for (const entry of item) stack.push(entry);
+    else for (const key of Object.keys(item)) stack.push(item[key]);
+  }
+  return out;
+}
+addEventListener('message', (event) => {
+  if (event.source !== parent || !event.data || typeof event.data !== 'object') return;
+  const message = event.data;
+  if (message.kind === 'start' && !worker && typeof message.code === 'string') {
+    try {
+      worker = new Worker('data:text/javascript;charset=utf-8,' + encodeURIComponent(message.code), { type: 'module' });
+      worker.onmessage = (reply) => parent.postMessage({ kind: 'worker', data: reply.data }, '*', transfers(reply.data));
+      worker.onerror = (error) => parent.postMessage({ kind: 'failed', reason: `the isolated worker failed: ${error.message || 'unknown error'} (${error.filename || 'no filename'}:${error.lineno || 0})` }, '*');
+      parent.postMessage({ kind: 'started' }, '*');
+    } catch (error) { parent.postMessage({ kind: 'failed', reason: String(error) }, '*'); }
+  } else if (message.kind === 'send' && worker) {
+    worker.postMessage(message.data, transfers(message.data));
+  } else if (message.kind === 'stop' && worker) {
+    worker.terminate();
+    worker = null;
+  }
+});
+</script></body></html>

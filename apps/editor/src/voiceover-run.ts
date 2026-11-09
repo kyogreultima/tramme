@@ -11,6 +11,7 @@ import { freshId, snap } from './model.ts';
 import { takeOps } from './voiceover.ts';
 import { defaultTrackOf } from './ui/timeline/tracks.ts';
 import { t } from './i18n/index.ts';
+import { fileProject, sameFileProject } from './files.ts';
 
 /** where the recording is: counting in (n seconds left), recording, or being saved */
 export const recording = signal<{ stage: 'count'; n: number } | { stage: 'record' } | { stage: 'save' } | null>(null);
@@ -26,20 +27,22 @@ async function wavOf(blob: Blob): Promise<{ wav: Blob; seconds: number }> {
 /** a press starts a take; a press while it runs ends it */
 export async function toggleVoiceover(): Promise<void> {
   if (recording.peek()) { stopNow?.(); return; }
+  const project = fileProject();
   const compId = S.compId.peek(), at = snap(S.time.peek(), comp.peek().fps);
   let stream: MediaStream;
   try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch { toast(t('timeline.noMicrophone'), 'error'); return; }
   let cancelled = false, ended = false;
   const chunks: Blob[] = [];
   const release = () => { for (const track of stream.getTracks()) track.stop(); };
+  if (!sameFileProject(project)) { release(); return; }
   cancelNow = () => { cancelled = true; stopNow?.(); };
   // three seconds to get ready, the film not yet playing
   for (let n = 3; n > 0 && !cancelled; n--) {
     recording.value = { stage: 'count', n };
     await new Promise<void>((r) => { stopNow = () => { ended = true; r(); }; setTimeout(r, 1000); });
-    if (ended) break;
+    if (ended || !sameFileProject(project)) break;
   }
-  if (cancelled || ended) { release(); recording.value = null; stopNow = cancelNow = null; return; }
+  if (cancelled || ended || !sameFileProject(project)) { release(); recording.value = null; stopNow = cancelNow = null; return; }
   const rec = new MediaRecorder(stream);
   rec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
   const stopped = new Promise<void>((r) => { rec.onstop = () => r(); });
@@ -51,15 +54,16 @@ export async function toggleVoiceover(): Promise<void> {
   S.playing.value = false;
   release();
   stopNow = null;
-  if (cancelled || !chunks.length) { recording.value = null; cancelNow = null; return; }
+  if (cancelled || !chunks.length || !sameFileProject(project)) { recording.value = null; cancelNow = null; return; }
   recording.value = { stage: 'save' };
   try {
     const { wav, seconds } = await wavOf(new Blob(chunks, { type: rec.mimeType }));
+    if (!sameFileProject(project) || cancelled) return;
     const doc = S.doc.peek(), id = freshId(doc.assets, 'voice'), path = `assets/voice/${id}-${Date.now()}.wav`;
     const r = takeOps(doc, compId, id, { src: path, name: t('timeline.voiceTake', { n: Object.keys(doc.assets).filter((a) => a.startsWith('voice')).length + 1 }), duration: Math.round(seconds * 1000) / 1000 }, at, defaultTrackOf(doc.compositions[compId], true, S.selection.peek()[0]) ?? 'A1');
     if (!r) { toast(t('timeline.cannotRecordHere'), 'error'); return; }
-    await api.writeAny(S.project.peek().id, path, wav);
-    if (commit(t('timeline.recordVoiceover'), r.ops)) select([r.id]);
+    await api.writeAny(project.id, path, wav);
+    if (sameFileProject(project) && !cancelled && commit(t('timeline.recordVoiceover'), r.ops)) select([r.id]);
   } catch (e) { toast((e as Error).message, 'error'); } finally { recording.value = null; cancelNow = null; }
 }
 

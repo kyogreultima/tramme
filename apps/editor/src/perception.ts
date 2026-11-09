@@ -364,7 +364,7 @@ const palette: ToolType<{ asset?: string; t?: number; tokens?: boolean }> = {
       tokens: { type: 'boolean', title: 'Make tokens', description: 'set plate, ink and accent from these colours (yes by default)' },
     },
   },
-  ai: { when: 'dressing footage or a photo: graphics in the colours of the picture look designed for it' },
+  ai: { when: 'dressing footage or a photo: graphics in the colours of the picture look designed for it; also on a picture you generated when the project has no palette yet: its colours become the tokens of the project (a picture in the right colours first, then the palette from it)' },
   async run({ asset: wanted, t: at = 0, tokens = true }, ctx) {
     const asset = mediaOf(ctx, wanted, ['image', 'video']), a = ctx.doc.assets[asset];
     const { g } = canvas(96, 96);

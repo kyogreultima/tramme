@@ -1,37 +1,104 @@
-// The vocabulary of a document on the Node side: built-in nodes plus the
-// document's plugins, imported from its folder (a changed file is imported
-// again, thanks to its modification time in the URL), or from the project's
-// files held in memory (archives).
+// CLI plugin declarations are loaded in the same opaque browser worker as the
+// editor. Native Node never imports a project's module during validation.
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
-import type { TrammeDoc, Registry } from '@tramme/core';
+import type { PluginModule, Registry, TrammeDoc } from '@tramme/core';
 import { builtinRegistry } from '@tramme/nodes';
 import { srcPath } from '@tramme/project';
+import type { PluginDecl } from '../../../apps/editor/src/plugins/protocol.ts';
+import { launch } from './browser.ts';
+import { Server } from './server.ts';
 
-/** the vocabulary of a project held in memory (an archive, a folder read for packing): its plugins imported from its own files, as the editor does on import */
+const MAX_PLUGIN_SOURCE = 1024 * 1024;
+const MAX_PROJECT_PLUGINS = 64;
+const pluginIds = (doc: TrammeDoc) => {
+  const ids = doc.plugins ?? [];
+  if (ids.length > MAX_PROJECT_PLUGINS) throw new Error(`too many project plugins (${MAX_PROJECT_PLUGINS} at most)`);
+  return ids;
+};
+
+async function isolatedDeclarations(plugins: { id: string; code: string }[]): Promise<PluginDecl[]> {
+  if (!plugins.length) return [];
+  const server = new Server({ dir: process.cwd(), mounts: [] });
+  server.use((_req, res, url) => {
+    if (url.pathname !== '/__tramme/plugin-schema/') return false;
+    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
+    res.end('<!doctype html><html><body><script type="module" src="/__tramme/plugin-schema/plugin-schema-page.js"></script></body></html>');
+    return true;
+  });
+  let browser: Awaited<ReturnType<typeof launch>>['browser'] | undefined;
+  try {
+    const port = await server.start();
+    await server.bundle('plugin-schema', path.join(import.meta.dirname, 'plugin-schema-page.ts'));
+    const launched = await launch();
+    browser = launched.browser;
+    const { page } = launched;
+    await page.goto(`http://127.0.0.1:${port}/__tramme/plugin-schema/`);
+    await page.waitForFunction(() => typeof (window as any).TRAMME_PLUGIN_SCHEMA === 'function');
+    return await page.evaluate((sources) => (window as any).TRAMME_PLUGIN_SCHEMA(sources), plugins) as PluginDecl[];
+  } finally { await browser?.close(); server.close(); }
+}
+
+function registryFrom(declarations: PluginDecl[]): Registry {
+  const registry = builtinRegistry().clone();
+  const isolated = () => { throw new Error('plugin behavior must run in the browser sandbox'); };
+  for (const declaration of declarations) {
+    const module: PluginModule = {
+      meta: declaration.meta,
+      nodes: declaration.nodes.map((node) => ({ ...node, render: { canvas2d: isolated } })) as PluginModule['nodes'],
+      effects: declaration.effects as PluginModule['effects'],
+      modifiers: declaration.modifiers.map((modifier) => ({ ...modifier, apply: isolated })) as PluginModule['modifiers'],
+      tools: declaration.tools.map((tool) => ({ ...tool, run: isolated })) as PluginModule['tools'],
+      checks: declaration.checks.map((check) => ({ ...check, run: isolated })) as PluginModule['checks'],
+      prompts: declaration.prompts,
+      kits: declaration.kits,
+      presets: declaration.presets,
+    };
+    registry.use(module, declaration.id);
+  }
+  return registry;
+}
+
+/** Vocabulary of an archive, with module initialization isolated from Node. */
 export async function filesRegistry(doc: TrammeDoc, files: Map<string, Uint8Array>): Promise<Registry> {
-  const reg = builtinRegistry().clone();
-  for (const id of doc.plugins || []) {
+  const sources: { id: string; code: string }[] = [];
+  for (const id of pluginIds(doc)) {
     const file = srcPath(doc.assets[id]?.src ?? '');
     const data = file ? files.get(file) : undefined;
     if (!data) throw new Error(`plugin "${id}" not found in the project`);
-    try { reg.use(await import(`data:text/javascript;base64,${Buffer.from(data).toString('base64')}`), id); }
-    catch (e) { throw new Error(`plugin "${id}" unreadable: ${(e as Error).message}`); }
+    if (data.byteLength > MAX_PLUGIN_SOURCE) throw new Error(`plugin "${id}" exceeds 1 MB`);
+    sources.push({ id, code: new TextDecoder().decode(data) });
   }
-  return reg;
+  try { return registryFrom(await isolatedDeclarations(sources)); }
+  catch (error) {
+    const message = (error as Error).message;
+    const named = /^plugin ([^:]+): (.*)$/.exec(message);
+    throw new Error(named ? `plugin "${named[1]}" unreadable: ${named[2]}` : `plugin unreadable: ${message}`);
+  }
 }
 
-/** resolve: absolute URL paths of mounts to files (relative srcs resolve against dir) */
+/** Vocabulary of a project folder and its configured mounts, isolated. */
 export async function docRegistry(doc: TrammeDoc, dir: string, resolve?: (urlPath: string) => string | null): Promise<Registry> {
-  const reg = builtinRegistry().clone();
-  for (const id of doc.plugins || []) {
-    const a = doc.assets[id];
-    if (!a || a.type !== 'module') continue;
-    const file = a.src.startsWith('/') ? resolve?.(a.src) ?? null : path.resolve(dir, a.src);
-    if (!file || !fs.existsSync(file)) throw new Error(`plugin "${id}" not found: ${a.src}`);
-    reg.use(await import(`${pathToFileURL(file).href}?v=${fs.statSync(file).mtimeMs}`), id);
+  const sources: { id: string; code: string }[] = [];
+  for (const id of pluginIds(doc)) {
+    const asset = doc.assets[id];
+    if (!asset || asset.type !== 'module') continue;
+    const relative = asset.src.startsWith('/') ? null : srcPath(asset.src);
+    if (!asset.src.startsWith('/') && (!relative || asset.src.includes('\\'))) throw new Error(`plugin "${id}" has an invalid path: ${asset.src}`);
+    const file = asset.src.startsWith('/') ? resolve?.(asset.src) ?? null : path.resolve(dir, relative!);
+    if (relative && (path.relative(dir, file!).startsWith(`..${path.sep}`) || path.isAbsolute(path.relative(dir, file!)))) throw new Error(`plugin "${id}" leaves its project`);
+    if (!file || !fs.existsSync(file)) throw new Error(`plugin "${id}" not found: ${asset.src}`);
+    if (relative) {
+      const realRoot = fs.realpathSync(dir), realFile = fs.realpathSync(file);
+      const rel = path.relative(realRoot, realFile);
+      if (rel === '..' || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel)) throw new Error(`plugin "${id}" leaves its project`);
+    }
+    const stat = fs.statSync(file);
+    if (!stat.isFile()) throw new Error(`plugin "${id}" is not a file`);
+    if (stat.size > MAX_PLUGIN_SOURCE) throw new Error(`plugin "${id}" exceeds 1 MB`);
+    sources.push({ id, code: fs.readFileSync(file, 'utf8') });
   }
-  return reg;
+  try { return registryFrom(await isolatedDeclarations(sources)); }
+  catch (error) { throw new Error(`plugin unreadable: ${(error as Error).message}`); }
 }

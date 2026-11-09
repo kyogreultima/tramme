@@ -3,26 +3,14 @@
 // layer (a picture riding a card that turns). The render draws the layer
 // alone and carries its box onto the corners in perspective (fx.pin).
 
-import { DEFAULT_PERSPECTIVE, Evaluator, layerQuad, pointer, type Op, type Quad, type ToolContext, type ToolType, type Vec2 } from '@tramme/core';
+import { pointer, type Op, type ToolContext, type ToolType, type Vec2 } from '@tramme/core';
+import { sampleQuads } from './isolated-quads.ts';
 
 interface Input { layer: string; corners?: [Vec2, Vec2, Vec2, Vec2]; onto?: string; from?: number; to?: number }
 
 const CORNERS = ['tl', 'tr', 'br', 'bl'] as const;
 /** a key every tenth of a second */
 const STEP = 0.1;
-
-/** the quad of a layer of the root composition at a time: where its box lands on screen, tilt and camera included */
-export function quadAt(ev: Evaluator, compId: string, id: string, t: number): Quad {
-  const frame = ev.frame(t, compId), L = frame.layers.find((x) => x.id === id);
-  if (!L) throw new Error(`${id}: not drawn at ${t.toFixed(2)} s (outside its in and out points, or hidden)`);
-  const host = { layerId: id, t, frame: Math.round(t * frame.comp.fps), fps: frame.comp.fps, width: frame.comp.width, height: frame.comp.height, duration: frame.comp.duration, asset: () => null, assetInfo: () => undefined, assetUrl: () => '' };
-  let box = null;
-  try { box = L.node.bounds?.(L.props, host as never) ?? null; } catch { box = null; }
-  const size = L.props.size as Vec2 | undefined;
-  box ??= size ? { x: -size[0] / 2, y: -size[1] / 2, w: size[0], h: size[1] } : null;
-  if (!box) throw new Error(`${id}: a layer with no size cannot be followed`);
-  return layerQuad(L, box, [1, 0, 0, 1, 0, 0], frame.camera?.perspective ?? DEFAULT_PERSPECTIVE);
-}
 
 const pin: ToolType<Input> = {
   name: 'pin', title: 'Pin on four corners', description: "pins a layer's picture on four corners in perspective (a corner-pin effect): the corners given, or those of another layer followed over time (a picture riding a card, a screen on a monitor)",
@@ -56,12 +44,13 @@ const pin: ToolType<Input> = {
       if (!target) throw new Error(`${a.onto}: no such layer in the composition`);
       const from = a.from ?? target.in ?? 0, to = Math.min(comp.duration, a.to ?? target.out ?? comp.duration);
       if (!(to > from)) throw new Error(`${a.onto}: nothing to follow between ${from} and ${to} s`);
-      const ev = new Evaluator(ctx.doc, ctx.registry), n = Math.ceil((to - from) / STEP - 1e-9);
+      const n = Math.ceil((to - from) / STEP - 1e-9);
       const keys: Record<(typeof CORNERS)[number], { t: number; v: Vec2 }[]> = { tl: [], tr: [], br: [], bl: [] };
+      const sampleTimes = Array.from({ length: n + 1 }, (_, i) => +Math.min(to - 1e-4, from + i * STEP).toFixed(4));
+      const quads = await sampleQuads(ctx, a.onto!, sampleTimes);
       for (let i = 0; i <= n; i++) {
         // the last key lands on the end (the last step may be shorter)
-        const t = +Math.min(to - 1e-4, from + i * STEP).toFixed(4);
-        const q = quadAt(ev, ctx.compId, a.onto!, t);
+        const t = sampleTimes[i], q = quads[i];
         CORNERS.forEach((k, j) => keys[k].push({ t: i === n ? +to.toFixed(4) : t, v: [+q[j][0].toFixed(2), +q[j][1].toFixed(2)] }));
       }
       props = Object.fromEntries(CORNERS.map((k) => [k, { $k: keys[k] }]));

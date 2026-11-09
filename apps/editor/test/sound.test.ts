@@ -1,10 +1,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { searchSounds, variantsOf, type SoundEntry, type ToolContext, type Transcript, type TrammeDoc } from '@tramme/core';
+import { applyOps, searchSounds, variantsOf, type SoundEntry, type ToolContext, type Transcript, type TrammeDoc } from '@tramme/core';
 import { builtinRegistry } from '@tramme/nodes';
 import { newProject } from '@tramme/project';
 import { momentsOf, SOUND_TOOLS } from '../src/sound.ts';
+import { addVolumeBlockOps } from '../src/ui/timeline/mixer.ts';
 import { SOUND_PRESETS } from '../src/sound-presets.ts';
 // the preferences the tools read (imported here, before any module reset)
 import { DEFAULT_PREFERENCES, prefs, setPrefs } from '../src/settings.ts';
@@ -288,5 +289,26 @@ describe('the duck tool', () => {
       { t: 0.8, v: -6 }, { t: 1, v: -18 }, { t: 3, v: -18 }, { t: 3.5, v: -6 },
       { t: 3.8, v: -6 }, { t: 4, v: -18 }, { t: 5, v: -18 }, { t: 5.5, v: -6 },
     ]);
+  });
+
+  it('writes the same four relative keys as two drawn blocks on a tracked music bed', async () => {
+    const words: Transcript['words'] = [{ w: 'First', s: 1, e: 3 }, { w: 'Second', s: 6, e: 7 }];
+    const transcript: Transcript = { version: 1, duration: 10, words };
+    const d = project(), c = d.compositions.main;
+    c.tracks = [{ id: 'A1', kind: 'audio', volume: -4 }];
+    c.layers.bed.track = 'A1';
+    const { ctx } = context(d, { transcript: async () => transcript });
+    const out = await tool('duck').run({ depth: -12, attack: 0.2, release: 0.5 }, ctx) as { ops: any[] };
+    expect(out.ops).toHaveLength(1);
+    expect(out.ops[0].path).toBe('/compositions/main/tracks/0/volumeBlocks');
+    expect(out.ops[0].value.map((block: { keys: unknown[] }) => block.keys)).toEqual([
+      [{ t: 0.8, v: 0 }, { t: 1, v: -12 }, { t: 3, v: -12 }, { t: 3.5, v: 0 }],
+      [{ t: 5.8, v: 0 }, { t: 6, v: -12 }, { t: 7, v: -12 }, { t: 7.5, v: 0 }],
+    ]);
+    const drawnOnce = applyOps(d, addVolumeBlockOps(c, 'main', 'A1', 1, 3, -12, 0.2, 0.5)).doc;
+    const drawnTwice = applyOps(drawnOnce, addVolumeBlockOps(drawnOnce.compositions.main, 'main', 'A1', 6, 7, -12, 0.2, 0.5)).doc;
+    expect(out.ops[0].value.map((block: { keys: unknown[] }) => block.keys)).toEqual(drawnTwice.compositions.main.tracks![0].volumeBlocks!.map((block) => block.keys));
+    expect(c.tracks[0].volume).toBe(-4);
+    expect(c.layers.bed.props?.gain).toBe(-6);
   });
 });

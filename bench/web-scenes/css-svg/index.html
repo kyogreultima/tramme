@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<style>
+  @font-face { font-family: GeistScene; src: url('./geist-latin-wght-normal.woff2') format('woff2'); font-weight: 100 900; }
+  html, body { margin: 0; width: 320px; height: 180px; background: transparent; }
+  #stage { position: relative; width: 320px; height: 180px; overflow: hidden; background: transparent; }
+  .plate { position: absolute; inset: 30px 38px; border-radius: 18px; background: linear-gradient(130deg, #2430aa, #ee65a1); animation: plate-slide 1s linear both paused; }
+  @keyframes plate-slide { from { transform: translateX(-65px) rotate(-8deg); } to { transform: translateX(0) rotate(0deg); } }
+  svg { position: absolute; inset: 0; width: 320px; height: 180px; overflow: visible; }
+  #orbit { fill: none; stroke: #fef4d8; stroke-width: 6; stroke-linecap: round; stroke-dasharray: 270; }
+  #dot { fill: #fef4d8; }
+  .label { position: absolute; left: 95px; top: 90px; color: #fff8e8; font: 700 22px GeistScene; letter-spacing: 0.08em; }
+</style>
+<div id="stage" data-composition-id="css-svg" data-no-timeline data-width="320" data-height="180" data-duration="1" data-fps="6">
+  <div class="plate" id="plate"></div>
+  <div class="label">SCENE</div>
+  <svg viewBox="0 0 320 180" aria-hidden="true">
+    <path id="orbit" d="M 65 124 C 115 30, 205 30, 255 124" />
+    <circle id="dot" cx="65" cy="124" r="8"><animate attributeName="cx" from="65" to="255" dur="1s" fill="freeze" /></circle>
+  </svg>
+</div>
+<script type="module">
+  import { sceneController } from '/vendor/scene-runtime.js';
+  const plate = document.getElementById('plate');
+  const orbit = document.getElementById('orbit');
+  const controller = sceneController(1);
+  controller.css(document);
+  controller.svg(document.querySelector('svg'));
+  controller.register((p) => {
+      plate.style.opacity = String(0.3 + 0.7 * p);
+      orbit.style.strokeDashoffset = String(270 * (1 - p));
+  });
+  controller.install(window);
+  window.__hf.seek(0);
+</script>
