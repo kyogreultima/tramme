@@ -12,11 +12,11 @@ The only thread: every roadmap in `docs/`, in the order they should be worked, a
 | 4 | Platform: accounts backend and billing | in progress; payment provider last | Needed for the commercial launch under FSL-1.1-ALv2 | Not in this repository. It lives in the private `tramme-platform` (`docs/accounts.md`, `docs/billing.md` there). Built since the first version of this file: the beta deployment of both repositories, the accounts in the web and desktop apps, the account mails. Left there: the payment provider, the sign-in with Google and GitHub, the cloud storage of projects |
 | 5 | [Installed plugins](installed-plugins-roadmap.md) | 5 open, 26 done; the marketplace waits for the API | Unblocked by 4 | No. The five boxes are the marketplace: catalogue, author accounts and signatures, reviews, revocation. They need the platform's API and decisions on who reviews |
 | 6 | [Sound parity](sound-parity-roadmap.md) | **Agent work complete:** 25 done, 4 open; steps 1–6 built, step 7 outside this queue | Catch-up on a competitor: useful, not blocking | Yes, all six steps. The providers are answered by fakes in the tests; trying them for real costs money and is the user's |
-| 7 | Loose ends | [Generation](generation-roadmap.md) 2, [Editing](editing-roadmap.md) 2, [Sound](sound-roadmap.md) 2, [Components](components-roadmap.md) 1, [Packs](packs-roadmap.md) 1 (decision 4), [Plugins](plugins-roadmap.md) 1 | Small leftovers. The Plugins one is the isolation work of item 1 | See below |
+| 7 | Loose ends | [Generation](generation-roadmap.md) 1, [Editing](editing-roadmap.md) 2, [Sound](sound-roadmap.md) 2, [Components](components-roadmap.md) 1, [Packs](packs-roadmap.md) 1 (decision 4), [Plugins](plugins-roadmap.md) 1 | Small leftovers. The Plugins one is the isolation work of item 1 | See below |
 
 The loose ends, one by one:
 
-- Generation: the palette tool box, yes. The checks that read a picture wait for the OCR perception step, which does not exist yet.
+- Generation: the palette tool box is done. The checks that read a picture wait for the OCR perception step, which does not exist yet.
 - Editing: no. Voice and music apart has no known ONNX export of Demucs to build on, and HDR waits by design for Canvas 2D above 8 bits.
 - Sound: no. The recorded whooshes are chosen and judged by hand; trying the real providers costs money.
 - Components: no. The volume view is written as "later" and nothing asks for it.
@@ -40,7 +40,7 @@ Of the open boxes of items 1 to 7, the ones an agent can land alone, in the orde
 1. Sound parity, steps 1 to 6. Nothing waits for the user.
 2. Safe projects, steps 1 to 5. Nothing waits for the user to start; the devices' checks come back to them.
 3. Web scenes, step 0's prototypes and the user's engine decision are complete. Next: steps 1 to 4 and 6 to 8, step 9 for desktop and CLI, and step 5 after item 2 above.
-4. The Generation palette-tool box.
+4. The Generation palette-tool box: done.
 
 Everything else above waits for the user: a run on their quota, a blind scoring, a device, an independent review or a hand-picked set of recordings. The agent lists those as blocked and does not start them. The web scenes engine decision was recorded on 2026-11-06 from step 0's figures.
 

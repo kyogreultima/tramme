@@ -71,4 +71,6 @@ Done when: asked for "a night-sky background", the assistant has one made, propo
 ### Step 6. What was made, checked
 
 - [ ] Checks that read a picture asset: words drawn in it (the OCR of a coming perception step says so — text in pictures is untranslatable), a background too busy under the captions (the contrast check reads the picture), a picture smaller than the frame that shows it. The checks read the assets, so they hold for any picture, generated or not.
-- [ ] The palette tool turns a generated picture into tokens, and the guide says so: a picture in the project's colours before a palette of its own.
+- [x] The palette tool turns a generated picture into tokens, and the guide says so: a picture in the project's colours before a palette of its own.
+
+Palette guide (2026-11-09): the `palette` tool already read any image asset, a generated one included, and offered its colours as tokens. The `generate-image` guide and the palette tool's notes now say when: a project with no palette gets its colours from its first good picture. The first box of this step waits for the OCR perception step.
