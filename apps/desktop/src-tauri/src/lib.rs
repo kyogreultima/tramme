@@ -4,6 +4,7 @@
 // local storage, so the editor runs unmodified, like behind its Worker.
 
 mod account;
+mod analytics;
 mod api;
 mod fetch;
 pub mod format;
@@ -366,6 +367,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .invoke_handler(tauri::generate_handler![
+            analytics::analytics_state, analytics::analytics_set, analytics::analytics_event,
             desktop_state, desktop_pick_home, desktop_set_home, desktop_pending_name, desktop_pending_bytes,
             desktop_fetch, desktop_fetch_abort, desktop_open_plugins,
             desktop_quick_enable, desktop_quick_open, desktop_quick_do, desktop_quick_drop_names, desktop_quick_drop_file

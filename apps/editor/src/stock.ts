@@ -10,6 +10,7 @@ import { pointer, type Op, type ToolContext, type ToolType } from '@tramme/core'
 import { unzipSync } from 'fflate';
 import { api, reach } from './api.ts';
 import { alone, askUser } from './confirm.ts';
+import { prefs } from './settings.ts';
 import { packGlb } from './glb.ts';
 import { openverse } from './openverse.ts';
 import { keepMedia, placeMedia, slugOf } from './media.ts';
@@ -231,7 +232,7 @@ async function keepHit(ctx: ToolContext, hit: StockHit, where: Placement): Promi
   const asset = `${isModel ? 'model-' : isVideo ? 'video-' : 'image-'}${slug}`.slice(0, 64);
   if (ctx.doc.assets[asset]) return { ops: [], text: `"${hit.title}" is already in the project as ${asset}: nothing was fetched again.` };
   const main = hit.files.find((f) => f.role === 'model' || f.role === 'env' || f.role === 'color') ?? hit.files[0];
-  const record: Record<string, unknown> = { source: hit.source, id: hit.id, kind: hit.kind, title: hit.title, author: hit.author, license: hit.license, landing: hit.landing, url: main.url, ...(hit.kind === 'hdri' ? { env: true } : {}), ...(where.real ? { what: where.real, permission: 'the user said yes' } : {}) };
+  const record: Record<string, unknown> = { source: hit.source, id: hit.id, kind: hit.kind, title: hit.title, author: hit.author, license: hit.license, landing: hit.landing, url: main.url, ...(hit.kind === 'hdri' ? { env: true } : {}), ...(where.real ? { what: where.real, permission: prefs.peek().assistantFetchesReal ? "the user's settings allow the assistant to fetch real logos and people" : 'the user said yes' } : {}) };
   const at = where.at ?? 0;
   if (isModel) {
     const gltf = await (await fetchFile(main.url, ctx.signal)).json() as object;
@@ -269,11 +270,12 @@ interface Input { kind: StockKind; query?: string; what?: string; count?: number
 
 const describe = (h: StockHit) => `- ${keyOf(h)} · ${h.title} · ${h.author} · ${h.license}${h.size ? ` · ${h.size[0]}×${h.size[1]}` : ''}${h.seconds ? ` · ${h.seconds} s` : ''}`;
 
-/** a real brand's logo, a real person or product: only with the user's yes, and never in a turn left alone */
+/** a real brand's logo, a real person or product: only with the user's yes, and never in a turn left alone, unless the setting gives that yes in advance */
 async function real(a: Input, ctx: ToolContext) {
   const what = a.what?.trim();
   if (!what) throw new Error('say what to fetch (what): the brand, the person or the product, as the user would name it');
-  if (!await askUser(t('stock.realTitle'), t('stock.realText', { what }), t('stock.realYes'))) {
+  const inAdvance = prefs.peek().assistantFetchesReal;
+  if (!inAdvance && !await askUser(t('stock.realTitle'), t('stock.realText', { what }), t('stock.realYes'))) {
     if (alone()) {
       realWanted.add(what);
       return { ops: [], text: `Not fetched: ${what} needs the user's yes, and nobody is there to give it. Nothing was fetched. A wordmark set in the film's type stands for a logo, and a picture made for the film (generate-image with object) stands for a real one. The end of the turn lists "${what}" for the user, who can ask for it.` };
@@ -283,7 +285,7 @@ async function real(a: Input, ctx: ToolContext) {
   const hit = await commons(what, ctx.signal).catch((e) => { throw new Error(`Wikimedia Commons did not answer (${(e as Error).message}): set the name in the film's type instead`); });
   if (!hit) return { ops: [], text: `Nothing on Wikimedia Commons for "${what}". Set the name in the film's type, and make a picture for the film.` };
   const kept = await keepHit(ctx, hit, { ...a, real: what });
-  return { ops: kept.ops, label: t('stock.kept', { title: hit.title }), text: `${kept.text} Licence as Commons states it: ${hit.license}; the user said yes, and the record says so. Credit it (credits).`, notice: t('stock.kept', { title: hit.title }) };
+  return { ops: kept.ops, label: t('stock.kept', { title: hit.title }), text: `${kept.text} Licence as Commons states it: ${hit.license}; ${inAdvance ? "the user's settings allow fetching real logos and people" : 'the user said yes'}, and the record says so. Credit it (credits).`, notice: t('stock.kept', { title: hit.title }) };
 }
 
 const stock: ToolType<Input> = {

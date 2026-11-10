@@ -1,4 +1,6 @@
 ---
+// the choice about audience measurement (only asked on the production address)
+import Consent from '../components/Consent.astro';
 // the visitor's system, for the download buttons
 import Platform from '../components/Platform.astro';
 import SiteHead from '../components/SiteHead.astro';
@@ -63,5 +65,6 @@ const page = segment === 'p' ? 'project' : segment;
   </head>
   <body class:list={['site', { landing }]} data-page={page}>
     <slot />
+    <Consent />
   </body>
 </html>

@@ -1,0 +1,16 @@
+---
+// Starlight's footer, with the audience-measurement choice (the docs are a
+// full page load, with their own head: components/docs/Head.astro) and the way
+// back to it. The docs are English.
+import Default from '@astrojs/starlight/components/Footer.astro';
+import Consent from '../Consent.astro';
+import ConsentChoice from '../ConsentChoice.astro';
+---
+
+<Default {...Astro.props}><slot /></Default>
+<div class="privacy"><ConsentChoice /></div>
+<Consent />
+
+<style>
+  .privacy { margin-top: 1.5rem; }
+</style>

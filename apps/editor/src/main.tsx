@@ -5,6 +5,7 @@
 // started first.
 
 import { exportQueue } from './export-queue.ts';
+import { startMeasuring, trackPage } from './analytics.ts';
 import { render } from 'preact';
 // first: the browser's offer to install the app comes early
 import './install.ts';
@@ -20,6 +21,7 @@ import { App } from './ui/App.tsx';
 import { Home } from './ui/Home.tsx';
 import { normalize, route, SPA_PATHS, startRouter } from './router.ts';
 import { useEffect } from 'preact/hooks';
+import { effect } from '@preact/signals';
 import { AuthPage, type AuthMode } from './ui/AuthPage.tsx';
 import { SpacePage } from './ui/Space.tsx';
 import { Quick } from './ui/Quick.tsx';
@@ -43,7 +45,7 @@ import { startProject } from './start.ts';
 import { t } from './i18n/index.ts';
 import { boot } from './mode.ts';
 import { initDesktop } from './desktop.ts';
-import { autoCheck } from './version.ts';
+import { watchUpdates } from './version.ts';
 import { copiesFor, startInstalled } from './installed.ts';
 import { lift } from './nav.ts';
 
@@ -134,6 +136,8 @@ boot().then(() => {
     lift();
     return;
   }
+  // audience measurement: an option of the settings, off until turned on (analytics.ts)
+  void startMeasuring();
   // the native app: a .tramme handed by the system imports like a dropped one
   initDesktop();
   // the plugins installed on this device, read once from where they are kept
@@ -141,8 +145,9 @@ boot().then(() => {
   // the local companion, found whenever it starts, on the home page and in the editor
   watchCompanion();
   // a newer version of the app, looked for on its own every twelve hours
-  void autoCheck();
+  watchUpdates();
   if (m) {
+    trackPage(location.pathname);
     openProject(m[1]).catch((e) => {
       S.loadError.value = (e as Error).message;
       fail(t('app.couldNotOpenThe'), (e as Error).message);
@@ -151,6 +156,8 @@ boot().then(() => {
     // anything else is the home page; its pages and the account's change without a load from here on
     if (!SPA_PATHS.has(normalize(location.pathname))) history.replaceState(null, '', '/');
     startRouter();
+    // each page of the home and the account, as the router changes them
+    effect(() => trackPage(route.value.path));
     render(<Pages />, root);
     lift();
     void answerNotices(query);

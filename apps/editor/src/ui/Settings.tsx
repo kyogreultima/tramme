@@ -24,6 +24,7 @@ import { Icon } from './icons.tsx';
 import { resetSeen, setAutoTours, toursState } from '../tours/index.ts';
 import { LOCALES, locale, m, t } from '../i18n/index.ts';
 import { vaultOrigin } from '../mode.ts';
+import { answerConsent, consent } from '../analytics.ts';
 import { tauri } from '../tauri.ts';
 import { fromVault } from '../vault/link.ts';
 import { Providers as ProviderList, type ProviderActions } from './Providers.tsx';
@@ -420,6 +421,12 @@ function Behavior() {
           <Toggle on={prefs.value.quickLauncher} onChange={(on) => setPrefs({ quickLauncher: on })} />
         </Row>
       )}
+      <Row label={t('settings.assistantTranscribes')} hint={t('settings.assistantTranscribesHint')}>
+        <Toggle on={prefs.value.assistantTranscribes} onChange={(on) => setPrefs({ assistantTranscribes: on })} />
+      </Row>
+      <Row label={t('settings.assistantFetchesReal')} hint={t('settings.assistantFetchesRealHint')}>
+        <Toggle on={prefs.value.assistantFetchesReal} onChange={(on) => setPrefs({ assistantFetchesReal: on })} />
+      </Row>
       <Row label={t('settings.resume')} hint={t('settings.resumeHint')}>
         <Toggle on={a.resume} onChange={(on) => setAiSettings({ resume: on })} />
       </Row>
@@ -522,6 +529,9 @@ function About() {
       </Row>
       <Row label={t('settings.checkUpdates')} hint={t('settings.checkUpdatesHint')}>
         <Toggle on={p.checkUpdates} onChange={(on) => setPrefs({ checkUpdates: on })} />
+      </Row>
+      <Row label={t('settings.usageStats')} hint={t('settings.usageStatsHint')}>
+        <Toggle on={consent.value} onChange={(on) => void answerConsent(on)} />
       </Row>
     </Section>
   );

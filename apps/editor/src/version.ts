@@ -81,5 +81,11 @@ export async function autoCheck(): Promise<void> {
       setPrefs({ updateNotified: found.version });
       toast(t('update.available', { version: found.version }), 'info', 9000);
     }
-  } catch { /* offline, or GitHub busy: nothing to say, the next start tries again */ }
+  } catch { /* offline, or GitHub busy: nothing to say, the next look tries again */ }
+}
+
+/** looks at the start, then every half hour for as long as the app stays open (a look is only made when twelve hours have passed): an app left open for days still learns of a new version */
+export function watchUpdates(): void {
+  void autoCheck();
+  setInterval(() => void autoCheck(), 30 * 60_000);
 }

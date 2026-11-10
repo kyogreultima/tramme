@@ -3,6 +3,22 @@ use std::{env, fs, path::PathBuf};
 fn main() {
     tauri_build::build();
     backend_origin();
+    measurement_id();
+}
+
+/// The audience-measurement property's id, written once, in brand/analytics.ts
+/// (the website and the editor read it there); analytics.rs gets it from here.
+fn measurement_id() {
+    let file = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("../../../brand/analytics.ts");
+    println!("cargo:rerun-if-changed={}", file.display());
+    println!("cargo:rerun-if-env-changed=TRAMME_GA_API_SECRET");
+    let source = fs::read_to_string(&file).unwrap_or_else(|e| panic!("{}: {e}", file.display()));
+    let id = source
+        .lines()
+        .find(|l| l.starts_with("export const MEASUREMENT_ID"))
+        .and_then(|l| l.split('\'').nth(1))
+        .unwrap_or_else(|| panic!("no MEASUREMENT_ID in {}", file.display()));
+    println!("cargo:rustc-env=TRAMME_MEASUREMENT_ID={id}");
 }
 
 /// The accounts backend of this build is the app of its environment: the beta
@@ -44,4 +60,6 @@ fn backend_origin() {
         None => app.unwrap_or_else(|| panic!("unknown environment \"{name}\" (TRAMME_ENV): one of {}", known.join(", "))),
     };
     println!("cargo:rustc-env=TRAMME_BACKEND_ORIGIN={}", app.trim_end_matches('/'));
+    // the environment's name, for the audience measurement (analytics.rs): only production is measured
+    println!("cargo:rustc-env=TRAMME_ENV_NAME={name}");
 }

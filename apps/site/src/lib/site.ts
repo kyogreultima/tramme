@@ -1,7 +1,7 @@
 // What the site says of itself, wherever it is read: the pages' heads, the
 // link previews, the search engines' structured data, robots.txt, llms.txt.
 
-import { APP, ORIGINS, REPO, repoFile } from './links';
+import { APP, ORIGINS, QUALRIS, REPO, repoFile } from './links';
 import { faq } from './faq';
 import { plan } from './plans';
 import type { Locale } from './i18n';
@@ -38,7 +38,8 @@ export function landingData(site: URL, preview: string, systems: string[], local
         offers: (['basic', 'plus', 'pro'] as const).map((id) => ({ '@type': 'Offer', name: id[0].toUpperCase() + id.slice(1), price: String(plan(id).price.month), priceCurrency: 'EUR' })),
         license: repoFile('LICENSE'),
         sameAs: [REPO],
-        author: { '@type': 'Person', name: 'Aziz Chanou' },
+        author: { '@type': 'Organization', name: 'Qualris', url: QUALRIS, email: 'hello@qualris.com' },
+        publisher: { '@type': 'Organization', name: 'Qualris', url: QUALRIS },
       },
       {
         '@type': 'FAQPage',

@@ -23,7 +23,7 @@ describe('the licence of the versions after 0.16.0', () => {
   it('is the Functional Source License, with its licensor and its year filled in', () => {
     const licence = read('LICENSE');
     expect(licence).toContain('Functional Source License, Version 1.1, ALv2 Future License');
-    expect(licence).toContain('Copyright 2026 Aziz Chanou');
+    expect(licence).toContain('Copyright 2026 Qualris');
     expect(licence).not.toContain('${');
   });
 

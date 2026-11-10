@@ -85,6 +85,9 @@ jobs:
           rust-targets: ${{ matrix.rust-targets }}
       - run: npm ci
       - name: Build the editor and the app
+        env:
+          # audience measurement of the desktop app (apps/desktop/src-tauri/src/analytics.rs): without it nothing is counted
+          TRAMME_GA_API_SECRET: ${{ secrets.TRAMME_GA_API_SECRET }}
         run: npm run desktop:build -- ${{ matrix.args }}
       - name: Name the installers for the release
         run: node scripts/desktop-release.ts out ${{ needs.plan.outputs.tag }}

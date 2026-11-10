@@ -34,6 +34,7 @@ import { offerTours } from '../tours/index.ts';
 import { prefs, settingsOpen } from '../settings.ts';
 import { GLASS_THEMES } from '../theme/pref.ts';
 import { APP_VERSION, downloadOf, update } from '../version.ts';
+import { tauri } from '../tauri.ts';
 import { IDEAS } from '../ideas.ts';
 import { t } from '../i18n/index.ts';
 import { go } from '../nav.ts';
@@ -352,6 +353,8 @@ export function Home() {
         <div class="brand"><Brand size={20} /></div>
         <span class="grow" />
         <HelpButton page="home" />
+        {/* the desktop app only (the web app is always the current one): a newer version is found, its installer one click away */}
+        {tauri && update.value && <a class="icon-btn update" href={downloadOf(update.value).href} target="_blank" rel="noopener" title={t('home.newVersion', { version: update.value.version })} aria-label={t('home.newVersion', { version: update.value.version })}><Icon name="download" /></a>}
         <button class="icon-btn" data-tour="settings" title={t('common.settingsCtrl')} onClick={() => { settingsOpen.value = true; }}><Icon name="gear" /></button>
         {/* icons first, then the buttons: the two kinds stay grouped */}
         {installable.value && <button class="btn outline sm" title={t('home.installAppHint')} onClick={install}><Icon name="download" /><span class="label">{t('home.installApp')}</span></button>}
