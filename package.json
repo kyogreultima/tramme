@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Motion design engine and editor: JSON document, deterministic rendering, web editor",
   "license": "FSL-1.1-ALv2",
-  "author": "Aziz Chanou",
+  "author": "Qualris <hello@qualris.com> (https://qualris.com)",
   "workspaces": [
     "packages/*",
     "apps/*"

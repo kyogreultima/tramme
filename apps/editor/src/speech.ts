@@ -17,7 +17,7 @@ import { reach } from './api.ts';
 import { safeName, takenPaths, upload } from './files.ts';
 import { askUser } from './confirm.ts';
 import { pipelineOf, type PipelineRun } from './perception.ts';
-import { chosenModel } from './settings.ts';
+import { chosenModel, prefs } from './settings.ts';
 import { madeBy } from './models.ts';
 import { commit, S, toast } from './state.ts';
 import { m, t } from './i18n/index.ts';
@@ -183,7 +183,8 @@ export const transcribing = (assetId: string) => transcriptions.value.some((j) =
  * The transcript of a media asset for the assistant: there already, or under
  * way (waited for). The user is the one who starts a transcription: with
  * `ask`, the assistant asks them (never in a turn left alone); otherwise, or
- * when they say no, it is told to do without.
+ * when they say no, it is told to do without. The setting "let the assistant
+ * transcribe without asking" is their yes in advance, in a turn left alone too.
  */
 export async function transcriptFor(assetId: string, ask: boolean): Promise<string> {
   const stamp = projectStamp();
@@ -191,7 +192,7 @@ export async function transcriptFor(assetId: string, ask: boolean): Promise<stri
   if (S.doc.peek().assets[id]) return id;
   const job = running.get(`${stamp}\n${assetId}`);
   if (job) { const result = await job; requireProject(stamp); return result; }
-  if (ask && await askUser(t('transcribe.askTitle'), t('transcribe.askText', { name: a?.name || assetId }), t('transcribe.action'))) {
+  if (ask && (prefs.peek().assistantTranscribes || await askUser(t('transcribe.askTitle'), t('transcribe.askText', { name: a?.name || assetId }), t('transcribe.action')))) {
     requireProject(stamp);
     return transcribeAsset(assetId);
   }

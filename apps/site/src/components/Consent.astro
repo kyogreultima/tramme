@@ -1,0 +1,75 @@
+---
+// The visitor's choice about audience measurement (Google Analytics), asked
+// once, with a yes and a no of the same weight. It shows wherever the site
+// runs, so that it can be seen and tried locally; only the production address
+// loads anything of Google's or counts (brand/analytics.ts). The script also
+// counts the pages seen, those of the router too (it does not reload).
+import { localeOf, pathIn, t } from '../lib/i18n';
+
+const locale = localeOf(Astro.url.pathname);
+---
+
+<aside class="consent" data-consent hidden aria-labelledby="consent-title">
+  <p id="consent-title" class="title">{t(locale, 'consent.title')}</p>
+  <p class="text">{t(locale, 'consent.text')} <a href={pathIn(locale, '/privacy/')}>{t(locale, 'consent.more')}</a></p>
+  <div class="answers">
+    <button type="button" data-consent-answer="no">{t(locale, 'consent.refuse')}</button>
+    <button type="button" data-consent-answer="yes">{t(locale, 'consent.accept')}</button>
+  </div>
+</aside>
+
+<style>
+  .consent {
+    position: fixed; z-index: 40; right: var(--gutter); bottom: var(--gutter); display: grid; gap: 10px; width: min(calc(100vw - 2 * var(--gutter)), 420px);
+    padding: 18px; background: var(--panel); color: var(--ink); border: 1px solid var(--line-2); border-radius: var(--r-lg);
+  }
+  .consent[hidden] { display: none; }
+  .title { font-size: 1rem; font-weight: 600; }
+  .text { font-size: 0.875rem; line-height: 1.5; color: var(--ink-2); }
+  .text a { color: var(--ink); text-underline-offset: 3px; }
+  .answers { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px; }
+  button {
+    height: 40px; padding-inline: 16px; border: 1px solid var(--line-2); border-radius: var(--tramme-radius-control);
+    background: transparent; color: var(--ink); font: inherit; font-size: 0.875rem; font-weight: 500; cursor: pointer;
+    transition: background-color 0.2s var(--ease, ease);
+  }
+  button:hover { background: var(--hover); }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+
+<script>
+  import { consentPending, setConsent, startAnalytics, trackPage, type Place } from '../../../../brand/analytics';
+
+  const place = window as unknown as Place;
+  startAnalytics(place);
+
+  // the banner shows while no choice is made; the footer's button asks again (and withdraws a yes)
+  const banner = () => document.querySelector<HTMLElement>('[data-consent]');
+  const show = (shown: boolean) => { const b = banner(); if (b) b.hidden = !shown; };
+
+  function pageLoaded() {
+    show(consentPending(place));
+    for (const button of document.querySelectorAll<HTMLElement>('[data-consent-open]')) button.hidden = false;
+    trackPage(place, location.pathname, document.title);
+  }
+
+  {
+    document.addEventListener('click', (event) => {
+      const target = event.target instanceof Element ? event.target : null;
+      const answer = target?.closest<HTMLElement>('[data-consent-answer]');
+      if (answer) {
+        const granted = answer.dataset.consentAnswer === 'yes';
+        setConsent(place, granted);
+        show(false);
+        // the page the visitor is on counts from their yes
+        if (granted) trackPage(place, location.pathname, document.title);
+      } else if (target?.closest('[data-consent-open]')) {
+        show(true);
+      }
+    });
+  }
+
+  // the router fires this at the first load too; the docs have no router, they load fully
+  if (document.querySelector('meta[name="astro-view-transitions-enabled"]')) document.addEventListener('astro:page-load', pageLoaded);
+  else pageLoaded();
+</script>

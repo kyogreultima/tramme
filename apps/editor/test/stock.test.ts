@@ -284,6 +284,22 @@ describe('real logos and pictures', () => {
     expect(out.text).toMatch(/picture made for the film/);
   });
 
+  it('is fetched in a turn left alone when the user\'s settings say so, and the record says that, not a yes', async () => {
+    const { setPrefs } = await import('../src/settings.ts');
+    setPrefs({ assistantFetchesReal: true });
+    try {
+      confirm.turnBegins(true);
+      const w = world();
+      const out = await w.run(input);
+      expect(confirm.question.peek()).toBeNull();
+      expect(realWanted.size).toBe(0);
+      expect(JSON.parse(w.files.get('assets/stock/stock-commons-7.json') as string).permission).toMatch(/settings allow/);
+      expect(out.text).toMatch(/settings allow/);
+    } finally {
+      setPrefs({ assistantFetchesReal: false });
+    }
+  });
+
   it('wants to know what, and answers when Commons has nothing', async () => {
     await expect(world().run({ kind: 'real' })).rejects.toThrow(/what/);
     vi.stubGlobal('fetch', async () => jsonRes({ query: { pages: {} } }));

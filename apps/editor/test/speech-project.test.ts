@@ -29,6 +29,32 @@ describe('transcription project boundary', () => {
     }
   });
 
+  it('asks the user, or starts at once when their settings say so, a turn left alone included', async () => {
+    const project = newProject({ name: 'First', width: 64, height: 64, fps: 30, duration: 1 });
+    // a source outside the project's assets: a started transcription stops there, before any network
+    project.doc.assets.clip = { type: 'video', src: 'https://tramme.test/api/private' } as never;
+    const previous = { project: S.project.peek(), docUrl: S.docUrl.peek(), doc: S.doc.peek() };
+    const { turnBegins, turnEnds } = await import('../src/confirm.ts');
+    const { setPrefs } = await import('../src/settings.ts');
+    try {
+      S.project.value = project.manifest;
+      S.docUrl.value = 'https://tramme.test/projects/first/document.tramme.json';
+      S.doc.value = project.doc;
+      turnBegins(true);
+      // nobody is there to answer: it does without
+      await expect(transcriptFor('clip', true)).rejects.toThrow('starts transcriptions themselves');
+      setPrefs({ assistantTranscribes: true });
+      await expect(transcriptFor('clip', true)).rejects.toThrow('project asset');
+      expect(question.peek()).toBeNull();
+    } finally {
+      turnEnds();
+      setPrefs({ assistantTranscribes: false });
+      S.project.value = previous.project;
+      S.docUrl.value = previous.docUrl;
+      S.doc.value = previous.doc;
+    }
+  });
+
   it('does not start transcription in a newly opened project after a prompt', async () => {
     const first = newProject({ name: 'First', width: 64, height: 64, fps: 30, duration: 1 });
     const second = newProject({ name: 'Second', width: 64, height: 64, fps: 30, duration: 1 });

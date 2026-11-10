@@ -50,6 +50,7 @@ export default defineConfig({
       customCss: ['./src/styles/docs.css'],
       // the landing page's brand, theme script and toggle, so both sides look and choose alike
       components: {
+        Footer: './src/components/docs/Footer.astro',
         Head: './src/components/docs/Head.astro',
         SiteTitle: './src/components/docs/SiteTitle.astro',
         ThemeProvider: './src/components/ThemeProvider.astro',

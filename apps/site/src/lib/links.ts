@@ -6,6 +6,9 @@ import { originsFromEnv } from '../../../../brand/environments';
 const running = typeof process !== 'undefined';
 export const ORIGINS = originsFromEnv(running ? process.env : {}, running && process.argv.includes('dev'));
 
+/** Qualris, who publishes Tramme: its production site (the beta is beta.qualris.com) */
+export const QUALRIS = 'https://qualris.com';
+
 export const REPO_NAME = 'kyogreultima/tramme';
 export const REPO = `https://github.com/${REPO_NAME}`;
 /** a file or folder of the repository, on its main branch */

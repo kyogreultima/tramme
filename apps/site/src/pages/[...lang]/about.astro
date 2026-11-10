@@ -4,7 +4,7 @@ import Page from '../../components/Page.astro';
 import PageHead from '../../components/PageHead.astro';
 import Source from '../../components/Source.astro';
 import { docHref } from '../../lib/docs';
-import { REPO, repoFile } from '../../lib/links';
+import { QUALRIS, REPO, repoFile } from '../../lib/links';
 import { localeOf, localePaths } from '../../lib/i18n';
 
 export const getStaticPaths = localePaths;
@@ -14,7 +14,7 @@ const fr = localeOf(Astro.url.pathname) === 'fr';
 
 <Page
   title={fr ? 'À propos de Tramme' : 'About Tramme'}
-  description={fr ? 'Tramme est un moteur et un éditeur de motion design, avec son code source disponible, fait par Aziz Chanou. Ce que c\'est, sa licence et comment participer.' : 'Tramme is a motion design engine and editor, with its source available, made by Aziz Chanou. What it is, its licence and how to take part.'}
+  description={fr ? 'Tramme est un moteur et un éditeur de motion design, avec son code source disponible, fait par Qualris. Ce que c\'est, sa licence et comment participer.' : 'Tramme is a motion design engine and editor, with its source available, made by Qualris. What it is, its licence and how to take part.'}
 >
   <PageHead title={fr ? 'À propos de Tramme.' : 'About Tramme.'} lead={fr ? 'Un moteur et un éditeur de motion design, avec son code source disponible.' : 'A motion design engine and editor, with its source available.'} />
   <section class="wrap body">
@@ -24,7 +24,7 @@ const fr = localeOf(Astro.url.pathname) === 'fr';
         <p>Un film dans Tramme est un document, un simple fichier qui contient ses calques, ses images clés et son son. L'éditeur et l'assistant modifient ce document par les mêmes opérations : ce que l'un fait, l'autre peut le défaire. Chaque image est une fonction pure du temps, le rendu est donc déterministe : l'aperçu et l'export sont dessinés par le même moteur. <a href={docHref('document')}>Le format est dans la documentation</a>, pour qui le veut.</p>
 
         <h2>Qui le fait</h2>
-        <p>Tramme est fait par Aziz Chanou, à découvert : le code, les feuilles de route et le journal des versions sont dans le <a href={REPO}>dépôt</a> et dans la documentation, et le <a href={docHref('changelog')}>journal des versions</a> dit ce qui change à chaque version.</p>
+        <p>Tramme est fait par <a href={QUALRIS} target="_blank" rel="noopener">Qualris</a>, studio de conception d'artefacts numériques, à découvert : le code, les feuilles de route et le journal des versions sont dans le <a href={REPO}>dépôt</a> et dans la documentation, et le <a href={docHref('changelog')}>journal des versions</a> dit ce qui change à chaque version. Pour nous écrire : <a href="mailto:hello@qualris.com">hello@qualris.com</a>.</p>
 
         <h2>Licence</h2>
         <p>À partir de la version qui suit la 0.16.0, Tramme est sous la <a href={repoFile('LICENSE')}>Functional Source License</a> (FSL-1.1-ALv2). Vous pouvez lire, exécuter, modifier et redistribuer le code pour tout usage, sauf pour proposer un produit ou service commercial concurrent, et chaque version passe sous Apache-2.0 deux ans après sa sortie. Les versions jusqu'à la 0.16.0 restent sous la <a href={repoFile('LICENSE-APACHE')}>licence Apache 2.0</a>. Les travaux tiers sur lesquels Tramme s'appuie gardent leurs propres licences : voir les <a href={repoFile('THIRD_PARTY_NOTICES.md')}>mentions tierces</a>.</p>
@@ -41,7 +41,7 @@ const fr = localeOf(Astro.url.pathname) === 'fr';
         <p>A film in Tramme is a document, a plain file that holds its layers, its keyframes and its sound. The editor and the assistant change that document through the same operations, so what one does the other can undo. Every frame is a pure function of time, so rendering is deterministic: the preview and the export are drawn by the same engine. <a href={docHref('document')}>The format is in the docs</a>, for anyone who wants it.</p>
 
         <h2>Who makes it</h2>
-        <p>Tramme is made by Aziz Chanou, in the open: the code, the roadmaps and the changelog are in the <a href={REPO}>repository</a> and in the docs, and the <a href={docHref('changelog')}>changelog</a> says what changed in each version.</p>
+        <p>Tramme is made by <a href={QUALRIS} target="_blank" rel="noopener">Qualris</a>, a studio that designs digital artefacts, in the open: the code, the roadmaps and the changelog are in the <a href={REPO}>repository</a> and in the docs, and the <a href={docHref('changelog')}>changelog</a> says what changed in each version. To write to us: <a href="mailto:hello@qualris.com">hello@qualris.com</a>.</p>
 
         <h2>Licence</h2>
         <p>From the version after 0.16.0, Tramme is under the <a href={repoFile('LICENSE')}>Functional Source License</a> (FSL-1.1-ALv2). You can read, run, change and redistribute the source for any purpose except offering a competing commercial product or service, and each version becomes Apache-2.0 two years after its release. Versions up to 0.16.0 stay under the <a href={repoFile('LICENSE-APACHE')}>Apache License 2.0</a>. The third-party work Tramme builds on keeps its own licences: see the <a href={repoFile('THIRD_PARTY_NOTICES.md')}>third-party notices</a>.</p>

@@ -5,6 +5,7 @@
 import Page from '../../components/Page.astro';
 import PageHead from '../../components/PageHead.astro';
 import { docHref } from '../../lib/docs';
+import { QUALRIS } from '../../lib/links';
 import { localeOf, localePaths } from '../../lib/i18n';
 
 export const getStaticPaths = localePaths;
@@ -36,7 +37,13 @@ const fr = localeOf(Astro.url.pathname) === 'fr';
         <p>Le paiement des offres payantes est traité par [REVENDEUR DE RÉFÉRENCE : Paddle ou Lemon Squeezy, à décider]. Tramme ne voit ni ne conserve votre numéro de carte.</p>
 
         <h2>Ce site</h2>
-        <p>Il ne dépose aucun cookie, n'exécute aucun code d'analyse et ne charge aucun script ni aucune police tierce. Il retient votre choix de langue par son adresse, votre choix du thème clair ou sombre, et dans la documentation l'état du menu latéral, dans le stockage de votre navigateur ; rien de cela ne quitte votre navigateur. Le site est servi par Cloudflare qui, comme tout hébergeur, traite les requêtes qu'il reçoit.</p>
+        <p>Il retient votre choix de langue par son adresse, votre choix du thème clair ou sombre, et dans la documentation l'état du menu latéral, dans le stockage de votre navigateur ; rien de cela ne quitte votre navigateur. Le site est servi par Cloudflare qui, comme tout hébergeur, traite les requêtes qu'il reçoit.</p>
+
+        <h2>La mesure d'audience</h2>
+        <p>Le site, l'application web et l'application de bureau peuvent compter les pages et les fonctions utilisées avec Google Analytics, pour savoir quoi améliorer. C'est uniquement avec votre accord, demandé une fois, avec un « non » aussi simple que le « oui » : tant que vous n'avez pas dit oui, aucun script de Google n'est chargé et rien n'est envoyé. Aucune publicité, aucun profil publicitaire, jamais ; le contenu de vos projets, vos clés et ce que vous dites à l'assistant n'en font pas partie. Vous changez d'avis à tout moment, avec « Statistiques de visite » en bas de chaque page du site, dans les réglages de l'application web et dans ceux de l'application de bureau. Rien n'est mesuré en dehors des adresses publiques de Tramme.</p>
+
+        <h2>Qui est responsable</h2>
+        <p>Tramme est édité par <a href={QUALRIS} target="_blank" rel="noopener">Qualris</a>, studio de conception d'artefacts numériques. Pour toute question sur vos données, ou pour exercer vos droits : <a href="mailto:hello@qualris.com">hello@qualris.com</a>.</p>
 
         <p class="note">Cette page sera relue juridiquement avant le lancement.</p>
       </div>
@@ -58,7 +65,13 @@ const fr = localeOf(Astro.url.pathname) === 'fr';
         <p>Payment for the paid plans is handled by [MERCHANT OF RECORD: Paddle or Lemon Squeezy, to be decided]. Tramme never sees or keeps your card number.</p>
 
         <h2>This site</h2>
-        <p>It sets no cookies, runs no analytics code and loads no third-party script or font. It remembers your language by its address, your choice of the light or the dark theme, and in the docs the state of the sidebar, in your browser's storage; none of it leaves your browser. The site is delivered by Cloudflare, which, like any host, handles the requests it receives.</p>
+        <p>It remembers your language by its address, your choice of the light or the dark theme, and in the docs the state of the sidebar, in your browser's storage; none of it leaves your browser. The site is delivered by Cloudflare, which, like any host, handles the requests it receives.</p>
+
+        <h2>Audience measurement</h2>
+        <p>The site, the web app and the desktop app can count the pages and the features used with Google Analytics, to know what to improve. Only with your yes, asked once, with a no as easy as the yes: until you say yes, no Google script is loaded and nothing is sent. No advertising and no advertising profile, ever; the content of your projects, your keys and what you tell the assistant are never part of it. You can change your mind at any time, with “Visit statistics” at the bottom of each page of the site, in the web app's settings and in the desktop app's. Nothing is measured outside Tramme's public addresses.</p>
+
+        <h2>Who is responsible</h2>
+        <p>Tramme is published by <a href={QUALRIS} target="_blank" rel="noopener">Qualris</a>, a studio that designs digital artefacts. For any question about your data, or to exercise your rights: <a href="mailto:hello@qualris.com">hello@qualris.com</a>.</p>
 
         <p class="note">This page will be reviewed legally before launch.</p>
       </div>

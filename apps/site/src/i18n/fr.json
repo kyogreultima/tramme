@@ -38,8 +38,16 @@
     "security": "Sécurité",
     "licence": "Licence",
     "repository": "Dépôt",
-    "copyright": "© 2026 Aziz Chanou. Code source disponible, sous la Functional Source License.",
+    "copyright": "© 2026",
     "language": "Langue"
+  },
+  "consent": {
+    "title": "Compter cette visite ?",
+    "text": "Avec votre accord, Google Analytics compte les pages lues, pour savoir quoi améliorer. Ni publicité, ni profil. Sans accord, rien n'est envoyé.",
+    "more": "Ce qui est conservé où",
+    "accept": "Oui, compter",
+    "refuse": "Non",
+    "manage": "Statistiques de visite"
   },
   "faq": {
     "title": "Vos questions, nos réponses.",
