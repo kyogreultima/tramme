@@ -34,6 +34,9 @@ a.btn { text-decoration: none; }
 .icon-btn:active:not(:disabled) { background: var(--press); }
 .icon-btn:disabled { color: var(--text-4); cursor: default; }
 .icon-btn.on { background: var(--accent-soft); color: var(--accent-text); }
+/* a new version of the app is out: the button lights up, with a dot, until it is installed */
+.icon-btn.update { position: relative; background: var(--accent-soft); color: var(--accent-text); }
+.icon-btn.update::after { content: ''; position: absolute; top: 4px; right: 4px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
 .icon-btn.sm { width: var(--h-sm); height: var(--h-sm); }
 .icon-btn.xs { width: 18px; height: 18px; }
 .icon-btn.round { border-radius: var(--r-pill); }

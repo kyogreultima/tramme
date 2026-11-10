@@ -8,6 +8,20 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-11-10
+
+### Added
+
+- Audience measurement with Google Analytics, opt-in and counted only on the production addresses. The site asks once, with a "no" as easy as the "yes", and nothing of Google's is loaded before the yes; a "Visit statistics" button in the footer changes the choice. The web app and the desktop app have it as a setting (Settings, About), off until turned on, with no banner. The desktop app sends its events itself (it needs `TRAMME_GA_API_SECRET` at build time).
+- Two settings for what the assistant waits on while it edits: "Let the assistant transcribe without asking" and "Let the assistant fetch real logos and people without asking" (Settings, Behavior). Off, a turn left alone still does without; on, the licence record says the settings allowed it.
+- In the desktop app, a download button lights up in the home page's top bar, with a dot, as soon as a newer version is found; it leads to the installer of the system. The look for a new version, made at the start, is now repeated every half hour while the app stays open (it still only asks the server every twelve hours).
+
+### Changed
+
+- Qualris is the publisher of Tramme: the footer, the About and Privacy pages, the structured data, the licence notices and the installers name it, and link to qualris.com in a new tab. The footer line is now just "© 2026 Qualris".
+- The privacy page describes the audience measurement and says who to write to (hello@qualris.com).
+- The setting that checks for a new version says it asks the server, not GitHub.
+
 ### Fixed
 
 - While the assistant makes a first film, its message in the empty frame sits on a card you can read on any film, and the status pill above the film no longer touches it.
@@ -774,7 +788,8 @@ First public release.
 
 - Cloudflare Worker serving the editor and the API, projects stored in R2, access protected by Cloudflare Access.
 
-[Unreleased]: ../../compare/v0.21.0...HEAD
+[Unreleased]: ../../compare/v0.22.0...HEAD
+[0.22.0]: ../../compare/v0.21.0...v0.22.0
 [0.21.0]: ../../compare/v0.20.0...v0.21.0
 [0.20.0]: ../../compare/v0.19.0...v0.20.0
 [0.19.0]: ../../compare/v0.18.0...v0.19.0
