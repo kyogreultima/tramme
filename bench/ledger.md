@@ -14,11 +14,11 @@ the user, a cap of $6 per run.
 
 | Brief | baseline | levers | medium |
 |---|---|---|---|
-| `logo-sting` (5 s logo intro, 16:9) | $2.17, 35 req., 14.6 min | $0.98, 22 req., 3.9 min | |
-| `kinetic-quote` (12 s kinetic type, 9:16) | $1.71, 31 req., 7.1 min | $2.65, 44 req., 9.2 min | |
-| `data-short` (15 s data film, 16:9) | $4.82, 98 req., 17 min | $3.01, 51 req., 14.2 min | |
-| `fitness-app` (15 s vertical ad) | $6.10 (stopped at the cap), 98 req., 33.2 min | $3.06, 66 req., 11.5 min | |
-| In all | $14.80 (at least) | $9.70 (−34 %) | |
+| `logo-sting` (5 s logo intro, 16:9) | $2.17, 35 req., 14.6 min | $0.98, 22 req., 3.9 min | $0.69, 25 req., 3.8 min |
+| `kinetic-quote` (12 s kinetic type, 9:16) | $1.71, 31 req., 7.1 min | $2.65, 44 req., 9.2 min | $0.84, 20 req., 4.3 min |
+| `data-short` (15 s data film, 16:9) | $4.82, 98 req., 17 min | $3.01, 51 req., 14.2 min | $1.35, 31 req., 5.6 min |
+| `fitness-app` (15 s vertical ad) | $6.10 (stopped at the cap), 98 req., 33.2 min | $3.06, 66 req., 11.5 min | $2.73, 64 req., 10.4 min |
+| In all | $14.80 (at least) | $9.70 (−34 %) | $5.61 (−62 %) |
 
 - **baseline** (2026-11-11, editor at `22b8ff1`, effort high): before the cost work.
 - **levers** (2026-11-11, editor at `4f12eb5`, effort high): the system prompt no longer
@@ -44,6 +44,8 @@ The share of each cost centre on `data-short`, before and after the levers:
 
 After the levers, generating (the thinking above all) is half of the cost: the
 effort is the next lever, and the one that can move the quality.
+
+The effort stays at high by default until the films of the medium series are judged at least as good as the baseline's: a cost that drops while the films get worse is not a saving.
 
 ## Films to watch
 
