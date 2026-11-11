@@ -104,10 +104,21 @@ export function issueReport(issues: QualityIssue[], doc: TrammeDoc, compId: stri
   return { lines, notice };
 }
 
-/** the picture's quality checks of the context's composition as the assistant reads them, without the contact sheet or the sound (what a proposal's answer carries) */
+/** the warnings a proposal's answer shows at most: the rest is counted, the check tool has it all */
+const ANSWER_WARNINGS = 4;
+
+/**
+ * The picture's quality checks of the context's composition as a proposal's
+ * answer carries them: the counts and the first warnings only, without the
+ * notes, the contact sheet or the sound (the check tool gives those). A piece
+ * still being built has warnings it is about to fix: a short line keeps the
+ * model from chasing each of them call by call.
+ */
 export async function checksText(ctx: ToolContext): Promise<string> {
   const issues = await qualityChecksOf(ctx, ctx.compId, await analyses(ctx));
-  return [reportHead(issues), ...issueReport(issues, ctx.doc, ctx.compId).lines].join('\n');
+  const warnings = issues.filter((i) => i.severity === 'warning');
+  const lines = reportLines(groupIssues(warnings), { doc: ctx.doc, compId: ctx.compId, max: ANSWER_WARNINGS });
+  return [reportHead(issues), ...lines.lines, ...(lines.hidden ? [`(${lines.hidden} more kinds of warning: use_tool "check")`] : [])].join('\n');
 }
 
 const check: ToolType<{ frames?: number }> = {
