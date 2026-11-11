@@ -11,6 +11,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 ### Added
 
 - `remove-bg` cuts a whole set of pictures out in one call (`images`), each saved as its own asset.
+- The assistant's `write_file` changes a passage of a file (`find`) instead of writing a long plugin whole again.
 - `node bench/run.ts <brief>` runs a brief of the bench alone on the trial server, through the companion, and stops the turn once its cost passes a cap; three short briefs join the bench (a logo sting, a short data film, vertical kinetic type).
 
 ### Changed
