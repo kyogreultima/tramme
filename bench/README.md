@@ -47,6 +47,11 @@ transcripts and `run.json`; the project stays on the trial server to be watched
 and scored. A brief's `files` (paths under `bench/`) are put in the project's
 `assets/` first.
 
+`node bench/series.ts <series> [<other series>]` lists a series' runs (cost,
+requests, time, stopped at the cap or not), or compares two series brief by
+brief. It reads `run.json`, whose cost comes from the transcripts: a turn
+stopped at its cap is counted whole, where its usage line may be missing.
+
 ### What a run costs, and what a change did to it
 
 `node bench/usage.ts <project>` prints, for each turn, its tokens, the share
