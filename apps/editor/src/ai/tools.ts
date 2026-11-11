@@ -17,7 +17,7 @@ import { uid } from './calls.ts';
 import { isSceneTextPath } from '../scene-tools.ts';
 import { bumpScene } from '../webscene-preview.ts';
 import { api, type AiEvent } from '../api.ts';
-import { describeOp, freshId } from '../model.ts';
+import { describeOp, fitLongest, freshId } from '../model.ts';
 import { analyses, jpegOf, loadImage } from '../perception.ts';
 import { fileProject, requireFileProject, sameFileProject, safeName } from '../files.ts';
 import { transcriptFor, transcriptIdOf } from '../speech.ts';
@@ -32,7 +32,8 @@ import { preview } from '../preview.ts';
 import { prefs } from '../settings.ts';
 
 const text =(s: string, isError = false): ToolResult => ({ content: [{ type: 'text', text: s }], isError });
-const STILL_WIDTH = 768;
+/** the longest side of a still the assistant sees */
+const STILL_SIDE = 768;
 const TEXT_FILE = /\.(js|mjs|json|svg|md|markdown)$/i;
 /** a file read in parts of this many characters (about 15k tokens) */
 const READ_PART = 50_000;
@@ -204,7 +205,7 @@ export class ToolRunner {
       source = f.image; w = frames.width; h = frames.height;
     } else return text(`${assetId}: a video or an image is expected`, true);
     requireFileProject(project);
-    const url = jpegOf(source, w, h, Math.min(1, STILL_WIDTH / w));
+    const url = jpegOf(source, w, h, fitLongest(w, h, STILL_SIDE)[0] / w);
     this.events.push({ type: 'item', item: { id: uid(), role: 'assistant', image: { url, caption: `${a.name ?? assetId}${a.type === 'video' ? ` · ${t.toFixed(2)} s` : ''}` } } });
     return { content: [{ type: 'image', data: url.slice(url.indexOf(',') + 1), mimeType: 'image/jpeg' }] };
   }
@@ -363,7 +364,8 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
   /** a still of the live document, as a JPEG data URL */
   private stillUrl(t: number, compId?: string): Promise<string> {
     const doc = this.liveDoc();
-    return this.stills.still(doc, t, compId && doc.compositions[compId] ? compId : this.scoped ? this.compOf(doc) : doc.root, STILL_WIDTH);
+    const id = compId && doc.compositions[compId] ? compId : this.scoped ? this.compOf(doc) : doc.root, c = doc.compositions[id];
+    return this.stills.still(doc, t, id, c ? fitLongest(c.width, c.height, STILL_SIDE)[0] : STILL_SIDE);
   }
 
   private async still(t: number, compId: string | undefined, caption?: string): Promise<ToolResult> {

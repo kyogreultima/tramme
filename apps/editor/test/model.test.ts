@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Composition, TrammeDoc } from '@tramme/core';
 import { applyOps as apply } from '@tramme/core';
-import { carriedStart, contentEnd, crossfadeOps, cutEndOps, describeOp, fitCompOps, isToolAsset, mediaAssetsOf, splitLayerOps, trimInOps, wholeFile } from '../src/model.ts';
+import { carriedStart, contentEnd, crossfadeOps, cutEndOps, describeOp, fitCompOps, fitLongest, isToolAsset, mediaAssetsOf, splitLayerOps, trimInOps, wholeFile } from '../src/model.ts';
 import { passes } from '../src/ai/server.ts';
 import EN from '../src/i18n/en.json' with { type: 'json' };
 import FR from '../src/i18n/fr.json' with { type: 'json' };
@@ -202,5 +202,17 @@ describe('a clip cut at the playhead', () => {
   it('refuses a cross-fade when one clip holds the other', () => {
     expect(crossfadeOps(doc({ a: { type: 'video', in: 4, out: 6 }, b: { type: 'video', in: 0, out: 10 } }), 'main', 'a', 0.5)).toBeNull();
     expect(crossfadeOps(doc({ a: { type: 'video', in: 0, out: 10 }, b: { type: 'video', in: 4, out: 6 } }), 'main', 'a', 0.5)).toBeNull();
+  });
+});
+
+describe('a frame brought to a size for the assistant', () => {
+  it('keeps a landscape frame as wide as before and gives a portrait one the same longest side', () => {
+    expect(fitLongest(1920, 1080, 768)).toEqual([768, 432]);
+    expect(fitLongest(1080, 1920, 768)).toEqual([432, 768]);
+    expect(fitLongest(1080, 1350, 360)).toEqual([288, 360]);
+  });
+
+  it('never enlarges a small frame', () => {
+    expect(fitLongest(320, 180, 768)).toEqual([320, 180]);
   });
 });

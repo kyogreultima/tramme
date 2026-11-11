@@ -86,6 +86,12 @@ export const topLayers = (comp: Composition, ids: string[]) => ids.filter((id) =
 export const layerName = (id: string, l: Layer) => l.name || id;
 
 /** a text cut to at most max characters, an ellipsis marking the cut */
+/** a frame's size brought to `side` pixels on its longest side, never enlarged: a portrait picture costs the model what a landscape one does */
+export function fitLongest(width: number, height: number, side: number): [number, number] {
+  const k = Math.min(1, side / Math.max(width, height));
+  return [Math.max(1, Math.round(width * k)), Math.max(1, Math.round(height * k))];
+}
+
 export const clip = (text: string, max: number) => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
 
 /** a name fit for ids and paths: ascii letters without accents, digits, _ and dashes */

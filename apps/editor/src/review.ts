@@ -14,7 +14,9 @@ import { FILM_PLAN_PATH, parsePlan } from './filmplan.ts';
 import { formLinesForReview } from './forms.ts';
 import { t } from './i18n/index.ts';
 import { prefs } from './settings.ts';
+import { fitLongest } from './model.ts';
 
+/** the longest side of a cell of a sheet or a strip: a portrait frame costs the model what a landscape one does */
 const CELL = 360;
 
 /** Numeric motion figures for the strip, evaluated where project code runs. */
@@ -66,7 +68,7 @@ export async function stills(ctx: ToolContext, times: number[], compId: string) 
 async function sheet(ctx: ToolContext, times: number[], cols: number, compId: string): Promise<string> {
   const c = ctx.doc.compositions[compId];
   const images = await stills(ctx, times, compId);
-  return sheetOf(images.map((image, i) => ({ image, label: `${times[i].toFixed(2)} s` })), CELL, Math.round((CELL * c.height) / c.width), cols);
+  return sheetOf(images.map((image, i) => ({ image, label: `${times[i].toFixed(2)} s` })), ...fitLongest(c.width, c.height, CELL), cols);
 }
 
 /** the moments worth looking at: just after entrances, markers, problems, and enough to cover the whole */
@@ -144,7 +146,7 @@ const motion: ToolType<{ t: number; span?: number; steps?: number }> = {
     const to = Math.min(c.duration, from + span);
     const times = Array.from({ length: steps }, (_, i) => +Math.min(c.duration - 0.01, from + (span * i) / (steps - 1)).toFixed(3));
     const images = await stills(ctx, times, ctx.compId);
-    const url = sheetOf(images.map((image, i) => ({ image, label: `${times[i].toFixed(2)} s` })), CELL, Math.round((CELL * c.height) / c.width), Math.min(steps, 6));
+    const url = sheetOf(images.map((image, i) => ({ image, label: `${times[i].toFixed(2)} s` })), ...fitLongest(c.width, c.height, CELL), Math.min(steps, 6));
     // the same evaluation the render uses, so the figures are the movement's
     const report = await motionReportOf(ctx, from, to);
     const figs = report.figures.map(({ address, figures: f }) => {
