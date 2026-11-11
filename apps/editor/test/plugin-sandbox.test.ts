@@ -948,3 +948,19 @@ describe('the recording path', () => {
     expect(sandboxDeclaration('stars')).toBeNull();
   });
 });
+
+describe('a tool and a check of one name', () => {
+  it('runs the one asked for, the check as a check and the tool as a tool', async () => {
+    const twin: PluginModule = {
+      meta: { name: 'twin' } as never,
+      tools: [{ name: 'twin.figure', description: 'lays a figure', run: () => 'the tool ran' }],
+      checks: [{ name: 'twin.figure', run: () => [{ check: 'twin.figure', severity: 'warning', message: 'the check ran' }] }],
+    } as never;
+    const { host } = pair(new Map([['blob:twin', twin]]));
+    await host.ensure([{ id: 'twin', url: 'blob:twin' }]);
+    const issues = await host.runCheck('twin.figure', { doc: doc().doc, compId: 'root', comp: {}, samples: [], step: 1 } as unknown as CheckContext);
+    expect(JSON.stringify(issues)).toContain('the check ran');
+    expect(toolOutput(await host.runTool('twin.figure', {}, toolCtx(doc().doc))).text).toBe('the tool ran');
+    host.dispose();
+  });
+});

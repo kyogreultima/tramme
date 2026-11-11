@@ -100,13 +100,12 @@ export function startWorkerSide({ post, importModule, sandbox: makeSandbox }: Wo
     presets: JSON.parse(JSON.stringify(mod.presets ?? [])),
   });
 
-  const find = (name: string): { kind: 'tool' | 'check'; run: (input: any, ctx: any) => unknown; id: string } | null => {
+  /** a tool or a check by its name, of the kind asked: a plugin may give a tool and a check the same name (styk-figure) */
+  const find = (name: string, kind: 'tool' | 'check'): { run: (input: any, ctx: any) => unknown; id: string } | null => {
     // the project's own plugins first: an installed plugin's tool of the same name is not the one the page registered
     for (const [id, mod] of [...modules].sort(([a], [b]) => Number(a.startsWith(INSTALLED)) - Number(b.startsWith(INSTALLED)))) {
-      const tool = mod.tools?.find((t) => t.name === name);
-      if (tool) return { kind: 'tool', run: tool.run, id };
-      const check = mod.checks?.find((c) => c.name === name);
-      if (check) return { kind: 'check', run: check.run, id };
+      const entry = (kind === 'tool' ? mod.tools : mod.checks)?.find((x) => x.name === name);
+      if (entry) return { run: entry.run, id };
     }
     return null;
   };
@@ -297,9 +296,8 @@ export function startWorkerSide({ post, importModule, sandbox: makeSandbox }: Wo
         return;
       }
       if (m.kind === 'tool' || m.kind === 'check') {
-        const found = find(m.name);
+        const found = find(m.name, m.kind);
         if (!found) { post({ kind: 'result', call: m.call, err: `unknown ${m.kind}: ${m.name}` }); return; }
-        if (found.kind !== m.kind) { post({ kind: 'result', call: m.call, err: `${m.name} is a ${found.kind}, called as a ${m.kind}` }); return; }
         const controller = new AbortController();
         controllers.set(m.call, controller);
         const registry = schemaRegistryOf([...modules.values()]);
