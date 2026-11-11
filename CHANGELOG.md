@@ -21,6 +21,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
   - the inputs of the tools the instructions name ride in the cached prompt, so the model no longer fetches their schemas mid-turn;
   - the vocabulary's full entries leave out what only the interface uses (a field's panel group, its slider step, a label repeating its name);
   - a scene built apart is no longer sent to read the whole film plan, its own beats being in its message;
+  - a proposal's answer carries the quality checks of its composition, so the contact sheet is asked for once a scene is built rather than after every proposal;
   - a tool's input with a plain slip (an object where a text is wanted, a single value where a list is, a number written as text, an option in another case, a number past its bound) is read and told, not refused;
   - a portrait still, contact sheet or motion strip is sized by its longest side, like a landscape one, instead of being three times heavier.
 
