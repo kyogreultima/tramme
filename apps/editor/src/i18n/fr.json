@@ -1119,7 +1119,7 @@
     "quickLauncherHint": "Un petit bouton flottant au-dessus de vos autres applications quand Tramme est derrière. Sans projet ouvert, il lance un film ; avec un projet ouvert, il reçoit des fichiers déposés dessus, sollicite l'assistant et montre la lecture en anneau. Déplacez-le où vous voulez.",
     "noMatch": "Aucun réglage pour « {query} ».",
     "effort": "Effort",
-    "effortHint": "L'application que le modèle choisi met à chaque message : réflexion plus poussée et plus de vérifications quand il monte, mais plus lent et plus coûteux. Retenu pour chaque modèle. Claude : Élevé par défaut, ce qui convient à la plupart des travaux.",
+    "effortHint": "L'application que le modèle choisi met à chaque message : réflexion plus poussée et plus de vérifications quand il monte, mais plus lent et plus coûteux. Retenu pour chaque modèle. Claude : Moyen par défaut, qui fait des films aussi bons qu'Élevé pour bien moins cher ; montez-le pour les travaux les plus durs.",
     "effortNone": "Ce modèle n'a pas de niveaux d'effort.",
     "effortOfName": "Effort de {name}",
     "effortIs": "Effort : {level}",

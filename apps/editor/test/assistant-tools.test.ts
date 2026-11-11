@@ -32,10 +32,10 @@ describe('effort levels', () => {
     expect(effortLevels('antigravity:claude-sonnet-4-6')).toEqual([]);
   });
 
-  it('follow the choice made for each model; otherwise high for Claude, the model\'s own for the others', () => {
+  it('follow the choice made for each model; otherwise medium for Claude, the model\'s own for the others', () => {
     const chosen = { 'claude-opus-5-5': 'max', 'openai:gpt-5': 'low', 'gemini:gemini-2.5-pro': 'xhigh' } as const;
     expect(effortFor('claude-opus-5-5', chosen)).toBe('max');
-    expect(effortFor('claude-sonnet-5-5', chosen)).toBe('high');
+    expect(effortFor('claude-sonnet-5-5', chosen)).toBe('medium');
     expect(effortFor('openai:gpt-5', chosen)).toBe('low');
     expect(effortFor('openai:o4-mini', chosen)).toBeUndefined();
     // a level the model does not have: its default

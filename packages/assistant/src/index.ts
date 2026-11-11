@@ -12,8 +12,8 @@ import { splitGuides, type Guide } from './guides.ts';
 export * from './claude-models.ts';
 export { readableModel, setModelLabels } from './model-names.ts';
 
-/** Claude's level when none is chosen; the other models keep their own default */
-export const DEFAULT_EFFORT: Effort = 'high';
+/** Claude's level when none is chosen (the bench made films as good for 62 % less at medium than at high, bench/ledger.md); the other models keep their own default */
+export const DEFAULT_EFFORT: Effort = 'medium';
 
 // ── other models ─────────────────────────────────────────────
 // Claude goes through the companion or the server's Anthropic key. The others
@@ -128,7 +128,7 @@ export function effortLevels(model: string, reasons = false): Effort[] {
   }
 }
 
-/** the level a model works at: the one chosen for it, otherwise high for Claude (when its listing gives it levels) and nothing for the others (their own default) */
+/** the level a model works at: the one chosen for it, otherwise DEFAULT_EFFORT for Claude (when its listing gives it levels) and nothing for the others (their own default) */
 export function effortFor(model: string, chosen: Record<string, Effort | undefined>, reasons = false): Effort | undefined {
   const levels = effortLevels(model, reasons);
   if (!levels.length) return undefined;

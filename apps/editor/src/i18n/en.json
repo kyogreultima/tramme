@@ -1119,7 +1119,7 @@
     "quickLauncherHint": "A small floating button over your other apps while Tramme is behind them. With no project open it starts a film; with one open it takes files dropped on it, asks the assistant and shows the playback as a ring. Drag it where you like.",
     "noMatch": "No setting for \"{query}\".",
     "effort": "Effort",
-    "effortHint": "How hard the chosen model works on each message: deeper thinking and more checks as it rises, but slower and costlier. Kept for each model. Claude: High by default, which suits most work.",
+    "effortHint": "How hard the chosen model works on each message: deeper thinking and more checks as it rises, but slower and costlier. Kept for each model. Claude: Medium by default, which makes films as good as High for much less; raise it for the hardest work.",
     "effortNone": "This model has no effort levels.",
     "effortOfName": "Effort of {name}",
     "effortIs": "Effort: {level}",

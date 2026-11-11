@@ -43,7 +43,7 @@ export interface AiSettings {
   token: string;
   /** where local models answer (OpenAI format): Ollama by default, LM Studio on :1234 */
   localUrl: string;
-  /** the effort level chosen for each model that has levels; none chosen: high for Claude, the model's own default for the others */
+  /** the effort level chosen for each model that has levels; none chosen: DEFAULT_EFFORT (medium) for Claude, the model's own default for the others */
   efforts: Record<string, Effort>;
   /** tell the user when a turn is over (a notification when the editor is in the background) */
   notify: boolean;

@@ -17,6 +17,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Changed
 
+- Claude works at the Medium effort by default instead of High: on the bench, with the changes below, four films of different kinds cost 62 % less and came out at least as good. A level chosen for a model stays as it is.
 - The assistant costs less per film, for the same work:
   - its system prompt no longer changes with the project: the brief, the film plan and the installed plugins travel with the message, again only when they changed, so writing a brief or a plan no longer throws the conversation out of the cache;
   - the guides only some work needs (a video where someone speaks, shorts, sources, clips, node plugins, stock, sequences, tracking…) are read on demand, and the system prompt that every request reads is a third shorter;
