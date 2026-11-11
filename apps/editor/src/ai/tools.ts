@@ -10,7 +10,8 @@ import { editorEvaluator } from '../evaluator.ts';
 import { DOCUMENT, isChatPath, MANIFEST, pathIssue, srcPath } from '@tramme/project';
 import { VideoFrames } from '@tramme/render';
 import { Stills } from '../frames.ts';
-import type { ToolResult } from '@tramme/assistant';
+import { guidesOf, type ToolResult } from '@tramme/assistant';
+import reference from '../../../../docs/document.md';
 import { inputIssues, vocabularyDetail, vocabularyIndex } from './answers.ts';
 import { uid } from './calls.ts';
 import { isSceneTextPath } from '../scene-tools.ts';
@@ -336,6 +337,10 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
           return text(files.map((f) => `${f.path}\t${f.size} bytes`).join('\n') || '(no files)');
         }
         case 'read_file': return await this.read(String(input.path ?? ''), Number(input.offset ?? 0));
+        case 'read_guide': {
+          const guides = guidesOf(reference), guide = guides.find((g) => g.name === String(input.name ?? '').trim().toLowerCase());
+          return guide ? text(guide.text) : text(`no guide named "${input.name}": ${guides.map((g) => g.name).join(', ')}`, true);
+        }
         case 'write_file': return await this.write(String(input.path ?? ''), String(input.content ?? ''));
         case 'get_transcript': return await this.transcript(String(input.asset ?? ''), input.from, input.to, !!input.words);
         case 'media_frame': return await this.mediaFrame(String(input.asset ?? ''), Number(input.t ?? 0));

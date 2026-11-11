@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { joinSystem, systemParts, systemPrompt } from '../src/index.ts';
+import { guidesOf, joinSystem, systemParts, systemPrompt } from '../src/index.ts';
 
 const REF = '# Reference\n\nThe document format.\n\nMore of the reference.';
 
@@ -25,14 +25,16 @@ describe('the system prompt in cache order', () => {
     expect(systemParts(REF).variable).toBe('');
   });
 
-  it('says the same words as before, the reference first', () => {
+  it('says the same words as before with its guides, the reference first', () => {
     const p = systemPrompt(REF, 'BRIEF', ['plug: x']);
-    expect(paragraphs(p)).toEqual(paragraphs(BEFORE));
+    // the guides left the prompt for read_guide, and an index of them came in
+    const whole = [p, ...guidesOf(REF).map((g) => g.text)].join('\n\n');
+    expect(paragraphs(whole).filter((x) => !x.startsWith('Guides:'))).toEqual(paragraphs(BEFORE));
     expect(p).not.toBe(BEFORE);
     expect(p.indexOf(REF)).toBeLessThan(p.indexOf('BRIEF'));
     expect(p.indexOf(REF)).toBeLessThan(p.indexOf('plug: x'));
-    // the instructions come first, untouched
-    expect(p.startsWith(BEFORE.slice(0, BEFORE.indexOf('Plugins installed on this device')).trimEnd())).toBe(true);
+    // the instructions come first, their rules untouched
+    expect(p.startsWith(BEFORE.slice(0, BEFORE.indexOf('\n\nFinish:')))).toBe(true);
   });
 
   it('joins the two parts, and is the fixed part alone without a project', () => {
@@ -72,7 +74,7 @@ describe('the direction rules', () => {
 
   it('keep the example as one kind among the others, and name the style frames where the directions are proposed', () => {
     expect(direction).toContain('one kind among the others');
-    expect(fixed.slice(fixed.indexOf('Sources:'))).toContain('style-frames');
+    expect(guidesOf(REF).find((g) => g.name === 'sources')?.text).toContain('style-frames');
   });
 });
 
@@ -88,11 +90,10 @@ describe('the depth and camera rules', () => {
 
 describe('the material rules', () => {
   const { fixed } = systemParts(REF);
-  const material = fixed.slice(fixed.indexOf('Material:'), fixed.indexOf('Clips:'));
+  const material = fixed.slice(fixed.indexOf('Material:'), fixed.indexOf('Sound:') > fixed.indexOf('Material:') ? fixed.indexOf('Sound:') : fixed.indexOf('# Reference'));
 
-  it('sit between the pictures and the clips and name the object, the surface, the libraries, the credits and the yes', () => {
+  it('come after the pictures and name the object, the surface, the libraries, the credits and the yes', () => {
     expect(fixed.indexOf('Material:')).toBeGreaterThan(fixed.indexOf('Pictures:'));
-    expect(fixed.indexOf('Material:')).toBeLessThan(fixed.indexOf('Clips:'));
     for (const word of ['object', 'surface', 'stock', 'credits', 'wordmark', "the user's yes", 'solid.3d']) expect(material, word).toContain(word);
   });
 

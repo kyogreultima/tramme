@@ -6,6 +6,7 @@
 import { z } from 'zod';
 import { claudeModel, EFFORTS, type Effort } from './claude-models.ts';
 import { listedLabel, readableModel } from './model-names.ts';
+import { splitGuides, type Guide } from './guides.ts';
 
 // The Claude models are not listed here: they come from the Agent SDK or the Anthropic API, as they are now
 export * from './claude-models.ts';
@@ -226,6 +227,12 @@ export const TOOLS: ToolDef[] = [
     label: (i) => t('Reading {path}', { path: i.path }),
   },
   {
+    name: 'read_guide',
+    description: 'A guide of the instructions, by its name in the index at the end of the system prompt: read it before the work it covers, once in a conversation.',
+    schema: z.object({ name: z.string().describe('the guide\'s name, e.g. speaking') }),
+    label: (i) => t('Reading the guide {name}', { name: i.name }),
+  },
+  {
     name: 'write_file',
     description: 'Writes a text file of the project: a plugin in plugins/ (.js or .mjs), or data in assets/ (.json, .svg). The document is never written this way: it changes through propose_changes. A plugin already in use is reloaded in the preview.',
     schema: z.object({
@@ -433,8 +440,12 @@ export function systemParts(reference: string, brief?: string, installed?: strin
   ].filter(Boolean).join('\n\n');
   // the editor's packs are the same for every project: they ride with the cached part
   const entries = packs?.length ? `\n\nEntries of the editor's packs, by need (usable even when the project holds none; the first use adds the pack to the project; list_nodes { types } gives the full entry):\n${packs.map((x) => `- ${x}`).join('\n')}` : '';
-  return { fixed: `${INSTRUCTIONS}\n\n${reference}${entries}`, variable };
+  return { fixed: `${splitGuides(INSTRUCTIONS, reference).core}${entries}`, variable };
 }
+
+/** the guides read on demand (read_guide), cut from the instructions and the reference */
+export const guidesOf = (reference: string): Guide[] => splitGuides(INSTRUCTIONS, reference).guides;
+export type { Guide } from './guides.ts';
 
 /**
  * A message with the project's part of the prompt (its brief, plan, installed
