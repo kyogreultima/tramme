@@ -54,24 +54,47 @@ const HEADINGS: Record<Section, string> = {
 };
 const withNotes = (ai?: AiNotes) => (ai ? { ai } : {});
 
+/** a field's name as words ("trimStart", "trim-start" and "Trim start" read alike) */
+const words = (s: string) => s.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[-_\s]+/g, ' ').trim().toLowerCase();
+
+/**
+ * A field of a schema as the assistant reads it: the interface's own parts
+ * (its group in the panel, the step of its slider) left out, and its label
+ * when it only repeats the field's name. Descriptions, types, ranges,
+ * defaults, options and examples stay.
+ */
+function leanField(key: string, field: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(field)) {
+    if (k === 'group' || k === 'step') continue;
+    if ((k === 'label' || k === 'title') && typeof v === 'string' && words(v) === words(key)) continue;
+    out[k] = k === 'properties' && v && typeof v === 'object' ? leanFields(v as Record<string, Record<string, unknown>>)
+      : k === 'items' && v && typeof v === 'object' && !Array.isArray(v) ? leanField(key, v as Record<string, unknown>)
+      : v;
+  }
+  return out;
+}
+const leanFields = (fields: Record<string, Record<string, unknown>>) => Object.fromEntries(Object.entries(fields).map(([k, f]) => [k, leanField(k, f)]));
+const leanInput = (schema?: JsonSchema) => (schema ? leanField('', schema as Record<string, unknown>) : { type: 'object' });
+
 /** the vocabulary by section, each entry once, for the index and the details alike */
 function entries(reg: Registry): Record<Section, Entry[]> {
   return {
     nodes: reg.listNodes().map((n) => ({
       name: n.type, head: `${n.type} "${n.title}" [${n.category}${n.container ? ', container' : ''}]`, props: propLine(n.props), ai: n.ai,
-      full: { type: n.type, title: n.title, category: n.category, container: !!n.container, ...withNotes(n.ai), props: n.props },
+      full: { type: n.type, title: n.title, category: n.category, container: !!n.container, ...withNotes(n.ai), props: leanFields(n.props as never) },
     })),
     effects: reg.listEffects().map((e) => ({
       name: e.type, head: `${e.type} "${e.title}" [${e.stage}]`, props: propLine(e.props), ai: e.ai,
-      full: { type: e.type, title: e.title, stage: e.stage, ...withNotes(e.ai), props: e.props },
+      full: { type: e.type, title: e.title, stage: e.stage, ...withNotes(e.ai), props: leanFields(e.props as never) },
     })),
     modifiers: reg.listModifiers().map((m) => ({
       name: m.type, head: `${m.type} "${m.title}"${m.description ? `: ${m.description}` : ''}`, props: propLine(m.params), ai: m.ai,
-      full: { type: m.type, title: m.title, description: m.description, ...withNotes(m.ai), params: m.params },
+      full: { type: m.type, title: m.title, description: m.description, ...withNotes(m.ai), params: leanFields(m.params as never) },
     })),
     tools: reg.listTools().map(({ tool: x, from }) => ({
       name: x.name, head: `${x.name}(${inputLine(x.input)}) [${from}]${x.description ? `: ${x.description}` : ''}`, props: '', ai: x.ai,
-      full: { name: x.name, from, description: x.description, ...withNotes(x.ai), input: x.input ?? { type: 'object' } },
+      full: { name: x.name, from, description: x.description, ...withNotes(x.ai), input: leanInput(x.input) },
     })),
   };
 }
@@ -109,7 +132,7 @@ export function vocabularyIndex(reg: Registry, opts: { query?: string; installed
   }
   if (words.length && !matched) return `Nothing in the vocabulary holds "${opts.query}": try other words, or list_nodes without query for the index.`;
   if (hidden) out.push('', `${hidden} more entries come from the plugins installed on this device and the editor's packs, whose entries by need the instructions list: list_nodes { query } finds their schemas; drawing with one adds it to the project with your changes.`);
-  out.push('', 'list_nodes with types gives the full entries: property labels, descriptions, ranges, examples, tool input schemas.');
+  out.push('', 'list_nodes with types gives the full entries: descriptions, ranges, defaults, examples, tool input schemas.');
   return out.join('\n');
 }
 

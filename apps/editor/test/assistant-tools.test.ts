@@ -99,9 +99,24 @@ describe("the assistant's tools", () => {
     const type = reg.listNodes()[0].type;
     const detail = JSON.parse(vocabularyDetail(reg, [type, 'check', 'nothing-like-it']));
     expect(detail.nodes.map((n: { type: string }) => n.type)).toEqual([type]);
-    expect(detail.nodes[0].props).toEqual(reg.listNodes()[0].props);
+    expect(Object.keys(detail.nodes[0].props)).toEqual(Object.keys(reg.listNodes()[0].props));
     expect(detail.tools[0]).toMatchObject({ name: 'check', input: { type: 'object' } });
     expect(detail.unknown).toEqual(['nothing-like-it']);
+  });
+
+  it("leaves out of the full entries what only the interface uses, never what says what a field does", () => {
+    const reg = builtinRegistry().registerTool(...REVIEW_TOOLS);
+    const { nodes } = JSON.parse(vocabularyDetail(reg, ['shape.path', 'image']));
+    const path = nodes.find((n: { type: string }) => n.type === 'shape.path').props, image = nodes.find((n: { type: string }) => n.type === 'image').props;
+    // the panel's group and slider step go; a label that repeats the name goes
+    expect(path.trimStart).not.toHaveProperty('group');
+    expect(path.trimStart).not.toHaveProperty('step');
+    expect(path.trimStart).not.toHaveProperty('label');
+    // what it means, its range and its default stay
+    expect(path.trimStart).toMatchObject({ type: 'number', default: 0, min: 0, max: 1 });
+    expect(path.trimStart.description).toMatch(/fraction of the outline/);
+    // a label that says more than the name stays
+    expect(image.size.label).toBe('Frame');
   });
 });
 
