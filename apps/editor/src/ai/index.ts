@@ -602,58 +602,65 @@ export async function* ask(p: AskPayload, signal: AbortSignal): AsyncGenerator<A
   /** the tool calls of the scenes built apart: their own lines hold them, the director's does not */
   let apart = 0;
   if (!current()) return;
-  yield* resuming(attempt, signal, tally);
-  if (!current()) return;
-  // a film planned this turn with scenes to build is built scene by scene, each in a fresh context, then assembled in this one
-  if (aiSettings.peek().scenesApart === 'auto' && !signal.aborted) {
-    const readPlan = async () => {
-      const result = await api.readText(project.id, FILM_PLAN_PATH).catch(() => null);
-      return current() ? parsePlan(result?.text) : null;
-    };
-    const planned = await readPlan();
+  // the turn, then its scenes built apart and their assembly; a stop ends it, and the usage line below still tells what was spent
+  const work = async function* (): AsyncGenerator<AiEvent> {
+    yield* resuming(attempt, signal, tally);
     if (!current()) return;
-    // the plan must be this turn's: an old plan does not start a run on an unrelated message
-    if (planned && Date.parse(planned.updated) >= started && todoScenes(planned, runner.liveDoc()).run.length >= 3) {
-      // the brief and the plan as the director left them: each scene reads them with its first message, under the same system prompt as every turn
-      const briefNow = (await api.readText(project.id, 'assets/brief.json').catch(() => null))?.text ?? brief ?? undefined;
+    // a film planned this turn with scenes to build is built scene by scene, each in a fresh context, then assembled in this one
+    if (aiSettings.peek().scenesApart === 'auto' && !signal.aborted) {
+      const readPlan = async () => {
+        const result = await api.readText(project.id, FILM_PLAN_PATH).catch(() => null);
+        return current() ? parsePlan(result?.text) : null;
+      };
+      const planned = await readPlan();
       if (!current()) return;
-      const sceneParts = systemParts(reference, briefNow, mine, packLines(packs), planText(planned));
-      const via = viaFor(route, model);
-      // what each scene's turn used, for its own line and to leave out of the director's
-      const sceneUse = new Map<string, { tools: number; images: number }>();
-      const sceneTurn = (scenePrompt: string, scene: PlanScene) => (async function* (): AsyncGenerator<AiEvent> {
+      // the plan must be this turn's: an old plan does not start a run on an unrelated message
+      if (planned && Date.parse(planned.updated) >= started && todoScenes(planned, runner.liveDoc()).run.length >= 3) {
+        // the brief and the plan as the director left them: each scene reads them with its first message, under the same system prompt as every turn
+        const briefNow = (await api.readText(project.id, 'assets/brief.json').catch(() => null))?.text ?? brief ?? undefined;
         if (!current()) return;
-        const own = new ServerSession(), mine2: Tally = { usage: NO_USAGE, seen: 0, reported: false }, before = runner.calls;
-        let sid: string | undefined;
-        runner.scope = { comp: scene.comp!, root: S.doc.peek().root, tokens: [] };
-        try {
-          yield* resuming((again) => freshTurn({ prompt: again && (route !== 'companion' || sid) ? again : withProject(scenePrompt, sceneParts.variable), system, tools: true, via, runner, signal, effort, cacheTtl, session: own, sessionId: again ? sid : undefined, onSession: (id) => { sid = id; } }), signal, mine2);
-        } finally { runner.scope = null; sceneUse.set(scene.id, { tools: runner.calls - before, images: mine2.seen }); }
-        yield { type: 'usage', usage: mine2.usage };
-      })();
-      const result = yield* runScenes({
-        plan: planned, doc: () => runner.liveDoc(), turn: sceneTurn, read: readPlan,
-        save: async (p) => {
-          if (!current()) throw new Error('the project changed while the plan was being saved');
-          await api.write(project.id, FILM_PLAN_PATH, JSON.stringify(p, null, 1));
-          if (!current()) throw new Error('the project changed while the plan was being saved');
-        },
-        line: (scene, u, ms) => ({ ...u, tools: sceneUse.get(scene.id)?.tools ?? 0, images: sceneUse.get(scene.id)?.images ?? 0, ms, model, route: USAGE_ROUTE[route], scene: scene.name }),
-        signal,
-      });
-      if (!current()) return;
-      for (const u of sceneUse.values()) apart += u.tools;
-      if (!signal.aborted) {
-        // the director assembles with the plan as the scenes left it, told only when it moved
-        const after = systemParts(reference, briefNow, mine, packLines(packs), planText((await readPlan()) ?? planned)).variable;
+        const sceneParts = systemParts(reference, briefNow, mine, packLines(packs), planText(planned));
+        const via = viaFor(route, model);
+        // what each scene's turn used, for its own line and to leave out of the director's
+        const sceneUse = new Map<string, { tools: number; images: number }>();
+        const sceneTurn = (scenePrompt: string, scene: PlanScene) => (async function* (): AsyncGenerator<AiEvent> {
+          if (!current()) return;
+          const own = new ServerSession(), mine2: Tally = { usage: NO_USAGE, seen: 0, reported: false }, before = runner.calls;
+          let sid: string | undefined;
+          runner.scope = { comp: scene.comp!, root: S.doc.peek().root, tokens: [] };
+          try {
+            yield* resuming((again) => freshTurn({ prompt: again && (route !== 'companion' || sid) ? again : withProject(scenePrompt, sceneParts.variable), system, tools: true, via, runner, signal, effort, cacheTtl, session: own, sessionId: again ? sid : undefined, onSession: (id) => { sid = id; } }), signal, mine2);
+          } finally {
+            runner.scope = null;
+            sceneUse.set(scene.id, { tools: runner.calls - before, images: mine2.seen });
+            apart += runner.calls - before;
+          }
+          yield { type: 'usage', usage: mine2.usage };
+        })();
+        const result = yield* runScenes({
+          plan: planned, doc: () => runner.liveDoc(), turn: sceneTurn, read: readPlan,
+          save: async (p) => {
+            if (!current()) throw new Error('the project changed while the plan was being saved');
+            await api.write(project.id, FILM_PLAN_PATH, JSON.stringify(p, null, 1));
+            if (!current()) throw new Error('the project changed while the plan was being saved');
+          },
+          line: (scene, u, ms) => ({ ...u, tools: sceneUse.get(scene.id)?.tools ?? 0, images: sceneUse.get(scene.id)?.images ?? 0, ms, model, route: USAGE_ROUTE[route], scene: scene.name }),
+          signal,
+        });
         if (!current()) return;
-        const changed = after !== session.given ? after : '';
-        session.given = after;
-        yield* resuming(attempt, signal, tally, withProject(assemblyNote(result), changed));
+        if (!signal.aborted) {
+          // the director assembles with the plan as the scenes left it, told only when it moved
+          const after = systemParts(reference, briefNow, mine, packLines(packs), planText((await readPlan()) ?? planned)).variable;
+          if (!current()) return;
+          const changed = after !== session.given ? after : '';
+          session.given = after;
+          yield* resuming(attempt, signal, tally, withProject(assemblyNote(result), changed));
+        }
       }
     }
-  }
-  if (!current()) return;
+  };
+  try { yield* work(); } catch (e) { if (!signal.aborted) throw e; }
+  if (!sameFileProject(project)) return;
   const { usage, seen, reported } = tally;
   const harvest = harvestNote([...runner.wrotePlugins]);
   if (harvest) yield { type: 'item', item: { id: uid(), role: 'assistant', text: harvest } };

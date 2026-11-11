@@ -37,6 +37,19 @@ describe('the usage line of a turn', () => {
     expect(item?.usage?.unknown).toBeUndefined();
   });
 
+  it('is kept when the turn is stopped half way', async () => {
+    const stop = new AbortController();
+    vi.spyOn(ServerSession.prototype, 'turn').mockImplementation(async function* () {
+      yield { type: 'usage', usage: { ...NO_USAGE, requests: 3, cacheRead: 90000 } };
+      stop.abort();
+      throw Object.assign(new Error('stopped'), { name: 'AbortError' });
+    });
+    const out: AiEvent[] = [];
+    for await (const ev of ai.ask({ text: 'hi', context: {}, doc: S.doc.peek(), decisions: [] }, stop.signal)) out.push(ev);
+    const item = out.flatMap((e) => (e.type === 'item' && e.item.usage ? [e.item] : []))[0];
+    expect(item?.usage).toMatchObject({ requests: 3, cacheRead: 90000 });
+  });
+
   it('marks a turn that reported no usage as unknown, not as zero', async () => {
     const item = await turn([{ type: 'done' }]);
     expect(item?.usage).toMatchObject({ route: 'server', unknown: true });
