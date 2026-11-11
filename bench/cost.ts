@@ -11,7 +11,7 @@ const M = 1e6;
 
 /** the dollars of a turn, and whether they are a lower bound; null when the model has no price or the route reported no usage */
 /** the dollars of some tokens at a model's price, and whether they are a lower bound; null when the model has none */
-function priced(u: Usage, model: string): { dollars: number; lowerBound: boolean } | null {
+export function priced(u: Usage, model: string): { dollars: number; lowerBound: boolean } | null {
   const price = PRICES[model];
   if (!price) return null;
   // a line kept before the lifetimes were told has no hour of writes

@@ -113,6 +113,30 @@
       "format": "16:9",
       "seconds": 25,
       "prompt": "Product video for Sentinel, a cloud security platform: it scans 10,000 assets in minutes, ranks the real risks, and fixes them in one click. Serious, technical, dark blue with alert reds."
+    },
+    {
+      "id": "logo-sting",
+      "split": "test",
+      "format": "16:9",
+      "seconds": 5,
+      "prompt": "Une intro de 5 secondes pour Kestrel Freight, une société de transport aérien de marchandises, à placer au début de toutes nos vidéos. Le logo est dans assets/kestrel-mark.svg : respecte-le tel quel. Sobre, précise, avec une signature sonore.",
+      "files": [
+        "assets/kestrel-mark.svg"
+      ]
+    },
+    {
+      "id": "data-short",
+      "split": "test",
+      "format": "16:9",
+      "seconds": 15,
+      "prompt": "15 seconds on our water results for LinkedIn: the Ndiaye bottling plant now uses 2.1 litres of water per litre bottled, down from 3.4 in 2021, and recycles 68% of it. Calm and factual, our colours are deep green and sand."
+    },
+    {
+      "id": "kinetic-quote",
+      "split": "test",
+      "format": "9:16",
+      "seconds": 12,
+      "prompt": "Typographie animée verticale pour Instagram, 12 secondes, sur cette phrase de notre fondatrice : « On ne vend pas des chaises. On vend le temps que vous passez assis. » — Léa Morel, Assise. Rien que du texte, mais qu'il vive."
     }
   ]
 }

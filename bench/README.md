@@ -27,6 +27,26 @@ those videos, not general.
 6. Run the same brief a second time in a new project: the two films are scored
    apart, then side by side for variety.
 
+### Running a brief unattended
+
+`node bench/run.ts <brief id>` does the steps above alone, on the trial server
+(port 8790, its own state in `.wrangler/state-bench`) with the companion:
+
+```
+npx wrangler dev -c apps/worker/wrangler.jsonc --port 8790 --var DEV_OPEN:1 --persist-to .wrangler/state-bench
+node packages/cli/src/main.ts agent --origin http://localhost:8790
+node bench/run.ts logo-sting --series baseline --cap 6 --effort high
+```
+
+The turn goes through Claude Code, so it spends the subscription's quota: it is
+stopped once its cost, read live from Claude Code's transcripts at the API's
+prices, passes `--cap` dollars. `--dry` opens the project and checks the
+companion answers without sending anything. The run leaves in
+`out/bench/<series>/<brief>-<n>/` the conversations (for `usage.ts`), the
+transcripts and `run.json`; the project stays on the trial server to be watched
+and scored. A brief's `files` (paths under `bench/`) are put in the project's
+`assets/` first.
+
 ### What a run costs, and what a change did to it
 
 `node bench/usage.ts <project>` prints, for each turn, its tokens, the share
