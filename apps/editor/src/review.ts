@@ -104,6 +104,12 @@ export function issueReport(issues: QualityIssue[], doc: TrammeDoc, compId: stri
   return { lines, notice };
 }
 
+/** the picture's quality checks of the context's composition as the assistant reads them, without the contact sheet or the sound (what a proposal's answer carries) */
+export async function checksText(ctx: ToolContext): Promise<string> {
+  const issues = await qualityChecksOf(ctx, ctx.compId, await analyses(ctx));
+  return [reportHead(issues), ...issueReport(issues, ctx.doc, ctx.compId).lines].join('\n');
+}
+
 const check: ToolType<{ frames?: number }> = {
   name: 'check', title: 'Check the composition', description: "runs the quality checks (readability, safe zone, overlaps, pacing; the sound: the master's loudness and peak, each effect on its cue and heard over the bed, the music under the voice, dips and silences) and shows a contact sheet of the key moments and the picture of the mix",
   input: { type: 'object', properties: { frames: { type: 'integer', minimum: 2, maximum: 12, title: 'Frames' } } },

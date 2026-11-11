@@ -29,6 +29,7 @@ import { approvedProjectResource, readLimitedBody } from '../plugins/host.ts';
 import { pluginHost } from '../plugins/index.ts';
 import { ensureDeclared, ensureSandboxDoc, moduleItemsOf } from '../plugins/sandbox-draw.ts';
 import { preview } from '../preview.ts';
+import { checksText } from '../review.ts';
 import { prefs } from '../settings.ts';
 
 const text =(s: string, isError = false): ToolResult => ({ content: [{ type: 'text', text: s }], isError });
@@ -319,7 +320,10 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
           return text(JSON.stringify(editorEvaluator(doc, reg, { data }).value(String(input.address), Number(input.t), compId)));
         }
         case 'render_still': return await this.still(Number(input.t), input.compId, input.caption);
-        case 'propose_changes': return await this.propose(String(input.label ?? 'Change'), input.ops as Op[]);
+        case 'propose_changes': {
+          const r = await this.propose(String(input.label ?? 'Change'), input.ops as Op[]);
+          return r.isError ? r : await this.withChecks(r);
+        }
         case 'discard_proposal': {
           // a scene builder drops its own changes: the director's root and the scenes built before it stay proposed
           if (this.scoped && this.before) {
@@ -477,6 +481,20 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
     if (repaired.length) lines.push(`(input read as: ${repaired.join('; ')})`);
     content.unshift({ type: 'text', text: lines.join('\n') || `${name}: done.` });
     return { content };
+  }
+
+  /**
+   * A proposal's answer with the picture's quality checks of the composition as it now
+   * stands: the model reads what is wrong without another call. The contact sheet and the
+   * sound stay with the check tool. Checks that cannot run leave the answer as it was.
+   */
+  private async withChecks(r: ToolResult): Promise<ToolResult> {
+    try {
+      const doc = this.liveDoc(), ctx = this.toolContext(doc, await this.registry(doc));
+      const checks = await checksText(ctx);
+      const said = r.content[0]?.type === 'text' ? r.content[0].text : '';
+      return { ...r, content: [{ type: 'text', text: `${said}\nChecks of "${ctx.compId}" with it: ${checks}` }, ...r.content.slice(1)] };
+    } catch { return r; }
   }
 
   private async propose(label: string, ops: Op[], current?: () => boolean): Promise<ToolResult> {
