@@ -45,7 +45,7 @@ The share of each cost centre on `data-short`, before and after the levers:
 After the levers, generating (the thinking above all) is half of the cost: the
 effort is the next lever, and the one that can move the quality.
 
-The effort stays at high by default until the films of the medium series are judged at least as good as the baseline's: a cost that drops while the films get worse is not a saving.
+2026-11-11: the user judged the films of the medium series at least as good as the baseline's; medium became Claude's default effort.
 
 ## Films to watch
 
