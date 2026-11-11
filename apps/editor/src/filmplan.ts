@@ -166,9 +166,36 @@ function sceneIds(names: string[]): string[] {
   });
 }
 
-interface FilmPlanInput { idea: string; kinds: PictureKind[]; scenes: Omit<PlanScene, 'id'>[]; directions: Direction[]; example?: { kind: PictureKind; what: string }; loop?: boolean }
+type SceneInput = Omit<PlanScene, 'id'>;
+/** a first plan gives its idea, kinds, scenes and directions; a plan written again gives only what changes, the rest kept */
+interface FilmPlanInput { idea?: string; kinds?: PictureKind[]; scenes?: SceneInput[]; change?: (Partial<SceneInput> & { name: string })[]; directions?: Direction[]; example?: { kind: PictureKind; what: string }; loop?: boolean }
 
 const kindProp = { type: 'string', enum: PICTURE_KINDS };
+/** a scene of the plan, as the tool takes it */
+const SCENE_ITEM = {
+  type: 'object',
+  properties: {
+    name: { type: 'string', description: 'a short name' }, kind: kindProp, idea: { type: 'string', description: 'what the scene shows and does, in a sentence' },
+    hero: { type: 'boolean', description: 'the scene the film is remembered for: its style frame is drawn first' },
+    seconds: { type: 'number', description: 'how long it lasts, when known' },
+    comp: { type: 'string', description: 'the id of the composition the scene is built in (the root plays it)' },
+    brief: { type: 'string', description: 'what the builder of this scene needs beyond the plan: the words, names and figures it shows, the sources it uses, its length and where it sits in the root' },
+    motion: {
+      type: 'array', description: 'up to 16 measurable motion beats, in scene-local seconds; include camera moves and a hold for reading',
+      items: { type: 'object', properties: {
+        subject: { type: 'string', description: 'the subject or camera that moves' },
+        start: { type: 'number', description: 'motion starts, seconds from the scene start' },
+        end: { type: 'number', description: 'motion reaches its destination, scene-local seconds' },
+        action: { type: 'string', description: 'travel, destination, anticipation and overshoot in measurable terms, e.g. rise 120 px, overshoot 7%' },
+        easing: { type: 'string', description: 'curve or spring parameters; linear when intentionally mechanical' },
+        settle: { type: 'number', description: 'time by which motion has settled, at or after end' },
+        soundAt: { type: 'number', description: 'optional sound cue time in scene-local seconds' },
+      }, required: ['subject', 'start', 'end', 'action'] },
+    },
+  },
+  required: ['name', 'kind', 'idea'],
+};
+
 const filmPlan: ToolType<FilmPlanInput> = {
   name: 'film-plan', title: 'Film plan', description: `writes the plan of a film (assets/film-plan.json): its idea, the 2 to 5 kinds of picture it alternates (${PICTURE_KINDS.map((k) => `${k}: ${KIND_LINE[k]}`).join('; ')}), each scene with its kind and its idea, and one to three directions written precisely (type, palette, light, materials, framing); it says when the scenes would look alike`,
   input: {
@@ -179,29 +206,11 @@ const filmPlan: ToolType<FilmPlanInput> = {
       loop: { type: 'boolean', title: 'Loop', description: 'a seamless loop: the last moment continues into the first' },
       scenes: {
         type: 'array', title: 'Scenes', description: 'the scenes in order, each with the kind of picture it is and what happens in it; no kind twice in a row, none on more than half the scenes',
-        items: {
-          type: 'object',
-          properties: {
-            name: { type: 'string', description: 'a short name' }, kind: kindProp, idea: { type: 'string', description: 'what the scene shows and does, in a sentence' },
-            hero: { type: 'boolean', description: 'the scene the film is remembered for: its style frame is drawn first' },
-            seconds: { type: 'number', description: 'how long it lasts, when known' },
-            comp: { type: 'string', description: 'the id of the composition the scene is built in (the root plays it)' },
-            brief: { type: 'string', description: 'what the builder of this scene needs beyond the plan: the words, names and figures it shows, the sources it uses, its length and where it sits in the root' },
-            motion: {
-              type: 'array', description: 'up to 16 measurable motion beats, in scene-local seconds; include camera moves and a hold for reading',
-              items: { type: 'object', properties: {
-                subject: { type: 'string', description: 'the subject or camera that moves' },
-                start: { type: 'number', description: 'motion starts, seconds from the scene start' },
-                end: { type: 'number', description: 'motion reaches its destination, scene-local seconds' },
-                action: { type: 'string', description: 'travel, destination, anticipation and overshoot in measurable terms, e.g. rise 120 px, overshoot 7%' },
-                easing: { type: 'string', description: 'curve or spring parameters; linear when intentionally mechanical' },
-                settle: { type: 'number', description: 'time by which motion has settled, at or after end' },
-                soundAt: { type: 'number', description: 'optional sound cue time in scene-local seconds' },
-              }, required: ['subject', 'start', 'end', 'action'] },
-            },
-          },
-          required: ['name', 'kind', 'idea'],
-        },
+        items: SCENE_ITEM,
+      },
+      change: {
+        type: 'array', title: 'Change', description: 'a plan written again: only the scenes that change, each by its name with the fields that change (the others and their fields stay)',
+        items: { ...SCENE_ITEM, required: ['name'] },
       },
       directions: {
         type: 'array', title: 'Directions', description: 'one to three directions, different from each other and from what you would do by default',
@@ -221,20 +230,29 @@ const filmPlan: ToolType<FilmPlanInput> = {
         properties: { kind: kindProp, what: { type: 'string' } }, required: ['kind', 'what'],
       },
     },
-    required: ['idea', 'kinds', 'scenes', 'directions'],
   },
   ai: {
-    when: 'before building a film or dressing a video, after reading the sources and the brief; again when the user changes the story',
+    when: 'before building a film or dressing a video, after reading the sources and the brief; again when the user changes the story, then with only what changes (change for some scenes)',
     avoid: 'one kind of picture for every scene; a kind used as a layout (a kind says what the picture is, not where things sit)',
   },
   async run(input, ctx) {
     const prev = parsePlan(await ctx.readText(FILM_PLAN_PATH).catch(() => null));
-    const ids = sceneIds(input.scenes.map((s) => s.name));
+    // a plan written again keeps what is not given: its idea, kinds, scenes and directions
+    const idea = input.idea ?? prev?.idea, kinds = input.kinds ?? prev?.kinds, directions = input.directions ?? prev?.directions;
+    const scenes: SceneInput[] = [...(input.scenes ?? prev?.scenes.map(({ id: _id, ...s }) => s) ?? [])];
+    if (!idea || !kinds?.length || !scenes.length || !directions) throw new Error('a first plan gives its idea, kinds, scenes and directions');
+    // the scenes that change, by name, with the fields that change
+    for (const c of input.change ?? []) {
+      const i = scenes.findIndex((s) => s.name === c.name);
+      if (i < 0) throw new Error(`${c.name}: no scene of that name (the plan's scenes: ${scenes.map((s) => s.name).join(', ')})`);
+      scenes[i] = { ...scenes[i], ...c };
+    }
+    const ids = sceneIds(scenes.map((s) => s.name));
     const written: FilmPlan = {
-      version: 1, kind: 'film-plan', updated: new Date().toISOString(), idea: input.idea, kinds: input.kinds,
-      scenes: input.scenes.map((s, i) => { const had = prev?.scenes.find((p) => p.id === ids[i]); return { ...(had?.status ? { status: had.status } : {}), ...(had?.comp ? { comp: had.comp } : {}), ...(had?.brief ? { brief: had.brief } : {}), ...(had?.seconds !== undefined ? { seconds: had.seconds } : {}), ...(had?.motion ? { motion: had.motion } : {}), ...s, id: ids[i] }; }), directions: input.directions,
+      version: 1, kind: 'film-plan', updated: new Date().toISOString(), idea, kinds,
+      scenes: scenes.map((s, i) => { const had = prev?.scenes.find((p) => p.id === ids[i]); return { ...(had?.status ? { status: had.status } : {}), ...(had?.comp ? { comp: had.comp } : {}), ...(had?.brief ? { brief: had.brief } : {}), ...(had?.seconds !== undefined ? { seconds: had.seconds } : {}), ...(had?.motion ? { motion: had.motion } : {}), ...s, id: ids[i] }; }), directions,
       ...((input.loop ?? prev?.loop) !== undefined ? { loop: input.loop ?? prev?.loop } : {}),
-      ...(input.example ? { example: input.example } : {}),
+      ...((input.example ?? prev?.example) ? { example: input.example ?? prev?.example } : {}),
       ...(prev?.frames?.length ? { frames: prev.frames } : {}), ...(prev?.target ? { target: prev.target } : {}),
     };
     const invalid = motionIssues(written.scenes.map((s) => ({ ...s, seconds: s.seconds ?? ctx.doc.compositions[s.comp ?? '']?.duration })));
@@ -243,7 +261,7 @@ const filmPlan: ToolType<FilmPlanInput> = {
     const issues = [...planIssues(written), ...directionIssues(written.directions)];
     return {
       ops: [planOp(ctx.doc)], label: t('filmPlan.written'),
-      text: `The film plan is at ${path}${prev ? ' (the style frames and the target kept before are kept)' : ''}:\n${planText(written)}\n${issues.length ? `To fix:\n${issues.map((l) => `- ${l}`).join('\n')}\nCall film-plan again with these fixed.\n` : ''}Next: have the directions drawn (style-frames), then build each scene in its kind.`,
+      text: `The film plan is at ${path}${prev ? ' (the style frames and the target kept before are kept)' : ''}:\n${planText(written)}\n${issues.length ? `To fix:\n${issues.map((l) => `- ${l}`).join('\n')}\nCall film-plan again with only what changes to fix them.\n` : ''}Next: have the directions drawn (style-frames), then build each scene in its kind.`,
     };
   },
 };

@@ -95,3 +95,26 @@ describe('art direction is not a measured defect', () => {
     expect(issues.filter((i) => i.blocking).map((i) => i.id)).toEqual(['provisional', 'readable']);
   });
 });
+
+describe('a plan written again', () => {
+  it('takes only what changes, a scene by its name, and keeps the rest', async () => {
+    const { doc } = project('Again');
+    const files = new Map<string, string>();
+    const ctx = { doc, readText: async (p: string) => files.get(p) ?? null, writeFile: async (p: string, v: string) => { files.set(p, v); return p; } } as unknown as ToolContext;
+    await plans.FILM_PLAN_TOOLS[0].run(plan(), ctx);
+    await plans.FILM_PLAN_TOOLS[0].run({ change: [{ name: 'Product', idea: 'One product turns, then lands' }] }, ctx);
+    const again = plans.parsePlan(files.get(plans.FILM_PLAN_PATH))!;
+    expect(again.idea).toBe('A product loop');
+    expect(again.loop).toBe(true);
+    expect(again.scenes).toMatchObject([{ name: 'Product', kind: '3d', idea: 'One product turns, then lands', motion: [beat] }]);
+  });
+
+  it('says which scenes it knows when a change names another, and asks a first plan for all of it', async () => {
+    const { doc } = project('Again');
+    const files = new Map<string, string>();
+    const ctx = { doc, readText: async (p: string) => files.get(p) ?? null, writeFile: async (p: string, v: string) => { files.set(p, v); return p; } } as unknown as ToolContext;
+    await expect(plans.FILM_PLAN_TOOLS[0].run({ change: [{ name: 'Product', idea: 'x' }] }, ctx)).rejects.toThrow('a first plan gives');
+    await plans.FILM_PLAN_TOOLS[0].run(plan(), ctx);
+    await expect(plans.FILM_PLAN_TOOLS[0].run({ change: [{ name: 'Nope', idea: 'x' }] }, ctx)).rejects.toThrow("the plan's scenes: Product");
+  });
+});
