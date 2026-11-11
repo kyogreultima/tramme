@@ -28,10 +28,17 @@ const REFERENCE_GUIDES: Record<string, Part> = {
   'The library of references': { name: 'references', line: 'the library of the craft\'s references and the films kept' },
 };
 
+/** the subsections of the reference (by their "### " heading) read on demand; one whose name a guide has already joins it */
+const SUBSECTION_GUIDES: Record<string, Part> = {
+  'Event lists': { name: 'events', line: '' },
+  'Sequences': { name: 'sequences', line: 'a film put together from clips: a sequence composition, its tracks, clips and edits' },
+  'Tracks': { name: 'tracking', line: 'where something filmed is over time: the track tool\'s file and what reads it' },
+};
+
 /** the chapters of the instructions (by the start of their first line) read on demand */
 const INSTRUCTION_GUIDES: Record<string, Part> = {
   'Dressing a video where someone speaks:': { name: 'speaking', line: 'a video where someone speaks: cuts, fillers, captions, titles, cut-outs, tracking' },
-  'A story that keeps score': { name: 'events', line: 'a story that keeps score (money, points): event lists, counters, tags, receipts' },
+  'A story that keeps score': { name: 'events', line: 'a story that keeps score (money, points): the event list, its file, counters, tags, receipts and events() in expressions' },
   'Clips:': { name: 'clips', line: 'a clip made from words or from a still (generate-video)' },
   'Hydracept:': { name: 'hydracept', line: 'pictures, clips, sounds and voices made through Hydracept' },
   'Sources:': { name: 'sources', line: 'a project holding the video\'s material (documents, pictures, footage, sounds): read it all, the brief, the directions' },
@@ -49,13 +56,24 @@ export function splitGuides(instructions: string, reference: string): { core: st
     if (part) guides.push({ ...part, text: block });
     return !part;
   });
+  /** a part taken out: a guide of its own, or added to the one of its name */
+  const take = (part: Part, text: string) => {
+    const same = guides.find((g) => g.name === part.name);
+    if (same) same.text = `${same.text}\n\n${text}`;
+    else guides.push({ ...part, text });
+  };
   const sections = reference.split(/\n(?=## )/);
   const refKept = sections.filter((section) => {
     const heading = /^## (.+)/.exec(section)?.[1]?.trim();
     const part = heading ? REFERENCE_GUIDES[heading] : undefined;
-    if (part) guides.push({ ...part, text: section.trim() });
+    if (part) take(part, section.trim());
     return !part;
-  });
+  }).map((section) => section.split(/\n(?=### )/).filter((sub) => {
+    const heading = /^### (.+)/.exec(sub)?.[1]?.trim();
+    const part = heading ? SUBSECTION_GUIDES[heading] : undefined;
+    if (part) take(part, sub.trim());
+    return !part;
+  }).join('\n'));
   const index = `Guides: read one (read_guide with its name) before the work it covers, once in a conversation; the rules above stand without them.\n${guides.map((g) => `- ${g.name}: ${g.line}`).join('\n')}`;
   return { core: `${kept.join('\n\n')}\n\n${refKept.join('\n').trim()}\n\n${index}`, guides };
 }

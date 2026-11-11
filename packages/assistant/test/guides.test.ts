@@ -7,7 +7,7 @@ const reference = fs.readFileSync(new URL('../../../docs/document.md', import.me
 describe('the guides read on demand', () => {
   it('finds every guide it names: a renamed heading or chapter is not dropped in silence', () => {
     const names = guidesOf(reference).map((g) => g.name).sort();
-    expect(names).toEqual(['clips', 'critic', 'events', 'film-plan', 'hydracept', 'interface', 'node-plugins', 'references', 'scenes', 'shorts', 'sources', 'speaking', 'stock', 'surfaces', 'tilts', 'typefaces']);
+    expect(names).toEqual(['clips', 'critic', 'events', 'film-plan', 'hydracept', 'interface', 'node-plugins', 'references', 'scenes', 'sequences', 'shorts', 'sources', 'speaking', 'stock', 'surfaces', 'tilts', 'tracking', 'typefaces']);
   });
 
   it('leaves their text out of the system prompt and lists them at its end', () => {
@@ -23,5 +23,16 @@ describe('the guides read on demand', () => {
   it('shrinks the system prompt by a quarter at least', () => {
     const whole = systemParts(reference).fixed.length + guidesOf(reference).reduce((n, g) => n + g.text.length, 0);
     expect(systemParts(reference).fixed.length).toBeLessThan(whole * 0.75);
+  });
+});
+
+describe('a subsection read on demand', () => {
+  it('joins the guide of its name, or makes its own, and leaves the rest of its section', () => {
+    const events = guidesOf(reference).find((g) => g.name === 'events')!;
+    expect(events.text).toMatch(/^A story that keeps score/);
+    expect(events.text).toContain('### Event lists');
+    const { fixed } = systemParts(reference);
+    expect(fixed).not.toContain('### Sequences');
+    expect(fixed).toContain('### Following the music');
   });
 });
