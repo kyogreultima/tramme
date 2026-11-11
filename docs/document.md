@@ -335,6 +335,8 @@ export const tools = [{
     //   time: the editor's current time (s); selection: ids of the selected layers; registry: the document's vocabulary
     //   assetUrl(id): absolute URL of an asset's file; fileUrl(path): the same for any project file
     //   readText(path): a text file of the project (assets/, or a web scene's under scenes/<id>/), or null; files(): every file of the project (path, size)
+    //   readFile(path): a file under assets/ as a Blob (a picture, a sound, a font), or null: the way a tool reads the project's media
+    //     (its sandbox fetches nothing outside its own origin, so fetch(assetUrl(id)) fails); absent in the command line
     //   folderFiles?(folder): the files of a web scene's folder (scenes/<id>), whatever their type; absent in the command line
     //   writeFile(path, data): under assets/ (computed data), a plugin under plugins/ (.js, .mjs), or a web scene's text file under scenes/<id>/; returns the path
     //   renderStill(t, compId?): a JPEG data URL of a frame, pending proposal included

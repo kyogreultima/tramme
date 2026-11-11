@@ -40,6 +40,12 @@ export interface ToolContext {
   /** a text file of the project, or null when there is none */
   readText(path: string): Promise<string | null>;
   /**
+   * a file of the project under assets/ as it is (a picture, a sound, a font),
+   * or null when there is none: read through the editor, so a plugin in its
+   * sandbox reaches it without network access; absent in the command line
+   */
+  readFile?(path: string): Promise<Blob | null>;
+  /**
    * a data file that ships beside a pack of the editor (`plugins/<pack>/`),
    * read at authoring time from the editor's own origin; offered only to a
    * plugin whose meta.id is a shipped pack's (`tramme/<pack>`), absent in the

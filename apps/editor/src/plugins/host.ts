@@ -186,6 +186,13 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
       if (!projectPath(a.path)) throw new Error('invalid project path');
       return (ctx as ToolContext).readText(a.path);
     }
+    if (a.kind === 'readFile') {
+      if (!projectPath(a.path)) throw new Error('invalid project path');
+      const read = (ctx as ToolContext).readFile;
+      if (!read) throw new Error('readFile: the project\'s files are not reached here');
+      // the bytes as plain data: the sandbox makes them a Blob again
+      return read(a.path).then(async (b) => (b ? { type: b.type, bytes: await b.arrayBuffer() } : null));
+    }
     if (a.kind === 'packFile') {
       if (!projectPath(a.path)) throw new Error('invalid project path');
       const read = (ctx as ToolContext).packFile;

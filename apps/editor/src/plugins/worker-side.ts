@@ -118,6 +118,11 @@ export function startWorkerSide({ post, importModule, sandbox: makeSandbox }: Wo
       assetUrl: (id) => { const src = doc.assets[id]?.src; if (!src) throw new Error(`unknown asset: ${id}`); return new URL(src, base).href; },
       fileUrl: (path) => new URL(path, base).href,
       readText: (path) => ask(call, { kind: 'readText', path }),
+      // a picture or a sound of the project, through the page: the sandbox reaches no other origin
+      readFile: async (path) => {
+        const r = await ask(call, { kind: 'readFile', path }) as { type: string; bytes: ArrayBuffer } | null;
+        return r ? new Blob([r.bytes], { type: r.type }) : null;
+      },
       // a shipped pack's data files, from the editor's own origin (the page fetches them)
       ...(metaId && metaId.startsWith('tramme/') ? { packFile: (path: string) => ask(call, { kind: 'packFile', path }) } : {}),
       files: () => ask(call, { kind: 'files' }),
@@ -330,7 +335,7 @@ export function guardRealm(realm: { fetch?: typeof fetch; WebSocket?: unknown; l
     realm.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
       const target = new URL(url, realm.location?.href ?? origin);
-      if (target.origin !== origin) return Promise.reject(new Error(`the plugin sandbox reaches its own origin only, not ${target.origin}`));
+      if (target.origin !== origin) return Promise.reject(new Error(`the plugin sandbox reaches its own origin only, not ${target.origin}: a tool reads the project's files with ctx.readFile(path) (pictures, sounds) or ctx.readText(path)`));
       return real(input, init);
     }) as typeof fetch;
   }

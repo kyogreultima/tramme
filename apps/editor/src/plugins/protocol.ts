@@ -218,6 +218,7 @@ export type FromWorker =
 /** what a running tool or check needs from the page */
 export type Ask =
   | { kind: 'readText'; path: string }
+  | { kind: 'readFile'; path: string }
   | { kind: 'packFile'; path: string }
   | { kind: 'files' }
   | { kind: 'writeFile'; path: string; data: { text: string } | { bytes: ArrayBuffer } }

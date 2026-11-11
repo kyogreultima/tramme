@@ -964,3 +964,33 @@ describe('a tool and a check of one name', () => {
     host.dispose();
   });
 });
+
+describe("a project's file read from the sandbox", () => {
+  const reader: PluginModule = {
+    meta: { name: 'reader' } as never,
+    tools: [{ name: 'reader.size', description: 'reads a picture', run: async ({ path }: { path: string }, ctx: ToolContext) => {
+      const b = await ctx.readFile!(path);
+      return b ? `${b.type} ${b.size}` : 'none';
+    } }],
+  } as never;
+
+  it('comes through the page as bytes, without network access', async () => {
+    const { host } = pair(new Map([['blob:reader', reader]]));
+    await host.ensure([{ id: 'reader', url: 'blob:reader' }]);
+    const asked: string[] = [];
+    const readFile = async (path: string) => { asked.push(path); return path === 'assets/logo.png' ? new Blob([new Uint8Array([1, 2, 3])], { type: 'image/png' }) : null; };
+    expect(toolOutput(await host.runTool('reader.size', { path: 'assets/logo.png' }, toolCtx(doc().doc, { readFile }))).text).toBe('image/png 3');
+    expect(toolOutput(await host.runTool('reader.size', { path: 'assets/none.png' }, toolCtx(doc().doc, { readFile }))).text).toBe('none');
+    expect(asked).toEqual(['assets/logo.png', 'assets/none.png']);
+    host.dispose();
+  });
+
+  it('never leaves the project', async () => {
+    const { host } = pair(new Map([['blob:reader', reader]]));
+    await host.ensure([{ id: 'reader', url: 'blob:reader' }]);
+    const readFile = vi.fn(async () => null);
+    await expect(host.runTool('reader.size', { path: '../secrets.json' }, toolCtx(doc().doc, { readFile }))).rejects.toThrow('invalid project path');
+    expect(readFile).not.toHaveBeenCalled();
+    host.dispose();
+  });
+});
