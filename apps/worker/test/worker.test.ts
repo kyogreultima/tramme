@@ -361,7 +361,9 @@ describe('sounds made by a provider', () => {
     try {
       const made = await call('/api/generate', ask({ kind: 'music', prompt: 'warm piano', duration: 12, plan }));
       expect(made.status).toBe(200);
-      expect(p.seen[0].body).toMatchObject({ model_id: 'music_v2_5', composition_plan: plan, force_instrumental: true });
+      expect(p.seen[0].body).toMatchObject({ model_id: 'music_v2_5', composition_plan: plan });
+      // the provider refuses force_instrumental beside a plan: the plan's styles say instrumental
+      expect(p.seen[0].body).not.toHaveProperty('force_instrumental');
       expect(p.seen[0].body).not.toHaveProperty('prompt');
       expect(p.seen[0].body).not.toHaveProperty('music_length_ms');
       expect((await call('/api/generate', ask({ kind: 'music', prompt: 'warm piano', duration: 13, plan }))).status).toBe(400);

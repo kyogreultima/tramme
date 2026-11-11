@@ -55,7 +55,8 @@ const PROVIDERS: Record<Provider, { kinds: SoundKind[]; make(key: string, ask: A
       } else if (ask.kind === 'music') {
         model = 'music_v2_5';
         res = await post(`${ELEVEN}/music?${MP3}`, ask.plan
-          ? { composition_plan: ask.plan, model_id: model, force_instrumental: true }
+          // the provider takes force_instrumental with a prompt only: a plan says instrumental in its styles and keeps vocals out
+          ? { composition_plan: ask.plan, model_id: model }
           : { prompt: ask.prompt, model_id: model, force_instrumental: true, ...(ask.duration ? { music_length_ms: Math.round(clamp(ask.duration, 3, 600) * 1000) } : {}) });
       } else {
         model = ask.model && ask.model in ELEVEN_VOICE_MODELS ? ask.model : ELEVEN_VOICE_DEFAULT;

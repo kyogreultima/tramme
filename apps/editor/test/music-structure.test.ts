@@ -54,3 +54,14 @@ it('keeps a hero reveal when a densely cut film exceeds thirty sections', () => 
   expect(chunks.reduce((sum, chunk) => sum + chunk.duration_ms, 0)).toBe(300000);
   expect(chunks.some((chunk) => /^\[Reveal\].*accent/i.test(chunk.text))).toBe(true);
 });
+
+it("keeps a long prompt within the provider's limits on styles, in short pieces", () => {
+  const prompt = `Elegant premium brand film score, 120 bpm, 4/4, ${'warm felt piano and soft analog pads, '.repeat(20)}a gentle swell into the reveal; no vocals.`;
+  expect(prompt.length).toBeGreaterThan(500);
+  const request = musicSections(musicCutPlan(12, 30, [{ t: 6, kind: 'cut' }]), prompt);
+  for (const chunk of request.chunks) {
+    expect(chunk.positive_styles.length).toBeLessThanOrEqual(50);
+    expect(chunk.positive_styles.every((s) => s.trim().length > 0 && s.length <= 500)).toBe(true);
+    expect(chunk.positive_styles).toContain('Elegant premium brand film score');
+  }
+});
