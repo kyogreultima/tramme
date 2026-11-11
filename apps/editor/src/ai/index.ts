@@ -8,7 +8,7 @@
 
 import { installed, offIn } from '../installed.ts';
 import { computed, signal } from '@preact/signals';
-import { addUsage, claudeModels, defaultClaudeModel, parseApiModels, setClaudeModels, type ClaudeModel, type Usage, CLI_DEFAULT, COMPANION_PORT, EFFORTS, effortFor, effortLevels, ENGINE_MODELS, ENGINES, engineOf, LOCAL_URL, modelLabel, modelName, NO_USAGE, pickModel, PROVIDER_LABEL, providerOf, readableModel, REMOTE, setModelLabels, joinSystem, queuedPrompt, setTranslator, slotOf, systemParts, userPrompt, withProject, type Effort, type Engine, type TurnContext } from '@tramme/assistant';
+import { addUsage, claudeModels, defaultClaudeModel, parseApiModels, setClaudeModels, type ClaudeModel, type Usage, CLI_DEFAULT, COMPANION_PORT, EFFORTS, effortFor, effortLevels, ENGINE_MODELS, ENGINES, engineOf, LOCAL_URL, modelLabel, modelName, NO_USAGE, pickModel, PROVIDER_LABEL, providerOf, readableModel, REMOTE, setModelLabels, joinSystem, namedTools, queuedPrompt, setTranslator, slotOf, systemParts, userPrompt, withProject, type Effort, type Engine, type TurnContext } from '@tramme/assistant';
 import { CHAT, CHAT_INDEX, chatPath } from '@tramme/project';
 import type { TrammeDoc } from '@tramme/core';
 import reference from '../../../../docs/document.md';
@@ -16,7 +16,7 @@ import { api, type AiEvent, type ChatItem, type KeyedProvider, type KeyStatus, t
 import { propose, S, toast } from '../state.ts';
 import { companionModels, companionTurn, NO_ENGINES, pairCompanion, probeCompanion, stopCompanion, type CompanionState, type Engines } from './companion.ts';
 import { passes, pause, recallDetails, ServerSession, type Message } from './server.ts';
-import { harvestNote, realNote } from './answers.ts';
+import { harvestNote, realNote, toolSignatures } from './answers.ts';
 import { realWanted } from '../stock.ts';
 import { ToolRunner } from './tools.ts';
 import { criticModel, freshTurn, type Via } from './consult.ts';
@@ -578,8 +578,10 @@ export async function* ask(p: AskPayload, signal: AbortSignal): AsyncGenerator<A
   const mine = installed.peek().filter((x) => x.enabled && !offHere.includes(x.manifest.id)).map((x) => `${x.manifest.name}${x.manifest.description ? `: ${x.manifest.description}` : ''}`);
   // the packs that ship with the editor, each entry in a line by need: reachable without being in the project
   const packs = await shippedPacks();
+  // the inputs of the editor's own tools the prompt names: the same for every project, they ride in the cached part
+  const signatures = toolSignatures(S.registry.peek(), namedTools(reference));
   // the system prompt is the part that is the same for every project and every turn; the project's part goes with the message, when it changed
-  const parts = systemParts(reference, brief ?? undefined, mine, packLines(packs), plan), system = { fixed: parts.fixed, variable: '' };
+  const parts = systemParts(reference, brief ?? undefined, mine, packLines(packs), plan, signatures), system = { fixed: parts.fixed, variable: '' };
   const told = fresh || session.given !== parts.variable ? parts.variable : '';
   session.given = parts.variable;
   const prompt = withProject(p.queued ? queuedPrompt(p.queued.map((m) => ({ text: m.text, ctx: m.context })), notes) : userPrompt(p.text, p.context, notes), told);
@@ -619,7 +621,7 @@ export async function* ask(p: AskPayload, signal: AbortSignal): AsyncGenerator<A
         // the brief and the plan as the director left them: each scene reads them with its first message, under the same system prompt as every turn
         const briefNow = (await api.readText(project.id, 'assets/brief.json').catch(() => null))?.text ?? brief ?? undefined;
         if (!current()) return;
-        const sceneParts = systemParts(reference, briefNow, mine, packLines(packs), planText(planned, { scene: true }));
+        const sceneParts = systemParts(reference, briefNow, mine, packLines(packs), planText(planned, { scene: true }), signatures);
         const via = viaFor(route, model);
         // what each scene's turn used, for its own line and to leave out of the director's
         const sceneUse = new Map<string, { tools: number; images: number }>();
@@ -650,7 +652,7 @@ export async function* ask(p: AskPayload, signal: AbortSignal): AsyncGenerator<A
         if (!current()) return;
         if (!signal.aborted) {
           // the director assembles with the plan as the scenes left it, told only when it moved
-          const after = systemParts(reference, briefNow, mine, packLines(packs), planText((await readPlan()) ?? planned)).variable;
+          const after = systemParts(reference, briefNow, mine, packLines(packs), planText((await readPlan()) ?? planned), signatures).variable;
           if (!current()) return;
           const changed = after !== session.given ? after : '';
           session.given = after;

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { effortFor, effortLevels, pickModel } from '@tramme/assistant';
 import { listClaude, unlistClaude } from './claude-listed.ts';
 import { builtinRegistry } from '@tramme/nodes';
-import { harvestNote, realNote, inputIssues, vocabularyDetail, vocabularyIndex } from '../src/ai/answers.ts';
+import { harvestNote, realNote, inputIssues, toolSignatures, vocabularyDetail, vocabularyIndex } from '../src/ai/answers.ts';
 import { REVIEW_TOOLS } from '../src/review.ts';
 
 describe('effort levels', () => {
@@ -145,5 +145,21 @@ describe('the plugins written in a turn', () => {
     expect(note.match(/a\.js/g)).toHaveLength(1);
     expect(note).toContain('Keep a plugin in the library');
     expect(note).not.toContain('library-add');
+  });
+});
+
+describe("the inputs of the tools the prompt names", () => {
+  it("gives the editor's own tools named in the prompt in a line each, never a project's plugin", async () => {
+    const { namedTools } = await import('@tramme/assistant');
+    const fs = await import('node:fs');
+    const reference = fs.readFileSync(new URL('../../../docs/document.md', import.meta.url), 'utf8');
+    const reg = builtinRegistry().registerTool(...REVIEW_TOOLS);
+    reg.use({ tools: [{ name: 'check-brand', description: 'a plugin of the project', run: () => '' }] }, 'brand');
+    const lines = toolSignatures(reg, new Set([...namedTools(reference), 'check-brand']));
+    expect(lines).toContain('motion(t:number, span?:number, steps?:integer)');
+    expect(lines.some((l) => l.startsWith('check('))).toBe(true);
+    expect(lines.some((l) => l.startsWith('check-brand('))).toBe(false);
+    // in the same order whatever the registry's
+    expect(lines).toEqual([...lines].sort());
   });
 });

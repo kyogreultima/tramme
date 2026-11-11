@@ -430,9 +430,10 @@ export interface SystemParts { fixed: string; variable: string }
  * project's own taste (assets/brief.json), when there is one; plan is the film
  * plan as text (assets/film-plan.json), when there is one; installed: the
  * plugins installed on the user's device, one line each (name: what it is for);
- * packs: the lines of the editor's packs' entries by need (the same for every project).
+ * packs: the lines of the editor's packs' entries by need (the same for every project);
+ * signatures: the inputs of the editor's own tools the prompt names (namedTools), one line each (the same for every project).
  */
-export function systemParts(reference: string, brief?: string, installed?: string[], packs?: string[], plan?: string): SystemParts {
+export function systemParts(reference: string, brief?: string, installed?: string[], packs?: string[], plan?: string, signatures?: string[]): SystemParts {
   const variable = [
     installed?.length ? `Plugins installed on this device, offered in every project (their nodes and tools are not in the list_nodes index: search them with list_nodes { query }; a layer of one copies the plugin into the project):\n${installed.map((x) => `- ${x}`).join('\n')}` : '',
     brief ? `The brief of the project (assets/brief.json), the taste of this project, over your defaults where they differ:\n${brief}` : '',
@@ -440,7 +441,13 @@ export function systemParts(reference: string, brief?: string, installed?: strin
   ].filter(Boolean).join('\n\n');
   // the editor's packs are the same for every project: they ride with the cached part
   const entries = packs?.length ? `\n\nEntries of the editor's packs, by need (usable even when the project holds none; the first use adds the pack to the project; list_nodes { types } gives the full entry):\n${packs.map((x) => `- ${x}`).join('\n')}` : '';
-  return { fixed: `${splitGuides(INSTRUCTIONS, reference).core}${entries}`, variable };
+  const inputs = signatures?.length ? `\n\nInputs of the tools named above (use_tool; ? marks an optional one; list_nodes { types } says what each means):\n${signatures.map((x) => `- ${x}`).join('\n')}` : '';
+  return { fixed: `${splitGuides(INSTRUCTIONS, reference).core}${entries}${inputs}`, variable };
+}
+
+/** the names quoted in what every request reads ("check", "remove-bg"…): the tools among them get their inputs in the prompt */
+export function namedTools(reference: string): Set<string> {
+  return new Set([...splitGuides(INSTRUCTIONS, reference).core.matchAll(/"([a-z][a-z0-9._-]*)"/g)].map((m) => m[1]));
 }
 
 /** the guides read on demand (read_guide), cut from the instructions and the reference */

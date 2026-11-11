@@ -136,6 +136,12 @@ export function vocabularyIndex(reg: Registry, opts: { query?: string; installed
   return out.join('\n');
 }
 
+/** the inputs of the editor's own tools among these names, one line each (name(input)), by name: the same for every project */
+export function toolSignatures(reg: Registry, names: Set<string>): string[] {
+  return reg.listTools().filter(({ tool, from }) => from === 'tramme' && names.has(tool.name))
+    .map(({ tool }) => `${tool.name}(${inputLine(tool.input)})`).sort();
+}
+
 /** the full entries of the names asked for (JSON), and the names not found */
 export function vocabularyDetail(reg: Registry, types: string[]): string {
   const want = new Set(types), all = entries(reg);
