@@ -8,6 +8,26 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+### Added
+
+- `remove-bg` cuts a whole set of pictures out in one call (`images`), each saved as its own asset.
+- `node bench/run.ts <brief>` runs a brief of the bench alone on the trial server, through the companion, and stops the turn once its cost passes a cap; three short briefs join the bench (a logo sting, a short data film, vertical kinetic type).
+
+### Changed
+
+- The assistant costs less per film, for the same work:
+  - its system prompt no longer changes with the project: the brief, the film plan and the installed plugins travel with the message, again only when they changed, so writing a brief or a plan no longer throws the conversation out of the cache;
+  - the guides only some work needs (a video where someone speaks, shorts, sources, clips, node plugins, stock, sequences, tracking…) are read on demand, and the system prompt that every request reads is a third shorter;
+  - the inputs of the tools the instructions name ride in the cached prompt, so the model no longer fetches their schemas mid-turn;
+  - the vocabulary's full entries leave out what only the interface uses (a field's panel group, its slider step, a label repeating its name);
+  - a scene built apart is no longer sent to read the whole film plan, its own beats being in its message;
+  - a tool's input with a plain slip (an object where a text is wanted, a single value where a list is, a number written as text, an option in another case, a number past its bound) is read and told, not refused;
+  - a portrait still, contact sheet or motion strip is sized by its longest side, like a landscape one, instead of being three times heavier.
+
+### Fixed
+
+- A turn stopped half way keeps the line of what it spent.
+
 ## [0.22.0] - 2026-11-10
 
 ### Added
