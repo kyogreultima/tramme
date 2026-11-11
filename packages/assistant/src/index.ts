@@ -436,6 +436,17 @@ export function systemParts(reference: string, brief?: string, installed?: strin
   return { fixed: `${INSTRUCTIONS}\n\n${reference}${entries}`, variable };
 }
 
+/**
+ * A message with the project's part of the prompt (its brief, plan, installed
+ * plugins) put in front: that part travels in the conversation rather than in the
+ * system prompt, so the system prompt stays the same from one turn and one
+ * project to the next and the conversation stays in the cache when the brief or
+ * the plan changes. It is given again only when it changed; the latest one wins.
+ */
+export function withProject(prompt: string, variable: string): string {
+  return variable ? `<project>\nThe project as it stands now (it replaces any earlier version of this note):\n\n${variable}\n</project>\n\n${prompt}` : prompt;
+}
+
 /** the two parts as one text (the routes that cache by themselves, or not at all) */
 export const joinSystem = ({ fixed, variable }: SystemParts): string => (variable ? `${fixed}\n\n${variable}` : fixed);
 
