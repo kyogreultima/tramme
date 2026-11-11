@@ -4,15 +4,20 @@
 
 import { pointer, type Op, type ToolContext, type ToolType } from '@tramme/core';
 import { canvas, loadImage } from './perception.ts';
-import { keep, matteModel, matting } from './cutout.ts';
+import { averaged, decontaminate, mirrored, refineAlpha } from './matte-refine.ts';
+import { encodePng } from './png-encode.ts';
+import { keep, matteModel, matting, stillMatteModel } from './cutout.ts';
 import { madeBy } from './models.ts';
 import { freshId, isToolAsset, linkedTransform, mediaAssetsOf, siblingsOf } from './model.ts';
 import { t } from './i18n/index.ts';
 
 /**
- * A picture with its background cut out: the matte of the subject (or of a
- * person) becomes its alpha. `kept` is the share of the picture the subject
- * covers (0 to 1), which says when a cutout looks wrong.
+ * A picture with its background cut out. The network's matte (read twice, the
+ * picture and its mirror, and averaged) is snapped to the picture's own edge,
+ * made a pixel or two wide, taken in a little, cleaned of specks; the colours
+ * of the edge are the subject's own, not the old ground's, so the cut sits on
+ * any ground without an outline. `kept` is the share of the picture the
+ * subject covers (0 to 1), which says when a cutout looks wrong.
  */
 export async function cutoutBlob(source: Blob, subject: 'any' | 'person', progress?: (n: number, of: number, what: string) => void): Promise<{ blob: Blob; kept: number; width: number; height: number }> {
   const url = URL.createObjectURL(source);
@@ -21,15 +26,21 @@ export async function cutoutBlob(source: Blob, subject: 'any' | 'person', progre
     const width = img.naturalWidth || img.width, height = img.naturalHeight || img.height;
     const { c, g } = canvas(width, height);
     g.drawImage(img, 0, 0, width, height);
-    progress?.(1, 3, t('removebg.reading'));
-    const matte = keep(await (await matting(subject))(c), null);
-    progress?.(2, 3, t('removebg.reading'));
+    progress?.(1, 5, t('removebg.reading'));
+    const run = await matting(subject, stillMatteModel(subject));
+    const first = await run(c);
+    progress?.(2, 5, t('removebg.reading'));
+    const mirror = canvas(width, height);
+    mirror.g.translate(width, 0); mirror.g.scale(-1, 1); mirror.g.drawImage(c, 0, 0);
+    const matte = keep(averaged(first, mirrored(await run(mirror.c), width, height)), null);
+    progress?.(3, 5, t('removebg.refining'));
     const px = g.getImageData(0, 0, width, height);
+    const alpha = refineAlpha(px.data, matte, width, height);
+    progress?.(4, 5, t('removebg.refining'));
+    const rgba = decontaminate(px.data, alpha, width, height);
     let opaque = 0;
-    for (let i = 0; i < matte.length; i++) { px.data[i * 4 + 3] = matte[i]; if (matte[i] >= 128) opaque++; }
-    g.putImageData(px, 0, 0);
-    const blob = await new Promise<Blob>((done, fail) => c.toBlob((b) => (b ? done(b) : fail(new Error('the PNG could not be made'))), 'image/png'));
-    return { blob, kept: opaque / matte.length, width, height };
+    for (let i = 0; i < alpha.length; i++) if (alpha[i] >= 0.5) opaque++;
+    return { blob: await encodePng(rgba, width, height), kept: opaque / alpha.length, width, height };
   } finally { URL.revokeObjectURL(url); }
 }
 

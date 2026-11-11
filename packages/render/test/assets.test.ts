@@ -125,17 +125,18 @@ describe('isolated asset paths', () => {
     expect(maximum).toBe(8);
   });
 
-  it('refuses an oversized image before creating its bitmap', async () => {
+  it('brings an oversized image down instead of refusing it', async () => {
     const doc = newProject({ name: 'Large image', width: 64, height: 64, fps: 1, duration: 1 }).doc;
     doc.assets.image = { type: 'image', src: 'assets/huge.png' };
     const loaded = new AssetStore(doc, 'https://example.test/projects/a/document.tramme.json');
     loaded.sandboxModules = true;
     vi.stubGlobal('fetch', vi.fn(async () => new Response(new Uint8Array([1]), { headers: { 'content-type': 'image/png' } })));
     vi.stubGlobal('Image', class { src = ''; naturalWidth = 6000; naturalHeight = 6000; async decode() {} });
-    const bitmap = vi.fn();
+    const bitmap = vi.fn(async (_: unknown, o?: { resizeWidth: number; resizeHeight: number }) => ({ width: o?.resizeWidth ?? 6000, height: o?.resizeHeight ?? 6000, close() {} }));
     vi.stubGlobal('createImageBitmap', bitmap);
-    await expect((loaded as unknown as { load(id: string, a: typeof doc.assets.image): Promise<unknown> }).load('image', doc.assets.image)).rejects.toThrow('16 million pixels');
-    expect(bitmap).not.toHaveBeenCalled();
+    const result = await (loaded as unknown as { load(id: string, a: typeof doc.assets.image): Promise<{ width: number; height: number }> }).load('image', doc.assets.image);
+    expect(result.width * result.height).toBeLessThanOrEqual(16 * 1024 * 1024);
+    expect(bitmap.mock.calls[0][1]).toMatchObject({ resizeQuality: 'high' });
   });
 
   it('cancels an oversized image response before creating a decoder', async () => {
@@ -156,19 +157,58 @@ describe('isolated asset paths', () => {
     expect(decoder).not.toHaveBeenCalled();
   });
 
-  it('caps retained decoded images across one isolated project', async () => {
+  /** an isolated project of `n` images of 4000 × 4000 (16 million pixels each: four fill the 64 million the sandbox takes) */
+  function heavy(n: number) {
     const doc = newProject({ name: 'Many images', width: 64, height: 64, fps: 1, duration: 1 }).doc;
-    for (let i = 0; i < 5; i++) doc.assets[`image-${i}`] = { type: 'image', src: `assets/${i}.png` };
+    for (let i = 0; i < n; i++) doc.assets[`image-${i}`] = { type: 'image', src: `assets/${i}.png` };
     const loaded = new AssetStore(doc, 'https://example.test/projects/a/document.tramme.json');
     loaded.sandboxModules = true;
+    loaded.keptSide = 8192;
     vi.stubGlobal('fetch', vi.fn(async () => new Response(new Uint8Array([1]), { headers: { 'content-type': 'image/png' } })));
     vi.stubGlobal('Image', class { src = ''; naturalWidth = 4000; naturalHeight = 4000; async decode() {} });
-    const close = vi.fn();
-    vi.stubGlobal('createImageBitmap', vi.fn(async () => ({ width: 4000, height: 4000, close })));
+    vi.stubGlobal('OffscreenCanvas', class { width = 1; height = 1; });
+    vi.stubGlobal('createImageBitmap', vi.fn(async (_: unknown, o?: { resizeWidth: number; resizeHeight: number }) => ({ width: o?.resizeWidth ?? 4000, height: o?.resizeHeight ?? 4000, close() {} })));
     vi.stubGlobal('document', { fonts: { ready: Promise.resolve() } });
-    await expect(loaded.sync(doc)).rejects.toThrow('images exceed 256 MB');
-    expect(close).toHaveBeenCalledTimes(1);
-    expect([...Array(4)].every((_, i) => loaded.has(`image-${i}`))).toBe(true);
+    const retained = () => { let px = 0; for (let i = 0; i < n; i++) if (loaded.has(`image-${i}`)) { const b = loaded.get<{ width: number; height: number }>(`image-${i}`); px += b.width * b.height; } return px; };
+    return { doc, loaded, retained };
+  }
+
+  it('opens a project heavier than the room: what fits is kept, the rest waits without an error', async () => {
+    const { doc, loaded, retained } = heavy(60);
+    await loaded.sync(doc);
+    expect(retained()).toBeLessThanOrEqual(64 * 1024 * 1024);
+    expect(loaded.coldIds().length).toBe(56);
+    expect(loaded.hasCold).toBe(true);
+    // a change that leaves the images alone does not decode the waiting ones again
+    const fetched = (fetch as unknown as { mock: { calls: unknown[] } }).mock.calls.length;
+    await loaded.sync(structuredClone(doc));
+    expect((fetch as unknown as { mock: { calls: unknown[] } }).mock.calls.length).toBe(fetched);
+  });
+
+  it('gives a waiting picture to the frame that shows it, making room from the ones it does not', async () => {
+    const { doc, loaded, retained } = heavy(10);
+    await loaded.sync(doc);
+    const kept = Object.keys(doc.assets).filter((id) => loaded.has(id)), wanted = loaded.coldIds()[0];
+    loaded.beginFrame();
+    for (const id of kept.slice(0, 3)) loaded.use(id, () => {}); // three of the four are shown in this frame
+    const pending: Promise<unknown>[] = [];
+    const picture = loaded.use(wanted, (p) => pending.push(p));
+    expect(picture).toBeDefined();
+    expect(loaded.has(wanted)).toBe(false);
+    await Promise.all(pending);
+    expect(loaded.has(wanted)).toBe(true);
+    expect(retained()).toBeLessThanOrEqual(64 * 1024 * 1024);
+    // the one that left is the one the frame did not use
+    expect(kept.slice(0, 3).every((id) => loaded.has(id))).toBe(true);
+    expect(loaded.has(kept[3])).toBe(false);
+  });
+
+  it('keeps the original size of a picture brought down, for the nodes that lay it out', async () => {
+    const { loaded } = heavy(1);
+    loaded.keptSide = 1000;
+    const bitmap = await (loaded as unknown as { load(id: string, a: unknown): Promise<{ width: number; naturalWidth: number }> }).load('image-0', { type: 'image', src: 'assets/0.png' });
+    expect(bitmap.width).toBe(1000);
+    expect(bitmap.naturalWidth).toBe(4000);
   });
 
   it('releases decoded images when an asset changes or leaves the project', async () => {

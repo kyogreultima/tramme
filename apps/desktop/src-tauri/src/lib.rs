@@ -79,6 +79,17 @@ fn desktop_open_plugins() -> Result<(), String> {
     std::process::Command::new(opener).arg(&dir).spawn().map(|_| ()).map_err(|e| e.to_string())
 }
 
+/// a web page (or a release's installer) in the system's browser: the window's own
+/// webview does nothing for a link that opens a new tab, so the page asks for it here
+#[tauri::command]
+fn desktop_open_url(url: String) -> Result<(), String> {
+    if !(url.starts_with("https://") || url.starts_with("http://")) {
+        return Err("only web addresses open in the browser".into());
+    }
+    let opener = if cfg!(target_os = "macos") { "open" } else if cfg!(windows) { "explorer" } else { "xdg-open" };
+    std::process::Command::new(opener).arg(&url).spawn().map(|_| ()).map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 fn desktop_fetch(id: u32, request: fetch::Outbound, events: tauri::ipc::Channel<fetch::Event>) -> Result<(), String> {
     let keys = keys::KeyStore::system().map_err(|e| e.message)?;
@@ -369,7 +380,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             analytics::analytics_state, analytics::analytics_set, analytics::analytics_event,
             desktop_state, desktop_pick_home, desktop_set_home, desktop_pending_name, desktop_pending_bytes,
-            desktop_fetch, desktop_fetch_abort, desktop_open_plugins,
+            desktop_fetch, desktop_fetch_abort, desktop_open_plugins, desktop_open_url,
             desktop_quick_enable, desktop_quick_open, desktop_quick_do, desktop_quick_drop_names, desktop_quick_drop_file
         ])
         .register_asynchronous_uri_scheme_protocol(SCHEME, |_ctx, request, responder| {

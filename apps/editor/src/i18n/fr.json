@@ -1449,6 +1449,7 @@
     "safeZones": "Zones sûres",
     "grid": "Grille",
     "onionSkin": "Pelure d'oignon (le précédent en rouge, le suivant en vert, à l'arrêt)",
+    "heavyProject": "Ce projet est lourd : certaines images sont affichées en taille réduite pour garder un aperçu fluide. Votre projet n’est pas modifié.",
     "loadingAssets": "Chargement des assets…",
     "proposalPreview": "Aperçu de la proposition",
     "proposalHidden": "Proposition masquée",
@@ -3089,6 +3090,7 @@
   },
   "removebg": {
     "reading": "lecture du sujet",
+    "refining": "affinage du contour",
     "done": "Le fond de {name} est détouré."
   },
   "cuts": {

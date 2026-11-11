@@ -18,7 +18,7 @@
 .set-nav-item.on svg.i { color: var(--accent-text); }
 .set-nav .grow { flex: 1; }
 .set-nav > .btn { justify-content: flex-start; }
-.set-pane { display: flex; flex-direction: column; gap: 22px; padding: 22px 26px; overflow: auto; user-select: text; }
+.set-pane { display: flex; flex-direction: column; gap: 22px; padding: 22px 26px; overflow: auto; user-select: text; container: setpane / inline-size; }
 .set-results:not(:has(.set-row))::after { content: attr(data-empty); color: var(--text-3); font-size: var(--fs-md); }
 .set-results .set-section:not(:has(.set-row)) { display: none; }
 .set-section { display: flex; flex-direction: column; gap: 12px; }
@@ -94,6 +94,27 @@ html.vault:not(.compact) .set-row:not(.stack) .set-control { justify-content: fl
 
 /* the providers, in their own cards */
 .provider-row .set-actions { flex: none; }
+
+/* the rows follow the room of the pane, not the window's: a control beside its label only while the label keeps a readable line */
+@container setpane (max-width: 640px) {
+  .set-row { grid-template-columns: 1fr; }
+  .set-control { justify-content: flex-start; overflow-x: auto; }
+  .theme-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@container setpane (max-width: 420px) {
+  .theme-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+/* a narrower window: a slimmer navigation gives the pane the room */
+@media (max-width: 1000px) {
+  .modal-body.settings { grid-template-columns: 184px minmax(0, 1fr); }
+  .set-pane { padding: 18px 20px; }
+}
+/* a short window: the navigation keeps every section in view */
+@media (max-height: 760px) {
+  .set-nav { padding: 10px 8px; }
+  .set-group-title { padding: 10px 10px 4px; }
+  .set-nav-item { height: 30px; }
+}
 
 @media (max-width: 760px) {
   .set-row { grid-template-columns: 1fr; }

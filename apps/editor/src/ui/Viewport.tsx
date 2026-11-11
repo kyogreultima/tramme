@@ -24,6 +24,7 @@ import { m, t } from '../i18n/index.ts';
 import { picking, pixelAt } from '../dropper.ts';
 import { grading, Scopes } from './Scopes.tsx';
 import { Loader } from './Logo.tsx';
+import { plainRenderMessage } from '../render-message.ts';
 import { WebSceneFrames } from './WebSceneFrames.tsx';
 
 /** a finger rather than a mouse: bigger handles */
@@ -547,7 +548,7 @@ export function Viewport({ bare = false, inset = INSET, overlay, intercept }: Vi
   return (
     <div class={`viewport${bare ? ' bare' : ''}`} data-tour="viewport" ref={host} onWheel={onWheel} onPointerDownCapture={touchDown} onPointerMove={touchMove} onPointerUp={touchUp} onPointerCancel={touchUp} style={{ cursor: spaceDown ? 'grab' : undefined }}>
       {!bare && grading() && <Scopes />}
-      {!bare && currentRemote?.error && <div class="hint" style={{ position: 'absolute', top: 48, right: 12, zIndex: 4 }}>{t('viewport.isolatedUnavailable', { error: currentRemote.error })}</div>}
+      {!bare && currentRemote?.error && <div class="hint" style={{ position: 'absolute', top: 48, right: 12, zIndex: 4 }}>{t('viewport.isolatedUnavailable', { error: plainRenderMessage(currentRemote.error) })}</div>}
       {!bare && <div class="toolbar" data-tour="viewport-tools" onPointerDown={(e) => e.stopPropagation()}>
         <button class="zoom" onClick={zoomMenu} title={t('viewport.zoomCtrlWheel')}>{Math.round(scale * 100)} %</button>
         <span class="sep" />
@@ -628,7 +629,7 @@ export function Viewport({ bare = false, inset = INSET, overlay, intercept }: Vi
         {overlay}
       </div>
       {!preview.renderer && !S.renderError.value && <div class="loading" role="status" style={{ left, top, width: sw, height: sh }}><Loader /><span>{t('viewport.loadingAssets')}</span></div>}
-      {S.renderError.value && <div class="error">{S.renderError.value}</div>}
+      {S.renderError.value && <div class="error" title={S.renderError.value}>{plainRenderMessage(S.renderError.value)}</div>}
       {pending && !bare && (
         <div class="banner ai">
           <Icon name="chat" />

@@ -1449,6 +1449,7 @@
     "safeZones": "Safe zones",
     "grid": "Grid",
     "onionSkin": "Onion skin (previous red, next green, at rest)",
+    "heavyProject": "This project is heavy: some pictures are shown at a reduced size to keep the preview smooth. Your project is untouched.",
     "loadingAssets": "Loading assets…",
     "proposalPreview": "Proposal preview",
     "proposalHidden": "Proposal hidden",
@@ -1810,6 +1811,7 @@
   },
   "removebg": {
     "reading": "reading the subject",
+    "refining": "refining the edge",
     "done": "The background of {name} is cut out."
   },
   "cuts": {

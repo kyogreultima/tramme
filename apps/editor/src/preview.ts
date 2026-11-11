@@ -427,6 +427,8 @@ class Preview {
       } else {
         const frame = r.render(t, { samples: 1, checker: true });
         this.docSamples = frame.motionBlur.samples;
+        // a project heavier than the room: the pictures of the next seconds are brought in
+        if (S.playing.peek()) r.prefetch(t);
         // a video frame still decoding: drawn again as soon as it is there
         if (r.incomplete) r.settle().then((waited) => { if (waited && !S.playing.peek()) this.invalidate(); });
         // a layer or effect that failed is drawn as a red frame: say which and why

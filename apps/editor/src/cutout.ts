@@ -13,8 +13,9 @@ import { AVC_FROM_STREAM } from './avc.ts';
 import { t } from './i18n/index.ts';
 import { freshId, linkedTransform, siblingsOf } from './model.ts';
 import { canvas, CUT, distance, histogram, onDemand, peopleIn } from './perception.ts';
-import { madeBy, type ModelEntry, type ModelTask } from './models.ts';
-import { chosenModel } from './settings.ts';
+import { madeBy, modelsFor, type ModelEntry, type ModelTask } from './models.ts';
+import { refineAlpha, refinementFor } from './matte-refine.ts';
+import { chosenModel, prefs } from './settings.ts';
 
 /** long side of the pictures the mattes are made at */
 const PROC = 1024;
@@ -58,9 +59,18 @@ const MATTING = new Map<string, () => Promise<Matting>>();
 /** the model the cut-out of this subject runs on this computer */
 export const matteModel = (subject: Subject): ModelEntry => chosenModel(matteTask(subject));
 
+/**
+ * The model that cuts a still: the one chosen in the settings, else the sharp
+ * one for any subject (IS-Net, 1024 px: a still is cut once, so it can take
+ * its time). A video keeps the small one by default, which runs on every frame.
+ */
+export function stillMatteModel(subject: Subject): ModelEntry {
+  if (prefs.peek().models[matteTask(subject)] || subject === 'person') return matteModel(subject);
+  return modelsFor('cutout-any').find((m) => m.id === 'isnet-general') ?? matteModel(subject);
+}
+
 /** the matte of a picture, 0..255 per pixel at its size: on the GPU (WebGPU), on the processor when the GPU refuses the model */
-export function matting(subject: Subject): Promise<Matting> {
-  const entry = matteModel(subject);
+export function matting(subject: Subject, entry: ModelEntry = matteModel(subject)): Promise<Matting> {
   if (entry.adapter.kind !== 'matte') throw new Error(`${entry.name} is not a matte model`);
   const a = entry.adapter;
   if (!MATTING.has(entry.id)) MATTING.set(entry.id, onDemand('the cut-out model', async () => {
@@ -267,7 +277,9 @@ async function matteVideo(url: string, from: number, to: number, subject: Subjec
           if (!boxes.length) empty++;
           where = gate(boxes, pw, ph);
         }
-        prev = steady(prev, keep(await matte(picture.c), where));
+        // the network's edge snapped to the picture's own (a mask video's edge is what shows around the subject)
+        const rough = keep(await matte(picture.c), where), sharp = refineAlpha(picture.g.getImageData(0, 0, pw, ph).data, rough, pw, ph, { ...refinementFor(pw, ph), specks: 0 });
+        prev = steady(prev, Uint8ClampedArray.from(sharp, (v) => v * 255));
         for (let i = 0, d = img.data; i < prev.length; i++) { d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = prev[i]; d[i * 4 + 3] = 255; }
         small.g.putImageData(img, 0, 0);
         out.g.drawImage(small.c, 0, 0, W, H);

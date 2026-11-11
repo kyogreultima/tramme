@@ -34,6 +34,13 @@ export function initDesktop(): void {
       .then((m) => { go(`/p/${m.id}`); })
       .catch((e) => console.warn('[tramme] desktop open:', (e as Error).message));
   };
+  // a link that opens a new tab does nothing in the webview: it goes to the system's browser
+  document.addEventListener('click', (e) => {
+    const a = (e.target as Element | null)?.closest?.('a[target="_blank"]') as HTMLAnchorElement | null;
+    if (!a || e.defaultPrevented || !/^https?:\/\//.test(a.href)) return;
+    e.preventDefault();
+    app.core.invoke('desktop_open_url', { url: a.href }).catch((err) => console.warn('[tramme] open link:', err));
+  });
   // the quick bubble, a window of its own, follows the setting
   effect(() => { app.core.invoke('desktop_quick_enable', { on: prefs.value.quickLauncher }).catch(() => {}); });
   startQuickLink();
