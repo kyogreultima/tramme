@@ -19,6 +19,7 @@ import { passes, pause, recallDetails, ServerSession, type Message } from './ser
 import { harvestNote, realNote, toolSignatures } from './answers.ts';
 import { realWanted } from '../stock.ts';
 import { ToolRunner } from './tools.ts';
+import { BRIEF_PATH } from '../brief.ts';
 import { criticModel, freshTurn, type Via } from './consult.ts';
 import { assemblyNote, runScenes } from './scenes-run.ts';
 import { todoScenes, type PlanScene } from '../filmplan.ts';
@@ -566,8 +567,8 @@ export async function* ask(p: AskPayload, signal: AbortSignal): AsyncGenerator<A
   const fresh = route === 'companion' ? !resumed : !session.server.messages.length;
   if (fresh) notes.unshift(...earlier());
   // the project's brief, when there is one, is given with the first message: the assistant follows it from the first word
-  let brief: string | null = null;
-  try { brief = (await api.readText(project.id, 'assets/brief.json'))?.text ?? null; } catch { brief = null; }
+  const readBrief = async () => (await api.readText(project.id, BRIEF_PATH).catch(() => null))?.text ?? undefined;
+  const brief = await readBrief();
   if (!current()) return;
   // the film plan rides beside it: the kinds of picture, the scenes and the direction the assistant follows
   let plan: string | undefined;
@@ -581,7 +582,7 @@ export async function* ask(p: AskPayload, signal: AbortSignal): AsyncGenerator<A
   // the inputs of the editor's own tools the prompt names: the same for every project, they ride in the cached part
   const signatures = toolSignatures(S.registry.peek(), namedTools(reference));
   // the system prompt is the part that is the same for every project and every turn; the project's part goes with the message, when it changed
-  const parts = systemParts(reference, brief ?? undefined, mine, packLines(packs), plan, signatures), system = { fixed: parts.fixed, variable: '' };
+  const parts = systemParts(reference, brief, mine, packLines(packs), plan, signatures), system = { fixed: parts.fixed, variable: '' };
   const told = fresh || session.given !== parts.variable ? parts.variable : '';
   session.given = parts.variable;
   const prompt = withProject(p.queued ? queuedPrompt(p.queued.map((m) => ({ text: m.text, ctx: m.context })), notes) : userPrompt(p.text, p.context, notes), told);
@@ -619,7 +620,7 @@ export async function* ask(p: AskPayload, signal: AbortSignal): AsyncGenerator<A
       // the plan must be this turn's: an old plan does not start a run on an unrelated message
       if (planned && Date.parse(planned.updated) >= started && todoScenes(planned, runner.liveDoc()).run.length >= 3) {
         // the brief and the plan as the director left them: each scene reads them with its first message, under the same system prompt as every turn
-        const briefNow = (await api.readText(project.id, 'assets/brief.json').catch(() => null))?.text ?? brief ?? undefined;
+        const briefNow = (await readBrief()) ?? brief;
         if (!current()) return;
         const sceneParts = systemParts(reference, briefNow, mine, packLines(packs), planText(planned, { scene: true }), signatures);
         const via = viaFor(route, model);
