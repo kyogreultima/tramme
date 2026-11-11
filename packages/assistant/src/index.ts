@@ -234,10 +234,11 @@ export const TOOLS: ToolDef[] = [
   },
   {
     name: 'write_file',
-    description: 'Writes a text file of the project: a plugin in plugins/ (.js or .mjs), or data in assets/ (.json, .svg). The document is never written this way: it changes through propose_changes. A plugin already in use is reloaded in the preview.',
+    description: 'Writes a text file of the project: a plugin in plugins/ (.js or .mjs), or data in assets/ (.json, .svg). With find, changes only that part of an existing file: use it to correct a file rather than writing it whole again. The document is never written this way: it changes through propose_changes. A plugin already in use is reloaded in the preview.',
     schema: z.object({
       path: z.string().describe('e.g. plugins/star.js'),
-      content: z.string(),
+      content: z.string().describe('the whole file; with find, the text that replaces it'),
+      find: z.string().optional().describe('text copied exactly from the existing file, which must occur once'),
     }),
     label: (i) => t('Writing {path}', { path: i.path }),
   },

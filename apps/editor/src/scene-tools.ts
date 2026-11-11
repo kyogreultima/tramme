@@ -4,6 +4,7 @@
 
 import { pathIssue, SceneSchema } from '@tramme/project';
 import { pointer, staticValue, type Op, type ToolContext, type ToolType, type TrammeDoc } from '@tramme/core';
+import { replaceOnce } from './model.ts';
 
 const ID = /^[a-z0-9][a-z0-9-]{0,63}$/;
 /** the scene files a tool writes as text; pictures, fonts and media come from the user's assets */
@@ -193,9 +194,7 @@ const editScene: ToolType<{ id: string; file: string; find: string; replace: str
     if (typeof input.find !== 'string' || !input.find || typeof input.replace !== 'string') throw new Error('find is the text to replace, and replace the new text');
     const body = await ctx.readText(path);
     if (body === null) throw new Error(`${path} not found`);
-    const count = body.split(input.find).length - 1;
-    if (count !== 1) throw new Error(`${path}: the text to find occurs ${count} times; it must occur exactly once`);
-    const next = body.replace(input.find, () => input.replace);
+    const next = replaceOnce(body, input.find, input.replace, path);
     if (next.length > MAX_FILE) throw new Error(`${path}: the result exceeds 1 MiB`);
     if (input.file === 'scene.json') {
       const problems = await sceneProblems(input.id, ctx, new Map([['scene.json', next]]));

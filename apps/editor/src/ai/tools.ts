@@ -17,7 +17,7 @@ import { uid } from './calls.ts';
 import { isSceneTextPath } from '../scene-tools.ts';
 import { bumpScene } from '../webscene-preview.ts';
 import { api, type AiEvent } from '../api.ts';
-import { describeOp, fitLongest, freshId } from '../model.ts';
+import { describeOp, fitLongest, freshId, replaceOnce } from '../model.ts';
 import { analyses, jpegOf, loadImage } from '../perception.ts';
 import { fileProject, requireFileProject, sameFileProject, safeName } from '../files.ts';
 import { transcriptFor, transcriptIdOf } from '../speech.ts';
@@ -346,7 +346,7 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
           const guides = guidesOf(reference), guide = guides.find((g) => g.name === String(input.name ?? '').trim().toLowerCase());
           return guide ? text(guide.text) : text(`no guide named "${input.name}": ${guides.map((g) => g.name).join(', ')}`, true);
         }
-        case 'write_file': return await this.write(String(input.path ?? ''), String(input.content ?? ''));
+        case 'write_file': return await this.write(String(input.path ?? ''), String(input.content ?? ''), typeof input.find === 'string' ? input.find : undefined);
         case 'get_transcript': return await this.transcript(String(input.asset ?? ''), input.from, input.to, !!input.words);
         case 'media_frame': return await this.mediaFrame(String(input.asset ?? ''), Number(input.t ?? 0));
         case 'cut_media': return await this.cut(input);
@@ -550,12 +550,20 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
     return text(`[${path}: characters ${offset} to ${end} of ${body.length}${more}]\n${body.slice(offset, end)}`);
   }
 
-  private async write(path: string, content: string): Promise<ToolResult> {
+  private async write(path: string, given: string, find?: string): Promise<ToolResult> {
     const project = fileProject();
     const bad = pathIssue(path) ?? (/%|#/.test(path) ? 'invalid project path' : null);
     if (bad) return text(`${path}: ${bad}`, true);
     const ok = (/^plugins\/.+\.(js|mjs)$/i.test(path)) || (/^assets\/.+\.(json|svg)$/i.test(path));
     if (!ok) return text('allowed writes: plugins/*.js|mjs and assets/*.json|svg. The document changes through propose_changes.', true);
+    // with find, only that part changes: the file is read, the passage replaced, and the whole written back
+    let content = given;
+    if (find !== undefined) {
+      const body = await readProjectText(project.id, path);
+      requireFileProject(project);
+      if (body === null) return text(`${path} not found: write it whole, without find`, true);
+      content = replaceOnce(body, find, given, path);
+    }
     await api.write(project.id, path, content, { type: /\.(js|mjs)$/i.test(path) ? 'text/javascript' : undefined });
     requireFileProject(project);
     if (path.startsWith('plugins/')) this.wrotePlugins.add(path);

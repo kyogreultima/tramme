@@ -86,6 +86,14 @@ export const topLayers = (comp: Composition, ids: string[]) => ids.filter((id) =
 export const layerName = (id: string, l: Layer) => l.name || id;
 
 /** a text cut to at most max characters, an ellipsis marking the cut */
+/** a file's text with `find`, which must occur exactly once, replaced: a small change without writing the whole file again */
+export function replaceOnce(body: string, find: string, replace: string, path: string): string {
+  if (!find) throw new Error('find is the text to replace, copied exactly from the file');
+  const count = body.split(find).length - 1;
+  if (count !== 1) throw new Error(`${path}: the text to find occurs ${count} times; it must occur exactly once`);
+  return body.replace(find, () => replace);
+}
+
 /** a frame's size brought to `side` pixels on its longest side, never enlarged: a portrait picture costs the model what a landscape one does */
 export function fitLongest(width: number, height: number, side: number): [number, number] {
   const k = Math.min(1, side / Math.max(width, height));
