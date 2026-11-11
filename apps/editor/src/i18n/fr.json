@@ -3091,7 +3091,8 @@
   "removebg": {
     "reading": "lecture du sujet",
     "refining": "affinage du contour",
-    "done": "Le fond de {name} est détouré."
+    "done": "Le fond de {name} est détouré.",
+    "doneMany": "{n} fonds détourés."
   },
   "cuts": {
     "done": "« {name} » resserré : {saved} gagnées."

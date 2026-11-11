@@ -24,7 +24,7 @@ vi.mock('../src/perception.ts', async (original) => ({
   }),
 }));
 
-const { cutoutBlob } = await import('../src/removebg.ts');
+const { cutoutBlob, REMOVEBG_TOOLS } = await import('../src/removebg.ts');
 
 describe('the background cut out of a made picture', () => {
   it('keeps the subject in the alpha and says what share of the picture it covers', async () => {
@@ -43,5 +43,26 @@ describe('the background cut out of a made picture', () => {
     await cutoutBlob(new Blob(['picture']), 'any', (n) => steps.push(n));
     expect(steps.length).toBeGreaterThan(0);
     expect(steps).toEqual([...steps].sort((a, b) => a - b));
+  });
+});
+
+describe('several pictures in one call', () => {
+  const tool = REMOVEBG_TOOLS[0];
+  const ctx = (assets: Record<string, { type: string; src: string; name?: string }>) => ({
+    doc: { assets, compositions: { main: { layers: {}, order: [], width: 1920, height: 1080 } } },
+    compId: 'main', time: 0, selection: [],
+    assetUrl: (id: string) => `/a/${id}`,
+    writeFile: async (path: string) => path,
+  }) as never;
+
+  it('cuts each one out as its own asset, places none, and says them all', async () => {
+    vi.stubGlobal('fetch', async () => new Response(new Blob(['picture'], { type: 'image/png' })));
+    const out = await tool.run({ images: ['desk-teck', 'desk-oak', 'desk-teck'] }, ctx({ 'desk-teck': { type: 'image', src: 'a.png' }, 'desk-oak': { type: 'image', src: 'b.png' } })) as { ops: { path: string }[]; text: string };
+    expect(out.ops.map((o) => o.path)).toEqual(['/assets/desk-teck-cut', '/assets/desk-oak-cut']);
+    expect(out.text).toContain('2 backgrounds cut out, none placed');
+  });
+
+  it('refuses what is not a picture of the project, before cutting anything', async () => {
+    await expect(tool.run({ images: ['desk-teck', 'nope'] }, ctx({ 'desk-teck': { type: 'image', src: 'a.png' } }))).rejects.toThrow('not pictures of the project: nope');
   });
 });

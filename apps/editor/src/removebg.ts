@@ -44,6 +44,18 @@ export async function cutoutBlob(source: Blob, subject: 'any' | 'person', progre
   } finally { URL.revokeObjectURL(url); }
 }
 
+/** one picture of the project cut out and saved as its own image asset: the operation that adds it (or replaces an earlier cut), and its size */
+async function cutAsset(id: string, subject: 'any' | 'person', ctx: ToolContext): Promise<{ nid: string; had: boolean; op: Op; width: number; height: number }> {
+  const res = await fetch(ctx.assetUrl(id));
+  if (!res.ok) throw new Error(`${id}: the picture could not be read (HTTP ${res.status})`);
+  const { blob, width, height } = await cutoutBlob(await res.blob(), subject, ctx.progress);
+  const path = await ctx.writeFile(`assets/cutout/${id}.png`, blob);
+  const nid = `${id}-cut`.slice(0, 64);
+  const had = !!ctx.doc.assets[nid];
+  const op: Op = { op: had ? 'replace' : 'add', path: pointer('assets', nid), value: { type: 'image', src: path, name: ctx.doc.assets[id].name ? `${ctx.doc.assets[id].name} cut out` : nid, madeBy: [madeBy(matteModel(subject))] } };
+  return { nid, had, op, width, height };
+}
+
 export const REMOVEBG_TOOLS: ToolType[] = [
   {
     name: 'remove-bg',
@@ -55,20 +67,27 @@ export const REMOVEBG_TOOLS: ToolType[] = [
         image: { type: 'string', format: 'asset', assetType: 'image', title: 'Image' },
         subject: { type: 'string', enum: ['any', 'person'], title: 'Subject', description: 'the main subject, or a person only' },
         place: { type: 'boolean', title: 'Place it', description: 'add the cut picture to the composition as its own layer (yes by default)' },
+        images: { type: 'array', items: { type: 'string', format: 'asset', assetType: 'image' }, title: 'Images', description: 'several pictures cut out in one call, each saved as its own asset and none placed (instead of one call per picture)' },
       },
     },
-    ai: { when: 'a picture whose background must go (a product, a person on a busy background): titles and graphics then pass behind the subject' },
-    async run({ image: wanted, subject = 'any', place = true }, ctx: ToolContext) {
+    ai: { when: 'a picture whose background must go (a product, a person on a busy background): titles and graphics then pass behind the subject; a whole set of product shots at once with images' },
+    async run({ image: wanted, subject = 'any', place = true, images: many }, ctx: ToolContext) {
+      if (Array.isArray(many) && many.length) {
+        const missing = many.filter((x: string) => ctx.doc.assets[x]?.type !== 'image');
+        if (missing.length) throw new Error(`not pictures of the project: ${missing.join(', ')}`);
+        const cuts = [];
+        for (const id of [...new Set(many as string[])]) cuts.push({ id, ...(await cutAsset(id, subject, ctx)) });
+        return {
+          ops: cuts.map((c) => c.op), reload: cuts.filter((c) => c.had).map((c) => c.nid), label: t('removebg.doneMany', { n: cuts.length }),
+          text: [`${cuts.length} backgrounds cut out, none placed:`, ...cuts.map((c) => `- "${c.id}" → "${c.nid}" (${c.width}×${c.height})`)].join('\n'),
+          notice: t('removebg.doneMany', { n: cuts.length }),
+        };
+      }
       const images = Object.entries(ctx.doc.assets).filter(([, a]) => a.type === 'image');
       const id = wanted ?? mediaAssetsOf(ctx.doc, ctx.compId, ctx.selection, ['image'])[0] ?? images.filter(([aid, a]) => !isToolAsset(aid, a)).at(-1)?.[0];
       if (!id) throw new Error('the project has no picture: bring one in first');
-      const res = await fetch(ctx.assetUrl(id));
-      if (!res.ok) throw new Error(`${id}: the picture could not be read (HTTP ${res.status})`);
-      const { blob, width: iw, height: ih } = await cutoutBlob(await res.blob(), subject, ctx.progress);
-      const path = await ctx.writeFile(`assets/cutout/${id}.png`, blob);
-      const nid = `${id}-cut`.slice(0, 64);
-      const had = !!ctx.doc.assets[nid];
-      const ops: Op[] = [{ op: had ? 'replace' : 'add', path: pointer('assets', nid), value: { type: 'image', src: path, name: ctx.doc.assets[id].name ? `${ctx.doc.assets[id].name} cut out` : nid, madeBy: [madeBy(matteModel(subject))] } }];
+      const { nid, had, op, width: iw, height: ih } = await cutAsset(id, subject, ctx);
+      const ops: Op[] = [op];
       const comp = ctx.doc.compositions[ctx.compId];
       // run again, the layer that already shows the cut keeps showing it (its asset is replaced and reloaded): no second copy
       const shown = Object.keys(comp.layers).find((x) => comp.layers[x].type === 'image' && comp.layers[x].props?.image === nid);

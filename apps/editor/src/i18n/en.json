@@ -1812,7 +1812,8 @@
   "removebg": {
     "reading": "reading the subject",
     "refining": "refining the edge",
-    "done": "The background of {name} is cut out."
+    "done": "The background of {name} is cut out.",
+    "doneMany": "{n} backgrounds cut out."
   },
   "cuts": {
     "done": "\"{name}\" tightened: {saved} saved."
