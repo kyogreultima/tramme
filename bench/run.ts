@@ -21,6 +21,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { CHAT_INDEX, chatPath } from '@tramme/project';
+import type { Page } from 'puppeteer-core';
+import { COMPANION_PORT } from '@tramme/assistant';
 import { launch } from '../packages/cli/src/browser.ts';
 import { priced } from './cost.ts';
 import { PRICES } from './prices.ts';
@@ -71,7 +73,35 @@ async function call<T>(p: string, init?: RequestInit): Promise<T> {
   return r.json() as Promise<T>;
 }
 
+const COMPANION = `http://127.0.0.1:${COMPANION_PORT}`;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * The brief sent, then the turn watched until nothing has run for 15 s (its
+ * scenes built apart included); once its cost passes the cap, the companion is
+ * told to stop (straight, so a busy page cannot delay it) and so is the editor.
+ * Whether it was stopped.
+ */
+async function watch(page: Page, start: number, token: string): Promise<boolean> {
+  // send resolves when the turn is over: it is not awaited
+  await page.evaluate((text) => { void (window as any).__tramme.send(text); }, brief!.prompt);
+  let capped = false, seenRunning = false, idleSince = 0;
+  while (!(idleSince && Date.now() - idleSince > 15000 && (seenRunning || Date.now() - start > 90000))) {
+    await sleep(5000);
+    const live = transcriptsSince(start);
+    process.stdout.write(`\r${((Date.now() - start) / 60000).toFixed(1)} min, ${live.requests} requests, $${live.dollars.toFixed(2)}   `);
+    if (live.dollars > cap && !capped) {
+      capped = true;
+      console.log('\ncap passed: stopping the turn');
+      await fetch(`${COMPANION}/stop`, { method: 'POST', headers: { authorization: `Bearer ${token}` } }).catch(() => {});
+      await page.evaluate(() => (window as any).__tramme.stop());
+    }
+    const isRunning = await page.evaluate(() => (window as any).__tramme.running.value as boolean);
+    if (isRunning) { seenRunning = true; idleSince = 0; } else if (!idleSince) idleSince = Date.now();
+  }
+  await sleep(3000);
+  return capped;
+}
 
 async function main() {
   const companion = JSON.parse(fs.readFileSync(path.join(os.homedir(), '.tramme', 'companion.json'), 'utf8')).token as string;
@@ -98,20 +128,8 @@ async function main() {
     // the companion answers before the message leaves (no route: the words would wait in the box)
     await page.waitForFunction(() => (window as any).__tramme.aiRoute.value === 'companion', { timeout: 60000 })
       .catch(() => { throw new Error('the companion does not answer the editor: is `node packages/cli/src/main.ts agent --origin http://localhost:8790` running?'); });
-    if (dry) { console.log('dry run: the project opens and the companion answers; nothing sent'); return; }
-    await page.evaluate((text) => (window as any).__tramme.send(text), brief!.prompt);
-    // the turn runs, its scenes built apart included; it is over once nothing has run for 15 s
-    let seenRunning = false, idleSince = 0;
-    for (;;) {
-      await sleep(5000);
-      const isRunning = await page.evaluate(() => (window as any).__tramme.running.value as boolean);
-      const live = transcriptsSince(start);
-      if (isRunning) { seenRunning = true; idleSince = 0; } else if (!idleSince) idleSince = Date.now();
-      process.stdout.write(`\r${((Date.now() - start) / 60000).toFixed(1)} min, ${live.requests} requests, $${live.dollars.toFixed(2)}   `);
-      if (live.dollars > cap && !capped) { capped = true; console.log(`\ncap passed: stopping the turn`); await page.evaluate(() => (window as any).__tramme.stop()); }
-      if (idleSince && Date.now() - idleSince > 15000 && (seenRunning || Date.now() - start > 90000)) break;
-    }
-    await sleep(3000);
+    if (dry) console.log('dry run: the project opens and the companion answers; nothing sent');
+    else capped = await watch(page, start, companion);
   } catch (e) { error = (e as Error).message; console.error(`\n${error}`); }
   finally { await browser.close(); }
   if (dry && !error) { fs.rmSync(dir, { recursive: true, force: true }); return; }
