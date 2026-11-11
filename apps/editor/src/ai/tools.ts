@@ -5,7 +5,7 @@
 // only changes through proposals the user applies.
 
 import { copiesFor, copyId, installedTypes, sandboxedDoc } from '../installed.ts';
-import { applyOps, getAt, isTranscript, pointer, remapTranscript, silences, toolInputIssues, toolOutput, validate, type TrammeDoc, type Op, type Registry, type ToolContext, type Transcript } from '@tramme/core';
+import { applyOps, getAt, isTranscript, pointer, remapTranscript, silences, repairToolInput, toolInputIssues, toolOutput, validate, type TrammeDoc, type Op, type Registry, type ToolContext, type Transcript } from '@tramme/core';
 import { editorEvaluator } from '../evaluator.ts';
 import { DOCUMENT, isChatPath, MANIFEST, pathIssue, srcPath } from '@tramme/project';
 import { VideoFrames } from '@tramme/render';
@@ -428,7 +428,7 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
   }
 
   /** a tool of the project's plugins: its text and images for the assistant, its operations added to the proposal */
-  private async useTool(name: string, input: unknown): Promise<ToolResult> {
+  private async useTool(name: string, given: unknown): Promise<ToolResult> {
     this.notice = '';
     const projectId = S.project.peek().id, docUrl = S.docUrl.peek();
     const current = () => S.project.peek()?.id === projectId && S.docUrl.peek() === docUrl;
@@ -440,6 +440,8 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
       return text(`unknown tool: ${name}. ${names.length ? `Tools of this project: ${names.join(', ')}.` : 'This project has no tools (list_nodes).'}`, true);
     }
     const { tool, from } = reg.tool(name);
+    // a slip whose meaning is plain is put right here rather than costing the model another call; it is told how its input was read
+    const { input, repaired } = repairToolInput(tool.input, given);
     const issues = toolInputIssues(tool.input, input);
     if (issues.length) return text(`input refused by ${name}:\n${issues.join('\n')}`, true);
     let out;
@@ -465,6 +467,7 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
       if (r.isError) return text([said, ...lines].join('\n'), true);
       lines.push(said);
     }
+    if (repaired.length) lines.push(`(input read as: ${repaired.join('; ')})`);
     content.unshift({ type: 'text', text: lines.join('\n') || `${name}: done.` });
     return { content };
   }

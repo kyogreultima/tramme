@@ -149,6 +149,53 @@ export function toolOutput(r: unknown): ToolOutput {
 const typeOf = (v: unknown) => (v === null ? 'null' : Array.isArray(v) ? 'array' : Number.isInteger(v) ? 'integer' : typeof v);
 const fits = (v: unknown, type: string) => { const t = typeOf(v); return t === type || (type === 'number' && t === 'integer'); };
 
+/** an object or a list as plain text: "key: value" lines, items joined */
+function asText(v: unknown): string {
+  if (Array.isArray(v)) return v.map(asText).join('; ');
+  if (v && typeof v === 'object') return Object.entries(v).map(([k, x]) => `${k}: ${asText(x)}`).join('\n');
+  return String(v);
+}
+
+/**
+ * An input with the slips whose meaning is plain put right, against the
+ * tool's schema (top-level properties only), and what was put right, one line
+ * each: an object or a list given where a text is wanted becomes that text, a
+ * single value where a list is wanted becomes a list of one, a number or a
+ * yes/no written as text becomes one, an option in another case takes the
+ * schema's, a number past a bound is brought to it. Anything else is left for
+ * toolInputIssues to refuse.
+ */
+export function repairToolInput(schema: JsonSchema | undefined, input: unknown): { input: unknown; repaired: string[] } {
+  if (!schema || typeOf(input) !== 'object') return { input, repaired: [] };
+  const props = (schema.properties ?? {}) as Record<string, JsonSchema>;
+  const out: Record<string, unknown> = { ...(input as Record<string, unknown>) }, repaired: string[] = [];
+  for (const [k, v] of Object.entries(out)) {
+    const p = props[k];
+    if (!p || v === undefined) continue;
+    const types = p.type === undefined ? [] : Array.isArray(p.type) ? (p.type as string[]) : [p.type as string];
+    let fixed = v;
+    if (types.length && !types.some((t) => fits(v, t))) {
+      const want = types[0], got = typeOf(v);
+      if (want === 'string' && (got === 'object' || got === 'array')) fixed = asText(v);
+      else if (want === 'array' && got !== 'null') fixed = [v];
+      else if ((want === 'number' || want === 'integer') && got === 'string' && (v as string).trim() !== '' && Number.isFinite(Number(v))) fixed = want === 'integer' ? Math.round(Number(v)) : Number(v);
+      else if (want === 'boolean' && (v === 'true' || v === 'false')) fixed = v === 'true';
+      if (fixed !== v) repaired.push(`${k}: ${got} given, taken as ${want}`);
+    }
+    if (Array.isArray(p.enum) && typeof fixed === 'string' && !p.enum.includes(fixed)) {
+      const same = p.enum.find((e) => typeof e === 'string' && e.toLowerCase() === (fixed as string).trim().toLowerCase());
+      if (same !== undefined) { repaired.push(`${k}: "${fixed}" taken as "${same}"`); fixed = same; }
+    }
+    if (typeof fixed === 'number') {
+      const n = fixed;
+      if (typeof p.minimum === 'number' && n < p.minimum) { repaired.push(`${k}: ${n} brought up to ${p.minimum}`); fixed = p.minimum; }
+      if (typeof p.maximum === 'number' && n > p.maximum) { repaired.push(`${k}: ${n} brought down to ${p.maximum}`); fixed = p.maximum; }
+    }
+    out[k] = fixed;
+  }
+  return { input: out, repaired };
+}
+
 /**
  * What is wrong with an input, against the tool's schema: required keys,
  * types, enums and number bounds of the top-level properties. Deeper checks
