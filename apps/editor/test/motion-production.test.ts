@@ -27,6 +27,11 @@ describe('timed motion direction', () => {
     expect(prompt).toContain('loop');
   });
 
+  it('sends the director to the file for the beats, never a scene builder that has its own in its message', () => {
+    expect(plans.planText(plan())).toContain(`Timed motion beats are in ${plans.FILM_PLAN_PATH}`);
+    expect(plans.planText(plan(), { scene: true })).not.toContain(plans.FILM_PLAN_PATH);
+  });
+
   it('rejects motion outside the scene or settling before the movement ends', () => {
     const bad = { ...scene, motion: [{ ...beat, end: 8, settle: 1.5 }] };
     expect(plans.motionIssues([bad]).join('\n')).toMatch(/Product.*6 s/);

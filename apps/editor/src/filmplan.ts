@@ -112,11 +112,15 @@ export function directionIssues(directions: Direction[]): string[] {
 const LIMIT = 2500;
 const directionText = (d: Direction) => `${d.name}: ${FIELDS.map((f) => `${f} ${d[f]}`).join('; ')}`;
 
-/** the plan as the model reads it in the system prompt, at most 2 500 characters, the scenes' ideas clipped first */
-export function planText(plan: FilmPlan): string {
+/**
+ * The plan as the model reads it with its message, at most 2 500 characters, the
+ * scenes' ideas clipped first. For a scene built apart (`scene`), its own beats
+ * are in its message: it is not sent to the file for them.
+ */
+export function planText(plan: FilmPlan, opts: { scene?: boolean } = {}): string {
   const head = [`Idea: ${plan.idea}`, `Kinds: ${plan.kinds.join(', ')}.`];
   if (plan.loop) head.push('Seamless loop: the ending returns to the opening; no closing card unless the brief asks for one.');
-  if (plan.scenes.some((s) => s.motion?.length)) head.push(`Timed motion beats are in ${FILM_PLAN_PATH}; read each scene's motion before building it.`);
+  if (!opts.scene && plan.scenes.some((s) => s.motion?.length)) head.push(`Timed motion beats are in ${FILM_PLAN_PATH}; read each scene's motion before building it.`);
   if (plan.example) head.push(`Example from the user (${plan.example.kind}, one kind among the others): ${plan.example.what}`);
   const kept = plan.directions[0];
   const tail = [...(kept ? [`${plan.target ? 'Kept' : 'First'} direction: ${directionText(kept)}`] : []), ...(plan.target ? [`Target (style frame): ${plan.target}`] : [])];

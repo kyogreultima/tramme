@@ -619,7 +619,7 @@ export async function* ask(p: AskPayload, signal: AbortSignal): AsyncGenerator<A
         // the brief and the plan as the director left them: each scene reads them with its first message, under the same system prompt as every turn
         const briefNow = (await api.readText(project.id, 'assets/brief.json').catch(() => null))?.text ?? brief ?? undefined;
         if (!current()) return;
-        const sceneParts = systemParts(reference, briefNow, mine, packLines(packs), planText(planned));
+        const sceneParts = systemParts(reference, briefNow, mine, packLines(packs), planText(planned, { scene: true }));
         const via = viaFor(route, model);
         // what each scene's turn used, for its own line and to leave out of the director's
         const sceneUse = new Map<string, { tools: number; images: number }>();
