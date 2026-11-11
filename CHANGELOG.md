@@ -29,6 +29,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 ### Fixed
 
 - A turn stopped half way keeps the line of what it spent.
+- A film's music made by ElevenLabs is no longer refused when its prompt is long, nor for being asked as instrumental beside its plan.
 
 ## [0.22.0] - 2026-11-10
 
