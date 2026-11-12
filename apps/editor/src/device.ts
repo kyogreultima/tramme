@@ -196,8 +196,9 @@ export const carriesBody = (req: Request, origin: string): boolean =>
  * Android's WebView gives the app's protocol a request without its body (apps/desktop/src-tauri/src/bodies.rs):
  * the page's fetch lays the body in the app first, through the IPC, then sends the request with its token.
  * Every fetch of the page goes through here, so no caller changes. Off Android it does nothing.
+ * `part` is what one IPC call carries (a test makes it small).
  */
-export function carryBodies(): void {
+export function carryBodies(part = BODY_PART): void {
   if (platform !== 'android') return;
   const native = window.fetch.bind(window);
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -206,8 +207,8 @@ export function carryBodies(): void {
     const bytes = new Uint8Array(await req.arrayBuffer());
     if (!bytes.length) return native(req.url, withoutBody(req));
     const token = crypto.randomUUID();
-    for (let at = 0; at < bytes.length; at += BODY_PART) {
-      await tauri!.core.invoke('device_body', { token, part: toBase64(bytes.subarray(at, at + BODY_PART)) });
+    for (let at = 0; at < bytes.length; at += part) {
+      await tauri!.core.invoke('device_body', { token, part: toBase64(bytes.subarray(at, at + part)) });
     }
     return native(req.url, withoutBody(req, token));
   };

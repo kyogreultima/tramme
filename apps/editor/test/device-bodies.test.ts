@@ -16,7 +16,8 @@ beforeEach(() => {
   invoke.mockClear();
   vi.stubGlobal('location', { origin: ORIGIN });
   vi.stubGlobal('window', { fetch: async (url: string, init?: RequestInit) => { sent.push({ url, init }); return new Response('{}'); } });
-  carryBodies();
+  // parts of 1 KB: a body of a few KB goes in several
+  carryBodies(1024);
 });
 afterEach(() => vi.unstubAllGlobals());
 
@@ -40,7 +41,7 @@ describe('the bodies of the phone app\'s requests', () => {
   });
 
   it('a large body goes in several parts, in order', async () => {
-    const big = new Uint8Array(9 << 20).map((_, i) => i % 251);
+    const big = new Uint8Array(2500).map((_, i) => i % 251);
     await window.fetch(`${ORIGIN}/api/device/exports/a.mp4?at=0`, { method: 'PUT', body: big });
     const token = new Headers(sent[0].init!.headers).get('x-tramme-body')!;
     expect(invoke.mock.calls.length).toBe(3);
