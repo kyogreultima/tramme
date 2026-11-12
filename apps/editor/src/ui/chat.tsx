@@ -6,6 +6,7 @@
 
 import type { ComponentChildren } from 'preact';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
+import { handheld } from './controls.tsx';
 import type { ChatItem, TurnUsage } from '../api.ts';
 import { engineOf, modelLabel, providerOf } from '@tramme/assistant';
 import { aiSettings, aiStatus, CLI_SETUP, cliUnavailable, providerLabel, refreshStatus, setAiSettings } from '../ai/index.ts';
@@ -181,8 +182,6 @@ export function Lightbox() {
   return lightbox.value ? <div class="lightbox" onClick={() => { lightbox.value = null; }}><img src={lightbox.value} alt="" /></div> : null;
 }
 
-/** a phone or a tablet: nothing to start a companion with */
-const handheld = () => matchMedia('(pointer: coarse)').matches;
 
 /** a command to type in a terminal, copied on click */
 export function Command({ text }: { text: string }) {
@@ -244,6 +243,7 @@ export function Access() {
       <b>{t('assistant.noAiConnected')}</b>
       <span>{t('assistant.connectAnAiHint')}</span>
       {connect}
+      {/* a phone or a tablet: nothing to start a companion with */}
       {!handheld() && (
         <details class="access-more">
           <summary>{t('assistant.orTheCompanion')}</summary>

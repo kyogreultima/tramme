@@ -18,7 +18,7 @@ import { sandboxedDoc } from '../installed.ts';
 import { pluginHost } from '../plugins/index.ts';
 import { ensureDeclared, ensureSandboxDoc, moduleItemsOf } from '../plugins/sandbox-draw.ts';
 import { fileProject, sameFileProject } from '../files.ts';
-import { openMenu, type MenuItem } from './controls.tsx';
+import { handheld, openMenu, type MenuItem } from './controls.tsx';
 import { Icon } from './icons.tsx';
 import { m, t } from '../i18n/index.ts';
 import { picking, pixelAt } from '../dropper.ts';
@@ -28,7 +28,7 @@ import { plainRenderMessage } from '../render-message.ts';
 import { WebSceneFrames } from './WebSceneFrames.tsx';
 
 /** a finger rather than a mouse: bigger handles */
-const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+const coarse = handheld();
 const zoom = signal<'fit' | number>('fit');
 const pan = signal<Vec2>([0, 0]);
 

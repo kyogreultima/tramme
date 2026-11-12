@@ -48,6 +48,9 @@ a.brand:hover { background: var(--hover); }
 .brief-files { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 16px 6px; }
 .brief-bar { display: flex; align-items: center; gap: 6px; padding: 8px 10px 10px 12px; }
 .brief-bar .grow { flex: 1; }
+/* the model and Start side by side: one height, one type size (the buttons grow to touch size on a touch screen, so does it) */
+.brief-bar .model-pick { height: var(--h-md); font-size: var(--fs-md); }
+@media (pointer: coarse) { .brief-bar .model-pick { height: var(--h-lg); } }
 /* the small rectangle of each format, in the segmented control */
 .brief-formats button i { display: block; border: 1.5px solid currentColor; border-radius: 2px; }
 .hero-ideas { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; max-width: 760px; }
@@ -141,10 +144,14 @@ a.brand:hover { background: var(--hover); }
   .presets { grid-template-columns: repeat(2, 1fr); }
   /* the brief box lines up with the films under it: the page's margin only */
   .hero { padding: 18px 0 8px; }
-  .brief-bar { flex-wrap: wrap; row-gap: 8px; }
-  /* the formats on a line of their own, the bar's whole width, four equal choices */
-  .brief-bar .seg { order: 3; flex: 1 0 100%; }
+  /* two lines: the tools, the model and Start; then the formats across the whole width. A grid, so the
+     model and Start share one size and shrink together rather than Start dropping to the next line;
+     Material keeps its icon only (its title says it) */
+  .brief-bar { display: grid; grid-template-columns: auto auto auto minmax(0, 1fr) minmax(0, 96px) minmax(0, 96px); row-gap: 8px; }
+  .brief-bar .seg { grid-row: 2; grid-column: 1 / -1; }
   .brief-bar .seg button { flex: 1 1 0; min-width: 0; padding: 0 6px; }
+  .brief-bar .material .label { display: none; }
+  .brief-bar .model-pick, .brief-bar > .btn.primary { width: 100%; min-width: 0; max-width: none; padding: 0 8px; justify-content: center; }
 }
 .home-version { margin-top: auto; padding-top: 8px; text-align: center; font-size: var(--fs-xs); }
 .home-version a { color: var(--accent); }

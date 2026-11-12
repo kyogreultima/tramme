@@ -11,7 +11,8 @@
 .studio .toasts { bottom: auto; top: 64px; }
 
 /* ── the stage: the film, and what floats over it ──────────── */
-.studio-stage { position: relative; flex: 1; min-height: 0; overflow: hidden; background: var(--stage); border-radius: var(--r-lg); box-shadow: var(--shadow-1); }
+/* a size container: what sits on the film (the invitation) follows the stage's size, which the phone's keyboard halves */
+.studio-stage { position: relative; flex: 1; min-height: 0; overflow: hidden; container-type: size; background: var(--stage); border-radius: var(--r-lg); box-shadow: var(--shadow-1); }
 .studio-stage .viewport { position: absolute; inset: 0; background: transparent; }
 .studio-stage .viewport .stage { cursor: crosshair; }
 /* Tramme at work: a ring of accent breathes around the picture (the picture itself does not move) */
@@ -45,12 +46,16 @@
 .take-actions .btn { border-radius: var(--r-pill); }
 
 /* an empty film: what to do, or what the assistant is doing */
-.invite { position: absolute; left: 32px; right: 32px; top: 60px; bottom: 150px; z-index: 3; display: grid; place-content: center; justify-items: center; gap: 10px; text-align: center; pointer-events: none; }
-.invite-mark { display: grid; place-items: center; width: 56px; height: 56px; margin-bottom: 6px; border-radius: var(--r-md); background: var(--accent-soft); color: var(--accent-text); }
-.invite-mark svg { width: 28px; height: 28px; fill: currentColor; }
+/* the invitation sits on the empty film, which is dark in every theme: the colours of text on a picture,
+   the sizes from the stage's (cqmin), the paragraph left out when the stage is too low for it */
+.invite { position: absolute; left: 32px; right: 32px; top: 60px; bottom: 150px; z-index: 3; display: grid; place-content: center; justify-items: center; gap: clamp(4px, 2cqmin, 10px); text-align: center; pointer-events: none; }
+.invite-mark { display: grid; place-items: center; width: clamp(34px, 12cqmin, 56px); height: clamp(34px, 12cqmin, 56px); margin-bottom: clamp(0px, 1.2cqmin, 6px); border-radius: var(--r-md); background: color-mix(in srgb, var(--on-media) 12%, transparent); color: var(--on-media); }
+.invite.making .invite-mark { background: var(--accent-soft); color: var(--accent-text); }
+.invite-mark svg { width: 50%; height: 50%; color: inherit; fill: currentColor; }
 .invite.making .invite-mark svg { animation: work 1.4s var(--ease) infinite; }
-.invite h2 { margin: 0; font-size: clamp(22px, 3vw, 32px); font-weight: 650; letter-spacing: -0.02em; }
-.invite p { margin: 0; max-width: 400px; color: var(--text-2); font-size: var(--fs-md); line-height: var(--lh-text); }
+.invite h2 { margin: 0; color: var(--on-media); font-size: clamp(15px, 6cqmin, 32px); font-weight: 650; letter-spacing: -0.02em; }
+.invite p { margin: 0; max-width: min(400px, 80cqw); color: color-mix(in srgb, var(--on-media) 72%, transparent); font-size: clamp(12px, 3.2cqmin, var(--fs-md)); line-height: var(--lh-text); }
+@container (max-height: 380px) { .invite p { display: none; } }
 /* while the first film is made, the words sit on a card of their own: the film behind them is any colour, black included */
 .invite.making { inset: auto; left: 50%; top: 50%; bottom: auto; right: auto; width: min(440px, calc(100% - 64px)); transform: translate(-50%, -50%); padding: 28px 32px 30px; border-radius: var(--r-lg); background: var(--float); backdrop-filter: blur(16px) saturate(1.4); -webkit-backdrop-filter: blur(16px) saturate(1.4); box-shadow: var(--shadow-2); }
 .invite.making h2 { color: var(--text); }
@@ -219,9 +224,9 @@ button.ctx-chip:hover { background: var(--field-hover); color: var(--text); }
   .sb-now { display: none; }
   .studio-side { flex: none; min-height: 60vh; padding-bottom: 150px; }
   .studio-body > .resizer { display: none; }
-  .thread { overflow: visible; }
+  /* the studio's notes scroll with its page; the atelier's assistant keeps its own scroll */
+  .studio-side .thread { overflow: visible; }
   .invite { bottom: 20px; }
-  .invite p { display: none; }
 }
 
 /* retouching: several pins, strokes, the layers an area may mean, the list of retouches */

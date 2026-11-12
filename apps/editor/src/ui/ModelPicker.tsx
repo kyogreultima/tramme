@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { CLI_DEFAULT, ENGINE_MODELS, modelLabel, PROVIDER_LABEL, providerOf, type Effort } from '@tramme/assistant';
 import { aiModels, aiSettings, aiStatus, currentEffort, loadModels, modelEfforts, providerLabel, remoteProviders, setAiSettings, setEffort, type ModelOption } from '../ai/index.ts';
 import { openSettings } from '../settings.ts';
-import { Popover, Seg } from './controls.tsx';
+import { handheld, Popover, Seg } from './controls.tsx';
 import { Icon } from './icons.tsx';
 import { t } from '../i18n/index.ts';
 
@@ -83,7 +83,8 @@ export function ModelPicker({ wide = false }: { wide?: boolean }) {
     if (!anchor) return;
     setQuery('');
     loadModels();
-    setTimeout(() => search.current?.focus(), 0);
+    // straight to the search with a keyboard; on a touch screen the keyboard would cover the list: it comes when the field is touched
+    if (!handheld()) setTimeout(() => search.current?.focus(), 0);
   }, [anchor]);
   const pick = (id: string) => { setAiSettings({ model: id }); setAnchor(null); };
   // a model typed in full (openai:gpt-x, zai:glm-4-plus, custom:deepseek:deepseek-chat, local:qwen3:8b), for one the lists do not show

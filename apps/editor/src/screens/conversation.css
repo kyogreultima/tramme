@@ -249,13 +249,13 @@
 .ai-line .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-4); }
 .ai-line .dot.ok { background: var(--ok); }
 .ai-line .dot.off { background: var(--danger); }
-.assistant .access { display: flex; flex-direction: column; gap: 8px; align-self: stretch; text-align: left; padding: 12px; border-radius: var(--r-sm); background: var(--surface-2); font-size: var(--fs-sm); line-height: 1.45; color: var(--text-2); }
-.assistant .access b { color: var(--text); font-weight: 600; }
-.assistant .access code.cmd { margin-top: 0; }
-.assistant .access .btn { align-self: flex-start; }
+.access { display: flex; flex-direction: column; gap: 8px; align-self: stretch; text-align: left; padding: 12px; border-radius: var(--r-sm); background: var(--surface-2); font-size: var(--fs-sm); line-height: 1.45; color: var(--text-2); }
+.access b { color: var(--text); font-weight: 600; }
+.access code.cmd { margin-top: 0; }
+.access .btn { align-self: flex-start; }
 .ai-more { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; line-height: 1.45; }
-.assistant .access-more summary { cursor: pointer; color: var(--text-3); }
-.assistant .access-more[open] { display: flex; flex-direction: column; gap: 8px; }
+.access-more summary { cursor: pointer; color: var(--text-3); }
+.access-more[open] { display: flex; flex-direction: column; gap: 8px; }
 .access-row { display: flex; gap: 6px; }
 .access-row .field { flex: 1; min-width: 0; height: var(--h-sm); }
 code.cmd { display: block; margin-top: 4px; padding: 6px 8px; border-radius: var(--r-xs); background: var(--surface); font-family: var(--mono); font-size: 10.5px; color: var(--text); word-break: break-all; cursor: copy; user-select: text; }

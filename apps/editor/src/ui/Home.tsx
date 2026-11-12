@@ -21,7 +21,7 @@ import { packCommands, shippedPacks } from '../packs.ts';
 import { useCommandMenu, useMentionMenu } from './composer.tsx';
 import { expandMentions } from '../mentions.ts';
 import { MicButton, writeInto } from './MicButton.tsx';
-import { Modal, longPress, openMenu, Seg } from './controls.tsx';
+import { handheld, Modal, longPress, openMenu, Seg } from './controls.tsx';
 import { Icon } from './icons.tsx';
 import { Brand } from './Logo.tsx';
 import { ModelPicker } from './ModelPicker.tsx';
@@ -222,7 +222,9 @@ export function DirectionBox({ busy, onStart }: { busy: boolean; onStart: (words
       <form class="brief-box" data-tour="home-new" onSubmit={(e) => { e.preventDefault(); start(); }}
         onDragOver={(e) => { if (e.dataTransfer?.types.includes('Files')) { e.preventDefault(); e.stopPropagation(); } }}
         onDrop={(e) => { if (!e.dataTransfer) return; e.preventDefault(); e.stopPropagation(); droppedOf(e.dataTransfer).then((list) => add(list.filter((p) => isSourceFile(p.file)))); }}>
-        <textarea ref={area} value={words} placeholder={t('home.heroPlaceholder')} autoFocus
+        <textarea ref={area} value={words} placeholder={t('home.heroPlaceholder')}
+          // ready to type with a keyboard; on a touch screen the keyboard would cover the page as soon as it opens
+          autoFocus={!handheld()}
           aria-autocomplete="list"
           onInput={(e) => { setWords((e.target as HTMLTextAreaElement).value); commandMenu.typed(); mention.sync(); }}
           onClick={mention.sync}
@@ -241,7 +243,7 @@ export function DirectionBox({ busy, onStart }: { busy: boolean; onStart: (words
           </div>
         )}
         <div class="brief-bar">
-          <button type="button" class="btn sm ghost" title={t('home.addMaterialHint')} onClick={() => files.current?.click()}><Icon name="attach" />{t('home.addMaterial')}</button>
+          <button type="button" class="btn sm ghost material" title={t('home.addMaterialHint')} aria-label={t('home.addMaterial')} onClick={() => files.current?.click()}><Icon name="attach" /><span class="label">{t('home.addMaterial')}</span></button>
           <button type="button" class="icon-btn sm" title={t('home.fromSourcesFolder')} onClick={() => folder.current?.click()}><Icon name="folder" /></button>
           <MicButton onText={(add) => writeInto(area.current, setWords, add)} />
           <input ref={files} type="file" multiple hidden accept="image/*,video/*,audio/*,.pdf,application/pdf,.md,.markdown,.json,.ttf,.otf,.woff,.woff2,.glb,.gltf" onChange={chosen} />

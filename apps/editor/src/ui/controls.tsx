@@ -145,18 +145,33 @@ export function bandOf(el: Element, from: { clientX: number; clientY: number }, 
   return { band, ids };
 }
 
+/** a touch screen (a phone, a tablet): fingers rather than a pointer, a keyboard that covers half the screen when a field takes the focus */
+export const handheld = (): boolean => typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+
 // ── popover ──────────────────────────────────────────────────
 export function Popover({ anchor, onClose, children, class: cls = '', align = 'left' }: { anchor: HTMLElement; onClose: () => void; children: ComponentChildren; class?: string; align?: 'left' | 'right' }) {
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ x: number; top?: number; bottom?: number; max: number } | null>(null);
   useLayoutEffect(() => {
-    const a = anchor.getBoundingClientRect(), r = ref.current!.getBoundingClientRect();
-    let x = align === 'right' ? a.right - r.width : a.left;
-    x = Math.max(8, Math.min(x, innerWidth - r.width - 8));
-    // below the anchor when it fits, otherwise above; neither: the side with more room, scrolled inside
-    const below = innerHeight - a.bottom - 14, above = a.top - 14;
-    const down = r.height <= below || (r.height > above && below >= above);
-    setPos(down ? { x, top: a.bottom + 6, max: below } : { x, bottom: innerHeight - a.top + 6, max: above });
+    const place = () => {
+      const el = ref.current;
+      if (!el) return;
+      // its natural size, not the one a previous placement capped
+      const capped = el.style.maxHeight;
+      el.style.maxHeight = '';
+      const a = anchor.getBoundingClientRect(), r = el.getBoundingClientRect();
+      el.style.maxHeight = capped;
+      let x = align === 'right' ? a.right - r.width : a.left;
+      x = Math.max(8, Math.min(x, innerWidth - r.width - 8));
+      // below the anchor when it fits, otherwise above; neither: the side with more room, scrolled inside
+      const below = innerHeight - a.bottom - 14, above = a.top - 14;
+      const down = r.height <= below || (r.height > above && below >= above);
+      setPos(down ? { x, top: a.bottom + 6, max: below } : { x, bottom: innerHeight - a.top + 6, max: above });
+    };
+    place();
+    // placed again when the window changes size: a phone's keyboard opening or closing halves or doubles the room
+    addEventListener('resize', place);
+    return () => removeEventListener('resize', place);
   }, [anchor]);
   useEffect(() => {
     const close = (e: Event) => { if (!ref.current?.contains(e.target as Node) && !anchor.contains(e.target as Node)) onClose(); };
@@ -302,7 +317,7 @@ export function Select({ value, options, onChange, title }: { value: string; opt
   const [open, setOpen] = useState<HTMLElement | null>(null);
   const [active, setActive] = useState(-1);
   const listRef = useRef<HTMLDivElement>(null);
-  const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+  const coarse = handheld();
   const entries = options.map((o) => ({ value: optValue(o), label: optLabel(o) }));
   const current = entries.find((o) => o.value === value);
   useEffect(() => {
@@ -461,14 +476,15 @@ export function useSize(key: string, initial: number, min: number, max: number) 
 }
 
 /** a dialog over the page; Escape or a click outside closes it */
-export function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: ComponentChildren; wide?: boolean }) {
+/** `above`: over the popovers and menus too, for a dialog that answers a gesture made in one (the phone's save sheet after an export) */
+export function Modal({ title, onClose, children, wide, above }: { title: string; onClose: () => void; children: ComponentChildren; wide?: boolean; above?: boolean }) {
   useEffect(() => {
     const key = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     addEventListener('keydown', key);
     return () => removeEventListener('keydown', key);
   }, [onClose]);
   return (
-    <div class="modal-back" onPointerDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div class={`modal-back${above ? ' above' : ''}`} onPointerDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div class={`modal${wide ? ' wide' : ''}`} role="dialog" aria-label={title}>
         <div class="modal-head"><span>{title}</span><button class="icon-btn sm" title={t('common.close')} onClick={onClose}><Icon name="x" /></button></div>
         {children}
