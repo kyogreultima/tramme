@@ -101,6 +101,12 @@ jobs:
           grep -aq "$symbol" "$RUNNER_TEMP/lib.so" \
             || { echo "::error::the Rust library does not answer the package $package ($symbol missing)"; exit 1; }
           echo "package $package, $symbol present"
+          # Google Play and Android 15's 16 KB-page devices refuse a library aligned on 4 KB (build.rs asks the linker)
+          readelf="$NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
+          for align in $("$readelf" -lW "$RUNNER_TEMP/lib.so" | awk '$1 == "LOAD" { print $NF }'); do
+            [ $((align)) -ge 16384 ] || { echo "::error::the Rust library is not aligned on 16 KB pages (a segment on $align)"; exit 1; }
+          done
+          echo "16 KB pages"
 
       - name: Sign
         if: env.SIGNED == 'true'
