@@ -129,14 +129,15 @@ jobs:
 
   site:
     name: Deploy the beta site
-    needs: release
+    needs: [plan, release]
     runs-on: ubuntu-latest
     env:
       TRAMME_ENV: beta
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      # the site reads the beta's latest build (apps/site/src/lib/download.ts)
+      # the site reads the beta's latest build (apps/site/src/lib/download.ts): the one just published, by its tag
       GITHUB_TOKEN: ${{ github.token }}
+      RELEASE_TAG: ${{ needs.plan.outputs.tag }}
     steps:
       - name: Cloudflare's secrets
         run: |

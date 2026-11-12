@@ -141,15 +141,16 @@ jobs:
 
   site:
     name: Deploy the site
-    needs: release
+    needs: [plan, release]
     # the site is deployed at launch only: set the repository variable SITE_DEPLOY=on then
     if: vars.SITE_DEPLOY == 'on'
     runs-on: ubuntu-latest
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      # the site reads the latest release (apps/site/src/lib/download.ts)
+      # the site reads the latest release (apps/site/src/lib/download.ts): the one just published, by its tag
       GITHUB_TOKEN: ${{ github.token }}
+      RELEASE_TAG: ${{ needs.plan.outputs.tag }}
     steps:
       - name: Cloudflare's secrets
         run: |

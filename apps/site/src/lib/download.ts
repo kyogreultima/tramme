@@ -38,14 +38,27 @@ export async function latestRelease(log: (s: string) => void, channel: Channel =
   const get = (path: string) => fetch(`https://api.github.com/repos/${REPO_NAME}/${path}`, { headers, signal: AbortSignal.timeout(10_000) });
   try {
     let release: GitHubRelease | undefined;
-    if (channel === 'beta') {
+    let beta = false;
+    // the release a workflow has just published (desktop.yml, desktop-beta.yml), read by its tag: GitHub's list
+    // and its "latest" can still show the one before for a minute, and the site would offer that one
+    const tag = process.env.RELEASE_TAG;
+    if (tag) {
+      const r = await get(`releases/tags/${encodeURIComponent(tag)}`);
+      if (!r.ok) throw new Error(`HTTP ${r.status} for the release ${tag}`);
+      const just = (await r.json()) as GitHubRelease;
+      if (!just.draft && hasInstaller(just) && Boolean(just.prerelease) === (channel === 'beta')) {
+        release = just;
+        beta = channel === 'beta';
+      }
+    }
+    if (!release && channel === 'beta') {
       // the newest first: the latest prerelease that carries an installer
       const r = await get('releases?per_page=30');
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       release = ((await r.json()) as GitHubRelease[]).find((x) => !x.draft && x.prerelease && hasInstaller(x));
+      beta = release !== undefined;
       if (!release) log('site: no beta build of the desktop app yet: the latest release is offered');
     }
-    const beta = release !== undefined;
     if (!release) {
       const r = await get('releases/latest');
       if (r.status === 404) {
