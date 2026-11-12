@@ -12,6 +12,7 @@ mod api;
 mod desktop;
 #[cfg(mobile)]
 mod device_secrets;
+mod exports;
 mod fetch;
 pub mod format;
 mod keys;
@@ -77,7 +78,8 @@ pub fn run() {
     #[cfg(mobile)]
     let builder = builder.invoke_handler(tauri::generate_handler![
         analytics::analytics_state, analytics::analytics_set, analytics::analytics_event,
-        desktop_state, desktop_fetch, desktop_fetch_abort, desktop_open_url
+        desktop_state, desktop_fetch, desktop_fetch_abort, desktop_open_url,
+        exports::device_save, exports::device_share, exports::device_keep_awake, exports::device_exit
     ]);
     builder
         .plugin(tauri_plugin_dialog::init())
@@ -97,6 +99,7 @@ pub fn run() {
             #[cfg(mobile)]
             {
                 store::set_roots(app.path().app_data_dir()?.join("Tramme"), app.path().app_config_dir()?.join("desktop.json"));
+                exports::init(app.path().app_cache_dir()?.join("exports"));
                 device_secrets::install(app.state::<tauri_plugin_tramme_device::Device<tauri::Wry>>().inner().clone());
             }
             let url = format!("{SCHEME}://localhost/").parse().unwrap();

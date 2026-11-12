@@ -100,6 +100,7 @@ fn route_inner(parts: &[String], req: Request<Vec<u8>>) -> Result<Body, store::H
         ("projects", _) => projects(&store, parts, req),
         ("library", _) => shelf(&store, "plugins", parts, req),
         ("sounds", _) => shelf(&store, "sounds", parts, req),
+        ("device", _) => device(parts, req),
         ("keys", _) => Ok(ok_json(KeyStore::system()?.route(method, &decode_segments(&parts[1..]), req.body())?)),
         // the account: sent to the backend of this build's environment (account.rs)
         ("auth" | "account" | "billing", _) => Ok(crate::account::route(&req)),
@@ -109,6 +110,51 @@ fn route_inner(parts: &[String], req: Request<Vec<u8>>) -> Result<Body, store::H
             &json!({ "error": "the provider routes are answered by the page in the desktop app (api.reach)" }),
         )),
         _ => Ok(json_response(404, &json!({ "error": format!("unknown route: {method} /api/{}", parts.join("/")) }))),
+    }
+}
+
+/// the exports folder of a phone (exports.rs): `/api/device/exports/<name>`
+fn device(parts: &[String], req: Request<Vec<u8>>) -> Result<Body, store::HttpError> {
+    let method = req.method().as_str();
+    let Some(dir) = crate::exports::dir() else { return store::http_err(404, "no exports folder on this device") };
+    if parts.get(1).map(String::as_str) != Some("exports") || parts.len() < 3 {
+        return Ok(json_response(404, &json!({ "error": format!("unknown route: {method} /api/{}", parts.join("/")) })));
+    }
+    let name = decode_segments(&parts[2..]).join("/");
+    match method {
+        "PUT" => {
+            let at: u64 = query(&req).iter().find(|(k, _)| k == "at").and_then(|(_, v)| v.parse().ok()).unwrap_or(0);
+            crate::exports::write_at(dir, &name, at, req.body())?;
+            Response::builder().status(StatusCode::NO_CONTENT).body(Vec::new()).map_err(response_err)
+        }
+        "GET" => {
+            let range = header(&req, "range").and_then(store::parse_range);
+            let safe = crate::exports::safe_name(&name);
+            let mut builder = Response::builder()
+                .header("content-type", crate::format::mime_of(&safe))
+                .header("cache-control", "no-store")
+                .header("accept-ranges", "bytes");
+            let body = match crate::exports::read(dir, &name, range)? {
+                Some((start, bytes, size)) => {
+                    if range.is_some() {
+                        builder = builder
+                            .status(StatusCode::PARTIAL_CONTENT)
+                            .header("content-range", format!("bytes {start}-{}/{size}", start + bytes.len() as u64 - 1));
+                    }
+                    bytes
+                }
+                None => {
+                    builder = builder.status(StatusCode::RANGE_NOT_SATISFIABLE);
+                    Vec::new()
+                }
+            };
+            builder.body(body).map_err(response_err)
+        }
+        "DELETE" => {
+            crate::exports::remove(dir, &name)?;
+            Response::builder().status(StatusCode::NO_CONTENT).body(Vec::new()).map_err(response_err)
+        }
+        _ => Ok(json_response(405, &json!({ "error": format!("unknown route: {method} /api/device/exports") }))),
     }
 }
 
@@ -365,7 +411,11 @@ fn not_modified(stored: &store::Stored) -> Result<Body, store::HttpError> {
 
 /// a range against the whole file, or None when it does not fit
 fn slice(data: &[u8], range: store::Range) -> Option<(usize, usize)> {
-    let size = data.len();
+    span(data.len(), range)
+}
+
+/// the same, knowing only the file's size: (start, length)
+pub fn span(size: usize, range: store::Range) -> Option<(usize, usize)> {
     match range {
         store::Range::Suffix(n) => {
             let n = (n as usize).min(size);
