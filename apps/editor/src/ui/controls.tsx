@@ -34,16 +34,18 @@ const LONG_MENU = 14;
 const isEntry = (it: MenuItem): it is MenuEntry => it !== 'sep' && !('section' in it);
 const fold = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
+/** whether an entry's label or detail holds the query (case and accents ignored) */
+export const menuMatches = (it: MenuEntry, query: string): boolean => fold(`${it.label} ${it.detail ?? ''}`).includes(fold(query.trim()));
+
 /** the entries whose label or detail holds the query, each under its section (the separators go); all of them for an empty query */
 export function filterMenu(items: MenuItem[], query: string): MenuItem[] {
-  const q = fold(query.trim());
-  if (!q) return items;
+  if (!query.trim()) return items;
   const out: MenuItem[] = [];
   let section: MenuItem | null = null;
   for (const it of items) {
     if (it === 'sep') continue;
     if (!isEntry(it)) { section = it; continue; }
-    if (!fold(`${it.label} ${it.detail ?? ''}`).includes(q)) continue;
+    if (!menuMatches(it, query)) continue;
     if (section) { out.push(section); section = null; }
     out.push(it);
   }
@@ -190,6 +192,9 @@ export function bandOf(el: Element, from: { clientX: number; clientY: number }, 
   }).map((n) => n.getAttribute(attr)!);
   return { band, ids };
 }
+
+/** the phone's layout (one column, the tabs at the bottom): the width the editor's stylesheets switch at */
+export const phoneLayout = (): boolean => typeof matchMedia === 'function' && matchMedia('(max-width: 760px)').matches;
 
 /** a touch screen (a phone, a tablet): fingers rather than a pointer, a keyboard that covers half the screen when a field takes the focus */
 export const handheld = (): boolean => typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;

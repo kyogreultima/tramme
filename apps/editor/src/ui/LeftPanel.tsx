@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { addLayer, applyOps, isLocked, layerActive, moveLayer, pointer, propKind, removeLayer, staticValue, type Asset, type KeyframedProp, type Prop, type StaticProp, type Vec2, type TrammeDoc, type Layer, type NodeType, type Op, type PresetType, type TokenType } from '@tramme/core';
 import { clickSelect, comp, commit, foldAll, S, select, toggleFold, viewDoc, toast, uiTime } from '../state.ts';
 import { fitCompOps, flatTree, freshId, layerName, shiftProp, parentOf, SOUND_GROUP, soundGroupOf, subtree, topLayers, commonStem, folderOf, imagesIn, wholeFile } from '../model.ts';
-import { ColorField, longPress, openMenu, Seg, Swatch, TextInput, resolveColor, type MenuEntry, type MenuItem } from './controls.tsx';
+import { ColorField, longPress, menuMatches, openMenu, phoneLayout, Seg, Swatch, TextInput, resolveColor, type MenuEntry, type MenuItem } from './controls.tsx';
 import { Icon, kindColor, kindIcon } from './icons.tsx';
 import { ASSET_MIME, chosenAsset, COMP_MIME, sourceOpen } from './timeline/assets-drag.ts';
 import { newSequenceFromAsset } from './timeline/place.ts';
@@ -145,7 +145,8 @@ export async function assetLayer(id: string, a: Asset): Promise<{ layer: Layer; 
   return null;
 }
 
-export function addLayerMenu(e: MouseEvent | DOMRect) {
+/** what can be added to the composition, by section: the layers of the registry and the ready-made ones (the editor's, the plugins') */
+export function layerChoices(): { section: string; entries: MenuEntry[] }[] {
   const reg = S.registry.peek();
   const groups = new Map<string, NodeType[]>();
   for (const n of reg.listNodes()) { if (!groups.has(n.category)) groups.set(n.category, []); groups.get(n.category)!.push(n); }
@@ -163,8 +164,16 @@ export function addLayerMenu(e: MouseEvent | DOMRect) {
       ? { label, detail, icon: 'effects' as const, onClick: () => applyStack(preset) }
       : { label, detail, icon: kindIcon(preset.layer!.type), onClick: () => insertLayer(presetLayer(preset), preset.name) });
   }
-  const items: MenuItem[] = [...sections].flatMap(([section, entries]) => [{ section }, ...entries]);
-  openMenu(e as MouseEvent, items);
+  return [...sections].map(([section, entries]) => ({ section, entries }));
+}
+
+/** the layer library is open in the layers panel (the phone's way to add a layer) */
+export const libraryOpen = signal(false);
+
+/** adding a layer: a menu at the pointer on a computer; on a phone, the library in the layers panel (a floating list of sixty entries is a computer's gesture) */
+export function addLayerMenu(e: MouseEvent | DOMRect) {
+  if (phoneLayout()) { tab.value = 'layers'; S.mobileTab.value = 'layers'; libraryOpen.value = true; return; }
+  openMenu(e as MouseEvent, layerChoices().flatMap(({ section, entries }): MenuItem[] => [{ section }, ...entries]));
 }
 
 export function deleteSelection() {
@@ -835,6 +844,55 @@ function Tokens() {
   );
 }
 
+/**
+ * The phone's way to add a layer, in the layers panel (as a video app's library): the sections as a row of
+ * tabs, the chosen one's layers as tiles, a search across all of them. Closed by its button, by the back
+ * button (an overlay for device.ts) and once a layer is added.
+ */
+function LayerLibrary() {
+  const choices = layerChoices();
+  const [section, setSection] = useState(choices[0]?.section ?? '');
+  const [query, setQuery] = useState('');
+  const close = () => { libraryOpen.value = false; };
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') close(); };
+    addEventListener('keydown', key);
+    return () => removeEventListener('keydown', key);
+  }, []);
+  const searching = !!query.trim();
+  const shown = searching
+    ? choices.map((c) => ({ ...c, entries: c.entries.filter((it) => menuMatches(it, query)) })).filter((c) => c.entries.length)
+    : choices.filter((c) => c.section === section);
+  return (
+    <div class="layer-library">
+      <div class="library-head">
+        <div class="field"><Icon name="search" /><input value={query} placeholder={t('common.findInMenu')} aria-label={t('common.findInMenu')} spellcheck={false} onInput={(e) => setQuery((e.target as HTMLInputElement).value)} /></div>
+        <button class="icon-btn sm" title={t('common.close')} aria-label={t('common.close')} onClick={close}><Icon name="x" /></button>
+      </div>
+      {!searching && (
+        <div class="library-sections" role="tablist">
+          {choices.map((c) => <button key={c.section} role="tab" aria-selected={c.section === section} class={`chip${c.section === section ? ' on' : ''}`} onClick={() => setSection(c.section)}>{c.section}</button>)}
+        </div>
+      )}
+      <div class="library-body">
+        {searching && !shown.length && <div class="empty">{t('common.noMatch')}</div>}
+        {shown.map((c) => (
+          <section key={c.section}>
+            {searching && <div class="menu-label">{c.section}</div>}
+            <div class="library-grid">
+              {c.entries.map((it) => (
+                <button key={`${it.label}${it.detail ?? ''}`} class="library-tile" disabled={it.disabled} onClick={() => { close(); it.onClick(); }}>
+                  {it.icon && <Icon name={it.icon} />}<span class="library-name">{it.label}</span>{it.detail && <span class="library-detail">{it.detail}</span>}
+                </button>
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /** fold or unfold every group at once: shown when the composition has groups */
 export function FoldButtons() {
   if (!Object.values(comp.value.layers).some((l) => l.children)) return null;
@@ -861,7 +919,9 @@ export function LeftPanel() {
         <span class="grow" />
         {current === 'layers' && <button class="icon-btn sm" title={t('panel.addALayer')} onClick={(e) => addLayerMenu(e)}><Icon name="plus" /></button>}
       </div>
-      {current === 'layers' && <div class="panel-body" onClick={(e) => { if (e.target === e.currentTarget) select([]); }}><CompTrail /><LayerTree /></div>}
+      {current === 'layers' && (libraryOpen.value
+        ? <LayerLibrary />
+        : <div class="panel-body" onClick={(e) => { if (e.target === e.currentTarget) select([]); }}><CompTrail /><LayerTree /></div>)}
       {current === 'assets' && <Assets />}
       {current === 'tokens' && <Tokens />}
     </>

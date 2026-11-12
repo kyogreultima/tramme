@@ -650,3 +650,21 @@ svg.i.flip { transform: rotate(180deg); }
 .scopes .vector canvas { width: 96px; height: 96px; border-radius: 50%; }
 .scopes figcaption { font-size: 10px; color: rgba(255, 255, 255, .6); text-align: center; }
 @media (max-width: 760px) { .scopes canvas { width: 128px; height: 64px; } .scopes .vector canvas { width: 64px; height: 64px; } }
+
+/* ── the layer library: the phone's way to add a layer, in the layers panel ── */
+.layer-library { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.library-head { display: flex; align-items: center; gap: 6px; padding: 8px 10px 6px; flex: none; }
+.library-head .field { flex: 1; min-width: 0; }
+.library-sections { display: flex; gap: 6px; padding: 2px 10px 8px; overflow-x: auto; scrollbar-width: none; flex: none; }
+.library-sections::-webkit-scrollbar { display: none; }
+.library-sections .chip { flex: none; height: 32px; padding: 0 12px; }
+.library-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 4px 10px 16px; }
+.library-body .menu-label { padding: 10px 2px 6px; }
+.library-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+.library-tile {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; min-height: 84px; padding: 10px 6px;
+  border: 0; border-radius: var(--r-md); background: var(--surface-2); color: var(--text); font: 500 var(--fs-sm)/1.25 var(--ui); text-align: center;
+}
+.library-tile svg.i { width: 22px; height: 22px; color: var(--accent-text); }
+.library-tile:hover, .library-tile:active { background: var(--hover); }
+.library-detail { color: var(--text-3); font-size: var(--fs-xs); }
