@@ -11,6 +11,7 @@ use sha2::{Digest, Sha256};
 use std::fs;
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
 
 /// an error as the API answers it: its status and message
 #[derive(Debug)]
@@ -25,13 +26,26 @@ pub fn http_err<T>(status: u16, message: impl Into<String>) -> Res<T> {
     Err(HttpError { status, message: message.into() })
 }
 
+/// where a phone's app keeps its projects and its settings (the app's private
+/// folders, which the system gives it): set once at startup, on mobile
+static ROOTS: OnceLock<(PathBuf, PathBuf)> = OnceLock::new();
+
+/// the places the app was given (home of the projects, settings file); the first call wins
+pub fn set_roots(home: PathBuf, settings: PathBuf) {
+    let _ = ROOTS.set((home, settings));
+}
+
 /// where the projects live: TRAMME_HOME (a custom place, the tests), the
-/// folder chosen in the app's settings, or a Tramme folder in the documents
+/// place the app was given (a phone), the folder chosen in the app's settings,
+/// or a Tramme folder in the documents
 pub fn home() -> PathBuf {
     if let Ok(h) = std::env::var("TRAMME_HOME") {
         if !h.trim().is_empty() {
             return PathBuf::from(h);
         }
+    }
+    if let Some((h, _)) = ROOTS.get() {
+        return h.clone();
     }
     if let Some(h) = configured_home() {
         return h;
@@ -44,6 +58,9 @@ pub fn home() -> PathBuf {
 
 /// the app's settings, beside the other apps' (%APPDATA%/tramme/desktop.json)
 pub fn settings_path() -> Option<PathBuf> {
+    if let Some((_, s)) = ROOTS.get() {
+        return Some(s.clone());
+    }
     let mut p = dirs::config_dir()?;
     p.push("tramme");
     p.push("desktop.json");
@@ -196,6 +213,12 @@ pub fn parse_range(header: &str) -> Option<Range> {
         Err(_) => None,
     };
     Some(Range::Offset { offset, length })
+}
+
+impl Default for Store {
+    fn default() -> Store {
+        Store::new()
+    }
 }
 
 impl Store {
@@ -701,14 +724,13 @@ impl Store {
                 return None;
             }
             (self.project_dir(id), path)
-        } else if let Some(rest) = key.strip_prefix("library/") {
+        } else {
+            let rest = key.strip_prefix("library/")?;
             let (shelf, name) = rest.split_once('/')?;
             if shelf != "plugins" && shelf != "sounds" {
                 return None;
             }
             (self.home.join("library").join(shelf), name)
-        } else {
-            return None;
         };
         if rest.is_empty() || rest.split('/').any(|part| part.is_empty() || part == "." || part == "..") {
             return None;
@@ -1006,6 +1028,14 @@ mod tests {
     fn store() -> (Store, tempfile::TempDir) {
         let dir = tempfile::tempdir().unwrap();
         (Store::with_home(dir.path().to_path_buf()), dir)
+    }
+
+    #[test]
+    fn roots_set_by_the_app_win() {
+        let tmp = tempfile::tempdir().unwrap();
+        set_roots(tmp.path().join("h"), tmp.path().join("s.json"));
+        assert_eq!(home(), tmp.path().join("h"));
+        assert_eq!(settings_path(), Some(tmp.path().join("s.json")));
     }
 
     fn create(store: &Store) -> Manifest {

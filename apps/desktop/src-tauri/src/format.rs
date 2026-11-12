@@ -377,8 +377,8 @@ mod tests {
 
     #[test]
     fn ids_read_from_the_name() {
-        assert_eq!(new_id("Mon Projet Été!").starts_with("mon-projet-ete-"), true);
-        assert_eq!(new_id("ab").starts_with("project-"), true);
+        assert!(new_id("Mon Projet Été!").starts_with("mon-projet-ete-"));
+        assert!(new_id("ab").starts_with("project-"));
         let id = new_id("x");
         assert!(valid_id(&id), "{id}");
     }

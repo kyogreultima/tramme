@@ -17,7 +17,6 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = ["macos-private-api"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-notification = "2"
-tauri-plugin-single-instance = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"
@@ -27,11 +26,15 @@ chrono = { version = "0.4", default-features = false, features = ["clock"] }
 rand = "0.8"
 dirs = "6"
 unicode-normalization = "0.1"
-keyring = { version = "3", features = ["windows-native", "apple-native", "sync-secret-service"] }
 ureq = { version = "2", default-features = false, features = ["tls", "gzip"] }
 regex = "1"
 base64 = "0.22"
 url = "2"
+
+# the computer's own: a second launch handed to the running app, the system keychain
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-single-instance = "2"
+keyring = { version = "3", features = ["windows-native", "apple-native", "sync-secret-service"] }
 
 [dev-dependencies]
 tempfile = "3"

@@ -57,13 +57,16 @@ pub trait Secrets: Send + Sync {
 }
 
 /// the system keychain
+#[cfg(desktop)]
 pub struct Keychain;
 
+#[cfg(desktop)]
 fn keychain_err(e: keyring::Error) -> HttpError {
     eprintln!("desktop: keychain error: {e}");
     HttpError { status: 500, message: "the system keychain refused the key".into() }
 }
 
+#[cfg(desktop)]
 impl Secrets for Keychain {
     fn get(&self, slot: &str) -> Option<String> {
         keyring::Entry::new(SERVICE, slot).ok()?.get_password().ok().filter(|k| !k.is_empty())
@@ -79,11 +82,39 @@ impl Secrets for Keychain {
     }
 }
 
+#[cfg(desktop)]
 static KEYCHAIN: Keychain = Keychain;
 
 /// the system keychain, for what else the app keeps in it (the account's session, account.rs)
+#[cfg(desktop)]
 pub fn keychain() -> &'static dyn Secrets {
     &KEYCHAIN
+}
+
+/// a phone's secrets: until the device's own store is installed (device_secrets.rs), none can be kept
+#[cfg(mobile)]
+struct NoSecrets;
+
+#[cfg(mobile)]
+impl Secrets for NoSecrets {
+    fn get(&self, _slot: &str) -> Option<String> {
+        None
+    }
+    fn set(&self, _slot: &str, _key: &str) -> Res<()> {
+        http_err(501, "not yet on this device")
+    }
+    fn delete(&self, _slot: &str) -> Res<()> {
+        http_err(501, "not yet on this device")
+    }
+}
+
+#[cfg(mobile)]
+static NO_SECRETS: NoSecrets = NoSecrets;
+
+/// the secrets of a phone's app
+#[cfg(mobile)]
+pub fn keychain() -> &'static dyn Secrets {
+    &NO_SECRETS
 }
 
 /// a provider of the OpenAI chat format added by the user
@@ -154,7 +185,7 @@ impl KeyStore {
     /// the keys of the app: the system keychain, the custom providers in the app's settings
     pub fn system() -> Res<KeyStore> {
         let Some(settings) = store::settings_path() else { return http_err(500, "no settings folder on this machine") };
-        Ok(KeyStore { secrets: &KEYCHAIN, settings })
+        Ok(KeyStore { secrets: keychain(), settings })
     }
 
     #[cfg(test)]

@@ -30,7 +30,7 @@ fn ok_json(data: serde_json::Value) -> Body {
 }
 
 fn request_json<T: serde::de::DeserializeOwned>(req: &Request<Vec<u8>>) -> Result<T, store::HttpError> {
-    serde_json::from_slice::<T>(&req.body())
+    serde_json::from_slice::<T>(req.body())
         .map_err(|_| store::HttpError { status: 400, message: "unreadable JSON body".into() })
 }
 
