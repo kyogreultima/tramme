@@ -78,8 +78,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
+      # the CLI reads the flavour from --config only: with TAURI_CONFIG alone the installer was "Tramme"'s,
+      # replacing the stable app around a program built as Tramme Beta (a file: no JSON quoting through cmd)
       - name: Build the editor and the app
-        run: pnpm desktop:build ${{ matrix.args }}
+        shell: bash
+        run: |
+          printf '%s' "$TAURI_CONFIG" > "$RUNNER_TEMP/flavour.conf.json"
+          pnpm desktop:build ${{ matrix.args }} --config "$RUNNER_TEMP/flavour.conf.json"
       - name: Name the installers for the release
         run: node scripts/desktop-release.ts out ${{ needs.plan.outputs.tag }}
       - uses: actions/upload-artifact@v7
