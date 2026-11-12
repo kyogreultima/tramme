@@ -38,13 +38,24 @@ fn desktop_state() -> serde_json::Value {
 
 /// a web page (or a release's installer) in the system's browser: the window's own
 /// webview does nothing for a link that opens a new tab, so the page asks for it here
+#[cfg(desktop)]
 #[tauri::command]
 fn desktop_open_url(url: String) -> Result<(), String> {
-    if !(url.starts_with("https://") || url.starts_with("http://")) {
-        return Err("only web addresses open in the browser".into());
-    }
+    web_address(&url)?;
     let opener = if cfg!(target_os = "macos") { "open" } else if cfg!(windows) { "explorer" } else { "xdg-open" };
     std::process::Command::new(opener).arg(&url).spawn().map(|_| ()).map_err(|e| e.to_string())
+}
+
+/// on a phone, the system opens it (DevicePlugin.kt): there is no browser to spawn
+#[cfg(mobile)]
+#[tauri::command]
+async fn desktop_open_url(app: tauri::AppHandle, url: String) -> Result<(), String> {
+    web_address(&url)?;
+    app.state::<tauri_plugin_tramme_device::Device<tauri::Wry>>().open_url(&url)
+}
+
+fn web_address(url: &str) -> Result<(), String> {
+    if url.starts_with("https://") || url.starts_with("http://") { Ok(()) } else { Err("only web addresses open in the browser".into()) }
 }
 
 #[tauri::command]

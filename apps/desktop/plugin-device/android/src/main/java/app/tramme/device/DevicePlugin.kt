@@ -2,10 +2,12 @@ package app.tramme.device
 
 import android.Manifest
 import android.app.Activity
+import android.content.ClipData
 import android.content.ContentValues
 import android.content.Intent
 import android.content.SharedPreferences
 import android.media.MediaScannerConnection
+import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
@@ -52,6 +54,11 @@ class FileArgs {
     lateinit var path: String
     lateinit var name: String
     lateinit var mime: String
+}
+
+@InvokeArg
+class UrlArgs {
+    lateinit var url: String
 }
 
 @InvokeArg
@@ -225,6 +232,8 @@ class DevicePlugin(private val activity: Activity) : Plugin(activity) {
             val send = Intent(Intent.ACTION_SEND).apply {
                 type = args.mime
                 putExtra(Intent.EXTRA_STREAM, uri)
+                // the chooser and the chosen app read it through the clip, not only the extra
+                clipData = ClipData.newRawUri(args.name, uri)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
             activity.startActivity(Intent.createChooser(send, null))
@@ -244,6 +253,17 @@ class DevicePlugin(private val activity: Activity) : Plugin(activity) {
             else activity.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         }
         invoke.resolve(JSObject())
+    }
+
+    @Command
+    fun openUrl(invoke: Invoke) {
+        val args = invoke.parseArgs(UrlArgs::class.java)
+        try {
+            activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(args.url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            invoke.resolve(JSObject())
+        } catch (e: Exception) {
+            invoke.reject("no app opens this address")
+        }
     }
 
     @Command

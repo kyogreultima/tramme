@@ -60,6 +60,15 @@ struct Awake {
     on: bool,
 }
 
+/// a command without arguments still sends an object
+#[derive(Serialize)]
+struct Empty {}
+
+#[derive(Serialize)]
+struct Url<'a> {
+    url: &'a str,
+}
+
 #[derive(Deserialize)]
 struct Secret {
     value: Option<String>,
@@ -106,7 +115,12 @@ impl<R: Runtime> Device<R> {
     }
 
     pub fn exit(&self) {
-        let _ = self.call("exit", Value::Null);
+        let _ = self.call("exit", Empty {});
+    }
+
+    /// a web address in the phone's browser (or the app that claims it)
+    pub fn open_url(&self, url: &str) -> Result<(), String> {
+        self.call("openUrl", Url { url }).map(|_| ())
     }
 }
 
@@ -132,6 +146,7 @@ mod tests {
         assert_eq!(device.secret_get("a"), None);
         assert_eq!(device.secret_set("a", "b"), Err(NOT_HERE.to_string()));
         assert_eq!(device.save(Path::new("x.mp4"), "x.mp4", "video/mp4"), Err(NOT_HERE.to_string()));
+        assert_eq!(device.open_url("https://tramme.dev"), Err(NOT_HERE.to_string()));
         device.keep_awake(true);
         device.exit();
     }
