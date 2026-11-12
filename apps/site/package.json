@@ -10,14 +10,14 @@
     "preview": "astro preview"
   },
   "dependencies": {
-    "@astrojs/cloudflare": "^14.4.3",
-    "@astrojs/starlight": "^0.42.5",
+    "@astrojs/cloudflare": "^14.4.7",
+    "@astrojs/starlight": "^0.42.11",
     "@phosphor-icons/core": "^2.1.1",
     "@tramme/core": "*",
     "@tramme/nodes": "*",
     "@tramme/plans": "*",
     "@tramme/render": "*",
-    "astro": "^7.3.6",
-    "cookie": "^2.0.1"
+    "astro": "^7.4.11",
+    "cookie": "^2.0.2"
   }
 }

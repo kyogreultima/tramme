@@ -6,9 +6,9 @@
   "type": "module",
   "exports": { ".": "./src/index.ts", "./src/*": "./src/*" },
   "dependencies": {
-    "@babel/parser": "^7.29.13",
+    "@babel/parser": "^7.29.14",
     "@tramme/core": "*",
     "fflate": "^0.8.3",
-    "zod": "^4.6.5"
+    "zod": "^4.6.7"
   }
 }

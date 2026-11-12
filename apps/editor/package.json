@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "@jitsi/rnnoise-wasm": "^0.2.1",
-    "@mediapipe/tasks-vision": "^1.1.1",
+    "@mediapipe/tasks-vision": "^1.2.3",
     "@tramme/api": "*"
   }
 }

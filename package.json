@@ -37,39 +37,43 @@
     "node": ">=24"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^5.20261001.1",
-    "@tauri-apps/cli": "^2.12.1",
+    "@cloudflare/workers-types": "^5.20261112.1",
+    "@tauri-apps/cli": "^2.12.4",
     "@types/cross-spawn": "^6.0.6",
     "@types/node": "^24.19.2",
     "@types/pngjs": "^6.0.5",
     "@types/ws": "^8.18.2",
     "esbuild": "^0.28.2",
-    "fake-indexeddb": "^6.2.5",
+    "fake-indexeddb": "^6.2.8",
     "fflate": "^0.8.3",
     "happy-dom": "^21.0.4",
     "lottie-web": "^5.13.0",
     "typescript": "^7.0.2",
-    "vitest": "^5.0.3",
-    "wrangler": "^4.145.0"
+    "vitest": "^5.1.0",
+    "wrangler": "^4.161.0"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.3.286",
+    "@anthropic-ai/claude-agent-sdk": "^0.3.322",
     "@fontsource-variable/geist": "^5.3.0",
     "@fontsource-variable/geist-mono": "^5.3.0",
-    "@huggingface/transformers": "^4.3.0",
-    "@neon/config": "^1.11.3",
+    "@huggingface/transformers": "^4.3.2",
+    "@neon/config": "^1.14.0",
     "@neon/env": "^1.6.15",
-    "@preact/signals": "^2.11.3",
-    "driver.js": "^1.8.0",
+    "@preact/signals": "^2.11.4",
+    "driver.js": "^1.12.1",
     "gifenc": "^1.0.3",
-    "mediabunny": "^1.61.0",
+    "mediabunny": "^1.65.2",
     "onnxruntime-web": "1.31.0-dev.20260914-8d85527a0",
-    "pdfjs-dist": "^6.4.299",
+    "pdfjs-dist": "^6.5.438",
     "preact": "^10.29.8"
   },
   "overrides": {
     "miniflare": {
-      "undici": "7.30.1"
+      "undici": "7.30.2"
+    },
+    "@hyperframes/engine": {
+      "undici": "7.30.2",
+      "puppeteer": "25.17.0"
     }
   }
 }
