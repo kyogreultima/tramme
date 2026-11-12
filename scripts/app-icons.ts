@@ -8,7 +8,8 @@
 // mobile app. Writes apps/editor/icon.svg (the favicon), the PNGs Android,
 // Chrome and iOS ask for (apps/editor/icons, served at /icons), and the desktop
 // app's two sources in apps/desktop/src-tauri/icons: icon.png (the mark alone,
-// 1024 px) and mobile-source.png (the mark on the white tile). build.ts copies
+// 1024 px), mobile-source.png (the mark on the white tile) and installer.ico (the
+// Windows installer's: the tile rising from an open box). build.ts copies
 // the editor's and names them in the manifest, whose launch screen is the same
 // white.
 //
@@ -67,3 +68,52 @@ console.log(`${path.relative(ROOT, DESKTOP)} (1024×1024)`);
 // the phones' source: the mark on the white tile, which the system rounds itself
 await sharp(Buffer.from(art(14, { radius: 0 })), { density: 72 * 1024 / 24 }).resize(1024, 1024).png({ compressionLevel: 9 }).toFile(MOBILE);
 console.log(`${path.relative(ROOT, MOBILE)} (1024×1024)`);
+
+// The Windows installer's icon (bundle.windows.nsis.installerIcon): the white tile with the mark, rising
+// from an open box, and a download arrow on the box. Drawn on a 256-unit box, in the paper theme's colours.
+const box = {
+  inside: themeColour('light-text-2'),
+  flap: themeColour('light-field-active'),
+  front: themeColour('light-text-4'),
+  rim: themeColour('light-field-hover'),
+  badge: themeColour('light-accent'),
+  arrow: themeColour('light-on-accent'),
+  // the white parts' edge, so that they hold on a white desktop
+  edge: themeColour('light-text-4'),
+};
+const installer = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">'
+  // the box's inside, then its two flaps opened outwards
+  + `<path d="M50 104 H206 L214 142 H42 Z" fill="${box.inside}"/>`
+  + `<path d="M50 104 L10 86 L4 124 L42 142 Z" fill="${box.flap}" stroke="${box.edge}" stroke-opacity="0.6" stroke-width="3" stroke-linejoin="round"/>`
+  + `<path d="M206 104 L246 86 L252 124 L214 142 Z" fill="${box.flap}" stroke="${box.edge}" stroke-opacity="0.6" stroke-width="3" stroke-linejoin="round"/>`
+  // the tile, its foot hidden in the box
+  + `<rect x="76" y="22" width="104" height="128" rx="20" fill="${TILE}" stroke="${box.edge}" stroke-opacity="0.6" stroke-width="3"/>`
+  + `<g transform="translate(128 78) scale(${+(68 / height).toFixed(5)}) translate(${-width / 2} ${-height / 2})" fill="${TILE_FILL}">${paths.map((d) => `<path d="${d}"/>`).join('')}</g>`
+  // the front, its rim, and the arrow on it
+  + `<path d="M42 142 H214 L206 238 Q205 246 197 246 H59 Q51 246 50 238 Z" fill="${box.front}"/>`
+  + `<path d="M42 142 H214 L213 154 H43 Z" fill="${box.rim}"/>`
+  + `<circle cx="128" cy="198" r="36" fill="${box.badge}" stroke="${TILE}" stroke-width="8"/>`
+  + `<path d="M128 178 V216 M112 202 L128 218 L144 202" fill="none" stroke="${box.arrow}" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>`
+  + '</svg>';
+
+// an .ico holding PNG images (Windows Vista and later), one per size Explorer asks for
+const INSTALLER = path.join(ROOT, 'apps/desktop/src-tauri/icons/installer.ico');
+const SIZES = [16, 24, 32, 48, 64, 128, 256];
+const images = await Promise.all(SIZES.map((size) =>
+  sharp(Buffer.from(installer), { density: 72 * size / 256 }).resize(size, size).png({ compressionLevel: 9 }).toBuffer()));
+const head = Buffer.alloc(6 + 16 * images.length);
+head.writeUInt16LE(1, 2);
+head.writeUInt16LE(images.length, 4);
+let offset = head.length;
+images.forEach((png, i) => {
+  const at = 6 + 16 * i;
+  head.writeUInt8(SIZES[i] % 256, at);
+  head.writeUInt8(SIZES[i] % 256, at + 1);
+  head.writeUInt16LE(1, at + 4);
+  head.writeUInt16LE(32, at + 6);
+  head.writeUInt32LE(png.length, at + 8);
+  head.writeUInt32LE(offset, at + 12);
+  offset += png.length;
+});
+fs.writeFileSync(INSTALLER, Buffer.concat([head, ...images]));
+console.log(`${path.relative(ROOT, INSTALLER)} (${SIZES.join(', ')})`);
