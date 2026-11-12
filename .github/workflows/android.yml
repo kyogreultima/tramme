@@ -66,6 +66,7 @@ jobs:
           sdkmanager "ndk;$NDK"
           echo "NDK_HOME=$ANDROID_HOME/ndk/$NDK" >> "$GITHUB_ENV"
       - run: npm ci
+      # the generated Gradle project calls the CLI back through `npm run tauri` (package.json's "tauri" script)
       - name: Generate the Android project
         working-directory: apps/desktop
         run: npx tauri android init --ci

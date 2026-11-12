@@ -20,6 +20,7 @@
     "site:build": "npm run build -w apps/site",
     "site:deploy": "npm run site:build && cd apps/site && wrangler deploy",
     "site:deploy:beta": "npm run site:build && cd apps/site && wrangler deploy --name tramme-site-beta --domain beta.tramme.dev",
+    "tauri": "cd apps/desktop && tauri",
     "desktop:dev": "node apps/editor/build.ts && cd apps/desktop && tauri dev",
     "desktop:build": "node apps/editor/build.ts && cd apps/desktop && tauri build",
     "android:dev": "node apps/editor/build.ts && cd apps/desktop && tauri android dev",
