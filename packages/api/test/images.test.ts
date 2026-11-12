@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { IMAGE_PROVIDERS, imageConfig, generateImage } from '../src/images.ts';
+import { IMAGE_PROVIDERS, imageConfig, generateImage, pickGeminiImageModel } from '../src/images.ts';
 import type { Keys } from '../src/keys.ts';
 
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 13, 10, 26, 10]);
@@ -19,10 +19,19 @@ const keys = (have = true): Keys => ({
 const out = (input: string, init?: RequestInit) => fetch(input, init);
 
 /** what was asked of the (stubbed) provider, and what it answered */
+/** Google's listing of models, as the tests have it: one picture model among others */
+const GEMINI_LISTED = { models: [
+  { name: 'models/gemini-2.5-flash', supportedGenerationMethods: ['generateContent'] },
+  { name: 'models/gemini-3.1-flash-image', supportedGenerationMethods: ['generateContent'] },
+  { name: 'models/imagen-4.0-generate-001', supportedGenerationMethods: ['predict'] },
+] };
+
 function stubFetch(...answers: Response[]) {
   const calls: { url: string; init?: RequestInit }[] = [];
   let n = 0;
   vi.stubGlobal('fetch', (url: string | URL, init?: RequestInit) => {
+    // Gemini's listing of models answers apart: it is not one of the answers the test gives
+    if (String(url).includes('/v1beta/models?')) return Promise.resolve(jsonRes(GEMINI_LISTED));
     calls.push({ url: String(url), init });
     return Promise.resolve(answers[Math.min(n++, answers.length - 1)]);
   });
@@ -51,9 +60,10 @@ describe('the picture providers', () => {
   it('gemini: the proportions as asked, the picture read from the answer, none named when it holds back', async () => {
     const calls = stubFetch(jsonRes({ candidates: [{ content: { parts: [{ inlineData: { data: b64(PNG), mimeType: 'image/png' } }] } }] }));
     const made = await IMAGE_PROVIDERS.gemini.make('k', { prompt: 'a lighthouse', ratio: '9:16' }, out, keys());
-    expect(calls[0].url).toContain('/models/gemini-3.8-flash-image:generateContent');
+    // the picture model is the one Google lists, not a name written here
+    expect(calls[0].url).toContain('/models/gemini-3.1-flash-image:generateContent');
     expect(asked(calls[0]).generationConfig).toMatchObject({ responseModalities: ['IMAGE'], imageConfig: { aspectRatio: '9:16' } });
-    expect(made).toMatchObject({ type: 'image/png', model: 'gemini-3.8-flash-image' });
+    expect(made).toMatchObject({ type: 'image/png', model: 'gemini-3.1-flash-image' });
     expect(new Uint8Array(made.image)).toEqual(PNG);
     stubFetch(jsonRes({ candidates: [{ content: { parts: [{ text: 'I cannot' }] } }] }));
     await expect(IMAGE_PROVIDERS.gemini.make('k', { prompt: 'x', ratio: '1:1' }, out, keys())).rejects.toMatchObject({ status: 502, message: /gemini: no picture/ });
@@ -158,5 +168,18 @@ describe('takes, a picture to change, the size asked', () => {
     const calls = stubFetch(jsonRes({ data: [{ url: 'https://cdn.example/img' }] }), new Response(PNG, { headers: { 'content-type': 'image/png' } }));
     await IMAGE_PROVIDERS.zai.make('k', { prompt: 'x', ratio: '16:9', size: 'small' }, out, keys());
     expect(asked(calls[0]).size).toBe('960x544');
+  });
+});
+
+describe("Gemini's picture model", () => {
+  const listed = (...names: string[]) => names.map((n) => ({ name: `models/${n}`, supportedGenerationMethods: ['generateContent'] }));
+
+  it('is the newest stable one Google lists, a preview only when there is no other', () => {
+    expect(pickGeminiImageModel(listed('gemini-2.5-flash-image', 'gemini-3.1-flash-image', 'gemini-3.5-pro-image-preview', 'gemini-3.5-flash'))).toBe('gemini-3.1-flash-image');
+    expect(pickGeminiImageModel(listed('gemini-3-pro-image-preview', 'gemini-2.5-flash'))).toBe('gemini-3-pro-image-preview');
+  });
+
+  it('is none when nothing makes pictures through generateContent', () => {
+    expect(pickGeminiImageModel([{ name: 'models/imagen-4.0-generate-001', supportedGenerationMethods: ['predict'] }, ...listed('gemini-2.5-flash')])).toBeNull();
   });
 });

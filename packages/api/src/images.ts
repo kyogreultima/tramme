@@ -35,7 +35,44 @@ const b64 = (s: string): ArrayBuffer => {
   return u.buffer;
 };
 
-const OPENAI_MODEL = 'gpt-image-1', GEMINI_MODEL = 'gemini-3.8-flash-image', ZAI_MODEL = 'cogview-4';
+const OPENAI_MODEL = 'gpt-image-1', ZAI_MODEL = 'cogview-4';
+/** the Gemini picture model taken when Google's listing cannot be read */
+const GEMINI_FALLBACK = 'gemini-2.5-flash-image';
+
+interface GeminiListed { name?: string; supportedGenerationMethods?: string[] }
+
+/**
+ * The Gemini model that makes pictures, among those Google lists: one that
+ * answers generateContent and has "image" in its name (Imagen answers another
+ * method), a stable one before a preview or an experiment, the newest version
+ * first. Google renames them often: a name written here once went out of date
+ * and every style frame failed with it.
+ */
+export function pickGeminiImageModel(models: GeminiListed[]): string | null {
+  const version = (id: string) => (/gemini-(\d+(?:\.\d+)?)/.exec(id)?.[1] ?? '0').split('.').map(Number);
+  const newer = (a: string, b: string) => { const [x, y] = [version(a), version(b)]; return (y[0] - x[0]) || ((y[1] ?? 0) - (x[1] ?? 0)); };
+  const ids = models
+    .filter((m) => m.supportedGenerationMethods?.includes('generateContent'))
+    .map((m) => (m.name ?? '').replace(/^models\//, ''))
+    .filter((id) => /^gemini-.*image/.test(id));
+  const stable = ids.filter((id) => !/preview|exp/.test(id)).sort(newer);
+  return stable[0] ?? ids.sort(newer)[0] ?? null;
+}
+
+/** the picture model of each Gemini key, asked again after ten minutes or after a refusal */
+const geminiModels = new Map<string, { id: string; at: number }>();
+
+async function geminiImageModel(key: string, fetch: Reach['fetch']): Promise<string> {
+  const known = geminiModels.get(key);
+  if (known && Date.now() - known.at < 10 * 60_000) return known.id;
+  let id = GEMINI_FALLBACK;
+  try {
+    const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000', { headers: { 'x-goog-api-key': key } });
+    if (res.ok) id = pickGeminiImageModel(((await res.json()) as { models?: GeminiListed[] }).models ?? []) ?? GEMINI_FALLBACK;
+  } catch { /* the fallback stands */ }
+  geminiModels.set(key, { id, at: Date.now() });
+  return id;
+}
 
 /** OpenAI's size for a ratio: its three sizes, the square when a small picture is asked (it costs least) */
 const openaiSize = (ask: Ask) => (ask.size === 'small' ? '1024x1024' : WIDE.includes(ask.ratio) ? '1536x1024' : TALL.includes(ask.ratio) ? '1024x1536' : '1024x1024');
@@ -81,7 +118,8 @@ export const IMAGE_PROVIDERS: Record<ImageProvider, { make(key: string, ask: Ask
   },
   gemini: {
     async make(key, ask, fetch) {
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
+      const model = await geminiImageModel(key, fetch);
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
         method: 'POST', headers: { 'x-goog-api-key': key, 'content-type': 'application/json' },
         body: JSON.stringify({
           // a picture to change goes first, its mask after it (Gemini takes no mask of its own: the words say what it means)
@@ -93,11 +131,13 @@ export const IMAGE_PROVIDERS: Record<ImageProvider, { make(key: string, ask: Ask
           generationConfig: { responseModalities: ['IMAGE'], imageConfig: { aspectRatio: ask.ratio } },
         }),
       });
+      // a model gone since the listing: listed again at the next picture
+      if (res.status === 404) geminiModels.delete(key);
       if (!res.ok) await providerFailure('gemini', res);
       const j = await res.json() as { candidates?: { content?: { parts?: { inlineData?: { data?: string; mimeType?: string } }[] } }[] };
       const part = (j.candidates?.[0]?.content?.parts ?? []).find((p) => typeof p.inlineData?.data === 'string');
       if (!part?.inlineData?.data) throw new HttpError(502, 'gemini: no picture in the answer');
-      return { image: b64(part.inlineData.data), type: part.inlineData.mimeType ?? 'image/png', model: GEMINI_MODEL };
+      return { image: b64(part.inlineData.data), type: part.inlineData.mimeType ?? 'image/png', model };
     },
   },
   zai: {
