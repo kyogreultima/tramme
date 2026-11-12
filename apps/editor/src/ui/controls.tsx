@@ -28,6 +28,28 @@ export type MenuItem = MenuEntry | { section: string } | 'sep';
 
 const menuState = signal<{ x: number; y: number; items: MenuItem[] } | null>(null);
 
+/** beyond this many entries a menu gets a search field, and its height is capped */
+const LONG_MENU = 14;
+
+const isEntry = (it: MenuItem): it is MenuEntry => it !== 'sep' && !('section' in it);
+const fold = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+
+/** the entries whose label or detail holds the query, each under its section (the separators go); all of them for an empty query */
+export function filterMenu(items: MenuItem[], query: string): MenuItem[] {
+  const q = fold(query.trim());
+  if (!q) return items;
+  const out: MenuItem[] = [];
+  let section: MenuItem | null = null;
+  for (const it of items) {
+    if (it === 'sep') continue;
+    if (!isEntry(it)) { section = it; continue; }
+    if (!fold(`${it.label} ${it.detail ?? ''}`).includes(q)) continue;
+    if (section) { out.push(section); section = null; }
+    out.push(it);
+  }
+  return out;
+}
+
 export function openMenu(e: { clientX: number; clientY: number } | DOMRect, items: MenuItem[]) {
   const x = 'clientX' in e ? e.clientX : e.left;
   const y = 'clientY' in e ? e.clientY : e.bottom + 4;
@@ -99,12 +121,16 @@ export function MenuHost() {
   const m = menuState.value;
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ x: 0, y: 0 });
+  const [query, setQuery] = useState('');
+  const long = !!m && m.items.filter(isEntry).length > LONG_MENU;
   useLayoutEffect(() => {
     if (!m || !ref.current) return;
+    setQuery('');
     const r = ref.current.getBoundingClientRect();
     setPos({ x: Math.max(8, Math.min(m.x, innerWidth - r.width - 8)), y: Math.max(8, Math.min(m.y, innerHeight - r.height - 8)) });
-    // the keyboard starts on the first entry
-    setTimeout(() => ref.current?.querySelector<HTMLButtonElement>('.menu-item:not([disabled])')?.focus());
+    // the keyboard starts on the search of a long menu, else on the first entry; a touch screen focuses nothing (its keyboard would cover the menu)
+    if (handheld()) return;
+    setTimeout(() => ref.current?.querySelector<HTMLElement>(long ? '.menu-search input' : '.menu-item:not([disabled])')?.focus());
   }, [m]);
   useEffect(() => {
     if (!m) return;
@@ -119,9 +145,19 @@ export function MenuHost() {
   if (!m) return null;
   // when some items have an icon, the others keep its place: labels stay aligned
   const iconed = m.items.some((it) => it !== 'sep' && !('section' in it) && it.icon && it.icon !== 'check');
+  const shown = long ? filterMenu(m.items, query) : m.items;
   return (
-    <div class="menu" ref={ref} style={{ left: pos.x, top: pos.y }} role="menu">
-      {m.items.map((it, i) => it === 'sep' ? <hr key={i} /> : 'section' in it ? <div class="menu-label" key={i}>{it.section}</div> : (
+    <div class={`menu${long ? ' long' : ''}`} ref={ref} style={{ left: pos.x, top: pos.y }} role="menu">
+      {long && (
+        <div class="menu-search field">
+          <Icon name="search" />
+          <input value={query} placeholder={t('common.findInMenu')} aria-label={t('common.findInMenu')} spellcheck={false}
+            onInput={(e) => setQuery((e.target as HTMLInputElement).value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { const first = filterMenu(m.items, query).find(isEntry); if (first && !first.disabled) { menuState.value = null; first.onClick(); } } }} />
+        </div>
+      )}
+      {long && !shown.some(isEntry) && <div class="menu-label">{t('common.noMatch')}</div>}
+      {shown.map((it, i) => it === 'sep' ? <hr key={i} /> : 'section' in it ? <div class="menu-label" key={i}>{it.section}</div> : (
         <MenuButton key={i} it={it} iconed={iconed} onPick={() => { menuState.value = null; it.onClick(); }} />
       ))}
     </div>

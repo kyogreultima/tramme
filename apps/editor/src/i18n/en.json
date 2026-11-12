@@ -6,6 +6,8 @@
     "low": "Low (dB)", "mid": "Mid (dB)", "midFreq": "Mid frequency (Hz)", "midQ": "Mid Q", "high": "High (dB)", "amount": "Amount", "frequency": "Frequency (Hz)", "wet": "Wet", "time": "Time", "feedback": "Feedback", "drive": "Drive", "tone": "Tone (Hz)", "timeUnit": "Time unit", "milliseconds": "Milliseconds", "tempo": "Tempo (BPM)", "tempoUnset": "Not set", "tempoNeeded": "Set a tempo to enable this note delay"
   },
   "common": {
+    "findInMenu": "Find…",
+    "noMatch": "Nothing matches.",
     "pickInViewport": "Pick in the viewport (Escape: cancel)",
     "companionHttpStatus": "companion: HTTP {status}",
     "companion": "Companion",

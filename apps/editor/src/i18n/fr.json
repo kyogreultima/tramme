@@ -6,6 +6,8 @@
     "low": "Graves (dB)", "mid": "Médiums (dB)", "midFreq": "Fréquence médium (Hz)", "midQ": "Q médium", "high": "Aigus (dB)", "amount": "Quantité", "frequency": "Fréquence (Hz)", "wet": "Effet", "time": "Temps", "feedback": "Répétition", "drive": "Saturation", "tone": "Tonalité (Hz)", "timeUnit": "Unité du temps", "milliseconds": "Millisecondes", "tempo": "Tempo (BPM)", "tempoUnset": "Non défini", "tempoNeeded": "Définissez un tempo pour activer ce délai en valeur de note"
   },
   "common": {
+    "findInMenu": "Chercher…",
+    "noMatch": "Rien ne correspond.",
     "pickInViewport": "Prendre dans la vue (Échap : annuler)",
     "companionHttpStatus": "compagnon : HTTP {status}",
     "companion": "Compagnon",

@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { addLayer, applyOps, isLocked, layerActive, moveLayer, pointer, propKind, removeLayer, staticValue, type Asset, type KeyframedProp, type Prop, type StaticProp, type Vec2, type TrammeDoc, type Layer, type NodeType, type Op, type PresetType, type TokenType } from '@tramme/core';
 import { clickSelect, comp, commit, foldAll, S, select, toggleFold, viewDoc, toast, uiTime } from '../state.ts';
 import { fitCompOps, flatTree, freshId, layerName, shiftProp, parentOf, SOUND_GROUP, soundGroupOf, subtree, topLayers, commonStem, folderOf, imagesIn, wholeFile } from '../model.ts';
-import { ColorField, longPress, openMenu, Seg, Swatch, TextInput, resolveColor, type MenuItem } from './controls.tsx';
+import { ColorField, longPress, openMenu, Seg, Swatch, TextInput, resolveColor, type MenuEntry, type MenuItem } from './controls.tsx';
 import { Icon, kindColor, kindIcon } from './icons.tsx';
 import { ASSET_MIME, chosenAsset, COMP_MIME, sourceOpen } from './timeline/assets-drag.ts';
 import { newSequenceFromAsset } from './timeline/place.ts';
@@ -149,21 +149,21 @@ export function addLayerMenu(e: MouseEvent | DOMRect) {
   const reg = S.registry.peek();
   const groups = new Map<string, NodeType[]>();
   for (const n of reg.listNodes()) { if (!groups.has(n.category)) groups.set(n.category, []); groups.get(n.category)!.push(n); }
-  const items: MenuItem[] = [];
-  for (const [cat, nodes] of groups) {
-    items.push({ section: t(cat) });
-    for (const n of nodes) items.push({ label: t(n.title), icon: kindIcon(n.type), onClick: () => insertLayer(newLayer(S.doc.peek(), S.compId.peek(), n)) });
-  }
+  // one section per name: a category of layers and one of ready-made layers that share a name (Print) are one
+  const sections = new Map<string, MenuEntry[]>();
+  const into = (cat: string, entry: MenuEntry) => { const name = t(cat); if (!sections.has(name)) sections.set(name, []); sections.get(name)!.push(entry); };
+  for (const [cat, nodes] of groups) for (const n of nodes) into(cat, { label: t(n.title), icon: kindIcon(n.type), onClick: () => insertLayer(newLayer(S.doc.peek(), S.compId.peek(), n)) });
   // ready-made layers: the editor's and the project's plugins'
   const presets = reg.listPresets().filter(({ preset }) => (preset.layer ? reg.hasNode(preset.layer.type) : !!preset.effects?.length));
-  const sections = new Map<string, typeof presets>();
-  for (const p of presets) { const cat = p.preset.category ?? m('panel.presets'); if (!sections.has(cat)) sections.set(cat, []); sections.get(cat)!.push(p); }
-  for (const [cat, list] of sections) {
-    items.push({ section: t(cat) });
-    for (const { preset } of list) items.push(preset.effects
-      ? { label: tr(preset.title ?? preset.name), icon: 'effects' as const, onClick: () => applyStack(preset) }
-      : { label: tr(preset.title ?? preset.name), icon: kindIcon(preset.layer!.type), onClick: () => insertLayer(presetLayer(preset), preset.name) });
+  for (const { preset } of presets) {
+    const cat = preset.category ?? m('panel.presets'), label = tr(preset.title ?? preset.name);
+    // a ready-made layer named as the layer it is made of (Bar chart) says what it holds
+    const detail = preset.description && sections.get(t(cat))?.some((e) => e.label === label) ? tr(preset.description) : undefined;
+    into(cat, preset.effects
+      ? { label, detail, icon: 'effects' as const, onClick: () => applyStack(preset) }
+      : { label, detail, icon: kindIcon(preset.layer!.type), onClick: () => insertLayer(presetLayer(preset), preset.name) });
   }
+  const items: MenuItem[] = [...sections].flatMap(([section, entries]) => [{ section }, ...entries]);
   openMenu(e as MouseEvent, items);
 }
 
