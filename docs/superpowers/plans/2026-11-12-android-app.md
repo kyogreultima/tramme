@@ -17,7 +17,7 @@
 - Nothing Android is built or installed on the owner's machine. Local checks: `npm test`, `npm run typecheck`, `cargo test` and `cargo clippy` in `apps/desktop/src-tauri` (desktop target). The Android compile is proven by the CI job only.
 - Commit on `develop`, never push, no co-author trailer.
 - Upload key certificate: `CN=Tramme, O=Qualris`. Keystore and passwords only in GitHub secrets: `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`.
-- Android artifacts are never part of the public GitHub release nor of the site.
+- The signed `.apk` is published in the GitHub release (stable from `main`, prerelease beta from `develop`) and offered by the site; the `.aab` and any unsigned build stay private workflow artifacts. Beta product: name "Tramme Beta", id `app.tramme.beta`, `TRAMME_ENV=beta`.
 - No purchase entry point (plans, checkout, subscription management) visible on Android.
 - Permissions only when used: `RECORD_AUDIO` (dictation, voice-over); `WRITE_EXTERNAL_STORAGE` with `android:maxSdkVersion="28"` (saving on Android 8 and 9 only). Nothing else beyond `INTERNET`.
 - New UI: theme tokens only, existing components, every string in `apps/editor/src/i18n/en.json` and `fr.json`; no raw technical error shown (`plainRenderMessage`).
@@ -29,7 +29,7 @@
 2. An export name with spaces, accents or `../` → saved under a safe name, never outside the exports folder (Task 3 test).
 3. Back button with a menu open on top of a project page → closes the menu, does not leave the project (Task 6 test of `backAction`).
 4. App killed and reopened → provider keys and account session still there (Task 2: secrets in the Keystore-backed store, the Rust side asks Kotlin each time; checked by the owner on a phone).
-5. The CI without the signing secrets (before the keystore exists) → still green, with an unsigned debug `.apk` and a notice (Task 7).
+5. The CI without the signing secrets (before the keystore exists) → still green, an unsigned debug `.apk` as a private artifact and a notice, nothing Android in the release, the site without an Android row (Task 8).
 
 ---
 
@@ -157,24 +157,45 @@
 - [ ] **Step 4: Run** `npm test`, `npm run typecheck`. Expected: PASS.
 - [ ] **Step 5: Commit** `feat(android): the back button closes, goes back, then leaves`.
 
-### Task 7: CI builds and signs; scripts and docs
+### Task 7: The site offers the Android app
 
 **Files:**
-- Modify: `.github/workflows/desktop.yml` (job `android`; `release` downloads `pattern: desktop-*` only)
+- Modify: `apps/desktop/downloads.ts` (`Os`, `INSTALLERS`, `SYSTEMS`)
+- Modify: `scripts/desktop-release.ts` (an installer whose file the CI already named is taken as it is)
+- Modify: `apps/site/src/components/DownloadLink.astro`, `apps/site/src/pages/[...lang]/download.astro`, `apps/site/src/pages/[...lang]/index.astro` where they assume desktop systems only (visitor detection, wording, FAQ)
+- Modify: `apps/editor/src/version.ts:25` only if the update notice would now offer the `.apk` (it must not: the Android app shows no update notice, Task 4)
+- Test: the existing tests of `downloads.ts` and of the site's download wording (find them with `grep -rln "OFFERED_SYSTEMS\|systemsLine" apps scripts --include=*.test.ts`)
+
+**Interfaces:**
+- Produces: `Os = 'windows' | 'mac' | 'linux' | 'android'`; `SYSTEMS.android = 'Android'`; installer `{ os: 'android', file: 'tramme-android.apk', built: '', suffix: '.apk', kind: 'APK', runs: 'Android 8 and newer' }`. `built: ''` means "already named by the CI under `out/`": `desktop-release.ts` skips it (the Android job never runs that script).
+- Produces (site): on an Android phone the download button offers the `.apk`; the download page lists Android with the known limit of the spec (the site's app and the Play Store's cannot update each other: uninstall first, export the projects before).
+
+- [ ] **Step 1: Write the failing tests:** `systemsLine('en') === 'Windows, Linux and Android'` and `systemsLine('fr') === 'Windows, Linux et Android'` (macOS still withheld); `OFFERED_INSTALLERS.some((i) => i.file === 'tramme-android.apk')`; the site's visitor detection (pure function where it lives, or extracted to `apps/site/src/lib/` if it is inline) maps an Android user agent to `'android'`, before Linux (an Android UA contains "Linux").
+- [ ] **Step 2: Run** `npm test`. Expected: the new assertions FAIL.
+- [ ] **Step 3: Implement** the table, the script's skip, the site's detection, wording (en and fr) and the limit's sentence on the download page.
+- [ ] **Step 4: Run** `npm test`, `npm run typecheck`, and `npm run site:build` (or the site's own check script) without `GITHUB_TOKEN`. Expected: PASS; the build logs that the links are left out or found, without error.
+- [ ] **Step 5: Commit** `feat(site): the Android app on the download page`.
+
+### Task 8: CI builds, signs and publishes; scripts and docs
+
+**Files:**
+- Create: `.github/workflows/android.yml` (reusable, `workflow_call`)
+- Modify: `.github/workflows/desktop.yml` and `.github/workflows/desktop-beta.yml` (call it; their release jobs download `pattern: desktop-*`)
 - Create: `.github/workflows/android-keystore.yml`
 - Modify: `package.json` (`android:dev`, `android:build`)
 - Modify: `CONTRIBUTING.md` (section Android), `docs/desktop-and-mobile-apps.md` (step 6), `CHANGELOG.md` (unreleased section, if the file keeps one)
 
 **Interfaces:**
-- Consumes: everything above; secrets of the Global Constraints.
-- Produces: artifact `android` with `tramme-<version>.aab` and `tramme-<version>.apk` (signed), or `tramme-<version>-debug.apk` without the secrets.
+- Consumes: everything above; secrets of the Global Constraints; `TRAMME_GA_API_SECRET` as the desktop builds.
+- `android.yml` inputs: `environment` (`production` | `beta`), `tauri-config` (JSON string, `''` for stable; beta: `{"productName":"Tramme Beta","identifier":"app.tramme.beta"}`). Secrets: `inherit`.
+- Produces: artifact `desktop-Android` holding only the signed `tramme-android.apk` (so the existing release jobs publish it with the desktop installers), and artifact `android-private` holding `tramme-<version>.aab` (signed) or, without the secrets, `tramme-<version>-debug.apk` (and then no `desktop-Android` at all).
 
 - [ ] **Step 1: Scripts.** `"android:dev": "node apps/editor/build.ts && cd apps/desktop && tauri android dev"`, `"android:build": "node apps/editor/build.ts && cd apps/desktop && tauri android build"`.
-- [ ] **Step 2: Job `android`** in `desktop.yml`, `needs: [plan, checks]`, same `if` as `build`, `runs-on: ubuntu-latest`: `./.github/actions/setup` with `rust-targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android`; `actions/setup-java@v4` (temurin 17); `android-actions/setup-android@v3`; `sdkmanager "ndk;27.2.12479018"` and `NDK_HOME` set to it; `npm ci`; `cd apps/desktop && npx tauri android init --ci`; with `TRAMME_GA_API_SECRET` as the desktop: `npm run android:build -- --aab --apk` when the signing secrets exist, else `npm run android:build -- --apk --debug` and a `::notice::` saying the build is unsigned. Signing step (secrets present): decode `ANDROID_KEYSTORE_BASE64` to `$RUNNER_TEMP/upload.jks`; `zipalign -p 4` then `apksigner sign` for the universal release `.apk`; `jarsigner -sigalg SHA256withRSA -digestalg SHA-256` for the `.aab`; `apksigner verify --print-certs` and fail unless the output contains `O=Qualris`; remove the keystore file. Rename to the names above, `actions/upload-artifact@v4` name `android`, `if-no-files-found: error`.
-- [ ] **Step 3: Release untouched by Android:** in `release`, `actions/download-artifact@v4` gets `pattern: desktop-*` with `merge-multiple: true`.
-- [ ] **Step 4: `android-keystore.yml`**, `workflow_dispatch` only: needs `ANDROID_KEYSTORE_PASSWORD` and `ANDROID_KEY_PASSWORD` set first; `keytool -genkeypair -v -keystore upload.jks -alias tramme -keyalg RSA -keysize 4096 -validity 10000 -dname "CN=Tramme, O=Qualris"`; prints the base64 nowhere; uploads `upload.jks` as an artifact with `retention-days: 1`. Comment at the top: download it, store its base64 as `ANDROID_KEYSTORE_BASE64` and the alias `tramme` as `ANDROID_KEY_ALIAS`, keep a copy offline, delete the artifact.
-- [ ] **Step 5: Docs.** CONTRIBUTING "Android": the four secrets, the keystore workflow, where the artifacts land, uploading the `.aab` to the Play Console, installing the `.apk` on a phone; the owner's phone checklist from the spec's "Checks". `docs/desktop-and-mobile-apps.md` step 6: what was done and how (plugin crate, generated project not committed, signing after build).
-- [ ] **Step 6: Validate the workflow files** locally: `npx --yes @action-validator/cli .github/workflows/desktop.yml` and the keystore one (or `actionlint` if available). Expected: no error. Then `npm test`, `npm run typecheck`.
-- [ ] **Step 7: Commit** `ci(android): the app built and signed on CI`.
+- [ ] **Step 2: `android.yml`**, one job on `ubuntu-latest`, env `TRAMME_ENV: ${{ inputs.environment }}` and `TAURI_CONFIG: ${{ inputs.tauri-config }}` (merged over `tauri.conf.json` and `tauri.android.conf.json`, as the desktop beta does): `./.github/actions/setup` with `rust-targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android`; `actions/setup-java@v4` (temurin 17); `android-actions/setup-android@v3`; `sdkmanager "ndk;27.2.12479018"` and `NDK_HOME` set to it; `npm ci`; `cd apps/desktop && npx tauri android init --ci`; `npm run android:build -- --aab --apk` when the four signing secrets exist, else `npm run android:build -- --apk --debug` and a `::notice::` that the build is unsigned and not published. Signing (secrets present): decode `ANDROID_KEYSTORE_BASE64` to `$RUNNER_TEMP/upload.jks`; `zipalign -p 4` then `apksigner sign` on the universal release `.apk`; `jarsigner -sigalg SHA256withRSA -digestalg SHA-256` on the `.aab`; `apksigner verify --print-certs` and fail unless the output contains `O=Qualris`; delete the keystore file. Upload the two artifacts above, `if-no-files-found: error` on the one that must exist.
+- [ ] **Step 3: Call it.** In `desktop.yml`, job `android: needs: [plan, checks]`, same `if` as `build`, `uses: ./.github/workflows/android.yml`, `with: { environment: production, tauri-config: '' }`, `secrets: inherit`; `release` needs `[plan, build, android]` and downloads `pattern: desktop-*`, `merge-multiple: true`. Same in `desktop-beta.yml` with `environment: beta` and the beta config. The desktop release must not wait on a failed Android build forever: `release` runs when `build` succeeded and `android` succeeded or was skipped (`if: always() && needs.build.result == 'success' && needs.android.result != 'failure' && …the existing tag condition`).
+- [ ] **Step 4: `android-keystore.yml`**, `workflow_dispatch` only: needs `ANDROID_KEYSTORE_PASSWORD` and `ANDROID_KEY_PASSWORD` set first; `keytool -genkeypair -v -keystore upload.jks -alias tramme -keyalg RSA -keysize 4096 -validity 10000 -dname "CN=Tramme, O=Qualris"`; prints the base64 nowhere; uploads `upload.jks` as an artifact with `retention-days: 1`. Comment at the top: download it, store its base64 as `ANDROID_KEYSTORE_BASE64` and `tramme` as `ANDROID_KEY_ALIAS`, keep a copy offline, delete the artifact.
+- [ ] **Step 5: Docs.** CONTRIBUTING "Android": the four secrets and the keystore workflow, where each file lands (`.apk` in the release and on the site, `.aab` in the run's artifacts), uploading the `.aab` to the Play Console, the beta product next to the stable one, the owner's phone checklist from the spec's "Checks". `docs/desktop-and-mobile-apps.md` step 6: what was done and how (plugin crate, generated project not committed, signing after build, the site offering the `.apk`).
+- [ ] **Step 6: Validate the workflow files** locally with `npx --yes @action-validator/cli` on each changed workflow (or `actionlint` if available). Expected: no error. Then `npm test`, `npm run typecheck`.
+- [ ] **Step 7: Commit** `ci(android): the app built, signed and published on CI`.
 
-After Task 7: tell the owner that the Android compile is proven only by the first CI run after their version bump and push, and what to set in the GitHub secrets.
+After Task 8: tell the owner that the Android compile is proven only by the first CI run after their version bump and push (the beta one, from `develop`, is the first), and what to set in the GitHub secrets before it.
