@@ -1,9 +1,13 @@
+import com.android.build.api.dsl.LibraryExtension
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
     id("com.android.library")
     id("org.jetbrains.kotlin.android")
 }
 
-android {
+// AGP 9 deprecates the `android { }` accessor of a library: the extension is configured by its type
+extensions.configure<LibraryExtension> {
     namespace = "app.tramme.device"
     // at least tauri-android's own (36 in tauri 2.12): a release build refuses a lower one
     compileSdk = 36
@@ -21,8 +25,11 @@ android {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
     }
-    kotlinOptions {
-        jvmTarget = "1.8"
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget = JvmTarget.JVM_1_8
     }
 }
 
