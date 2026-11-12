@@ -595,16 +595,19 @@ svg.i.flip { transform: rotate(180deg); }
   /* !important over the panel's inline size (desktop): it must shrink, or the message box ends up under the tabs */
   .app[data-tab=ai] .col.right .assistant { height: auto !important; flex: 1 1 0 !important; }
   .app[data-tab=inspector] .col.right .inspector-wrap { flex: 1; }
+  .app[data-tab=effects] .effects-tab { display: flex; grid-row: 3 / 5; min-height: 0; border-radius: 0; }
   /* the names' column: a fixed share of the screen, whatever width the desktop remembered (the inline --names) */
   .timeline { grid-template-columns: min(132px, 36%) minmax(0, 1fr); }
   /* the tabs: one bar across the bottom, each tab its icon over its name */
   .mobile-tabs {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; height: calc(var(--tabs-h) + env(safe-area-inset-bottom));
     display: flex; align-items: stretch; padding: 4px 6px env(safe-area-inset-bottom);
+    /* as a video editor's tools: they scroll sideways when they no longer fit */
+    overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none;
     background: var(--float); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); box-shadow: 0 -1px 0 var(--line);
   }
   .mobile-tabs button {
-    flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+    flex: 1 0 64px; min-width: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
     padding: 0 2px; border: 0; border-radius: var(--r-md); background: transparent; color: var(--text-3); font: 500 var(--fs-xs)/1.1 var(--ui);
   }
   .mobile-tabs button svg.i { width: 18px; height: 18px; flex: none; }
@@ -651,7 +654,9 @@ svg.i.flip { transform: rotate(180deg); }
 .scopes figcaption { font-size: 10px; color: rgba(255, 255, 255, .6); text-align: center; }
 @media (max-width: 760px) { .scopes canvas { width: 128px; height: 64px; } .scopes .vector canvas { width: 64px; height: 64px; } }
 
-/* ── the layer library: the phone's way to add a layer, in the layers panel ── */
+/* ── the Effects tab: what a phone adds, as tiles (desktop: none, its layers' menu adds) ── */
+.effects-tab { display: none; flex-direction: column; }
+.mobile-tabs::-webkit-scrollbar { display: none; }
 .layer-library { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .library-head { display: flex; align-items: center; gap: 6px; padding: 8px 10px 6px; flex: none; }
 .library-head .field { flex: 1; min-width: 0; }

@@ -167,12 +167,9 @@ export function layerChoices(): { section: string; entries: MenuEntry[] }[] {
   return [...sections].map(([section, entries]) => ({ section, entries }));
 }
 
-/** the layer library is open in the layers panel (the phone's way to add a layer) */
-export const libraryOpen = signal(false);
-
-/** adding a layer: a menu at the pointer on a computer; on a phone, the library in the layers panel (a floating list of sixty entries is a computer's gesture) */
+/** adding a layer: a menu at the pointer on a computer; on a phone, the Effects tab (a floating list of sixty entries is a computer's gesture) */
 export function addLayerMenu(e: MouseEvent | DOMRect) {
-  if (phoneLayout()) { tab.value = 'layers'; S.mobileTab.value = 'layers'; libraryOpen.value = true; return; }
+  if (phoneLayout()) { S.mobileTab.value = 'effects'; return; }
   openMenu(e as MouseEvent, layerChoices().flatMap(({ section, entries }): MenuItem[] => [{ section }, ...entries]));
 }
 
@@ -845,20 +842,14 @@ function Tokens() {
 }
 
 /**
- * The phone's way to add a layer, in the layers panel (as a video app's library): the sections as a row of
- * tabs, the chosen one's layers as tiles, a search across all of them. Closed by its button, by the back
- * button (an overlay for device.ts) and once a layer is added.
+ * The phone's Effects tab (App.tsx), as a video app's: the sections as a row of tabs that scrolls, the
+ * chosen one's layers and ready-made layers as tiles, a search across all of them. A tile adds its layer
+ * and shows the picture, where it now is.
  */
-function LayerLibrary() {
+export function LayerLibrary() {
   const choices = layerChoices();
   const [section, setSection] = useState(choices[0]?.section ?? '');
   const [query, setQuery] = useState('');
-  const close = () => { libraryOpen.value = false; };
-  useEffect(() => {
-    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') close(); };
-    addEventListener('keydown', key);
-    return () => removeEventListener('keydown', key);
-  }, []);
   const searching = !!query.trim();
   const shown = searching
     ? choices.map((c) => ({ ...c, entries: c.entries.filter((it) => menuMatches(it, query)) })).filter((c) => c.entries.length)
@@ -867,7 +858,6 @@ function LayerLibrary() {
     <div class="layer-library">
       <div class="library-head">
         <div class="field"><Icon name="search" /><input value={query} placeholder={t('common.findInMenu')} aria-label={t('common.findInMenu')} spellcheck={false} onInput={(e) => setQuery((e.target as HTMLInputElement).value)} /></div>
-        <button class="icon-btn sm" title={t('common.close')} aria-label={t('common.close')} onClick={close}><Icon name="x" /></button>
       </div>
       {!searching && (
         <div class="library-sections" role="tablist">
@@ -881,7 +871,7 @@ function LayerLibrary() {
             {searching && <div class="menu-label">{c.section}</div>}
             <div class="library-grid">
               {c.entries.map((it) => (
-                <button key={`${it.label}${it.detail ?? ''}`} class="library-tile" disabled={it.disabled} onClick={() => { close(); it.onClick(); }}>
+                <button key={`${it.label}${it.detail ?? ''}`} class="library-tile" disabled={it.disabled} onClick={() => { it.onClick(); S.mobileTab.value = 'viewport'; }}>
                   {it.icon && <Icon name={it.icon} />}<span class="library-name">{it.label}</span>{it.detail && <span class="library-detail">{it.detail}</span>}
                 </button>
               ))}
@@ -919,9 +909,7 @@ export function LeftPanel() {
         <span class="grow" />
         {current === 'layers' && <button class="icon-btn sm" title={t('panel.addALayer')} onClick={(e) => addLayerMenu(e)}><Icon name="plus" /></button>}
       </div>
-      {current === 'layers' && (libraryOpen.value
-        ? <LayerLibrary />
-        : <div class="panel-body" onClick={(e) => { if (e.target === e.currentTarget) select([]); }}><CompTrail /><LayerTree /></div>)}
+      {current === 'layers' && <div class="panel-body" onClick={(e) => { if (e.target === e.currentTarget) select([]); }}><CompTrail /><LayerTree /></div>}
       {current === 'assets' && <Assets />}
       {current === 'tokens' && <Tokens />}
     </>

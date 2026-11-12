@@ -156,7 +156,7 @@ export function keepAwake(on: boolean): void {
 // ── the back button ──────────────────────────────────────────
 
 /** what is open on top of a page: the menus, popovers, lists and dialogs (ui/controls.tsx), which close on Escape */
-const OVERLAYS = '.menu, .popover, .modal-back, [role="listbox"], .layer-library';
+const OVERLAYS = '.menu, .popover, .modal-back, [role="listbox"]';
 
 /** What the back button does: closes what is open on top first, then goes back through the pages, then leaves the app. */
 export function backAction(s: { overlayOpen: boolean; path: string }): 'escape' | 'history' | 'exit' {
