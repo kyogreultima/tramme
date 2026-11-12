@@ -1,0 +1,21 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- asked at the moment of use only: dictation and voice-over -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- saving to the gallery before Android 10 -->
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
+
+    <application>
+        <!-- hands a finished export to the share sheet -->
+        <provider
+            android:name="app.tramme.device.TrammeFileProvider"
+            android:authorities="${applicationId}.tramme.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/tramme_files" />
+        </provider>
+    </application>
+</manifest>

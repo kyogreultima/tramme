@@ -91,30 +91,10 @@ pub fn keychain() -> &'static dyn Secrets {
     &KEYCHAIN
 }
 
-/// a phone's secrets: until the device's own store is installed (device_secrets.rs), none can be kept
-#[cfg(mobile)]
-struct NoSecrets;
-
-#[cfg(mobile)]
-impl Secrets for NoSecrets {
-    fn get(&self, _slot: &str) -> Option<String> {
-        None
-    }
-    fn set(&self, _slot: &str, _key: &str) -> Res<()> {
-        http_err(501, "not yet on this device")
-    }
-    fn delete(&self, _slot: &str) -> Res<()> {
-        http_err(501, "not yet on this device")
-    }
-}
-
-#[cfg(mobile)]
-static NO_SECRETS: NoSecrets = NoSecrets;
-
-/// the secrets of a phone's app
+/// the secrets of a phone's app: the device plugin's Keystore (device_secrets.rs)
 #[cfg(mobile)]
 pub fn keychain() -> &'static dyn Secrets {
-    &NO_SECRETS
+    &crate::device_secrets::DeviceSecrets
 }
 
 /// a provider of the OpenAI chat format added by the user

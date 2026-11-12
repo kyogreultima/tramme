@@ -3821,6 +3821,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "tauri-plugin-tramme-device"
+version = "0.22.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-plugin",
+]
+
+[[package]]
 name = "tauri-runtime"
 version = "2.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4257,6 +4267,7 @@ dependencies = [
  "tauri-plugin-dialog",
  "tauri-plugin-notification",
  "tauri-plugin-single-instance",
+ "tauri-plugin-tramme-device",
  "tempfile",
  "unicode-normalization",
  "ureq",

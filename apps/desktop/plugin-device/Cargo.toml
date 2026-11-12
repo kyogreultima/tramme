@@ -1,0 +1,15 @@
+[package]
+name = "tauri-plugin-tramme-device"
+version = "0.22.0"
+description = "what the phone gives the Tramme app: the Keystore for its secrets, the gallery, the share sheet, the back button"
+edition = "2021"
+publish = false
+links = "tauri-plugin-tramme-device"
+
+[dependencies]
+tauri = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[build-dependencies]
+tauri-plugin = { version = "2", features = ["build"] }

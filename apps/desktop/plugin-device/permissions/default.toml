@@ -1,0 +1,3 @@
+[default]
+description = "The page may listen to the device's back button."
+permissions = ["allow-register-listener", "allow-remove-listener"]

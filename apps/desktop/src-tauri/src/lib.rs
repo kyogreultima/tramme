@@ -10,6 +10,8 @@ mod analytics;
 mod api;
 #[cfg(desktop)]
 mod desktop;
+#[cfg(mobile)]
+mod device_secrets;
 mod fetch;
 pub mod format;
 mod keys;
@@ -80,6 +82,7 @@ pub fn run() {
     builder
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_tramme_device::init())
         .register_asynchronous_uri_scheme_protocol(SCHEME, |_ctx, request, responder| {
             // answered off the main thread: the storage does disk I/O
             let app = _ctx.app_handle().clone();
@@ -92,7 +95,10 @@ pub fn run() {
             desktop::read_launch_args();
             // a phone gives the app its own private folders: the projects and the settings live there
             #[cfg(mobile)]
-            store::set_roots(app.path().app_data_dir()?.join("Tramme"), app.path().app_config_dir()?.join("desktop.json"));
+            {
+                store::set_roots(app.path().app_data_dir()?.join("Tramme"), app.path().app_config_dir()?.join("desktop.json"));
+                device_secrets::install(app.state::<tauri_plugin_tramme_device::Device<tauri::Wry>>().inner().clone());
+            }
             let url = format!("{SCHEME}://localhost/").parse().unwrap();
             let window = WebviewWindowBuilder::new(app, "main", WebviewUrl::CustomProtocol(url)).title("Tramme");
             #[cfg(desktop)]
