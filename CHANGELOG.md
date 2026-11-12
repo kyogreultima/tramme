@@ -10,6 +10,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Added
 
+- Tramme on Android: the desktop app's crate also builds as an Android app (`.apk` offered by the site, `.aab` for the Play Store), built and signed on CI only. The editor runs in local mode with the projects and the keys on the phone (the keys under the Android Keystore), imports from the gallery, exports a long video to a file instead of memory, then saves it to the gallery or the downloads or shares it; the back button closes, goes back, then leaves. It sells nothing and shows no update notice.
 - `remove-bg` cuts a whole set of pictures out in one call (`images`), each saved as its own asset.
 - The assistant's `write_file` changes a passage of a file (`find`) instead of writing a long plugin whole again.
 - A plugin's tool reads the project's pictures, sounds and fonts with `ctx.readFile(path)`, through the editor: in the desktop app its sandbox could not fetch them (Origyn: a plugin written five times over).

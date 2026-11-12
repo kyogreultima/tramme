@@ -1,0 +1,131 @@
+# The Android app (apps/desktop, the same Tauri crate as the computers' app),
+# built, signed and handed to the workflow that calls it (desktop.yml for the
+# stable app, desktop-beta.yml for Tramme Beta). Nothing Android is built
+# anywhere else: no toolchain on a developer's machine.
+#
+# The Android project is not committed: `tauri android init` generates it here
+# on every build (apps/desktop/plugin-device brings our Kotlin, and
+# tauri.android.conf.json the application id). Signing is done after the build,
+# on the produced files, so the generated Gradle files are never patched.
+#
+# With the four signing secrets (ANDROID_KEYSTORE_BASE64,
+# ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD; the
+# keystore is made once by android-keystore.yml):
+#   - artifact desktop-Android: the signed tramme-android.apk, which the calling
+#     workflow's release job publishes with the computers' installers, the site
+#     offering it (apps/desktop/downloads.ts);
+#   - artifact android-private: the signed tramme-<version>.aab, for the Play
+#     Console, never published.
+# Without them: an unsigned debug .apk as the private artifact, a notice, and no
+# desktop-Android, so nothing unsigned is ever released and the release goes on.
+
+name: Android app
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: The environment the app is built for (brand/environments.ts), where its links lead
+        type: string
+        required: true
+      tauri-config:
+        description: A JSON merged over tauri.conf.json and tauri.android.conf.json ('' for the stable app)
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build (Android)
+    runs-on: ubuntu-latest
+    env:
+      TRAMME_ENV: ${{ inputs.environment }}
+      TAURI_CONFIG: ${{ inputs.tauri-config }}
+      # audience measurement of the app (apps/desktop/src-tauri/src/analytics.rs): without it nothing is counted
+      TRAMME_GA_API_SECRET: ${{ secrets.TRAMME_GA_API_SECRET }}
+      # whether the four signing secrets are all there (a secret cannot be tested in an `if` directly)
+      SIGNED: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' && secrets.ANDROID_KEYSTORE_PASSWORD != '' && secrets.ANDROID_KEY_ALIAS != '' && secrets.ANDROID_KEY_PASSWORD != '' }}
+      NDK: 27.2.12479018
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+        with:
+          rust-targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: android-actions/setup-android@v3
+      - name: The NDK
+        run: |
+          sdkmanager "ndk;$NDK"
+          echo "NDK_HOME=$ANDROID_HOME/ndk/$NDK" >> "$GITHUB_ENV"
+      - run: npm ci
+      - name: Generate the Android project
+        working-directory: apps/desktop
+        run: npx tauri android init --ci
+      - name: Build, unsigned
+        if: env.SIGNED == 'true'
+        run: npm run android:build -- --aab --apk
+      - name: Build without the signing secrets
+        if: env.SIGNED != 'true'
+        run: |
+          echo "::notice::the Android signing secrets are not set: an unsigned debug .apk is built, kept as a private artifact, and nothing Android is released"
+          npm run android:build -- --apk --debug
+
+      - name: Sign
+        if: env.SIGNED == 'true'
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          version=$(node -p "require('./apps/desktop/src-tauri/tauri.conf.json').version")
+          tools=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          keystore="$RUNNER_TEMP/upload.jks"
+          # the keystore exists for this step only
+          trap 'rm -f "$keystore"' EXIT
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$keystore"
+          mkdir -p public private
+
+          apk=$(find apps/desktop/src-tauri/gen/android -name '*release-unsigned.apk' | head -1)
+          aab=$(find apps/desktop/src-tauri/gen/android -name '*.aab' | head -1)
+          [ -n "$apk" ] && [ -n "$aab" ] || { echo "::error::the release .apk or .aab was not produced"; exit 1; }
+
+          "$tools/zipalign" -p 4 "$apk" "$RUNNER_TEMP/aligned.apk"
+          "$tools/apksigner" sign --ks "$keystore" --ks-key-alias "$ANDROID_KEY_ALIAS" \
+            --ks-pass env:ANDROID_KEYSTORE_PASSWORD --key-pass env:ANDROID_KEY_PASSWORD \
+            --out public/tramme-android.apk "$RUNNER_TEMP/aligned.apk"
+          jarsigner -keystore "$keystore" -storepass:env ANDROID_KEYSTORE_PASSWORD -keypass:env ANDROID_KEY_PASSWORD \
+            -sigalg SHA256withRSA -digestalg SHA-256 -signedjar "private/tramme-$version.aab" "$aab" "$ANDROID_KEY_ALIAS"
+
+          # the certificate must name Qualris, or nothing goes out
+          "$tools/apksigner" verify --print-certs public/tramme-android.apk | tee certs-apk.txt
+          keytool -printcert -jarfile "private/tramme-$version.aab" | tee certs-aab.txt
+          grep -q 'O=Qualris' certs-apk.txt || { echo "::error::the .apk is not signed with the Qualris certificate"; exit 1; }
+          grep -q 'O=Qualris' certs-aab.txt || { echo "::error::the .aab is not signed with the Qualris certificate"; exit 1; }
+          rm -f certs-apk.txt certs-aab.txt
+
+      - name: Keep the unsigned build
+        if: env.SIGNED != 'true'
+        run: |
+          mkdir -p private
+          version=$(node -p "require('./apps/desktop/src-tauri/tauri.conf.json').version")
+          cp "$(find apps/desktop/src-tauri/gen/android -name '*debug*.apk' | head -1)" "private/tramme-$version-debug.apk"
+
+      # the .apk alone, under its release name: the release job takes every desktop-* artifact
+      - uses: actions/upload-artifact@v4
+        if: env.SIGNED == 'true'
+        with:
+          name: desktop-Android
+          path: public/tramme-android.apk
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-private
+          path: private/
+          if-no-files-found: error

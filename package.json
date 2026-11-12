@@ -22,6 +22,8 @@
     "site:deploy:beta": "npm run site:build && cd apps/site && wrangler deploy --name tramme-site-beta --domain beta.tramme.dev",
     "desktop:dev": "node apps/editor/build.ts && cd apps/desktop && tauri dev",
     "desktop:build": "node apps/editor/build.ts && cd apps/desktop && tauri build",
+    "android:dev": "node apps/editor/build.ts && cd apps/desktop && tauri android dev",
+    "android:build": "node apps/editor/build.ts && cd apps/desktop && tauri android build",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p . && tsc --noEmit -p apps/worker",
     "tramme": "node packages/cli/src/main.ts",

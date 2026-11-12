@@ -1,6 +1,6 @@
 # The desktop app (apps/desktop) for Windows, macOS and Linux, each built on
-# its own system, and its releases. main's version (scripts/version.ts) is
-# released as soon as it has no tag: the three are published as one GitHub
+# its own system, and the Android app (android.yml), and their releases. main's version (scripts/version.ts) is
+# released as soon as it has no tag: the installers (and the signed Android .apk) are published as one GitHub
 # release vX.Y.Z, under the stable names of apps/desktop/downloads.ts that the
 # site links to, with the changelog's section as notes, and the site is
 # deployed again so its version and sizes follow. A manual run on main does the
@@ -97,10 +97,24 @@ jobs:
           path: out/
           if-no-files-found: error
 
+  # the Android app, built and signed by one reusable workflow (without the signing secrets: nothing Android is released)
+  android:
+    name: Android
+    needs: [plan, checks]
+    if: needs.plan.outputs.build == 'true'
+    uses: ./.github/workflows/android.yml
+    with:
+      environment: production
+      tauri-config: ''
+    secrets: inherit
+
   release:
     name: Release
-    needs: [plan, build]
-    if: needs.plan.outputs.tag != ''
+    needs: [plan, build, android]
+    # the desktop builds must have succeeded, Android too or not run: a failed Android build stops the release, a missing one does not
+    if: >-
+      always() && needs.plan.outputs.tag != '' && needs.build.result == 'success'
+      && (needs.android.result == 'success' || needs.android.result == 'skipped')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -113,6 +127,8 @@ jobs:
           node-version: 24
       - uses: actions/download-artifact@v4
         with:
+          # the installers only: the Android .aab is a private artifact of the run
+          pattern: desktop-*
           path: out
           merge-multiple: true
       - name: Publish

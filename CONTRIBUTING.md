@@ -86,6 +86,23 @@ The desktop workflow ([.github/workflows/desktop.yml](.github/workflows/desktop.
 
 An urgent fix to the released version starts from `main` instead: a `fix/…` branch with the fix and a patch version (`node scripts/version.ts 0.11.2`), merged into `main`, which releases it the same way. A pull request from `main` into `develop` (a merge commit too) then brings it back; in the changelog, keep both sides.
 
+## Android
+
+The Android app is the desktop crate built for Android (`apps/desktop`, the Kotlin in `apps/desktop/plugin-device`). **Nothing Android is built on a developer's machine**: the generated Android project is not committed, CI makes it and builds it ([.github/workflows/android.yml](.github/workflows/android.yml), called by the desktop and desktop-beta workflows). `npm run android:dev` and `npm run android:build` exist for whoever has the toolchain; nobody needs them.
+
+**The upload key, once.** Set the repository secrets `ANDROID_KEYSTORE_PASSWORD` and `ANDROID_KEY_PASSWORD`, run the workflow *Android upload key* by hand (it makes `upload.jks`, certificate `CN=Tramme, O=Qualris`, alias `tramme`), download its artifact, and store `base64 -w0 upload.jks` as `ANDROID_KEYSTORE_BASE64` and `tramme` as `ANDROID_KEY_ALIAS`. Keep a copy of the file offline and delete the artifact. If the key is lost, Google can reset the upload key (Play App Signing holds the real one).
+
+**What a run produces.**
+
+- With the four secrets (`ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`): a signed `tramme-android.apk`, published in the GitHub release next to the computers' installers (the stable one from `main`, a prerelease from `develop` for the beta), which the site offers on its download page; and a signed `tramme-<version>.aab` in the run's artifacts (`android-private`), for the Play Console. The signing step fails unless the certificate names Qualris.
+- Without them: an unsigned debug `.apk` in the run's artifacts, a notice, and nothing Android in the release. The rest of the release goes on.
+
+**The Play Console.** Download `android-private` from the run of the release, upload the `.aab` to a release of the app (Play App Signing on). The beta is its own product, *Tramme Beta* (`app.tramme.beta`), installable next to the stable app; the store listing, the privacy policy and the content rating are the owner's.
+
+**The `.apk` of the site and the Play Store's cannot update each other** (not signed by the same key): moving from one to the other means uninstalling first, and the projects stored in the app go with it unless exported. The download page says so.
+
+**Checks on a phone**, with the `.apk` from the site: create a project; import a video from the gallery; edit; export a 9:16 video of at least 60 seconds without a crash; find it in the gallery and share it; sign in to the account; save a provider key, close the app and reopen it, the assistant still works; the back button closes a menu or a dialog first, then goes back, then leaves the app; no purchase entry point shows anywhere.
+
 ## License and sign-off
 
 Tramme is under the [Functional Source License 1.1, ALv2 Future License](LICENSE) (FSL-1.1-ALv2). By contributing, you agree that:
