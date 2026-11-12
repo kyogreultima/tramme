@@ -152,9 +152,11 @@ input[type=text].plain, input.plain { background: transparent; border: 0; outlin
 .menu-item .menu-hint, .menu-item .hint { margin-left: auto; color: var(--text-3); font: 400 var(--fs-xs) var(--mono); }
 .menu-item.danger, .menu-item.danger svg.i { color: var(--danger); }
 .menu-item .check { color: var(--accent-text); margin-left: auto; }
-/* a long menu: a capped height, its search kept at the top while the entries scroll */
-.menu.long { max-height: min(520px, calc(100dvh - 16px)); width: 280px; padding-top: 0; }
-.menu-search { position: sticky; top: 0; z-index: 1; margin: 0 -6px 4px; padding: 6px; background: var(--raised); }
+/* a long menu: a capped height, its search on top and its entries scrolling below it (nothing passes under the search) */
+.menu.long { display: flex; flex-direction: column; max-height: min(520px, calc(100dvh - 16px)); width: 280px; overflow: hidden; }
+.menu-search { flex: none; padding: 0 0 6px; margin-bottom: 4px; border-bottom: 1px solid var(--line); }
+.menu-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+@media (max-width: 760px) { .menu.long { max-height: min(520px, 60dvh); width: min(320px, calc(100vw - 16px)); } }
 .menu-label { padding: 8px 10px 4px; color: var(--text-3); font: 500 var(--fs-xs)/1 var(--ui); }
 .menu hr { height: 1px; margin: 6px 4px; border: 0; background: var(--line); }
 /* the menus still built as plain buttons (until each moves to .menu-item) */

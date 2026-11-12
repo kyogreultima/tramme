@@ -126,11 +126,16 @@ export function MenuHost() {
   useLayoutEffect(() => {
     if (!m || !ref.current) return;
     setQuery('');
-    const r = ref.current.getBoundingClientRect();
-    setPos({ x: Math.max(8, Math.min(m.x, innerWidth - r.width - 8)), y: Math.max(8, Math.min(m.y, innerHeight - r.height - 8)) });
+    // inside the window, placed again when it changes size (a phone's keyboard)
+    const place = () => {
+      const r = ref.current?.getBoundingClientRect();
+      if (r) setPos({ x: Math.max(8, Math.min(m.x, innerWidth - r.width - 8)), y: Math.max(8, Math.min(m.y, innerHeight - r.height - 8)) });
+    };
+    place();
+    addEventListener('resize', place);
     // the keyboard starts on the search of a long menu, else on the first entry; a touch screen focuses nothing (its keyboard would cover the menu)
-    if (handheld()) return;
-    setTimeout(() => ref.current?.querySelector<HTMLElement>(long ? '.menu-search input' : '.menu-item:not([disabled])')?.focus());
+    if (!handheld()) setTimeout(() => ref.current?.querySelector<HTMLElement>(long ? '.menu-search input' : '.menu-item:not([disabled])')?.focus());
+    return () => removeEventListener('resize', place);
   }, [m]);
   useEffect(() => {
     if (!m) return;
@@ -149,17 +154,22 @@ export function MenuHost() {
   return (
     <div class={`menu${long ? ' long' : ''}`} ref={ref} style={{ left: pos.x, top: pos.y }} role="menu">
       {long && (
-        <div class="menu-search field">
-          <Icon name="search" />
-          <input value={query} placeholder={t('common.findInMenu')} aria-label={t('common.findInMenu')} spellcheck={false}
-            onInput={(e) => setQuery((e.target as HTMLInputElement).value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') { const first = filterMenu(m.items, query).find(isEntry); if (first && !first.disabled) { menuState.value = null; first.onClick(); } } }} />
+        <div class="menu-search">
+          <div class="field">
+            <Icon name="search" />
+            <input value={query} placeholder={t('common.findInMenu')} aria-label={t('common.findInMenu')} spellcheck={false}
+              onInput={(e) => setQuery((e.target as HTMLInputElement).value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { const first = filterMenu(m.items, query).find(isEntry); if (first && !first.disabled) { menuState.value = null; first.onClick(); } } }} />
+          </div>
         </div>
       )}
-      {long && !shown.some(isEntry) && <div class="menu-label">{t('common.noMatch')}</div>}
-      {shown.map((it, i) => it === 'sep' ? <hr key={i} /> : 'section' in it ? <div class="menu-label" key={i}>{it.section}</div> : (
-        <MenuButton key={i} it={it} iconed={iconed} onPick={() => { menuState.value = null; it.onClick(); }} />
-      ))}
+      {/* a long menu scrolls its entries under a search that stays put */}
+      <div class={long ? 'menu-list' : 'menu-entries'}>
+        {long && !shown.some(isEntry) && <div class="menu-label">{t('common.noMatch')}</div>}
+        {shown.map((it, i) => it === 'sep' ? <hr key={i} /> : 'section' in it ? <div class="menu-label" key={i}>{it.section}</div> : (
+          <MenuButton key={i} it={it} iconed={iconed} onPick={() => { menuState.value = null; it.onClick(); }} />
+        ))}
+      </div>
     </div>
   );
 }
