@@ -65,18 +65,42 @@ jobs:
         run: |
           sdkmanager "ndk;$NDK"
           echo "NDK_HOME=$ANDROID_HOME/ndk/$NDK" >> "$GITHUB_ENV"
+      # The CLI takes the flavour (Tramme Beta) from --config only: TAURI_CONFIG alone reaches the Rust
+      # build but not the generated project, and a project generated as app.tramme around a library
+      # built as app.tramme.beta crashes on launch (its Kotlin classes find none of their native methods).
+      # init and build are given the same file.
+      - name: The flavour's configuration
+        run: |
+          if [ -n "$TAURI_CONFIG" ]; then
+            printf '%s' "$TAURI_CONFIG" > "$RUNNER_TEMP/flavour.conf.json"
+            echo "FLAVOUR=--config $RUNNER_TEMP/flavour.conf.json" >> "$GITHUB_ENV"
+          fi
       # the generated Gradle project calls the CLI back through `pnpm tauri` (package.json's "tauri" script)
       - name: Generate the Android project
         working-directory: apps/desktop
-        run: pnpm tauri android init --ci
+        run: pnpm tauri android init --ci $FLAVOUR
+      # init lays Tauri's own launcher icons; ours (`tauri icon`, src-tauri/icons/android) go over them
+      - name: The app's icons
+        run: cp -r apps/desktop/src-tauri/icons/android/. apps/desktop/src-tauri/gen/android/app/src/main/res/
       - name: Build, unsigned
         if: env.SIGNED == 'true'
-        run: pnpm android:build --aab --apk
+        run: pnpm android:build --aab --apk $FLAVOUR
       - name: Build without the signing secrets
         if: env.SIGNED != 'true'
         run: |
           echo "::notice::the Android signing secrets are not set: an unsigned debug .apk is built, kept as a private artifact, and nothing Android is released"
-          pnpm android:build --apk --debug
+          pnpm android:build --apk --debug $FLAVOUR
+      # the Kotlin half and the Rust half must name the same package, or the app closes as soon as it opens
+      - name: The app's two halves agree
+        run: |
+          set -euo pipefail
+          package=$(sed -n 's/^ *namespace *= *"\(.*\)"/\1/p' apps/desktop/src-tauri/gen/android/app/build.gradle.kts)
+          symbol="Java_${package//./_}_Rust_onCreate"
+          apk=$(find apps/desktop/src-tauri/gen/android -name '*.apk' | head -1)
+          unzip -p "$apk" lib/arm64-v8a/libtramme_desktop_lib.so > "$RUNNER_TEMP/lib.so"
+          grep -aq "$symbol" "$RUNNER_TEMP/lib.so" \
+            || { echo "::error::the Rust library does not answer the package $package ($symbol missing)"; exit 1; }
+          echo "package $package, $symbol present"
 
       - name: Sign
         if: env.SIGNED == 'true'
