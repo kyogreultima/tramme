@@ -29,7 +29,7 @@ export function DeviceSaveSheet() {
   const label = { gallery: t('device.saveToGallery'), downloads: t('device.saveToDownloads'), share: t('device.share') };
   const icon = { gallery: 'download', downloads: 'download', share: 'upload' } as const;
   return (
-    <Modal title={t('device.ready')} onClose={() => p.done(false)}>
+    <Modal title={t('device.ready')} onClose={() => p.done(false)} above>
       <div class="modal-body">
         <p class="mono">{p.name}</p>
         <div class="modal-foot">

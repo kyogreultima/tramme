@@ -1385,6 +1385,7 @@
     "doneInSS": "Terminé en {s} s",
     "nMb": "{n} Mo",
     "saveToComputer": "Enregistrer sur l'ordinateur",
+    "saveOnDevice": "Enregistrer ou partager",
     "keptInPath": "gardé dans {path}",
     "keepInTheProject": "Garder dans le projet",
     "exportReady": "Un fichier exporté attend dans le menu d'export",

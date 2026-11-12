@@ -387,6 +387,8 @@
 .publish-chapters .faint { flex: 1; }
 .export-go { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 4px; padding-top: 12px; border-top: 1px solid var(--line); }
 .export-go > .btn { width: 100%; min-width: 0; height: auto; min-height: 40px; padding: 10px 12px; white-space: normal; line-height: 1.3; }
+/* what to do with the finished file: save it, keep it in the project */
+.export-saves { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .export-queue { display: flex; flex-direction: column; gap: 4px; padding-top: 6px; border-top: 1px solid var(--line-soft); font-size: var(--fs-xs); }
 .export-queue-head { display: flex; align-items: center; justify-content: space-between; color: var(--text-3); }
 .export-job { display: flex; align-items: center; gap: 8px; color: var(--text-2); }
@@ -566,8 +568,10 @@ svg.i.flip { transform: rotate(180deg); }
   .topbar > .sep, .topbar > .grow, .topbar .settings, .topbar [data-tour="help"], .topbar [data-tour="settings"], .topbar [data-tour="versions"] { display: none; }
   .topbar .project { flex: 1 1 0; min-width: 0; gap: 2px; }
   .project input.title { flex: 1 1 0; min-width: 0; max-width: none; width: 0 !important; field-sizing: fixed; text-overflow: ellipsis; }
-  .topbar .btn.primary { width: 36px; padding: 0; justify-content: center; }
+  .topbar .btn.primary { position: relative; width: 36px; padding: 0; justify-content: center; }
   .topbar .btn.primary .label { display: none; }
+  /* a finished export waiting: a dot in the button's corner, the icon kept in its middle */
+  .topbar .btn.primary .export-dot { position: absolute; top: 5px; right: 5px; width: 6px; height: 6px; }
 }
 @media (max-width: 760px) {
   html, body, .app { max-width: 100vw; overflow: hidden; }

@@ -3,7 +3,11 @@
 // to the gallery or the downloads, or shares (device.ts).
 
 import { saveOnDevice } from './device.ts';
+import { t } from './i18n/index.ts';
 import { platform } from './tauri.ts';
+
+/** what the button that calls saveBlob says: a phone has no computer to save to, its sheet saves or shares */
+export const saveLabel = (): string => (platform === 'android' ? t('topbar.saveOnDevice') : t('topbar.saveToComputer'));
 
 export async function saveBlob(blob: Blob, name: string): Promise<boolean> {
   if (platform === 'android') return saveOnDevice(blob, name);

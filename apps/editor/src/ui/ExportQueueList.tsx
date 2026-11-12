@@ -2,7 +2,7 @@
 // progress, what is done and can be saved; each can be taken out or stopped.
 
 import { exportQueue, queueVersion } from '../export-queue.ts';
-import { saveBlob } from '../download.ts';
+import { saveBlob, saveLabel } from '../download.ts';
 import { t } from '../i18n/index.ts';
 import { Icon } from './icons.tsx';
 
@@ -21,7 +21,7 @@ export function ExportQueueList() {
           {j.status === 'waiting' && <span class="faint">{t('topbar.queueWaiting')}</span>}
           {j.status === 'cancelled' && <span class="faint">{t('topbar.queueCancelled')}</span>}
           {j.status === 'error' && <span class="err" title={j.error}>{t('topbar.queueFailed')}</span>}
-          {j.status === 'done' && j.result && <button class="btn sm" onClick={() => void saveBlob(j.result!.blob, j.result!.name)}><Icon name="download" />{t('topbar.saveToComputer')}</button>}
+          {j.status === 'done' && j.result && <button class="btn sm" onClick={() => void saveBlob(j.result!.blob, j.result!.name)}><Icon name="download" />{saveLabel()}</button>}
           {(j.status === 'waiting' || j.status === 'running') && <button class="icon-btn xs" title={t('topbar.cancelExport')} onClick={() => exportQueue.cancel(j.id)}><Icon name="x" /></button>}
         </div>
       ))}

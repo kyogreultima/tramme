@@ -167,6 +167,8 @@ input[type=text].plain, input.plain { background: transparent; border: 0; outlin
 
 /* the dialog (Modal): 20 px, a 15/600 title, pill buttons in its foot */
 .modal-back { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 16px; background: var(--scrim); backdrop-filter: blur(4px); animation: fade var(--t-fast) ease; }
+/* a dialog answering a gesture made in a popover: over it (65), under the toasts (70) */
+.modal-back.above { z-index: 68; }
 .modal { width: min(460px, 100%); max-height: calc(100dvh - 32px); overflow: auto; border-radius: var(--r-xl); background: var(--raised); box-shadow: var(--shadow-3); animation: pop var(--t-med) var(--ease); }
 .modal.wide { width: min(560px, 100%); }
 .modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 16px 6px 22px; font: 600 var(--fs-lg)/1.3 var(--ui); letter-spacing: -0.01em; }
@@ -174,6 +176,8 @@ input[type=text].plain, input.plain { background: transparent; border: 0; outlin
 .modal-body p { margin: 0; }
 .modal-body .field { height: var(--h-md); }
 .modal-foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+/* on a phone a row of buttons shares the width equally: each one a full thumb's target */
+@media (max-width: 760px) { .modal-foot > .btn, .export-saves > .btn { flex: 1 1 0; min-width: 0; } }
 .modal-foot .grow { flex: 1; }
 .lbl { font: 500 var(--fs-sm)/1 var(--ui); color: var(--text-2); margin-bottom: -6px; }
 
