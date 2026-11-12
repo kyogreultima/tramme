@@ -15,7 +15,8 @@ import { DOCUMENT } from '@tramme/project';
 import { upgradeDoc, type TrammeDoc } from '@tramme/core';
 import { api } from './api.ts';
 import { preview } from './preview.ts';
-import { commit, hooks, load, S, select, setTime, undo } from './state.ts';
+import { comp, commit, hooks, load, S, select, setTime, undo } from './state.ts';
+import { measureRhythm } from './critic/rhythm.ts';
 import { aiRoute, chat, chatId, loadChats, runTool, watchCompanion } from './ai/index.ts';
 import { running, send, stop } from './ai/conversation.ts';
 import { App } from './ui/App.tsx';
@@ -98,8 +99,9 @@ async function openProject(id: string) {
   hooks.copies = copiesFor;
   if (!info.manifest.thumbnail) setTimeout(() => thumbnail(true), 1500);
   // a handle for measurements and automated checks (tramme bench, bench/run.ts); runTool runs a tool of the / menu, its events returned;
-  // send, running, chat and stop drive a turn of the assistant as the message box does
-  (window as any).__tramme = { S, preview, select, setTime, undo, commit, runTool, exportQueue, send, running, chat, chatId, stop, aiRoute };
+  // send, running, chat and stop drive a turn of the assistant as the message box does; rhythm measures the composition on screen as the critic does
+  const rhythm = () => measureRhythm(comp.peek().duration, (t) => preview.thumbnail(t, 480));
+  (window as any).__tramme = { S, preview, select, setTime, undo, commit, runTool, exportQueue, send, running, chat, chatId, stop, aiRoute, rhythm };
 }
 
 const query = new URLSearchParams(location.search);

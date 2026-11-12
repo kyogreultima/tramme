@@ -7,7 +7,7 @@
 
 import { pointer, likeness, type Op, type ToolContext, type ToolType } from '@tramme/core';
 import { qualityChecksOf } from '../isolated-checks.ts';
-import { criticSystem, NO_USAGE, addUsage, parseVerdict, type Usage } from '@tramme/assistant';
+import { criticSystem, DONE_BAR, NO_USAGE, addUsage, parseVerdict, type Usage } from '@tramme/assistant';
 import { loadReferences, type Reference } from '../references/catalogue.ts';
 import { consult, seesPictures, type ConsultRequest, type Via } from '../ai/consult.ts';
 import { FILM_PLAN_PATH, parsePlan } from '../filmplan.ts';
@@ -17,6 +17,7 @@ import { scenesOf } from '../scenes.ts';
 import { t } from '../i18n/index.ts';
 import { doneIssues, type DoneIssue } from './done.ts';
 import { gather, type Evidence } from './evidence.ts';
+import { measureRhythm, rhythmLines, type Rhythm } from './rhythm.ts';
 
 /** what the tool needs from the assistant's turn: kept apart so the tool does not import the engine that registers it */
 export interface CriticHost {
@@ -30,6 +31,8 @@ export interface CriticHost {
   consult(req: ConsultRequest, via: Via): Promise<{ text: string; usage: Usage }>;
   /** the titles of the faults of the craft, for the critic to name; none when the library of references cannot be read */
   faults(): Promise<string[]>;
+  /** the film's rhythm, measured on its rendered frames */
+  rhythm(ctx: ToolContext, compId: string): Promise<Rhythm>;
 }
 
 /** the titles of the catalogue's faults */
@@ -49,7 +52,9 @@ async function targetLikeness(ctx: ToolContext, compId: string, evidence: Eviden
   return `Likeness to the target at ${hero.toFixed(1)} s: ${like.score}/100 (palette ${like.palette}, layout ${like.layout}, light ${like.light})${like.words.length ? `; ${like.words.join('; ')}` : ''}.`;
 }
 
-let host: CriticHost = { via: () => null, rounds: () => 2, gather, likeness: targetLikeness, consult, faults: loadFaults };
+const filmRhythm = (ctx: ToolContext, compId: string) => measureRhythm(ctx.doc.compositions[compId].duration, (t) => ctx.renderStill(t, compId), ctx.signal);
+
+let host: CriticHost = { via: () => null, rounds: () => 2, gather, likeness: targetLikeness, consult, faults: loadFaults, rhythm: filmRhythm };
 /** the assistant's turn engine hands the tool its route and its setting; tests hand it stubs */
 export function setCriticHost(next: Partial<CriticHost>) { host = { ...host, ...next }; }
 
@@ -100,7 +105,13 @@ const critique: ToolType<Input> = {
     const plan = parsePlan(await ctx.readText(FILM_PLAN_PATH).catch(() => null));
     const issues = await qualityChecksOf(ctx, id, await analyses(ctx));
     const beats = { data: await analyses(ctx), analysisIds: Object.keys(ctx.doc.assets).filter((a) => /^analysis-/.test(a)) };
-    const found = doneIssues(ctx.doc, id, ctx.registry, plan, issues, beats);
+    // the rhythm on the rendered frames: what cannot be read in the document (a frame that cannot be drawn leaves it out)
+    const rhythm = takes?.length ? null : await host.rhythm(ctx, id).then(rhythmLines).catch((e) => { if (ctx.signal.aborted) throw e; return null; });
+    const found: DoneIssue[] = [
+      ...doneIssues(ctx.doc, id, ctx.registry, plan, issues, beats),
+      ...(rhythm?.defects ?? []).map((line) => ({ id: 'rhythm', line, blocking: true })),
+      ...(rhythm?.facts ?? []).map((line) => ({ id: 'rhythm', line })),
+    ];
     const measured = found.filter((i) => i.blocking);
     const advice = found.filter((i) => !i.blocking);
     const head = [
@@ -144,7 +155,7 @@ const critique: ToolType<Input> = {
     const lines = [
       head,
       `Verdict: ${done ? 'done' : 'not yet'}${verdict.verdict === 'done' && !done ? ' (the critic said done, but what is measured above is missing)' : ''}`,
-      ...(verdict.score !== null ? [`Score ${verdict.score}/10`] : []),
+      ...(verdict.score !== null ? [`Score ${verdict.score}/10${verdict.axes ? ` (${Object.entries(verdict.axes).map(([a, n]) => `${a} ${n}`).join(', ')}; done asks ${DONE_BAR} on every axis)` : ''}`] : []),
       ...(verdict.fixes.length ? ['What matters most:', ...verdict.fixes.map((f, i) => `${i + 1}. ${f.scene ? `${f.scene}: ` : ''}${f.what}${f.why ? ` (${f.why})` : ''}`)] : []),
       ...(verdict.raw ? [`The critic answered in prose, not in the form asked; taken as not yet. Its words: ${verdict.raw.slice(0, 600)}`] : []),
       ...[...new Set(twice)].map((s) => `${s} failed twice: make two or three takes of it (use_tool "scene-takes") rather than fixing it again`),
