@@ -4,9 +4,12 @@
   "license": "FSL-1.1-ALv2",
   "private": true,
   "type": "module",
-  "exports": { ".": "./src/index.ts", "./src/*": "./src/*" },
+  "exports": {
+    ".": "./src/index.ts",
+    "./src/*": "./src/*"
+  },
   "dependencies": {
-    "@babel/parser": "^7.29.14",
+    "@babel/parser": "^8.1.2",
     "@tramme/core": "*",
     "fflate": "^0.8.3",
     "zod": "^4.6.7"

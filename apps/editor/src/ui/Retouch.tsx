@@ -46,7 +46,7 @@ const long = (pts: Pt[]) => pts.reduce((s, q, i) => (i ? s + Math.hypot(q[0] - p
  * an area follows the finger and is done when it lifts. While an area waits for
  * the user's word, a press on a layer turns it on or off in the proposal.
  */
-export function pressPicture(p: Vec2, _e: PointerEvent, hit: () => string | null, toComp: (e: { clientX: number; clientY: number }) => Vec2, area: RefObject<HTMLTextAreaElement>): boolean {
+export function pressPicture(p: Vec2, _e: PointerEvent, hit: () => string | null, toComp: (e: { clientX: number; clientY: number }) => Vec2, area: RefObject<HTMLTextAreaElement | null>): boolean {
   const c = comp.peek(), id = hit(), l = id ? c.layers[id] : null;
   const under = l && id ? { id, name: l.name ?? id, type: l.type } : null;
   S.playing.value = false;

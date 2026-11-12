@@ -223,7 +223,7 @@ export function DirectionBox({ busy, onStart }: { busy: boolean; onStart: (words
         onDragOver={(e) => { if (e.dataTransfer?.types.includes('Files')) { e.preventDefault(); e.stopPropagation(); } }}
         onDrop={(e) => { if (!e.dataTransfer) return; e.preventDefault(); e.stopPropagation(); droppedOf(e.dataTransfer).then((list) => add(list.filter((p) => isSourceFile(p.file)))); }}>
         <textarea ref={area} value={words} placeholder={t('home.heroPlaceholder')} autoFocus
-          role="combobox" aria-expanded={commandMenu.open} aria-autocomplete="list"
+          aria-autocomplete="list"
           onInput={(e) => { setWords((e.target as HTMLTextAreaElement).value); commandMenu.typed(); mention.sync(); }}
           onClick={mention.sync}
           onKeyDown={(e) => { if (commandMenu.keyDown(e) || mention.keyDown(e)) return; if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); start(); } }} />
