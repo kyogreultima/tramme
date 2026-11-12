@@ -46,8 +46,20 @@ vec3 sceneLight(vec3 c, int source) {
   if (source == 6) return ${toRec709('rec2020')} * vec3(hlg(c.r), hlg(c.g), hlg(c.b));
   return toLinear(c);
 }
-// scene light to the screen: a filmic shoulder (highlights roll off instead of clipping, 18 % grey near 0.2)
-vec3 filmic(vec3 x) { x = max(x, 0.0) * 0.8; return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0); }
+// scene light to the screen, the hues kept: a colour outside Rec.709 (a channel below zero) pulled toward the grey of its
+// brightness until it fits; the brightness through a shoulder (as it is up to 18 % grey, the highlights rolling off toward
+// white instead of clipping); a channel that would pass white eased toward white, the brightness kept
+float shoulder(float x) { return x <= 0.18 ? x : 0.18 + 0.82 * (1.0 - exp(-(x - 0.18) / 0.82)); }
+vec3 toDisplay(vec3 c) {
+  float Y = max(dot(c, LUMA), 0.0), lo = min(c.r, min(c.g, c.b));
+  if (lo < 0.0) c = mix(vec3(Y), c, Y / max(Y - lo, 1e-6));
+  float Yt = shoulder(Y);
+  // half the brightness carried as it is, half each channel through the shoulder: bright colours lean toward white as film does
+  vec3 o = mix(Y > 1e-6 ? c * (Yt / Y) : vec3(0.0), vec3(shoulder(c.r), shoulder(c.g), shoulder(c.b)), 0.5);
+  float hi = max(o.r, max(o.g, o.b));
+  if (hi > 1.0) o = Yt + (o - Yt) * (1.0 - Yt) / max(hi - Yt, 1e-6);
+  return clamp(o, 0.0, 1.0);
+}
 vec3 oklab(vec3 c) {
   vec3 lms = vec3(dot(c, vec3(0.4122214708, 0.5363325363, 0.0514459929)), dot(c, vec3(0.2119034982, 0.6806995451, 0.1073969566)), dot(c, vec3(0.0883024619, 0.2817188376, 0.6299787005)));
   lms = sign(lms) * pow(abs(lms), vec3(1.0 / 3.0));
@@ -185,8 +197,8 @@ vec4 effect(vec2 uv) {
   vec3 tilt = (wheelTint(u_shadowsColor) + vec3(u_shadowsLevel)) * sh + (wheelTint(u_midtonesColor) + vec3(u_midtonesLevel)) * md
     + (wheelTint(u_highlightsColor) + vec3(u_highlightsLevel)) * hl + wheelTint(u_globalColor);
   c *= exp2(tilt * 1.2);
-  // to the screen: log footage through a filmic shoulder, video as it is
-  vec3 o = toScreen(scene ? filmic(c) : clamp(c, 0.0, 1.0));
+  // to the screen: log footage through the display transform (toDisplay), video as it is
+  vec3 o = toScreen(scene ? toDisplay(c) : clamp(c, 0.0, 1.0));
   o = o * (1.0 - 0.12 * u_fade) + 0.1 * u_fade;
   o = mix(p.rgb, o, clamp(u_strength, 0.0, 1.0));
   return vec4(clamp(o, 0.0, 1.0) * p.a, p.a);
