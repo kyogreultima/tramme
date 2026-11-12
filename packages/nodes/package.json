@@ -4,5 +4,10 @@
   "license": "FSL-1.1-ALv2",
   "private": true,
   "type": "module",
-  "exports": { ".": "./src/index.ts" }
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@tramme/core": "workspace:*"
+  }
 }

@@ -11,13 +11,14 @@
   },
   "dependencies": {
     "@astrojs/cloudflare": "^14.4.7",
-    "@astrojs/starlight": "^0.42.11",
+    "@astrojs/starlight": "^0.42.10",
     "@phosphor-icons/core": "^2.1.1",
-    "@tramme/core": "*",
-    "@tramme/nodes": "*",
-    "@tramme/plans": "*",
-    "@tramme/render": "*",
-    "astro": "^7.4.11",
-    "cookie": "^2.0.2"
+    "@tramme/core": "workspace:*",
+    "@tramme/nodes": "workspace:*",
+    "@tramme/plans": "workspace:*",
+    "@tramme/render": "workspace:*",
+    "astro": "^7.4.10",
+    "cookie": "^2.0.2",
+    "sharp": "^0.35.5"
   }
 }

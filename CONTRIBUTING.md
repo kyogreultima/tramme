@@ -12,16 +12,16 @@ By taking part, you agree to the [code of conduct](CODE_OF_CONDUCT.md). For a se
 
 ## Setup
 
-Node 24 or newer. Chrome is needed for command-line renders. Rust is needed for the desktop storage test: without `cargo` on the PATH those tests are skipped, and CI (which has Rust) makes sure they still run somewhere.
+Node 24 or newer, and pnpm: `corepack enable` gives the version `packageManager` names in package.json. Chrome is needed for command-line renders. Rust is needed for the desktop storage test: without `cargo` on the PATH those tests are skipped, and CI (which has Rust) makes sure they still run somewhere.
 
 ```sh
-npm install
-npm test            # unit tests (Vitest)
-npm run typecheck
-npm run dev         # the editor on http://localhost:8787/
+pnpm install
+pnpm test  # unit tests (Vitest)
+pnpm typecheck
+pnpm dev   # the editor on http://localhost:8787/
 ```
 
-`npm run dev` runs the Worker locally with simulated storage in `.wrangler/state`. Model keys for the assistant go in `apps/worker/.dev.vars` (copy `apps/worker/.dev.vars.example`), which git ignores. More in [docs/deploy.md](docs/deploy.md).
+`pnpm dev` runs the Worker locally with simulated storage in `.wrangler/state`. Model keys for the assistant go in `apps/worker/.dev.vars` (copy `apps/worker/.dev.vars.example`), which git ignores. More in [docs/deploy.md](docs/deploy.md).
 
 ## Where things are
 
@@ -67,7 +67,7 @@ Nobody pushes to `develop` or `main` directly: everything goes through a pull re
 
 1. Fork the repository (or, with write access, work in the repository itself) and create a branch from `develop`: `git switch -c feat/timeline-snapping origin/develop`.
 2. Keep each pull request focused on one change. Open it as a draft for early feedback.
-3. Make sure `npm test` and `npm run typecheck` pass.
+3. Make sure `pnpm test` and `pnpm typecheck` pass.
 4. Open the pull request against `develop`. Its title follows [Conventional Commits](https://www.conventionalcommits.org/): `type(scope): summary`, the type among `feat`, `fix`, `docs`, `test`, `refactor`, `perf`, `chore`, `ci`, `build`, `style`, `revert`, the scope optional (`editor`, `core`, `render`, `cli`, `worker`, `desktop`, `site`…). A check enforces it: pull requests are squashed, so the title becomes the commit on `develop`. The branch's own commits can say anything.
 5. Add a line to the `Unreleased` section of [CHANGELOG.md](CHANGELOG.md) when the change is visible to users.
 6. Describe what changed and why, and how you tested it. Add a screenshot for interface changes.
@@ -88,7 +88,7 @@ An urgent fix to the released version starts from `main` instead: a `fix/…` br
 
 ## Android
 
-The Android app is the desktop crate built for Android (`apps/desktop`, the Kotlin in `apps/desktop/plugin-device`). **Nothing Android is built on a developer's machine**: the generated Android project is not committed, CI makes it and builds it ([.github/workflows/android.yml](.github/workflows/android.yml), called by the desktop and desktop-beta workflows). `npm run android:dev` and `npm run android:build` exist for whoever has the toolchain; nobody needs them.
+The Android app is the desktop crate built for Android (`apps/desktop`, the Kotlin in `apps/desktop/plugin-device`). **Nothing Android is built on a developer's machine**: the generated Android project is not committed, CI makes it and builds it ([.github/workflows/android.yml](.github/workflows/android.yml), called by the desktop and desktop-beta workflows). `pnpm android:dev` and `pnpm android:build` exist for whoever has the toolchain; nobody needs them.
 
 **The upload key, once.** Set the repository secrets `ANDROID_KEYSTORE_PASSWORD` and `ANDROID_KEY_PASSWORD`, run the workflow *Android upload key* by hand (it makes `upload.jks`, certificate `CN=Tramme, O=Qualris`, alias `tramme`), download its artifact, and store `base64 -w0 upload.jks` as `ANDROID_KEYSTORE_BASE64` and `tramme` as `ANDROID_KEY_ALIAS`. Keep a copy of the file offline and delete the artifact. If the key is lost, Google can reset the upload key (Play App Signing holds the real one).
 

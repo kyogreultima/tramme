@@ -9,7 +9,7 @@
 // prices, read live from Claude Code's transcripts).
 //
 // Needs the trial server (port 8790, its own state) and the companion running:
-//   npx wrangler dev -c apps/worker/wrangler.jsonc --port 8790 --var DEV_OPEN:1 --persist-to .wrangler/state-bench
+//   pnpm exec wrangler dev -c apps/worker/wrangler.jsonc --port 8790 --var DEV_OPEN:1 --persist-to .wrangler/state-bench
 //   node packages/cli/src/main.ts agent --origin http://localhost:8790
 //
 // Leaves in <out>/<series>/<brief>-<n>/ the project's conversations

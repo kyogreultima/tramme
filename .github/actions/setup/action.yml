@@ -1,11 +1,17 @@
-# Shared setup of the workflows: Node 24 with the npm cache, Rust stable with
-# its cache over the desktop crate, and on Linux the system libraries that
-# crate needs (WebKitGTK for the webview, D-Bus for the keychain).
+# Shared setup of the workflows: Node 24 and pnpm (the version package.json's
+# packageManager names) with its store cached, the project's dependencies
+# installed from the lockfile, and, unless `rust` is 'false', Rust stable with its
+# cache over the desktop crate and on Linux the system libraries that crate needs
+# (WebKitGTK for the webview, D-Bus for the keychain).
 
 name: Set up Tramme
-description: Node 24, Rust stable, and the Linux libraries of the desktop crate.
+description: Node 24, pnpm and the dependencies, Rust stable, and the Linux libraries of the desktop crate.
 
 inputs:
+  rust:
+    description: "'false' leaves Rust and the desktop crate's libraries out (a job that only builds the site)"
+    required: false
+    default: 'true'
   rust-targets:
     description: Extra Rust targets to install, comma separated (for the universal macOS build)
     required: false
@@ -14,18 +20,24 @@ inputs:
 runs:
   using: composite
   steps:
+    - uses: pnpm/action-setup@v6
     - uses: actions/setup-node@v7
       with:
         node-version: 24
-        cache: npm
+        cache: pnpm
+    - name: The dependencies
+      shell: bash
+      run: pnpm install --frozen-lockfile
     - uses: dtolnay/rust-toolchain@stable
+      if: inputs.rust != 'false'
       with:
         targets: ${{ inputs.rust-targets }}
     - uses: Swatinem/rust-cache@v2
+      if: inputs.rust != 'false'
       with:
         workspaces: apps/desktop/src-tauri
     - name: Linux libraries (WebKitGTK, the keychain over D-Bus)
-      if: runner.os == 'Linux'
+      if: runner.os == 'Linux' && inputs.rust != 'false'
       shell: bash
       run: |
         sudo apt-get update

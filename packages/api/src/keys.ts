@@ -95,7 +95,7 @@ export async function loadKeys(store: KeyStore, secrets?: Secrets): Promise<Keys
   return {
     get: (p) => { const from = source(p); return from === 'settings' ? s.keys[p] : from === 'server' ? secret(p) : undefined; },
     field: (p, name) => { const from = source(p); return from === 'settings' ? stored(p, name) : from === 'server' ? served(p, name) : undefined; },
-    how: (providers, one = 'it') => `connect ${one} in Settings, Providers${secrets ? ` (or npx wrangler secret put ${providers.map((p) => secrets.name(p)).join(' or ')})` : ''}`,
+    how: (providers, one = 'it') => `connect ${one} in Settings, Providers${secrets ? ` (or pnpm exec wrangler secret put ${providers.map((p) => secrets.name(p)).join(' or ')})` : ''}`,
     custom: (id) => s.custom.find((c) => c.id === id),
     status: () => ({
       providers: Object.fromEntries(PROVIDERS.map((p) => [p, source(p)])) as KeyStatus['providers'],

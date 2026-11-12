@@ -4,7 +4,7 @@
   // (landing, platform pages, Starlight docs). Every page is prerendered today and
   // served as static assets; the adapter writes the deployed configuration to
   // dist/client/wrangler.json and .wrangler/deploy/config.json, which `wrangler deploy`
-  // follows when run from this folder: npm run site:deploy (build, then deploy).
+  // follows when run from this folder: pnpm site:deploy (build, then deploy).
   // See docs/deploy.md for the editor Worker.
   "name": "tramme-site",
   "compatibility_date": "2026-09-25",
@@ -13,7 +13,7 @@
     // Starlight builds a 404.html: served, with a 404 status, on unknown paths
     "not_found_handling": "404-page"
   },
-  // branch builds (npx wrangler preview): no vars nor bindings to tell apart from production
+  // branch builds (pnpm exec wrangler preview): no vars nor bindings to tell apart from production
   "previews": {}
   // To serve the site from your own domain (a zone on this Cloudflare account),
   // add routes and deploy again. Keep them in step with the editor's addresses

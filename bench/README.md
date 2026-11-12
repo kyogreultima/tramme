@@ -33,7 +33,7 @@ those videos, not general.
 (port 8790, its own state in `.wrangler/state-bench`) with the companion:
 
 ```
-npx wrangler dev -c apps/worker/wrangler.jsonc --port 8790 --var DEV_OPEN:1 --persist-to .wrangler/state-bench
+pnpm exec wrangler dev -c apps/worker/wrangler.jsonc --port 8790 --var DEV_OPEN:1 --persist-to .wrangler/state-bench
 node packages/cli/src/main.ts agent --origin http://localhost:8790
 node bench/run.ts logo-sting --series baseline --cap 6 --effort high
 ```
@@ -110,9 +110,9 @@ decoding or the transfer). The GPU works asynchronously: its share of a frame
 is paid when the pixels are read back.
 
 ```
-npm run tramme -- load --json before.json          # before a change
-npm run tramme -- load --before before.json        # after: each figure with its change
-npm run tramme -- load video4k --frames 30         # one case, its first second
+pnpm tramme load --json before.json    # before a change
+pnpm tramme load --before before.json  # after: each figure with its change
+pnpm tramme load video4k --frames 30   # one case, its first second
 ```
 
 The figures depend on the machine (a real GPU or a software one, the cores):

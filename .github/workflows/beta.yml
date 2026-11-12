@@ -45,9 +45,10 @@ jobs:
           fi
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
-      - run: npm ci
+        with:
+          rust: 'false'
       # builds the site, then wrangler deploy as the Worker tramme-site-beta on beta.tramme.dev
-      - run: npm run site:deploy:beta
+      - run: pnpm site:deploy:beta
 
   app:
     name: Tell the platform repository (beta.app.tramme.dev)

@@ -50,29 +50,13 @@ changelog = changelog
   .replace(`[Unreleased]: ../../compare/v${old}...HEAD`, `[Unreleased]: ../../compare/v${version}...HEAD\n[${version}]: ../../compare/v${old}...v${version}`);
 write('CHANGELOG.md', changelog);
 
-// the packages, edited in place (their layouts differ): their own version, and
-// the versions of each other they pin
+// the packages, edited in place (their layouts differ): their own version. They
+// name each other as workspace:* and pnpm's lockfile holds no version of theirs.
 const escaped = old.replaceAll('.', '\\.');
 /** the old version, where it follows `before` (a pattern), becomes the new one */
 const bump = (f: string, before: string, flags = '') => write(f, read(f).replace(new RegExp(`(${before})"${escaped}"`, flags), `$1"${version}"`));
 const manifests = ['package.json', ...['apps', 'packages'].flatMap((d) => fs.readdirSync(path.join(root, d)).map((p) => `${d}/${p}/package.json`))];
-for (const f of manifests.filter((f) => fs.existsSync(path.join(root, f)))) {
-  bump(f, '"version": ');
-  bump(f, '"@tramme/[^"]+": ', 'g');
-}
-
-// npm's lockfile, which npm writes as this does
-type Entry = { version?: string; dependencies?: Record<string, string> };
-const lock = JSON.parse(read('package-lock.json')) as { version: string; packages: Record<string, Entry> };
-lock.version = version;
-for (const [where, entry] of Object.entries(lock.packages)) {
-  if (where !== '' && !/^(apps|packages)\/[^/]+$/.test(where)) continue;
-  if (entry.version === old) entry.version = version;
-  for (const [name, range] of Object.entries(entry.dependencies ?? {})) {
-    if (name.startsWith('@tramme/') && range === old) entry.dependencies![name] = version;
-  }
-}
-write('package-lock.json', JSON.stringify(lock, null, 2) + '\n');
+for (const f of manifests.filter((f) => fs.existsSync(path.join(root, f)))) bump(f, '"version": ');
 
 // the desktop app: Tauri's version (the installers' names), the crate, its device plugin (Android) and the lockfile
 const tauri = 'apps/desktop/src-tauri';

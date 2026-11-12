@@ -2,7 +2,7 @@
 # Never put real keys in this file (it is kept in git).
 # Simpler: connect the providers in the editor (Settings, Providers); a key
 # connected there comes before the one here.
-# Deployed app: the same names as Cloudflare secrets (npx wrangler secret put NAME).
+# Deployed app: the same names as Cloudflare secrets (pnpm exec wrangler secret put NAME).
 
 # Claude through the server (fallback when the local companion is not running)
 ANTHROPIC_API_KEY=
@@ -26,6 +26,6 @@ HYDRACEPT_API_KEY=
 HYDRACEPT_PROJECT=
 # HYDRACEPT_ENVIRONMENT=development
 
-# Accounts: the backend (npm run server:dev, in the private platform repository) that answers /api/auth, /api/account and /api/billing.
+# Accounts: the backend (pnpm server:dev, in the private platform repository) that answers /api/auth, /api/account and /api/billing.
 # Leave empty for no accounts. The editor then shows no sign-in.
 ACCOUNTS_URL=

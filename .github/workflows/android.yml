@@ -65,19 +65,18 @@ jobs:
         run: |
           sdkmanager "ndk;$NDK"
           echo "NDK_HOME=$ANDROID_HOME/ndk/$NDK" >> "$GITHUB_ENV"
-      - run: npm ci
-      # the generated Gradle project calls the CLI back through `npm run tauri` (package.json's "tauri" script)
+      # the generated Gradle project calls the CLI back through `pnpm tauri` (package.json's "tauri" script)
       - name: Generate the Android project
         working-directory: apps/desktop
-        run: npx tauri android init --ci
+        run: pnpm tauri android init --ci
       - name: Build, unsigned
         if: env.SIGNED == 'true'
-        run: npm run android:build -- --aab --apk
+        run: pnpm android:build --aab --apk
       - name: Build without the signing secrets
         if: env.SIGNED != 'true'
         run: |
           echo "::notice::the Android signing secrets are not set: an unsigned debug .apk is built, kept as a private artifact, and nothing Android is released"
-          npm run android:build -- --apk --debug
+          pnpm android:build --apk --debug
 
       - name: Sign
         if: env.SIGNED == 'true'

@@ -1,6 +1,6 @@
 # The web app (apps/editor served by apps/worker, the "personal" deployment at
 # app.tramme.dev) deployed again on every push to main, once the checks pass.
-# Without it the app stays on the last hand-run `npm run deploy:personal`. A
+# Without it the app stays on the last hand-run `pnpm run deploy:personal`. A
 # manual run on main deploys the same way.
 
 name: Web app
@@ -40,6 +40,7 @@ jobs:
           fi
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
-      - run: npm ci
+        with:
+          rust: 'false'
       # builds the editor, then wrangler deploy --env personal
-      - run: npm run deploy:personal
+      - run: pnpm run deploy:personal

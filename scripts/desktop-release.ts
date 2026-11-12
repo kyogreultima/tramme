@@ -1,4 +1,4 @@
-// Gathers the desktop app's installers built on this machine (npm run
+// Gathers the desktop app's installers built on this machine (pnpm
 // desktop:build) under their release names (apps/desktop/downloads.ts), for
 // .github/workflows/desktop.yml and desktop-beta.yml:
 //   node scripts/desktop-release.ts <out dir> [tag]

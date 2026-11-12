@@ -36,6 +36,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
   - a tool's input with a plain slip (an object where a text is wanted, a single value where a list is, a number written as text, an option in another case, a number past its bound) is read and told, not refused;
   - a portrait still, contact sheet or motion strip is sized by its longest side, like a landscape one, instead of being three times heavier.
 - The dependencies are on their latest stable versions, Preact 11 among them. The command boxes are plain text boxes to screen readers, as HTML allows a text area to be, no longer comboboxes.
+- The repository works with pnpm instead of npm (`pnpm install`, `pnpm dev`, `pnpm test`; `corepack enable` gives the version package.json names): each package declares what it imports, only the dependencies the project needs run install scripts, and no version younger than a day is taken.
 
 ### Fixed
 

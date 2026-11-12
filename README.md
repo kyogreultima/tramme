@@ -13,40 +13,40 @@ A motion design engine and editor. The document (JSON) is the source of truth; t
 
 ## Getting started
 
-Node 24 or newer. Chrome for command-line renders.
+Node 24 or newer, and pnpm (`corepack enable` gives the version `packageManager` names in package.json). Chrome for command-line renders.
 
 ```sh
-npm install
-npm test                      # the engine, the operations, the format, the interop, the editor's logic, the Worker, the API and the desktop storage
-npm run typecheck
+pnpm install
+pnpm test  # the engine, the operations, the format, the interop, the editor's logic, the Worker, the API and the desktop storage
+pnpm typecheck
 
-npm run dev                   # the editor on http://localhost:8787/ (local Worker, projects in .wrangler/state)
-npm run site                  # the landing page and the docs (Astro) on http://localhost:4321/
-npm run desktop:dev           # the editor as a native window (Tauri 2), projects in Documents/Tramme
+pnpm dev          # the editor on http://localhost:8787/ (local Worker, projects in .wrangler/state)
+pnpm site         # the landing page and the docs (Astro) on http://localhost:4321/
+pnpm desktop:dev  # the editor as a native window (Tauri 2), projects in Documents/Tramme
 ```
 
-`npm run dev` rebuilds the editor on every change and runs the Worker locally (`wrangler dev`): R2 storage simulated on disk, no Cloudflare Access. It also starts the assistant's companion, which pairs with this editor by itself (`TRAMME_NO_COMPANION=1` to go without it). The home screen starts a film from words: describe it, add its material if there is any, pick a format, and the project opens in the studio with the assistant at work. A blank project, a video, a `.tramme` file, a Lottie animation and the examples are there too.
+`pnpm dev` rebuilds the editor on every change and runs the Worker locally (`wrangler dev`): R2 storage simulated on disk, no Cloudflare Access. It also starts the assistant's companion, which pairs with this editor by itself (`TRAMME_NO_COMPANION=1` to go without it). The home screen starts a film from words: describe it, add its material if there is any, pick a format, and the project opens in the studio with the assistant at work. A blank project, a video, a `.tramme` file, a Lottie animation and the examples are there too.
 
 For the assistant with another local page, in a second terminal:
 
 ```sh
-npm run tramme -- agent      # companion: Claude with this machine's Claude Code login
+pnpm tramme agent  # companion: Claude with this machine's Claude Code login
 ```
 
 then paste the token it prints in the editor (Assistant, settings). See [The assistant](#the-assistant).
 
 ## The desktop app
 
-The same editor in a native window ([Tauri 2](https://v2.tauri.app/); Windows, macOS and Linux; the site offers the Windows and Linux installers, the macOS one waits for Apple's signature, see `WITHHELD` in `apps/desktop/downloads.ts`): `npm run desktop:dev`. A custom protocol serves the built editor and its `/api` routes from Rust, so the editor runs unmodified and its projects live in folders (`Documents/Tramme` by default, changed in the settings), without a server. Videos over 95 MB are sent in parts like on the web, a `.tramme` double-clicked in the file explorer opens in the running window, and the storage passes the same contract suite as R2 and the browser. The assistant works without a server too: the provider keys live in the system keychain, the provider routes run in the page and their requests leave through Rust (transcription included, with the OpenAI key); the companion `tramme agent` also works from the app, with its origin (`npm run tramme -- agent --origin http://tramme.localhost`). The whole picture, and what comes next, in [docs/desktop-and-mobile-apps.md](docs/desktop-and-mobile-apps.md).
+The same editor in a native window ([Tauri 2](https://v2.tauri.app/); Windows, macOS and Linux; the site offers the Windows and Linux installers, the macOS one waits for Apple's signature, see `WITHHELD` in `apps/desktop/downloads.ts`): `pnpm desktop:dev`. A custom protocol serves the built editor and its `/api` routes from Rust, so the editor runs unmodified and its projects live in folders (`Documents/Tramme` by default, changed in the settings), without a server. Videos over 95 MB are sent in parts like on the web, a `.tramme` double-clicked in the file explorer opens in the running window, and the storage passes the same contract suite as R2 and the browser. The assistant works without a server too: the provider keys live in the system keychain, the provider routes run in the page and their requests leave through Rust (transcription included, with the OpenAI key); the companion `tramme agent` also works from the app, with its origin (`pnpm tramme agent --origin http://tramme.localhost`). The whole picture, and what comes next, in [docs/desktop-and-mobile-apps.md](docs/desktop-and-mobile-apps.md).
 
 ## Deploying
 
-On Cloudflare, in one of two modes. **Private**: the Worker serves the editor and the API, projects live in R2, Cloudflare Access protects the whole. **Personal** (`npm run deploy:personal`): a public deployment anyone uses without an account; projects stay in each visitor's browser, keys in a key vault the editor cannot read, and the browser calls the providers itself. Step by step in [docs/deploy.md](docs/deploy.md). The private mode, in short:
+On Cloudflare, in one of two modes. **Private**: the Worker serves the editor and the API, projects live in R2, Cloudflare Access protects the whole. **Personal** (`pnpm deploy:personal`): a public deployment anyone uses without an account; projects stay in each visitor's browser, keys in a key vault the editor cannot read, and the browser calls the providers itself. Step by step in [docs/deploy.md](docs/deploy.md). The private mode, in short:
 
 ```sh
-npx wrangler r2 bucket create tramme-projects
+pnpm exec wrangler r2 bucket create tramme-projects
 # Cloudflare Access: an application on the domain, then ACCESS_TEAM_DOMAIN and ACCESS_AUD in apps/worker/wrangler.jsonc
-npm run deploy
+pnpm run deploy
 # optional: provider keys (Anthropic, OpenAI, Gemini, OpenRouter, Z.AI, ElevenLabs, Hydracept with its project ID, custom) in the editor's Settings, Providers
 ```
 
@@ -71,7 +71,7 @@ tramme load     [case…] [--json file] [--before file] the load cases of bench/
 tramme schema                                         regenerates the JSON schema
 ```
 
-(`tramme` = `node packages/cli/src/main.ts`, or `npm run tramme -- <command>`. `<doc>` is a project folder or a document file.)
+(`tramme` = `node packages/cli/src/main.ts`, or `pnpm tramme <command>`. `<doc>` is a project folder or a document file.)
 
 ## Layout
 

@@ -78,9 +78,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
-      - run: npm ci
       - name: Build the editor and the app
-        run: npm run desktop:build -- ${{ matrix.args }}
+        run: pnpm desktop:build ${{ matrix.args }}
       - name: Name the installers for the release
         run: node scripts/desktop-release.ts out ${{ needs.plan.outputs.tag }}
       - uses: actions/upload-artifact@v7
@@ -146,9 +145,7 @@ jobs:
             exit 1
           fi
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: ./.github/actions/setup
         with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - run: npm run site:deploy:beta
+          rust: 'false'
+      - run: pnpm site:deploy:beta

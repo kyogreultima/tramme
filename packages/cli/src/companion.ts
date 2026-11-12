@@ -8,7 +8,7 @@
 //
 // Listening on 127.0.0.1 only. Every request carries the pairing token shown
 // at startup; pages of other origins than the allowed ones are refused. A page
-// of an origin named with --origin (the editor `npm run dev` serves, a deployed
+// of an origin named with --origin (the editor `pnpm dev` serves, a deployed
 // editor) receives the token by itself (/pair); any other local page has to be
 // given it by hand. The command lines reach Tramme's tools at /mcp/<key>, an
 // address that only holds for the turn running.

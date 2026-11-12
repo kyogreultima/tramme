@@ -3,7 +3,7 @@
 // the site (the terms) are written from these, never as a fixed address, so
 // that every environment sends its visitors to its own other half.
 //
-//   local        what runs on this machine: `npm run site` (4321) and `npm run dev` (8787)
+//   local        what runs on this machine: `pnpm site` (4321) and `pnpm dev` (8787)
 //   beta         the beta deployment
 //   production   the public one
 //

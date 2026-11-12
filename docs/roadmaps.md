@@ -62,13 +62,13 @@ An agent works through the queue above, one box after the other, in this session
 1. Sync: pull the branch, fetch `develop`, merge it in if it moved (a merge, never a rebase). No check run here: the last iteration left the branch green, and a merge that changed nothing needs none. After a merge that did bring changes, run the full suite once.
 2. Pick the first unticked box of the queue that is not blocked.
 3. Read the box, its step, its roadmap's principles, the files it names, and the nearest existing feature, built the same way.
-4. Build it with its tests (vitest, next to the existing ones). The house rules: rendering stays a pure function of `t`; every new property comes from a schema (`npm run schema` after a change of the document format); every new tool is a tool of the editor's vocabulary with its `ai` notes; every new string in English and French; no colour outside the theme's tokens; no model packed in the bundle.
+4. Build it with its tests (vitest, next to the existing ones). The house rules: rendering stays a pure function of `t`; every new property comes from a schema (`pnpm schema` after a change of the document format); every new tool is a tool of the editor's vocabulary with its `ai` notes; every new string in English and French; no colour outside the theme's tokens; no model packed in the bundle.
 5. Check, scoped to what the iteration touched, run once and not repeated after a green result:
-   - `npm run typecheck`, always.
-   - `npx vitest run <the touched packages' test folders>` (for example `packages/project/test`), plus the tests of the packages that import them when an exported signature changed. Never the whole suite, and never `apps/site/test` unless `apps/site` or a page of `docs/` changed.
-   - `npm run site:build` only when a page of `docs/` or `apps/site` changed, and not for a roadmap's tick, status line or `CHANGELOG.md` line alone.
-   - The full `npm test` and `npm run site:build` run once, before opening the pull request (and after a merge of `develop` that brought changes), not per box.
-   A failure is fixed, not skipped. Re-run only the failing file while fixing it (`npx vitest run <file>`), then the scoped set once. After three honest attempts at the same one, revert the work in progress, put the box in the blocked list with the reason, and take the next.
+   - `pnpm typecheck`, always.
+   - `pnpm exec vitest run <the touched packages' test folders>` (for example `packages/project/test`), plus the tests of the packages that import them when an exported signature changed. Never the whole suite, and never `apps/site/test` unless `apps/site` or a page of `docs/` changed.
+   - `pnpm site:build` only when a page of `docs/` or `apps/site` changed, and not for a roadmap's tick, status line or `CHANGELOG.md` line alone.
+   - The full `pnpm test` and `pnpm site:build` run once, before opening the pull request (and after a merge of `develop` that brought changes), not per box.
+   A failure is fixed, not skipped. Re-run only the failing file while fixing it (`pnpm exec vitest run <file>`), then the scoped set once. After three honest attempts at the same one, revert the work in progress, put the box in the blocked list with the reason, and take the next.
 6. Write it down: tick the box and update its roadmap's status line, add what was left out under it, add a line to `CHANGELOG.md` under `Unreleased` written for the people who use Tramme (no box is ticked without it), and put what could not be checked here under the box as "to check on a device", and again in the pull request. That never blocks a box.
 7. Commit (Conventional Commits, the code, its tests, the ticked box and the changelog line together; the commits are the user's, never Claude as author or co-author) and push.
 8. Report one line: the box landed, its commit, what is next.

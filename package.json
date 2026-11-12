@@ -6,20 +6,16 @@
   "description": "Motion design engine and editor: JSON document, deterministic rendering, web editor",
   "license": "FSL-1.1-ALv2",
   "author": "Qualris <hello@qualris.com> (https://qualris.com)",
-  "workspaces": [
-    "packages/*",
-    "apps/*"
-  ],
   "scripts": {
     "build": "node apps/editor/build.ts",
     "dev": "node apps/editor/build.ts --dev",
     "dev:personal": "node apps/editor/build.ts --dev --personal",
     "deploy": "node apps/editor/build.ts && wrangler deploy -c apps/worker/wrangler.jsonc",
     "deploy:personal": "node apps/editor/build.ts && wrangler deploy -c apps/worker/wrangler.jsonc --env personal",
-    "site": "npm run dev -w apps/site",
-    "site:build": "npm run build -w apps/site",
-    "site:deploy": "npm run site:build && cd apps/site && wrangler deploy",
-    "site:deploy:beta": "npm run site:build && cd apps/site && wrangler deploy --name tramme-site-beta --domain beta.tramme.dev",
+    "site": "pnpm --filter ./apps/site dev",
+    "site:build": "pnpm --filter ./apps/site build",
+    "site:deploy": "pnpm site:build && cd apps/site && wrangler deploy",
+    "site:deploy:beta": "pnpm site:build && cd apps/site && wrangler deploy --name tramme-site-beta --domain beta.tramme.dev",
     "tauri": "cd apps/desktop && tauri",
     "desktop:dev": "node apps/editor/build.ts && cd apps/desktop && tauri dev",
     "desktop:build": "node apps/editor/build.ts && cd apps/desktop && tauri build",
@@ -37,8 +33,14 @@
     "node": ">=24"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^5.20261112.1",
+    "@cloudflare/workers-types": "^5.20261110.1",
     "@tauri-apps/cli": "^2.12.4",
+    "@tramme/api": "workspace:*",
+    "@tramme/assistant": "workspace:*",
+    "@tramme/core": "workspace:*",
+    "@tramme/nodes": "workspace:*",
+    "@tramme/project": "workspace:*",
+    "@tramme/render": "workspace:*",
     "@types/cross-spawn": "^6.0.6",
     "@types/node": "^24.19.2",
     "@types/pngjs": "^6.0.5",
@@ -48,9 +50,12 @@
     "fflate": "^0.8.3",
     "happy-dom": "^21.0.4",
     "lottie-web": "^5.13.0",
+    "pngjs": "^7.0.0",
+    "puppeteer-core": "^25.17.0",
+    "sharp": "^0.35.5",
     "typescript": "^7.0.2",
     "vitest": "^5.1.0",
-    "wrangler": "^4.161.0"
+    "wrangler": "^4.160.1"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.322",
@@ -60,20 +65,12 @@
     "@neon/config": "^1.14.0",
     "@neon/env": "^2.1.3",
     "@preact/signals": "^2.11.4",
-    "driver.js": "^1.12.1",
+    "driver.js": "^1.11.0",
     "gifenc": "^1.0.3",
     "mediabunny": "^1.65.2",
     "onnxruntime-web": "1.31.0-dev.20260914-8d85527a0",
     "pdfjs-dist": "^6.5.438",
     "preact": "^11.2.0"
   },
-  "overrides": {
-    "miniflare": {
-      "undici": "7.30.2"
-    },
-    "@hyperframes/engine": {
-      "undici": "7.30.2",
-      "puppeteer": "25.17.0"
-    }
-  }
+  "packageManager": "pnpm@12.18.0"
 }

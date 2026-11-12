@@ -190,7 +190,7 @@ export function Command({ text }: { text: string }) {
 }
 
 /** the command that starts the local companion for this editor */
-export const CompanionCommand = () => <Command text={/^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? 'npm run dev' : `npm run tramme -- agent --origin ${location.origin}`} />;
+export const CompanionCommand = () => <Command text={/^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? 'pnpm dev' : `pnpm tramme agent --origin ${location.origin}`} />;
 
 /** how to reach a model, right in the conversation when the assistant cannot answer: an AI account first, the companion for those who run one */
 export function Access() {

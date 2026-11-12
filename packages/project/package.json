@@ -9,8 +9,8 @@
     "./src/*": "./src/*"
   },
   "dependencies": {
-    "@babel/parser": "^8.1.2",
-    "@tramme/core": "*",
+    "@babel/parser": "^8.1.0",
+    "@tramme/core": "workspace:*",
     "fflate": "^0.8.3",
     "zod": "^4.6.7"
   }

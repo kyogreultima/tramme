@@ -9,7 +9,7 @@
   },
   "sideEffects": false,
   "dependencies": {
-    "@tramme/project": "*",
+    "@tramme/project": "workspace:*",
     "fflate": "^0.8.3"
   }
 }

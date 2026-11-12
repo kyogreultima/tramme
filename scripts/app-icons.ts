@@ -15,8 +15,8 @@
 //
 //   node scripts/app-icons.ts
 //   cd apps/desktop
-//   npx tauri icon src-tauri/icons/icon.png --ios-color "#ffffff"          (the desktop sizes)
-//   npx tauri icon src-tauri/icons/mobile-source.png -o <a temp folder> --ios-color "#ffffff"
+//   pnpm tauri icon src-tauri/icons/icon.png --ios-color "#ffffff"          (the desktop sizes)
+//   pnpm tauri icon src-tauri/icons/mobile-source.png -o <a temp folder> --ios-color "#ffffff"
 //     then copy its ios/ and android/ over src-tauri/icons: the phones' icons, on the white tile
 
 import fs from 'node:fs';

@@ -3,9 +3,9 @@
 // / menu lists them: name, title, description) and the French of those
 // strings; docs/packs.md gains one section per pack (the site's Packs page).
 //
-//   npm run packs:index            # write both
+//   pnpm packs:index  # write both
 //   node scripts/packs/index.ts --check
-//                                  # exit 1 when either file would change (CI)
+//                     # exit 1 when either file would change (CI)
 //
 // Run after a pack lands or its tools change; every pack task's last step.
 
@@ -66,7 +66,7 @@ const list = (label: string, items: string[]) => (items.length ? `- ${label}: ${
 const packsMd = [
   '# Packs',
   '',
-  'The plugin packs that ship with the editor: one self-contained file each in `plugins/`, added to a project from the Code section, their commands in the `/` menu from the home screen on. Each brings nodes (layers only it can draw), tools (a whole thing laid out in one move) and checks (what the review flags). This page is generated from the packs themselves by `npm run packs:index` — do not edit it by hand.',
+  'The plugin packs that ship with the editor: one self-contained file each in `plugins/`, added to a project from the Code section, their commands in the `/` menu from the home screen on. Each brings nodes (layers only it can draw), tools (a whole thing laid out in one move) and checks (what the review flags). This page is generated from the packs themselves by `pnpm packs:index` — do not edit it by hand.',
   '',
   ...index.flatMap((e) => [
     `## ${e.name}`,
@@ -85,7 +85,7 @@ const mdOut = `${packsMd}\n`;
 
 if (check) {
   const stale = (url: URL, next: string, name: string) => {
-    if (readFileSync(url, 'utf8') !== next) { console.error(`stale: ${name} (run npm run packs:index)`); return true; }
+    if (readFileSync(url, 'utf8') !== next) { console.error(`stale: ${name} (run pnpm packs:index)`); return true; }
     return false;
   };
   const bad = stale(indexUrl, indexJson, 'plugins/index.json') | stale(packsMdUrl, mdOut, 'docs/packs.md');

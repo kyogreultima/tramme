@@ -20,7 +20,7 @@ import { originsFromEnv } from '../../brand/environments.ts';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '../..');
-// TRAMME_DIST: build elsewhere (benchmarks, without touching a running `npm run dev`)
+// TRAMME_DIST: build elsewhere (benchmarks, without touching a running `pnpm dev`)
 const DIST = process.env.TRAMME_DIST ? path.resolve(process.env.TRAMME_DIST) : path.join(HERE, 'dist');
 const dev = process.argv.includes('--dev');
 const personal = process.argv.includes('--personal');
@@ -292,13 +292,13 @@ if (!dev) {
   await Promise.all([ctx.rebuild(), sw.rebuild(), sandbox.rebuild(), sceneRuntime.rebuild()]);
   await Promise.all([ctx.watch(), sw.watch(), sandbox.watch(), sceneRuntime.watch()]);
   const port = process.env.PORT ?? '8787';
-  // TRAMME_STATE: projects stored elsewhere (trials beside a running `npm run dev`)
+  // TRAMME_STATE: projects stored elsewhere (trials beside a running `pnpm dev`)
   const state = process.env.TRAMME_STATE ?? '.wrangler/state';
   // personal mode: the editor on localhost, the key vault on 127.0.0.1 (another origin, as cles.<domain> in production)
   const mode = personal
     ? ['-c', personalDevConfig(), '--env', 'personal', '--var', `APP_ORIGIN:http://localhost:${port}`, '--var', `VAULT_ORIGIN:http://127.0.0.1:${port}`]
     : ['-c', 'apps/worker/wrangler.jsonc', '--var', 'DEV_OPEN:1'];
-  const wrangler = spawn('npx', ['wrangler', 'dev', '--port', port, ...mode, '--persist-to', state], { cwd: ROOT, stdio: 'inherit', shell: process.platform === 'win32' });
+  const wrangler = spawn('pnpm', ['exec', 'wrangler', 'dev', '--port', port, ...mode, '--persist-to', state], { cwd: ROOT, stdio: 'inherit', shell: process.platform === 'win32' });
   // the assistant's local companion, paired by itself with this editor (TRAMME_NO_COMPANION=1: without it)
   let companion: ReturnType<typeof spawn> | null = null, elsewhere = false;
   if (!process.env.TRAMME_NO_COMPANION) {

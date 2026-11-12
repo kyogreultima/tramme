@@ -10,8 +10,8 @@ Configuration: [apps/worker/wrangler.jsonc](../apps/worker/wrangler.jsonc) (the 
 ## 1. Account and storage
 
 ```sh
-npx wrangler login
-npx wrangler r2 bucket create tramme-projects
+pnpm exec wrangler login
+pnpm exec wrangler r2 bucket create tramme-projects
 ```
 
 The bucket name is the one in `r2_buckets` in `wrangler.jsonc`. Each project takes the prefix `projects/<id>/`.
@@ -19,7 +19,7 @@ The bucket name is the one in `r2_buckets` in `wrangler.jsonc`. Each project tak
 ## 2. First deployment
 
 ```sh
-npm run deploy        # builds the editor, then wrangler deploy
+pnpm run deploy  # builds the editor, then wrangler deploy
 ```
 
 Until Cloudflare Access is configured, the API answers 503 ("access not configured"): the editor shows up but reads and writes no project. That is on purpose: nothing is open by default.
@@ -41,7 +41,7 @@ Put them in `apps/worker/wrangler.jsonc`:
 }
 ```
 
-then `npm run deploy`. The Worker then checks the signature (the team's public keys), the audience, the issuer and the expiry of the `Cf-Access-Jwt-Assertion` token, and refuses write requests coming from another origin.
+then `pnpm run deploy`. The Worker then checks the signature (the team's public keys), the audience, the issuer and the expiry of the `Cf-Access-Jwt-Assertion` token, and refuses write requests coming from another origin.
 
 ## 4. The assistant
 
@@ -50,7 +50,7 @@ Two paths, chosen in the editor (Assistant, settings):
 - **Local companion**: on your machine, with the login of an agent installed there (Claude Code, Codex with a ChatGPT login, or the Antigravity CLI with a Google login), no key.
 
   ```sh
-  npm run tramme -- agent --origin https://<your editor's address>
+  pnpm tramme agent --origin https://<your editor's address>
   ```
 
   The editor at that address pairs by itself, with no token to copy. The companion listens on `127.0.0.1` only and refuses pages from other origins; another local page must be given the pairing token it prints, by hand. Chrome may ask for permission to access the local network the first time.
@@ -66,11 +66,11 @@ Keys are connected in the editor: **Settings, Providers**, then *Connect* on a p
 Cloudflare secrets still work, for a deployment configured from the command line; a key connected in the settings comes first:
 
 ```sh
-npx wrangler secret put ANTHROPIC_API_KEY -c apps/worker/wrangler.jsonc
-npx wrangler secret put OPENAI_API_KEY -c apps/worker/wrangler.jsonc
-npx wrangler secret put GEMINI_API_KEY -c apps/worker/wrangler.jsonc
-npx wrangler secret put OPENROUTER_API_KEY -c apps/worker/wrangler.jsonc
-npx wrangler secret put ZAI_API_KEY -c apps/worker/wrangler.jsonc
+pnpm exec wrangler secret put ANTHROPIC_API_KEY -c apps/worker/wrangler.jsonc
+pnpm exec wrangler secret put OPENAI_API_KEY -c apps/worker/wrangler.jsonc
+pnpm exec wrangler secret put GEMINI_API_KEY -c apps/worker/wrangler.jsonc
+pnpm exec wrangler secret put OPENROUTER_API_KEY -c apps/worker/wrangler.jsonc
+pnpm exec wrangler secret put ZAI_API_KEY -c apps/worker/wrangler.jsonc
 ```
 
 A provider set this way shows as *Server secret* in the settings: it cannot be disconnected from the editor, only replaced by a key connected there.
@@ -79,7 +79,7 @@ Only connected providers show up in the model menu. A custom provider is reached
 
 ## 6. Sounds made by a provider
 
-Optional: the assistant's `generate-sound` tool makes sound effects, music beds and voice-overs at authoring time, saved in the project like any sound. ElevenLabs makes all three; a voice-over can also come from OpenAI or Gemini. Connect ElevenLabs in **Settings, Providers** like the others (or `npx wrangler secret put ELEVENLABS_API_KEY -c apps/worker/wrangler.jsonc`).
+Optional: the assistant's `generate-sound` tool makes sound effects, music beds and voice-overs at authoring time, saved in the project like any sound. ElevenLabs makes all three; a voice-over can also come from OpenAI or Gemini. Connect ElevenLabs in **Settings, Providers** like the others (or `pnpm exec wrangler secret put ELEVENLABS_API_KEY -c apps/worker/wrangler.jsonc`).
 
 Without any of these keys the assistant still has the sound library (recorded sounds shipped with Tramme, the user's own) and the sounds it writes as code. Each provider bills its own use.
 
@@ -117,12 +117,12 @@ Anyone opens the address and works at once: no account, nothing kept on the serv
 3. Deploy:
 
    ```sh
-   npm run deploy:personal   # builds the editor, then wrangler deploy --env personal
+   pnpm deploy:personal  # builds the editor, then wrangler deploy --env personal
    ```
 
    The personal Worker is `tramme`, the private one `tramme-private`: both can live side by side.
 
-   The repository deploys it by itself: [.github/workflows/app.yml](../.github/workflows/app.yml) runs the checks on every push to `main`, then `npm run deploy:personal`. It needs the repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` (the same two as the site's deploy). Do not connect the repository to Cloudflare's Workers Builds, on this Worker or the site's (`tramme-site`): it would build every branch, `develop` included, straight to production, past the checks and the launch switch of the workflows.
+   The repository deploys it by itself: [.github/workflows/app.yml](../.github/workflows/app.yml) runs the checks on every push to `main`, then `pnpm deploy:personal`. It needs the repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` (the same two as the site's deploy). Do not connect the repository to Cloudflare's Workers Builds, on this Worker or the site's (`tramme-site`): it would build every branch, `develop` included, straight to production, past the checks and the launch switch of the workflows.
 
 Any other address of this Worker (its `workers.dev` one, previews) sends to `APP_ORIGIN`. Until both addresses are set, it answers 503.
 
@@ -147,11 +147,11 @@ What a malicious plugin of a shared project could still do: spend the visitor's 
 ## Local development
 
 ```sh
-npm run dev           # http://localhost:8787/
-npm run dev:personal  # the personal mode: the editor on http://localhost:8787/, the vault on http://127.0.0.1:8787/
+pnpm dev           # http://localhost:8787/
+pnpm dev:personal  # the personal mode: the editor on http://localhost:8787/, the vault on http://127.0.0.1:8787/
 ```
 
-The assistant's companion starts along, paired with this editor (`TRAMME_NO_COMPANION=1` to go without it). The Worker runs in `wrangler dev`: R2 simulated in `.wrangler/state`, Access check lifted (the `DEV_OPEN` variable, honored only on `localhost`). Model keys, locally, are connected in **Settings, Providers** as on the deployed app (kept in the simulated R2), or go in `apps/worker/.dev.vars` (ignored by git; template to copy: `apps/worker/.dev.vars.example`). Fill in only the providers you use, then restart `npm run dev`:
+The assistant's companion starts along, paired with this editor (`TRAMME_NO_COMPANION=1` to go without it). The Worker runs in `wrangler dev`: R2 simulated in `.wrangler/state`, Access check lifted (the `DEV_OPEN` variable, honored only on `localhost`). Model keys, locally, are connected in **Settings, Providers** as on the deployed app (kept in the simulated R2), or go in `apps/worker/.dev.vars` (ignored by git; template to copy: `apps/worker/.dev.vars.example`). Fill in only the providers you use, then restart `pnpm dev`:
 
 ```
 ANTHROPIC_API_KEY=

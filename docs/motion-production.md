@@ -37,7 +37,7 @@ The CLI decodes MP4, MOV and WebM files after encoding and adding chapters, incl
 Check an existing file independently:
 
 ```sh
-npm run tramme -- check-media film.mp4 --width 1920 --height 1080 --fps 30 --frames 180 --duration 6 --json
+pnpm tramme check-media film.mp4 --width 1920 --height 1080 --fps 30 --frames 180 --duration 6 --json
 ```
 
 Expectation flags are optional. JSON includes `ok`, `expected`, `actual` and `issues`; failure returns exit code 1. `--timeout` sets the decode timeout in milliseconds (120000 by default). This check validates decoded video and timing; it does not judge composition, certify audio loudness or check destination-specific upload rules.
