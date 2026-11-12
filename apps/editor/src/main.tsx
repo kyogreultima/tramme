@@ -47,7 +47,7 @@ import { startProject } from './start.ts';
 import { t } from './i18n/index.ts';
 import { boot } from './mode.ts';
 import { initDesktop } from './desktop.ts';
-import { startBackButton } from './device.ts';
+import { carryBodies, followBars, startBackButton } from './device.ts';
 import { watchUpdates } from './version.ts';
 import { copiesFor, startInstalled } from './installed.ts';
 import { lift } from './nav.ts';
@@ -133,6 +133,8 @@ async function answerNotices(q: URLSearchParams) {
 }
 
 const m = location.pathname.match(/^\/p\/([a-z0-9][a-z0-9-]{2,63})\/?$/);
+// on the phone, a request's body goes to the app through the IPC: set before the first request
+carryBodies();
 boot().then(() => {
   // the quick bubble's own window: the bubble alone, none of the app around it
   if (location.pathname === '/quick') {
@@ -146,6 +148,7 @@ boot().then(() => {
   // the native app: a .tramme handed by the system imports like a dropped one
   initDesktop();
   startBackButton();
+  followBars();
   // the plugins installed on this device, read once from where they are kept
   startInstalled();
   // the local companion, found whenever it starts, on the home page and in the editor

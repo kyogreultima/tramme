@@ -58,6 +58,12 @@ struct File<'a> {
 }
 
 #[derive(Serialize)]
+struct Bars<'a> {
+    color: &'a str,
+    light: bool,
+}
+
+#[derive(Serialize)]
 struct Awake {
     on: bool,
 }
@@ -114,6 +120,11 @@ impl<R: Runtime> Device<R> {
 
     pub fn keep_awake(&self, on: bool) {
         let _ = self.call("keepAwake", Awake { on });
+    }
+
+    /// the colour under the status and navigation bars (the page sits between them), their icons dark when `light`
+    pub fn bars(&self, color: &str, light: bool) {
+        let _ = self.call("bars", Bars { color, light });
     }
 
     pub fn exit(&self) {

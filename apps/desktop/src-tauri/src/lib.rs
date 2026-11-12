@@ -8,6 +8,7 @@
 mod account;
 mod analytics;
 mod api;
+mod bodies;
 #[cfg(desktop)]
 mod desktop;
 #[cfg(mobile)]
@@ -90,7 +91,8 @@ pub fn run() {
     let builder = builder.invoke_handler(tauri::generate_handler![
         analytics::analytics_state, analytics::analytics_set, analytics::analytics_event,
         desktop_state, desktop_fetch, desktop_fetch_abort, desktop_open_url,
-        exports::device_save, exports::device_share, exports::device_keep_awake, exports::device_exit
+        exports::device_save, exports::device_share, exports::device_keep_awake, exports::device_exit,
+        exports::device_bars, bodies::device_body
     ]);
     builder
         .plugin(tauri_plugin_dialog::init())
@@ -130,6 +132,8 @@ pub fn run() {
 /// any request on the app origin: /api to the storage, everything else to the
 /// embedded assets, with index.html for the editor's pages (/p/<id>)
 fn handle(app: tauri::AppHandle, request: Request<Vec<u8>>) -> Response<Cow<'static, [u8]>> {
+    // on Android the body comes through the IPC, the request names it (bodies.rs)
+    let request = bodies::restore(request);
     let path = request.uri().path().to_string();
     let response = if path == "/api" || path.starts_with("/api/") {
         api::route(request)

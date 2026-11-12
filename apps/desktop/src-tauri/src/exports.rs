@@ -160,6 +160,14 @@ pub async fn device_keep_awake(app: tauri::AppHandle, on: bool) {
     }
 }
 
+/// the system's bars over the page's colour, their icons dark on a light one (the page's theme-color)
+#[tauri::command]
+pub async fn device_bars(app: tauri::AppHandle, color: String, light: bool) {
+    if let Some(device) = app.try_state::<Device<tauri::Wry>>() {
+        device.bars(&color, light);
+    }
+}
+
 /// the back button with nothing left to go back to: leave the app
 #[tauri::command]
 pub async fn device_exit(app: tauri::AppHandle) {

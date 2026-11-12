@@ -8,6 +8,7 @@
 
 import { signal } from '@preact/signals';
 import type { StreamTarget, StreamTargetChunk } from 'mediabunny';
+import { toBase64 } from '@tramme/interop';
 import { t } from './i18n/index.ts';
 import { platform, tauri } from './tauri.ts';
 
@@ -173,4 +174,57 @@ export function startBackButton(): void {
     else if (action === 'history') { if (history.length > 1) history.back(); else void import('./nav.ts').then((n) => n.go('/')); }
     else tauri!.core.invoke('device_exit').catch(() => {});
   }).catch((e) => console.warn('[tramme] back button:', (e as Error).message));
+}
+
+// ── the bodies of the requests ───────────────────────────────
+
+/** what one IPC call carries of a body (base64 makes it a third larger) */
+const BODY_PART = 4 << 20;
+
+/** the request as it leaves, without its body (read already): the app has it beforehand under `token`, if any */
+export function withoutBody(req: Request, token?: string): RequestInit {
+  const headers = new Headers(req.headers);
+  if (token) headers.set('x-tramme-body', token);
+  return { method: req.method, headers, signal: req.signal, cache: req.cache, redirect: req.redirect, credentials: req.credentials };
+}
+
+/** whether a request's body must go through the IPC: one to the app's own origin that has one */
+export const carriesBody = (req: Request, origin: string): boolean =>
+  req.method !== 'GET' && req.method !== 'HEAD' && new URL(req.url).origin === origin;
+
+/**
+ * Android's WebView gives the app's protocol a request without its body (apps/desktop/src-tauri/src/bodies.rs):
+ * the page's fetch lays the body in the app first, through the IPC, then sends the request with its token.
+ * Every fetch of the page goes through here, so no caller changes. Off Android it does nothing.
+ */
+export function carryBodies(): void {
+  if (platform !== 'android') return;
+  const native = window.fetch.bind(window);
+  window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    const req = new Request(input, init);
+    if (!carriesBody(req, location.origin)) return native(input, init);
+    const bytes = new Uint8Array(await req.arrayBuffer());
+    if (!bytes.length) return native(req.url, withoutBody(req));
+    const token = crypto.randomUUID();
+    for (let at = 0; at < bytes.length; at += BODY_PART) {
+      await tauri!.core.invoke('device_body', { token, part: toBase64(bytes.subarray(at, at + BODY_PART)) });
+    }
+    return native(req.url, withoutBody(req, token));
+  };
+}
+
+// ── the system's bars ────────────────────────────────────────
+
+/** the bars take the page's colour (theme/pref.ts writes it in theme-color), their icons dark on a light theme */
+export function followBars(): void {
+  if (platform !== 'android') return;
+  const color = document.querySelector('meta[name="theme-color"]');
+  const scheme = document.querySelector('meta[name="color-scheme"]');
+  const tell = () => tauri!.core.invoke('device_bars', {
+    color: color?.getAttribute('content') ?? '#090f13',
+    light: scheme?.getAttribute('content') === 'light',
+  }).catch(() => {});
+  tell();
+  const watch = new MutationObserver(tell);
+  for (const meta of [color, scheme]) if (meta) watch.observe(meta, { attributes: true, attributeFilter: ['content'] });
 }

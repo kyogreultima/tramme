@@ -14,11 +14,16 @@ import android.provider.MediaStore
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
+import android.graphics.Color
+import android.view.View
 import android.view.WindowManager
 import android.webkit.WebView
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.OnBackPressedDispatcherOwner
 import androidx.core.content.FileProvider
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import app.tauri.PermissionState
 import app.tauri.annotation.Command
 import app.tauri.annotation.InvokeArg
@@ -62,6 +67,12 @@ class UrlArgs {
 }
 
 @InvokeArg
+class BarsArgs {
+    lateinit var color: String
+    var light: Boolean = false
+}
+
+@InvokeArg
 class AwakeArgs {
     var on: Boolean = false
 }
@@ -83,6 +94,19 @@ class DevicePlugin(private val activity: Activity) : Plugin(activity) {
 
     override fun load(webView: WebView) {
         super.load(webView)
+        // Android 15 draws the app under the status and navigation bars (edge to edge): the page is laid
+        // between them instead, and above the keyboard while it is open, so the top bar stays reachable
+        // and a field being typed in stays in sight. The bars show the page's colour (`bars`).
+        activity.runOnUiThread {
+            val content = activity.findViewById<View>(android.R.id.content) ?: return@runOnUiThread
+            ViewCompat.setOnApplyWindowInsetsListener(content) { view, insets ->
+                val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
+                val keyboard = insets.getInsets(WindowInsetsCompat.Type.ime())
+                view.setPadding(bars.left, bars.top, bars.right, maxOf(bars.bottom, keyboard.bottom))
+                WindowInsetsCompat.CONSUMED
+            }
+            ViewCompat.requestApplyInsets(content)
+        }
         // the back button: the page decides what it closes (device.ts); a callback added later is asked first
         val owner = activity as? OnBackPressedDispatcherOwner ?: return
         owner.onBackPressedDispatcher.addCallback(object : OnBackPressedCallback(true) {
@@ -251,6 +275,23 @@ class DevicePlugin(private val activity: Activity) : Plugin(activity) {
         activity.runOnUiThread {
             if (args.on) activity.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             else activity.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+        invoke.resolve(JSObject())
+    }
+
+    @Command
+    fun bars(invoke: Invoke) {
+        val args = invoke.parseArgs(BarsArgs::class.java)
+        val color = try { Color.parseColor(args.color) } catch (e: IllegalArgumentException) { null }
+        activity.runOnUiThread {
+            if (color != null) {
+                activity.findViewById<View>(android.R.id.content)?.setBackgroundColor(color)
+                activity.window.decorView.setBackgroundColor(color)
+            }
+            WindowCompat.getInsetsController(activity.window, activity.window.decorView).apply {
+                isAppearanceLightStatusBars = args.light
+                isAppearanceLightNavigationBars = args.light
+            }
         }
         invoke.resolve(JSObject())
     }
