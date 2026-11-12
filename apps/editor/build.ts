@@ -154,6 +154,17 @@ function writeExamples() {
   return list.length;
 }
 
+/** the installed version of a package of the editor's, read beside the file it resolves to */
+function versionOf(name: string): string {
+  let dir = path.dirname(createRequire(path.join(HERE, 'package.json')).resolve(name));
+  while (!fs.existsSync(path.join(dir, 'package.json')) || (JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8')) as { name?: string }).name !== name) {
+    const up = path.dirname(dir);
+    if (up === dir) throw new Error(`no package.json of ${name}`);
+    dir = up;
+  }
+  return (JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8')) as { version: string }).version;
+}
+
 const options: esbuild.BuildOptions = {
   entryPoints: { main: path.join(HERE, 'src/main.tsx'), vault: path.join(HERE, 'src/vault/main.tsx') },
   outdir: path.join(DIST, 'assets'),
@@ -162,7 +173,8 @@ const options: esbuild.BuildOptions = {
   bundle: true, splitting: !dev, chunkNames: 'chunk-[hash]', format: 'esm', platform: 'browser', target: 'chrome120',
   minify: !dev && !process.env.TRAMME_NOMINIFY, sourcemap: 'linked', metafile: true, logLevel: 'warning',
   jsx: 'automatic', jsxImportSource: 'preact',
-  define: { __TRAMME_SITE__: JSON.stringify(ORIGINS.site) },
+  // MediaPipe's WebAssembly is fetched from a CDN (faces.ts): the version of the package bundled with it
+  define: { __TRAMME_SITE__: JSON.stringify(ORIGINS.site), __MEDIAPIPE__: JSON.stringify(versionOf('@mediapipe/tasks-vision')) },
   loader: { '.ttf': 'file', '.woff2': 'file', '.md': 'text', '.svg': 'text' },
   legalComments: 'linked',
 };

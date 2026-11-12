@@ -15,8 +15,9 @@ import { canvas, onDemand } from './perception.ts';
 import { chosenModel } from './settings.ts';
 import { t } from './i18n/index.ts';
 
-/** the runtime of MediaPipe's tasks: its WebAssembly, the version of the package, fetched the first time */
-const WASM = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.1.1/wasm';
+declare const __MEDIAPIPE__: string | undefined;
+/** the runtime of MediaPipe's tasks: its WebAssembly, of the installed package's version (build.ts), fetched the first time */
+const WASM = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${typeof __MEDIAPIPE__ === 'string' ? __MEDIAPIPE__ : 'latest'}/wasm`;
 /** long side of the pictures the faces are looked for in, and of the mask video at most */
 const LOOK = 640, MASK = 1280;
 
