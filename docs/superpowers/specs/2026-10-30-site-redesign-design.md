@@ -4,7 +4,7 @@ Date: 2026-10-30. Status: agreed in conversation (plan of the day, then "go" wit
 
 ## Intent
 
-Tramme's site is one long page, a download page and the docs. It should read like the site of a product that has several things to show: a top bar with menus, a page per pillar of the app, a gallery of examples, a short pricing answer, a changelog, an about page, and a real footer. The content structure follows CapCut's French site (https://www.capcut.com/fr-fr/): a hero with the app in front, the smart-editor features as cards, the tools by category, templates (here the repository's examples), social proof, a closing call, and a footer in columns.
+Tramme's site is one long page, a download page and the docs. It should read like the site of a product that has several things to show: a top bar with menus, a page per pillar of the app, a gallery of examples, a short pricing answer, a changelog, an about page, and a real footer. The content structure follows the usual product site of a video app: a hero with the app in front, the smart-editor features as cards, the tools by category, templates (here the repository's examples), social proof, a closing call, and a footer in columns.
 
 The look takes a little from the reference screenshot the user gave (MAXS): a big assertive hero with the app's picture right under it, a manifesto sentence with small pictures set inside the text, feature cards pairing a screenshot with a short caption, a full-width picture with a piece of the interface floating over it, an accordion FAQ, a giant wordmark closing the page. It leaves what makes that reference brutalist: condensed capitals, hard edges and blocks, the neon yellow-green, decorations (stars), extreme contrast.
 
@@ -26,7 +26,7 @@ The look takes a little from the reference screenshot the user gave (MAXS): a bi
 
 ## Anti-goals (it fails even if it works)
 
-- Looking like CapCut or like MAXS: borrowed ideas, not borrowed looks.
+- Looking like another product's site: borrowed ideas, not borrowed looks.
 - Anything the memory of this project forbids: a colour outside the theme tokens, gradients, glows, sparkles, small labels above titles, step numbers, connector dashes; the same layout for every section.
 - Invented proof: no testimonials, no download counts, no ratings, no partner logos Tramme has no relation with.
 - A heavier landing page: it still runs no engine, the videos load near the screen, and its weight and its scores are not worse than today's.
@@ -74,7 +74,7 @@ The "web app" page of the plan is dropped: the app opens from the top bar's prim
 
 ## What was decided
 
-- By the user: the content follows CapCut's structure; the design takes a little from the screenshot and none of its brutalism; the site follows the app's theme; a plan first.
+- By the user: the content follows a video app's product-site structure; the design takes a little from the screenshot and none of its brutalism; the site follows the app's theme; a plan first.
 - By default, accepted with "go": English only for now; the pages above, with a pricing page, a changelog in place of a blog, and a privacy page; the landing page and the shared pieces first, the other pages after.
 - *My call*: no "web app" page; the manifesto section and the giant wordmark are kept from the screenshot, the counter and the testimonials are not; the FAQ is real questions only.
 

@@ -6,7 +6,7 @@ Date: 2026-11-12. Status: design, waiting for approval.
 
 Tramme must also be a mobile app, published on the Google Play Store under Qualris. The editor already works on a phone as an installable web app (the owner estimates the responsive work at 80 % done); this project is about **packaging that same editor as a native Android app** that the Play Store accepts, not about new editing features.
 
-Out of scope, a separate project to brainstorm next: reaching CapCut's feature level on the phone (the loop "pick clips in the gallery → cut, split, reorder with the thumb → text, music, transitions, effects from a bottom toolbar → export 9:16 and share"). This project only makes sure that loop's two ends that depend on the device, **import from the gallery** and **export to the gallery or a share**, work natively.
+Out of scope, a separate project to brainstorm next: reaching a mobile video editor's feature level on the phone (the loop "pick clips in the gallery → cut, split, reorder with the thumb → text, music, transitions, effects from a bottom toolbar → export 9:16 and share"). This project only makes sure that loop's two ends that depend on the device, **import from the gallery** and **export to the gallery or a share**, work natively.
 
 Also out of scope, handled by the owner: the Play Console organization account for Qualris, the D-U-N-S number, identity checks, the store listing texts, the privacy policy and the content rating questionnaire.
 
@@ -19,7 +19,7 @@ Also out of scope, handled by the owner: the Play Console organization account f
 
 ## Non-goals
 
-- New editing tools (the CapCut project).
+- New editing tools (the mobile editing project).
 - iOS (later; WKWebView has its own export questions, see docs/desktop-and-mobile-apps.md).
 - Selling anything in the app. Nothing is sold today.
 - Building or installing the Android toolchain on the owner's machine: every Android build runs on GitHub's CI.
