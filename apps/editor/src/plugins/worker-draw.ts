@@ -16,12 +16,16 @@
 
 import { Evaluator, layerClock, motionReport as coreMotionReport, parseColor, pictureMotion as corePictureMotion, runChecks, sampleAt, soundCues, type Host, type Instance, type NodeType, type PluginModule, type TrammeDoc } from '@tramme/core';
 import { quadAt } from '../quad.ts';
-import { builtinRegistry } from '@tramme/nodes';
+import { builtinRegistry, setWebScenePlaceholder } from '@tramme/nodes';
 import { CanvasPool, Compositor, drawComposed, drawFrame, drawLayers, finishOf, subTimes } from '@tramme/render/src/index.ts';
 import { nodeContext, resizeNode } from '@tramme/render/src/gpu.ts';
 import { RecordingPath2D } from './recording-path.ts';
 import type { DrawPayload, DrawResult, FramePayload, LayerSample, SandboxDoc } from './protocol.ts';
 import type { SandboxDrawSide } from './worker-side.ts';
+
+// A web scene not captured yet (its pictures are made by `tramme render`) draws nothing here instead of
+// failing the whole frame: the page shows the live scene over it, or its own placeholder (preview.ts).
+setWebScenePlaceholder(() => null);
 
 const MAX_PIXELS = 2048;
 const FALLING_AREA = { x: -60, y: -60, w: 120, h: 120 };
