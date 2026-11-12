@@ -14,6 +14,9 @@ coverage/
 .eslintcache
 .cache/
 
+# Footage of the bench's local briefs: the user's own videos, never committed
+bench/local/
+
 # Example renders and local project state
 examples/*/renders/
 examples/*/.tramme/

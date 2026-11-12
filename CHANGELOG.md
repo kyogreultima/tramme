@@ -16,9 +16,12 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 - A plugin's tool reads the project's pictures, sounds and fonts with `ctx.readFile(path)`, through the editor: in the desktop app its sandbox could not fetch them (Origyn: a plugin written five times over).
 - A film plan written again takes only what changes (`change` for some scenes, by name); the rest of the plan is kept.
 - `node bench/run.ts <brief>` runs a brief of the bench alone on the trial server, through the companion, and stops the turn once its cost passes a cap; three short briefs join the bench (a logo sting, a short data film, vertical kinetic type).
+- The critic measures the film's rhythm on its rendered frames: a stretch of 4 s or more where nothing moves, or a film standing still more than half its time, is a defect it never lets pass; how much of the frame the subject fills and how many different pictures the film shows are given to it to weigh. The bench records the same measures for each run (`--pictures` picks the picture provider of a run), and a brief that dresses a filmed talking-head video joins it, its footage kept on the machine.
 
 ### Changed
 
+- The critic is harsh: it scores idea, composition, scale, material, rhythm, motion and finish, and a film is done only when every one reaches 8. It no longer takes a small subject in an empty frame, a long hold or flat plates for a choice of style, and it judges a dressed video on what its inserts show and how often the picture changes.
+- The assistant's guide holds what makes a film look made in any style (one visual idea that comes back, a dominant element that uses the frame, scale changing from shot to shot, something new every 2 to 4 s), and how a talking video is edited like the big channels (inserts that show what is said, in varied forms, the speaker's framing changing, a look taken from the room).
 - Claude works at the Medium effort by default instead of High: on the bench, with the changes below, four films of different kinds cost 62 % less and came out at least as good. A level chosen for a model stays as it is.
 - The assistant costs less per film, for the same work:
   - its system prompt no longer changes with the project: the brief, the film plan and the installed plugins travel with the message, again only when they changed, so writing a brief or a plan no longer throws the conversation out of the cache;

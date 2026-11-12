@@ -137,6 +137,16 @@
       "format": "9:16",
       "seconds": 12,
       "prompt": "Typographie animée verticale pour Instagram, 12 secondes, sur cette phrase de notre fondatrice : « On ne vend pas des chaises. On vend le temps que vous passez assis. » — Léa Morel, Assise. Rien que du texte, mais qu'il vive."
+    },
+    {
+      "id": "talking-head",
+      "split": "test",
+      "format": "16:9",
+      "seconds": 60,
+      "files": [
+        "local/talking-head.mp4"
+      ],
+      "prompt": "Habille cette vidéo face caméra pour ma chaîne YouTube (assets/talking-head.mp4), au niveau des grandes chaînes : coupe les silences et les hésitations, ajoute des mots-clés, des plans de coupe qui illustrent ce que je dis et un peu de son. Garde le format 16:9, en français."
     }
   ]
 }

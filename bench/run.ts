@@ -1,4 +1,4 @@
-// node bench/run.ts <brief id> [--series baseline] [--cap 6] [--effort high]
+// node bench/run.ts <brief id> [--series baseline] [--cap 6] [--effort high] [--pictures hydracept]
 //   [--model claude-opus-5-5] [--url http://localhost:8790] [--out out/bench]
 //
 // Runs one brief of briefs.json as a user would, alone: a new project in the
@@ -32,6 +32,8 @@ const flag = (name: string, fallback: string) => { const i = argv.indexOf(`--${n
 const id = argv.find((a, i) => !a.startsWith('--') && !argv[i - 1]?.startsWith('--'));
 const series = flag('series', 'baseline'), cap = Number(flag('cap', '6')), effort = flag('effort', 'high');
 const dry = argv.includes('--dry');
+/** the Pictures settings' provider for this run (the editor's own choice by default) */
+const pictures = flag('pictures', '');
 const model = flag('model', 'claude-opus-5-5'), base = flag('url', 'http://localhost:8790').replace(/\/+$/, ''), outRoot = flag('out', 'out/bench');
 
 interface Brief { id: string; split: string; format: string; seconds: number; prompt: string; files?: string[] }
@@ -107,6 +109,7 @@ async function main() {
   const companion = JSON.parse(fs.readFileSync(path.join(os.homedir(), '.tramme', 'companion.json'), 'utf8')).token as string;
   const project = await call<{ id: string }>('/api/projects', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: `bench ${brief!.id}`, width, height, duration: brief!.seconds }) });
   for (const f of brief!.files ?? []) {
+    if (!fs.existsSync(path.join(here, f))) throw new Error(`${f} is missing: a local brief's footage stays on the machine that has it (bench/local/, never committed)`);
     const r = await fetch(`${base}/api/projects/${project.id}/files/assets/${encodeURIComponent(path.basename(f))}`, { method: 'PUT', body: fs.readFileSync(path.join(here, f)) });
     if (!r.ok) throw new Error(`file ${f}: HTTP ${r.status}`);
   }
@@ -117,11 +120,14 @@ async function main() {
   const { browser, page } = await launch({ quiet: true });
   const settings = { model, prefer: 'companion', token: companion, apply: 'all', efforts: { [model]: effort }, notify: false };
   // the editor's own page only: the preview's sandboxed frames have no storage
-  await page.evaluateOnNewDocument((s) => {
-    try { localStorage.setItem('tramme.assistant', JSON.stringify(s)); localStorage.setItem('tramme.tours', JSON.stringify({ seen: {}, auto: false })); } catch { /* a sandboxed frame */ }
-  }, settings);
+  await page.evaluateOnNewDocument((s, p) => {
+    try {
+      localStorage.setItem('tramme.assistant', JSON.stringify(s)); localStorage.setItem('tramme.tours', JSON.stringify({ seen: {}, auto: false }));
+      if (p) localStorage.setItem('tramme.preferences', JSON.stringify({ ...JSON.parse(localStorage.getItem('tramme.preferences') ?? '{}'), pictureProvider: p }));
+    } catch { /* a sandboxed frame */ }
+  }, settings, pictures);
   const start = Date.now();
-  let capped = false, error: string | null = null;
+  let capped = false, error: string | null = null, rhythm: unknown = null;
   try {
     await page.goto(`${base}/p/${project.id}`);
     await page.waitForFunction(() => !!(window as any).__tramme?.send, { timeout: 120000 });
@@ -129,7 +135,11 @@ async function main() {
     await page.waitForFunction(() => (window as any).__tramme.aiRoute.value === 'companion', { timeout: 60000 })
       .catch(() => { throw new Error('the companion does not answer the editor: is `node packages/cli/src/main.ts agent --origin http://localhost:8790` running?'); });
     if (dry) console.log('dry run: the project opens and the companion answers; nothing sent');
-    else capped = await watch(page, start, companion);
+    else {
+      capped = await watch(page, start, companion);
+      // the film's rhythm, measured as the critic measures it (the same gates, for every series)
+      rhythm = await page.evaluate(() => (window as any).__tramme.rhythm()).catch((e) => { console.error(`rhythm: ${(e as Error).message}`); return null; });
+    }
   } catch (e) { error = (e as Error).message; console.error(`\n${error}`); }
   finally { await browser.close(); }
   if (dry && !error) { fs.rmSync(dir, { recursive: true, force: true }); return; }
@@ -145,7 +155,7 @@ async function main() {
   const live = transcriptsSince(start);
   fs.mkdirSync(path.join(dir, 'transcripts'), { recursive: true });
   for (const f of live.files) fs.copyFileSync(f, path.join(dir, 'transcripts', path.basename(f)));
-  const result = { brief: brief!.id, series, model, effort, cap, capped, error, dollars: +live.dollars.toFixed(2), requests: live.requests, minutes: +((Date.now() - start) / 60000).toFixed(1), project: `${base}/p/${project.id}`, at: new Date(start).toISOString() };
+  const result = { brief: brief!.id, series, model, effort, pictures: pictures || 'auto', cap, capped, error, dollars: +live.dollars.toFixed(2), requests: live.requests, minutes: +((Date.now() - start) / 60000).toFixed(1), project: `${base}/p/${project.id}`, at: new Date(start).toISOString(), rhythm };
   fs.writeFileSync(path.join(dir, 'run.json'), JSON.stringify(result, null, 2) + '\n');
   console.log(`\n${JSON.stringify(result)}`);
 }
