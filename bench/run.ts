@@ -123,7 +123,8 @@ async function main() {
   await page.evaluateOnNewDocument((s, p) => {
     try {
       localStorage.setItem('tramme.assistant', JSON.stringify(s)); localStorage.setItem('tramme.tours', JSON.stringify({ seen: {}, auto: false }));
-      if (p) localStorage.setItem('tramme.preferences', JSON.stringify({ ...JSON.parse(localStorage.getItem('tramme.preferences') ?? '{}'), pictureProvider: p }));
+      // nobody is there to answer: what a user away for long allows in advance (transcriptions), and the picture provider asked for
+      localStorage.setItem('tramme.preferences', JSON.stringify({ ...JSON.parse(localStorage.getItem('tramme.preferences') ?? '{}'), assistantTranscribes: true, ...(p ? { pictureProvider: p } : {}) }));
     } catch { /* a sandboxed frame */ }
   }, settings, pictures);
   const start = Date.now();
