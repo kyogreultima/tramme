@@ -3368,6 +3368,7 @@
       "mailLanguage": "Langue de nos e-mails",
       "plan": "Forfait et crédits",
       "planHint": "Ce que comprend votre compte, et comment le changer.",
+      "planHintHere": "Ce que comprend votre compte.",
       "currentPlan": "Forfait",
       "planBasic": "Basic",
       "planPlus": "Plus",

@@ -25,7 +25,7 @@ import { resetSeen, setAutoTours, toursState } from '../tours/index.ts';
 import { LOCALES, locale, m, t } from '../i18n/index.ts';
 import { vaultOrigin } from '../mode.ts';
 import { answerConsent, consent } from '../analytics.ts';
-import { tauri } from '../tauri.ts';
+import { platform, tauri } from '../tauri.ts';
 import { fromVault } from '../vault/link.ts';
 import { Providers as ProviderList, type ProviderActions } from './Providers.tsx';
 import { ViewSwitch } from './views.tsx';
@@ -416,7 +416,7 @@ function Behavior() {
       <Row label={t('settings.notifyDone')} hint={t(NOTIFY_HINT[permission])}>
         <Toggle on={a.notify} onChange={notifyOn} />
       </Row>
-      {tauri && (
+      {platform === 'desktop' && (
         <Row label={t('settings.quickLauncher')} hint={t('settings.quickLauncherHint')}>
           <Toggle on={prefs.value.quickLauncher} onChange={(on) => setPrefs({ quickLauncher: on })} />
         </Row>
@@ -524,12 +524,14 @@ function About() {
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <span class="mono">{APP_VERSION}</span>
           {found && <a class="btn sm primary" href={downloadOf(found).href} target="_blank" rel="noopener"><Icon name="download" />{downloadOf(found).direct ? t('update.download') : t('update.release')}</a>}
-          <button class="btn sm" disabled={state === 'looking'} onClick={look}><Icon name={state === 'looking' ? 'spinner' : 'search'} />{state === 'looking' ? t('update.checking') : t('settings.checkNow')}</button>
+          {platform !== 'android' && <button class="btn sm" disabled={state === 'looking'} onClick={look}><Icon name={state === 'looking' ? 'spinner' : 'search'} />{state === 'looking' ? t('update.checking') : t('settings.checkNow')}</button>}
         </div>
       </Row>
-      <Row label={t('settings.checkUpdates')} hint={t('settings.checkUpdatesHint')}>
-        <Toggle on={p.checkUpdates} onChange={(on) => setPrefs({ checkUpdates: on })} />
-      </Row>
+      {platform !== 'android' && (
+        <Row label={t('settings.checkUpdates')} hint={t('settings.checkUpdatesHint')}>
+          <Toggle on={p.checkUpdates} onChange={(on) => setPrefs({ checkUpdates: on })} />
+        </Row>
+      )}
       <Row label={t('settings.usageStats')} hint={t('settings.usageStatsHint')}>
         <Toggle on={consent.value} onChange={(on) => void answerConsent(on)} />
       </Row>
@@ -551,8 +553,8 @@ const GROUPS: { title: () => string; panes: Pane[] }[] = [
       { id: 'models', icon: 'download', title: () => t('localModels.title'), body: LocalModels },
       { id: 'plugins', icon: 'code', title: () => t('plugins.title'), body: Plugins },
       { id: 'tours', icon: 'help', title: () => t('common.guidedTours'), body: Tours },
-      // the native app only: the projects live in a folder of this computer
-      ...(tauri ? [{ id: 'storage' as SettingsSection, icon: 'folder', title: () => t('settings.storage'), body: Storage }] : []),
+      // the computer's app only: the projects live in a folder of this computer (a phone keeps them in the app)
+      ...(platform === 'desktop' ? [{ id: 'storage' as SettingsSection, icon: 'folder', title: () => t('settings.storage'), body: Storage }] : []),
     ],
   },
   {
@@ -562,7 +564,8 @@ const GROUPS: { title: () => string; panes: Pane[] }[] = [
       { id: 'providers', icon: 'key', title: () => t('settings.providers'), body: Providers },
       { id: 'model', icon: 'wand', title: () => t('settings.model'), body: Model },
       { id: 'behavior', icon: 'chat', title: () => t('settings.behavior'), body: Behavior },
-      { id: 'connection', icon: 'link', title: () => t('settings.connection'), body: Connection },
+      // the local companion is a program of a computer: none on a phone
+      ...(platform === 'android' ? [] : [{ id: 'connection' as SettingsSection, icon: 'link', title: () => t('settings.connection'), body: Connection }]),
     ],
   },
   { title: () => t('settings.about'), panes: [{ id: 'about', icon: 'help', title: () => t('settings.about'), body: About }] },

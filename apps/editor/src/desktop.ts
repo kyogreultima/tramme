@@ -4,7 +4,7 @@
 // deployments have none of Tauri, so everything here is a no-op there.
 
 import { importFile } from './importer.ts';
-import { frame, tauri } from './tauri.ts';
+import { frame, platform, tauri } from './tauri.ts';
 import { go } from './nav.ts';
 import { prefs } from './settings.ts';
 import { effect } from '@preact/signals';
@@ -16,7 +16,7 @@ export function initDesktop(): void {
   // the window's frame, for the top bars' room (styles.css); in full screen
   // the traffic lights of macOS leave
   const root = document.documentElement;
-  root.dataset.frame = frame;
+  if (frame) root.dataset.frame = frame;
   if (frame === 'mac') {
     const win = app.window.getCurrentWindow();
     const check = () => { win.isFullscreen().then((f) => { root.toggleAttribute('data-fullscreen', f); }, () => {}); };
@@ -41,7 +41,8 @@ export function initDesktop(): void {
     e.preventDefault();
     app.core.invoke('desktop_open_url', { url: a.href }).catch((err) => console.warn('[tramme] open link:', err));
   });
-  // the quick bubble, a window of its own, follows the setting
+  // the computer's own: the quick bubble, a window of its own, follows the setting; a .tramme opened from the system
+  if (platform !== 'desktop') return;
   effect(() => { app.core.invoke('desktop_quick_enable', { on: prefs.value.quickLauncher }).catch(() => {}); });
   startQuickLink();
   // the listener first, so an open arriving during the read is not lost

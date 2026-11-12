@@ -15,6 +15,7 @@ interface Tauri {
   core: {
     invoke: (cmd: string, args?: Record<string, unknown>) => Promise<unknown>;
     Channel: new <T>() => Channel<T>;
+    addPluginListener: (plugin: string, event: string, cb: (payload: unknown) => void) => Promise<PluginListener>;
   };
   event: {
     listen: (name: string, handler: (event: { payload: unknown }) => void) => Promise<() => void>;
@@ -22,6 +23,9 @@ interface Tauri {
   };
   window: { getCurrentWindow: () => NativeWindow };
 }
+
+/** what a Tauri mobile plugin lets the page hear (apps/desktop/plugin-device): `back`, the system's back button */
+export interface PluginListener { unregister: () => Promise<void> }
 
 export interface NativeWindow {
   minimize: () => Promise<void>;
@@ -38,11 +42,17 @@ export interface NativeWindow {
 
 export const tauri: Tauri | undefined = typeof window !== 'undefined' ? (window as unknown as { __TAURI__?: Tauri }).__TAURI__ : undefined;
 
-/** how the desktop app's window is framed (apps/desktop/src-tauri/src/lib.rs): the
+/** where the page runs: undefined on the web, 'android' in the phone app, 'desktop' in the computer's;
+ *  the one place that asks (no other code reads the user agent for it) */
+export const platformOf = (hasTauri: boolean, userAgent: string): 'android' | 'desktop' | undefined =>
+  !hasTauri ? undefined : /Android/i.test(userAgent) ? 'android' : 'desktop';
+export const platform = platformOf(!!tauri, typeof navigator !== 'undefined' ? navigator.userAgent : '');
+
+/** how the desktop app's window is framed (apps/desktop/src-tauri/src/desktop.rs): the
  *  editor's top bar is its title bar, which moves it, and carries its buttons
  *  ('own': Windows, Linux) or makes room for the system's traffic lights ('mac');
- *  none on the web */
-export const frame: 'own' | 'mac' | undefined = tauri ? (/Mac/.test(navigator.userAgent) ? 'mac' : 'own') : undefined;
+ *  none on the web and on a phone (the system has its own bar) */
+export const frame: 'own' | 'mac' | undefined = platform === 'desktop' ? (/Mac/.test(navigator.userAgent) ? 'mac' : 'own') : undefined;
 
 /** what the app tells of a request, in this order: head, chunks, then end or error */
 type Heard =

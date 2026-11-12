@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { PLUGIN_API } from '@tramme/core';
 import { asksMore, compareVersions } from '@tramme/project';
 import { backup, canPickFolder, copiesIn, stopped, copyId, copyOps, offIn, candidateOf, folderAccess, folderName, forgetFolder, install, installed, persistence, pickFolder, refreshInstalled, restoreBackup, setEnabled, storageKind, uninstall, type Candidate, type Installed } from '../installed.ts';
-import { tauri } from '../tauri.ts';
+import { platform, tauri } from '../tauri.ts';
 import { api } from '../api.ts';
 import { preview } from '../preview.ts';
 import { KIND_LABEL } from '../importer.ts';
@@ -116,7 +116,7 @@ export function Plugins() {
       <Section title={t('plugins.title')} hint={t('plugins.hint')}>
         <Row label={t('plugins.where')} hint={where}>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {kind === 'desktop' && <button class="btn sm" onClick={() => tauri!.core.invoke('desktop_open_plugins').catch((e) => toast(String(e), 'error'))}><Icon name="folder" />{t('plugins.openFolder')}</button>}
+            {kind === 'desktop' && platform === 'desktop' && <button class="btn sm" onClick={() => tauri!.core.invoke('desktop_open_plugins').catch((e) => toast(String(e), 'error'))}><Icon name="folder" />{t('plugins.openFolder')}</button>}
             {canPickFolder() && kind !== 'folder' && <button class="btn sm" onClick={() => pickFolder().catch((e) => { if ((e as Error).name !== 'AbortError') toast((e as Error).message, 'error'); })}><Icon name="folder" />{t('plugins.pickFolder')}</button>}
             {kind === 'folder' && locked && <button class="btn sm" onClick={async () => { if (await folderAccess(true)) { setLocked(false); await refreshInstalled(); } }}><Icon name="unlock" />{t('plugins.allowAgain')}</button>}
             {kind === 'folder' && <button class="btn sm" onClick={() => forgetFolder()}>{t('plugins.forgetFolder')}</button>}

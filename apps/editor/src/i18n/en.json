@@ -2122,6 +2122,7 @@
       "mailLanguage": "Language of our emails",
       "plan": "Plan and credits",
       "planHint": "What your account includes, and how to change it.",
+      "planHintHere": "What your account includes.",
       "currentPlan": "Plan",
       "planBasic": "Basic",
       "planPlus": "Plus",
