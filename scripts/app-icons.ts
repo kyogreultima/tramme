@@ -17,7 +17,11 @@
 //   cd apps/desktop
 //   pnpm tauri icon src-tauri/icons/icon.png --ios-color "#ffffff"          (the desktop sizes)
 //   pnpm tauri icon src-tauri/icons/mobile-source.png -o <a temp folder> --ios-color "#ffffff"
-//     then copy its ios/ and android/ over src-tauri/icons: the phones' icons, on the white tile
+//     then copy its ios/ over src-tauri/icons: the iPhone's icons, on the white tile
+//
+// The Android icons (src-tauri/icons/android, laid over the generated project by android.yml) are
+// written here, not by `tauri icon`: an adaptive icon is a transparent foreground over a background,
+// which the launcher crops to its own shape, so the mark has to sit in the zone that always shows.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -37,8 +41,8 @@ const TILE_FILL = themeColour('light-accent');
 
 // the icon is drawn on a 24-unit box; the mark, `size` units tall, in its middle, on a tile if there is one
 // (`radius` rounds the tile: 0 for the squares the systems round themselves)
-const art = (size: number, tile?: { radius: number }) => {
-  const color = tile ? TILE_FILL : fill;
+// (`color` overrides the mark's: the phones' mark is the paper accent even where the tile is drawn by the system)
+const art = (size: number, tile?: { radius: number }, color = tile ? TILE_FILL : fill) => {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">${tile ? `<rect width="24" height="24" rx="${tile.radius}" fill="${TILE}"/>` : ''}`
     + `<g transform="translate(12 12) scale(${+(size / height).toFixed(5)}) translate(${-width / 2} ${-height / 2})" fill="${color}">${paths.map((d) => `<path d="${d}"/>`).join('')}</g></svg>`;
 };
@@ -68,6 +72,40 @@ console.log(`${path.relative(ROOT, DESKTOP)} (1024×1024)`);
 // the phones' source: the mark on the white tile, which the system rounds itself
 await sharp(Buffer.from(art(14, { radius: 0 })), { density: 72 * 1024 / 24 }).resize(1024, 1024).png({ compressionLevel: 9 }).toFile(MOBILE);
 console.log(`${path.relative(ROOT, MOBILE)} (1024×1024)`);
+
+// Android. The adaptive icon (Android 8 and later) is drawn on 108 dp, of which the launcher shows the
+// centred 72 dp, cut to its shape (circle, squircle…): the foreground is the mark alone on transparency,
+// 38 dp tall (8.5 of the 24 units), about half of the shown part, with room all round in any shape;
+// the background is the white tile, a colour; the same mark is the monochrome layer Android 13 tints
+// for themed icons. Before Android 8 the launcher shows ic_launcher as it is: the white tile to its edges,
+// a square and a circle (ic_launcher_round), with the mark at the same share of what shows.
+const ANDROID = path.join(ROOT, 'apps/desktop/src-tauri/icons/android');
+const DENSITIES: [string, number][] = [['mdpi', 1], ['hdpi', 1.5], ['xhdpi', 2], ['xxhdpi', 3], ['xxxhdpi', 4]];
+const ADAPTIVE_MARK = 8.5;
+const LEGACY_MARK = ADAPTIVE_MARK * 108 / 72;
+const roundTile = (svg: string) => svg.replace(/<rect width="24" height="24" rx="0"/, '<circle cx="12" cy="12" r="12"');
+const png = (svg: string, size: number, file: string) =>
+  sharp(Buffer.from(svg), { density: 72 * size / 24 }).resize(size, size).png({ compressionLevel: 9 }).toFile(file);
+fs.rmSync(ANDROID, { recursive: true, force: true });
+for (const [density, scale] of DENSITIES) {
+  const dir = path.join(ANDROID, `mipmap-${density}`);
+  fs.mkdirSync(dir, { recursive: true });
+  await png(art(ADAPTIVE_MARK, undefined, TILE_FILL), 108 * scale, path.join(dir, 'ic_launcher_foreground.png'));
+  await png(art(LEGACY_MARK, { radius: 0 }), 48 * scale, path.join(dir, 'ic_launcher.png'));
+  await png(roundTile(art(LEGACY_MARK, { radius: 0 })), 48 * scale, path.join(dir, 'ic_launcher_round.png'));
+}
+const adaptive = '<?xml version="1.0" encoding="utf-8"?>\n<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">\n'
+  + '  <background android:drawable="@color/ic_launcher_background"/>\n'
+  + '  <foreground android:drawable="@mipmap/ic_launcher_foreground"/>\n'
+  + '  <monochrome android:drawable="@mipmap/ic_launcher_foreground"/>\n'
+  + '</adaptive-icon>\n';
+fs.mkdirSync(path.join(ANDROID, 'mipmap-anydpi-v26'), { recursive: true });
+fs.writeFileSync(path.join(ANDROID, 'mipmap-anydpi-v26/ic_launcher.xml'), adaptive);
+fs.writeFileSync(path.join(ANDROID, 'mipmap-anydpi-v26/ic_launcher_round.xml'), adaptive);
+fs.mkdirSync(path.join(ANDROID, 'values'), { recursive: true });
+fs.writeFileSync(path.join(ANDROID, 'values/ic_launcher_background.xml'),
+  `<?xml version="1.0" encoding="utf-8"?>\n<resources>\n  <color name="ic_launcher_background">${TILE}</color>\n</resources>\n`);
+console.log(`${path.relative(ROOT, ANDROID)} (adaptive, monochrome, legacy square and round)`);
 
 // The Windows installer's icon (bundle.windows.nsis.installerIcon): the white tile with the mark, rising
 // from an open box, and a download arrow on the box. Drawn on a 256-unit box, in the paper theme's colours.
