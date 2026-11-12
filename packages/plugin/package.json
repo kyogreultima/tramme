@@ -1,6 +1,6 @@
 {
   "name": "@tramme/plugin",
-  "version": "0.22.0",
+  "version": "0.23.0",
   "license": "FSL-1.1-ALv2",
   "private": true,
   "type": "module",
@@ -8,6 +8,6 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@tramme/core": "0.22.0"
+    "@tramme/core": "0.23.0"
   }
 }

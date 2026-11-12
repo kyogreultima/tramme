@@ -3979,7 +3979,7 @@ dependencies = [
 
 [[package]]
 name = "tauri-plugin-tramme-device"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -4406,7 +4406,7 @@ dependencies = [
 
 [[package]]
 name = "tramme-desktop"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "base64 0.23.1",
  "chrono",

@@ -8,6 +8,8 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-11-12
+
 ### Added
 
 - Tramme on Android: the desktop app's crate also builds as an Android app (`.apk` offered by the site, `.aab` for the Play Store), built and signed on CI only. The editor runs in local mode with the projects and the keys on the phone (the keys under the Android Keystore), imports from the gallery, exports a long video to a file instead of memory, then saves it to the gallery or the downloads or shares it; the back button closes, goes back, then leaves. It sells nothing and shows no update notice.
@@ -17,6 +19,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 - A film plan written again takes only what changes (`change` for some scenes, by name); the rest of the plan is kept.
 - `node bench/run.ts <brief>` runs a brief of the bench alone on the trial server, through the companion, and stops the turn once its cost passes a cap; three short briefs join the bench (a logo sting, a short data film, vertical kinetic type).
 - The critic measures the film's rhythm on its rendered frames: a stretch of 4 s or more where nothing moves, or a film standing still more than half its time, is a defect it never lets pass; how much of the frame the subject fills and how many different pictures the film shows are given to it to weigh. The bench records the same measures for each run (`--pictures` picks the picture provider of a run), and a brief that dresses a filmed talking-head video joins it, its footage kept on the machine.
+- The Windows installer has its own icon: the app's tile rising from an open box.
 
 ### Changed
 
@@ -32,6 +35,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
   - a proposal's answer carries the quality checks of its composition, so the contact sheet is asked for once a scene is built rather than after every proposal;
   - a tool's input with a plain slip (an object where a text is wanted, a single value where a list is, a number written as text, an option in another case, a number past its bound) is read and told, not refused;
   - a portrait still, contact sheet or motion strip is sized by its longest side, like a landscape one, instead of being three times heavier.
+- The dependencies are on their latest stable versions, Preact 11 among them. The command boxes are plain text boxes to screen readers, as HTML allows a text area to be, no longer comboboxes.
 
 ### Fixed
 
@@ -40,6 +44,12 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 - A turn stopped half way keeps the line of what it spent.
 - A plugin's check with the name of one of its tools runs (the stick figure's pose check said it was "a tool, called as a check" in every review).
 - A film's music made by ElevenLabs is no longer refused when its prompt is long, nor for being asked as instrumental beside its plan.
+- The site offers the build that has just come out: it read GitHub's list of releases, which can still show the one before for a minute.
+
+### Security
+
+- The desktop app writes its archives with zip 9, past four advisories of the zip crate (RUSTSEC-2026-0367, -0368, -0369, -0429).
+- No dependency carries a known vulnerability: undici and Puppeteer are raised under the web scenes' engine, which stays on its pinned version.
 
 ## [0.22.0] - 2026-11-10
 
@@ -821,7 +831,8 @@ First public release.
 
 - Cloudflare Worker serving the editor and the API, projects stored in R2, access protected by Cloudflare Access.
 
-[Unreleased]: ../../compare/v0.22.0...HEAD
+[Unreleased]: ../../compare/v0.23.0...HEAD
+[0.23.0]: ../../compare/v0.22.0...v0.23.0
 [0.22.0]: ../../compare/v0.21.0...v0.22.0
 [0.21.0]: ../../compare/v0.20.0...v0.21.0
 [0.20.0]: ../../compare/v0.19.0...v0.20.0

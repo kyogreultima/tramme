@@ -74,10 +74,12 @@ for (const [where, entry] of Object.entries(lock.packages)) {
 }
 write('package-lock.json', JSON.stringify(lock, null, 2) + '\n');
 
-// the desktop app: Tauri's version (the installers' names), the crate and its lockfile
+// the desktop app: Tauri's version (the installers' names), the crate, its device plugin (Android) and the lockfile
 const tauri = 'apps/desktop/src-tauri';
 bump(`${tauri}/tauri.conf.json`, '"version": ');
 bump(`${tauri}/Cargo.toml`, '^version = ', 'm');
+bump('apps/desktop/plugin-device/Cargo.toml', '^version = ', 'm');
 bump(`${tauri}/Cargo.lock`, 'name = "tramme-desktop"\r?\nversion = ');
+bump(`${tauri}/Cargo.lock`, 'name = "tauri-plugin-tramme-device"\r?\nversion = ');
 
 console.log(`${old} → ${version}: commit and push to main to release it`);

@@ -1,6 +1,6 @@
 [package]
 name = "tauri-plugin-tramme-device"
-version = "0.22.0"
+version = "0.23.0"
 description = "what the phone gives the Tramme app: the Keystore for its secrets, the gallery, the share sheet, the back button"
 edition = "2021"
 publish = false
