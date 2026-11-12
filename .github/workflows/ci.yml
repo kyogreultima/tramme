@@ -21,7 +21,7 @@ jobs:
       # this machine has Rust: the storage test must fail, never skip
       TRAMME_REQUIRE_DESKTOP_TESTS: 1
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
       - run: npm ci
       - run: npm run typecheck
@@ -33,7 +33,7 @@ jobs:
     name: Site build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
       - run: npm ci
       # the site cuts the README by headings: a renamed heading must break here

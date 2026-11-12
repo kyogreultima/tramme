@@ -43,7 +43,7 @@ jobs:
             echo "::error::the repository's secrets CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are missing (Settings, Secrets and variables, Actions): the beta site was not deployed"
             exit 1
           fi
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
       - run: npm ci
       # builds the site, then wrangler deploy as the Worker tramme-site-beta on beta.tramme.dev

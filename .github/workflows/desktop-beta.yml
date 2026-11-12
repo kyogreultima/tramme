@@ -36,8 +36,8 @@ jobs:
     outputs:
       tag: ${{ steps.plan.outputs.tag }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
       - id: plan
@@ -76,14 +76,14 @@ jobs:
       # the beta app is another product: its own name and identifier (merged over tauri.conf.json)
       TAURI_CONFIG: '{"productName":"Tramme Beta","identifier":"app.tramme.desktop.beta"}'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
       - run: npm ci
       - name: Build the editor and the app
         run: npm run desktop:build -- ${{ matrix.args }}
       - name: Name the installers for the release
         run: node scripts/desktop-release.ts out ${{ needs.plan.outputs.tag }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: desktop-beta-${{ matrix.name }}
           path: out/
@@ -112,8 +112,8 @@ jobs:
     env:
       TAG: ${{ needs.plan.outputs.tag }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
         with:
           # the installers only: the Android .aab is a private artifact of the run
           pattern: desktop-*
@@ -145,8 +145,8 @@ jobs:
             echo "::error::the repository's secrets CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are missing: the build is out, the beta site was not deployed"
             exit 1
           fi
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
