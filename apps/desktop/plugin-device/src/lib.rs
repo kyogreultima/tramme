@@ -8,6 +8,7 @@
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+#[cfg(not(target_os = "android"))]
 use std::marker::PhantomData;
 use std::path::Path;
 use tauri::plugin::{Builder, TauriPlugin};
@@ -16,6 +17,7 @@ use tauri::{Manager, Runtime};
 #[cfg(target_os = "android")]
 use tauri::plugin::PluginHandle;
 
+#[cfg(not(target_os = "android"))]
 const NOT_HERE: &str = "android only";
 
 /// the device's side, in the app's managed state

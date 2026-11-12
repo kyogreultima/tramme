@@ -44,6 +44,7 @@ pub fn providers() -> &'static BTreeMap<String, Provider> {
     LIST.get_or_init(|| serde_json::from_str(KEYED).expect("packages/api/src/keyed-providers.json"))
 }
 
+#[cfg(desktop)]
 const SERVICE: &str = "tramme";
 
 /// the changes of the keys, one at a time (each request runs on its own thread)
