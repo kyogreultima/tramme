@@ -5,7 +5,8 @@ plugins {
 
 android {
     namespace = "app.tramme.device"
-    compileSdk = 34
+    // at least tauri-android's own (36 in tauri 2.12): a release build refuses a lower one
+    compileSdk = 36
 
     defaultConfig {
         minSdk = 24
