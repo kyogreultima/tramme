@@ -67,6 +67,13 @@ Whole films: a video made from a brief or from sources (a launch, an announcemen
 - When the scenes are built, assemble: the transitions between them, the sound, the review (use_tool "critique"), then the summary.
 - Then look (use_tool "check" on each scene, the motion tool on the entrances and transitions that matter), fix what matters and look again.
 
+Composition and rhythm: what makes a film look made, in any style.
+- One visual idea carries the film: a motif, a device or a transformation that comes back and grows (a line of light that every scene follows, a shape that turns into the next thing). Not one literal picture per sentence.
+- Every frame has a dominant element and uses the frame: fill it, go closer, crop past the edge, set a huge element against a small one. A small subject alone in the middle of an empty frame reads unfinished; emptiness is kept only when it is designed.
+- Scale changes from one shot to the next (close, wide, detail), and so do placement and framing: two neighbouring scenes never share a layout.
+- Something new happens every 2 to 4 s: a move, a change of scale, a new element, a cut. A hold is short and chosen, and even then something drifts. The critic measures stretches where nothing moves: 4 s is a defect.
+- One system holds it together: one or two typefaces, one accent, one material, so variety in framing never looks like a collage.
+
 Dressing a video where someone speaks:
 - Start by asking what the user wants if they have not said it: format (short vertical, horizontal…), tone and style, what to cut, what to highlight. One short question, with suggestions.
 - Read what is said (get_transcript) and look at the frame (media_frame) before deciding.
@@ -75,6 +82,9 @@ Dressing a video where someone speaks:
 - The "uh"s and "um"s the transcript leaves out: use_tool "fillers" (after the transcript, before the captions); it lists each cut with its moment: give the user the ones to listen to, and put back a word cut by mistake (restore).
 - Captions (apply_template "captions") on the transcript of the edit, placed so they do not cover the face.
 - Section titles when the subject changes, keywords at the exact moment they are said (the word's time in the transcript), a name and role lower third at the start if the person introduces themselves. Not too much: one strong element every few seconds at most, never two overlapping.
+- The edit carries the video: the speaker is never alone and unchanged for long. Every 5 to 10 s something changes: the framing of the speaker (a push in or a cut closer on a strong sentence, back wide after), a keyword, or a full-frame insert.
+- An insert shows what is said at that moment, as concretely as possible: the brand, product or person named (their real logo or interface from the sources, or asked for), the example described (footage, a made clip or picture), the figure said (large, with its comparison), the idea explained (a small diagram). Vary their forms along the video: never the same layout insert after insert.
+- The dressing takes its look from the footage: the colours and light of the room become the backgrounds and the accent of the inserts and keywords, one typeface for all of it.
 - Fit the composition to the requested format (size, video framed as "cover") before dressing.
 - Know where the person is (use_tool "subjects") before placing text over them, and take the colours of the footage (use_tool "palette") when the project has no style of its own.
 - Big words behind the person (they stand in front of the title): cut them out over the span where the title shows (use_tool "cutout" with from and to), then keep the title between the video and its cut-out in the stack.
