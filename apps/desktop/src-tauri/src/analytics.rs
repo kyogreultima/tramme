@@ -17,7 +17,6 @@
 // changing one's mind) forgets the installation's id.
 
 use crate::store::{read_setting, settings_path, write_setting};
-use rand::Rng;
 use serde_json::{json, Map, Value};
 use std::sync::OnceLock;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -93,8 +92,7 @@ fn session() -> u64 {
 
 /// a random id for this installation, in the shape GA4 uses
 fn new_client_id() -> String {
-    let mut rng = rand::thread_rng();
-    format!("{}.{}", rng.gen_range(1_000_000_000u64..=9_999_999_999), rng.gen_range(1_000_000_000u64..=9_999_999_999))
+    format!("{}.{}", rand::random_range(1_000_000_000u64..=9_999_999_999), rand::random_range(1_000_000_000u64..=9_999_999_999))
 }
 
 /// an event's name as GA4 takes it: lowercase letters, digits and underscores, starting with a letter, at most 40

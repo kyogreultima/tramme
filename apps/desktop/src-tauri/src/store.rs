@@ -905,10 +905,8 @@ impl Store {
             return http_err(400, format!("invalid key: {key}"));
         }
         let id: String = {
-            use rand::Rng as _;
             const DIGITS: &[u8] = b"0123456789abcdefghijklmnopqrstuvwxyz";
-            let mut rng = rand::thread_rng();
-            (0..20).map(|_| DIGITS[rng.gen_range(0..36)] as char).collect()
+            (0..20).map(|_| DIGITS[rand::random_range(0..36)] as char).collect()
         };
         let dir = self.upload_dir(&id);
         if dir.exists() {

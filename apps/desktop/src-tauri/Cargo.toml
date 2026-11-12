@@ -20,16 +20,16 @@ tauri-plugin-notification = "2"
 tauri-plugin-tramme-device = { path = "../plugin-device" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-sha2 = "0.10"
-zip = { version = "2", default-features = false, features = ["deflate"] }
+sha2 = "0.11"
+zip = { version = "9", default-features = false, features = ["deflate"] }
 percent-encoding = "2"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
-rand = "0.8"
-dirs = "6"
+rand = "0.10"
+dirs = "7"
 unicode-normalization = "0.1"
 ureq = { version = "2", default-features = false, features = ["tls", "gzip"] }
 regex = "1"
-base64 = "0.22"
+base64 = "0.23"
 url = "2"
 
 # the computer's own: a second launch handed to the running app, the system keychain
