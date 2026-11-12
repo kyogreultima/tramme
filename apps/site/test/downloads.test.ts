@@ -10,18 +10,27 @@ afterEach(() => vi.unstubAllGlobals());
 describe('the systems the app is offered for', () => {
   it('leave macOS out while its app cannot be installed (it is not signed)', () => {
     expect(WITHHELD).toEqual(['mac']);
-    expect(OFFERED_SYSTEMS).toEqual(['windows', 'linux']);
-    expect(OFFERED_INSTALLERS.map((i) => i.os)).toEqual(['windows', 'linux', 'linux']);
+    expect(OFFERED_SYSTEMS).toEqual(['windows', 'linux', 'android']);
+    expect(OFFERED_INSTALLERS.map((i) => i.os)).toEqual(['windows', 'linux', 'linux', 'android']);
   });
 
   it('are still all built: the release carries every installer, so that offering one again is a change of one line', () => {
     expect(INSTALLERS.some((i) => i.os === 'mac')).toBe(true);
-    expect(Object.keys(SYSTEMS)).toEqual(['windows', 'mac', 'linux']);
+    expect(Object.keys(SYSTEMS)).toEqual(['windows', 'mac', 'linux', 'android']);
   });
 
   it('are named in a line, in each language', () => {
-    expect(systemsLine('en')).toBe('Windows and Linux');
-    expect(systemsLine('fr')).toBe('Windows et Linux');
+    expect(systemsLine('en')).toBe('Windows, Linux and Android');
+    expect(systemsLine('fr')).toBe('Windows, Linux et Android');
+  });
+});
+
+describe('the Android app', () => {
+  it('is the signed .apk of the release, under its stable name, named by the CI that built it', () => {
+    expect(OFFERED_INSTALLERS.some((i) => i.file === 'tramme-android.apk')).toBe(true);
+    const apk = INSTALLERS.find((i) => i.os === 'android')!;
+    expect(apk).toMatchObject({ suffix: '.apk', kind: 'APK', built: '' });
+    expect(SYSTEMS.android).toBe('Android');
   });
 });
 
@@ -31,7 +40,7 @@ describe('the release the site offers', () => {
     vi.stubGlobal('fetch', async () => new Response(JSON.stringify({ tag_name: 'v1.2.3', html_url: 'https://example.test/r', assets }), { status: 200 }));
     const { latestRelease } = await import('../src/lib/download');
     const release = await latestRelease(() => {});
-    expect(release?.installers.map((i) => i.os)).toEqual(['windows', 'linux', 'linux']);
+    expect(release?.installers.map((i) => i.os)).toEqual(['windows', 'linux', 'linux', 'android']);
     expect(release?.installers.every((i) => !/macos|\.dmg/i.test(i.href))).toBe(true);
   });
 });

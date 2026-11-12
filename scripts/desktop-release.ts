@@ -25,6 +25,8 @@ if (tag && tag !== `v${version}` && !new RegExp(`^v${version.replaceAll('.', '\\
 fs.mkdirSync(out, { recursive: true });
 let found = 0;
 for (const i of INSTALLERS) {
+  // already named by the CI that built it (the signed Android .apk): it is in the release's files as it is
+  if (!i.built) continue;
   const dir = path.join(tauri, 'target', i.built);
   const file = fs.existsSync(dir) ? fs.readdirSync(dir).find((f) => f.includes(`_${version}_`) && f.endsWith(i.suffix)) : undefined;
   if (!file) continue;

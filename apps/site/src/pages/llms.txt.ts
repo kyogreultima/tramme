@@ -14,7 +14,7 @@ const PAGES = [
   ['/explore/', 'Explore', 'Public projects made with Tramme by the community'],
   ['/pricing/', 'Pricing', 'Basic is free; Plus and Pro add cloud projects, AI ready to use and cloud export; prices in euros'],
   ['/roadmap/', 'Roadmap', 'What is coming to Tramme'],
-  ['/download/', 'Download', `The desktop app for ${systemsLine('en')}`],
+  ['/download/', 'Download', `The app for ${systemsLine('en')}`],
   ['/about/', 'About', 'What Tramme is, its licence, how to take part'],
   ['/terms/', 'Terms', 'Terms of use and sale'],
   ['/privacy/', 'Privacy', 'What is kept where'],
