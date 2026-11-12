@@ -8,6 +8,27 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-11-13
+
+### Added
+
+- Colour grading as a colourist's tools do it, in a new Colour category of effects:
+  - **Colour grading** (`fx.grade`) develops a clip: a camera's log (Sony S-Log3, Panasonic V-Log, ARRI LogC3, Apple Log, Canon Log 3, HLG) read into scene light with its gamut, its highlights rolling off on screen instead of clipping; white balance (temperature, tint); exposure in stops; contrast, highlights, shadows, whites and blacks, masked by the brightness around each pixel so a window does not halo the wall beside it; texture, clarity and dehaze; vibrance that spares the skin, and saturation; colour wheels over the shadows, mid tones and highlights, and a global one, with their balance and blending; a fade.
+  - **HSL** (`fx.hsl`) moves each of eight colours alone (hue, saturation, luminance), the greys untouched.
+  - **Hue curves** (`fx.huecurves`): hue against hue, saturation and luminance, saturation by luminance and by saturation, edited on a curve with the hues along its foot.
+  - **Colour isolation** (`fx.secondary`) picks a colour with the dropper (a sky, a skin, a shirt), softens its matte, and corrects it alone, or everything but it; its matte can be viewed.
+  - **Film look** (`fx.film`: halation, bloom, grain in the mid tones) and a **Vignette** for a clip (`fx.vignette`).
+  - Eight **colour looks**, ready-made grades put on the selected clips in one tap (Natural pop, Teal and orange, Warm film, Golden hour, Cool night, Bleach bypass, Faded matte, Black and white); on a phone they are tiles of the Effects tab.
+  - The scopes add the RGB parade and the histogram beside the waveform (the one chosen is remembered), and show for every effect of the Colour category.
+- The assistant knows when to use each grading effect, and reads a camera's log through `fx.grade` instead of a conversion LUT.
+
+### Changed
+
+- A layer's GLSL effects in a row run as one chain on the GPU: the layer is uploaded once and the effects hand their result to each other in half floats, so a grade, curves and a LUT stacked lose nothing between them; the result is dithered as it goes back to 8 bits, so a pushed sky no longer bands.
+- A large effect's settings are folded into groups in the inspector (a grade's light, its presence, its colour wheels…), and an effect has a button that puts it back at rest. A curve's square double-clicked goes back to rest too.
+- LUT, Curves, Colour wheels and Colour correction sit in the Colour category.
+- On a phone, the colour wheels and curves are larger, for a finger.
+
 ## [0.23.0] - 2026-11-12
 
 ### Added
@@ -832,7 +853,8 @@ First public release.
 
 - Cloudflare Worker serving the editor and the API, projects stored in R2, access protected by Cloudflare Access.
 
-[Unreleased]: ../../compare/v0.23.0...HEAD
+[Unreleased]: ../../compare/v0.24.0...HEAD
+[0.24.0]: ../../compare/v0.23.0...v0.24.0
 [0.23.0]: ../../compare/v0.22.0...v0.23.0
 [0.22.0]: ../../compare/v0.21.0...v0.22.0
 [0.21.0]: ../../compare/v0.20.0...v0.21.0
