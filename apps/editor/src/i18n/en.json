@@ -1818,6 +1818,16 @@
   "cuts": {
     "done": "\"{name}\" tightened: {saved} saved."
   },
+  "device": {
+    "ready": "Your file is ready",
+    "saveToGallery": "Save to the gallery",
+    "saveToDownloads": "Save to the downloads",
+    "share": "Share",
+    "saved": "Saved",
+    "saveFailed": "The file could not be saved. Check that the phone has room left.",
+    "shareFailed": "The file could not be shared.",
+    "exportNeedsTramme": "The export stops while Tramme is not on screen. Come back to finish it."
+  },
   "dictation": {
     "start": "Dictate: speak, then click again to write what you said",
     "stop": "Stop and write what you said",

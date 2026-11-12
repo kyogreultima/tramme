@@ -1,7 +1,12 @@
 // Saving a file on the user's computer: the system's save dialog when the
-// browser has one, a download otherwise.
+// browser has one, a download otherwise. On a phone's app: the sheet that saves
+// to the gallery or the downloads, or shares (device.ts).
+
+import { saveOnDevice } from './device.ts';
+import { platform } from './tauri.ts';
 
 export async function saveBlob(blob: Blob, name: string): Promise<boolean> {
+  if (platform === 'android') return saveOnDevice(blob, name);
   const picker = (window as unknown as { showSaveFilePicker?: (o: unknown) => Promise<FileSystemFileHandle> }).showSaveFilePicker;
   if (picker) {
     try {

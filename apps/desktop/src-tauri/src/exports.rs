@@ -8,6 +8,7 @@
 //   PUT    /api/device/exports/<name>?at=<n>   body = bytes, written at offset n (the file is created, never truncated)
 //   GET    /api/device/exports/<name>          the file, with byte ranges
 //   DELETE /api/device/exports/<name>
+//   POST   /api/device/exports/<name>?as=<new>  the file under the name the user gave it
 //
 // The code is the same on every platform so the desktop's tests and lints cover
 // it; only a phone sets the folder up and registers the commands.
@@ -100,6 +101,15 @@ pub fn remove(dir: &Path, name: &str) -> Res<()> {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
         Err(e) => Err(io_err(e)),
     }
+}
+
+/// an export under another name (the user's: the gallery and the share sheet show it); one of that name is replaced
+pub fn rename(dir: &Path, from: &str, to: &str) -> Res<()> {
+    let (from, to) = (path_of(dir, from), path_of(dir, to));
+    if from == to {
+        return Ok(());
+    }
+    fs::rename(from, to).map_err(io_err)
 }
 
 /// deletes the files not touched for `older_than`
@@ -210,6 +220,19 @@ mod tests {
         remove(tmp.path(), "v.mp4").unwrap();
         assert!(!tmp.path().join("v.mp4").exists());
         remove(tmp.path(), "v.mp4").unwrap();
+    }
+
+    #[test]
+    fn rename_replaces_and_stays_in_the_folder() {
+        let tmp = tempfile::tempdir().unwrap();
+        write_at(tmp.path(), "export-1.mp4", 0, b"new").unwrap();
+        write_at(tmp.path(), "Mon film.mp4", 0, b"older").unwrap();
+        rename(tmp.path(), "export-1.mp4", "Mon film.mp4").unwrap();
+        assert_eq!(fs::read(tmp.path().join("Mon film.mp4")).unwrap(), b"new");
+        assert!(!tmp.path().join("export-1.mp4").exists());
+        rename(tmp.path(), "Mon film.mp4", "../../out.mp4").unwrap();
+        assert!(tmp.path().join("_.._out.mp4").exists());
+        assert_eq!(rename(tmp.path(), "nothing.mp4", "x.mp4").unwrap_err().status, 500);
     }
 
     #[test]

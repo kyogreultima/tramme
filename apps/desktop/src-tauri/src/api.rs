@@ -150,6 +150,11 @@ fn device(parts: &[String], req: Request<Vec<u8>>) -> Result<Body, store::HttpEr
             };
             builder.body(body).map_err(response_err)
         }
+        "POST" => {
+            let to = query(&req).into_iter().find(|(k, _)| k == "as").map(|(_, v)| v).unwrap_or_default();
+            crate::exports::rename(dir, &name, &to)?;
+            Response::builder().status(StatusCode::NO_CONTENT).body(Vec::new()).map_err(response_err)
+        }
         "DELETE" => {
             crate::exports::remove(dir, &name)?;
             Response::builder().status(StatusCode::NO_CONTENT).body(Vec::new()).map_err(response_err)

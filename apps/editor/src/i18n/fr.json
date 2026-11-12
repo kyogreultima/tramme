@@ -3100,6 +3100,16 @@
   "cuts": {
     "done": "« {name} » resserré : {saved} gagnées."
   },
+  "device": {
+    "ready": "Votre fichier est prêt",
+    "saveToGallery": "Enregistrer dans la galerie",
+    "saveToDownloads": "Enregistrer dans les téléchargements",
+    "share": "Partager",
+    "saved": "Enregistré",
+    "saveFailed": "Le fichier n'a pas pu être enregistré. Vérifiez qu'il reste de la place sur le téléphone.",
+    "shareFailed": "Le fichier n'a pas pu être partagé.",
+    "exportNeedsTramme": "L'export s'arrête quand Tramme n'est plus à l'écran. Revenez pour le terminer."
+  },
   "dictation": {
     "start": "Dicter : parlez, puis cliquez à nouveau pour écrire ce que vous avez dit",
     "stop": "Arrêter et écrire ce que vous avez dit",
