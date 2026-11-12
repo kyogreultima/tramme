@@ -22,7 +22,8 @@ Also out of scope, handled by the owner: the Play Console organization account f
 - New editing tools (the CapCut project).
 - iOS (later; WKWebView has its own export questions, see docs/desktop-and-mobile-apps.md).
 - Selling anything in the app. Nothing is sold today.
-- A CI workflow for Android (the CI quota is exhausted; local build only for now).
+- Building or installing the Android toolchain on the owner's machine: every Android build runs on GitHub's CI.
+- Uploading to the Play Console automatically: the owner uploads the `.aab` by hand for now.
 - Google or GitHub sign-in (already off in the desktop app, same reason: needs the system browser and a way back).
 - The local companion (`tramme agent`): impossible on a phone, hidden.
 
@@ -39,13 +40,13 @@ Also out of scope, handled by the owner: the Play Console organization account f
 - **Publisher Qualris.** Upload key certificate: `O=Qualris`; `publisher` and copyright already say Qualris in `tauri.conf.json`.
 - **Environments.** Links and the backend come from `brand/environments.ts` (as `account.rs` does through `build.rs`); never a hardcoded domain.
 - **Theme tokens only** for any new UI (save/share sheet, permission explanations); no raw technical errors shown to the user (`plainRenderMessage`).
-- **Secrets never in the repo.** The upload keystore and its passwords live outside the repository; the build reads them from environment variables or a git-ignored properties file.
-- **No push**: work is committed on `develop` only.
+- **Secrets never in the repo.** The upload keystore and its passwords live in the repository's GitHub secrets (the keystore base64-encoded); the CI job writes them to a temporary file for the build only.
+- **Built on CI only.** Nothing Android is built on the owner's machine. The work is committed on `develop` only, never pushed by the builder; the owner updates the version (`scripts/version.ts`) and pushes, and CI builds.
 
 ## How (decided)
 
 - **Same Tauri crate as the desktop.** `apps/desktop/src-tauri` gains the Android target (`tauri android init`, Tauri 2 mobile). The generated Android project (`gen/android`) is committed, except build outputs. Code that only makes sense on the desktop is put behind `#[cfg(desktop)]` / `#[cfg(mobile)]`: single instance, the quick bubble window, the `.tramme` file association, the projects folder setting, the update notice and downloads.
-- **Identity** (designer's call, to confirm: it can never change once published): application id `app.tramme`, in the line of the desktop's `app.tramme.desktop`, set by an Android-only config override (`tauri.android.conf.json`) so the desktop keeps its own. Name on the phone: Tramme. Portrait and landscape both allowed.
+- **Identity** (confirmed by the owner; it can never change once published): application id `app.tramme`, in the line of the desktop's `app.tramme.desktop`, set by an Android-only config override (`tauri.android.conf.json`) so the desktop keeps its own. Name on the phone: Tramme. Portrait and landscape both allowed.
 - **Environment**: the same environment selection as the desktop build (`build.rs` from `brand/environments.ts`); the build uploaded to the Play Store points at production. Analytics behave as on the desktop (opt-in).
 - **Same editor**, served by the same custom protocol (on Android the webview reaches it as `http://tramme.localhost`). The editor learns it is on Android from the Tauri global (as `apps/editor/src/tauri.ts` does for the desktop) and adapts only what this design lists.
 - **Storage**: the store of `store.rs` unchanged, rooted in the app's private data folder instead of `Documents/Tramme`. Projects are private to the app; what leaves the phone leaves through export, `.tramme` export or share.
@@ -58,12 +59,14 @@ Also out of scope, handled by the owner: the Play Console organization account f
 - **Android versions**: minimum Android 8 (API 26), target the API level Play requires at build time. Video export needs WebCodecs in the system WebView (Chromium 94 or newer, updated by the Play Store); where it is missing, the export formats are explained instead of failing late, as `webexport.ts` already does with `VideoEncoder`.
 - **Version**: the Android version name follows `tauri.conf.json` (set by `scripts/version.ts`); the version code is derived from it so it always grows (major × 10000 + minor × 100 + patch).
 - **Icons**: generated from the existing source icon with `tauri icon`, including Android's adaptive icon.
-- **Commands**: `npm run android:dev` (emulator or phone over USB) and `npm run android:build` (signed `.aab`, plus an `.apk` to install directly for testing).
-- **Docs**: `docs/desktop-and-mobile-apps.md` step 6 updated with what was done; a short "Android" section in `CONTRIBUTING.md` (toolchain, keystore, build).
+- **CI**: an Android job next to the desktop ones in `.github/workflows/desktop.yml`, on the same triggers: the release (a version on `main` without a tag) builds the signed `.aab` and a signed `.apk`; a manual run on another branch builds them too. Both are kept as workflow artifacts, private: the `.aab` for the Play Console, the `.apk` for the owner to install on a phone and test. Neither goes into the public GitHub release nor onto the site's download page. Without the signing secrets, the job still builds an unsigned debug `.apk` and says so, so the pipeline can be checked before the keystore exists.
+- **Upload keystore**: created once by a manual workflow (or a documented `keytool` command run in CI), certificate `CN=Tramme, O=Qualris`; the owner stores the result in the GitHub secrets and keeps a copy somewhere safe. If it is ever lost, Google can reset the upload key (Play App Signing holds the real one).
+- **npm scripts** `android:dev` and `android:build` exist for whoever has the toolchain (CI calls `android:build`); nobody needs them on the owner's machine.
+- **Docs**: `docs/desktop-and-mobile-apps.md` step 6 updated with what was done; a short "Android" section in `CONTRIBUTING.md` (the secrets to set, where the artifacts land, how to upload to the Play Console).
 
 ## Left to the builder
 
-- Installing the toolchain on this Windows machine (JDK 17, Android SDK, NDK, Rust Android targets) and writing down exactly what was installed in CONTRIBUTING.md.
+- The CI job's setup (JDK, Android SDK and NDK, Rust Android targets, caches), kept as short as the desktop jobs.
 - The exact secure-storage implementation behind `Secrets` (a Tauri mobile plugin in Kotlin, or a maintained crate), as long as the key stays in the Android Keystore.
 - Whether "Save to gallery" and "Share" are one small Kotlin plugin of the app or existing maintained Tauri plugins; prefer the fewest dependencies.
 - How the editor exposes "is Android" (one helper next to the desktop's detection, reused everywhere: no scattered checks).
@@ -71,7 +74,8 @@ Also out of scope, handled by the owner: the Play Console organization account f
 
 ## Checks before calling it done
 
-- `cargo check` for the desktop target and for `aarch64-linux-android` both pass; the Rust store tests and the storage contract suite still pass on the desktop.
-- On an emulator and, if available, a real phone: create a project, import a video from the gallery, edit, export a 9:16 video of at least 60 seconds without a crash, find it in the gallery, share it; sign in to the account; save a provider key, restart the app, the assistant still works; the back button behaves as described.
+- Locally, without any Android toolchain: the desktop still builds and its tests pass (Rust store tests, storage contract suite, `npm test`, `npm run typecheck`); the editor's Android branches are covered by its own tests where they hold logic (version code, export sheet choice, back button order, purchase switch).
+- On CI: the Android job compiles and produces the artifacts.
+- By the owner, on a phone with the CI's `.apk`: create a project, import a video from the gallery, edit, export a 9:16 video of at least 60 seconds without a crash, find it in the gallery, share it; sign in to the account; save a provider key, restart the app, the assistant still works; the back button behaves as described.
 - No purchase entry point visible on Android.
-- `npm run android:build` produces a signed `.aab` whose certificate says Qualris.
+- The CI's `.aab` is signed with a certificate that says Qualris.
