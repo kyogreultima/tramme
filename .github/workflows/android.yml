@@ -57,7 +57,10 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
+      # its default list asks for "tools", a package the SDK no longer ships: sdkmanager fails on it
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
       - name: The NDK
         run: |
           sdkmanager "ndk;$NDK"
