@@ -32,6 +32,7 @@ export * from './analysis.ts';
 export * from './events.ts';
 export * from './track.ts';
 export * from './lut.ts';
+export * from './colorspace.ts';
 export * from './stabilize.ts';
 export * from './components.ts';
 export * from './denoise.ts';

@@ -1,6 +1,7 @@
 import { BUILTIN_CHECKS, Registry } from '@tramme/core';
 import { timeShift } from './timeshift.ts';
 import { bloom, blur, chromatic, color, curves, depthBlur, displace, exposure, glow, grade, grain, key, lut, matte, parallax, pin, shadow, smooth, tint, transition, vignette, wheels } from './effects.ts';
+import { GRADING } from './grading.ts';
 import { comp } from './comp.ts';
 import { particles } from './particles.ts';
 import { shader } from './shader.ts';
@@ -27,7 +28,7 @@ export { canvasPaint, fillStroke, toPath2D } from './paint.ts';
 export { setWebScenePlaceholder } from './webscene.ts';
 export type { CodeEntry } from './misc.ts';
 export const NODES = [rect, ellipse, path, image, model, solid, sequence, video, webscene, text, captions, counter, tag, receipt, callout, group, comp, adjust, particles, shader, follow, rope, cloth, flock, code, audio, timeShift];
-export const EFFECTS = [vignette, grain, bloom, exposure, chromatic, grade, blur, shadow, glow, color, tint, matte, smooth, displace, parallax, depthBlur, transition, key, lut, curves, wheels, pin];
+export const EFFECTS = [vignette, grain, bloom, exposure, chromatic, grade, blur, shadow, glow, color, tint, matte, smooth, displace, parallax, depthBlur, transition, key, lut, curves, wheels, ...GRADING, pin];
 // notes for the assistant (list_nodes)
 for (const n of NODES) n.ai ??= NODE_NOTES[n.type];
 for (const e of EFFECTS) e.ai ??= EFFECT_NOTES[e.type];

@@ -470,12 +470,14 @@
 .prop .pvalue > .curve-field { flex: none; background: var(--field); border-radius: var(--r-sm); cursor: crosshair; touch-action: none; }
 .curve-field .grid { stroke: var(--border); stroke-width: .5; }
 .curve-field .diag { stroke: var(--border); stroke-width: .5; stroke-dasharray: 2 2; }
+.curve-field .hues { opacity: .9; pointer-events: none; }
 .curve-field .curve { fill: none; stroke: var(--text); stroke-width: 1.5; }
 .curve-field .pt { fill: var(--accent); stroke: var(--bg); stroke-width: 1; cursor: move; }
 /* a colour wheel: the hues around, white at the centre */
 .prop .pvalue > .wheel-field { flex: none; cursor: crosshair; touch-action: none; }
 .wheel-field .cross { stroke: rgba(0, 0, 0, .25); stroke-width: .5; }
 .wheel-field .pt { fill: #fff; stroke: #000; stroke-width: 1.2; }
+@media (max-width: 760px) { .prop .pvalue > .wheel-field { width: 116px; height: 116px; } .prop .pvalue > .curve-field { width: 176px; height: 176px; } .curve-field .pt { r: 7px; } .fx-group-head { height: 36px; } }
 .wheel-field { border-radius: 50%; background: radial-gradient(circle closest-side, rgba(255, 255, 255, .95), rgba(255, 255, 255, 0) 100%), conic-gradient(from 90deg, #f00, #f0f, #00f, #0ff, #0f0, #ff0, #f00); }
 /* the keyframe button: a diamond */
 .kbtn { width: 18px; height: 18px; border: 0; padding: 0; background: transparent; display: grid; place-items: center; color: var(--text-4); border-radius: var(--r-xs); }
@@ -503,6 +505,12 @@
 .fx { display: flex; flex-direction: column; gap: 4px; padding: 8px; border-radius: var(--r-md); background: var(--surface-2); }
 .fx-head { display: flex; align-items: center; gap: 6px; }
 .fx-title { flex: 1; font-weight: 500; }
+.fx-group { display: flex; flex-direction: column; gap: 4px; }
+.fx-group + .fx-group { border-top: 1px solid var(--border); padding-top: 4px; }
+.fx-group-head { display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 2px; border: 0; background: none; color: var(--text-2); font: 600 var(--fs-sm)/1 var(--ui); cursor: pointer; text-align: left; }
+.fx-group-head:hover { color: var(--text); }
+.fx-group-head svg.i.chev { width: 11px; height: 11px; color: var(--text-3); transition: transform var(--t-fast) var(--ease); }
+.fx-group.open > .fx-group-head svg.i.chev { transform: rotate(90deg); }
 svg.i.flip { transform: rotate(180deg); }
 .mod { border-radius: var(--r-md); background: var(--surface-2); padding: 6px 8px 8px; display: flex; flex-direction: column; gap: 4px; }
 .mod-head { display: flex; align-items: center; gap: 6px; font-size: var(--fs-sm); font-weight: 600; color: var(--expr); }
@@ -652,6 +660,15 @@ svg.i.flip { transform: rotate(180deg); }
 .scopes canvas { display: block; width: 192px; height: 96px; image-rendering: pixelated; background: #000; border-radius: var(--r-xs); }
 .scopes .vector canvas { width: 96px; height: 96px; border-radius: 50%; }
 .scopes figcaption { font-size: 10px; color: rgba(255, 255, 255, .6); text-align: center; }
+.scopes .scope-kinds { display: flex; justify-content: center; gap: 2px; }
+.scopes .scope-kinds button { border: 0; background: none; padding: 2px 6px; border-radius: var(--r-xs); color: rgba(255, 255, 255, .55); font: 500 10px/1.2 var(--ui); cursor: pointer; min-height: 22px; }
+.scopes .scope-kinds button.on { color: #fff; background: rgba(255, 255, 255, .14); }
+.scopes { padding-right: 26px; }
+.scopes-close { position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; display: grid; place-items: center; border: 0; border-radius: var(--r-xs); background: none; color: rgba(255, 255, 255, .6); cursor: pointer; }
+.scopes-close:hover { color: #fff; background: rgba(255, 255, 255, .12); }
+.scopes-close svg.i { width: 12px; height: 12px; }
+.scopes-chip { position: absolute; right: 12px; bottom: 12px; z-index: 3; display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border: 0; border-radius: var(--r-md); background: rgba(10, 11, 13, .82); backdrop-filter: blur(10px); color: rgba(255, 255, 255, .85); font: 500 var(--fs-sm)/1 var(--ui); cursor: pointer; pointer-events: auto; box-shadow: var(--shadow-2); }
+.scopes-chip svg.i { width: 14px; height: 14px; }
 @media (max-width: 760px) { .scopes canvas { width: 128px; height: 64px; } .scopes .vector canvas { width: 64px; height: 64px; } }
 
 /* ── the Effects tab: what a phone adds, as tiles (desktop: none, its layers' menu adds) ── */

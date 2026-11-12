@@ -67,4 +67,23 @@ export const EDITOR_PRESETS: PresetType[] = [
       { type: 'fx.glow', props: { color: '#000000', radius: 12, strength: 0.35 } },
     ],
   },
+  // colour looks: a grade (fx.grade) and its companions, every value still the effect's own to change
+  ...([
+    ['look-natural', 'Natural pop', 'more life without looking graded: the highlights held, the shadows opened, a little clarity and vibrance',
+      [{ type: 'fx.grade', props: { contrast: 0.1, highlights: -0.25, shadows: 0.2, clarity: 0.15, vibrance: 0.3 } }]],
+    ['look-teal-orange', 'Teal and orange', 'the blockbuster look: teal shadows, warm highlights and skin, more contrast',
+      [{ type: 'fx.grade', props: { contrast: 0.15, shadowsColor: [-0.345, -0.061], highlightsColor: [0.217, 0.125], vibrance: 0.15, saturation: -0.05 } }]],
+    ['look-warm-film', 'Warm film', 'a warm film print: faded blacks, a soft halation around the lights, fine grain',
+      [{ type: 'fx.grade', props: { temperature: 0.25, contrast: 0.1, saturation: -0.1, fade: 0.25, highlightsColor: [0.123, 0.086] } }, { type: 'fx.film', props: { halation: 0.4, bloom: 0.1, grain: 0.3 } }]],
+    ['look-golden-hour', 'Golden hour', 'the light of the end of the day: warm, soft highlights, the edges a little darker',
+      [{ type: 'fx.grade', props: { temperature: 0.4, tint: 0.08, highlights: -0.15, shadows: 0.1, vibrance: 0.2 } }, { type: 'fx.vignette', props: { amount: 0.25 } }]],
+    ['look-cool-night', 'Cool night', 'night: darker, cooler, blue in the shadows, colours held back',
+      [{ type: 'fx.grade', props: { temperature: -0.35, exposure: -0.4, contrast: 0.15, saturation: -0.2, shadowsColor: [-0.212, -0.212] } }]],
+    ['look-bleach-bypass', 'Bleach bypass', 'hard and silvery: strong contrast, colours drained, detail pushed',
+      [{ type: 'fx.grade', props: { contrast: 0.45, saturation: -0.55, clarity: 0.2, highlights: -0.15 } }]],
+    ['look-faded', 'Faded matte', 'soft and matte: lifted blacks, low contrast, a warm touch in the highlights',
+      [{ type: 'fx.grade', props: { fade: 0.5, contrast: -0.15, saturation: -0.15, highlightsColor: [0.1, 0.06] } }]],
+    ['look-black-white', 'Black and white', 'black and white with contrast and texture',
+      [{ type: 'fx.grade', props: { saturation: -1, contrast: 0.25, clarity: 0.15 } }]],
+  ] as [string, string, string, { type: string; props: Record<string, unknown> }[]][]).map(([name, title, description, effects]): PresetType => ({ name, title, description, category: m('panel.colourLooks'), effects })),
 ];

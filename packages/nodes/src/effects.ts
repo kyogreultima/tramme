@@ -2,6 +2,7 @@
 // sub-frames are averaged in linear light. Their props animate like any other.
 
 import type { EffectType } from '@tramme/core';
+import { WHEEL_GLSL } from './grading.ts';
 
 export const vignette: EffectType = {
   type: 'look.vignette', title: 'Vignette', category: 'Finishing', stage: 'finish',
@@ -86,7 +87,7 @@ export const glow: EffectType<{ color: string; radius: number; strength: number 
 };
 
 export const color: EffectType<{ brightness: number; contrast: number; saturation: number; hue: number }> = {
-  type: 'fx.color', title: 'Color correction', category: 'Effects', stage: 'layer',
+  type: 'fx.color', title: 'Color correction', category: 'Colour', stage: 'layer',
   props: {
     brightness: { type: 'number', default: 1, min: 0, step: 0.01, unit: 'x', label: 'Brightness' },
     contrast: { type: 'number', default: 1, min: 0, step: 0.01, unit: 'x', label: 'Contrast' },
@@ -423,13 +424,14 @@ vec4 effect(vec2 uv) {
 
 /** a LUT: the colours of the layer through a .cube table (a grade, a log footage's conversion), at a strength */
 export const lut: EffectType<{ lut: string | null; strength: number }> = {
-  type: 'fx.lut', title: 'LUT', category: 'Effects', stage: 'layer',
+  type: 'fx.lut', title: 'LUT', category: 'Colour', stage: 'layer',
   description: 'the colours through a .cube table: a look, or the conversion of log footage',
   props: {
     lut: { type: 'asset', default: null, nullable: true, assetType: 'lut', label: 'LUT', animatable: false, description: 'a .cube file imported into the project' },
     strength: { type: 'number', default: 1, min: 0, max: 1, step: 0.01, label: 'Strength' },
   },
   gl: {
+    dither: true,
     code: `vec4 effect(vec2 uv) {
   vec4 p = texture(uImage, uv);
   if (u_lut_size < 2.0 || p.a <= 0.0) return p;
@@ -446,7 +448,7 @@ const IDENTITY = { v: [[0, 0], [1, 1]], closed: false };
 
 /** tone curves: the master curve on the three channels, then one curve each for red, green and blue */
 export const curves: EffectType<{ master: unknown; red: unknown; green: unknown; blue: unknown; strength: number }> = {
-  type: 'fx.curves', title: 'Curves', category: 'Effects', stage: 'layer',
+  type: 'fx.curves', title: 'Curves', category: 'Colour', stage: 'layer',
   description: 'tone curves: contrast, a lifted black, a colour cast, by points on a curve',
   props: {
     master: { type: 'path', format: 'curve', default: IDENTITY, label: 'Master', description: 'the brightness: points from 0 (black) to 1 (white)' },
@@ -456,6 +458,7 @@ export const curves: EffectType<{ master: unknown; red: unknown; green: unknown;
     strength: { type: 'number', default: 1, min: 0, max: 1, step: 0.01, label: 'Strength' },
   },
   gl: {
+    dither: true,
     code: `float through(sampler2D curve, float x) { return texture(curve, vec2(clamp(x, 0.0, 1.0) * (255.0 / 256.0) + 0.5 / 256.0, 0.5)).r; }
 vec4 effect(vec2 uv) {
   vec4 p = texture(uImage, uv);
@@ -476,7 +479,7 @@ const W0: [number, number] = [0, 0];
  * its distance from the centre) and a level, as a colourist grades.
  */
 export const wheels: EffectType<{ lift: [number, number]; liftLevel: number; gamma: [number, number]; gammaLevel: number; gain: [number, number]; gainLevel: number }> = {
-  type: 'fx.wheels', title: 'Colour wheels', category: 'Effects', stage: 'layer',
+  type: 'fx.wheels', title: 'Colour wheels', category: 'Colour', stage: 'layer',
   description: 'lift, gamma and gain: the shadows, the mid tones and the highlights pushed toward a colour, and their levels',
   props: {
     lift: { type: 'vec2', format: 'wheel', default: W0, label: 'Lift', group: 'Shadows', description: 'the colour the shadows lean toward' },
@@ -487,21 +490,15 @@ export const wheels: EffectType<{ lift: [number, number]; liftLevel: number; gam
     gainLevel: { type: 'number', default: 0, min: -1, max: 1, step: 0.005, label: 'Gain level', group: 'Highlights', description: 'brightens (or dims) the whites' },
   },
   gl: {
-    code: `// a wheel's colour: its hue at full saturation, made neutral in brightness, times its amount
-vec3 tint(vec2 w) {
-  float k = min(length(w), 1.0);
-  if (k <= 0.0) return vec3(0.0);
-  float h = atan(w.y, w.x) / 6.2831853;
-  vec3 c = clamp(abs(mod(h * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0);
-  return (c - dot(c, vec3(0.2126, 0.7152, 0.0722))) * k;
-}
+    dither: true,
+    code: `${WHEEL_GLSL}
 vec4 effect(vec2 uv) {
   vec4 p = texture(uImage, uv);
   if (p.a <= 0.0) return p;
   vec3 c = p.rgb / p.a;
-  vec3 lift = u_liftLevel + tint(u_lift) * 0.25;
-  vec3 gain = 1.0 + u_gainLevel + tint(u_gain) * 0.5;
-  vec3 gamma = max(vec3(0.05), 1.0 + u_gammaLevel + tint(u_gamma) * 0.5);
+  vec3 lift = u_liftLevel + wheelTint(u_lift) * 0.25;
+  vec3 gain = 1.0 + u_gainLevel + wheelTint(u_gain) * 0.5;
+  vec3 gamma = max(vec3(0.05), 1.0 + u_gammaLevel + wheelTint(u_gamma) * 0.5);
   vec3 o = clamp(gain * (c + lift * (1.0 - c)), 0.0, 1.0);
   return vec4(pow(o, 1.0 / gamma) * p.a, p.a);
 }`,

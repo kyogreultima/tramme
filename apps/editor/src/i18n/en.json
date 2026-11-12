@@ -721,6 +721,17 @@
     "noProjectNamed": "Nothing named “{query}”."
   },
   "inspector": {
+    "resetEffect": "Reset the effect",
+    "sourceRec709": "Rec.709 / sRGB (video)",
+    "sourceSlog3": "Sony S-Log3",
+    "sourceVlog": "Panasonic V-Log",
+    "sourceLogc3": "ARRI LogC3",
+    "sourceApplelog": "Apple Log (iPhone)",
+    "sourceClog3": "Canon Log 3",
+    "sourceHlg": "HLG (HDR phones)",
+    "viewResult": "Result",
+    "viewMatte": "Matte",
+    "viewIsolated": "Colour alone",
     "sceneParamsRead": "Read the scene parameters",
     "sceneReadParams": "Read the parameters from scene.json",
     "sceneParamsCurrent": "The parameters already match scene.json.",
@@ -870,6 +881,7 @@
     "camera": "Camera (2.5D)"
   },
   "panel": {
+    "colourLooks": "Colour looks",
     "keepInLibrary": "Keep in the library",
     "componentWith": "A component: {params}",
     "component": "component",
@@ -1428,6 +1440,10 @@
     "hdrUnavailable": "HDR: this browser's canvas cannot hold it yet, the export stays SDR"
   },
   "viewport": {
+    "scopes": "Scopes",
+    "hideScopes": "Hide the scopes",
+    "parade": "Parade",
+    "histogram": "Histogram",
     "sceneLive": "Live preview of the web scene {folder}",
     "sceneProblem": "Web scene {folder}: {problem}",
     "websceneCaptured": "Web scene {folder}: its pictures are made when you export with tramme render",

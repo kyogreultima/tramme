@@ -9,14 +9,21 @@
 // straight) or sampler2D (a layer, drawn alone at the same instant); a LUT
 // asset (assetType 'lut') as sampler3D u_<name> with u_<name>_size,
 // u_<name>_min and u_<name>_max (its table's size and domain); a tone curve
-// (a path prop of format 'curve') as sampler2D u_<name>, 256 values in red.
-// Programs are compiled once per source.
+// (a path prop of format 'curve' or 'hue-curve') as sampler2D u_<name>, 256
+// values in red. Programs are compiled once per source.
+// The effects of one layer run as a chain (glChain): the layer is uploaded
+// once, each pass writes to a half-float target the next one reads, and only
+// the last writes 8 bits again (dithered when an effect asks): a grade, then
+// curves, then a LUT lose nothing between them.
 
 import { applyHomography, curveTable, homography, invertHomography, parseColor, type Lut3D, type PathValue, type PropSchema, type Quad } from '@tramme/core';
 
 const VERT = `#version 300 es
 out vec2 vUv;
 void main() { vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2); vUv = p; gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0); }`;
+
+/** a curve read as a 1D table: a tone curve, or a curve over the hues */
+const isCurve = (format: string | undefined) => format === 'curve' || format === 'hue-curve';
 
 /** the declarations a schema gives a fragment */
 export function uniformsOf(schema: PropSchema): string {
@@ -28,21 +35,29 @@ export function uniformsOf(schema: PropSchema): string {
     // a layer, and whether one is named (a mask left out acts as all white, by the effect's choice)
     if (d.type === 'layer') return `uniform sampler2D ${n}; uniform float ${n}_set;`;
     if (d.type === 'asset' && d.assetType === 'lut') return `uniform highp sampler3D ${n}; uniform float ${n}_size; uniform vec3 ${n}_min; uniform vec3 ${n}_max;`;
-    if (d.type === 'path' && d.format === 'curve') return `uniform sampler2D ${n};`;
+    if (d.type === 'path' && isCurve(d.format)) return `uniform sampler2D ${n};`;
     return '';
   }).filter(Boolean).join('\n');
 }
 
-/** the whole fragment program of an effect */
+/**
+ * The whole fragment program of an effect. uDither (set on the last pass of a
+ * chain written to 8 bits) adds less than one step of noise, so a smooth
+ * gradient pushed by a grade does not band.
+ */
 export const fragmentOf = (code: string, schema: PropSchema) => `#version 300 es
 precision highp float;
 in vec2 vUv; out vec4 fragColor;
-uniform sampler2D uImage; uniform vec2 uRes; uniform float uScale; uniform float uTime; uniform float uLayerTime;
+uniform sampler2D uImage; uniform vec2 uRes; uniform float uScale; uniform float uTime; uniform float uLayerTime; uniform float uDither;
 ${uniformsOf(schema)}
 ${code}
-void main() { fragColor = effect(vUv); }`;
+void main() {
+  vec4 c = effect(vUv);
+  if (uDither > 0.5 && c.a > 0.0) c.rgb = clamp(c.rgb + (fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715)))) - 0.5) / 255.0, 0.0, c.a);
+  fragColor = c;
+}`;
 
-interface GL { canvas: OffscreenCanvas | HTMLCanvasElement; gl: WebGL2RenderingContext; programs: Map<string, WebGLProgram | Error>; vao: WebGLVertexArrayObject; textures: WebGLTexture[] }
+interface GL { canvas: OffscreenCanvas | HTMLCanvasElement; gl: WebGL2RenderingContext; programs: Map<string, WebGLProgram | Error>; vao: WebGLVertexArrayObject; textures: WebGLTexture[]; float?: boolean; between?: { w: number; h: number; targets: { fb: WebGLFramebuffer; tex: WebGLTexture }[] } }
 let shared: GL | null = null;
 
 /** a canvas for WebGL2, where the platform makes one (null in a bare runtime) */
@@ -106,7 +121,7 @@ export function setUniforms(gl: WebGL2RenderingContext, p: WebGLProgram, schema:
       gl.bindTexture(gl.TEXTURE_2D, tex);
       gl.uniform1i(loc, unit++);
       gl.uniform1f(gl.getUniformLocation(p, `u_${k.replace(/\W/g, '_')}_set`), typeof v === 'string' && v ? 1 : 0);
-    } else if (d.type === 'path' && d.format === 'curve') {
+    } else if (d.type === 'path' && isCurve(d.format)) {
       gl.activeTexture(gl.TEXTURE0 + unit);
       gl.bindTexture(gl.TEXTURE_2D, curveTexture(gl, ((v as PathValue | undefined)?.v ?? []) as number[][]));
       gl.uniform1i(loc, unit++);
@@ -272,37 +287,84 @@ export function resizeNode(g: import('@tramme/core').NodeGL, w: number, h: numbe
   }
 }
 
+/** one effect of a chain: its fragment, its values, the pictures of its layer props (canvases of the frame's size) */
+export interface GlStep {
+  code: string;
+  schema: PropSchema;
+  props: Record<string, unknown>;
+  layers?: Record<string, CanvasImageSource | null>;
+  /** the effect smooths its 8-bit result with a step of noise (grades) */
+  dither?: boolean;
+}
+
+/** the two targets a chain passes between, half floats where the GPU renders to them */
+function between(g: GL, w: number, h: number) {
+  const { gl } = g;
+  if (g.between && g.between.w === w && g.between.h === h) return g.between.targets;
+  for (const t of g.between?.targets ?? []) { gl.deleteFramebuffer(t.fb); gl.deleteTexture(t.tex); }
+  g.float ??= !!gl.getExtension('EXT_color_buffer_float');
+  const targets = [0, 1].map(() => {
+    const tex = gl.createTexture()!;
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texStorage2D(gl.TEXTURE_2D, 1, g.float ? gl.RGBA16F : gl.RGBA8, w, h);
+    for (const [k, v] of [[gl.TEXTURE_MIN_FILTER, gl.LINEAR], [gl.TEXTURE_MAG_FILTER, gl.LINEAR], [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, k, v);
+    const fb = gl.createFramebuffer()!;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+    return { fb, tex };
+  });
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  g.between = { w, h, targets };
+  return targets;
+}
+
 /**
- * Runs an effect's fragment over the pixels of a 2D canvas, in place: the
- * canvas is read as premultiplied sRGB and gets the result. `layers` gives
- * the pictures of the effect's layer props (canvases of the same size).
+ * Runs effects' fragments over the pixels of a 2D canvas, in place, one after
+ * the other: the canvas is read once as premultiplied sRGB, the passes hand
+ * their result to each other in half floats, and the canvas gets the last
+ * one's. A step whose program does not compile is left out and reported to
+ * `onError` (by its index); the others still run.
  */
-export function glPass(ctx: CanvasRenderingContext2D, code: string, schema: PropSchema, props: Record<string, unknown>, t: number, scale: number, layers: Record<string, CanvasImageSource | null> = {}, layerIn = 0, lutOf: (name: string, value: unknown) => Lut3D | null = () => null) {
+export function glChain(ctx: CanvasRenderingContext2D, steps: GlStep[], t: number, scale: number, layerIn = 0, lutOf: (name: string, value: unknown) => Lut3D | null = () => null, onError?: (index: number, err: Error) => void) {
   const g = context(), { gl } = g, { width: w, height: h } = ctx.canvas;
   if (g.canvas.width !== w || g.canvas.height !== h) { g.canvas.width = w; g.canvas.height = h; }
-  const p = program(g, fragmentOf(code, schema));
+  const runs: { step: GlStep; p: WebGLProgram }[] = [];
+  steps.forEach((step, i) => {
+    try { runs.push({ step, p: program(g, fragmentOf(step.code, step.schema)) }); } catch (e) { if (!onError) throw e; onError(i, e as Error); }
+  });
+  if (!runs.length) return;
   const made: WebGLTexture[] = [];
+  const targets = runs.length > 1 ? between(g, w, h) : [];
+  const dither = runs.some((r) => r.step.dither);
   try {
     gl.viewport(0, 0, w, h);
-    gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
-    gl.useProgram(p);
     const image = texture(gl, ctx.canvas as TexImageSource);
     made.push(image);
-    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, image);
-    gl.uniform1i(gl.getUniformLocation(p, 'uImage'), 0);
-    gl.uniform2f(gl.getUniformLocation(p, 'uRes'), w, h);
-    gl.uniform1f(gl.getUniformLocation(p, 'uTime'), t);
-    gl.uniform1f(gl.getUniformLocation(p, 'uLayerTime'), t - layerIn);
-    gl.uniform1f(gl.getUniformLocation(p, 'uScale'), scale);
-    setUniforms(gl, p, schema, props, 1, (k) => {
-      const src = layers[k];
-      if (!src) return null;
-      const tex = texture(gl, src as TexImageSource);
-      made.push(tex);
-      return tex;
-    }, lutOf);
-    gl.bindVertexArray(g.vao);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    let src = image;
+    runs.forEach(({ step, p }, i) => {
+      const last = i === runs.length - 1, target = last ? null : targets[i % 2];
+      gl.bindFramebuffer(gl.FRAMEBUFFER, target?.fb ?? null);
+      gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.useProgram(p);
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, src);
+      gl.uniform1i(gl.getUniformLocation(p, 'uImage'), 0);
+      gl.uniform2f(gl.getUniformLocation(p, 'uRes'), w, h);
+      gl.uniform1f(gl.getUniformLocation(p, 'uTime'), t);
+      gl.uniform1f(gl.getUniformLocation(p, 'uLayerTime'), t - layerIn);
+      gl.uniform1f(gl.getUniformLocation(p, 'uScale'), scale);
+      gl.uniform1f(gl.getUniformLocation(p, 'uDither'), last && dither ? 1 : 0);
+      setUniforms(gl, p, step.schema, step.props, 1, (k) => {
+        const pic = step.layers?.[k];
+        if (!pic) return null;
+        const tex = texture(gl, pic as TexImageSource);
+        made.push(tex);
+        return tex;
+      }, lutOf);
+      gl.bindVertexArray(g.vao);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      if (target) src = target.tex;
+    });
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalCompositeOperation = 'copy';

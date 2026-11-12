@@ -486,7 +486,7 @@ function Field({ def, value, ctx, label, onDraft, onCommit, onPick }: { def: Pro
       return <Select value={String(value ?? '')} options={[['', t('inspector.none')], ...opts]} onChange={(v) => onCommit(v || null)} />;
     }
     case 'path':
-      if (def.format === 'curve') return <CurveField value={value as PathValue | null} onDraft={onDraft} onCommit={onCommit} />;
+      if (def.format === 'curve' || def.format === 'hue-curve') return <CurveField value={value as PathValue | null} rest={def.default as PathValue | undefined} hue={def.format === 'hue-curve'} onDraft={onDraft} onCommit={onCommit} />;
       return <JsonField value={value} label={label} onCommit={onCommit} />;
     case 'color':
       return value === null ? <NullPaint onSet={() => onCommit('#FFFFFF')} /> : <ColorField value={rawColor(value)} tokens={ctx.tokens} onDraft={onDraft} onCommit={onCommit} onPick={onPick} />;
@@ -515,6 +515,9 @@ const ENUM_LABEL: Record<string, string> = {
   butt: m('inspector.butt'), round: m('inspector.round'), square: m('common.square'), miter: m('inspector.miter'), bevel: m('inspector.bevel'), alphabetic: m('inspector.alphabetic'), top: m('inspector.top'), middle: m('inspector.middle'), bottom: m('inspector.bottom'),
   normal: m('inspector.normal'), multiply: m('inspector.multiply'), screen: m('inspector.screen'), overlay: m('inspector.overlay'), darken: m('inspector.darken'), lighten: m('inspector.lighten'), add: m('inspector.additive'),
   both: m('inspector.both'), lift: m('inspector.lift'), push: m('inspector.push'),
+  // the footage a grade reads, and the views of a selection
+  rec709: m('inspector.sourceRec709'), slog3: m('inspector.sourceSlog3'), vlog: m('inspector.sourceVlog'), logc3: m('inspector.sourceLogc3'), applelog: m('inspector.sourceApplelog'), clog3: m('inspector.sourceClog3'), hlg: m('inspector.sourceHlg'),
+  result: m('inspector.viewResult'), matte: m('inspector.viewMatte'), isolated: m('inspector.viewIsolated'),
 };
 
 const rawColor = (v: unknown) => (typeof v === 'string' ? v : '#000000');
@@ -553,13 +556,22 @@ function WheelField({ value, onDraft, onCommit }: { value: [number, number]; onD
   );
 }
 
+/** the hues along a hue curve's x axis, as OKLCh turns them (0 a pinkish red, then red, orange, yellow, green, cyan, blue, purple, magenta) */
+const HUE_STRIP: [number, string][] = [[0, '#FF3D8B'], [0.08, '#FF2A1F'], [0.16, '#FF8A00'], [0.3, '#FFE000'], [0.39, '#30D030'], [0.54, '#00D5E0'], [0.73, '#2050FF'], [0.82, '#8A40FF'], [0.91, '#FF40D0'], [1, '#FF3D8B']];
+
 /**
- * A tone curve: its points over a square from black (0) to white (1), the
- * curve drawn through them as the effect reads it. Drag a point; click the
- * square to add one; double-click a point (not an end) to take it out.
+ * A curve: its points over a square, the curve drawn through them as the
+ * effect reads it. A tone curve goes from black (0) to white (1), its guide
+ * the diagonal; a curve at rest flat (hue and saturation curves) has its
+ * guide across, and a hue curve the hues along its foot, its two ends one
+ * point (the hues go round). Drag a point; click the square to add one;
+ * double-click a point (not an end) to take it out, the square to put the
+ * curve back at rest.
  */
-function CurveField({ value, onDraft, onCommit }: { value: PathValue | null; onDraft: (v: unknown) => void; onCommit: (v: unknown) => void }) {
-  const S_ = 120, pts = ((value?.v ?? [[0, 0], [1, 1]]) as number[][]).map((p) => [p[0], p[1]]).sort((a, b) => a[0] - b[0]);
+function CurveField({ value, rest, hue, onDraft, onCommit }: { value: PathValue | null; rest?: PathValue; hue?: boolean; onDraft: (v: unknown) => void; onCommit: (v: unknown) => void }) {
+  const S_ = 120, base = (rest?.v ?? [[0, 0], [1, 1]]) as number[][];
+  const flat = base.length >= 2 && base[0][1] === base[base.length - 1][1];
+  const pts = ((value?.v ?? base) as number[][]).map((p) => [p[0], p[1]]).sort((a, b) => a[0] - b[0]);
   const table = curveTable(pts, 64);
   const line = Array.from(table, (y, i) => `${(i / 63) * S_},${(1 - y) * S_}`).join(' ');
   const write = (next: number[][]) => ({ v: next.map(([x, y]) => [+x.toFixed(3), +y.toFixed(3)]).sort((a, b) => a[0] - b[0]), closed: false });
@@ -577,6 +589,8 @@ function CurveField({ value, onDraft, onCommit }: { value: PathValue | null; onD
       // the ends keep their place on the x axis; the others stay between their neighbours
       const lo = i === 0 ? 0 : list[i - 1][0] + 0.01, hi = i === list.length - 1 ? 1 : list[i + 1][0] - 0.01;
       next[i] = [i === 0 || i === list.length - 1 ? list[i][0] : Math.min(hi, Math.max(lo, x)), y];
+      // a hue curve goes round: its two ends move together
+      if (hue && (i === 0 || i === list.length - 1)) next[i === 0 ? list.length - 1 : 0][1] = y;
       last = write(next);
       onDraft(last);
     };
@@ -591,9 +605,13 @@ function CurveField({ value, onDraft, onCommit }: { value: PathValue | null; onD
     onCommit(write(next));
   };
   return (
-    <svg class="curve-field" viewBox={`0 0 ${S_} ${S_}`} width={S_} height={S_} onPointerDown={add as never}>
+    <svg class="curve-field" viewBox={`0 0 ${S_} ${S_}`} width={S_} height={S_} onPointerDown={add as never} onDblClick={() => onCommit(write(base))}>
+      {hue && <>
+        <defs><linearGradient id="curve-hues">{HUE_STRIP.map(([o, c]) => <stop key={o} offset={o} stop-color={c} />)}</linearGradient></defs>
+        <rect class="hues" x={0} y={S_ - 6} width={S_} height={6} fill="url(#curve-hues)" />
+      </>}
       {[0.25, 0.5, 0.75].map((g) => <g key={g}><line class="grid" x1={g * S_} y1={0} x2={g * S_} y2={S_} /><line class="grid" x1={0} y1={g * S_} x2={S_} y2={g * S_} /></g>)}
-      <line class="diag" x1={0} y1={S_} x2={S_} y2={0} />
+      {flat ? <line class="diag" x1={0} y1={(1 - base[0][1]) * S_} x2={S_} y2={(1 - base[0][1]) * S_} /> : <line class="diag" x1={0} y1={S_} x2={S_} y2={0} />}
       <polyline class="curve" points={line} />
       {pts.map((p, i) => (
         <circle key={i} class="pt" cx={p[0] * S_} cy={(1 - p[1]) * S_} r={4.5}
@@ -667,6 +685,20 @@ function Section({ title, children, right, id }: { title: string; children: prea
         <span onClick={(e) => e.stopPropagation()} style={{ display: 'flex', gap: 2 }}>{right}</span>
       </div>
       {open && <div class="section-body">{children}</div>}
+    </div>
+  );
+}
+
+/** a part of a large effect (a grade's light, its colour wheels…), folded or open, remembered per effect type */
+function FxGroup({ id, title, children }: { id: string; title: string; children: preact.ComponentChildren }) {
+  const key = 'tramme.fxg.' + id;
+  const [open, setOpen] = useState(() => { try { return localStorage.getItem(key) !== '0'; } catch { return true; } });
+  const toggle = () => { setOpen(!open); try { localStorage.setItem(key, open ? '0' : '1'); } catch { /* private */ } };
+  if (!title) return <>{children}</>;
+  return (
+    <div class={`fx-group${open ? ' open' : ''}`}>
+      <button class="fx-group-head" aria-expanded={open} onClick={toggle}><Icon name="chevron" class="chev" /><span>{title}</span></button>
+      {open && children}
     </div>
   );
 }
@@ -911,10 +943,17 @@ function EffectsSection({ ctx, base, address, effects, stage, title }: { ctx: Ct
             <div class="fx-head">
               <Toggle on={fx.enabled !== false} onChange={(v) => commit(v ? t('inspector.enableEffect') : t('inspector.disableEffect'), setAtOps(ctx.doc, `${base}/effects/${i}/enabled`, v))} />
               <span class="fx-title">{def ? tr(def.title) : fx.type}</span>
+              {def && Object.keys(fx.props ?? {}).length > 0 && <button class="icon-btn xs" title={t('inspector.resetEffect')} onClick={() => commit(t('inspector.resetEffect'), [{ op: 'replace', path: `${base}/effects/${i}/props`, value: {} }])}><Icon name="undo" /></button>}
               <button class="icon-btn xs" title={t('inspector.moveUp')} disabled={i === 0} onClick={() => commit(t('inspector.effectOrder'), [{ op: 'move', from: `${base}/effects/${i}`, path: `${base}/effects/${i - 1}` }])}><Icon name="chevronDown" class="flip" /></button>
               <button class="icon-btn xs" title={t('common.remove')} onClick={() => commit(t('common.removeName', { name: def ? tr(def.title) : fx.type }), [{ op: 'remove', path: `${base}/effects/${i}` }])}><Icon name="x" /></button>
             </div>
-            {def && fx.enabled !== false && <SchemaRows ctx={ctx} schema={def.props} basePath={`${base}/effects/${i}/props`} baseAddress={`${address}.${fx.id}`} />}
+            {def && fx.enabled !== false && (Object.values(def.props).some((d) => d.group)
+              ? grouped(def.props, '').map(([g, schema]) => (
+                <FxGroup key={g} id={`${fx.type}.${g}`} title={tr(g)}>
+                  <SchemaRows ctx={ctx} schema={schema} basePath={`${base}/effects/${i}/props`} baseAddress={`${address}.${fx.id}`} />
+                </FxGroup>
+              ))
+              : <SchemaRows ctx={ctx} schema={def.props} basePath={`${base}/effects/${i}/props`} baseAddress={`${address}.${fx.id}`} />)}
           </div>
         );
       })}
