@@ -13,14 +13,14 @@
 # macOS is left out as in the stable release: an app Apple has not signed cannot
 # be installed (apps/desktop/downloads.ts).
 
-name: Desktop app (beta)
+name: Desktop and Android apps (beta)
 
 on:
   push:
     branches: [develop]
-    # a new version of the app always changes the first; the second makes a change to this workflow try itself
+    # a new version of the app always changes the first; the others make a change to these workflows try itself
     # (a workflow that only runs by hand is not listed by GitHub until it is on the default branch)
-    paths: [apps/desktop/src-tauri/tauri.conf.json, .github/workflows/desktop-beta.yml]
+    paths: [apps/desktop/src-tauri/tauri.conf.json, .github/workflows/desktop-beta.yml, .github/workflows/android.yml]
   workflow_dispatch:
 
 permissions:

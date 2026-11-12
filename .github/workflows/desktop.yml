@@ -7,7 +7,7 @@
 # same if the version is still unreleased; elsewhere it only builds, kept as the
 # run's artifacts.
 
-name: Desktop app
+name: Desktop and Android apps
 
 on:
   push:
