@@ -151,3 +151,26 @@ export function keepAwake(on: boolean): void {
     leaving = null;
   }
 }
+
+// ── the back button ──────────────────────────────────────────
+
+/** what is open on top of a page: the menus, popovers, lists and dialogs (ui/controls.tsx), which close on Escape */
+const OVERLAYS = '.menu, .popover, .modal-back, [role="listbox"]';
+
+/** What the back button does: closes what is open on top first, then goes back through the pages, then leaves the app. */
+export function backAction(s: { overlayOpen: boolean; path: string }): 'escape' | 'history' | 'exit' {
+  if (s.overlayOpen) return 'escape';
+  return s.path === '/' ? 'exit' : 'history';
+}
+
+/** the system's back button, from the plugin (apps/desktop/plugin-device): the page decides what it does */
+export function startBackButton(): void {
+  if (platform !== 'android') return;
+  tauri!.core.addPluginListener('tramme-device', 'back', () => {
+    const action = backAction({ overlayOpen: !!document.querySelector(OVERLAYS), path: location.pathname });
+    if (action === 'escape') (document.activeElement ?? document.body).dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    // a page opened with nothing before it (the app started on a project) goes to the projects
+    else if (action === 'history') { if (history.length > 1) history.back(); else void import('./nav.ts').then((n) => n.go('/')); }
+    else tauri!.core.invoke('device_exit').catch(() => {});
+  }).catch((e) => console.warn('[tramme] back button:', (e as Error).message));
+}

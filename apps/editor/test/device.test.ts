@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { deviceFileOf, deviceTarget, deviceWritable, saveChoices } from '../src/device.ts';
+import { backAction, deviceFileOf, deviceTarget, deviceWritable, saveChoices } from '../src/device.ts';
 
 describe('what the sheet offers for a file', () => {
   it('a video or a picture goes to the gallery, the rest to the downloads, and any can be shared', () => {
@@ -85,5 +85,21 @@ describe('an export written to the exports folder', () => {
   it('is a mediabunny target', async () => {
     const { target } = await deviceTarget('a.mp4');
     expect(target.constructor.name).toBe('StreamTarget');
+  });
+});
+
+describe('the back button', () => {
+  it('closes what is open on top first, wherever the user is', () => {
+    expect(backAction({ overlayOpen: true, path: '/p/abc' })).toBe('escape');
+    expect(backAction({ overlayOpen: true, path: '/' })).toBe('escape');
+  });
+
+  it('then goes back through the pages', () => {
+    expect(backAction({ overlayOpen: false, path: '/p/abc' })).toBe('history');
+    expect(backAction({ overlayOpen: false, path: '/space' })).toBe('history');
+  });
+
+  it('then leaves the app, from the projects only', () => {
+    expect(backAction({ overlayOpen: false, path: '/' })).toBe('exit');
   });
 });

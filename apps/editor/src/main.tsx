@@ -46,6 +46,7 @@ import { startProject } from './start.ts';
 import { t } from './i18n/index.ts';
 import { boot } from './mode.ts';
 import { initDesktop } from './desktop.ts';
+import { startBackButton } from './device.ts';
 import { watchUpdates } from './version.ts';
 import { copiesFor, startInstalled } from './installed.ts';
 import { lift } from './nav.ts';
@@ -142,6 +143,7 @@ boot().then(() => {
   void startMeasuring();
   // the native app: a .tramme handed by the system imports like a dropped one
   initDesktop();
+  startBackButton();
   // the plugins installed on this device, read once from where they are kept
   startInstalled();
   // the local companion, found whenever it starts, on the home page and in the editor
