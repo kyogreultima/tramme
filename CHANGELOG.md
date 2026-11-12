@@ -31,6 +31,8 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Fixed
 
+- Style frames and pictures made by Gemini work again: the picture model is now read from Google's list instead of a name that no longer existed, which made every style frame fail.
+- The style frames and the end of a scene find a scene by its name or a word only it holds, not only by its exact id.
 - A turn stopped half way keeps the line of what it spent.
 - A plugin's check with the name of one of its tools runs (the stick figure's pose check said it was "a tool, called as a check" in every review).
 - A film's music made by ElevenLabs is no longer refused when its prompt is long, nor for being asked as instrumental beside its plan.

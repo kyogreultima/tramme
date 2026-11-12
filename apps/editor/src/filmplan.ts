@@ -147,6 +147,15 @@ export function todoScenes(plan: FilmPlan, doc: TrammeDoc): { run: PlanScene[]; 
   return { run, skipped };
 }
 
+/** a scene of the plan by its id, its name, or a word only its id or name holds ("record" for "ton-record-battu"); undefined when none or several */
+export function sceneNamed(plan: FilmPlan, asked: string): PlanScene | undefined {
+  const w = asked.trim().toLowerCase();
+  const exact = plan.scenes.find((s) => s.id === w || s.name.toLowerCase() === w);
+  if (exact) return exact;
+  const holding = plan.scenes.filter((s) => s.id.includes(w) || s.name.toLowerCase().includes(w));
+  return holding.length === 1 ? holding[0] : undefined;
+}
+
 /** the plan with one scene's state changed */
 export const setStatus = (plan: FilmPlan, id: string, status: PlanScene['status']): FilmPlan => ({ ...plan, updated: new Date().toISOString(), scenes: plan.scenes.map((s) => (s.id === id ? { ...s, status } : s)) });
 
@@ -274,9 +283,10 @@ const sceneDone: ToolType<{ scene: string; note?: string }> = {
   async run({ scene, note }, ctx) {
     const plan = parsePlan(await ctx.readText(FILM_PLAN_PATH).catch(() => null));
     if (!plan) throw new Error('there is no film plan: write it first (use_tool "film-plan")');
-    if (!plan.scenes.some((s) => s.id === scene)) throw new Error(`${scene}: no such scene (the plan's scenes: ${plan.scenes.map((s) => s.id).join(', ')})`);
-    await ctx.writeFile(FILM_PLAN_PATH, JSON.stringify(setStatus(plan, scene, 'built'), null, 1));
-    return { ops: [planOp(ctx.doc)], label: `${scene} built`, text: `${scene} is marked built${note ? ` (${note})` : ''}. Stop here: do not summarise.` };
+    const found = sceneNamed(plan, scene);
+    if (!found) throw new Error(`${scene}: no such scene (the plan's scenes: ${plan.scenes.map((s) => s.id).join(', ')})`);
+    await ctx.writeFile(FILM_PLAN_PATH, JSON.stringify(setStatus(plan, found.id, 'built'), null, 1));
+    return { ops: [planOp(ctx.doc)], label: `${found.id} built`, text: `${found.id} is marked built${note ? ` (${note})` : ''}. Stop here: do not summarise.` };
   },
 };
 

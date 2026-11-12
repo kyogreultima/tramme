@@ -118,3 +118,16 @@ describe('a plan written again', () => {
     await expect(plans.FILM_PLAN_TOOLS[0].run({ change: [{ name: 'Nope', idea: 'x' }] }, ctx)).rejects.toThrow("the plan's scenes: Product");
   });
 });
+
+describe('a scene named loosely', () => {
+  const p = () => ({ ...plan(), scenes: [{ ...scene, id: 'ton-record-battu', name: 'Ton record battu' }, { ...scene, id: 'l-app', name: "L'app" }, { ...scene, id: 'ton-rythme', name: 'Ton rythme' }] });
+  it('is found by its id, its name, or a word only it holds', () => {
+    expect(plans.sceneNamed(p(), 'l-app')?.id).toBe('l-app');
+    expect(plans.sceneNamed(p(), 'Ton rythme')?.id).toBe('ton-rythme');
+    expect(plans.sceneNamed(p(), 'record')?.id).toBe('ton-record-battu');
+  });
+  it('is not guessed when the word names several, or none', () => {
+    expect(plans.sceneNamed(p(), 'ton')).toBeUndefined();
+    expect(plans.sceneNamed(p(), 'drop')).toBeUndefined();
+  });
+});
