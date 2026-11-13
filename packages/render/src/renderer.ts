@@ -110,6 +110,8 @@ export class Renderer {
   times: FrameParts = noParts();
   /** what the last frame drawn was missing (video frames being decoded) */
   private pending: Promise<unknown>[] = [];
+  /** the sub-frame being drawn, from the frame's own time (s): Host.shutter */
+  private shutterOffset = 0;
   private preserve = true;
   private isolate = false;
   private pluginModule?: RendererOptions['pluginModule'];
@@ -228,7 +230,7 @@ export class Renderer {
     const comp = this.evaluator.comp(compId);
     return (layerId: string): Host => ({
       layerId, layerIn: comp.layers[layerId]?.in ?? 0,
-      t: f.t, frame: f.frame, fps: comp.fps, width: comp.width, height: comp.height, duration: comp.duration,
+      t: f.t, frame: f.frame, shutter: this.shutterOffset, fps: comp.fps, width: comp.width, height: comp.height, duration: comp.duration,
       asset: <T>(id: string) => assets.use<T>(id, (p) => { this.pending.push(p); }),
       assetInfo: (id: string) => assets.info(id),
       assetUrl: (id: string) => assets.url(id),
@@ -422,7 +424,9 @@ export class Renderer {
         const sub = ts === t ? frame : this.evaluator.frame(ts, this.compId);
         const d0 = performance.now();
         this.times.evaluate += d0 - e1;
-        this.drawScene(sub);
+        // footage holds the frame's own picture across the shutter (Host.shutter)
+        this.shutterOffset = ts - t;
+        try { this.drawScene(sub); } finally { this.shutterOffset = 0; }
         this.compositor.add(this.scene, 1 / times.length);
         this.times.draw += performance.now() - d0;
         if (i < times.length) return null;

@@ -878,7 +878,7 @@
     "finishingEffects": "Effets de finition",
     "nLayersSelected": "{n} calques sélectionnés.",
     "inspectTheFirst": "Inspecter le premier",
-    "camera": "Caméra (2.5D)"
+    "camera": "Caméra (2,5D)"
   },
   "panel": {
     "colourLooks": "Looks couleur",
@@ -1572,10 +1572,10 @@
     "cutoutMask": "{name} · masque",
     "cutoutSubject": "{name} · détourage",
     "depthEstimating": "lecture de la profondeur",
-    "depthDone": "Profondeur lue sur {frames} image(s). Donnez une caméra à la composition (ou lancez photo-2.5d sur une photo) : le calque bouge en 2.5D.",
+    "depthDone": "Profondeur lue sur {frames} image(s). Donnez une caméra à la composition (ou lancez photo-2.5d sur une photo) : le calque bouge en 2,5D.",
     "depthLabel": "Profondeur de {name}",
     "depthMap": "{name} · profondeur",
-    "photo25dDone": "{name} bouge désormais en 2.5D : profondeur, caméra et cadrage posés."
+    "photo25dDone": "{name} bouge désormais en 2,5D : profondeur, caméra et cadrage posés."
   },
   "model": {
     "placed": "{name} posé comme modèle 3D."
@@ -1978,7 +1978,7 @@
     "To (s)": "À (s)",
     "Video layer": "Calque vidéo",
     "Depth parallax": "Parallaxe de profondeur",
-    "a 2.5D relief from a depth map (the depth tool makes one): near grows, far shrinks as the camera moves": "un relief 2.5D depuis une carte de profondeur (l'outil profondeur en fait une) : le proche grandit, le lointain rétrécit quand la caméra bouge",
+    "a 2.5D relief from a depth map (the depth tool makes one): near grows, far shrinks as the camera moves": "un relief 2,5D depuis une carte de profondeur (l'outil profondeur en fait une) : le proche grandit, le lointain rétrécit quand la caméra bouge",
     "Depth layer": "Calque de profondeur",
     "usually hidden; grey levels, bright = near": "généralement caché ; niveaux de gris, clair = proche",
     "Plane": "Plan",
@@ -2304,7 +2304,7 @@
     "Lip sync": "Synchronisation labiale",
     "Mouths": "Bouches",
     "Photo": "Photo",
-    "Photo in 2.5D": "Photo en 2.5D",
+    "Photo in 2.5D": "Photo en 2,5D",
     "Read the depth": "Lire la profondeur",
     "Seconds": "Secondes",
     "how far the camera drifts (1: about 8% of the width sideways)": "l'ampleur de la dérive de la caméra (1 : environ 8 % de la largeur, sur le côté)",
@@ -2314,7 +2314,7 @@
     "reads the depth of a photo or a video as a grey map (bright where near), saved as an asset, and wires it: fx.parallax moves the layer the way the composition camera would, a photo also takes a depth of field (fx.depthBlur)": "lit la profondeur d'une photo ou d'une vidéo en une carte de gris (clair de près), enregistrée comme ressource, et la câble : fx.parallax bouge le calque comme la caméra de composition, une photo prend aussi une profondeur de champ (fx.depthBlur)",
     "the photo or footage to read (the selected layer by default)": "la photo ou la vidéo à lire (le calque sélectionné par défaut)",
     "the picture to move (the selected image by default)": "l'image à mettre en mouvement (l'image sélectionnée par défaut)",
-    "turns a still photo into a 2.5D move: reads its depth when it has none, adds the composition camera with a slow drift, and scales the photo up so the relief shows no edge": "transforme une photo en mouvement 2.5D : lit sa profondeur si elle n'y est pas, ajoute la caméra de composition avec une lente dérive, et agrandit la photo pour que le relief ne montre pas de bord",
+    "turns a still photo into a 2.5D move: reads its depth when it has none, adds the composition camera with a slow drift, and scales the photo up so the relief shows no edge": "transforme une photo en mouvement 2,5D : lit sa profondeur si elle n'y est pas, ajoute la caméra de composition avec une lente dérive, et agrandit la photo pour que le relief ne montre pas de bord",
     "{\"closed\":1,\"mbp\":2,\"fv\":3,\"ai\":4,\"e\":5,\"o\":6,\"u\":7,\"l\":8,\"d\":9}: which drawing each mouth shape shows": "{\"closed\":1,\"mbp\":2,\"fv\":3,\"ai\":4,\"e\":5,\"o\":6,\"u\":7,\"l\":8,\"d\":9} : quel dessin montre chaque forme de bouche",
     "Cloth": "Tissu",
     "Flock": "Nuée",
@@ -2420,7 +2420,7 @@
     "Shape": "Forme",
     "Shapes": "Formes",
     "Launch film": "Film de lancement",
-    "A 45 s launch film for Tramme, made in Tramme: a ball on the beat, kinetic type, the document, modifiers, shaders, particles, a 2.5D camera, nested compositions, sound-reactive motion, the assistant, the mark. Music and sound written as code.": "Un film de lancement de 45 s pour Tramme, fait dans Tramme : une balle sur le temps, de la typo cinétique, le document, les modificateurs, des shaders, des particules, une caméra 2.5D, des compositions imbriquées, du mouvement qui suit le son, l'assistant, le logo. Musique et sons écrits en code.",
+    "A 45 s launch film for Tramme, made in Tramme: a ball on the beat, kinetic type, the document, modifiers, shaders, particles, a 2.5D camera, nested compositions, sound-reactive motion, the assistant, the mark. Music and sound written as code.": "Un film de lancement de 45 s pour Tramme, fait dans Tramme : une balle sur le temps, de la typo cinétique, le document, les modificateurs, des shaders, des particules, une caméra 2,5D, des compositions imbriquées, du mouvement qui suit le son, l'assistant, le logo. Musique et sons écrits en code.",
     "Showreel": "Showreel",
     "A motion designer's showreel, made by the assistant in one conversation: kinetic type with a stagger, a grid of shapes, a counter, a shader smoke, particles, motion blur and a camera look (bloom, chromatic aberration, grain).": "Le showreel d'un motion designer, fait par l'assistant en une conversation : typo cinétique décalée, une grille de formes, un compteur, une fumée en shader, des particules, du flou de mouvement et un look caméra (bloom, aberration chromatique, grain).",
     "shows the layer only where another layer is: through text, a shape, a mask": "ne montre le calque que là où se trouve un autre calque : à travers un texte, une forme, un masque",

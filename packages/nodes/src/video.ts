@@ -48,7 +48,8 @@ export const video: NodeType<VideoProps> = {
       const speed = typeof p.rate === 'number' ? Math.abs(p.rate) : 1;
       const smooth = speed < 0.999 ? host.assetInfo(p.video).interpolated : undefined;
       const src = host.asset<VideoAsset>(smooth ?? p.video);
-      const t = mediaTime(p, host.t, host.layerIn ?? 0);
+      // the frame's own picture across the motion blur's shutter: footage carries its own blur, two of its frames never blend
+      const t = mediaTime(p, host.t - (host.shutter ?? 0), host.layerIn ?? 0);
       const { image, exact } = src.frameAt(t);
       if (!exact) host.defer?.(src.request(t));
       if (!image || !src.width || !src.height) return;

@@ -95,6 +95,12 @@ export interface Host {
   layerIn?: number;
   /** composition time (s), frame index at the composition rate */
   t: number;
+  /**
+   * During motion blur, how far this sub-frame is from the frame's own time
+   * (s). Footage holds its frame across the shutter (it carries its own blur):
+   * a video reads its picture at t − shutter, or two of its frames would blend.
+   */
+  shutter?: number;
   frame: number;
   fps: number;
   width: number;
