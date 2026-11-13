@@ -1,0 +1,43 @@
+{
+  "id": "cutout",
+  "order": 5,
+  "kind": "picture",
+  "compare": "sweep",
+  "beforeKeepsAbove": true,
+  "name": { "en": "Behind the subject", "fr": "Derrière le sujet" },
+  "text": {
+    "en": "A man walking along a river, filmed with no green screen, and a title across the frame. Tramme finds the person in every frame, in the browser, saves the cut-out as a mask video and slides the title between the street and him: the letters pass behind his head as he walks.",
+    "fr": "Un homme qui marche le long d’une rivière, filmé sans fond vert, et un titre en travers de l’image. Tramme trouve la personne à chaque image, dans le navigateur, enregistre le détourage en vidéo de masque et glisse le titre entre la rue et lui : les lettres passent derrière sa tête pendant qu’il marche."
+  },
+  "where": {
+    "en": "Type / and run Cut out the subject on the clip, the title as the layer to put behind it.",
+    "fr": "Tapez / et lancez Détourer le sujet sur le plan, avec le titre comme calque à placer derrière."
+  },
+  "settings": {
+    "en": "Cut out the subject: subject person, a look every 0.5 s within a shot; the title a text layer.",
+    "fr": "Détourer le sujet : sujet personne, un regard toutes les 0,5 s dans un plan ; le titre est un calque de texte."
+  },
+  "beforeLabel": { "en": "The title over the clip", "fr": "Le titre sur le plan" },
+  "afterLabel": { "en": "The title behind him, in Tramme", "fr": "Le titre derrière lui, dans Tramme" },
+  "videoLabel": { "en": "The title over the walk, then behind the man, a line sweeping between them", "fr": "Le titre sur la marche, puis derrière l’homme, une ligne balayant de l’un à l’autre" },
+  "source": {
+    "page": "https://www.pexels.com/video/a-man-walking-on-the-sidewalk-4571406/",
+    "file": "https://www.pexels.com/download/video/4571406/",
+    "sha256": "ab79d4f990dd038568787ce7cf93338b3c4466cccabdbc55781c58110cf7cf54",
+    "type": "video",
+    "author": "ArtHouse Studio",
+    "licence": "Pexels",
+    "licenceUrl": "https://www.pexels.com/license/",
+    "start": 0,
+    "duration": 7.5
+  },
+  "still": 4,
+  "after": {
+    "above": [
+      { "type": "text", "name": "Title", "transform": { "position": [960, 330] }, "props": { "text": "RIVERSIDE", "size": 300, "weight": 900, "tracking": 0.02, "align": "center", "baseline": "middle", "color": "#F4F1EA" } }
+    ]
+  },
+  "editor": [
+    { "tool": "cutout", "input": { "layer": "$layer", "subject": "person", "behind": "$over0" } }
+  ]
+}

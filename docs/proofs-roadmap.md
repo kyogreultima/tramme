@@ -54,7 +54,7 @@ The landing page gets a strip of three proofs, each a poster that opens its proo
 | Skin retouch | the `skin` tool, `fx.smooth` | A neutral close-up portrait, natural skin | Pexels, Pixabay (a portrait, shown with respect) | Picture, a crop at 100 %, labelled retouched | — |
 
 - [x] Keying (a Pexels green-screen take; it led to the colour-difference matte)
-- [ ] Cut-out without a green screen
+- [x] Cut-out without a green screen (a Pexels walk along a river; it led to footage holding its frame across the motion blur's shutter)
 - [ ] Background removed from photos
 - [x] A photo in 2.5D (a Pexels lake photo; it led to the parallax following the camera's pan, mirrored edges, the framing for the drift and a gentler depth of field)
 - [ ] Matching two shots
