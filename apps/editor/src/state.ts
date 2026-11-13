@@ -243,8 +243,16 @@ export const hooks = {
 };
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let conflict = false;
+/** the save on its way: the next waits for it, so it names the version that save made (two at once would refuse each other as a conflict) */
+let writing: Promise<unknown> = Promise.resolve();
 
-async function write(doc: TrammeDoc) {
+function write(doc: TrammeDoc): Promise<void> {
+  const run = writing.then(() => writeNow(doc));
+  writing = run.catch(() => {});
+  return run;
+}
+
+async function writeNow(doc: TrammeDoc) {
   const p = S.project.peek();
   try {
     const r = await api.write(p.id, DOCUMENT, stringifyDoc(doc), { ifMatch: docEtag || undefined, type: 'application/json' });
