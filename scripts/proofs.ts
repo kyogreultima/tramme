@@ -50,6 +50,8 @@ interface Manifest {
   after?: { effects?: { type: string; props?: Record<string, unknown> }[]; props?: Record<string, unknown>; below?: Record<string, unknown>[]; above?: Record<string, unknown>[] };
   /** the before keeps the layers put above the source (the same title, over the clip rather than behind its subject) */
   beforeKeepsAbove?: boolean;
+  /** the before is the after with these effects taken off (a photo in 2.5D: the same frame, flat), so the two compare at one framing and one sharpness */
+  beforeWithout?: string[];
   /** tools of the editor run on the after, in order ($layer is the source's layer, $asset its file) */
   editor?: Step[];
   /** 'made': the after is the composition the tools made (the vertical version of a shot), the clip's own frame kept */
@@ -287,10 +289,16 @@ const below = Object.fromEntries((m.after?.below ?? []).map((l, i) => [`under${i
 const above = Object.fromEntries((m.after?.above ?? []).map((l, i) => [`over${i}`, { in: 0, out: DUR, ...l }]));
 const two = secondLayer();
 const afterBase = doc(assets, { main: comp({ ...below, v: withAfter(sourceLayer()), ...two, ...above }, [...Object.keys(below), 'v', ...Object.keys(two), ...Object.keys(above)]) });
-const before = m.beforeKeepsAbove
+const plainBefore = m.beforeKeepsAbove
   ? doc(assets, { main: comp({ v: sourceLayer(), ...two, ...above }, ['v', ...Object.keys(two), ...Object.keys(above)]) })
   : doc(assets, { main: comp({ v: sourceLayer(), ...two }, ['v', ...Object.keys(two)]) });
 const after = m.editor?.length ? await viaEditor(src, afterBase) : afterBase;
+const flat = (d: Doc, types: string[]): Doc => {
+  const copy: Doc = structuredClone(d);
+  for (const c of Object.values(copy.compositions)) for (const l of Object.values<any>(c.layers)) if (l.effects) l.effects = l.effects.filter((e: { type: string }) => !types.includes(e.type));
+  return copy;
+};
+const before = m.beforeWithout ? flat(after, m.beforeWithout) : plainBefore;
 const write = (name: string, d: Doc) => { const f = path.join(dir, `${name}.tramme.json`); fs.writeFileSync(f, JSON.stringify(d, null, 1)); return f; };
 const files = { before: write('before', before), after: write('after', after), compare: write('compare', compareDoc(before, after)) };
 // an after of other proportions (a vertical version) is shown whole, centred in the before's frame, so the two pictures compare at one size

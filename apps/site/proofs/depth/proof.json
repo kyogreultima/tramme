@@ -17,20 +17,21 @@
     "en": "Photo in 2.5D: drift 1 (about 8 % of the width), depth read by Depth Anything v2 on the machine.",
     "fr": "Photo en 2,5D : dérive 1 (environ 8 % de la largeur), profondeur lue par Depth Anything v2 sur la machine."
   },
-  "beforeLabel": { "en": "The photo", "fr": "La photo" },
+  "beforeLabel": { "en": "The photo, flat", "fr": "La photo, à plat" },
   "afterLabel": { "en": "In 2.5D", "fr": "En 2,5D" },
   "videoLabel": { "en": "The camera moving through the photo in 2.5D", "fr": "La caméra qui traverse la photo en 2,5D" },
   "source": {
     "page": "https://www.pexels.com/photo/green-mountains-beside-the-lake-12961394/",
-    "file": "https://images.pexels.com/photos/12961394/pexels-photo-12961394.jpeg?auto=compress&cs=tinysrgb&w=2400",
-    "sha256": "7ecc3ccaacfcf784f3662f0c7f800d5df9727f3ecad3df6e27073d452eb4a250",
+    "file": "https://images.pexels.com/photos/12961394/pexels-photo-12961394.jpeg?auto=compress&cs=tinysrgb&w=3840",
+    "sha256": "1890fde1899c20fb5a7f5e9eb2e2d7f96097db7038fff69907801760ba0b2a02",
     "type": "image",
     "author": "Besjan Nuredini",
     "licence": "Pexels",
     "licenceUrl": "https://www.pexels.com/license/",
     "duration": 6
   },
-  "still": 3,
+  "still": 2.5,
+  "beforeWithout": ["fx.parallax"],
   "editor": [
     { "tool": "photo-2.5d", "input": { "layer": "$layer", "drift": 1 } }
   ]
