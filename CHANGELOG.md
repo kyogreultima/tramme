@@ -21,6 +21,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
   - Eight **colour looks**, ready-made grades put on the selected clips in one tap (Natural pop, Teal and orange, Warm film, Golden hour, Cool night, Bleach bypass, Faded matte, Black and white); on a phone they are tiles of the Effects tab.
   - The scopes add the RGB parade and the histogram beside the waveform (the one chosen is remembered), and show for every effect of the Colour category.
 - The assistant knows when to use each grading effect, and reads a camera's log through `fx.grade` instead of a conversion LUT.
+- The anime example is a new film, Paper Wings: a paper plane at sunset in four shots, drawn frame by frame (clouds lit from the side, the plane banking, telephone wires, a town with its windows lit), animated with sequences, parallax and a camera push.
 - The features page shows features on real footage, before and after (Before and after): a line dragged between the two pictures, the clip, where the tool is in the app and the footage's credit. The first is colour grading on an ungraded Apple Log clip from Pexels.
 
 ### Changed
@@ -30,6 +31,10 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 - LUT, Curves, Colour wheels and Colour correction sit in the Colour category, and the menu that adds an effect is in sections by category.
 - On a phone, the colour wheels and curves are larger, for a finger.
 - The chroma key reads a green or blue screen by colour difference: hair and motion blur come out half transparent, and the screen's colour is taken out of those edges, which keep the subject's own colour.
+
+### Fixed
+
+- A long film renders again in the editor and from the command line: its document, a few hundred thousand values well under 64 MB, was refused by the plugins' sandbox as too large (the launch film among the examples).
 
 ## [0.23.0] - 2026-11-12
 

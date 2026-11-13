@@ -30,7 +30,7 @@ const file = (id: string, ext: string): string | undefined => files[`../videos/$
 /** what each example says of itself, and the day it was published */
 const SEED: Record<(typeof IDS)[number], { description: string; publishedAt: string }> = {
   'launch-film': { description: '45 seconds cut on the beat: compositions inside compositions, a 2.5D camera, motion that follows the music.', publishedAt: '2026-10-03' },
-  anime: { description: 'Frame-by-frame drawings on an exposure sheet, in three shots.', publishedAt: '2026-10-02' },
+  anime: { description: 'A paper plane at sunset in four shots, drawn frame by frame: clouds lit from the side, the plane banking, wires and a town.', publishedAt: '2026-10-02' },
   showreel: { description: 'Made by the assistant: kinetic type, shapes, a counter, smoke and a camera look.', publishedAt: '2026-10-01' },
 };
 

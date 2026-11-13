@@ -1,11 +1,11 @@
 {
   "format": "tramme-project/1",
   "id": "example-anime",
-  "name": "Evening Breeze",
+  "name": "Paper Wings",
   "created": "2026-10-01T13:36:50.063Z",
-  "modified": "2026-10-02T10:11:34.918Z",
+  "modified": "2026-11-13T01:42:21.021Z",
   "width": 1920,
   "height": 1080,
-  "duration": 9,
+  "duration": 10.5,
   "thumbnail": "thumbnail.webp"
 }

@@ -27,6 +27,6 @@ export type ExampleId = (typeof IDS)[number];
 /** what each says of itself, and the colours that light its video slot until the clip is there */
 export const COPY: Record<ExampleId, { tint: [string, string]; text: string }> = {
   'launch-film': { tint: ['#0b0f12', '#2ec4b6'], text: '45 seconds cut on the beat: compositions inside compositions, a 2.5D camera, motion that follows the music.' },
-  anime: { tint: ['#1e2a5c', '#f6a86b'], text: 'Frame-by-frame drawings on an exposure sheet, in three shots.' },
+  anime: { tint: ['#2c3a78', '#ffb984'], text: 'A paper plane at sunset in four shots, drawn frame by frame: clouds lit from the side, the plane banking, wires and a town.' },
   showreel: { tint: ['#111316', '#ff4f7b'], text: 'Made by the assistant: kinetic type, shapes, a counter, smoke and a camera look.' },
 };
