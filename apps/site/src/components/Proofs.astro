@@ -1,0 +1,89 @@
+---
+// Features shown on real footage (lib/proofs.ts): for each, the picture before
+// and after, one over the other, a line dragged between them (a range input:
+// the finger, the mouse and the arrow keys move it), what was done, where the
+// tool is, the clip playing the same comparison, and the footage's credit.
+import { Image } from 'astro:assets';
+import Head from './Head.astro';
+import Media from './Media.astro';
+import { PROOFS } from '../lib/proofs';
+import { pick, type Locale, type Localised } from '../lib/i18n';
+
+interface Props { locale: Locale }
+const { locale } = Astro.props;
+
+const COPY: Localised<{ title: string; more: string; drag: string; footage: string; licence: string }> = {
+  en: { title: 'Shown, not claimed.', more: 'Real footage, before and after Tramme. Drag the line to compare.', drag: 'Move the line between before and after', footage: 'Footage', licence: 'licence' },
+  fr: { title: 'Montré, pas promis.', more: 'De vraies images, avant et après Tramme. Faites glisser la ligne pour comparer.', drag: 'Déplacer la ligne entre avant et après', footage: 'Images', licence: 'licence' },
+};
+const c = pick(locale, COPY);
+---
+
+<section class="section" id="proofs">
+  <div class="wrap">
+    <Head title={c.title} more={c.more} />
+  </div>
+  {PROOFS.map((p) => (
+    <article class="wrap proof" id={`proof-${p.id}`} data-reveal>
+      <div class="compare" data-compare style="--at: 50%">
+        <Image class="pic" src={p.before} alt={pick(locale, p.beforeLabel)} widths={[640, 1280, 1920]} sizes="(min-width: 1100px) 62vw, 100vw" />
+        <div class="after">
+          <Image class="pic" src={p.after} alt={pick(locale, p.afterLabel)} widths={[640, 1280, 1920]} sizes="(min-width: 1100px) 62vw, 100vw" />
+        </div>
+        <span class="tag left" aria-hidden="true">{pick(locale, p.beforeLabel)}</span>
+        <span class="tag right" aria-hidden="true">{pick(locale, p.afterLabel)}</span>
+        <span class="line" aria-hidden="true"></span>
+        <input type="range" min="0" max="100" value="50" step="0.5" aria-label={c.drag} data-compare-range />
+      </div>
+      <div class="words">
+        <h3>{pick(locale, p.name)}</h3>
+        <p>{pick(locale, p.text)}</p>
+        <p class="where">{pick(locale, p.where)}</p>
+        <p class="credit">{c.footage}: <a href={p.credit.url} rel="noopener" target="_blank">{p.credit.author}</a>, <a href={p.credit.licenceUrl} rel="noopener" target="_blank">{p.credit.licence} {c.licence}</a></p>
+      </div>
+      {p.video && (
+        <Media class="clip" id={`proof-${p.id}`} width={p.video.width} height={p.video.height} duration={p.video.duration} label={pick(locale, p.video.label)} />
+      )}
+    </article>
+  ))}
+</section>
+
+<style>
+  .proof { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: clamp(20px, 3vw, 48px); align-items: start; }
+  .proof + .proof { margin-top: var(--section); }
+  .clip { grid-column: 1 / -1; }
+  @media (max-width: 1100px) { .proof { grid-template-columns: 1fr; } }
+
+  /* the after picture over the before, cut at the line */
+  .compare { position: relative; overflow: hidden; border-radius: var(--r-lg); background: var(--panel); aspect-ratio: 16 / 9; touch-action: pan-y; }
+  .compare :global(.pic) { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+  .after { position: absolute; inset: 0; clip-path: inset(0 0 0 var(--at)); }
+  .line { position: absolute; top: 0; bottom: 0; left: var(--at); width: 2px; margin-left: -1px; background: var(--ink); pointer-events: none; }
+  .line::after { content: ''; position: absolute; top: 50%; left: 50%; width: 36px; height: 36px; margin: -18px 0 0 -18px; border-radius: 50%; background: var(--ink); box-shadow: 0 0 0 4px color-mix(in srgb, var(--bg) 40%, transparent); }
+  .tag { position: absolute; top: 14px; padding: 6px 10px; border-radius: var(--r-sm); background: color-mix(in srgb, var(--bg) 72%, transparent); color: var(--ink); font-size: 0.8125rem; line-height: 1.2; pointer-events: none; }
+  .tag.left { left: 14px; }
+  .tag.right { right: 14px; }
+  @media (max-width: 600px) { .tag { top: 8px; padding: 4px 7px; font-size: 0.6875rem; } .tag.left { left: 8px; } .tag.right { right: 8px; } }
+  /* the input covers the picture, invisible: dragging anywhere moves the line */
+  input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: ew-resize; }
+  .compare:has(input:focus-visible) .line::after { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+  .words { display: grid; gap: 14px; align-content: start; }
+  h3 { font-size: clamp(1.75rem, 3vw, 2.5rem); line-height: 1.05; }
+  .words p { color: var(--ink-2); font-size: 1.0625rem; line-height: 1.55; }
+  .where { color: var(--ink); }
+  .credit { font-size: 0.875rem; }
+  .credit a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
+</style>
+
+<script>
+  // the line follows the range (the router loads this script once, it binds at each page)
+  document.addEventListener('astro:page-load', () => {
+    for (const box of document.querySelectorAll<HTMLElement>('[data-compare]')) {
+      const range = box.querySelector<HTMLInputElement>('[data-compare-range]')!;
+      const set = () => box.style.setProperty('--at', `${range.value}%`);
+      range.addEventListener('input', set);
+      set();
+    }
+  });
+</script>

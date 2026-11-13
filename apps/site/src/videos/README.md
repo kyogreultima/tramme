@@ -7,6 +7,7 @@ Each video slot on the page (`components/Media.astro`) shows a placeholder until
 | hero | `tramme.webm` and/or `tramme.mp4`, `tramme.webp` | 1920×1080 |
 | examples | `launch-film`, `anime`, `showreel` (same extensions) | the example's own |
 | assistant | `assistant.webm` and/or `assistant.mp4`, `assistant.webp` | 1600×1000 (16:10) |
+| proofs (features page, `lib/proofs.ts`) | `proof-<id>.webm` and/or `.mp4`, `.webp`; its two stills in `assets/proofs/` | the footage's own |
 
 - **WebM (VP9) first, MP4 (H.264) as a fallback**: the browser takes the first one it can play. One of the two is enough.
 - **The poster** (`.webp`, or `.jpg`) shows before the clip loads: a frame of it, at the clip's size.
