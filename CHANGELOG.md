@@ -22,6 +22,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
   - The scopes add the RGB parade and the histogram beside the waveform (the one chosen is remembered), and show for every effect of the Colour category.
 - The assistant knows when to use each grading effect, and reads a camera's log through `fx.grade` instead of a conversion LUT.
 - The anime example is a new film, Paper Wings: a paper plane at sunset in four shots, drawn frame by frame (clouds lit from the side, the plane banking, telephone wires, a town with its windows lit), animated with sequences, parallax and a camera push.
+- The landing page shows three of the proofs, each opening its comparison on the features page.
 - The features page shows features on real footage, before and after (Before and after): a line dragged between the two pictures, the clip, where the tool is in the app and the footage's credit. The first are colour grading on an ungraded Apple Log clip, keying on a green-screen take, a photo in 2.5D a title passing behind a person filmed without a green screen (all from Pexels), and a voice cleaned of a street's noise, 15 dB lower, played before or after at the same instant (from Wikimedia Commons), and word-by-word captions on a NASA interview.
 
 ### Changed

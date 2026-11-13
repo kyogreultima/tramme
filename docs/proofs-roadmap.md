@@ -2,7 +2,7 @@
 
 Each major feature shown working on real footage that does not already show the result, before and after, on the site's features page (the Before and after section, `apps/site/src/components/Proofs.astro`, fed by `apps/site/src/lib/proofs.ts`). A proof is what a visitor can check with their own eyes; a sentence on a page is a claim.
 
-Status: colour grading done (an ungraded Apple Log clip from Pexels, 2026-11-13). Step 0 not started; the 16 proofs below wait for it, but the next one or two can be added to the current section before it.
+Status: step 0 done (the stage, the manifests, the script, the landing's strip). Shown on the site: colour grading, keying, a photo in 2.5D, a title behind a person, a clean voice, word-by-word captions. Drafts, with what they wait for: stabilisation, silences. Each proof so far found and fixed a defect of the feature it shows (see each box).
 
 ## Why
 
@@ -35,12 +35,12 @@ The landing page gets a strip of three proofs, each a poster that opens its proo
 
 ## Step 0. The pipeline and the stage
 
-- [ ] A proof's manifest, `proofs/<id>.json`: the source's page, its file's address, its licence and its page, its author, its SHA-256, the part used (in and out), the Tramme document used for the after (with its settings), the measure, and the texts.
-- [ ] `node scripts/proofs.ts <id>`: downloads the source into `out/proofs/<id>/` (never committed; the hash checked), renders before and after with the command line (`tramme still`, `tramme render`), measures, and writes the stills to `apps/site/src/assets/proofs/` and the clip to `apps/site/src/videos/` at the site's sizes. Run again, it gives the same files.
-- [ ] `lib/proofs.ts` reads the manifests instead of holding the texts (the texts in both languages stay in the manifest).
-- [ ] The stage described above, with the picture, video and sound kinds; checked on a phone and a computer, light and dark, keyboard alone.
-- [ ] The grading proof moved to the manifest and the stage, its files unchanged.
-- [ ] The strip of three proofs on the landing page, nothing loaded before it comes near (the landing's performance rule).
+- [x] A proof's manifest, `proofs/<id>.json`: the source's page, its file's address, its licence and its page, its author, its SHA-256, the part used (in and out), the Tramme document used for the after (with its settings), the measure, and the texts.
+- [x] `node scripts/proofs.ts <id>`: downloads the source into `out/proofs/<id>/` (never committed; the hash checked), renders before and after with the command line (`tramme still`, `tramme render`), measures, and writes the stills to `apps/site/src/assets/proofs/` and the clip to `apps/site/src/videos/` at the site's sizes. Run again, it gives the same files.
+- [x] `lib/proofs.ts` reads the manifests instead of holding the texts (the texts in both languages stay in the manifest).
+- [x] The stage described above, with the picture, video and sound kinds; checked on a phone and a computer, light and dark, keyboard alone.
+- [x] The grading proof moved to the manifest and the stage, its files unchanged.
+- [x] The strip of three proofs on the landing page, nothing loaded before it comes near (the landing's performance rule).
 
 ## Step 1. Pictures
 

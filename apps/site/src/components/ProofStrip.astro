@@ -1,0 +1,48 @@
+---
+// The landing's strip of proofs: the first three of lib/proofs.ts, each its
+// picture after Tramme and its name, opening the proof on the features page.
+// Small pictures, loaded as they come near; nothing else (the landing's rule).
+import { Image } from 'astro:assets';
+import Head from './Head.astro';
+import { PROOFS, PROOFS_NAME } from '../lib/proofs';
+import { pathIn, pick, type Locale, type Localised } from '../lib/i18n';
+
+interface Props { locale: Locale }
+const { locale } = Astro.props;
+const COPY: Localised<{ more: string; all: string }> = {
+  en: { more: 'Tramme’s features applied to free footage, before and after.', all: 'See every comparison' },
+  fr: { more: 'Les fonctionnalités de Tramme appliquées à des vidéos libres, avant et après.', all: 'Voir toutes les comparaisons' },
+};
+const c = pick(locale, COPY);
+const shown = PROOFS.slice(0, 3);
+---
+
+{shown.length > 0 && (
+  <section class="section proof-strip">
+    <div class="wrap">
+      <Head title={pick(locale, PROOFS_NAME)} more={c.more} />
+      <ul class="strip" role="list" data-stagger>
+        {shown.map((p) => (
+          <li>
+            <a href={pathIn(locale, `/features/#proof-${p.id}`)}>
+              <Image src={p.after} alt={pick(locale, p.afterLabel)} widths={[480, 960]} sizes="(min-width: 900px) 30vw, 100vw" loading="lazy" />
+              <span class="name">{pick(locale, p.name)}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+      <a class="btn btn-ghost all" href={pathIn(locale, '/features/#proofs')}>{c.all}</a>
+    </div>
+  </section>
+)}
+
+<style>
+  .strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin: 0; padding: 0; list-style: none; }
+  @media (max-width: 900px) { .strip { grid-template-columns: 1fr; } }
+  .strip a { display: grid; gap: 12px; color: var(--ink); text-decoration: none; }
+  .strip :global(img) { width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; border-radius: var(--r-lg); background: var(--panel); transition: opacity var(--tramme-duration-fast, 0.15s) var(--ease); }
+  .strip a:hover :global(img) { opacity: 0.88; }
+  .strip a:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: var(--r-lg); }
+  .name { font-size: 1.125rem; font-weight: 600; }
+  .all { margin-top: 28px; }
+</style>
