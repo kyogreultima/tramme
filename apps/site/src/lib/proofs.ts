@@ -31,6 +31,8 @@ export interface Proof {
   after: ImageMetadata;
   /** a sound proof's two sounds */
   sounds?: { before: string; after: string };
+  /** a proof kept out of the site, and why (a source or a tool that did not hold) */
+  draft?: string;
   /** whether its clip is made */
   clip: boolean;
 }
@@ -47,7 +49,7 @@ export const PROOFS: Proof[] = Object.values(manifests)
     const clip = !!(clips[`../videos/proof-${p.id}.webm`] || clips[`../videos/proof-${p.id}.mp4`]);
     return before && after ? { ...p, before, after, clip, ...(sb && sa ? { sounds: { before: sb, after: sa } } : {}) } : null;
   })
-  .filter((p): p is Proof => !!p && (p.kind !== 'sound' || !!p.sounds))
+  .filter((p): p is Proof => !!p && !p.draft && (p.kind !== 'sound' || !!p.sounds))
   .sort((a, b) => a.order - b.order);
 
 /** the section's name in the features page's index */

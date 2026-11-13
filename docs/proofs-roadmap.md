@@ -70,7 +70,7 @@ The landing page gets a strip of three proofs, each a poster that opens its proo
 | Slow motion | the long jobs' frame interpolation | A fast action at 25 or 30 fps (a jump, water) | Pexels, Pixabay | Video, side by side: frames repeated against frames made | — |
 | Upscaling | the long jobs' upscaling (the engine in use is named) | Low-resolution archive film | The Prelinger Archives (public domain) | Picture, a crop at 200 % | — |
 
-- [ ] Stabilisation
+- [ ] Stabilisation. First try (a walk filmed looking down, Pexels 4405576): no gain, the jitter 28.1 px before and 46.8 after a 1.5x zoom (`node scripts/proof-shake.ts`); the legs crossing the frame move with the ground the tracker follows. Needs a handheld source of a still scene, and the tool to set moving subjects aside (outliers by region). The manifest stays as a draft.
 - [ ] Tracking
 - [ ] Vertical reframe
 - [ ] Slow motion (said honestly: block-matching motion until RIFE runs)

@@ -1,0 +1,56 @@
+{
+  "id": "stabilisation",
+  "order": 3,
+  "draft": "the walk filmed looking down showed no gain (jitter 28.1 px before, 46.8 after a 1.5x zoom): the legs crossing the frame move with the ground the tracker follows; waits for a handheld source of a still scene, and for the tool to set moving subjects aside",
+  "kind": "picture",
+  "compare": "side",
+  "name": {
+    "en": "Stabilisation",
+    "fr": "Stabilisation"
+  },
+  "text": {
+    "en": "A walk filmed by hand, each step jolting the picture. Tramme follows points of the footage from frame to frame, reads the camera's path, keeps the moves that last more than half a second and takes the jolts out, zooming just enough to hide the edges.",
+    "fr": "Une marche filmée à la main, chaque pas secouant l’image. Tramme suit des points de l’image d’une image à l’autre, lit la trajectoire de la caméra, garde les mouvements de plus d’une demi-seconde et retire les secousses, en zoomant juste assez pour cacher les bords."
+  },
+  "where": {
+    "en": "Type / and run Stabilise a video on the clip; its Stabilisation setting then holds the result.",
+    "fr": "Tapez / et lancez Stabiliser une vidéo sur le plan ; son réglage Stabilisation garde ensuite le résultat."
+  },
+  "settings": {
+    "en": "Stabilise a video: strength 0.5 s (moves lasting longer stay).",
+    "fr": "Stabiliser une vidéo : force 0,5 s (les mouvements plus longs restent)."
+  },
+  "beforeLabel": {
+    "en": "Handheld, as shot",
+    "fr": "À la main, tel que filmé"
+  },
+  "afterLabel": {
+    "en": "Stabilised in Tramme",
+    "fr": "Stabilisé dans Tramme"
+  },
+  "videoLabel": {
+    "en": "The handheld walk and its stabilised version, side by side",
+    "fr": "La marche à la main et sa version stabilisée, côte à côte"
+  },
+  "source": {
+    "page": "https://www.pexels.com/video/a-person-taking-video-while-walking-4405576/",
+    "file": "https://www.pexels.com/download/video/4405576/",
+    "type": "video",
+    "author": "K",
+    "licence": "Pexels",
+    "licenceUrl": "https://www.pexels.com/license/",
+    "start": 2,
+    "duration": 8,
+    "sha256": "e9a9f8cf4e26f7a76c0d1073a11320f93af267af3e9e770ebf53c08bb1584300"
+  },
+  "still": 3,
+  "editor": [
+    {
+      "tool": "stabilize",
+      "input": {
+        "video": "$layer",
+        "strength": 0.5
+      }
+    }
+  ]
+}

@@ -61,9 +61,9 @@ async function source(): Promise<string> {
   }
   const sha = crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
   if (!m.source.sha256) {
-    const raw = JSON.parse(fs.readFileSync(manifestFile, 'utf8'));
-    raw.source.sha256 = sha;
-    fs.writeFileSync(manifestFile, JSON.stringify(raw, null, 2) + '\n');
+    // written beside the source's file address, the manifest's layout kept
+    const text = fs.readFileSync(manifestFile, 'utf8').replace(/("file": "[^"]*",)(\r?\n)(\s*)/, `$1$2$3"sha256": "${sha}",$2$3`);
+    fs.writeFileSync(manifestFile, text);
     console.log(`source hash written: ${sha}`);
   } else if (sha !== m.source.sha256) throw new Error(`the source changed: ${sha}, the manifest says ${m.source.sha256}`);
   return `assets/${path.basename(file)}`;
@@ -101,7 +101,8 @@ function compareDoc(before: Doc, after: Doc): Doc {
       line: { type: 'shape.rect', in: 0, out: DUR, transform: { position: k((x) => [x, H / 2]) }, props: { size: [4, H], fill: '#FFFFFF' } },
     }, ['b', 'a', 'line']);
   }
-  return doc({ ...before.assets, ...after.assets }, compositions, 'proofCompare');
+  // the tokens of both (a project made in the editor names its colours by tokens)
+  return { ...doc({ ...before.assets, ...after.assets }, compositions, 'proofCompare'), tokens: { ...before.tokens, ...after.tokens } };
 }
 
 // ── the tools, in the editor ─────────────────────────────────
@@ -127,9 +128,14 @@ async function viaEditor(src: string, base: Doc): Promise<Doc> {
       console.log(`tool ${step.tool}`);
       const out = await page.evaluate(async (name, input) => {
         const t = (window as any).__tramme, events: any[] = [];
-        for await (const ev of t.runTool(name, input)) events.push(ev.type === 'item' ? { type: 'item', text: ev.item?.text } : ev);
+        for await (const ev of t.runTool(name, input)) {
+          events.push(ev.type === 'item' ? { type: 'item', text: ev.item?.text } : ev);
+          // the tool's proposal accepted, as the user does with its button
+          if (ev.type === 'proposal' && !t.commit(ev.label, ev.ops, 'ai')) events.push({ type: 'error', message: `its proposal "${ev.label}" could not be applied` });
+        }
         return events;
       }, step.tool, fill(step.input) as Record<string, unknown>);
+      if (process.env.PROOF_DEBUG) console.log(JSON.stringify(out.filter((e: any) => e.type !== "tool-progress")).slice(0, 4000));
       const failed = out.find((e: any) => e.type === 'error');
       if (failed) throw new Error(`${step.tool}: ${failed.message}`);
     }
