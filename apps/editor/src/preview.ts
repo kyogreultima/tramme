@@ -270,6 +270,17 @@ class Preview {
     if (this.wanted !== this.applied) this.sync();
   }
 
+  /** once the document shown is the latest one, its files loaded (a clip just added, a tool reading its picture); `limit` ms at most */
+  async settled(limit = 60_000): Promise<boolean> {
+    const t0 = performance.now();
+    if (!this.renderer) return false;
+    while (this.busy || this.wanted !== this.applied) {
+      if (performance.now() - t0 > limit) return false;
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    return true;
+  }
+
   /** load a module asset again (a plugin edited on disk) */
   async reload(assetIds: string[]) {
     if (!this.renderer) return;

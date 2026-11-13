@@ -22,13 +22,14 @@ describe('matching the look of one shot to another', () => {
     expect(matchGrade(same, same)).toEqual(WHEELS_OFF);
   });
 
-  it('moves the mean of the shot onto the mean of the other, and spreads it like it', () => {
+  it('moves the mean of the shot onto the mean of the other, black kept near black', () => {
     const src: LookStats = { mean: [0.4, 0.45, 0.5], std: [0.2, 0.22, 0.18] }, ref: LookStats = { mean: [0.46, 0.44, 0.41], std: [0.22, 0.22, 0.22] };
     const p = matchGrade(ref, src);
     for (let ch = 0; ch < 3; ch++) {
       const at = (x: number) => { const c: [number, number, number] = [0.4, 0.45, 0.5].map((_, i) => (i === ch ? x : src.mean[i])) as [number, number, number]; return wheelsApply(c, p)[ch]; };
       expect(at(src.mean[ch])).toBeCloseTo(ref.mean[ch], 2);
-      expect(at(src.mean[ch] + src.std[ch]) - at(src.mean[ch] - src.std[ch])).toBeCloseTo(2 * ref.std[ch], 1);
+      // a wider spread is not bought by pushing black: it moves by 0.05 at most
+      expect(Math.abs(at(0))).toBeLessThanOrEqual(0.05 + 1e-3);
     }
   });
 
@@ -37,6 +38,21 @@ describe('matching the look of one shot to another', () => {
     for (const w of [p.lift, p.gamma, p.gain]) expect(Math.hypot(w[0], w[1])).toBeLessThanOrEqual(1 + 1e-9);
     expect(Math.abs(p.liftLevel)).toBeLessThanOrEqual(0.5);
     expect(Math.abs(p.gainLevel)).toBeLessThanOrEqual(1);
+  });
+
+  it('matches a cast whole, and the brightness and contrast only so far (two angles show different things)', () => {
+    // the shot: a dark tree against a cyan sky, all contrast; the reference: a lit lawn under a blue sky, flatter and brighter
+    const src: LookStats = { mean: [0.25, 0.4, 0.45], std: [0.3, 0.3, 0.3] }, ref: LookStats = { mean: [0.4, 0.5, 0.6], std: [0.15, 0.15, 0.15] };
+    const p = matchGrade(ref, src);
+    const grey = (v: number) => wheelsApply([v, v, v], p);
+    // black stays near black: the contrast is lowered by a fifth at most, not halved
+    expect(Math.max(...grey(0))).toBeLessThan(0.12);
+    // the cast moves whole: the reference's blue against its red, at the shot's mean
+    const at = wheelsApply(src.mean, p);
+    expect(at[2] - at[0]).toBeCloseTo(ref.mean[2] - ref.mean[0], 2);
+    // the brightness moves by 0.1 at most toward the reference's
+    const Y = (c: number[]) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+    expect(Y(at) - Y(src.mean)).toBeCloseTo(0.1, 2);
   });
 
   it('does not divide by the spread of a flat picture', () => {
