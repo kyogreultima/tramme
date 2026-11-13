@@ -54,6 +54,14 @@ describe('quality checks', () => {
     expect(found).not.toContain('text-size:edge');
   });
 
+  it('measure heavy capitals wider than lower case, without a canvas', async () => {
+    // a keyword of a short, 120 px black capitals, centred in 1080: drawn about 1070 px wide, to the edges
+    const loud = text('NOT CUTTING IT', {}, { size: 120, weight: 900, tracking: -0.02 });
+    expect(await checks(doc({ loud }))).toContain('safe-zone:loud');
+    // the same words in lower case and a regular weight fit
+    expect(await checks(doc({ quiet: text('not cutting it', {}, { size: 120 }) }))).not.toContain('safe-zone:quiet');
+  });
+
   it('find crowded entrances and still stretches', async () => {
     const dots = Object.fromEntries(Array.from({ length: 5 }, (_, i) => [`dot${i}`, { type: 'shape.ellipse', in: 2, transform: { position: [200 + i * 150, 960] }, props: { size: [40, 40] } } as Partial<Layer>]));
     const found = await checks(doc(dots));

@@ -91,10 +91,27 @@ function measureHost(doc: TrammeDoc, comp: Composition, t: number, layerId: stri
   };
 }
 
-/** a text's box without a canvas to measure it (command line, tests): average glyph widths */
+/** a glyph's width in ems in a common sans: capitals wider, narrow letters and spaces thinner */
+function glyphWidth(ch: string): number {
+  if (ch === ' ') return 0.27;
+  if (/[iljtfrI.,:;'!|]/.test(ch)) return 0.3;
+  if (/[MW]/.test(ch)) return 0.86;
+  if (/[mw]/.test(ch)) return 0.8;
+  if (/[A-Z]/.test(ch)) return 0.66;
+  return 0.54;
+}
+
+/** a line's width without a canvas: its glyphs, wider in a heavy weight, plus the tracking (in ems) */
+function lineWidth(line: string, size: number, weight: number, tracking: number): number {
+  const chars = [...line], bold = 1 + Math.max(0, weight - 400) / 500 * 0.12;
+  return size * (chars.reduce((w, c) => w + glyphWidth(c), 0) * bold + tracking * Math.max(0, chars.length - 1));
+}
+
+/** a text's box without a canvas to measure it (command line, tests): estimated glyph widths */
 function estimateText(p: Record<string, unknown>): Rect {
   const size = Number(p.size) || 64, lines = String(p.text ?? '').split('\n');
-  const w = Math.max(...lines.map((l) => l.length)) * size * 0.56, h = size * (1 + (lines.length - 1) * (Number(p.lineHeight) || 1.2));
+  const weight = Number(p.weight) || 400, tracking = Number(p.tracking) || 0;
+  const w = Math.max(...lines.map((l) => lineWidth(l, size, weight, tracking))), h = size * (1 + (lines.length - 1) * (Number(p.lineHeight) || 1.2));
   const x = p.align === 'center' ? -w / 2 : p.align === 'right' ? -w : 0;
   const y = p.baseline === 'top' ? 0 : p.baseline === 'middle' ? -size / 2 : p.baseline === 'bottom' ? -size : -size * 0.8;
   return { x, y, w, h };
