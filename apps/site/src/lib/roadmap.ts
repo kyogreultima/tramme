@@ -37,8 +37,8 @@ export const ROADMAP: RoadmapItem[] = [
     horizon: 'next',
     title: { en: 'Start from a reference', fr: 'Partir d\'une référence' },
     text: {
-      en: 'Drop a video, a gif or a Lottie you like next to your brief. The assistant reads how it is built (its scenes, its pace, its cuts on the music, its moves) and makes your film the same way, with your words, your brand and your footage, as editable layers. Inspired by reanimate (MIT).',
-      fr: 'Déposez une vidéo, un gif ou un Lottie qui vous plaît à côté de votre brief. L\'assistant lit comment il est construit (ses scènes, son rythme, ses coupes sur la musique, ses mouvements) et fait votre film de la même manière, avec vos mots, votre marque et vos images, en calques modifiables. Inspiré de reanimate (MIT).',
+      en: 'Drop a video, a gif or a Lottie you like, add your logo, screenshots and footage, and the assistant makes the same video around them: its scenes, pace, layouts, moves and type, with your content in place of its own, as editable layers. Inspired by reanimate (MIT).',
+      fr: 'Déposez une vidéo, un gif ou un Lottie qui vous plaît, ajoutez votre logo, vos captures et vos images : l\'assistant fait la même vidéo autour d\'eux, ses scènes, son rythme, ses mises en page, ses mouvements et sa typographie, avec votre contenu à la place du sien, en calques modifiables. Inspiré de reanimate (MIT).',
     },
   },
   {
