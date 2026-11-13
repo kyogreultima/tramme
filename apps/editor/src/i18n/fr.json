@@ -1643,6 +1643,8 @@
     "issue.loudness": "Le volume visé est {from}, ce format veut {to} LUFS"
   },
   "content": {
+    "Camera pan": "Panoramique de la caméra",
+    "the composition camera's: link to $comp.camera.pan; a sideways move then shifts the near depths more than the far, as a tracking shot does": "celui de la caméra de la composition : liez-le à $comp.camera.pan ; un mouvement latéral déplace alors les profondeurs proches plus que les lointaines, comme un travelling",
     "0 follows the frame, 1 is a circle": "0 suit le cadre, 1 est un cercle",
     "Aquas": "Turquoises",
     "Balance": "Équilibre",

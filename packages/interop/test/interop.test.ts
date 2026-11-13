@@ -142,8 +142,8 @@ describe('export SVG', () => {
   });
 
   it('image size read from the header', () => {
-    const png = fs.readFileSync(path.join(root, 'examples/anime/assets/scarf/scarf-01.png'));
-    expect(imageSize(new Uint8Array(png))).toEqual({ width: 1800, height: 760 });
+    const png = fs.readFileSync(path.join(root, 'examples/anime/assets/plane/plane-01.png'));
+    expect(imageSize(new Uint8Array(png))).toEqual({ width: 640, height: 360 });
   });
 });
 

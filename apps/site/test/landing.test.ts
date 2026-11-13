@@ -9,8 +9,8 @@ const used = (/<Page [^>]*>([\s\S]*?)<\/Page>/.exec(landing)?.[1] ?? '').replace
 const sections = [...used.matchAll(/<([A-Z]\w+) (?:locale=\{locale\} )?\/>/g)].map((m) => m[1]);
 
 describe('the landing page', () => {
-  it('is made of text and figures after the hero: no picture of the app, no video', () => {
-    expect(sections).toEqual(['Hero', 'Materials', 'Inside', 'Tools', 'Render', 'Bento', 'LandingClosing']);
+  it('is made of text and figures after the hero, and the stills of the proofs: no picture of the app, no video', () => {
+    expect(sections).toEqual(['Hero', 'Materials', 'ProofStrip', 'Inside', 'Tools', 'Render', 'Bento', 'LandingClosing']);
   });
 
   it('is served in both languages', () => {
