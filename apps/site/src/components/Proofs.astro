@@ -43,11 +43,11 @@ const SIZES = '(min-width: 1100px) 62vw, 100vw';
           <div class="frame">
             {p.kind === 'picture' && p.clip && (
               <div class="views" role="group">
-                <button type="button" aria-pressed="true" data-view-switch="picture">{c.picture}</button>
-                <button type="button" aria-pressed="false" data-view-switch="video">{c.video}</button>
+                <button type="button" aria-pressed={p.view === 'video' ? 'false' : 'true'} data-view-switch="picture">{c.picture}</button>
+                <button type="button" aria-pressed={p.view === 'video' ? 'true' : 'false'} data-view-switch="video">{c.video}</button>
               </div>
             )}
-            <div class="view" data-view="picture">
+            <div class="view" data-view="picture" hidden={p.kind === 'picture' && p.clip && p.view === 'video'}>
               <div class="compare" data-compare style="--at: 50%">
                 <Image class="pic" src={p.before} alt={pick(locale, p.beforeLabel)} widths={[640, 1280, 1920]} sizes={SIZES} loading="lazy" />
                 <div class="after">
@@ -71,7 +71,7 @@ const SIZES = '(min-width: 1100px) 62vw, 100vw';
               )}
             </div>
             {p.kind === 'picture' && p.clip && (
-              <div class="view" data-view="video" hidden>
+              <div class="view" data-view="video" hidden={p.view !== 'video'}>
                 <Media id={`proof-${p.id}`} width={p.source.width ?? 1920} height={p.source.height ?? 1080} duration={p.source.duration} label={pick(locale, p.videoLabel ?? p.name)} />
                 {p.compare === 'side' && (
                   <>

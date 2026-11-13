@@ -1,0 +1,37 @@
+{
+  "id": "depth",
+  "order": 4,
+  "kind": "picture",
+  "compare": "side",
+  "view": "video",
+  "name": { "en": "A photo in 2.5D", "fr": "Une photo en 2,5D" },
+  "text": {
+    "en": "One still photo: a rock in front, the lake, the mountains behind. Tramme reads the depth of each point of the picture, in the browser, then moves a camera through it: the rock passes in front of the water and the mountains, as in a shot filmed on a slider.",
+    "fr": "Une seule photo : un rocher devant, le lac, les montagnes derrière. Tramme lit la profondeur de chaque point de l’image, dans le navigateur, puis y fait bouger une caméra : le rocher passe devant l’eau et les montagnes, comme dans un plan filmé sur un travelling."
+  },
+  "where": {
+    "en": "Type / and run Photo in 2.5D on the photo: it reads the depth, adds the camera and frames the picture so its edges stay out.",
+    "fr": "Tapez / et lancez Photo en 2,5D sur la photo : l’outil lit la profondeur, ajoute la caméra et cadre l’image pour que ses bords restent hors champ."
+  },
+  "settings": {
+    "en": "Photo in 2.5D: drift 1 (about 8 % of the width), depth read by Depth Anything v2 on the machine.",
+    "fr": "Photo en 2,5D : dérive 1 (environ 8 % de la largeur), profondeur lue par Depth Anything v2 sur la machine."
+  },
+  "beforeLabel": { "en": "The photo", "fr": "La photo" },
+  "afterLabel": { "en": "In 2.5D in Tramme", "fr": "En 2,5D dans Tramme" },
+  "videoLabel": { "en": "The still photo and the camera moving through it in 2.5D, side by side", "fr": "La photo fixe et la caméra qui la traverse en 2,5D, côte à côte" },
+  "source": {
+    "page": "https://www.pexels.com/photo/green-mountains-beside-the-lake-12961394/",
+    "file": "https://images.pexels.com/photos/12961394/pexels-photo-12961394.jpeg?auto=compress&cs=tinysrgb&w=2400",
+    "sha256": "7ecc3ccaacfcf784f3662f0c7f800d5df9727f3ecad3df6e27073d452eb4a250",
+    "type": "image",
+    "author": "Besjan Nuredini",
+    "licence": "Pexels",
+    "licenceUrl": "https://www.pexels.com/license/",
+    "duration": 6
+  },
+  "still": 3,
+  "editor": [
+    { "tool": "photo-2.5d", "input": { "layer": "$layer", "drift": 1 } }
+  ]
+}

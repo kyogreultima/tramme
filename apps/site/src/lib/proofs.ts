@@ -15,6 +15,8 @@ export interface Proof {
   order: number;
   /** a picture compared with a line, or a sound compared with a switch */
   kind: 'picture' | 'sound';
+  /** the view a proof opens on: the picture (by default), or the clip when the change shows in motion (a 2.5D move) */
+  view?: 'picture' | 'video';
   /** how the clip compares: a line sweeping across, or the two side by side */
   compare: 'sweep' | 'side';
   name: Localised<string>;

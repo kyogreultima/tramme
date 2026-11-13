@@ -205,7 +205,7 @@ export const displace: EffectType<{ source: string | null; amount: number }> = {
  * camera's own move of the layer is left out (`at`, the layer's depth), so
  * linking the camera's settings gives the exact camera math, per pixel.
  */
-export const parallax: EffectType<{ source: string | null; plane: number; range: number; amount: number; perspective: number; zoom: number; at: number }> = {
+export const parallax: EffectType<{ source: string | null; plane: number; range: number; amount: number; perspective: number; zoom: number; at: number; pan: [number, number] }> = {
   type: 'fx.parallax', title: 'Depth parallax', category: 'Effects', stage: 'layer',
   description: 'a 2.5D relief from a depth map (the depth tool makes one): near grows, far shrinks as the camera moves',
   props: {
@@ -216,14 +216,19 @@ export const parallax: EffectType<{ source: string | null; plane: number; range:
     perspective: { type: 'number', default: 1000, min: 50, step: 10, unit: 'px', label: 'Perspective', description: "the composition camera's: link to $comp.camera.perspective" },
     zoom: { type: 'number', default: 1, min: 0.05, step: 0.01, unit: 'x', label: 'Zoom', description: "the composition camera's: link to $comp.camera.zoom" },
     at: { type: 'number', default: 0, step: 10, unit: 'px', label: 'Layer depth', description: "the layer's own transform.depth, so the camera's move is not counted twice: link to it" },
+    pan: { type: 'vec2', default: [0, 0], unit: 'px', label: 'Camera pan', description: "the composition camera's: link to $comp.camera.pan; a sideways move then shifts the near depths more than the far, as a tracking shot does" },
   },
   gl: {
-    code: `vec4 effect(vec2 uv) {
+    code: `// a point read mirrored past the picture's edge: a depth pushed out of the frame shows the picture's own texture, never a smeared edge
+vec2 mirrored(vec2 p) { return 1.0 - abs(1.0 - abs(p)); }
+vec4 effect(vec2 uv) {
   vec4 m = texture(u_source, uv);
   float d = m.a > 0.0 ? dot(m.rgb / m.a, vec3(0.2126, 0.7152, 0.0722)) : u_plane;
   float z = (u_plane - d) * u_range;
   float k = (z - u_at) / max(u_zoom * u_perspective, 1.0) * u_amount;
-  return texture(uImage, uv + (uv - 0.5) * k);
+  // the camera's zoom grows the near and shrinks the far around the middle; its pan moves the far less than the near
+  vec2 shift = vec2(u_pan.x, -u_pan.y) * uScale / uRes * k;
+  return texture(uImage, mirrored(uv + (uv - 0.5) * k - shift));
 }`,
   },
 };

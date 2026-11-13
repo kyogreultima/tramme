@@ -22,7 +22,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
   - The scopes add the RGB parade and the histogram beside the waveform (the one chosen is remembered), and show for every effect of the Colour category.
 - The assistant knows when to use each grading effect, and reads a camera's log through `fx.grade` instead of a conversion LUT.
 - The anime example is a new film, Paper Wings: a paper plane at sunset in four shots, drawn frame by frame (clouds lit from the side, the plane banking, telephone wires, a town with its windows lit), animated with sequences, parallax and a camera push.
-- The features page shows features on real footage, before and after (Before and after): a line dragged between the two pictures, the clip, where the tool is in the app and the footage's credit. The first is colour grading on an ungraded Apple Log clip from Pexels.
+- The features page shows features on real footage, before and after (Before and after): a line dragged between the two pictures, the clip, where the tool is in the app and the footage's credit. The first are colour grading on an ungraded Apple Log clip, keying on a green-screen take, and a photo in 2.5D, all from Pexels.
 
 ### Changed
 
@@ -34,6 +34,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Fixed
 
+- A photo in 2.5D moves in depth as the camera pans: the parallax follows the camera's pan (it followed only its zoom, so a sideways drift slid the whole photo in one piece), the near shifting more than the far. A depth pushed past the picture's edge shows the picture mirrored instead of a smeared edge, the photo is framed for the drift as well as for its relief, and its depth of field keeps the near subject sharp with a light blur far away (it blurred everything but the middle depth).
 - A long film renders again in the editor and from the command line: its document, a few hundred thousand values well under 64 MB, was refused by the plugins' sandbox as too large (the launch film among the examples).
 
 ## [0.23.0] - 2026-11-12

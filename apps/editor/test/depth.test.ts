@@ -37,7 +37,7 @@ describe('the depth of a picture', () => {
     expect(m).toMatchObject({ type: 'image', visible: false, props: { image: 'depth-photo', fit: { $link: 'photo.fit' }, box: [25, 12.5, 75, 37.5] } });
     expect(m.transform?.position).toEqual({ $link: 'photo.transform.position' });
     // the parallax: the camera's settings and the layer's own depth, so the camera's move is not counted twice
-    expect(c.layers.photo.effects).toEqual([{ id: 'parallax', type: 'fx.parallax', props: { source: depth, perspective: { $link: '$comp.camera.perspective' }, zoom: { $link: '$comp.camera.zoom' }, at: { $link: 'photo.transform.depth' } } }]);
+    expect(c.layers.photo.effects).toEqual([{ id: 'parallax', type: 'fx.parallax', props: { source: depth, perspective: { $link: '$comp.camera.perspective' }, zoom: { $link: '$comp.camera.zoom' }, pan: { $link: '$comp.camera.pan' }, at: { $link: 'photo.transform.depth' } } }]);
     // the map follows the photo
     const ev = new Evaluator(out, reg);
     for (const t of [0, 5, 9.9]) expect(ev.layerAt(depth, t, root).transform).toEqual(ev.layerAt('photo', t, root).transform);
@@ -100,8 +100,10 @@ describe('the depth of a picture', () => {
 
   it('moves a photo in 2.5D: the camera drifts, only once', () => {
     const doc = project(), root = doc.root;
-    const { ops, added } = photo25dOps(doc, root);
+    const { ops, added, margin } = photo25dOps(doc, root);
     expect(added).toBe(true);
+    // the photo needs room for the drift on each side: twice its farthest pan, as a share of the frame
+    expect(margin).toBeCloseTo(0.128, 5);
     const out = applyOps(doc, ops).doc, c = out.compositions[root];
     expect(validate(out, reg)).toEqual([]);
     // the drift: an arc of uneven keys, eased
@@ -115,6 +117,7 @@ describe('the depth of a picture', () => {
     const twice = photo25dOps(out, root);
     expect(twice.added).toBe(false);
     expect(twice.ops).toEqual([]);
+    expect(twice.margin).toBe(0);
   });
 
   it('keeps the parallax when the photo takes its depth of field in the same run', () => {
