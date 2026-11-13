@@ -9,7 +9,7 @@
 // (/ menu).
 
 import { ALL_FORMATS, BufferTarget, CanvasSink, CanvasSource, getFirstEncodableVideoCodec, Input, Mp4OutputFormat, Output, Quality, UrlSource } from 'mediabunny';
-import { pointer, staticValue, type Effect, type Layer, type Op, type ToolContext, type ToolType, type TrammeDoc } from '@tramme/core';
+import { pointer, staticValue, type Layer, type Op, type ToolContext, type ToolType, type TrammeDoc } from '@tramme/core';
 import { AVC_FROM_STREAM } from './avc.ts';
 import { t } from './i18n/index.ts';
 import { freshId, isToolAsset, linkedTransform, siblingsOf, transformOp } from './model.ts';
@@ -299,30 +299,10 @@ async function ensureDepth(ctx: ToolContext, source: string, progress: Progress)
     box = [x0 * k, y0 * k, x1 * k, y1 * k];
   }
   const src = await ctx.writeFile(l.type === 'video' ? `assets/depth/${source}.mp4` : `assets/depth/${source}.png`, blob);
+  // no depth of field by default: a blurred background reads as a softer picture, not as depth (fx.depthBlur stays at hand)
   const wired = depthLayers(ctx.doc, ctx.compId, source, asset, box);
-  // a photo takes a depth of field too, once (footage is given one by hand, or by photo-2.5d)
-  if (l.type === 'image') wired.ops = withDepthBlur(wired.ops, l, ctx.compId, source, wired.depth);
   const value = { type: l.type === 'video' ? 'video' : 'image', src, name: t('perception.depthLabel', { name: ctx.doc.assets[media].name ?? media }), madeBy: [madeBy(chosenModel('depth'))] };
   return { ops: [{ op: had ? 'replace' : 'add', path: pointer('assets', asset), value }, ...wired.ops], asset, reload: had ? [asset] : [], frames, ...(wired.framing ? { framing: wired.framing } : {}) };
-}
-
-/**
- * The ops of depthLayers with a depth of field on the photo, once: it reads
- * the hidden map layer `depth` (a layer, like the parallax's source), and
- * joins the effects list those ops may have just written (with the
- * parallax), as a second list would replace the first.
- */
-/** a photo's depth of field: sharp at the near depths, a light blur where it is far */
-export const DOF_FOCUS = 0.8, DOF_AMOUNT = 4;
-
-export function withDepthBlur(ops: Op[], l: Layer, compId: string, source: string, depth: string): Op[] {
-  if ((l.effects ?? []).some((e) => e.type === 'fx.depthBlur' && e.props?.source === depth)) return ops;
-  const path = pointer('compositions', compId, 'layers', source, 'effects');
-  const at = ops.findIndex((o) => o.op === 'add' && o.path === path);
-  const effects = (at >= 0 ? (ops[at] as Extract<Op, { op: 'add' }>).value : l.effects ?? []) as Effect[];
-  // a photo is focused on what is near: that stays sharp, the far softens a little (a strong blur at the middle depth leaves nothing sharp in a landscape)
-  const list = [...effects, { id: freshId(Object.fromEntries(effects.map((e) => [e.id, 1])), 'dof'), type: 'fx.depthBlur', props: { source: depth, focus: DOF_FOCUS, amount: DOF_AMOUNT } }];
-  return at >= 0 ? ops.map((o, i) => (i === at ? { op: 'add', path, value: list } : o)) : [...ops, { op: 'add', path, value: list }];
 }
 
 /** what the tools tell of a photo's framing */
@@ -343,7 +323,7 @@ const throttled = (ctx: ToolContext) => {
 
 const depth: ToolType<{ layer?: string }> = {
   name: 'depth', title: 'Read the depth',
-  description: 'reads the depth of a photo or a video as a grey map (bright where near), saved as an asset, and wires it: fx.parallax moves the layer the way the composition camera would, a photo also takes a depth of field (fx.depthBlur)',
+  description: 'reads the depth of a photo or a video as a grey map (bright where near), saved as an asset, and wires it: fx.parallax moves the layer the way the composition camera would',
   input: {
     type: 'object',
     properties: {
@@ -361,7 +341,6 @@ const depth: ToolType<{ layer?: string }> = {
       ops, reload, label: t('perception.depthLabel', { name: l.name ?? id }),
       text: [
         `Depth of "${id}" read (${l.type === 'video' ? `${frames} frames` : 'one picture'}): grey map saved as asset "${asset}" (bright where near), played by the hidden layer "${asset}-…", and fx.parallax on the layer, its perspective and zoom linked to the composition's camera.`,
-        ...(l.type === 'image' ? [`The photo also got fx.depthBlur (focus ${DOF_FOCUS}): the near depths sharp, the far softened by ${DOF_AMOUNT} px.`] : []),
         ...(framing ? [framingNote(framing)] : []),
         'Nothing moves until the composition has a camera: add one (pan, zoom) and the layer gains the relief. For a photo, photo-2.5d does depth and camera in one.',
         `Run again, the map is read again and the layers are reused. If "${id}" is trimmed or moved in time, run depth again.`,
@@ -403,10 +382,10 @@ const photo25d: ToolType<{ layer?: string; drift?: number; seconds?: number }> =
     return {
       ops, reload, label: t('perception.depthLabel', { name: l.name ?? id }),
       text: [
-        `"${id}" now moves in 2.5D: depth map asset "${asset}" (the hidden layer), fx.parallax on the photo (linked to the camera), fx.depthBlur (sharp near, focus ${DOF_FOCUS}, a light ${DOF_AMOUNT} px far).`,
+        `"${id}" now moves in 2.5D: depth map asset "${asset}" (the hidden layer), fx.parallax on the photo (linked to the camera).`,
         added ? `A camera was added: a slow drift over ${r2(dur)} s (pan, ease).` : 'A camera drives the parallax (the composition had one already: its move).',
         framingNote(framing ?? 'kept'),
-        'Tune it: drift for a wider move, fx.parallax range for a deeper relief, fx.depthBlur focus for what stays sharp.',
+        'Tune it: drift for a wider move, fx.parallax range for a deeper relief; fx.depthBlur on the depth map adds a depth of field when one is wanted.',
       ].join('\n'),
       notice: t('perception.photo25dDone', { name: l.name ?? id }),
     };

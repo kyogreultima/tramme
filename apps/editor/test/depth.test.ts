@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { applyOps, Evaluator, validate, type TrammeDoc } from '@tramme/core';
 import { newProject } from '@tramme/project';
-import { depthLayers, photo25dOps, scaleFor, steadyDepth, withDepthBlur } from '../src/depth.ts';
+import { depthLayers, photo25dOps, scaleFor, steadyDepth } from '../src/depth.ts';
 import { fieldsOf, inputOf } from '../src/ai/commands.ts';
 import { editorRegistry } from '../src/vocabulary.ts';
 
@@ -118,20 +118,6 @@ describe('the depth of a picture', () => {
     expect(twice.added).toBe(false);
     expect(twice.ops).toEqual([]);
     expect(twice.margin).toBe(0);
-  });
-
-  it('keeps the parallax when the photo takes its depth of field in the same run', () => {
-    const doc = project(), root = doc.root, l = doc.compositions[root].layers.photo;
-    const wired = depthLayers(doc, root, 'photo', 'depth-photo');
-    const ops = withDepthBlur(wired.ops, l, root, 'photo', wired.depth);
-    expect(ops.filter((o) => o.path.endsWith('/layers/photo/effects'))).toHaveLength(1);
-    const out = applyOps(doc, ops).doc;
-    expect(validate(out, reg)).toEqual([]);
-    // both read the hidden map layer
-    expect(out.compositions[root].layers.photo.effects!.map((e) => [e.type, e.props?.source])).toEqual([['fx.parallax', wired.depth], ['fx.depthBlur', wired.depth]]);
-    // run again: neither is added twice
-    const again = withDepthBlur(depthLayers(out, root, 'photo', 'depth-photo').ops, out.compositions[root].layers.photo, root, 'photo', wired.depth);
-    expect(again).toEqual([]);
   });
 
   it('asks for nothing that it can work out: the layer, the photo', () => {

@@ -226,9 +226,14 @@ vec4 effect(vec2 uv) {
   float d = m.a > 0.0 ? dot(m.rgb / m.a, vec3(0.2126, 0.7152, 0.0722)) : u_plane;
   float z = (u_plane - d) * u_range;
   float k = (z - u_at) / max(u_zoom * u_perspective, 1.0) * u_amount;
-  // the camera's zoom grows the near and shrinks the far around the middle; its pan moves the far less than the near
+  // the camera's pan moves the far less than the near
   vec2 shift = vec2(u_pan.x, -u_pan.y) * uScale / uRes * k;
-  return texture(uImage, mirrored(uv + (uv - 0.5) * k - shift));
+  // its push in grows the near around the middle, by as much as it zooms: at rest (zoom 1) the picture is the photo itself, a pan
+  // alone grows nothing (a rock at the frame's edge pushed 120 px off the water left its outline echoed over it). The far is not
+  // shrunk: the layer is drawn in the frame's size, and a far depth shrinking toward the middle reads past the frame's edge,
+  // where there is only the mirror (a mountain mirrored into the sky)
+  float grow = min(k * (1.0 - 1.0 / max(u_zoom, 0.05)), 0.0);
+  return texture(uImage, mirrored(uv + (uv - 0.5) * grow - shift));
 }`,
   },
 };
