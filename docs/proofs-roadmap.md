@@ -56,7 +56,7 @@ The landing page gets a strip of three proofs, each a poster that opens its proo
 - [x] Keying (a Pexels green-screen take; it led to the colour-difference matte)
 - [x] Cut-out without a green screen (a Pexels walk along a river; it led to footage holding its frame across the motion blur's shutter)
 - [x] Background removed from photos (a Pexels camera on wooden planks: the camera kept, the plant left out, the wood's colour taken out of the edge)
-- [x] A photo in 2.5D (a Pexels lake photo; it led to the parallax following the camera's pan, mirrored edges, the framing for the drift and a gentler depth of field)
+- [x] A photo in 2.5D (a Pexels lake photo; it led to the parallax following the camera's pan, mirrored edges, the framing for the drift and no depth of field by default: the blur read as a softer picture, not as depth)
 - [x] Matching two shots (two Pexels shots of the Golden Gate Bridge by two people; it led to the matching keeping black near black, a camera's cast matched whole and the brightness and contrast only so far, and to the tool waiting for the preview to load a clip just added; ΔE of the mean colours 10.4 to 8.6, the rest is what each shows)
 - [x] Skin retouch (a Pexels neutral portrait in 4K, shown at 100 %, the default strength 0.3, labelled retouched)
 

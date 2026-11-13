@@ -18,7 +18,7 @@
     "fr": "Détourer le sujet : sujet personne, un regard toutes les 0,5 s dans un plan ; le titre est un calque de texte."
   },
   "beforeLabel": { "en": "The title over the clip", "fr": "Le titre sur le plan" },
-  "afterLabel": { "en": "The title behind him, in Tramme", "fr": "Le titre derrière lui, dans Tramme" },
+  "afterLabel": { "en": "The title behind him", "fr": "Le titre derrière lui" },
   "videoLabel": { "en": "The title over the walk, then behind the man, a line sweeping between them", "fr": "Le titre sur la marche, puis derrière l’homme, une ligne balayant de l’un à l’autre" },
   "source": {
     "page": "https://www.pexels.com/video/a-man-walking-on-the-sidewalk-4571406/",

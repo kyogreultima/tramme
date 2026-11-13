@@ -12,8 +12,8 @@
     "fr": "Cinq minutes d’un astronaute qui répond à des questions dans la station, filmé en large au format 16:9. Un seul message à l’assistant a demandé trois shorts verticaux, comme les font les grandes chaînes. Il a transcrit la prise, repéré où se tient l’astronaute, choisi trois passages qui s’ouvrent sur une question et finissent sur une idée, cadré chacun en 9:16 sur lui, sous-titré chaque mot, écrit une accroche pour les premières secondes et affiché les mots-clés au moment où il les dit. Le clip montre le début de chaque short, l’un après l’autre."
   },
   "measure": {
-    "en": "5 min of video to three shorts of 42, 21 and 33 s; 42 minutes, most of them transcribing and finding him in the browser, and 34 requests, $1.04 at the API's prices.",
-    "fr": "5 min de vidéo pour trois shorts de 42, 21 et 33 s ; 42 minutes, surtout la transcription et la détection de l’astronaute dans le navigateur, et 34 requêtes, 1,04 $ aux prix de l’API."
+    "en": "5 min of video to three shorts of 42, 21 and 33 s; 42 minutes, most of them transcribing and finding him in the browser; 34 requests to the model.",
+    "fr": "5 min de vidéo pour trois shorts de 42, 21 et 33 s ; 42 minutes, surtout la transcription et la détection de l’astronaute dans le navigateur ; 34 requêtes au modèle."
   },
   "where": {
     "en": "In the Studio, join the long video to a message and ask for the shorts in your own words.",

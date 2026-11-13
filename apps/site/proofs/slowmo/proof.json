@@ -18,7 +18,7 @@
     "fr": "Ralenti fluide : 4 fois plus d’images ; le calque à 0,25×, à partir de 2,8 s du plan."
   },
   "beforeLabel": { "en": "Slowed, frames repeated", "fr": "Ralenti, images répétées" },
-  "afterLabel": { "en": "Slowed, frames made by Tramme", "fr": "Ralenti, images fabriquées par Tramme" },
+  "afterLabel": { "en": "Slowed, new frames in between", "fr": "Ralenti, nouvelles images intercalées" },
   "videoLabel": { "en": "The leap at a quarter speed, frames repeated on the left, frames made on the right", "fr": "Le saut au quart de la vitesse, images répétées à gauche, images fabriquées à droite" },
   "source": {
     "page": "https://www.pexels.com/video/border-collie-catching-frisbee-in-snowy-field-35235652/",

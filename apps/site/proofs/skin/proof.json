@@ -17,7 +17,7 @@
     "fr": "Lisser la peau : force 0,3, celle par défaut ; le plan montré à 100 % autour du visage."
   },
   "beforeLabel": { "en": "The skin as filmed", "fr": "La peau telle que filmée" },
-  "afterLabel": { "en": "Retouched in Tramme", "fr": "Retouchée dans Tramme" },
+  "afterLabel": { "en": "Retouched", "fr": "Retouchée" },
   "videoLabel": { "en": "The portrait at 100 %, the skin as filmed and then smoothed, a line sweeping between them", "fr": "Le portrait à 100 %, la peau telle que filmée puis adoucie, une ligne balayant de l’une à l’autre" },
   "source": {
     "page": "https://www.pexels.com/video/close-up-video-of-a-woman-looking-at-the-camera-showing-no-emotions-6665217/",

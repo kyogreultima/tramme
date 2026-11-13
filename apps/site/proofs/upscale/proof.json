@@ -17,8 +17,8 @@
     "fr": "Agrandir : Real-ESRGAN general x4 v3, l’image faite deux fois plus grande ; les deux montrées à 300 %."
   },
   "beforeLabel": { "en": "Enlarged by the browser", "fr": "Agrandie par le navigateur" },
-  "afterLabel": { "en": "Enlarged by Tramme", "fr": "Agrandie par Tramme" },
-  "videoLabel": { "en": "The street at 300 %, enlarged by the browser and by Tramme, a line sweeping between them", "fr": "La rue à 300 %, agrandie par le navigateur et par Tramme, une ligne balayant de l’une à l’autre" },
+  "afterLabel": { "en": "Enlarged by Real-ESRGAN", "fr": "Agrandie par Real-ESRGAN" },
+  "videoLabel": { "en": "The street at 300 %, enlarged by the browser and by Real-ESRGAN, a line sweeping between them", "fr": "La rue à 300 %, agrandie par le navigateur et par Real-ESRGAN, une ligne balayant de l’une à l’autre" },
   "source": {
     "page": "https://commons.wikimedia.org/wiki/File:Coolidge_street.JPG",
     "file": "https://upload.wikimedia.org/wikipedia/commons/5/52/Coolidge_street.JPG",

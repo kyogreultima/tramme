@@ -21,7 +21,7 @@
     "fr": "Caler l’étalonnage sur un plan : le plan de gauche comme référence, les images lues à 2 s."
   },
   "beforeLabel": { "en": "The two shots as filmed", "fr": "Les deux plans tels que filmés" },
-  "afterLabel": { "en": "The right one matched to the left, in Tramme", "fr": "Celui de droite raccordé à celui de gauche, dans Tramme" },
+  "afterLabel": { "en": "The right one matched to the left", "fr": "Celui de droite raccordé à celui de gauche" },
   "videoLabel": { "en": "The two shots side by side, as filmed and then matched, a line sweeping between them", "fr": "Les deux plans côte à côte, tels que filmés puis raccordés, une ligne balayant de l’un à l’autre" },
   "source": {
     "page": "https://www.pexels.com/video/golden-gate-bridge-on-a-sunny-day-32191519/",

@@ -18,7 +18,7 @@
     "fr": "Suivre un objet : la zone 24, 37, 38, 21 % à 2 s, un regard toutes les 0,1 s ; Annotation : l’étiquette et son détail, le côté choisi par Tramme."
   },
   "beforeLabel": { "en": "The clip", "fr": "Le plan" },
-  "afterLabel": { "en": "The label on the car, in Tramme", "fr": "L’étiquette sur la voiture, dans Tramme" },
+  "afterLabel": { "en": "The label on the car", "fr": "L’étiquette sur la voiture" },
   "videoLabel": { "en": "The car crossing the street, its label following it", "fr": "La voiture qui traverse la rue, son étiquette qui la suit" },
   "source": {
     "page": "https://www.pexels.com/video/a-red-car-is-driving-down-the-street-27028866/",

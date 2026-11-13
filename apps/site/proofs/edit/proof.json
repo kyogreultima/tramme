@@ -12,8 +12,8 @@
     "fr": "Une minute d’un astronaute qui répond à des questions dans la station, telle que filmée : un plan large, des pauses, des hésitations. Un seul message à l’assistant a demandé le montage des grandes chaînes. Il a coupé les pauses, sous-titré chaque mot, affiché les mots-clés au moment où il les dit, posé des images sur ce qu’il décrit, dessiné l’atmosphère, titré l’astronaute et ajouté les whooshes, puis relu ses propres images."
   },
   "measure": {
-    "en": "60 s of raw take to a 48 s film, the picture changing every 3.3 s; 12.7 minutes and 46 requests, $1.84 at the API's prices.",
-    "fr": "60 s de prise brute pour un film de 48 s, l’image change toutes les 3,3 s ; 12,7 minutes et 46 requêtes, 1,84 $ aux prix de l’API."
+    "en": "60 s of raw take to a 48 s film, the picture changing every 3.3 s; 12.7 minutes and 46 requests to the model.",
+    "fr": "60 s de prise brute pour un film de 48 s, l’image change toutes les 3,3 s ; 12,7 minutes et 46 requêtes au modèle."
   },
   "where": {
     "en": "In the Studio, join the video to a message and ask for the edit in your own words.",

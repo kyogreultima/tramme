@@ -19,7 +19,7 @@
     "fr": "Transcription par le modèle téléchargé (ce navigateur) ; Sous-titres : cinq mots à la fois, le mot prononcé sur sa pastille colorée."
   },
   "beforeLabel": { "en": "The interview", "fr": "L’interview" },
-  "afterLabel": { "en": "Captioned in Tramme", "fr": "Sous-titré dans Tramme" },
+  "afterLabel": { "en": "Captioned", "fr": "Sous-titré" },
   "videoLabel": { "en": "The interview with its word-by-word captions, its sound on with the button", "fr": "L’interview avec ses sous-titres mot à mot, le son activé par le bouton" },
   "source": {
     "page": "https://images.nasa.gov/details/ksc_122210_itow_melvin",

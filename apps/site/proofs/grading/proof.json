@@ -17,7 +17,7 @@
     "fr": "Étalonnage : images Apple Log, contraste +0,12, hautes lumières −0,35, ombres +0,2, noirs +0,25, clarté +0,12. TSL : rouges −0,15, bleus et turquoises −0,35 de saturation. Vignette 0,22."
   },
   "beforeLabel": { "en": "Apple Log, as shot", "fr": "Apple Log, tel que filmé" },
-  "afterLabel": { "en": "Graded in Tramme", "fr": "Étalonné dans Tramme" },
+  "afterLabel": { "en": "Graded", "fr": "Étalonné" },
   "videoLabel": { "en": "The log clip and its grade, a line sweeping between them", "fr": "Le plan en log et son étalonnage, une ligne balayant de l’un à l’autre" },
   "source": {
     "page": "https://www.pexels.com/video/ungraded-apple-prores-log-footage-27814739/",

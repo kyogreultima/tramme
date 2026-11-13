@@ -29,6 +29,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 - The features page shows features on real footage, before and after (Before and after): a line dragged between the two pictures, the clip, where the tool is in the app and the footage's credit. The first are colour grading on an ungraded Apple Log clip, keying on a green-screen take, a photo in 2.5D a title passing behind a person filmed without a green screen (all from Pexels), and a voice cleaned of a street's noise, 15 dB lower, played before or after at the same instant (from Wikimedia Commons), and word-by-word captions on a NASA interview.
 
 ### Changed
+- A photo in 2.5D takes no depth of field by default: a blurred background read as a softer picture, not as depth (fx.depthBlur stays at hand). The depth parallax leaves the photo as it is at rest: a pan moves the near more than the far, a push in grows the near by as much as it zooms, and nothing shrinks the far. It used to grow the near around the middle even when the camera only panned (a rock at the frame's edge, pushed 120 px off the water, left its outline echoed over it), and to shrink the far past the frame's edge (a mountain mirrored into the sky).
 - Matching the look of a shot matches a camera's cast whole and its brightness and contrast only so far (0.1 and ×0.8 to ×1.25), black kept within 0.05: two angles of one scene show different things, and matching their spread whole lifted and tinted the blacks of the darker one (a tree against the sky turned olive).
 
 - A layer's GLSL effects in a row run as one chain on the GPU: the layer is uploaded once and the effects hand their result to each other in half floats, so a grade, curves and a LUT stacked lose nothing between them; the result is dithered as it goes back to 8 bits, so a pushed sky no longer bands.
@@ -38,6 +39,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 - The chroma key reads a green or blue screen by colour difference: hair and motion blur come out half transparent, and the screen's colour is taken out of those edges, which keep the subject's own colour.
 
 ### Fixed
+- The closing section of the site's pages stays centred: its title and line were styled by a bare h2 and p, which weigh as much as the global reset, and whichever loaded last won.
 - Matching the look of a clip just added reads its picture once the preview has loaded it: run at once, it said "the picture cannot be read yet".
 - The first frame of a render waits up to 2 minutes for its videos, the others 20 s: two render pages opening a 4K source of 170 MB at once stopped on "frame 0 never finished". A segments' folder Windows still holds no longer hides the render's own error.
 

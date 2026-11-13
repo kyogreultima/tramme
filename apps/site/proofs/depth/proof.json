@@ -2,7 +2,7 @@
   "id": "depth",
   "order": 4,
   "kind": "picture",
-  "compare": "side",
+  "compare": "after",
   "view": "video",
   "name": { "en": "A photo in 2.5D", "fr": "Une photo en 2,5D" },
   "text": {
@@ -18,8 +18,8 @@
     "fr": "Photo en 2,5D : dérive 1 (environ 8 % de la largeur), profondeur lue par Depth Anything v2 sur la machine."
   },
   "beforeLabel": { "en": "The photo", "fr": "La photo" },
-  "afterLabel": { "en": "In 2.5D in Tramme", "fr": "En 2,5D dans Tramme" },
-  "videoLabel": { "en": "The still photo and the camera moving through it in 2.5D, side by side", "fr": "La photo fixe et la caméra qui la traverse en 2,5D, côte à côte" },
+  "afterLabel": { "en": "In 2.5D", "fr": "En 2,5D" },
+  "videoLabel": { "en": "The camera moving through the photo in 2.5D", "fr": "La caméra qui traverse la photo en 2,5D" },
   "source": {
     "page": "https://www.pexels.com/photo/green-mountains-beside-the-lake-12961394/",
     "file": "https://images.pexels.com/photos/12961394/pexels-photo-12961394.jpeg?auto=compress&cs=tinysrgb&w=2400",
