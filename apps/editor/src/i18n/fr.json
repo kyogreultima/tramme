@@ -1098,6 +1098,8 @@
     "varySoundsHint": "Un son placé sur plusieurs moments alterne ses variantes, pour ne pas sonner copié.",
     "assistantTranscribes": "Laisser l’assistant transcrire sans demander",
     "assistantTranscribesHint": "Quand il a besoin de ce qui est dit dans un enregistrement, il le transcrit seul, y compris quand il travaille pendant votre absence. L’enregistrement est envoyé au modèle de parole que vous avez choisi. Désactivé : il demande d’abord, et s’en passe si personne ne répond.",
+    "acceptReadings": "Faire les vidéos d’après une référence sans montrer sa lecture d’abord",
+    "acceptReadingsHint": "L’assistant lit comment la référence est faite et enchaîne sur votre vidéo faite de la même façon. Désactivé : il vous montre d’abord la lecture, à corriger ou à accepter.",
     "assistantFetchesReal": "Laisser l’assistant chercher de vrais logos et de vraies personnes sans demander",
     "assistantFetchesRealHint": "Le logo d’une vraie marque, une vraie personne ou un vrai produit, pris dans une banque d’images libre, avec sa licence notée dans le projet. Désactivé : il demande d’abord, et compose le nom dans la typographie du film si personne ne répond.",
     "confirmPaid": "Demander avant un son payant",
@@ -1557,6 +1559,25 @@
   "brief": {
     "written": "Brief du projet écrit (assets/brief.json)."
   },
+  "reading": {
+    "label": "Lecture de {name}",
+    "done": "Référence lue : {scenes} scène(s). Le film peut maintenant être fait de la même façon avec votre contenu.",
+    "declined": "La lecture n'a pas été acceptée : dites à l'assistant ce qu'il faut changer.",
+    "shots": "Recherche des plans",
+    "frames": "Lecture des plans",
+    "title": "Comment la référence est faite",
+    "text": "Vérifiez la lecture avant que votre vidéo soit faite de la même façon avec votre contenu. Corrigez ce que fait une scène, choisissez l'asset de chaque emplacement, supprimez une scène ou fusionnez-la avec la suivante.",
+    "accept": "Faire ma vidéo ainsi",
+    "seconds": "{s} s",
+    "onBeat": "coupe sur la mesure {bar}",
+    "what": "Ce que fait la scène",
+    "remove": "Supprimer",
+    "merge": "Fusionner avec la suivante",
+    "words": "Vos mots",
+    "built": "Dessiné dans le film",
+    "missing": "Rien de vous pour l'instant",
+    "role": { "logo": "Logo", "headline": "Titre", "text": "Texte", "screenshot": "Écran", "photo": "Photo", "video": "Vidéo", "product": "Produit", "person": "Personne", "figure": "Figure", "shape": "Forme" }
+  },
   "perception": {
     "beatsDone": "Musique analysée : {tempo} bpm, {beats} temps, {bars} mesures, {sections} changement(s) de section. L'assistant peut maintenant couper et animer sur le temps.",
     "noPulse": "Pas de pulsation régulière dans ce son ; {hits} coups trouvés, et son volume dans le temps.",
@@ -1960,6 +1981,8 @@
     "Gaps longer than (s)": "Silences de plus de (s)",
     "Pause kept (s)": "Pause gardée (s)",
     "Save a still": "Enregistrer une image fixe",
+    "Remake a reference": "Refaire une référence",
+    "the same video as a reference you give (a video, a gif or a Lottie), made with your logo, screens, footage and words": "la même vidéo qu'une référence que vous donnez (une vidéo, un gif ou un Lottie), faite avec votre logo, vos écrans, vos images et vos mots",
     "Transcribe and read": "Transcrire et lire",
     "a picture of the composition at a moment, saved as an image asset (cover, thumbnail)": "une image de la composition à un instant, enregistrée comme asset image (couverture, vignette)",
     "a quiet stretch longer than this is shortened": "un silence plus long que cela est raccourci",

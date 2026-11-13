@@ -55,6 +55,8 @@ export interface Preferences {
   pluginsOff: string[];
   /** the assistant may start a transcription (a recording is sent to a speech model) without asking, also in a turn left alone */
   assistantTranscribes: boolean;
+  /** a video made from a reference goes on without showing its reading first (the outline) */
+  acceptReadings: boolean;
   /** the assistant may fetch a real brand's logo, a real person or product from Wikimedia Commons without asking, also in a turn left alone */
   assistantFetchesReal: boolean;
   /** the studio: after an area is drawn, the layers it proposes are confirmed always, only when more than three, or never */
@@ -83,7 +85,7 @@ export interface Preferences {
 
 export const DEFAULT_PREFERENCES: Preferences = {
   language: 'auto', theme: 'studio', view: 'studio', motion: 'auto', still: 'display', blur: 'document', exactFrames: true, scrubAudio: true, sandboxPreview: false,
-  effectsDb: -8, musicDb: -14, duckDb: -12, varySounds: true, confirmPaid: true, paidPerTurn: 10, voiceProvider: 'auto', voice: '', voiceModel: '', previewVolume: 1, previewMuted: false, proxies: true, models: {}, pluginsOff: [], areaConfirm: 'always', assistantTranscribes: false, assistantFetchesReal: false, checkUpdates: true, lastUpdateCheck: 0, updateNotified: '', recentCommands: [], quickLauncher: false,
+  effectsDb: -8, musicDb: -14, duckDb: -12, varySounds: true, confirmPaid: true, paidPerTurn: 10, voiceProvider: 'auto', voice: '', voiceModel: '', previewVolume: 1, previewMuted: false, proxies: true, models: {}, pluginsOff: [], areaConfirm: 'always', assistantTranscribes: false, assistantFetchesReal: false, acceptReadings: false, checkUpdates: true, lastUpdateCheck: 0, updateNotified: '', recentCommands: [], quickLauncher: false,
   pictureProvider: 'auto', pictureQuality: 'auto', pictureSize: 'large', styleFrames: 2,
   videoProvider: 'auto', videoSeconds: 8, dictation: 'local',
 };
@@ -152,6 +154,7 @@ function load(): Preferences {
     p.pluginsOff = Array.isArray(p.pluginsOff) ? p.pluginsOff.filter((x) => typeof x === 'string') : [];
     p.areaConfirm = p.areaConfirm === 'many' || p.areaConfirm === 'never' ? p.areaConfirm : 'always';
     p.assistantTranscribes = p.assistantTranscribes === true;
+    p.acceptReadings = p.acceptReadings === true;
     p.assistantFetchesReal = p.assistantFetchesReal === true;
     p.checkUpdates = p.checkUpdates !== false;
     p.lastUpdateCheck = Number.isFinite(p.lastUpdateCheck) ? p.lastUpdateCheck : 0;

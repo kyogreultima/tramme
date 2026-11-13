@@ -16,6 +16,7 @@ import { S, toast } from '../state.ts';
 import { answer, chatShown, choose, question, type Question } from '../confirm.ts';
 import { attachmentUrl, type Attachment } from '../attachments.ts';
 import { Icon } from './icons.tsx';
+import { ReadingOutline } from './ReadingOutline.tsx';
 import { TranscribeButton } from './Transcribe.tsx';
 import { locale, t } from '../i18n/index.ts';
 
@@ -82,6 +83,12 @@ export function QuestionCard() {
   const q = question.value;
   useEffect(() => { chatShown.value++; return () => { chatShown.value--; }; }, []);
   if (!q?.inChat) return null;
+  if (q.outline) return (
+    <div class="proposal question">
+      <div class="proposal-head"><Icon name="film" /><span class="ptitle">{t('reading.title')}</span></div>
+      <ReadingOutline q={q} />
+    </div>
+  );
   return (
     <div class="proposal question">
       <div class="proposal-head"><Icon name="alert" /><span class="ptitle">{q.title}</span></div>

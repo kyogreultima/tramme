@@ -58,6 +58,24 @@
 .question-choice img { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; border-radius: var(--r-sm); box-shadow: inset 0 0 0 1px var(--line); transition: box-shadow var(--t-fast) var(--ease); }
 .question-choice:hover img, .question-choice:focus-visible img { box-shadow: 0 0 0 2px var(--accent); }
 .question-choice:focus-visible { outline: none; }
+.reading-outline { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.reading-scenes { list-style: none; margin: 0; padding: 0 12px; display: flex; flex-direction: column; gap: 10px; max-height: 60vh; overflow: auto; }
+.reading-scene { display: flex; gap: 10px; align-items: flex-start; padding-bottom: 10px; box-shadow: inset 0 -1px 0 var(--line); }
+.reading-still { flex: none; width: 200px; max-width: 40%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: var(--r-sm); box-shadow: inset 0 0 0 1px var(--line); }
+.reading-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.reading-meta { display: flex; align-items: center; gap: 8px; color: var(--text-3); font-size: var(--fs-sm); flex-wrap: wrap; }
+.reading-what { width: 100%; resize: vertical; font: inherit; font-size: var(--fs-sm); color: var(--text); background: var(--surface-2); border: 0; border-radius: var(--r-sm); box-shadow: inset 0 0 0 1px var(--line); padding: 6px 8px; }
+.reading-slots { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 10px; align-items: center; font-size: var(--fs-sm); }
+.reading-slots li { display: contents; }
+.reading-role { color: var(--text-3); }
+.reading-fill { color: var(--text-2); }
+.reading-slots select { min-width: 0; max-width: 100%; font: inherit; color: var(--text); background: var(--surface-2); border: 0; border-radius: var(--r-sm); box-shadow: inset 0 0 0 1px var(--line); padding: 3px 6px; }
+@media (max-width: 520px) {
+  .reading-scene { flex-direction: column; align-items: stretch; }
+  .reading-still { width: 100%; max-width: none; }
+  .reading-meta .btn, .reading-outline > .proposal-actions .btn { flex: 1 1 0; justify-content: center; }
+  .reading-meta .grow, .reading-outline > .proposal-actions .grow { display: none; }
+}
 
 /* ── the thread: notes, work, takes ────────────────────────── */
 .thread { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 10px; padding: 14px 14px 24px; }

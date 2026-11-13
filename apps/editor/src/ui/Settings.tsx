@@ -427,6 +427,9 @@ function Behavior() {
       <Row label={t('settings.assistantFetchesReal')} hint={t('settings.assistantFetchesRealHint')}>
         <Toggle on={prefs.value.assistantFetchesReal} onChange={(on) => setPrefs({ assistantFetchesReal: on })} />
       </Row>
+      <Row label={t('settings.acceptReadings')} hint={t('settings.acceptReadingsHint')}>
+        <Toggle on={prefs.value.acceptReadings} onChange={(on) => setPrefs({ acceptReadings: on })} />
+      </Row>
       <Row label={t('settings.resume')} hint={t('settings.resumeHint')}>
         <Toggle on={a.resume} onChange={(on) => setAiSettings({ resume: on })} />
       </Row>

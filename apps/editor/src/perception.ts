@@ -152,6 +152,24 @@ export const distance = (a: Float32Array, b: Float32Array) => { let s = 0; for (
 /** a change of picture this large (their distance) is a cut */
 export const CUT = 0.3;
 
+/** how often the cut detection looks at a video (s) */
+export const SHOT_STEP = 0.2;
+
+/**
+ * The cuts in a run of picture changes (the histogram distance from the look
+ * before, `step` s apart): a jump well above its neighbourhood, at least 0.6 s
+ * from the previous one, placed between the two looks.
+ */
+export function cutsOf(diffs: { t: number; d: number }[], sensitivity = 0.5, step = SHOT_STEP): number[] {
+  const threshold = 0.5 - 0.35 * sensitivity, cuts: number[] = [];
+  diffs.forEach(({ t: at, d }, k) => {
+    const around = diffs.slice(Math.max(0, k - 5), k + 6).filter((_, j) => j !== Math.min(5, k)).map((x) => x.d);
+    const base = around.length ? around.reduce((s, x) => s + x, 0) / around.length : 0;
+    if (d > threshold && d > base * 2.5 && (!cuts.length || at - cuts.at(-1)! >= 0.6)) cuts.push(+(at - step / 2).toFixed(2));
+  });
+  return cuts;
+}
+
 const shots: ToolType<{ asset?: string; sensitivity?: number }> = {
   name: 'shots', title: 'Find the shots', description: 'finds the cuts between shots in a video',
   input: {
@@ -165,13 +183,13 @@ const shots: ToolType<{ asset?: string; sensitivity?: number }> = {
   async run({ asset: wanted, sensitivity = 0.5 }, ctx) {
     const asset = mediaOf(ctx, wanted, ['video']), a = ctx.doc.assets[asset];
     const input = new Input({ source: new UrlSource(ctx.assetUrl(asset)), formats: ALL_FORMATS });
-    const diffs: { t: number; d: number }[] = [];
+    const diffs: { t: number; d: number }[] = [], step = SHOT_STEP;
     let duration = 0;
     try {
       const track = await input.getPrimaryVideoTrack();
       if (!track) throw new Error('this file has no picture');
       duration = await input.computeDuration();
-      const W = 48, H = 27, step = 0.2, sink = new CanvasSink(track, { width: W, height: H, fit: 'fill', poolSize: 2 });
+      const W = 48, H = 27, sink = new CanvasSink(track, { width: W, height: H, fit: 'fill', poolSize: 2 });
       const { g } = canvas(W, H);
       const times = Array.from({ length: Math.floor(duration / step) }, (_, i) => +(i * step).toFixed(3));
       let prev: Float32Array | null = null, i = 0;
@@ -188,13 +206,7 @@ const shots: ToolType<{ asset?: string; sensitivity?: number }> = {
     } finally {
       input.dispose();
     }
-    // a cut: a jump well above its neighbourhood, at least 0.6 s from the previous one
-    const threshold = 0.5 - 0.35 * sensitivity, cuts: number[] = [];
-    diffs.forEach(({ t: at, d }, k) => {
-      const around = diffs.slice(Math.max(0, k - 5), k + 6).filter((_, j) => j !== Math.min(5, k)).map((x) => x.d);
-      const base = around.length ? around.reduce((s, x) => s + x, 0) / around.length : 0;
-      if (d > threshold && d > base * 2.5 && (!cuts.length || at - cuts.at(-1)! >= 0.6)) cuts.push(+(at - 0.1).toFixed(2));
-    });
+    const cuts = cutsOf(diffs, sensitivity, step);
     const bounds = [0, ...cuts, +duration.toFixed(2)];
     const data = { version: 1, kind: 'shots', source: asset, duration: +duration.toFixed(3), cuts, shots: bounds.slice(1).map((to, k) => ({ from: bounds[k], to })) };
     const { id, ops, reload } = await save(ctx, asset, 'shots', data, `Shots · ${a.name ?? asset}`);
@@ -329,7 +341,8 @@ const subjects: ToolType<{ asset?: string; every?: number }> = {
 };
 
 // ── colours of the picture ───────────────────────────────────
-const hex = ([r, g, b]: [number, number, number]) => `#${[r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('').toUpperCase()}`;
+/** a colour as #RRGGBB */
+export const hex = ([r, g, b]: [number, number, number]) => `#${[r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('').toUpperCase()}`;
 const saturation = ([r, g, b]: [number, number, number]) => { const mx = Math.max(r, g, b), mn = Math.min(r, g, b); return mx ? (mx - mn) / mx : 0; };
 const luma = ([r, g, b]: [number, number, number]) => (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
 

@@ -1098,6 +1098,8 @@
     "varySoundsHint": "A sound placed on several moments alternates its variants, so it does not sound copied.",
     "assistantTranscribes": "Let the assistant transcribe without asking",
     "assistantTranscribesHint": "When it needs what is said in a recording, it transcribes it on its own, also when it works while you are away. The recording is sent to the speech model you chose. Off: it asks first, and does without when nobody answers.",
+    "acceptReadings": "Make videos from a reference without showing its reading first",
+    "acceptReadingsHint": "The assistant reads how the reference is made and goes on to make your video the same way. Off: it shows you the reading first, to correct or accept.",
     "assistantFetchesReal": "Let the assistant fetch real logos and people without asking",
     "assistantFetchesRealHint": "A real brand's logo, a real person or product, taken from a free image library with its licence recorded in the project. Off: it asks first, and sets the name in the film's type when nobody answers.",
     "confirmPaid": "Ask before a paid sound",
@@ -1556,6 +1558,25 @@
   },
   "brief": {
     "written": "Brief of the project written (assets/brief.json)."
+  },
+  "reading": {
+    "label": "Reading of {name}",
+    "done": "Reference read: {scenes} scene(s). The film can now be made the same way with your content.",
+    "declined": "The reading was not accepted: tell the assistant what to change.",
+    "shots": "Finding the shots",
+    "frames": "Looking at the shots",
+    "title": "How the reference is made",
+    "text": "Check the reading before your video is made the same way with your content. Correct what a scene does, choose the asset for each place, remove a scene or merge it with the next.",
+    "accept": "Make my video this way",
+    "seconds": "{s} s",
+    "onBeat": "cut on bar {bar}",
+    "what": "What the scene does",
+    "remove": "Remove",
+    "merge": "Merge with the next",
+    "words": "Your words",
+    "built": "Drawn in the film",
+    "missing": "Nothing of yours yet",
+    "role": { "logo": "Logo", "headline": "Title", "text": "Text", "screenshot": "Screen", "photo": "Photo", "video": "Video", "product": "Product", "person": "Person", "figure": "Figure", "shape": "Shape" }
   },
   "perception": {
     "beatsDone": "Music analysed: {tempo} bpm, {beats} beats, {bars} bars, {sections} section change(s). The assistant can now cut and animate on the beat.",

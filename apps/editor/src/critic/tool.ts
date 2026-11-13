@@ -9,8 +9,9 @@ import { pointer, likeness, type Op, type ToolContext, type ToolType } from '@tr
 import { qualityChecksOf } from '../isolated-checks.ts';
 import { criticSystem, DONE_BAR, NO_USAGE, addUsage, parseVerdict, type Usage } from '@tramme/assistant';
 import { loadReferences, type Reference } from '../references/catalogue.ts';
-import { consult, seesPictures, type ConsultRequest, type Via } from '../ai/consult.ts';
-import { FILM_PLAN_PATH, parsePlan } from '../filmplan.ts';
+import { consult, dataImage as imageOf, seesPictures, type ConsultRequest, type Via } from '../ai/consult.ts';
+import { FILM_PLAN_PATH, parsePlan, type FilmPlan } from '../filmplan.ts';
+import { againstReference, type AgainstReference } from '../reading/check.ts';
 import { analyses } from '../perception.ts';
 import { renderAndTarget } from '../review.ts';
 import { scenesOf } from '../scenes.ts';
@@ -33,6 +34,8 @@ export interface CriticHost {
   faults(): Promise<string[]>;
   /** the film's rhythm, measured on its rendered frames */
   rhythm(ctx: ToolContext, compId: string): Promise<Rhythm>;
+  /** a film made from a reference, against its reading: what differs and the frames side by side; null when it follows none */
+  reference(ctx: ToolContext, plan: FilmPlan): Promise<AgainstReference | null>;
 }
 
 /** the titles of the catalogue's faults */
@@ -54,7 +57,7 @@ async function targetLikeness(ctx: ToolContext, compId: string, evidence: Eviden
 
 const filmRhythm = (ctx: ToolContext, compId: string) => measureRhythm(ctx.doc.compositions[compId].duration, (t) => ctx.renderStill(t, compId), ctx.signal);
 
-let host: CriticHost = { via: () => null, rounds: () => 2, gather, likeness: targetLikeness, consult, faults: loadFaults, rhythm: filmRhythm };
+let host: CriticHost = { via: () => null, rounds: () => 2, gather, likeness: targetLikeness, consult, faults: loadFaults, rhythm: filmRhythm, reference: againstReference };
 /** the assistant's turn engine hands the tool its route and its setting; tests hand it stubs */
 export function setCriticHost(next: Partial<CriticHost>) { host = { ...host, ...next }; }
 
@@ -64,14 +67,15 @@ const turn: { rounds: number; failures: Map<string, number>; usage: Usage[]; mod
 /** a new turn: no round used, no scene failed, no consult counted */
 export function resetCritic() { turn.rounds = 0; turn.failures.clear(); turn.usage = []; turn.model = ''; }
 
+/** a consult made by another tool of the turn (the reading of a reference), counted with the critic's */
+export function countConsult(usage: Usage, model: string) { turn.usage.push(usage); turn.model = model; }
+
 /** the turn's consults added up, with their count and the model that made them; undefined when there were none */
 export function consultsOf(): (Usage & { n: number; model: string }) | undefined {
   if (!turn.usage.length) return undefined;
   return { ...turn.usage.reduce(addUsage, NO_USAGE), n: turn.usage.length, model: turn.model };
 }
 
-/** a data URL as the parts a request takes */
-const imageOf = (url: string) => { const m = /^data:([^;]+);base64,(.*)$/.exec(url); return m ? { mediaType: m[1], data: m[2] } : null; };
 
 /** the strips of each take, side by side and labelled (the first picture of each, the target and the plan of the first) */
 async function gatherTakes(ctx: ToolContext, takes: string[]): Promise<Evidence> {
@@ -107,10 +111,13 @@ const critique: ToolType<Input> = {
     const beats = { data: await analyses(ctx), analysisIds: Object.keys(ctx.doc.assets).filter((a) => /^analysis-/.test(a)) };
     // the rhythm on the rendered frames: what cannot be read in the document (a frame that cannot be drawn leaves it out)
     const rhythm = takes?.length ? null : await host.rhythm(ctx, id).then(rhythmLines).catch((e) => { if (ctx.signal.aborted) throw e; return null; });
+    // a film made from a reference: measured against its reading (the takes are compared with each other, not with it)
+    const versus = plan && !takes?.length ? await host.reference(ctx, plan).catch((e) => { if (ctx.signal.aborted) throw e; return null; }) : null;
     const found: DoneIssue[] = [
       ...doneIssues(ctx.doc, id, ctx.registry, plan, issues, beats),
       ...(rhythm?.defects ?? []).map((line) => ({ id: 'rhythm', line, blocking: true })),
       ...(rhythm?.facts ?? []).map((line) => ({ id: 'rhythm', line })),
+      ...(versus?.issues ?? []).map((i) => ({ id: 'reference', line: i.line, ...(i.blocking ? { blocking: true } : {}) })),
     ];
     const measured = found.filter((i) => i.blocking);
     const advice = found.filter((i) => !i.blocking);
@@ -132,7 +139,7 @@ const critique: ToolType<Input> = {
     // the film in motion, the target and the plan: all the critic has
     let evidence: Evidence;
     try { evidence = takes?.length ? await gatherTakes(ctx, takes) : await host.gather(ctx, id, issues); } catch (e) { return measuredOnly(`The critic could not look at the film: ${(e as Error).message}`); }
-    const pictures = [...(evidence.target ? [evidence.target] : []), ...evidence.strips.map((s) => s.url)].map(imageOf).filter((x): x is NonNullable<typeof x> => !!x);
+    const pictures = [...(evidence.target ? [evidence.target] : []), ...evidence.strips.map((s) => s.url), ...(versus?.pairs ?? []).map((p) => p.url)].map(imageOf).filter((x): x is NonNullable<typeof x> => !!x);
     const takesText = takes?.length ? `\n\nThese are takes of one scene, built differently (their strips follow, in this order): ${takes.join(', ')}. Name the best in the "what" of your first fix and say why it beats the others.` : '';
     const text = [
       evidence.facts,
@@ -140,6 +147,7 @@ const critique: ToolType<Input> = {
       evidence.plan ? `Plan:\n${evidence.plan}` : '',
       evidence.target ? 'The first picture is the target frame the film was made towards: reach its level of finish, not its content.' : '',
       `Visual samples (four labelled frames per row, left to right, three rows per picture): overview rows cover the whole film; detail rows cover events and directed movement. Read each row's frame labels: spacing varies. Samples cannot prove smoothness between them. No audio was supplied; do not claim to have heard or verified the soundtrack.\n${evidence.strips.map((s) => s.caption).join('\n')}`,
+      versus?.pairs.length ? `The film is the same video as a reference, made with the user's content. The last pictures put a frame of the reference (left) beside the film (right) at the middle of a scene:\n${versus.pairs.map((p) => p.caption).join('\n')}\nName what keeps them from reading as the same video (a layout off, a softer move, another weight of type, a slower pace). Never ask for the reference's words, logos or pictures: the content is the user's.` : '',
     ].filter(Boolean).join('\n\n') + takesText;
 
     let answer: { text: string; usage: Usage };

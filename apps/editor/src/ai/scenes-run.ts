@@ -18,6 +18,7 @@ export function scenePrompt(plan: FilmPlan, scene: PlanScene, doc: TrammeDoc): s
     `Its idea: ${scene.idea}`,
     `Its brief: ${scene.brief?.trim() || 'nothing beyond the plan'}.`,
     ...(scene.motion?.length ? [`Timed motion (scene-local seconds):\n${motionText(scene)}\nBuild these beats, then inspect their starts, peaks and settled holds with the motion tool.`] : []),
+    ...(scene.reference ? [`It is made the same way as the reference's scene ${scene.follows} (times from the scene's start; boxes in 0..1 of the frame):\n${scene.reference}\nPut each slot at its box with the user's asset named for it (a text slot takes the user's words, as many as it holds; a slot with no asset is filled as the plan says), make its entrance at its time, the moves and the transition named. Never the reference's words, logos or pictures.`] : []),
     ...(plan.loop ? ['This film is a seamless loop: preserve motion and visual continuity through its end and beginning.'] : []),
     `Build it in the composition "${scene.comp}"${comp ? ` (${+comp.duration.toFixed(2)} s, ${comp.width} x ${comp.height})` : ''}: it exists already, the root plays it.`,
     before ? `It follows "${before.name}": take up what that scene leaves (a colour, a shape, a movement).` : 'It opens the film.',

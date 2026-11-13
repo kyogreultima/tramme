@@ -8,6 +8,7 @@ import { answer, chatShown, question } from '../confirm.ts';
 import { attend, away, notify } from '../notify.ts';
 import { Modal } from './controls.tsx';
 import { Choices } from './chat.tsx';
+import { ReadingOutline } from './ReadingOutline.tsx';
 import { t } from '../i18n/index.ts';
 
 export function QuestionDialog() {
@@ -20,6 +21,11 @@ export function QuestionDialog() {
   }, [q]);
   // asked during a turn of the assistant: in the conversation, when one is on screen
   if (!q || (q.inChat && chatShown.value > 0)) return null;
+  if (q.outline) return (
+    <Modal title={t('reading.title')} onClose={() => answer(false)} wide>
+      <div class="modal-body"><ReadingOutline q={q} /></div>
+    </Modal>
+  );
   return (
     <Modal title={q.title} onClose={() => answer(false)}>
       <div class="modal-body">

@@ -8,6 +8,10 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+### Added
+
+- **Remake a reference** (`/remake`): give a video, a gif or a Lottie you like, add your logo, screens, footage and words, and the assistant makes the same video around them. It reads how the reference is made (its shots cut to the frame, its music, the places where content sits, its moves, its transitions, its colours and its type, the camera measured on its pixels), shows you that reading scene by scene to correct (an asset to choose for each place, a scene to remove or merge), then plans the film on it, timed on your own music when you give one. The review checks the film against the reference: the scenes, their lengths, the cuts on the beats, the places filled, and never a word, a logo or a picture of the reference. A setting goes on without showing the reading first.
+
 ## [0.24.0] - 2026-11-13
 
 ### Added

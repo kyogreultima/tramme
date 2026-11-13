@@ -2,7 +2,7 @@
 
 The user gives the assistant a reference (a video, a gif or a Lottie) and adds their own assets: their logo, their screenshots, their footage, their pictures, their words. The assistant makes the same video in the context of those assets: the reference's scenes, pace, cuts on the music, layouts, moves, transitions, palette and type, with the user's assets wherever the reference showed its own content. The result is an editable Tramme project.
 
-Status: not started; decisions 1 to 4 taken on 2026-11-13. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
+Status: steps 1 to 4 built on 2026-11-13 (`/remake`, the `read-reference` tool, the outline, the plan and the checks; the reference is documented in [document.md](document.md#start-from-a-reference)); step 5 waits: its proof and its runs make films with the assistant, on the user's quota. Tick the boxes as steps land, and keep this file as the reference instead of re-deciding the plan.
 
 Inspired by [reanimate](https://github.com/NiazMorshed2007/reanimate) (MIT), a Claude Code skill that records an animation, writes its spec, builds it and verifies it against the original. Tramme keeps the loop and changes its aim: reanimate rebuilds the original, Tramme rebuilds it around other content. Any code taken from reanimate keeps its licence notice.
 
@@ -34,30 +34,34 @@ Taken by the user on 2026-11-13.
 
 ### Step 1. Reading a reference
 
-- [ ] A `reference` asset kind: a video, a gif or a Lottie dropped on the Studio or the assistant's prompt, kept under `assets/references/` and marked as a reference, so no layer shows it by mistake and the export never includes it.
-- [ ] The `read-reference` tool: the shots of the video (the `shots` tool), its music (`beats`), a few frames per shot sent to the model, and from them the reading: the scenes with their start, length and the beat they cut on; in each scene its slots, the places where content sits (a logo, a headline, a screenshot, a photo, a product, a figure) with their box, their role and their entrance; the moves (push-in, pan, tilt, rise, mask reveal…); the transitions; the role and rhythm of the text (title, word by word, caption); the pace (cuts per second, holds); the palette as colour values and the type as a description (serif or not, weight, width, case, tracking).
-- [ ] The movement read from the pixels where the frames alone leave it open: the motion estimate already used by slow motion gives each shot's direction and speed, so a push-in is told from a pan without asking the model.
-- [ ] A Lottie reference read exactly: the import ([lottie-import.ts](../packages/interop/src/lottie-import.ts)) gives its layers, keyframes and eases, and the reading takes its slots and timing from them, without a vision model.
-- [ ] The reading's schema in `@tramme/core`, written by `pnpm schema`, and documented in [document.md](document.md).
+- [x] A `reference` asset kind: a video, a gif or a Lottie dropped on the Studio or the assistant's prompt, kept under `assets/references/` and marked as a reference, so no layer shows it by mistake and the export never includes it.
+- [x] The `read-reference` tool: the shots of the video (the `shots` tool), its music (`beats`), a few frames per shot sent to the model, and from them the reading: the scenes with their start, length and the beat they cut on; in each scene its slots, the places where content sits (a logo, a headline, a screenshot, a photo, a product, a figure) with their box, their role and their entrance; the moves (push-in, pan, tilt, rise, mask reveal…); the transitions; the role and rhythm of the text (title, word by word, caption); the pace (cuts per second, holds); the palette as colour values and the type as a description (serif or not, weight, width, case, tracking).
+- [x] The movement read from the pixels where the frames alone leave it open: the motion estimate already used by slow motion gives each shot's direction and speed, so a push-in is told from a pan without asking the model.
+- [x] A Lottie reference read exactly: the import ([lottie-import.ts](../packages/interop/src/lottie-import.ts)) gives its layers, keyframes and eases, and the reading takes its slots and timing from them, without a vision model.
+- [x] The reading's schema in `@tramme/core`, written by `pnpm schema`, and documented in [document.md](document.md).
+
+Built differently: the reference stays where it was imported and is marked `reference: true`, rather than moved under `assets/references/` (only its reading is written there). The camera is measured by a search for the zoom or the shift that best explains a second look at the shot, the frame's border included, rather than by the block matching of slow motion: on flat graphics, the blocks find nothing. The reading's model is the turn's route, as the critic's, counted with the critic's consults; it is no paid generation, so it has no gate of its own.
+
+Checked in Chrome on a three-shot film rendered by Tramme (a title rising, a mark popping under a push-in, a screen sliding in), as mp4 and as gif: cuts at 1.99 and 3.99 s for 2 and 4, the push-in found on the second shot alone (72 px/s for 74), the user's logo and screen proposed for their slots. To check on a device: a real reference, read with a real model.
 
 ### Step 2. The reading shown to the user
 
-- [ ] The reading as an outline in the Studio: one row per scene with a still of the reference, its length, its beat, its slots and the asset of the user proposed for each; the user edits a row, swaps an asset, deletes a scene or merges two, and the asset changes through operations.
-- [ ] The setting that accepts the reading in advance (decision 3), in the assistant's settings with the other accept-in-advance options.
+- [x] The reading as an outline in the Studio: one row per scene with a still of the reference, its length, its beat, its slots and the asset of the user proposed for each; the user edits a row, swaps an asset, deletes a scene or merges two, and the asset changes through operations.
+- [x] The setting that accepts the reading in advance (decision 3), in the assistant's settings with the other accept-in-advance options.
 
 ### Step 3. The same video around the user's assets
 
-- [ ] Each slot matched to an asset of the user by its role (the logo to the logo's slot, a screenshot to a screen, a portrait to a person), and the words written for the text slots from the user's brief, in their language. A slot left without an asset is filled, in this order, by an asset the user adds, a picture made by `generate-image` behind its gate, or a plain type treatment; the answer names each slot filled that way.
-- [ ] The film plan made from the reading: one plan scene per reading scene, its length, beat, slots and direction (the reference's palette and the nearest typeface) kept. `film-plan` takes the reading as `reference` and says in the plan which scene of the reading each scene follows.
-- [ ] The scenes built with the existing vocabulary at the reading's layout, the moves and transitions mapped to the editor's (`push-in`, `compare`, masks, the transitions of the packs); a move the vocabulary lacks is named in the answer and replaced by the nearest, never drawn as a picture.
-- [ ] The cuts on the reference's timing; on the beats of the user's music at the same places of the bar when the user gives another music.
-- [ ] The text with the rhythm of the reference's text (word by word stays word by word, a held title stays held), its length fitted to the slot.
+- [x] Each slot matched to an asset of the user by its role (the logo to the logo's slot, a screenshot to a screen, a portrait to a person), and the words written for the text slots from the user's brief, in their language. A slot left without an asset is filled, in this order, by an asset the user adds, a picture made by `generate-image` behind its gate, or a plain type treatment; the answer names each slot filled that way.
+- [x] The film plan made from the reading: one plan scene per reading scene, its length, beat, slots and direction (the reference's palette and the nearest typeface) kept. `film-plan` takes the reading as `reference` and says in the plan which scene of the reading each scene follows.
+- [x] The scenes built with the existing vocabulary at the reading's layout, the moves and transitions mapped to the editor's (`push-in`, `compare`, masks, the transitions of the packs); a move the vocabulary lacks is named in the answer and replaced by the nearest, never drawn as a picture.
+- [x] The cuts on the reference's timing; on the beats of the user's music at the same places of the bar when the user gives another music.
+- [x] The text with the rhythm of the reference's text (word by word stays word by word, a held title stays held), its length fitted to the slot.
 
 ### Step 4. Checked against the reference
 
-- [ ] A structure check, in code: number of scenes, their lengths within a tolerance, cuts on the same beats, slots at the same places, the same kinds of move and transition. What differs is listed under `To fix:`.
-- [ ] A look check by the critic: a frame of the reference and the frame of the film at the same point of each scene, side by side; the critic names what keeps them from reading as the same video (a layout off, a softer move, a different weight of type) and never asks for the reference's content. Its rounds are bounded by `criticRounds`.
-- [ ] A content check, in code: no word of the reference's text, no logo or picture of the reference in the film (the reading keeps the words the model saw; the film's text is compared with them).
+- [x] A structure check, in code: number of scenes, their lengths within a tolerance, cuts on the same beats, slots at the same places, the same kinds of move and transition. What differs is listed under `To fix:`.
+- [x] A look check by the critic: a frame of the reference and the frame of the film at the same point of each scene, side by side; the critic names what keeps them from reading as the same video (a layout off, a softer move, a different weight of type) and never asks for the reference's content. Its rounds are bounded by `criticRounds`.
+- [x] A content check, in code: no word of the reference's text, no logo or picture of the reference in the film (the reading keeps the words the model saw; the film's text is compared with them).
 
 ### Step 5. Shown and measured
 

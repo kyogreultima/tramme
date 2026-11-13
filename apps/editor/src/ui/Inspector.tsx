@@ -306,7 +306,7 @@ function AssetsField({ def, value, ctx, onCommit }: { def: PropDef; value: unkno
   };
   const kind = def.assetType ?? 'image';
   const folders = new Map<string, string[]>();
-  for (const [id, a] of Object.entries(ctx.doc.assets)) if (a.type === kind) { const f = folderOf(a.src); folders.set(f, [...(folders.get(f) ?? []), id]); }
+  for (const [id, a] of Object.entries(ctx.doc.assets)) if (a.type === kind && !a.reference) { const f = folderOf(a.src); folders.set(f, [...(folders.get(f) ?? []), id]); }
   const toggle = (id: string) => onCommit(ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]);
   return (
     <div class="assets-field">
@@ -495,7 +495,7 @@ function Field({ def, value, ctx, label, onDraft, onCommit, onPick }: { def: Pro
     case 'assets':
       return <AssetsField def={def} value={value} ctx={ctx} onCommit={onCommit} />;
     case 'asset': {
-      const opts = Object.entries(ctx.doc.assets).filter(([, a]) => !def.assetType || a.type === def.assetType).map(([id, a]) => [id, a.name || id] as [string, string]);
+      const opts = Object.entries(ctx.doc.assets).filter(([, a]) => !a.reference && (!def.assetType || a.type === def.assetType)).map(([id, a]) => [id, a.name || id] as [string, string]);
       return <Select value={String(value ?? '')} options={[...(def.nullable ? [['', t('inspector.none')] as [string, string]] : []), ...opts]} onChange={(v) => onCommit(v || null)} />;
     }
     case 'ease': {

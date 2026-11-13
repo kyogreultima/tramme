@@ -6,6 +6,7 @@
 // so a turn left alone never stops on a question.
 
 import { signal } from '@preact/signals';
+import type { Reading } from '@tramme/core';
 import { prefs } from './settings.ts';
 
 export interface Question {
@@ -18,6 +19,10 @@ export interface Question {
   /** a choice among pictures (the takes of a generation): each one picked by its index, none by the cancel */
   choices?: { url: string; label: string }[];
   choose?: (index: number) => void;
+  /** the reading of a reference, shown as an outline the user corrects: a still per scene, the user's assets for the slots */
+  outline?: { reading: Reading; stills: string[]; assets: { id: string; name: string }[] };
+  /** the outline as the user leaves it, accepted */
+  keep?: (reading: Reading) => void;
 }
 
 /** the question shown, if any */
@@ -64,6 +69,23 @@ export function chooseAmong(title: string, text: string, choices: { url: string;
       title, text, yes: '', choices, inChat: !!turn,
       resolve: () => resolve(null),
       choose: (i) => { question.value = null; resolve(i); },
+    };
+  });
+}
+
+/**
+ * The reading of a reference shown as an outline: the reading as the user
+ * corrects and accepts it, or null when they decline. A turn left alone is
+ * never asked: the reading as it is.
+ */
+export function askReading(reading: Reading, stills: string[], assets: { id: string; name: string }[]): Promise<Reading | null> {
+  if (turn?.auto) return Promise.resolve(reading);
+  return new Promise((resolve) => {
+    question.peek()?.resolve(false);
+    question.value = {
+      title: '', text: '', yes: '', inChat: !!turn, outline: { reading, stills, assets },
+      resolve: () => resolve(null),
+      keep: (r) => { question.value = null; resolve(r); },
     };
   });
 }

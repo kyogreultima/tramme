@@ -7,7 +7,7 @@ const reference = fs.readFileSync(new URL('../../../docs/document.md', import.me
 describe('the guides read on demand', () => {
   it('finds every guide it names: a renamed heading or chapter is not dropped in silence', () => {
     const names = guidesOf(reference).map((g) => g.name).sort();
-    expect(names).toEqual(['clips', 'critic', 'events', 'film-plan', 'hydracept', 'interface', 'node-plugins', 'references', 'scenes', 'sequences', 'shorts', 'sources', 'speaking', 'stock', 'surfaces', 'tilts', 'tracking', 'typefaces']);
+    expect(names).toEqual(['clips', 'critic', 'events', 'film-plan', 'hydracept', 'interface', 'node-plugins', 'references', 'remake', 'scenes', 'sequences', 'shorts', 'sources', 'speaking', 'stock', 'surfaces', 'tilts', 'tracking', 'typefaces']);
   });
 
   it('leaves their text out of the system prompt and lists them at its end', () => {

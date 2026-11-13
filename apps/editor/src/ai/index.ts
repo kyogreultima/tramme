@@ -23,7 +23,10 @@ import { BRIEF_PATH } from '../brief.ts';
 import { criticModel, freshTurn, type Via } from './consult.ts';
 import { assemblyNote, runScenes } from './scenes-run.ts';
 import { todoScenes, type PlanScene } from '../filmplan.ts';
-import { consultsOf, resetCritic, setCriticHost } from '../critic/tool.ts';
+import { consultsOf, countConsult, resetCritic, setCriticHost } from '../critic/tool.ts';
+import { setReadingHost } from '../reading/tool.ts';
+import { alone, askReading } from '../confirm.ts';
+import { prefs } from '../settings.ts';
 import { runCall, uid } from './calls.ts';
 import { clip } from '../model.ts';
 import { FILM_PLAN_PATH, parsePlan, planText } from '../filmplan.ts';
@@ -527,6 +530,7 @@ function viaFor(route: Route, model: string): Via {
   };
 }
 setCriticHost({ via: criticVia, rounds: () => aiSettings.peek().criticRounds });
+setReadingHost({ via: criticVia, counted: countConsult, accepted: () => prefs.peek().acceptReadings || alone(), ask: (r, stills, assets) => askReading(r, stills, assets.map((x) => ({ id: x.id, name: x.name ?? x.id }))) });
 
 /** one user message; yields the assistant's events */
 export async function* ask(p: AskPayload, signal: AbortSignal): AsyncGenerator<AiEvent> {

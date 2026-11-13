@@ -34,6 +34,7 @@ const asset = z.strictObject({
   range: z.tuple([finite, finite]).optional(),
   bin: z.string().min(1).optional(),
   tags: z.array(z.string().min(1)).optional(),
+  reference: z.literal(true).optional(),
 });
 
 const transform = z.strictObject({

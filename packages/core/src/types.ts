@@ -91,6 +91,8 @@ export interface Asset {
   bin?: string;
   /** tags to find it by (lower case, no spaces); the engine ignores them */
   tags?: string[];
+  /** a video, gif or Lottie the user gave as a reference to make their film the same way: read, never shown by a layer */
+  reference?: true;
 }
 
 export interface Transform {

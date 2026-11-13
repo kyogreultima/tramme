@@ -44,3 +44,4 @@ export * from './montage.ts';
 export * from './chapters.ts';
 export * from './syncoffset.ts';
 export * from './colormatch.ts';
+export * from './reading.ts';
