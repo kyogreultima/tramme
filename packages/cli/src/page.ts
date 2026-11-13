@@ -7,7 +7,7 @@
 
 import type { TrammeDoc } from '@tramme/core';
 import { builtinRegistry } from '@tramme/nodes';
-import { addParts, encodeWav, formatParts, mixComposition, noParts, perFrame, Renderer, type FrameParts, type RenderOptions } from '@tramme/render';
+import { addParts, encodeWav, FIRST_SETTLE_LIMIT, formatParts, mixComposition, noParts, perFrame, Renderer, type FrameParts, type RenderOptions } from '@tramme/render';
 import { blitSandboxFrame, declarationsModule, ensureDeclared, ensureSandboxDoc, sandboxDeclaration, sandboxVideoFrames } from '../../../apps/editor/src/plugins/sandbox-draw.ts';
 import { browserHost, type PluginHost } from '../../../apps/editor/src/plugins/host.ts';
 import { containsExpression } from '@tramme/project';
@@ -152,7 +152,7 @@ const api = {
       if (await sandboxReady()) {
         blitSandboxFrame(renderer, await sandboxFrame(f), f / fps, false, true);
       } else {
-        await renderer.renderComplete(f / fps, { ...opts, toFbo: true });
+        await renderer.renderComplete(f / fps, { ...opts, toFbo: true, ...(f === f0 ? { settleLimit: FIRST_SETTLE_LIMIT } : {}) });
         // a frame whose pictures never came (see SETTLE_LIMIT): the export stops rather than carry a wrong picture
         if (renderer.late) { ws.close(); throw new Error(`frame ${f} (${(f / fps).toFixed(2)} s) never finished: a video frame or a plugin picture did not come`); }
       }

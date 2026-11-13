@@ -142,7 +142,8 @@ async function renderSegments(server: Server, first: Page, job: VideoJob, info: 
     return { info, frames: total, audio: !!audio, msPerFrame: (seconds * 1000) / total, parts, seconds, pages: spans.length };
   } finally {
     await Promise.all(pages.slice(1).map((p) => p.close().catch(() => {})));
-    fs.rmSync(tmp, { recursive: true, force: true });
+    // a segment still held open (an encoder stopped by an error, Windows) is retried, and never hides the render's own error
+    try { fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch (e) { console.error(`the segments' folder ${tmp} stays: ${(e as Error).message}`); }
   }
 }
 

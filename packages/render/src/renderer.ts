@@ -23,6 +23,8 @@ export interface RenderOptions {
 
 /** how long a complete frame waits for what it lacks (a video frame being decoded, a plugin's picture from the sandbox) */
 export const SETTLE_LIMIT = 20_000;
+/** the first frame of a render opens its files and decoders (a 4K source of 150 MB, several pages at once): it waits longer */
+export const FIRST_SETTLE_LIMIT = 120_000;
 
 /** sample times inside the shutter, never straddling a cut marker or the ends */
 export function subTimes(t: number, n: number, shutter: number, comp: Composition): number[] {
@@ -388,10 +390,10 @@ export class Renderer {
    * is the exact one (exports, stills). What never comes is waited for
    * SETTLE_LIMIT at most: the frame is then drawn with what it has.
    */
-  async renderComplete(t: number, opts: RenderOptions & { signal?: AbortSignal } = {}): Promise<EvaluatedFrame> {
+  async renderComplete(t: number, opts: RenderOptions & { signal?: AbortSignal; settleLimit?: number } = {}): Promise<EvaluatedFrame> {
     this.late = false;
     let frame = this.render(t, opts);
-    for (let i = 0; i < 30 && (await this.settle(SETTLE_LIMIT, opts.signal)); i++) frame = this.render(t, opts);
+    for (let i = 0; i < 30 && (await this.settle(opts.settleLimit ?? SETTLE_LIMIT, opts.signal)); i++) frame = this.render(t, opts);
     return frame;
   }
 
