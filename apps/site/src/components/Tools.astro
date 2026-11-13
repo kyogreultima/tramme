@@ -19,14 +19,14 @@ const c = pick(locale, COPY);
 <section class="section" id="tools">
   <div class="wrap">
     <Head title={c.title} more={c.more} />
-    <ul class="groups surface" role="list" data-reveal>
+    <ul class="groups surface" role="list" data-reveal data-live data-pick>
       {TOOL_GROUPS.map(({ name, text, doc, tools }) => (
         <li>
           <div class="what">
             <h3>{pick(locale, name)}</h3>
             <p>{pick(locale, text)}</p>
           </div>
-          <ul class="chips" role="list" data-stagger data-live data-pick>{pick(locale, tools).map((tool) => <li>{tool}</li>)}</ul>
+          <ul class="chips" role="list">{pick(locale, tools).map((tool) => <li>{tool}</li>)}</ul>
           <a class="more" href={docHref(doc)} aria-label={`${pick(locale, name)}, ${c.inDocs}`}>{c.docs}</a>
         </li>
       ))}
@@ -37,22 +37,23 @@ const c = pick(locale, COPY);
 <script>
   import '../scripts/live.ts';
 
-  // in each row on screen, one tool after the other is picked, as in a panel of the app; rows a beat apart
-  const EVERY = 1400;
+  // one selection goes through the toolbox while it is on screen, tool after tool and row after row, as a hand looking through a panel
+  const EVERY = 1100;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   document.addEventListener('astro:page-load', () => {
-    [...document.querySelectorAll<HTMLElement>('[data-pick]')].forEach((row, r) => {
-      if (row.dataset.ready !== undefined) return;
-      row.dataset.ready = '';
-      const chips = [...row.children] as HTMLElement[];
+    for (const box of document.querySelectorAll<HTMLElement>('[data-pick]')) {
+      if (box.dataset.ready !== undefined) continue;
+      box.dataset.ready = '';
+      const chips = [...box.querySelectorAll<HTMLElement>('.chips li')];
       let at = -1, timer = 0;
       const next = () => { chips[at]?.removeAttribute('data-picked'); at = (at + 1) % chips.length; chips[at].setAttribute('data-picked', ''); };
-      row.addEventListener('live', (e) => {
-        clearTimeout(timer); clearInterval(timer);
+      box.addEventListener('live', (e) => {
+        clearInterval(timer);
         if (!(e as CustomEvent<{ on: boolean }>).detail.on || reduced.matches) return;
-        timer = window.setTimeout(() => { next(); timer = window.setInterval(next, EVERY); }, 300 + r * 350);
+        if (at < 0) next();
+        timer = window.setInterval(next, EVERY);
       });
-    });
+    }
   });
 </script>
 
