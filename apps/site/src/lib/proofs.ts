@@ -17,8 +17,10 @@ export interface Proof {
   kind: 'picture' | 'sound';
   /** the view a proof opens on: the picture (by default), or the clip when the change shows in motion (a 2.5D move) */
   view?: 'picture' | 'video';
-  /** how the clip compares: a line sweeping across, or the two side by side */
-  compare: 'sweep' | 'side';
+  /** the clip keeps the sound of the after (captions heard as they are said): a button turns it on */
+  sound?: boolean;
+  /** how the clip compares: a line sweeping across, the two side by side, or the after alone full frame (captions to read) */
+  compare: 'sweep' | 'side' | 'after';
   name: Localised<string>;
   text: Localised<string>;
   where: Localised<string>;

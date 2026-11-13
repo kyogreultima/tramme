@@ -2,8 +2,9 @@
   "id": "captions",
   "order": 7,
   "kind": "picture",
-  "compare": "side",
+  "compare": "after",
   "view": "video",
+  "sound": true,
   "name": { "en": "Word-by-word captions", "fr": "Sous-titres mot à mot" },
   "text": {
     "en": "An astronaut answering an interview. Tramme transcribes the speech on the machine (Whisper, in the browser), times each word, and lays the captions over the shot a few words at a time, the word being said lit in colour as he says it.",
@@ -19,7 +20,7 @@
   },
   "beforeLabel": { "en": "The interview", "fr": "L’interview" },
   "afterLabel": { "en": "Captioned in Tramme", "fr": "Sous-titré dans Tramme" },
-  "videoLabel": { "en": "The interview and its word-by-word captions, side by side", "fr": "L’interview et ses sous-titres mot à mot, côte à côte" },
+  "videoLabel": { "en": "The interview with its word-by-word captions, its sound on with the button", "fr": "L’interview avec ses sous-titres mot à mot, le son activé par le bouton" },
   "source": {
     "page": "https://images.nasa.gov/details/ksc_122210_itow_melvin",
     "file": "https://images-assets.nasa.gov/video/ksc_122210_itow_melvin/ksc_122210_itow_melvin~orig.mp4",

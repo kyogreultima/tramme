@@ -31,7 +31,9 @@ type L = { en: string; fr: string };
 /** a step in the editor: a tool run (its proposal accepted), a media transcribed as its button does, or operations applied ($comp is the composition) */
 type Step = { tool: string; input: Record<string, unknown> } | { transcribe: string } | { ops: Record<string, unknown>[] };
 interface Manifest {
-  id: string; kind: 'picture' | 'sound'; compare: 'sweep' | 'side'; name: L;
+  id: string; kind: 'picture' | 'sound'; compare: 'sweep' | 'side' | 'after'; name: L;
+  /** the clip keeps the sound of the after (the before plays muted beside it) */
+  sound?: boolean;
   source: { page: string; file: string; sha256?: string; type: 'video' | 'image' | 'audio'; author: string; licence: string; licenceUrl: string; start?: number; duration: number; width?: number; height?: number };
   still: number;
   /** the after's layer: its effects, and props over the source layer's */
@@ -79,16 +81,19 @@ const comp = (layers: Record<string, unknown>, order: string[], w = W, h = H) =>
 /** the source as a layer filling the frame: a clip from its start, a picture, or a sound */
 function sourceLayer(): Record<string, any> {
   const t = m.source.type, at = { transform: { position: [W / 2, H / 2] } };
-  if (t === 'video') return { type: 'video', in: 0, out: DUR, ...at, props: { video: 'src', start: m.source.start ?? 0, size: [W, H], muted: m.kind !== 'sound' } };
+  if (t === 'video') return { type: 'video', in: 0, out: DUR, ...at, props: { video: 'src', start: m.source.start ?? 0, size: [W, H], muted: m.kind !== 'sound' && !m.sound } };
   if (t === 'image') return { type: 'image', in: 0, out: DUR, ...at, props: { image: 'src', size: [W, H], fit: 'cover' } };
   return { type: 'audio', in: 0, out: DUR, props: { audio: 'src', start: m.source.start ?? 0 } };
 }
 const withAfter = (l: Record<string, any>) => ({ ...l, props: { ...l.props, ...m.after?.props }, ...(m.after?.effects?.length ? { effects: m.after.effects.map((e, i) => ({ id: `p${i}`, props: {}, ...e })) } : {}) });
 
-/** the before and the after in one document: the after cut at a line sweeping across, or the two side by side */
+/** the before and the after in one document: the after cut at a line sweeping across, the two side by side, or the after alone, full frame (its before is the picture view's) */
 function compareDoc(before: Doc, after: Doc): Doc {
+  if (m.compare === 'after') return after;
   const a = after.compositions[after.root], b = before.compositions[before.root];
-  const compositions: Doc['compositions'] = { ...after.compositions, proofBefore: b };
+  // the clip's sound, when it has one, is the after's: the before plays muted beside it
+  const quiet = (c: any) => ({ ...c, layers: Object.fromEntries(Object.entries(c.layers as Record<string, any>).map(([k, l]) => [k, l.type === 'video' ? { ...l, props: { ...l.props, muted: true } } : l])) });
+  const compositions: Doc['compositions'] = { ...after.compositions, proofBefore: m.sound ? quiet(b) : b };
   const c = (comp: string, x: number, y: number, s = 1, extra: object = {}) => ({ type: 'comp', in: 0, out: DUR, transform: { position: [x, y], scale: [s, s] }, props: { comp }, ...extra });
   if (m.compare === 'side') {
     const fit = (k: { width: number; height: number }) => Math.min((W / 2) / k.width, H / k.height) * 0.94;
@@ -193,9 +198,10 @@ function stills(name: string, docFile: string) {
 
 function clip(docFile: string) {
   const master = path.join(dir, 'compare.mp4'), v = path.join(SITE, 'src/videos', `proof-${id}`);
-  cli('render', docFile, '--format', 'mp4', '--out', master, '--mute');
-  ff('-i', master, '-an', '-c:v', 'libvpx-vp9', '-crf', '37', '-b:v', '0', '-row-mt', '1', '-deadline', 'good', '-cpu-used', '2', '-pix_fmt', 'yuv420p', `${v}.webm`);
-  ff('-i', master, '-an', '-c:v', 'libx264', '-preset', 'slow', '-crf', '23', '-maxrate', '3500k', '-bufsize', '7000k', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', `${v}.mp4`);
+  cli('render', docFile, '--format', 'mp4', '--out', master, ...(m.sound ? [] : ['--mute']));
+  const audio = (codec: string, rate: string) => (m.sound ? ['-c:a', codec, '-b:a', rate] : ['-an']);
+  ff('-i', master, ...audio('libopus', '96k'), '-c:v', 'libvpx-vp9', '-crf', '37', '-b:v', '0', '-row-mt', '1', '-deadline', 'good', '-cpu-used', '2', '-pix_fmt', 'yuv420p', `${v}.webm`);
+  ff('-i', master, ...audio('aac', '128k'), '-c:v', 'libx264', '-preset', 'slow', '-crf', '23', '-maxrate', '3500k', '-bufsize', '7000k', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', `${v}.mp4`);
   ff('-ss', String(Math.min(DUR * 0.8, m.still + 3)), '-i', master, '-frames:v', '1', '-c:v', 'libwebp', '-quality', '80', `${v}.webp`);
 }
 

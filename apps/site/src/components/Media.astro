@@ -6,6 +6,8 @@
 // plain CSS, no request.
 import Play from '@phosphor-icons/core/assets/fill/play-fill.svg';
 import Pause from '@phosphor-icons/core/assets/fill/pause-fill.svg';
+import SoundOn from '@phosphor-icons/core/assets/fill/speaker-simple-high-fill.svg';
+import SoundOff from '@phosphor-icons/core/assets/fill/speaker-simple-slash-fill.svg';
 
 interface Props {
   id: string;
@@ -18,12 +20,14 @@ interface Props {
   duration?: number;
   /** the placeholder's ground and light, from the clip's own colors */
   tint?: [string, string];
+  /** the clip has a sound worth hearing: a button turns it on (a video only plays by itself muted) */
+  sound?: boolean;
   /** files of a clip that is not in src/videos (a public project's): its video and poster addresses */
   source?: { webm?: string; mp4?: string; poster?: string };
   class?: string;
 }
 
-const { id, width, height, label, duration, tint = ['#11171b', '#2ec4b6'], source, class: cls } = Astro.props;
+const { id, width, height, label, duration, tint = ['#11171b', '#2ec4b6'], source, sound, class: cls } = Astro.props;
 
 const files = import.meta.glob<string>('../videos/*.{webm,mp4,webp,jpg}', { eager: true, query: '?url', import: 'default' });
 const file = (ext: string): string | undefined => files[`../videos/${id}.${ext}`];
@@ -48,6 +52,12 @@ const ratio = reduced === '8:5' ? '16:10' : reduced;
         <Play class="i-play" aria-hidden="true" />
         <Pause class="i-pause" aria-hidden="true" />
       </button>
+      {sound && (
+        <button type="button" class="toggle sound" data-video-sound aria-label="Sound on" aria-pressed="false">
+          <SoundOff class="i-off" aria-hidden="true" />
+          <SoundOn class="i-on" aria-hidden="true" />
+        </button>
+      )}
     </>
   ) : (
     <div class="ph" role="img" aria-label={label}>
@@ -80,6 +90,14 @@ const ratio = reduced === '8:5' ? '16:10' : reduced;
         v.dataset.want = v.paused ? 'on' : 'off';
         if (v.paused) v.play().catch(() => {});
         else v.pause();
+      });
+      // the sound, when the clip has one: on by the visitor's hand only
+      const s = v.parentElement!.querySelector<HTMLButtonElement>('[data-video-sound]');
+      s?.addEventListener('click', () => {
+        v.muted = !v.muted;
+        s.setAttribute('aria-pressed', String(!v.muted));
+        s.setAttribute('aria-label', v.muted ? 'Sound on' : 'Sound off');
+        if (!v.muted && v.paused) { v.dataset.want = 'on'; v.play().catch(() => {}); }
       });
       io.observe(v);
     }
@@ -118,4 +136,9 @@ const ratio = reduced === '8:5' ? '16:10' : reduced;
   .toggle:hover { background: rgba(8, 11, 13, 0.85); }
   .i-pause, [data-playing] .i-play { display: none; }
   [data-playing] .i-pause { display: block; }
+  /* the sound beside the play button, shown while it is off */
+  .toggle.sound { right: 58px; }
+  .toggle.sound[aria-pressed='false'] { opacity: 1; }
+  .i-on, .toggle.sound[aria-pressed='true'] .i-off { display: none; }
+  .toggle.sound[aria-pressed='true'] .i-on { display: block; }
 </style>
