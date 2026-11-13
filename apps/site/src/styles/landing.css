@@ -18,11 +18,15 @@ body.landing main { padding-bottom: 0; }
     body.landing [data-stagger] > :nth-child(4) { --i: 3; }
     body.landing [data-stagger] > :nth-child(5) { --i: 4; }
     body.landing [data-stagger] > :nth-child(6) { --i: 5; }
+    body.landing [data-stagger] > :nth-child(7) { --i: 6; }
+    body.landing [data-stagger] > :nth-child(8) { --i: 7; }
     body.landing .head h2 { animation: rise-big linear both; animation-timeline: view(); animation-range: entry 0% entry 60%; }
     /* a list that staggers its children does not also fade as a block */
     body.landing [data-reveal][data-stagger] { animation: none; }
   }
 }
+/* the moving pieces (scripts/live.ts): their animations run only while they are on screen */
+body.landing [data-live]:not([data-on]), body.landing [data-live]:not([data-on]) *, body.landing [data-live]:not([data-on]) *::before, body.landing [data-live]:not([data-on]) *::after { animation-play-state: paused !important; }
 @keyframes rise { from { opacity: 0; transform: translateY(36px); } }
 @keyframes rise-big { from { opacity: 0; transform: translateY(64px); } }
 body.site .nav-reference {

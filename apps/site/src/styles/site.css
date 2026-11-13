@@ -60,9 +60,11 @@ body.site .cards strong { font-weight: 500; }
 body.site .cards p { max-width: 45ch; color: var(--ink-2); }
 body.site #packs .more, body.site #inside .more, body.site #cloud .more { text-align: left; }
 body.site #tools .groups { border-radius: 0; background: transparent; padding-inline: 0; }
-body.site #tools .chips li { border-radius: 4px; background: var(--panel-2); }
+body.site #tools .chips li { border-radius: 4px; background: var(--panel-2); transition: background-color 0.25s var(--ease), color 0.25s var(--ease), box-shadow 0.25s var(--ease); }
+/* the tool picked in its row (Tools.astro), as in the app's panels */
+body.site #tools .chips li[data-picked] { background: var(--accent-soft); color: var(--accent-text); box-shadow: inset 0 0 0 1px var(--accent); }
 body.site .formats { gap: 0 28px; }
-body.site .formats > li { min-height: 152px; padding-inline: 0; border-top: 1px solid var(--line-2); border-radius: 0; background: transparent; }
+body.site .formats > li { padding-inline: 0; border-top: 1px solid var(--line-2); border-radius: 0; background: transparent; }
 
 /* Pricing sits on a raised dark surface, with the dark action roles. */
 body[data-page='pricing'] .pricing-sheet {

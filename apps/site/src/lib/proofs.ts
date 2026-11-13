@@ -62,3 +62,10 @@ export const PROOFS: Proof[] = Object.values(manifests)
 
 /** the section's name in the features page's index */
 export const PROOFS_NAME: Localised<string> = { en: 'Before and after', fr: 'Avant et après' };
+
+/** a published proof by its id, for a picture of its footage elsewhere on the site (the landing's edit, its screens) */
+export function proofOf(id: string): Proof {
+  const p = PROOFS.find((x) => x.id === id);
+  if (!p) throw new Error(`no published proof "${id}"`);
+  return p;
+}

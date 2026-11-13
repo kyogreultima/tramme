@@ -26,13 +26,35 @@ const c = pick(locale, COPY);
             <h3>{pick(locale, name)}</h3>
             <p>{pick(locale, text)}</p>
           </div>
-          <ul class="chips" role="list">{pick(locale, tools).map((tool) => <li>{tool}</li>)}</ul>
+          <ul class="chips" role="list" data-stagger data-live data-pick>{pick(locale, tools).map((tool) => <li>{tool}</li>)}</ul>
           <a class="more" href={docHref(doc)} aria-label={`${pick(locale, name)}, ${c.inDocs}`}>{c.docs}</a>
         </li>
       ))}
     </ul>
   </div>
 </section>
+
+<script>
+  import '../scripts/live.ts';
+
+  // in each row on screen, one tool after the other is picked, as in a panel of the app; rows a beat apart
+  const EVERY = 1400;
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+  document.addEventListener('astro:page-load', () => {
+    [...document.querySelectorAll<HTMLElement>('[data-pick]')].forEach((row, r) => {
+      if (row.dataset.ready !== undefined) return;
+      row.dataset.ready = '';
+      const chips = [...row.children] as HTMLElement[];
+      let at = -1, timer = 0;
+      const next = () => { chips[at]?.removeAttribute('data-picked'); at = (at + 1) % chips.length; chips[at].setAttribute('data-picked', ''); };
+      row.addEventListener('live', (e) => {
+        clearTimeout(timer); clearInterval(timer);
+        if (!(e as CustomEvent<{ on: boolean }>).detail.on || reduced.matches) return;
+        timer = window.setTimeout(() => { next(); timer = window.setInterval(next, EVERY); }, 300 + r * 350);
+      });
+    });
+  });
+</script>
 
 <style>
   .groups { margin: 0; padding: clamp(8px, 1.2vw, 16px) clamp(20px, 3vw, 40px); list-style: none; }

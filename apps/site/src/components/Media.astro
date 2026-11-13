@@ -44,7 +44,7 @@ const ratio = reduced === '8:5' ? '16:10' : reduced;
 <div class:list={['media', cls]} style={`--ratio: ${width} / ${height}; --base: ${tint[0]}; --glow: ${tint[1]}`}>
   {webm || mp4 ? (
     <>
-      <video data-video muted loop playsinline preload="none" poster={poster} aria-label={label}>
+      <video data-video muted loop playsinline preload="none" data-poster={poster} aria-label={label}>
         {webm && <source src={webm} type="video/webm" />}
         {mp4 && <source src={mp4} type="video/mp4" />}
       </video>
@@ -74,6 +74,8 @@ const ratio = reduced === '8:5' ? '16:10' : reduced;
   const io = new IntersectionObserver((entries) => {
     for (const { target, isIntersecting } of entries) {
       const v = target as HTMLVideoElement;
+      // its poster too waits until it comes near (a poster attribute loads at once, whatever preload says)
+      if (isIntersecting && v.dataset.poster && !v.poster) v.poster = v.dataset.poster;
       const wanted = v.dataset.want ? v.dataset.want === 'on' : !reduced.matches;
       if (isIntersecting && wanted) v.play().catch(() => {});
       else v.pause();

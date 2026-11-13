@@ -35,7 +35,8 @@ describe('the components', () => {
   it('keep the scripts to the few that a behaviour needs', () => {
     const withScript = components.filter((f) => /<script/.test(read(f))).map((f) => path.basename(f, '.astro')).sort();
     // Proofs: its tabs, the line dragged between before and after, the sound switched at the same instant
-    expect(withScript).toEqual(['Consent', 'Hero', 'Media', 'Nav', 'Platform', 'ProjectCard', 'Proofs', 'Source', 'ThemeProvider', 'ThemeToggle'].sort());
+    // EditDesk: its playhead and the shot it cuts to; Tools: the tool picked in each row; MotionDemo, VectorFrame: paused off screen (scripts/live.ts)
+    expect(withScript).toEqual(['Consent', 'EditDesk', 'Hero', 'Media', 'MotionDemo', 'Nav', 'Platform', 'ProjectCard', 'Proofs', 'Source', 'ThemeProvider', 'ThemeToggle', 'Tools', 'VectorFrame'].sort());
     expect(withoutScript(read('components/Nav.astro'))).toContain('<details');
   });
 });

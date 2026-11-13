@@ -1,0 +1,39 @@
+---
+// The export's shot as vectors, for the formats that hold vectors (SVG, a
+// frame; Lottie, the frame moving): the lake's mountains, its water, the rock
+// in front, drawn in shapes of the site's colours. The moving one drifts its
+// cloud and its ripples while it is on screen (scripts/live.ts).
+interface Props { moving?: boolean; class?: string }
+const { moving = false, class: cls } = Astro.props;
+---
+
+<svg class:list={['vector', cls, { moving }]} viewBox="0 0 64 36" aria-hidden="true" {...(moving ? { 'data-live': '' } : {})}>
+  <rect class="sky" width="64" height="36" />
+  <g class="cloud"><ellipse cx="36" cy="10" rx="7" ry="2.6" /><ellipse cx="40" cy="8.6" rx="4" ry="2.6" /><ellipse cx="33" cy="9" rx="3" ry="2" /></g>
+  <path class="far" d="M0 14 L9 8 L15 5.5 L21 9 L34 17.5 L0 18 Z" />
+  <path class="near-hill" d="M28 18.5 L44 14 L64 10.5 L64 19.5 Z" />
+  <rect class="water" y="18" width="64" height="18" />
+  <g class="ripples"><path d="M14 22 h10 M34 24.5 h12 M22 28 h14 M44 30.5 h10" /></g>
+  <path class="rock" d="M0 25 L7 23.5 L15 27 L22 32 L26 36 L0 36 Z" />
+</svg>
+
+<script>
+  import '../scripts/live.ts';
+</script>
+
+<style>
+  .vector { display: block; border-radius: 5px; }
+  .sky { fill: var(--panel-2); }
+  .cloud { fill: var(--ink); }
+  .far { fill: var(--ink-3); }
+  .near-hill { fill: var(--accent-2); }
+  .water { fill: var(--accent); }
+  .ripples path { fill: none; stroke: var(--bg); stroke-width: 0.8; stroke-linecap: round; opacity: 0.5; }
+  .rock { fill: var(--ink-2); }
+  @media (prefers-reduced-motion: no-preference) {
+    .moving .cloud { animation: drift 6s ease-in-out infinite alternate; }
+    .moving .ripples { animation: ripple 2.4s ease-in-out infinite alternate; }
+  }
+  @keyframes drift { to { transform: translateX(-10px); } }
+  @keyframes ripple { to { transform: translateX(3px); opacity: 0.6; } }
+</style>

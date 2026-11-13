@@ -1,0 +1,185 @@
+---
+// An edit, playing: a viewer over a timeline of three tracks, the shots real
+// footage from the proofs. The playhead crosses the timeline in a loop; the
+// viewer cuts to the shot under it, the title over it shows when the title
+// clip is reached, the grade clip warms the picture. A click on the timeline
+// moves the playhead there. Only while on screen (scripts/live.ts); with
+// reduced motion, the playhead stays on one shot. Pictures loaded as they
+// come near; no engine, a few lines of script.
+import { Image, getImage } from 'astro:assets';
+import { proofOf } from '../lib/proofs';
+import { pick, type Locale, type Localised } from '../lib/i18n';
+
+interface Props { locale: Locale }
+const { locale } = Astro.props;
+
+const COPY: Localised<{ label: string; title: string; titleClip: string; gradeClip: string; music: string }> = {
+  en: { label: 'An edit playing in the timeline: six shots cut one after the other, a title over the third, a grade over the fourth, music under them all.', title: 'Directed in words.', titleClip: 'Title', gradeClip: 'Grade', music: 'music.wav' },
+  fr: { label: 'Un montage qui joue dans la timeline : six plans coupés l’un après l’autre, un titre sur le troisième, un étalonnage sur le quatrième, une musique sous tous.', title: 'Dirigé avec des mots.', titleClip: 'Titre', gradeClip: 'Étalonnage', music: 'musique.wav' },
+};
+const c = pick(locale, COPY);
+
+// the shots, end to end on the main track (from, to: shares of the loop)
+const SHOTS = [
+  { id: 'edit', file: 'nasa-talk.mp4', from: 0, to: 0.19 },
+  { id: 'cutout', file: 'riverside.mp4', from: 0.19, to: 0.35 },
+  { id: 'keying', file: 'green-screen.mp4', from: 0.35, to: 0.5 },
+  { id: 'grading', file: 'facade.mp4', from: 0.5, to: 0.68 },
+  { id: 'tracking', file: 'red-car.mp4', from: 0.68, to: 0.85 },
+  { id: 'slowmo', file: 'snow-dog.mp4', from: 0.85, to: 1 },
+];
+const shots = await Promise.all(SHOTS.map(async (s) => {
+  const picture = proofOf(s.id).after;
+  const thumb = await getImage({ src: picture, width: 320, format: 'webp' });
+  return { ...s, picture, thumb: thumb.src };
+}));
+// the clips over them: what they do to the picture
+const OVER = [
+  { fx: 'title', name: c.titleClip, from: 0.37, to: 0.49 },
+  { fx: 'grade', name: c.gradeClip, from: 0.52, to: 0.66 },
+];
+// the music's waveform: a fixed shape, louder where the cuts land
+const BARS = 160;
+const wave = Array.from({ length: BARS }, (_, i) => {
+  const x = i / BARS;
+  const beat = SHOTS.some((s) => Math.abs(x - s.from) < 0.012) ? 0.35 : 0;
+  const h = 0.28 + 0.22 * Math.abs(Math.sin(i * 0.37)) + 0.18 * Math.abs(Math.sin(i * 0.11 + 1)) + beat;
+  return Math.min(1, h);
+});
+const pct = (n: number) => `${(n * 100).toFixed(3)}%`;
+---
+
+<div class="desk" data-desk data-live role="img" aria-label={c.label}>
+  <div class="viewer" aria-hidden="true">
+    {shots.map((s, i) => (
+      <Image class="shot" data-shot={i} src={s.picture} alt="" widths={[480, 800, 1200]} sizes="(min-width: 900px) 46vw, 100vw" loading="lazy" />
+    ))}
+    <span class="title">{c.title}</span>
+  </div>
+  <div class="timeline" aria-hidden="true">
+    <span class="track-name">V2</span>
+    <div class="track over">
+      {OVER.map((o) => <span class={`clip fx-${o.fx}`} data-from={o.from} data-to={o.to} data-fx={o.fx} style={`left: ${pct(o.from)}; width: ${pct(o.to - o.from)}`}>{o.name}</span>)}
+    </div>
+    <span class="track-name">V1</span>
+    <div class="track main">
+      {shots.map((s, i) => (
+        <span class="clip shot-clip" data-from={s.from} data-to={s.to} data-index={i} style={`left: ${pct(s.from)}; width: ${pct(s.to - s.from)}; --thumb: url(${s.thumb})`}>
+          <span class="file">{s.file}</span>
+        </span>
+      ))}
+    </div>
+    <span class="track-name">A1</span>
+    <div class="track audio">
+      <span class="clip sound">
+        <svg viewBox={`0 0 ${BARS} 20`} preserveAspectRatio="none">
+          {wave.map((h, i) => <rect x={i + 0.2} y={10 - h * 9} width="0.6" height={h * 18} />)}
+        </svg>
+        <span class="file">{c.music}</span>
+      </span>
+    </div>
+    <div class="lane" data-lane>
+      <span class="head" data-playhead></span>
+    </div>
+  </div>
+</div>
+
+<script>
+  import '../scripts/live.ts';
+
+  /** one pass of the playhead over the timeline, in ms */
+  const LOOP = 15000;
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+
+  document.addEventListener('astro:page-load', () => {
+    for (const desk of document.querySelectorAll<HTMLElement>('[data-desk]')) {
+      if (desk.dataset.ready) continue;
+      desk.dataset.ready = '';
+      const head = desk.querySelector<HTMLElement>('[data-playhead]')!;
+      const lane = desk.querySelector<HTMLElement>('[data-lane]')!;
+      const clips = [...desk.querySelectorAll<HTMLElement>('[data-from]')];
+      const shots = [...desk.querySelectorAll<HTMLElement>('[data-shot]')];
+      // with reduced motion, parked on the green-screen take
+      let t = reduced.matches ? 0.42 : 0, last = 0, raf = 0;
+      const show = () => {
+        head.style.transform = `translateX(${(t * 100).toFixed(3)}%)`;
+        let shot = 0;
+        for (const clip of clips) {
+          const on = t >= Number(clip.dataset.from) && t < Number(clip.dataset.to);
+          clip.toggleAttribute('data-active', on);
+          if (on && clip.dataset.index) shot = Number(clip.dataset.index);
+          if (clip.dataset.fx) desk.toggleAttribute(`data-${clip.dataset.fx}`, on);
+        }
+        // the shot shown, and the next one ready: the others are not drawn, so not loaded until their turn
+        shots.forEach((s, i) => { s.toggleAttribute('data-active', i === shot); s.toggleAttribute('data-next', i === (shot + 1) % shots.length); });
+      };
+      const tick = (now: number) => {
+        t = (t + (now - last) / LOOP) % 1;
+        last = now;
+        show();
+        raf = requestAnimationFrame(tick);
+      };
+      desk.addEventListener('live', (e) => {
+        cancelAnimationFrame(raf);
+        if ((e as CustomEvent<{ on: boolean }>).detail.on && !reduced.matches) {
+          last = performance.now();
+          raf = requestAnimationFrame(tick);
+        }
+      });
+      // a click on the timeline moves the playhead there, as in an editor
+      desk.querySelector('.timeline')!.addEventListener('pointerdown', (e) => {
+        const r = lane.getBoundingClientRect();
+        t = Math.min(0.999, Math.max(0, ((e as PointerEvent).clientX - r.left) / r.width));
+        show();
+      });
+      show();
+    }
+  });
+</script>
+
+<style>
+  .desk { display: grid; gap: 10px; padding: 10px; border-radius: var(--r-lg); background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); }
+
+  /* the viewer: the shot under the playhead, cut (no transition) */
+  .viewer { position: relative; overflow: hidden; aspect-ratio: 16 / 9; border-radius: calc(var(--r-lg) - 6px); background: var(--stage); }
+  /* only the shot shown and the next are drawn: a lazy picture not drawn is not loaded */
+  .viewer :global(.shot) { position: absolute; inset: 0; display: none; width: 100%; height: 100%; object-fit: cover; opacity: 0; }
+  .viewer :global(.shot:is([data-active], [data-next])) { display: block; }
+  .viewer :global(.shot[data-active]) { opacity: 1; }
+  /* the grade clip warms and deepens the picture under it */
+  .desk[data-grade] .viewer :global(.shot) { filter: saturate(1.35) contrast(1.08); }
+  .title { position: absolute; left: 5%; bottom: 8%; max-width: 70%; font-size: clamp(1.25rem, 3.4vw, 3rem); line-height: 1; letter-spacing: -0.04em; color: var(--on-media); opacity: 0; transform: translateY(12px); transition: opacity 0.35s var(--ease), transform 0.5s var(--ease); }
+  .desk[data-title] .title { opacity: 1; transform: none; }
+
+  /* the timeline: a name column, three tracks, the playhead over them */
+  /* clipped: the playhead's lane is moved by its own width, and must not widen the page */
+  .timeline { position: relative; overflow: clip; display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 4px 8px; align-items: stretch; padding: 8px 4px 6px; cursor: ew-resize; user-select: none; touch-action: pan-y; }
+  .track-name { display: grid; place-items: center; font-size: 0.625rem; color: var(--ink-3); }
+  .track { position: relative; height: 34px; border-radius: 6px; background: var(--bg); }
+  .track.over { height: 22px; }
+  .track.audio { height: 30px; }
+  .clip { position: absolute; top: 0; bottom: 0; display: flex; align-items: center; overflow: hidden; padding-inline: 8px; border-radius: 6px; box-shadow: inset 0 0 0 1px var(--line-2); font-size: 0.625rem; white-space: nowrap; color: var(--ink-2); }
+  .clip[data-active] { box-shadow: inset 0 0 0 2px var(--accent); }
+  .over .clip { background: var(--accent-soft); color: var(--accent-text); }
+  /* a shot: its picture repeated along it, its file's name over it */
+  .shot-clip { background: var(--panel-2) var(--thumb) left center / auto 100% repeat-x; }
+  .shot-clip + .shot-clip { margin-left: 2px; }
+  .file { padding: 2px 5px; border-radius: 4px; background: var(--scrim); color: var(--on-media); }
+  .sound { left: 0; right: 0; padding: 0; background: var(--accent-soft); }
+  .sound svg { position: absolute; inset: 3px 0; width: 100%; height: calc(100% - 6px); fill: var(--accent-text); opacity: 0.55; }
+  .sound .file { position: relative; margin-left: 8px; }
+
+  /* the playhead: a lane as wide as the tracks, moved by its own width's share */
+  .lane { position: absolute; top: 0; bottom: 0; left: calc(4px + 28px + 8px); right: 4px; pointer-events: none; }
+  .head { position: absolute; inset: 0; will-change: transform; }
+  .head::before { content: ''; position: absolute; top: 0; bottom: 0; left: -1px; width: 2px; background: var(--ink); }
+  .head::after { content: ''; position: absolute; top: -2px; left: -6px; width: 12px; height: 10px; border-radius: 3px 3px 6px 6px; background: var(--ink); }
+
+  @media (max-width: 600px) {
+    .desk { padding: 6px; gap: 6px; }
+    .timeline { grid-template-columns: 22px minmax(0, 1fr); gap: 3px 6px; }
+    .lane { left: calc(4px + 22px + 6px); }
+    .track { height: 28px; }
+    .file { display: none; }
+  }
+</style>

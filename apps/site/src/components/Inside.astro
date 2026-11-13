@@ -44,7 +44,8 @@ const COPY: Localised<{ title: string; more: string; items: [string, string][]; 
 };
 const c = pick(locale, COPY);
 const ICONS = [BezierCurve, Waves, LinkSimple, Palette];
-const items = c.items.map(([title, text], i) => ({ Icon: ICONS[i], title, text }));
+const DEMOS = ['curve', 'behaviours', 'follow', 'style'] as const;
+const items = c.items.map(([title, text], i) => ({ Icon: ICONS[i], title, text, demo: DEMOS[i] }));
 ---
 
 <section class="section" id="inside">
