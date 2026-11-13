@@ -392,9 +392,21 @@ export const key: EffectType<{ color: string; tolerance: number; softness: numbe
   gl: {
     code: `vec2 chroma(vec3 c) { return vec2(-0.1146 * c.r - 0.3854 * c.g + 0.5 * c.b, 0.5 * c.r - 0.4542 * c.g - 0.0458 * c.b); }
 vec3 straight(vec4 p) { return p.a > 0.0 ? p.rgb / p.a : vec3(0.0); }
+// the key's own channel (green, blue or red) and how far it stands above the two others: a screen when it stands well above
+int screenChannel() { vec3 s = u_color.rgb; return s.g >= s.r && s.g >= s.b ? 1 : s.b >= s.r ? 2 : 0; }
+float excess(vec3 c, int ch) { return ch == 1 ? c.g - max(c.r, c.b) : ch == 2 ? c.b - max(c.r, c.g) : c.r - max(c.g, c.b); }
 float kept(vec2 uv, vec2 k) {
   vec4 p = texture(uImage, uv);
-  float d = length(chroma(straight(p)) - k);
+  vec3 c = straight(p);
+  int ch = screenChannel();
+  float screen = excess(u_color.rgb, ch);
+  if (screen > 0.15) {
+    // a green or blue screen, by colour difference: how much of the screen's excess the pixel has is how much of the
+    // screen it holds, so a hair or a hand in motion blur is as transparent as it is mixed
+    float raw = 1.0 - clamp(excess(c, ch) / screen, 0.0, 1.0);
+    return p.a * clamp((raw - u_tolerance) / max(max(u_softness, 0.0001) * 4.0, 0.0001), 0.0, 1.0);
+  }
+  float d = length(chroma(c) - k);
   return p.a * smoothstep(u_tolerance, u_tolerance + max(u_softness, 0.0001), d);
 }
 vec4 effect(vec2 uv) {
@@ -411,6 +423,10 @@ vec4 effect(vec2 uv) {
     }
   }
   if (u_view > 0.5) return vec4(vec3(a), 1.0);
+  // an edge half kept (hair, a hand in motion blur) is the subject mixed with the screen: the screen's share taken out,
+  // so its colour is the subject's, without a green or olive fringe
+  float m = p.a > 0.0 ? clamp(a / p.a, 0.0, 1.0) : 0.0;
+  if (m < 0.999) c = clamp((c - (1.0 - m) * u_color.rgb) / max(m, 0.2), 0.0, 1.0);
   // spill: the part of the colour's chroma that goes the key's way, taken out (its brightness kept)
   vec2 dir = length(k) > 0.0001 ? normalize(k) : vec2(0.0), q = chroma(c);
   float toward = max(0.0, dot(q, dir)) * u_spill;

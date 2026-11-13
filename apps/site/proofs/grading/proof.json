@@ -5,8 +5,8 @@
   "compare": "sweep",
   "name": { "en": "Colour grading", "fr": "Étalonnage" },
   "text": {
-    "en": "An iPhone clip shot in Apple Log, never graded: flat and grey, as the camera records it. Tramme reads the log into scene light, brings it to the screen without clipping, then grades it: highlights held, blacks set, the reds and the blue shadows calmed, a light vignette.",
-    "fr": "Un plan d’iPhone filmé en Apple Log, jamais étalonné : plat et gris, tel que la caméra l’enregistre. Tramme lit le log en lumière de scène, le ramène à l’écran sans écrêter, puis l’étalonne : hautes lumières tenues, noirs posés, rouges et ombres bleues calmés, un léger vignettage."
+    "en": "An ungraded iPhone clip shot in Apple Log: flat and grey, as the camera records it. Tramme reads the log into scene light, brings it to the screen with its highlights rolling off softly, then grades it: highlights held, blacks set, the reds and the blue shadows calmed, a light vignette.",
+    "fr": "Un plan d’iPhone brut, filmé en Apple Log : plat et gris, tel que la caméra l’enregistre. Tramme lit le log en lumière de scène, le ramène à l’écran avec des hautes lumières adoucies, puis l’étalonne : hautes lumières tenues, noirs posés, rouges et ombres bleues calmés, un léger vignettage."
   },
   "where": {
     "en": "Select the clip, then Properties, Effects, +, Colour: Colour grading, its footage set to Apple Log. Or one tap on a colour look in the library.",

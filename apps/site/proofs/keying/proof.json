@@ -1,0 +1,98 @@
+{
+  "id": "keying",
+  "order": 2,
+  "kind": "picture",
+  "compare": "sweep",
+  "name": {
+    "en": "Keying",
+    "fr": "Incrustation"
+  },
+  "text": {
+    "en": "A green-screen take with loose hair and quick gestures. Tramme measures how much of the screen each pixel holds, so hair and motion blur become half transparent, then takes the screen’s green out of those edges and out of the light it threw on the skin. The background is drawn in Tramme.",
+    "fr": "Une prise sur fond vert, cheveux lâchés et gestes vifs. Tramme mesure la part du fond dans chaque pixel, si bien que les cheveux et le flou de bougé deviennent semi-transparents, puis retire le vert du fond de ces bords et de la lumière qu’il a renvoyée sur la peau. Le décor est dessiné dans Tramme."
+  },
+  "where": {
+    "en": "Select the clip, then Properties, Effects, +, Effects: Chroma key; pick the screen with the key colour's dropper. Put a picture or a shape under it.",
+    "fr": "Sélectionnez le plan, puis Propriétés, Effets, +, Effets : Incrustation ; prenez le fond avec la pipette de la couleur de référence. Placez une image ou une forme dessous."
+  },
+  "settings": {
+    "en": "Chroma key: key colour #30B342 (picked on the screen), tolerance 0.06, softness 0.2, spill 1.",
+    "fr": "Incrustation : couleur de référence #30B342 (prise sur le fond), tolérance 0,06, douceur 0,2, débordement 1."
+  },
+  "beforeLabel": {
+    "en": "Green screen, as shot",
+    "fr": "Fond vert, tel que filmé"
+  },
+  "afterLabel": {
+    "en": "Keyed in Tramme",
+    "fr": "Incrusté dans Tramme"
+  },
+  "videoLabel": {
+    "en": "The green-screen take and its key, a line sweeping between them",
+    "fr": "La prise sur fond vert et son incrustation, une ligne balayant de l’une à l’autre"
+  },
+  "source": {
+    "page": "https://www.pexels.com/video/woman-in-pink-outfit-on-green-screen-background-29985923/",
+    "file": "https://www.pexels.com/download/video/29985923/",
+    "type": "video",
+    "author": "Jabeer Alhassan",
+    "licence": "Pexels",
+    "licenceUrl": "https://www.pexels.com/license/",
+    "start": 1,
+    "duration": 8,
+    "sha256": "05458db4b34e2fd4a2d1e5654e531ffbf51fa39798285c00de5d961dac9c1230"
+  },
+  "still": 1,
+  "after": {
+    "below": [
+      {
+        "type": "shape.rect",
+        "transform": {
+          "position": [
+            960,
+            540
+          ]
+        },
+        "props": {
+          "size": [
+            1920,
+            1080
+          ],
+          "fill": {
+            "type": "radial",
+            "center": [
+              -260,
+              -220
+            ],
+            "radius": 1500,
+            "stops": [
+              [
+                0,
+                "#3B6C8C"
+              ],
+              [
+                0.45,
+                "#1E3A52"
+              ],
+              [
+                1,
+                "#0B1622"
+              ]
+            ]
+          }
+        }
+      }
+    ],
+    "effects": [
+      {
+        "type": "fx.key",
+        "props": {
+          "color": "#30B342",
+          "tolerance": 0.06,
+          "softness": 0.2,
+          "spill": 1
+        }
+      }
+    ]
+  }
+}

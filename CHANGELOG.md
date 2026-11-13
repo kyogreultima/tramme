@@ -29,6 +29,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 - A large effect's settings are folded into groups in the inspector (a grade's light, its presence, its colour wheels…), and an effect has a button that puts it back at rest. A curve's square double-clicked goes back to rest too.
 - LUT, Curves, Colour wheels and Colour correction sit in the Colour category, and the menu that adds an effect is in sections by category.
 - On a phone, the colour wheels and curves are larger, for a finger.
+- The chroma key reads a green or blue screen by colour difference: hair and motion blur come out half transparent, and the screen's colour is taken out of those edges, which keep the subject's own colour.
 
 ## [0.23.0] - 2026-11-12
 

@@ -66,7 +66,7 @@ Done when: a video layer ramps from 1× to 0.3× and back over two seconds, the 
 
 ### Step 4. Keying
 
-- [x] `fx.key`, a chroma key: distance to the key colour in YCbCr, tolerance and softness, spill suppression (the key colour taken out of the edges), a choke to shrink the matte, and a matte view to judge it.
+- [x] `fx.key`, a chroma key (a green or blue screen read by colour difference since 0.24.0, the edges unmixed from the screen; other colours by their distance in YCbCr): distance to the key colour in YCbCr, tolerance and softness, spill suppression (the key colour taken out of the edges), a choke to shrink the matte, and a matte view to judge it.
   One GL program: the distance to the key on the chroma alone (Cb, Cr, BT.709), so the screen in shade keys like the screen in light; spill takes the part of the colour that goes the key's way out of what stays, its brightness kept; choke takes the least of eight looks around. Rendered and read back in Chrome (`packages/cli/test/render-effects.test.ts`). To check on a device: real green-screen footage, hair and motion blur.
 - [x] The key colour picked from the viewport with a dropper.
   Every colour property of the inspector has a dropper (`apps/editor/src/dropper.ts`): the next click on the picture gives the pixel's colour, Escape cancels; an effect's colour is picked with that effect off, so a key picks the screen as filmed. It reads the picture as shown (the composition's look included).

@@ -34,7 +34,7 @@ interface Manifest {
   source: { page: string; file: string; sha256?: string; type: 'video' | 'image' | 'audio'; author: string; licence: string; licenceUrl: string; start?: number; duration: number; width?: number; height?: number };
   still: number;
   /** the after's layer: its effects, and props over the source layer's */
-  after?: { effects?: { type: string; props?: Record<string, unknown> }[]; props?: Record<string, unknown> };
+  after?: { effects?: { type: string; props?: Record<string, unknown> }[]; props?: Record<string, unknown>; below?: Record<string, unknown>[] };
   /** tools of the editor run on the after, in order ($layer is the source's layer, $asset its file) */
   editor?: Step[];
 }
@@ -116,13 +116,13 @@ async function viaEditor(src: string, base: Doc): Promise<Doc> {
     await page.evaluateOnNewDocument(() => { try { localStorage.setItem('tramme.preferences', JSON.stringify({ view: 'atelier' })); localStorage.setItem('tramme.tours', JSON.stringify({ auto: false })); } catch { /* a sandboxed frame */ } });
     await page.goto(`${origin}/p/${project.id}`);
     await page.waitForFunction(() => (window as any).__tramme?.S?.doc?.value, { timeout: 120_000 });
-    const layer = base.compositions[base.root].layers.v;
+    const main = base.compositions[base.root];
     const fill = (v: unknown): unknown => (v === '$layer' ? 'v' : v === '$asset' ? 'src' : Array.isArray(v) ? v.map(fill) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, fill(x)])) : v);
-    await page.evaluate((asset, layer) => {
+    await page.evaluate((asset, layers, order) => {
       const t = (window as any).__tramme, c = t.S.compId.value;
-      t.commit('proof', [{ op: 'add', path: '/assets/src', value: asset }, { op: 'add', path: `/compositions/${c}/layers/v`, value: layer }, { op: 'add', path: `/compositions/${c}/order/-`, value: 'v' }]);
+      t.commit('proof', [{ op: 'add', path: '/assets/src', value: asset }, ...order.flatMap((id: string) => [{ op: 'add', path: `/compositions/${c}/layers/${id}`, value: layers[id] }, { op: 'add', path: `/compositions/${c}/order/-`, value: id }])]);
       t.select(['v']);
-    }, base.assets.src, layer);
+    }, base.assets.src, main.layers, main.order);
     for (const step of m.editor ?? []) {
       console.log(`tool ${step.tool}`);
       const out = await page.evaluate(async (name, input) => {
@@ -187,7 +187,10 @@ function sounds(name: string, docFile: string) {
 const src = await source();
 const assets: Doc['assets'] = { src: { type: m.source.type, src } };
 const before = doc(assets, { main: comp({ v: sourceLayer() }, ['v']) });
-const after = m.editor?.length ? await viaEditor(src, doc(assets, { main: comp({ v: withAfter(sourceLayer()) }, ['v']) })) : doc(assets, { main: comp({ v: withAfter(sourceLayer()) }, ['v']) });
+// the after: the layers under the source (a background for a key), then the source with its effects
+const below = Object.fromEntries((m.after?.below ?? []).map((l, i) => [`under${i}`, { in: 0, out: DUR, ...l }]));
+const afterBase = doc(assets, { main: comp({ ...below, v: withAfter(sourceLayer()) }, [...Object.keys(below), 'v']) });
+const after = m.editor?.length ? await viaEditor(src, afterBase) : afterBase;
 const write = (name: string, d: Doc) => { const f = path.join(dir, `${name}.tramme.json`); fs.writeFileSync(f, JSON.stringify(d, null, 1)); return f; };
 const files = { before: write('before', before), after: write('after', after), compare: write('compare', compareDoc(before, after)) };
 if (m.kind === 'sound') { sounds('before', files.before); sounds('after', files.after); } else { stills('before', files.before); stills('after', files.after); }

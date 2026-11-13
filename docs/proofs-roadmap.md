@@ -53,7 +53,7 @@ The landing page gets a strip of three proofs, each a poster that opens its proo
 | Matching two shots | Match the look of the first clip (clip menu) | Two shots of one scene from two cameras, different white balance | Pexels (same author, same place), the *Tears of Steel* plates | Picture: the two shots side by side, before and after | The mean colour difference (ΔE) between them |
 | Skin retouch | the `skin` tool, `fx.smooth` | A neutral close-up portrait, natural skin | Pexels, Pixabay (a portrait, shown with respect) | Picture, a crop at 100 %, labelled retouched | — |
 
-- [ ] Keying
+- [x] Keying (a Pexels green-screen take; it led to the colour-difference matte)
 - [ ] Cut-out without a green screen
 - [ ] Background removed from photos
 - [ ] A photo in 2.5D

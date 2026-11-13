@@ -20,8 +20,8 @@ interface Props { locale: Locale }
 const { locale } = Astro.props;
 
 const COPY: Localised<{ title: string; more: string; drag: string; footage: string; licence: string; picture: string; video: string; sound: string; settings: string; play: string; pause: string; before: string; after: string; features: string }> = {
-  en: { title: 'Shown, not claimed.', more: 'Real footage, before and after Tramme. Drag the line to compare.', drag: 'Move the line between before and after', footage: 'Footage', licence: 'licence', picture: 'Picture', video: 'Video', sound: 'Sound', settings: 'Settings', play: 'Play', pause: 'Pause', before: 'Before', after: 'After', features: 'Features shown' },
-  fr: { title: 'Montré, pas promis.', more: 'De vraies images, avant et après Tramme. Faites glisser la ligne pour comparer.', drag: 'Déplacer la ligne entre avant et après', footage: 'Images', licence: 'licence', picture: 'Image', video: 'Vidéo', sound: 'Son', settings: 'Réglages', play: 'Lire', pause: 'Pause', before: 'Avant', after: 'Après', features: 'Fonctionnalités montrées' },
+  en: { title: 'Before and after', more: 'Tramme’s features applied to free footage. Drag the line to compare the two versions.', drag: 'Move the line between before and after', footage: 'Footage', licence: 'licence', picture: 'Picture', video: 'Video', sound: 'Sound', settings: 'Settings', play: 'Play', pause: 'Pause', before: 'Before', after: 'After', features: 'Features shown' },
+  fr: { title: 'Avant et après', more: 'Les fonctionnalités de Tramme appliquées à des vidéos libres. Faites glisser la ligne pour comparer les deux versions.', drag: 'Déplacer la ligne entre avant et après', footage: 'Images', licence: 'licence', picture: 'Image', video: 'Vidéo', sound: 'Son', settings: 'Réglages', play: 'Lire', pause: 'Pause', before: 'Avant', after: 'Après', features: 'Fonctionnalités montrées' },
 };
 const c = pick(locale, COPY);
 const SIZES = '(min-width: 1100px) 62vw, 100vw';
