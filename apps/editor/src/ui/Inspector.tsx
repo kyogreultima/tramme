@@ -925,14 +925,23 @@ function MasksSection({ ctx, base, id, masks }: { ctx: Ctx; base: string; id: st
 /** a list of effects (layer or composition) with their props, add / toggle / remove / reorder */
 function EffectsSection({ ctx, base, address, effects, stage, title }: { ctx: Ctx; base: string; address: string; effects: import('@tramme/core').Effect[]; stage: 'layer' | 'finish'; title: string }) {
   const reg = S.registry.value;
-  const add = (e: MouseEvent) => openMenu(e, reg.listEffects().filter((x) => x.stage === stage).map((fx) => ({
-    label: tr(fx.title), icon: 'effects' as const,
-    onClick: () => {
-      const id = freshId(Object.fromEntries(effects.map((x) => [x.id, 1])), fx.type.split('.').pop()!);
-      const value = { id, type: fx.type, props: {} };
-      commit(t('inspector.addName', { name: tr(fx.title) }), effects.length ? [{ op: 'add', path: `${base}/effects/-`, value }] : [{ op: 'add', path: `${base}/effects`, value: [value] }]);
-    },
-  })));
+  // the effects by their category (Colour, Effects, Distort…), each a section of the menu, so a grade is found among thirty effects
+  const add = (e: MouseEvent) => {
+    const byCategory = new Map<string, MenuItem[]>();
+    for (const fx of reg.listEffects().filter((x) => x.stage === stage)) {
+      const cat = tr(fx.category);
+      if (!byCategory.has(cat)) byCategory.set(cat, []);
+      byCategory.get(cat)!.push({
+        label: tr(fx.title), icon: 'effects' as const,
+        onClick: () => {
+          const id = freshId(Object.fromEntries(effects.map((x) => [x.id, 1])), fx.type.split('.').pop()!);
+          const value = { id, type: fx.type, props: {} };
+          commit(t('inspector.addName', { name: tr(fx.title) }), effects.length ? [{ op: 'add', path: `${base}/effects/-`, value }] : [{ op: 'add', path: `${base}/effects`, value: [value] }]);
+        },
+      });
+    }
+    openMenu(e, byCategory.size > 1 ? [...byCategory].flatMap(([section, items]): MenuItem[] => [{ section }, ...items]) : [...byCategory.values()].flat());
+  };
   return (
     <Section id={`fx.${stage}`} title={title} right={<button class="icon-btn sm" title={t('inspector.addAnEffect')} onClick={add}><Icon name="plus" /></button>}>
       {effects.length === 0 && <div class="faint" style={{ padding: '2px 0 4px' }}>{t('inspector.noEffects')}</div>}

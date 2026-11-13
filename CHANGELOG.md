@@ -21,12 +21,13 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
   - Eight **colour looks**, ready-made grades put on the selected clips in one tap (Natural pop, Teal and orange, Warm film, Golden hour, Cool night, Bleach bypass, Faded matte, Black and white); on a phone they are tiles of the Effects tab.
   - The scopes add the RGB parade and the histogram beside the waveform (the one chosen is remembered), and show for every effect of the Colour category.
 - The assistant knows when to use each grading effect, and reads a camera's log through `fx.grade` instead of a conversion LUT.
+- The features page shows features on real footage, before and after (Before and after): a line dragged between the two pictures, the clip, where the tool is in the app and the footage's credit. The first is colour grading on an ungraded Apple Log clip from Pexels.
 
 ### Changed
 
 - A layer's GLSL effects in a row run as one chain on the GPU: the layer is uploaded once and the effects hand their result to each other in half floats, so a grade, curves and a LUT stacked lose nothing between them; the result is dithered as it goes back to 8 bits, so a pushed sky no longer bands.
 - A large effect's settings are folded into groups in the inspector (a grade's light, its presence, its colour wheels…), and an effect has a button that puts it back at rest. A curve's square double-clicked goes back to rest too.
-- LUT, Curves, Colour wheels and Colour correction sit in the Colour category.
+- LUT, Curves, Colour wheels and Colour correction sit in the Colour category, and the menu that adds an effect is in sections by category.
 - On a phone, the colour wheels and curves are larger, for a finger.
 
 ## [0.23.0] - 2026-11-12
