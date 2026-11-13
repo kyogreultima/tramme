@@ -55,7 +55,7 @@ The landing page gets a strip of three proofs, each a poster that opens its proo
 
 - [x] Keying (a Pexels green-screen take; it led to the colour-difference matte)
 - [x] Cut-out without a green screen (a Pexels walk along a river; it led to footage holding its frame across the motion blur's shutter)
-- [ ] Background removed from photos
+- [x] Background removed from photos (a Pexels camera on wooden planks: the camera kept, the plant left out, the wood's colour taken out of the edge)
 - [x] A photo in 2.5D (a Pexels lake photo; it led to the parallax following the camera's pan, mirrored edges, the framing for the drift and a gentler depth of field)
 - [ ] Matching two shots
 - [ ] Skin retouch

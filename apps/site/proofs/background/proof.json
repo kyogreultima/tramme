@@ -1,0 +1,42 @@
+{
+  "id": "background",
+  "order": 5,
+  "kind": "picture",
+  "compare": "sweep",
+  "name": { "en": "Background removed", "fr": "Fond retiré" },
+  "text": {
+    "en": "A film camera on wooden planks, a plant at the edge. Tramme finds the main subject on the machine (U²-Net), snaps the cut to the picture's own edge and takes the wood's colour out of the border, so the camera sits on any ground. The new ground is drawn in Tramme.",
+    "fr": "Un appareil photo argentique sur des planches, une plante au bord. Tramme trouve le sujet principal sur la machine (U²-Net), cale la découpe sur le bord réel de l’image et retire la couleur du bois de la bordure, si bien que l’appareil se pose sur n’importe quel fond. Le nouveau fond est dessiné dans Tramme."
+  },
+  "where": {
+    "en": "Type / and run Remove the background on the picture: the cut picture is added as its own layer.",
+    "fr": "Tapez / et lancez Retirer le fond sur l’image : l’image découpée est ajoutée comme calque à part."
+  },
+  "settings": {
+    "en": "Remove the background: subject any (the main one), placed in the composition.",
+    "fr": "Retirer le fond : sujet principal, placé dans la composition."
+  },
+  "beforeLabel": { "en": "The photo", "fr": "La photo" },
+  "afterLabel": { "en": "Cut out in Tramme", "fr": "Détouré dans Tramme" },
+  "videoLabel": { "en": "The photo and its cut-out on a new ground, a line sweeping between them", "fr": "La photo et son détourage sur un nouveau fond, une ligne balayant de l’une à l’autre" },
+  "source": {
+    "page": "https://www.pexels.com/photo/black-and-silver-film-camera-on-brown-wooden-surface-733853/",
+    "file": "https://images.pexels.com/photos/733853/pexels-photo-733853.jpeg?auto=compress&cs=tinysrgb&w=2400",
+    "sha256": "8d9faeb9847458cfca4e50231a7fbb9fba83c389624b7e28af8856fe3abd03f5",
+    "type": "image",
+    "author": "Tirachard Kumtanom",
+    "licence": "Pexels",
+    "licenceUrl": "https://www.pexels.com/license/",
+    "duration": 6
+  },
+  "still": 3,
+  "after": {
+    "below": [
+      { "type": "shape.rect", "transform": { "position": [960, 540] }, "props": { "size": [1920, 1080], "fill": { "type": "radial", "center": [0, -120], "radius": 1300, "stops": [[0, "#F2EDE4"], [0.6, "#D9D2C5"], [1, "#B9B0A2"]] } } }
+    ]
+  },
+  "editor": [
+    { "tool": "remove-bg", "input": { "image": "$asset", "subject": "any", "place": true } },
+    { "ops": [{ "op": "add", "path": "/compositions/$comp/layers/v/visible", "value": false }] }
+  ]
+}
