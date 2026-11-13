@@ -23,6 +23,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 - The assistant knows when to use each grading effect, and reads a camera's log through `fx.grade` instead of a conversion LUT.
 - The anime example is a new film, Paper Wings: a paper plane at sunset in four shots, drawn frame by frame (clouds lit from the side, the plane banking, telephone wires, a town with its windows lit), animated with sequences, parallax and a camera push.
 - A proof of the assistant's work: one message turned a NASA raw take of 60 s into a 48 s film (cuts, captions, keywords, pictures over the talk, a title, sound) in 12.7 minutes, shown first, with its sound.
+- A second proof of the assistant's work: one message turned five minutes of a NASA talk into three vertical shorts (42, 21 and 33 s), each framed on the speaker, captioned word by word, opening on a hook, in 42 minutes for $1.04; the clip plays the start of each in turn.
 - The landing page shows three of the proofs, each opening its comparison on the features page.
 - The features page shows features on real footage, before and after (Before and after): a line dragged between the two pictures, the clip, where the tool is in the app and the footage's credit. The first are colour grading on an ungraded Apple Log clip, keying on a green-screen take, a photo in 2.5D a title passing behind a person filmed without a green screen (all from Pexels), and a voice cleaned of a street's noise, 15 dB lower, played before or after at the same instant (from Wikimedia Commons), and word-by-word captions on a NASA interview.
 
@@ -37,6 +38,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 ### Fixed
 
 - A long tool call made through the companion stays open while the editor is at work on it: transcribing a 5-minute video took more than the 15 minutes the companion waited, and the assistant got "the editor did not answer". The editor now says every minute that the tool is still running; the 15 minutes count from its last word.
+- The command line's picture checks measure text closer to how it is drawn: capitals, a heavy weight and the tracking make it wider, narrow letters and spaces thinner. A keyword in black capitals running to the frame's edges passed the safe-zone check; a title in lower case was flagged when it fitted.
 - A photo in 2.5D moves in depth as the camera pans: the parallax follows the camera's pan (it followed only its zoom, so a sideways drift slid the whole photo in one piece), the near shifting more than the far. A depth pushed past the picture's edge shows the picture mirrored instead of a smeared edge, the photo is framed for the drift as well as for its relief, and its depth of field keeps the near subject sharp with a light blur far away (it blurred everything but the middle depth).
 - Footage holds its own frame across the motion blur's shutter: with the composition's motion blur on (the editor's default), a filmed clip blended two of its frames where the shutter straddled them, which doubled a face and showed a title through a cut-out subject.
 - The French interface writes 2,5D with a decimal comma.

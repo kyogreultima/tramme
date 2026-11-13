@@ -1,0 +1,42 @@
+{
+  "id": "shorts",
+  "order": 0.5,
+  "kind": "picture",
+  "compare": "after",
+  "view": "video",
+  "sound": true,
+  "bench": "nasa-shorts",
+  "name": { "en": "Three shorts from a long video", "fr": "Trois shorts tirés d’une longue vidéo" },
+  "text": {
+    "en": "Five minutes of an astronaut answering questions on the station, filmed wide in 16:9. One message to the assistant asked for three vertical shorts, as the big channels make them. It transcribed the talk, found where he stands, chose three passages that open on a question and end on a point, framed each in 9:16 on him, captioned every word, wrote a hook for the first seconds and put up the keywords as he says them. The clip plays the start of each short in turn.",
+    "fr": "Cinq minutes d’un astronaute qui répond à des questions dans la station, filmé en large au format 16:9. Un seul message à l’assistant a demandé trois shorts verticaux, comme les font les grandes chaînes. Il a transcrit la prise, repéré où se tient l’astronaute, choisi trois passages qui s’ouvrent sur une question et finissent sur une idée, cadré chacun en 9:16 sur lui, sous-titré chaque mot, écrit une accroche pour les premières secondes et affiché les mots-clés au moment où il les dit. Le clip montre le début de chaque short, l’un après l’autre."
+  },
+  "measure": {
+    "en": "5 min of video to three shorts of 42, 21 and 33 s; 42 minutes, most of them transcribing and finding him in the browser, and 34 requests, $1.04 at the API's prices.",
+    "fr": "5 min de vidéo pour trois shorts de 42, 21 et 33 s ; 42 minutes, surtout la transcription et la détection de l’astronaute dans le navigateur, et 34 requêtes, 1,04 $ aux prix de l’API."
+  },
+  "where": {
+    "en": "In the Studio, join the long video to a message and ask for the shorts in your own words.",
+    "fr": "Dans le Studio, joignez la longue vidéo à un message et demandez les shorts avec vos mots."
+  },
+  "settings": {
+    "en": "Claude Opus 5.5 at the medium effort, through the companion; the transcription is Whisper. The keywords and hooks are the assistant's, in the Archivo type (OFL).",
+    "fr": "Claude Opus 5.5 à l’effort moyen, par le compagnon ; la transcription est Whisper. Les mots-clés et les accroches sont de l’assistant, dans la police Archivo (OFL)."
+  },
+  "beforeLabel": { "en": "The long video", "fr": "La longue vidéo" },
+  "afterLabel": { "en": "The three shorts", "fr": "Les trois shorts" },
+  "videoLabel": { "en": "The start of each of the three shorts, in turn, its sound on with the button", "fr": "Le début de chacun des trois shorts, l’un après l’autre, le son activé par le bouton" },
+  "source": {
+    "page": "https://images.nasa.gov/details/jsc2022m000083_NTV-VideoFile_Mark_Vande_Hei_Social_Media_Questions_220314-MP4",
+    "file": "https://images-assets.nasa.gov/video/jsc2022m000083_NTV-VideoFile_Mark_Vande_Hei_Social_Media_Questions_220314-MP4/jsc2022m000083_NTV-VideoFile_Mark_Vande_Hei_Social_Media_Questions_220314-MP4~large.mp4",
+    "type": "video",
+    "author": "NASA",
+    "licence": "NASA",
+    "licenceUrl": "https://www.nasa.gov/nasa-brand-center/images-and-media/",
+    "start": 60,
+    "duration": 300,
+    "width": 1280,
+    "height": 720
+  },
+  "still": 6
+}

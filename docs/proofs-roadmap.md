@@ -2,7 +2,7 @@
 
 Each major feature shown working on real footage that does not already show the result, before and after, on the site's features page (the Before and after section, `apps/site/src/components/Proofs.astro`, fed by `apps/site/src/lib/proofs.ts`). A proof is what a visitor can check with their own eyes; a sentence on a page is a claim.
 
-Status: step 0 done (the stage, the manifests, the script, the landing's strip). Shown on the site: colour grading, keying, a photo in 2.5D, a title behind a person, a clean voice, word-by-word captions. Drafts, with what they wait for: stabilisation, silences. Each proof so far found and fixed a defect of the feature it shows (see each box).
+Status: step 0 done (the stage, the manifests, the script, the landing's strip). Shown on the site: a talk edited by the assistant, three shorts from a long video, colour grading, keying, a photo in 2.5D, a title behind a person, a clean voice, word-by-word captions. Drafts, with what they wait for: stabilisation, silences. Each proof so far found and fixed a defect of the feature it shows (see each box).
 
 ## Why
 
@@ -98,7 +98,7 @@ These run the assistant, so they cost the user's quota: each waits for the user'
 | Shorts from a long video | `shorts` on a talk | A CC talk of 10 minutes or more | Three vertical shorts beside the long video's timeline |
 
 - [x] A talking video, edited (a NASA raw take, 60 s to 48 s, 12.7 min and $1.84; the first runs lost their last edits to a save conflict, fixed: saves go one after the other)
-- [ ] Shorts from a long video (the user's go)
+- [x] Shorts from a long video (a NASA talk of 5 min to three shorts of 42, 21 and 33 s, 42 minutes and $1.04; it found two defects, fixed: a tool call longer than 15 minutes through the companion was dropped, the editor now says it is still at work; the command line's text checks measured heavy capitals too narrow, a keyword running to the edges passed)
 
 ## Not proven here
 
