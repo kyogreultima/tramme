@@ -94,3 +94,39 @@ describe('what a sound is like', () => {
     expect(silent).toMatchObject({ peakDb: -120, start: 0, end: 0 });
   });
 });
+
+describe('the sounds of a nested composition', () => {
+  // a shot: a composition with a video from 1 s of its file; the main film shows it from 2 s, its own time starting at 0.5 s
+  const nested = (props: Record<string, unknown> = {}, main: Record<string, unknown> = {}): TrammeDoc => ({
+    version: 1, meta: { title: 't' }, root: 'main',
+    assets: { v: { type: 'video', src: 'v.mp4' } },
+    compositions: {
+      shot: { name: 'shot', width: 100, height: 100, fps: 30, duration: 6, order: ['clip'], layers: { clip: { type: 'video', in: 0, out: 6, props: { video: 'v', start: 1, ...props } } } },
+      main: { name: 'main', width: 100, height: 100, fps: 30, duration: 10, order: ['s'], layers: { s: { type: 'comp', in: 2, out: 6, props: { comp: 'shot', start: 0.5, ...main } } } },
+    },
+  } as unknown as TrammeDoc);
+
+  it('plays in the film that holds it, at the film time it is shown and from the right point of its file', () => {
+    const [c] = audioClips(nested(), 'main');
+    // shown 2 s to 6 s of the film: the shot's 0.5 s to 4.5 s, so its file from 1.5 s
+    expect(c).toMatchObject({ layerId: 's/clip', asset: 'v', at: 2, duration: 4, offset: 1.5, rate: 1 });
+  });
+
+  it('follows the nested composition\'s speed, and stays silent when its video is muted or the layer hidden', () => {
+    const [fast] = audioClips(nested({}, { speed: 2 }), 'main');
+    // twice as fast: 4 s of film play 8 s of the shot, cut where the shot ends (6 s, so 2.75 s of film)
+    expect(fast).toMatchObject({ at: 2, offset: 1.5, rate: 2 });
+    expect(fast.duration).toBeCloseTo(2.75, 5);
+    expect(audioClips(nested({ muted: true }), 'main')).toEqual([]);
+    const hidden = nested();
+    hidden.compositions.main.layers.s.visible = false;
+    expect(audioClips(hidden, 'main')).toEqual([]);
+  });
+
+  it('never loops through a composition that holds itself', () => {
+    const d = nested();
+    d.compositions.shot.layers.back = { type: 'comp', in: 0, out: 6, props: { comp: 'main' } } as never;
+    d.compositions.shot.order.push('back');
+    expect(audioClips(d, 'main').map((c) => c.layerId)).toEqual(['s/clip']);
+  });
+});

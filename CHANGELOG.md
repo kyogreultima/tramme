@@ -39,6 +39,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 - Footage holds its own frame across the motion blur's shutter: with the composition's motion blur on (the editor's default), a filmed clip blended two of its frames where the shutter straddled them, which doubled a face and showed a title through a cut-out subject.
 - The French interface writes 2,5D with a decimal comma.
 - Cut the silences takes the pauses out: it removed only 0.24 s from the middle of each, whatever its length; it hears where the voice is in the sound (the voice detector the hesitations use), since a transcript's word timings stretch over the pauses and hid most of them, so it no longer needs a transcription first; and it works on a clip that shows part of its file, where it made an invalid document.
+- A nested composition is heard: the sounds of the videos and sounds inside it play in the film that holds it, in the preview and the exports, at its time, speed and loop (they were silent).
 - A long film renders again in the editor and from the command line: its document, a few hundred thousand values well under 64 MB, was refused by the plugins' sandbox as too large (the launch film among the examples).
 
 ## [0.23.0] - 2026-11-12

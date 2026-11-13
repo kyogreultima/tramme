@@ -171,13 +171,22 @@ function envelopeOf(prop: unknown, at: number, end: number, doc: TrammeDoc): [nu
   return [...times].sort((a, b) => a - b).map((t) => [t, num(sampleKeyframes('number', keys, t, doc.tokens ?? {}), 0)]);
 }
 
-export function audioClips(doc: TrammeDoc, compId: string): AudioClip[] {
+/**
+ * The sounds of a composition: its sound and video layers, and the sounds of
+ * the compositions it holds (comp layers), brought to its time. `seen` holds
+ * the compositions on the way, so one that holds itself is not entered again.
+ */
+export function audioClips(doc: TrammeDoc, compId: string, seen: ReadonlySet<string> = new Set([compId])): AudioClip[] {
   const comp = doc.compositions[compId];
   if (!comp) return [];
   const clips: AudioClip[] = [];
   const parent = new Map<string, string>();
   for (const [id, l] of Object.entries(comp.layers)) for (const k of l.children ?? []) parent.set(k, id);
   for (const [layerId, layer] of Object.entries(comp.layers)) {
+    if (layer.type === 'comp' && layer.visible !== false && !trackOff(comp, layer, 'hidden') && !trackOff(comp, layer, 'muted')) {
+      clips.push(...nestedClips(doc, comp, layerId, layer, parent, seen));
+      continue;
+    }
     if (layer.visible === false || trackOff(comp, layer, 'hidden') || trackOff(comp, layer, 'muted') || (layer.type !== 'audio' && layer.type !== 'video')) continue;
     const props = layer.props ?? {};
     if (layer.type === 'video' && staticValue(props.muted) === true) continue;
@@ -247,6 +256,60 @@ export function audioClips(doc: TrammeDoc, compId: string): AudioClip[] {
   }
   crossfades(comp, clips);
   return clips.sort((a, b) => a.at - b.at);
+}
+
+/**
+ * The sounds of the composition a comp layer shows, in the time of the one
+ * holding it: its clips placed by the layer's in point, start and speed
+ * (looping as the layer loops), cut to where the layer and its groups show
+ * it. A time override (remap) has no clock to follow: its composition's
+ * sounds stay silent there.
+ */
+function nestedClips(doc: TrammeDoc, comp: Composition, layerId: string, layer: Composition['layers'][string], parent: Map<string, string>, seen: ReadonlySet<string>): AudioClip[] {
+  const props = layer.props ?? {}, child = staticValue(props.comp);
+  if (typeof child !== 'string' || !doc.compositions[child] || seen.has(child)) return [];
+  const remap = props.remap;
+  if (remap !== undefined && remap !== null) return [];
+  const speed = num(staticValue(props.speed), 1), start = num(staticValue(props.start), 0);
+  if (!(speed > 0)) return [];
+  // where it shows: its own span, within its groups'
+  let lin = layer.in ?? 0, lout = Math.min(layer.out ?? comp.duration, comp.duration);
+  for (let p = parent.get(layerId); p; p = parent.get(p)) {
+    const g = comp.layers[p];
+    if (g.visible === false) return [];
+    lin = Math.max(lin, g.in ?? 0); lout = Math.min(lout, g.out ?? comp.duration);
+  }
+  if (lout <= lin) return [];
+  const inner = audioClips(doc, child, new Set([...seen, child]));
+  const length = doc.compositions[child].duration;
+  // a looping layer plays its composition again and again: as many times as it shows
+  const cycles = staticValue(props.loop) === true && length > 0 ? Math.ceil(((lout - (layer.in ?? 0)) * speed + start) / length) + 1 : 1;
+  const out: AudioClip[] = [];
+  for (let k = 0; k < cycles; k++) {
+    // the shot's time t is the film's time toFilm(t)
+    const toFilm = (t: number) => (layer.in ?? 0) + (t + k * length - start) / speed;
+    for (const c of inner) {
+      const at = toFilm(c.at), end = toFilm(c.at + c.duration);
+      const from = Math.max(at, lin), to = Math.min(end, lout);
+      if (to <= from) continue;
+      // its file runs `rate` seconds per second of the shot, so rate × speed per second of the film
+      const fileRate = c.rate * speed;
+      const remapCurve = (curve: [number, number][] | null | undefined, scale = 1) => curve?.map(([t, v]) => [toFilm(t), v * scale] as [number, number]) ?? null;
+      out.push({
+        ...c,
+        layerId: `${layerId}/${c.layerId}`,
+        at: from, duration: to - from,
+        offset: c.offset + (from - at) * fileRate,
+        rate: fileRate,
+        envelope: remapCurve(c.envelope),
+        ...(c.rateCurve ? { rateCurve: remapCurve(c.rateCurve, speed) } : {}),
+        ...(c.lowCutCurve ? { lowCutCurve: remapCurve(c.lowCutCurve) } : {}),
+        fadeIn: from > at ? 0 : Math.min(c.fadeIn / speed, to - from),
+        fadeOut: to < end ? 0 : Math.min(c.fadeOut / speed, to - from),
+      });
+    }
+  }
+  return out;
 }
 
 /**
