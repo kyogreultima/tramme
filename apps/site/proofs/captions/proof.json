@@ -1,0 +1,40 @@
+{
+  "id": "captions",
+  "order": 7,
+  "kind": "picture",
+  "compare": "side",
+  "view": "video",
+  "name": { "en": "Word-by-word captions", "fr": "Sous-titres mot à mot" },
+  "text": {
+    "en": "An astronaut answering an interview. Tramme transcribes the speech on the machine (Whisper, in the browser), times each word, and lays the captions over the shot a few words at a time, the word being said lit in colour as he says it.",
+    "fr": "Un astronaute qui répond à une interview. Tramme transcrit la parole sur la machine (Whisper, dans le navigateur), date chaque mot et pose les sous-titres sur le plan quelques mots à la fois, le mot prononcé allumé en couleur au moment où il le dit."
+  },
+  "where": {
+    "en": "Select the clip and press Transcribe in its Speech section; then add Captions from the layer library.",
+    "fr": "Sélectionnez le plan et appuyez sur Transcrire dans sa section Parole ; ajoutez ensuite Sous-titres depuis la bibliothèque de calques."
+  },
+  "settings": {
+    "en": "Transcription by the downloaded model (this browser); Captions: five words at a time, the spoken word on its coloured pill.",
+    "fr": "Transcription par le modèle téléchargé (ce navigateur) ; Sous-titres : cinq mots à la fois, le mot prononcé sur sa pastille colorée."
+  },
+  "beforeLabel": { "en": "The interview", "fr": "L’interview" },
+  "afterLabel": { "en": "Captioned in Tramme", "fr": "Sous-titré dans Tramme" },
+  "videoLabel": { "en": "The interview and its word-by-word captions, side by side", "fr": "L’interview et ses sous-titres mot à mot, côte à côte" },
+  "source": {
+    "page": "https://images.nasa.gov/details/ksc_122210_itow_melvin",
+    "file": "https://images-assets.nasa.gov/video/ksc_122210_itow_melvin/ksc_122210_itow_melvin~orig.mp4",
+    "sha256": "59c4807dc9c32bfbd2d97e7bfd400373ccc4eaa14ee14f3ba7f5aa88914cdc51",
+    "type": "video",
+    "author": "NASA",
+    "licence": "NASA",
+    "licenceUrl": "https://www.nasa.gov/nasa-brand-center/images-and-media/",
+    "start": 79,
+    "duration": 10
+  },
+  "still": 4,
+  "editor": [
+    { "transcribe": "$asset" },
+    { "tool": "captions", "input": { "transcript": "transcription-src", "at": 0, "duration": 10, "place": "bottom" } },
+    { "ops": [{ "op": "replace", "path": "/compositions/$comp/layers/captions/props/start", "value": 79 }] }
+  ]
+}

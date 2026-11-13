@@ -84,7 +84,7 @@ The landing page gets a strip of three proofs, each a poster that opens its proo
 | Silences and hesitations cut | `silences`, `fillers` | A talk with pauses, "um"s and restarts | NASA briefings, Commons interviews | Video with sound, the raw take beside the cut one | Seconds removed, cuts made |
 | A clean voice | `denoise` | A voice recorded in a noisy place (street, wind, hum) | Freesound (CC0, CC BY), Commons, LibriVox (some readings are noisy) | Sound: the Before / After player | Noise floor, dB |
 
-- [ ] Captions, word by word
+- [x] Captions, word by word (a NASA interview, public domain: transcribed by Whisper in the browser, the spoken word lit)
 - [ ] Silences and hesitations cut
 - [x] A clean voice (a street interview from Wikimedia Commons, CC BY 3.0: background noise from −41 to −57 dB, the voice's level unchanged)
 

@@ -28,7 +28,8 @@ const id = args.find((a) => !a.startsWith('--') && a !== flag('editor'));
 if (!id) { console.error('usage: node scripts/proofs.ts <id> [--editor http://localhost:8790]'); process.exit(1); }
 
 type L = { en: string; fr: string };
-interface Step { tool: string; input: Record<string, unknown> }
+/** a step in the editor: a tool run (its proposal accepted), a media transcribed as its button does, or operations applied ($comp is the composition) */
+type Step = { tool: string; input: Record<string, unknown> } | { transcribe: string } | { ops: Record<string, unknown>[] };
 interface Manifest {
   id: string; kind: 'picture' | 'sound'; compare: 'sweep' | 'side'; name: L;
   source: { page: string; file: string; sha256?: string; type: 'video' | 'image' | 'audio'; author: string; licence: string; licenceUrl: string; start?: number; duration: number; width?: number; height?: number };
@@ -127,6 +128,19 @@ async function viaEditor(src: string, base: Doc): Promise<Doc> {
       t.select(['v']);
     }, base.assets.src, main.layers, main.order);
     for (const step of m.editor ?? []) {
+      if ('transcribe' in step) {
+        console.log(`transcribe ${step.transcribe}`);
+        await page.evaluate((asset) => (window as any).__tramme.transcribe(asset), fill(step.transcribe) as string);
+        continue;
+      }
+      if ('ops' in step) {
+        await page.evaluate((ops) => {
+          const t = (window as any).__tramme, c = t.S.compId.value;
+          const at = (v: unknown): unknown => (typeof v === 'string' ? v.replace(/\$comp/g, c) : Array.isArray(v) ? v.map(at) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, at(x)])) : v);
+          if (!t.commit('proof', at(ops))) throw new Error('the operations of the proof could not be applied');
+        }, fill(step.ops) as Record<string, unknown>[]);
+        continue;
+      }
       console.log(`tool ${step.tool}`);
       const out = await page.evaluate(async (name, input) => {
         const t = (window as any).__tramme, events: any[] = [];
