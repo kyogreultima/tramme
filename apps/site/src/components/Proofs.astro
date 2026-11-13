@@ -49,7 +49,9 @@ const SIZES = '(min-width: 1100px) 62vw, 100vw';
             )}
             <div class="view" data-view="picture" hidden={p.kind === 'picture' && p.clip && p.view === 'video'}>
               <div class="compare" data-compare style="--at: 50%">
-                <Image class="pic" src={p.before} alt={pick(locale, p.beforeLabel)} widths={[640, 1280, 1920]} sizes={SIZES} loading="lazy" />
+                <div class="before">
+                  <Image class="pic" src={p.before} alt={pick(locale, p.beforeLabel)} widths={[640, 1280, 1920]} sizes={SIZES} loading="lazy" />
+                </div>
                 <div class="after">
                   <Image class="pic" src={p.after} alt={pick(locale, p.afterLabel)} widths={[640, 1280, 1920]} sizes={SIZES} loading="lazy" />
                 </div>
@@ -119,6 +121,8 @@ const SIZES = '(min-width: 1100px) 62vw, 100vw';
   /* the after picture over the before, cut at the line */
   .compare { position: relative; overflow: hidden; border-radius: var(--r-lg); background: var(--panel); aspect-ratio: 16 / 9; touch-action: pan-y; }
   .compare :global(.pic) { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+  /* the before is cut at the line too: on the rounded edge, smoothed, the picture under would bleed through the one over it (a green screen's green around the keyed take) */
+  .before { position: absolute; inset: 0; clip-path: inset(0 calc(100% - var(--at)) 0 0); }
   .after { position: absolute; inset: 0; clip-path: inset(0 0 0 var(--at)); }
   .line { position: absolute; top: 0; bottom: 0; left: var(--at); width: 2px; margin-left: -1px; background: var(--ink); pointer-events: none; }
   .line::after { content: ''; position: absolute; top: 50%; left: 50%; width: 36px; height: 36px; margin: -18px 0 0 -18px; border-radius: 50%; background: var(--ink); box-shadow: 0 0 0 4px color-mix(in srgb, var(--bg) 40%, transparent); }
