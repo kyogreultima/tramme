@@ -37,6 +37,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 - A photo in 2.5D moves in depth as the camera pans: the parallax follows the camera's pan (it followed only its zoom, so a sideways drift slid the whole photo in one piece), the near shifting more than the far. A depth pushed past the picture's edge shows the picture mirrored instead of a smeared edge, the photo is framed for the drift as well as for its relief, and its depth of field keeps the near subject sharp with a light blur far away (it blurred everything but the middle depth).
 - Footage holds its own frame across the motion blur's shutter: with the composition's motion blur on (the editor's default), a filmed clip blended two of its frames where the shutter straddled them, which doubled a face and showed a title through a cut-out subject.
 - The French interface writes 2,5D with a decimal comma.
+- Cut the silences takes the pauses out: it removed only 0.24 s from the middle of each, whatever its length; it hears where the voice is in the sound (the voice detector the hesitations use), since a transcript's word timings stretch over the pauses and hid most of them, so it no longer needs a transcription first; and it works on a clip that shows part of its file, where it made an invalid document.
 - A long film renders again in the editor and from the command line: its document, a few hundred thousand values well under 64 MB, was refused by the plugins' sandbox as too large (the launch film among the examples).
 
 ## [0.23.0] - 2026-11-12

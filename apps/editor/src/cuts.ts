@@ -1,9 +1,13 @@
-// Cutting the silences of a talking video: the quiet gaps between the words
-// of the transcript (hesitations, breaths) are shortened in place. The video
-// layer is split into the spans where something is said, laid back to back —
-// the piece tightens, and the rest of the timeline is left alone.
+// Cutting the silences of a talking video: the quiet gaps where nothing is
+// said (hesitations, breaths) are shortened in place. Where someone speaks is
+// heard in the sound by the voice detector the fillers use (Silero VAD, the
+// sound's energy without it): a transcript's word timings stretch a word over
+// the pause after it, so they alone miss most silences; they are the fallback.
+// The video layer is split into the spans where something is said, laid back
+// to back — the piece tightens, and the rest of the timeline is left alone.
 
-import { pointer, type Op, type ToolContext, type ToolType } from '@tramme/core';
+import { pointer, type Op, type Span, type ToolContext, type ToolType } from '@tramme/core';
+import { speechOf } from './fillers.ts';
 import { freshId } from './model.ts';
 import { t } from './i18n/index.ts';
 
@@ -31,28 +35,38 @@ export const CUTS_TOOLS: ToolType[] = [
       const lid = comp.order.find((id) => comp.layers[id]?.type === 'video' && comp.layers[id]?.props?.video === asset);
       if (!lid) throw new Error(`${asset} is not placed in this composition: place it first`);
       const layer = comp.layers[lid];
-      const tr = await ctx.transcript(asset);
-      const words = tr.words.filter((w) => Number.isFinite(w.s) && Number.isFinite(w.e)).sort((a, b) => a.s - b.s);
-      if (words.length < 2) throw new Error(`${asset}: its transcript has too few words to find the silences (transcribe it first)`);
       // the layer shows the file from props.start at the layer's in, at its rate
       const start = Number(layer.props?.start) || 0, rate = Number(layer.props?.rate) || 1;
       const lin = layer.in ?? 0, lout = Math.min(layer.out ?? comp.duration, comp.duration);
       const fileT = (c: number) => start + (c - lin) * rate;
       const usedFrom = fileT(lin), usedTo = fileT(lout);
-      // the quiet gaps between the words, inside the span the layer shows
+      // where something is said: heard in the sound, else the transcript's words
+      const heard = await speechOf(ctx, asset).catch(() => null);
+      let said: Span[], by: string;
+      if (heard?.spans.length) ({ spans: said, by } = heard);
+      else {
+        const tr = await ctx.transcript(asset);
+        const words = tr.words.filter((w) => Number.isFinite(w.s) && Number.isFinite(w.e)).sort((a, b) => a.s - b.s);
+        if (words.length < 2) throw new Error(`${asset}: its transcript has too few words to find the silences (transcribe it first)`);
+        said = words.map((w) => ({ from: w.s, to: w.e }));
+        by = 'the transcript';
+      }
+      // only the part of the file the layer shows: the file is heard, or transcribed, past it on both sides
+      said = said.filter((w) => w.to > usedFrom && w.from < usedTo).sort((a, b) => a.from - b.from);
+      if (!said.length) throw new Error(`${asset}: nothing is said in the part of the file "${lid}" shows`);
+      // the quiet gaps between what is said, inside the span the layer shows
       const gaps: { from: number; to: number }[] = [];
-      if (words[0].s - usedFrom > min) gaps.push({ from: usedFrom, to: words[0].s });
-      for (let i = 1; i < words.length; i++) if (words[i].s - words[i - 1].e > min) gaps.push({ from: words[i - 1].e, to: words[i].s });
-      if (usedTo - words[words.length - 1].e > min) gaps.push({ from: words[words.length - 1].e, to: usedTo });
-      // the spans to keep: each gap loses its middle, keeping `keep` on both sides
+      if (said[0].from - usedFrom > min) gaps.push({ from: usedFrom, to: said[0].from });
+      for (let i = 1; i < said.length; i++) if (said[i].from - said[i - 1].to > min) gaps.push({ from: said[i - 1].to, to: said[i].from });
+      if (usedTo - said[said.length - 1].to > min) gaps.push({ from: said[said.length - 1].to, to: usedTo });
+      // the spans to keep: each gap is taken out but for `keep` on both sides, the breath around the words
       const spans: { from: number; to: number }[] = [];
       let cursor = usedFrom, cutCount = 0;
       for (const g of gaps) {
         const cut = g.to - g.from - keep * 2;
         if (cut <= 0.04) continue;
-        const mid = (g.from + g.to) / 2;
-        spans.push({ from: cursor, to: mid - keep });
-        cursor = mid + keep;
+        spans.push({ from: cursor, to: g.from + keep });
+        cursor = g.to - keep;
         cutCount++;
       }
       spans.push({ from: cursor, to: usedTo });
@@ -87,7 +101,7 @@ export const CUTS_TOOLS: ToolType[] = [
         text: [
           `${cutCount} silence(s) cut from "${asset}": ${saved} saved, ${keep} s kept around each cut so it breathes.`,
           `The layer "${lid}" is now ${spans.length} span(s) laid back to back, ending at ${cursorC.toFixed(2)} s. The layers after it stay where they are: a gap may remain at the end, close it by hand (or ask me to close the ranks).`,
-          'The cut rides on the transcript: a word trailing into a breath keeps its tail. Check the result (check) and look at the joins with the motion tool.',
+          `The silences were found in ${by}. Check the result (check) and look at the joins with the motion tool.`,
         ].join('\n'),
       };
     },

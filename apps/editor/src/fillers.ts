@@ -57,8 +57,8 @@ function sileroVad(): Promise<(x: Float32Array) => Promise<Float32Array>> {
   return silero;
 }
 
-/** where someone speaks in a file (file seconds), and what found it */
-async function speechOf(ctx: ToolContext, asset: string): Promise<{ spans: Span[]; by: string }> {
+/** where someone speaks in a file (file seconds), and what found it (the silences cut by it too, cuts.ts) */
+export async function speechOf(ctx: ToolContext, asset: string): Promise<{ spans: Span[]; by: string }> {
   const bytes = await (await fetch(ctx.assetUrl(asset))).arrayBuffer();
   const buf = await new OfflineAudioContext(1, 1, 16000).decodeAudioData(bytes);
   const x = new Float32Array(buf.length);

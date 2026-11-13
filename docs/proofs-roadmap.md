@@ -85,7 +85,7 @@ The landing page gets a strip of three proofs, each a poster that opens its proo
 | A clean voice | `denoise` | A voice recorded in a noisy place (street, wind, hum) | Freesound (CC0, CC BY), Commons, LibriVox (some readings are noisy) | Sound: the Before / After player | Noise floor, dB |
 
 - [x] Captions, word by word (a NASA interview, public domain: transcribed by Whisper in the browser, the spoken word lit)
-- [ ] Silences and hesitations cut
+- [ ] Silences and hesitations cut. First try (a NASA interview): it found three defects of the tool, fixed (only 0.24 s was taken from each pause; a clip showing part of its file got an invalid document; word timings stretched over the pauses hid them, the sound is now heard by the voice detector). The passage has music under the voice, so the manifest stays a draft until a voice recorded alone is found.
 - [x] A clean voice (a street interview from Wikimedia Commons, CC BY 3.0: background noise from −41 to −57 dB, the voice's level unchanged)
 
 ## Step 4. Whole edits

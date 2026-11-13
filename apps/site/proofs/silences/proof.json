@@ -1,0 +1,53 @@
+{
+  "id": "silences",
+  "order": 8,
+  "draft": "the NASA passage has music under the voice: the pauses do not show in the waveform and each cut makes the music jump (24.0 s down to 22.4 s, four pauses); waits for a voice recorded alone",
+  "kind": "sound",
+  "compare": "sweep",
+  "name": {
+    "en": "Silences cut",
+    "fr": "Silences coupés"
+  },
+  "text": {
+    "en": "An astronaut telling his story, with the pauses of someone thinking aloud. Tramme hears where the voice is, on the machine (Silero, a voice detector), splits the clip at every pause longer than half a second and lays the spoken parts back to back, keeping a breath around each cut. The waveforms show the pauses gone.",
+    "fr": "Un astronaute qui raconte son parcours, avec les pauses de quelqu’un qui réfléchit à voix haute. Tramme entend où est la voix, sur la machine (Silero, un détecteur de voix), coupe le plan à chaque pause de plus d’une demi-seconde et remet les passages parlés bout à bout, en gardant un souffle autour de chaque coupe. Les formes d’onde montrent les pauses disparues."
+  },
+  "where": {
+    "en": "Type / and run Cut the silences on the clip.",
+    "fr": "Tapez / et lancez Couper les silences sur le plan."
+  },
+  "settings": {
+    "en": "Cut the silences: pauses longer than 0.5 s, 0.12 s kept on each side of a cut.",
+    "fr": "Couper les silences : pauses de plus de 0,5 s, 0,12 s gardé de chaque côté d’une coupe."
+  },
+  "beforeLabel": {
+    "en": "The answer as filmed",
+    "fr": "La réponse telle que filmée"
+  },
+  "afterLabel": {
+    "en": "Its silences cut in Tramme",
+    "fr": "Ses silences coupés dans Tramme"
+  },
+  "source": {
+    "page": "https://images.nasa.gov/details/ksc_122210_itow_melvin",
+    "file": "https://images-assets.nasa.gov/video/ksc_122210_itow_melvin/ksc_122210_itow_melvin~orig.mp4",
+    "sha256": "59c4807dc9c32bfbd2d97e7bfd400373ccc4eaa14ee14f3ba7f5aa88914cdc51",
+    "type": "video",
+    "author": "NASA",
+    "licence": "NASA",
+    "licenceUrl": "https://www.nasa.gov/nasa-brand-center/images-and-media/",
+    "start": 305,
+    "duration": 24
+  },
+  "still": 4,
+  "editor": [
+    {
+      "tool": "silences",
+      "input": {
+        "video": "$asset",
+        "min": 0.5,
+        "keep": 0.12
+      }
+    }
+  ]
+}
