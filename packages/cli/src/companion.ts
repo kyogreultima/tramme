@@ -79,7 +79,7 @@ export async function startCompanion(opts: { port?: number; origins?: string[]; 
     res.writeHead(200, { 'content-type': 'application/x-ndjson; charset=utf-8', 'cache-control': 'no-store' });
     const t: Turn = {
       send: (ev) => { if (!res.writableEnded) res.write(JSON.stringify(ev) + '\n'); },
-      pending: new Map(), abort: new AbortController(), key: crypto.randomBytes(24).toString('hex'),
+      pending: new Map(), alive: new Map(), abort: new AbortController(), key: crypto.randomBytes(24).toString('hex'),
       stop: () => t.abort.abort(),
     };
     if (!consult) turn = t;
@@ -154,6 +154,13 @@ export async function startCompanion(opts: { port?: number; origins?: string[]; 
         if (!done || !b.result) { json(404, { error: 'unknown or expired tool call' }); return; }
         turn!.pending.delete(b.callId!);
         done(b.result);
+        json(200, { ok: true });
+      } else if (req.method === 'POST' && url.pathname === '/tool-alive') {
+        // a tool still at work in the editor (a long transcription): its call stays open
+        const b = await readJson(req) as { callId?: string };
+        const alive = b.callId ? turn?.alive?.get(b.callId) : undefined;
+        if (!alive) { json(404, { error: 'unknown or expired tool call' }); return; }
+        alive();
         json(200, { ok: true });
       } else if (req.method === 'POST' && url.pathname === '/transcribe') {
         // speech to text on this machine, when the server has none

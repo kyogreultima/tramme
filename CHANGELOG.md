@@ -36,6 +36,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Fixed
 
+- A long tool call made through the companion stays open while the editor is at work on it: transcribing a 5-minute video took more than the 15 minutes the companion waited, and the assistant got "the editor did not answer". The editor now says every minute that the tool is still running; the 15 minutes count from its last word.
 - A photo in 2.5D moves in depth as the camera pans: the parallax follows the camera's pan (it followed only its zoom, so a sideways drift slid the whole photo in one piece), the near shifting more than the far. A depth pushed past the picture's edge shows the picture mirrored instead of a smeared edge, the photo is framed for the drift as well as for its relief, and its depth of field keeps the near subject sharp with a light blur far away (it blurred everything but the middle depth).
 - Footage holds its own frame across the motion blur's shutter: with the composition's motion blur on (the editor's default), a filmed clip blended two of its frames where the shutter straddled them, which doubled a face and showed a title through a cut-out subject.
 - The French interface writes 2,5D with a decimal comma.
