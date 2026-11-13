@@ -134,7 +134,9 @@
 }
 :root:is([data-theme="frost"], [data-theme="liquid-glass"]) .toggle:active:not(:disabled)::after { scale: 1.06 1; }
 :root:is([data-theme="frost"], [data-theme="liquid-glass"]) :is(.menu-item:hover, .menu-item.active, .menu button:not(.menu-item):hover) { background: rgba(38, 38, 42, .07); }
-html.vault:is([data-theme="frost"], [data-theme="liquid-glass"]), html.vault:is([data-theme="frost"], [data-theme="liquid-glass"]) body { background: var(--raised); }
+
+/* the key vault's page, framed in the settings: no wallpaper of its own, the dialog's glass shows through it (as specific as the wallpaper's rule, then later) */
+:root.vault:is([data-theme="frost"], [data-theme="liquid-glass"]) body { background: transparent; }
 
 /* The preview keeps the colourless lens with the shared component shapes. */
 .theme-card:is([data-theme-preview="frost"], [data-theme-preview="liquid-glass"]) .prev {

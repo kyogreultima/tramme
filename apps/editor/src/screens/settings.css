@@ -81,10 +81,10 @@
 .theme-card.on { color: var(--text); font-weight: 600; }
 .theme-card.on .prev { box-shadow: 0 0 0 2px var(--accent); }
 
-/* the key vault's page (personal mode), framed in the providers pane: as tall as its content, on the dialog's background (.modal) */
+/* the key vault's page (personal mode), framed in the providers pane: as tall as its content, transparent on the dialog's background (.modal), its glass in the glass themes (the page and the editor share one theme, so one colour scheme: the browser paints no backdrop of its own) */
 /* its page keeps a margin for the cards' edges (.vault-page): taken back, its titles line up with the other panes' */
 .vault-frame { display: block; width: calc(100% + 4px); margin: -1px -2px; border: 0; background: transparent; }
-html.vault, html.vault body { height: auto; overflow: visible; background: var(--raised); }
+html.vault, html.vault body { height: auto; overflow: visible; background: transparent; }
 /* the frame is narrower than the window: the rows follow the editor's layout (compact on a phone), told in the frame's address */
 html.vault:not(.compact) .set-row:not(.stack) { grid-template-columns: minmax(0, 1fr) auto; }
 html.vault:not(.compact) .set-row:not(.stack) .set-control { justify-content: flex-end; overflow-x: visible; }
