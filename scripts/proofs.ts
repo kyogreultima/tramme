@@ -47,6 +47,11 @@ type Doc = { schema: string; meta: { title: string }; tokens: object; assets: Re
 
 const manifestFile = path.join(SITE, 'proofs', id, 'proof.json');
 const m = JSON.parse(fs.readFileSync(manifestFile, 'utf8')) as Manifest;
+// a proof made by the assistant is a run of the bench, its files taken from the project it leaves
+if ((m as { bench?: string }).bench) {
+  console.error(`proof ${id} is made by the assistant: node bench/run.ts ${(m as { bench?: string }).bench} --series proof, then its film rendered and its stills taken from the project (docs/proofs-roadmap.md, step 4)`);
+  process.exit(1);
+}
 const dir = path.join(ROOT, 'out/proofs', id);
 fs.mkdirSync(path.join(dir, 'assets'), { recursive: true });
 const W = m.source.width ?? 1920, H = m.source.height ?? 1080, DUR = m.source.duration;

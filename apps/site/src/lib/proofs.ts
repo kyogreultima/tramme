@@ -37,6 +37,8 @@ export interface Proof {
   sounds?: { before: string; after: string };
   /** a proof kept out of the site, and why (a source or a tool that did not hold) */
   draft?: string;
+  /** made by the assistant: the bench brief whose run it shows */
+  bench?: string;
   /** whether its clip is made */
   clip: boolean;
 }

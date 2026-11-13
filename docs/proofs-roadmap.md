@@ -97,7 +97,7 @@ These run the assistant, so they cost the user's quota: each waits for the user'
 | A talking video, edited | The assistant on a raw take: cuts, captions, inserts that show what is said, a grade | A public-domain or CC talk (NASA, Commons), 1 to 2 minutes | Video: the raw take beside the finished film, the same 30 s |
 | Shorts from a long video | `shorts` on a talk | A CC talk of 10 minutes or more | Three vertical shorts beside the long video's timeline |
 
-- [ ] A talking video, edited (the user's go)
+- [x] A talking video, edited (a NASA raw take, 60 s to 48 s, 12.7 min and $1.84; the first runs lost their last edits to a save conflict, fixed: saves go one after the other)
 - [ ] Shorts from a long video (the user's go)
 
 ## Not proven here
