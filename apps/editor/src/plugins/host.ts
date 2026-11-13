@@ -33,17 +33,25 @@ export function onSandboxStopped(listen: (reason: string) => void): () => void {
 
 const RESPONSE_LIMIT = 8 * 1024 * 1024;
 const OUTBOUND_LIMIT = 64 * 1024 * 1024;
+/** the values an outbound message may hold: room for a long film's document, bounded so a walk of it stays short */
+const OUTBOUND_COUNT = 4_000_000;
 const GRAPHICS_LIMIT = 256 * 1024 * 1024;
 const canvasSize = (width: number, height: number, scale = 1) => {
   if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 || !Number.isFinite(scale) || scale <= 0) throw new Error('invalid sandbox canvas');
   if (width > 8192 || height > 8192 || width * scale > 8192 || height * scale > 8192) throw new Error('sandbox canvas exceeds 8192 pixels');
 };
-/** Check nested plain data without serializing a potentially hostile response. */
-function responseTooLarge(value: unknown, limit = RESPONSE_LIMIT): boolean {
+/**
+ * Check nested plain data without serializing a potentially hostile response.
+ * `count` bounds the values walked and the width of one array or object: tight
+ * for what a plugin sends back, wide for the editor's own outbound messages,
+ * whose document holds hundreds of thousands of values (a long film's keys and
+ * paths) well under its byte limit.
+ */
+function responseTooLarge(value: unknown, limit = RESPONSE_LIMIT, count = 10000): boolean {
   const stack = [value], seen = new Set<object>(), encoder = new TextEncoder();
   let bytes = 0, entries = 0;
   while (stack.length) {
-    if (++entries > 10000) return true;
+    if (++entries > count) return true;
     const item = stack.pop();
     if (typeof item === 'string') { if (item.length > limit) return true; bytes += encoder.encode(item).byteLength; }
     else if (!item || typeof item !== 'object') continue;
@@ -55,11 +63,11 @@ function responseTooLarge(value: unknown, limit = RESPONSE_LIMIT): boolean {
       } else if (item instanceof ArrayBuffer || ArrayBuffer.isView(item)) bytes += item.byteLength;
       else if (typeof Blob !== 'undefined' && item instanceof Blob) bytes += item.size;
       else if (item instanceof Map) { if (item.size > 10000) return true; for (const [key, content] of item) stack.push(key, content); }
-      else if (item instanceof Set) { if (item.size > 10000) return true; for (const content of item) stack.push(content); }
+      else if (item instanceof Set) { if (item.size > count) return true; for (const content of item) stack.push(content); }
       else {
-        if (Array.isArray(item) && item.length > 10000) return true;
+        if (Array.isArray(item) && item.length > count) return true;
         const fields = Object.entries(item);
-        if (fields.length > 10000) return true;
+        if (fields.length > count) return true;
         for (const [key, content] of fields) { bytes += key.length; stack.push(content); }
       }
     }
@@ -440,7 +448,7 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
   };
 
   const run = (msg: ToWorker & { call: number }, ctx?: ToolContext | CheckContext, signal?: AbortSignal): Promise<unknown> => {
-    if (responseTooLarge(msg, OUTBOUND_LIMIT)) return Promise.reject(new Error('sandbox message exceeds 64 MB'));
+    if (responseTooLarge(msg, OUTBOUND_LIMIT, OUTBOUND_COUNT)) return Promise.reject(new Error('sandbox message exceeds 64 MB'));
     if (graphicsTooLarge(msg)) return Promise.reject(new Error('sandbox graphics exceed 256 MB'));
     if (waits.size >= 64) return Promise.reject(new Error('too many pending sandbox calls'));
     const c = msg.call;
@@ -494,7 +502,7 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
       return Array.isArray(out) ? out as QualityIssue[] : [];
     },
     setDoc(doc) {
-      if (responseTooLarge(doc, OUTBOUND_LIMIT)) throw new Error('sandbox message exceeds 64 MB');
+      if (responseTooLarge(doc, OUTBOUND_LIMIT, OUTBOUND_COUNT)) throw new Error('sandbox message exceeds 64 MB');
       if (graphicsTooLarge(doc)) throw new Error('sandbox graphics exceed 256 MB');
       send({ kind: 'doc', doc });
     },
@@ -649,7 +657,7 @@ export function browserHost(docUrl: string): PluginHost {
   const projectRoot = docUrl ? new URL('./', new URL(docUrl, location.href)).pathname : '';
   const approved = (url: URL) => approvedProjectResource(url, projectRoot, location.origin, location.protocol);
   const post = (m: ToWorker) => {
-    if (responseTooLarge(m, OUTBOUND_LIMIT)) throw new Error('sandbox message exceeds 64 MB');
+    if (responseTooLarge(m, OUTBOUND_LIMIT, OUTBOUND_COUNT)) throw new Error('sandbox message exceeds 64 MB');
     if (graphicsTooLarge(m)) throw new Error('sandbox graphics exceed 256 MB');
     // Document images remain in the trusted page's AssetStore as well as the worker.
     // Structured-clone them; transferring ownership would detach the page's copy.

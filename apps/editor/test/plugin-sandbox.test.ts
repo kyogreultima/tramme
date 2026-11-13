@@ -214,6 +214,13 @@ describe('the plugin sandbox', () => {
     expect(() => host.setDoc({ doc: {}, docUrl: DOC_URL, images: {}, json: { huge }, fonts: [] })).toThrow('sandbox message exceeds 64 MB');
     expect(sent).toHaveLength(0);
   });
+  it('sends a long film’s document: hundreds of thousands of values well under the byte limit', () => {
+    const sent: unknown[] = [];
+    const { host } = connectHost((message) => sent.push(message), () => DOC_URL);
+    // 2,000 layers of 60 keys each, about 250,000 values, a few MB
+    const layers = Object.fromEntries(Array.from({ length: 2000 }, (_, i) => [`l${i}`, { type: 'shape.rect', transform: { position: { $k: Array.from({ length: 60 }, (_, k) => ({ t: k / 30, v: [k, i] })) } } }]));
+    expect(() => host.setDoc({ doc: { compositions: { main: { layers } } }, docUrl: DOC_URL, images: {}, json: {}, fonts: [] })).not.toThrow();
+  });
   it('bounds bitmap memory separately from plain-data messages in both directions', async () => {
     class Bitmap { width = 8192; height = 8192; }
     vi.stubGlobal('ImageBitmap', Bitmap);
