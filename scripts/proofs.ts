@@ -18,6 +18,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
+import { uploadProjectFile } from '../packages/cli/src/upload.ts';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const SITE = path.join(ROOT, 'apps/site');
@@ -123,7 +124,7 @@ async function viaEditor(src: string, base: Doc): Promise<Doc> {
   const origin = flag('editor') ?? 'http://localhost:8790';
   const call = async <T>(p: string, init?: RequestInit): Promise<T> => { const r = await fetch(origin + p, init); if (!r.ok) throw new Error(`${p}: ${r.status} ${await r.text()}`); return (r.headers.get('content-type') ?? '').includes('json') ? r.json() as Promise<T> : (r.text() as unknown as T); };
   const project = await call<{ id: string }>('/api/projects', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: `proof ${id}`, width: W, height: H, duration: DUR }) });
-  await call(`/api/projects/${project.id}/files/${src}`, { method: 'PUT', body: fs.readFileSync(path.join(dir, src)) });
+  await uploadProjectFile(origin, project.id, src, fs.readFileSync(path.join(dir, src)));
   const { launch } = await import('../packages/cli/src/browser.ts');
   const { browser, page } = await launch();
   try {

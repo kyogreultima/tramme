@@ -157,6 +157,16 @@
         "local/nasa-talk.mp4"
       ],
       "prompt": "Monte cette vidéo face caméra (assets/nasa-talk.mp4) au niveau des grandes chaînes YouTube : coupe les silences et les hésitations, ajoute des sous-titres mot à mot, des mots-clés, des plans de coupe qui montrent ce qu’il raconte et un peu de son. Garde le format 16:9. Il parle anglais : les textes à l’écran en anglais."
+    },
+    {
+      "id": "nasa-shorts",
+      "split": "proof",
+      "format": "9:16",
+      "seconds": 30,
+      "files": [
+        "local/nasa-long.mp4"
+      ],
+      "prompt": "Tire trois shorts verticaux de cette vidéo de 5 minutes (assets/nasa-long.mp4), comme les grandes chaînes : les trois meilleurs moments, chacun de 20 à 40 secondes, recadrés en 9:16 sur l’astronaute, avec sous-titres mot à mot et une accroche dans les premières secondes. Il parle anglais : les textes à l’écran en anglais."
     }
   ]
 }

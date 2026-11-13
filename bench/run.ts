@@ -24,6 +24,7 @@ import { CHAT_INDEX, chatPath } from '@tramme/project';
 import type { Page } from 'puppeteer-core';
 import { COMPANION_PORT } from '@tramme/assistant';
 import { launch } from '../packages/cli/src/browser.ts';
+import { uploadProjectFile } from '../packages/cli/src/upload.ts';
 import { priced } from './cost.ts';
 import { PRICES } from './prices.ts';
 
@@ -110,8 +111,8 @@ async function main() {
   const project = await call<{ id: string }>('/api/projects', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: `bench ${brief!.id}`, width, height, duration: brief!.seconds }) });
   for (const f of brief!.files ?? []) {
     if (!fs.existsSync(path.join(here, f))) throw new Error(`${f} is missing: a local brief's footage stays on the machine that has it (bench/local/, never committed)`);
-    const r = await fetch(`${base}/api/projects/${project.id}/files/assets/${encodeURIComponent(path.basename(f))}`, { method: 'PUT', body: fs.readFileSync(path.join(here, f)) });
-    if (!r.ok) throw new Error(`file ${f}: HTTP ${r.status}`);
+    // a long video goes in parts, as the editor sends it
+    await uploadProjectFile(base, project.id, `assets/${path.basename(f)}`, fs.readFileSync(path.join(here, f))).catch((e) => { throw new Error(`file ${f}: ${(e as Error).message}`); });
   }
   const dir = (() => { for (let n = 1; ; n++) { const d = path.join(outRoot, series, `${brief!.id}-${n}`); if (!fs.existsSync(d)) return d; } })();
   fs.mkdirSync(dir, { recursive: true });
