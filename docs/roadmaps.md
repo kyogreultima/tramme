@@ -13,7 +13,8 @@ The only thread: every roadmap in `docs/`, in the order they should be worked, a
 | 5 | [Installed plugins](installed-plugins-roadmap.md) | 5 open, 26 done; the marketplace waits for the API | Unblocked by 4 | No. The five boxes are the marketplace: catalogue, author accounts and signatures, reviews, revocation. They need the platform's API and decisions on who reviews |
 | 6 | [Sound parity](sound-parity-roadmap.md) | **Agent work complete:** 25 done, 4 open; steps 1–6 built, step 7 outside this queue | Catch-up on a competitor: useful, not blocking | Yes, all six steps. The providers are answered by fakes in the tests; trying them for real costs money and is the user's |
 | 7 | [Proofs](proofs-roadmap.md) | **Started:** 22 open; colour grading proven on ungraded Apple Log footage and shown on the features page | Shows on the site what the features do, on real footage, and tests each one on the material it exists for (the grading proof found a defect) | Yes for steps 0 to 3: the sources are free and the tools run on the machine. Step 4 runs the assistant on the user's quota and waits for the user's go |
-| 8 | Loose ends | [Generation](generation-roadmap.md) 1, [Editing](editing-roadmap.md) 2, [Sound](sound-roadmap.md) 2, [Components](components-roadmap.md) 1, [Packs](packs-roadmap.md) 1 (decision 4), [Plugins](plugins-roadmap.md) 1 | Small leftovers. The Plugins one is the isolation work of item 1 | See below |
+| 8 | [Start from a reference](reference-roadmap.md) | Not started: 16 open; decisions 1 to 4 are the user's | A film made in the manner of a reference the user gives, with their own content. After taste and finish: it builds on the film plan and the critic | No until the user has taken decisions 1 to 4; then steps 1 to 4 yes, step 5's runs wait for the user's go |
+| 9 | Loose ends | [Generation](generation-roadmap.md) 1, [Editing](editing-roadmap.md) 2, [Sound](sound-roadmap.md) 2, [Components](components-roadmap.md) 1, [Packs](packs-roadmap.md) 1 (decision 4), [Plugins](plugins-roadmap.md) 1 | Small leftovers. The Plugins one is the isolation work of item 1 | See below |
 
 The loose ends, one by one:
 
@@ -36,7 +37,7 @@ A roadmap with no open box is removed from `docs/`, and from the site's menu: it
 
 ## What an agent can work
 
-Of the open boxes of items 1 to 7, the ones an agent can land alone, in the order to take them:
+Of the open boxes of items 1 to 8, the ones an agent can land alone, in the order to take them:
 
 1. Sound parity, steps 1 to 6. Nothing waits for the user.
 2. Safe projects, steps 1 to 5. Nothing waits for the user to start; the devices' checks come back to them.
