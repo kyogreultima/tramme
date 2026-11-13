@@ -1,9 +1,16 @@
 ---
-// Features shown on real footage (lib/proofs.ts): for each, the picture before
-// and after, one over the other, a line dragged between them (a range input:
-// the finger, the mouse and the arrow keys move it), what was done, where the
-// tool is, the clip playing the same comparison, and the footage's credit.
+// Features shown on real footage (lib/proofs.ts), on one stage whose height
+// does not grow with their number: the features' names in a row (a tab
+// list, sideways on a phone), one proof shown, the others loaded only once
+// picked. A proof shows a picture before and after, one over the other, a
+// line dragged between them (a range input: finger, mouse, arrow keys), or,
+// switched in the same frame, its clip; a sound proof plays its sound
+// before or after at the same instant. Beside it: what was done, where the
+// tool is, the settings, the measure, the footage's credit. #proof-<id>
+// opens a proof.
 import { Image } from 'astro:assets';
+import PlayIcon from '@phosphor-icons/core/assets/fill/play-fill.svg';
+import PauseIcon from '@phosphor-icons/core/assets/fill/pause-fill.svg';
 import Head from './Head.astro';
 import Media from './Media.astro';
 import { PROOFS } from '../lib/proofs';
@@ -12,47 +19,102 @@ import { pick, type Locale, type Localised } from '../lib/i18n';
 interface Props { locale: Locale }
 const { locale } = Astro.props;
 
-const COPY: Localised<{ title: string; more: string; drag: string; footage: string; licence: string }> = {
-  en: { title: 'Shown, not claimed.', more: 'Real footage, before and after Tramme. Drag the line to compare.', drag: 'Move the line between before and after', footage: 'Footage', licence: 'licence' },
-  fr: { title: 'Montré, pas promis.', more: 'De vraies images, avant et après Tramme. Faites glisser la ligne pour comparer.', drag: 'Déplacer la ligne entre avant et après', footage: 'Images', licence: 'licence' },
+const COPY: Localised<{ title: string; more: string; drag: string; footage: string; licence: string; picture: string; video: string; sound: string; settings: string; play: string; pause: string; before: string; after: string; features: string }> = {
+  en: { title: 'Shown, not claimed.', more: 'Real footage, before and after Tramme. Drag the line to compare.', drag: 'Move the line between before and after', footage: 'Footage', licence: 'licence', picture: 'Picture', video: 'Video', sound: 'Sound', settings: 'Settings', play: 'Play', pause: 'Pause', before: 'Before', after: 'After', features: 'Features shown' },
+  fr: { title: 'Montré, pas promis.', more: 'De vraies images, avant et après Tramme. Faites glisser la ligne pour comparer.', drag: 'Déplacer la ligne entre avant et après', footage: 'Images', licence: 'licence', picture: 'Image', video: 'Vidéo', sound: 'Son', settings: 'Réglages', play: 'Lire', pause: 'Pause', before: 'Avant', after: 'Après', features: 'Fonctionnalités montrées' },
 };
 const c = pick(locale, COPY);
+const SIZES = '(min-width: 1100px) 62vw, 100vw';
 ---
 
-<section class="section" id="proofs">
-  <div class="wrap">
-    <Head title={c.title} more={c.more} />
-  </div>
-  {PROOFS.map((p) => (
-    <article class="wrap proof" id={`proof-${p.id}`} data-reveal>
-      <div class="compare" data-compare style="--at: 50%">
-        <Image class="pic" src={p.before} alt={pick(locale, p.beforeLabel)} widths={[640, 1280, 1920]} sizes="(min-width: 1100px) 62vw, 100vw" />
-        <div class="after">
-          <Image class="pic" src={p.after} alt={pick(locale, p.afterLabel)} widths={[640, 1280, 1920]} sizes="(min-width: 1100px) 62vw, 100vw" />
-        </div>
-        <span class="tag left" aria-hidden="true">{pick(locale, p.beforeLabel)}</span>
-        <span class="tag right" aria-hidden="true">{pick(locale, p.afterLabel)}</span>
-        <span class="line" aria-hidden="true"></span>
-        <input type="range" min="0" max="100" value="50" step="0.5" aria-label={c.drag} data-compare-range />
+{PROOFS.length > 0 && (
+  <section class="section" id="proofs">
+    <div class="wrap">
+      <Head title={c.title} more={c.more} />
+    </div>
+    <div class="wrap stage" data-proofs>
+      <div class="picker" role="tablist" aria-label={c.features}>
+        {PROOFS.map((p, i) => (
+          <button type="button" role="tab" id={`tab-${p.id}`} aria-controls={`proof-${p.id}`} aria-selected={i === 0 ? 'true' : 'false'} tabindex={i === 0 ? 0 : -1} data-proof-tab={p.id}>{pick(locale, p.name)}</button>
+        ))}
       </div>
-      <div class="words">
-        <h3>{pick(locale, p.name)}</h3>
-        <p>{pick(locale, p.text)}</p>
-        <p class="where">{pick(locale, p.where)}</p>
-        <p class="credit">{c.footage}: <a href={p.credit.url} rel="noopener" target="_blank">{p.credit.author}</a>, <a href={p.credit.licenceUrl} rel="noopener" target="_blank">{p.credit.licence} {c.licence}</a></p>
-      </div>
-      {p.video && (
-        <Media class="clip" id={`proof-${p.id}`} width={p.video.width} height={p.video.height} duration={p.video.duration} label={pick(locale, p.video.label)} />
-      )}
-    </article>
-  ))}
-</section>
+      {PROOFS.map((p, i) => (
+        <article class="proof" id={`proof-${p.id}`} role="tabpanel" aria-labelledby={`tab-${p.id}`} hidden={i > 0} data-proof={p.id}>
+          <div class="frame">
+            {p.kind === 'picture' && p.clip && (
+              <div class="views" role="group">
+                <button type="button" aria-pressed="true" data-view-switch="picture">{c.picture}</button>
+                <button type="button" aria-pressed="false" data-view-switch="video">{c.video}</button>
+              </div>
+            )}
+            <div class="view" data-view="picture">
+              <div class="compare" data-compare style="--at: 50%">
+                <Image class="pic" src={p.before} alt={pick(locale, p.beforeLabel)} widths={[640, 1280, 1920]} sizes={SIZES} loading="lazy" />
+                <div class="after">
+                  <Image class="pic" src={p.after} alt={pick(locale, p.afterLabel)} widths={[640, 1280, 1920]} sizes={SIZES} loading="lazy" />
+                </div>
+                <span class="tag left" aria-hidden="true">{pick(locale, p.beforeLabel)}</span>
+                <span class="tag right" aria-hidden="true">{pick(locale, p.afterLabel)}</span>
+                <span class="line" aria-hidden="true"></span>
+                <input type="range" min="0" max="100" value="50" step="0.5" aria-label={c.drag} data-compare-range />
+              </div>
+              {p.sounds && (
+                <div class="player" data-player>
+                  <audio preload="none" src={p.sounds.before} data-sound="before"></audio>
+                  <audio preload="none" src={p.sounds.after} data-sound="after"></audio>
+                  <button type="button" class="play" data-play aria-label={c.play} data-pause-label={c.pause}><PlayIcon class="i-play" aria-hidden="true" /><PauseIcon class="i-pause" aria-hidden="true" /></button>
+                  <div class="which" role="group" aria-label={c.sound}>
+                    <button type="button" aria-pressed="true" data-hear="before">{c.before}</button>
+                    <button type="button" aria-pressed="false" data-hear="after">{c.after}</button>
+                  </div>
+                </div>
+              )}
+            </div>
+            {p.kind === 'picture' && p.clip && (
+              <div class="view" data-view="video" hidden>
+                <Media id={`proof-${p.id}`} width={p.source.width ?? 1920} height={p.source.height ?? 1080} duration={p.source.duration} label={pick(locale, p.videoLabel ?? p.name)} />
+                {p.compare === 'side' && (
+                  <>
+                    <span class="tag left" aria-hidden="true">{pick(locale, p.beforeLabel)}</span>
+                    <span class="tag right" aria-hidden="true">{pick(locale, p.afterLabel)}</span>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+          <div class="words">
+            <h3>{pick(locale, p.name)}</h3>
+            <p>{pick(locale, p.text)}</p>
+            {p.measure && <p class="measure">{pick(locale, p.measure)}</p>}
+            <p class="where">{pick(locale, p.where)}</p>
+            {p.settings && <details><summary>{c.settings}</summary><p>{pick(locale, p.settings)}</p></details>}
+            <p class="credit">{c.footage}: <a href={p.source.page} rel="noopener" target="_blank">{p.source.author}</a>, <a href={p.source.licenceUrl} rel="noopener" target="_blank">{p.source.licence} {c.licence}</a></p>
+          </div>
+        </article>
+      ))}
+    </div>
+  </section>
+)}
 
 <style>
+  .stage { display: grid; gap: clamp(16px, 2vw, 24px); }
+  .picker { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+  .picker::-webkit-scrollbar { display: none; }
+  .picker button { flex: none; height: 40px; padding: 0 16px; border: 1px solid var(--line-2); border-radius: 999px; background: none; color: var(--ink-2); font: inherit; font-size: 0.9375rem; cursor: pointer; white-space: nowrap; }
+  .picker button:hover { color: var(--ink); }
+  .picker button[aria-selected='true'] { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+  .picker button:focus-visible, .views button:focus-visible, .which button:focus-visible, .play:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
   .proof { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: clamp(20px, 3vw, 48px); align-items: start; }
-  .proof + .proof { margin-top: var(--section); }
-  .clip { grid-column: 1 / -1; }
+  .proof[hidden] { display: none; }
   @media (max-width: 1100px) { .proof { grid-template-columns: 1fr; } }
+
+  .frame { position: relative; display: grid; gap: 10px; }
+  .views, .which { display: inline-flex; justify-self: start; gap: 2px; padding: 3px; border-radius: 999px; background: var(--panel); }
+  .views button, .which button { height: 32px; padding: 0 14px; border: 0; border-radius: 999px; background: none; color: var(--ink-2); font: inherit; font-size: 0.875rem; cursor: pointer; }
+  .views button[aria-pressed='true'], .which button[aria-pressed='true'] { background: var(--panel-2); color: var(--ink); }
+  .view { position: relative; }
+  .view[hidden] { display: none; }
 
   /* the after picture over the before, cut at the line */
   .compare { position: relative; overflow: hidden; border-radius: var(--r-lg); background: var(--panel); aspect-ratio: 16 / 9; touch-action: pan-y; }
@@ -65,25 +127,89 @@ const c = pick(locale, COPY);
   .tag.right { right: 14px; }
   @media (max-width: 600px) { .tag { top: 8px; padding: 4px 7px; font-size: 0.6875rem; } .tag.left { left: 8px; } .tag.right { right: 8px; } }
   /* the input covers the picture, invisible: dragging anywhere moves the line */
-  input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: ew-resize; }
+  .compare input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: ew-resize; }
   .compare:has(input:focus-visible) .line::after { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+  .player { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+  .play { display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: 50%; background: var(--ink); color: var(--bg); cursor: pointer; }
+  .play :global(svg) { width: 18px; height: 18px; fill: currentColor; }
+  .play .i-pause, .play[data-playing] .i-play { display: none; }
+  .play[data-playing] .i-pause { display: block; }
 
   .words { display: grid; gap: 14px; align-content: start; }
   h3 { font-size: clamp(1.75rem, 3vw, 2.5rem); line-height: 1.05; }
   .words p { color: var(--ink-2); font-size: 1.0625rem; line-height: 1.55; }
-  .where { color: var(--ink); }
+  .where, .measure { color: var(--ink); }
+  details summary { cursor: pointer; color: var(--ink); }
+  details p { margin-top: 8px; font-size: 0.9375rem; }
   .credit { font-size: 0.875rem; }
   .credit a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
 </style>
 
 <script>
-  // the line follows the range (the router loads this script once, it binds at each page)
+  // binds at each page (the router loads this script once)
   document.addEventListener('astro:page-load', () => {
-    for (const box of document.querySelectorAll<HTMLElement>('[data-compare]')) {
+    const stage = document.querySelector<HTMLElement>('[data-proofs]');
+    if (!stage) return;
+    const tabs = [...stage.querySelectorAll<HTMLButtonElement>('[data-proof-tab]')];
+    const panels = [...stage.querySelectorAll<HTMLElement>('[data-proof]')];
+    const show = (id: string, focus = false) => {
+      for (const t of tabs) { const on = t.dataset.proofTab === id; t.setAttribute('aria-selected', String(on)); t.tabIndex = on ? 0 : -1; if (on && focus) t.focus(); if (on) t.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }
+      for (const p of panels) {
+        const on = p.dataset.proof === id;
+        p.hidden = !on;
+        // a proof left: its clip and its sound stop
+        if (!on) for (const m of p.querySelectorAll<HTMLMediaElement>('video, audio')) m.pause();
+      }
+    };
+    tabs.forEach((t, i) => {
+      t.addEventListener('click', () => { show(t.dataset.proofTab!); history.replaceState(null, '', `#proof-${t.dataset.proofTab}`); });
+      t.addEventListener('keydown', (e) => {
+        const step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+        if (step) { e.preventDefault(); show(tabs[(i + step + tabs.length) % tabs.length].dataset.proofTab!, true); }
+      });
+    });
+    const asked = location.hash.match(/^#proof-(.+)$/)?.[1];
+    if (asked && tabs.some((t) => t.dataset.proofTab === asked)) { show(asked); stage.scrollIntoView(); }
+
+    for (const box of stage.querySelectorAll<HTMLElement>('[data-compare]')) {
       const range = box.querySelector<HTMLInputElement>('[data-compare-range]')!;
       const set = () => box.style.setProperty('--at', `${range.value}%`);
       range.addEventListener('input', set);
       set();
+    }
+    // picture or video, in the same frame
+    for (const panel of panels) {
+      const switches = [...panel.querySelectorAll<HTMLButtonElement>('[data-view-switch]')];
+      for (const s of switches) s.addEventListener('click', () => {
+        for (const o of switches) o.setAttribute('aria-pressed', String(o === s));
+        for (const v of panel.querySelectorAll<HTMLElement>('[data-view]')) v.hidden = v.dataset.view !== s.dataset.viewSwitch;
+        if (s.dataset.viewSwitch !== 'video') panel.querySelector('video')?.pause();
+      });
+    }
+    // a sound before or after, switched at the same instant
+    for (const player of stage.querySelectorAll<HTMLElement>('[data-player]')) {
+      const sounds = { before: player.querySelector<HTMLAudioElement>('[data-sound="before"]')!, after: player.querySelector<HTMLAudioElement>('[data-sound="after"]')! };
+      const play = player.querySelector<HTMLButtonElement>('[data-play]')!, hear = [...player.querySelectorAll<HTMLButtonElement>('[data-hear]')];
+      const range = player.closest('[data-proof]')!.querySelector<HTMLInputElement>('[data-compare-range]');
+      let current: 'before' | 'after' = 'before';
+      const playLabel = play.getAttribute('aria-label')!, pauseLabel = play.dataset.pauseLabel!;
+      const label = () => { const on = !sounds[current].paused; play.toggleAttribute('data-playing', on); play.setAttribute('aria-label', on ? pauseLabel : playLabel); };
+      play.addEventListener('click', () => { const s = sounds[current]; if (s.paused) s.play().catch(() => {}); else s.pause(); setTimeout(label, 0); });
+      for (const s of Object.values(sounds)) { s.addEventListener('pause', label); s.addEventListener('play', label); s.addEventListener('ended', label); }
+      for (const b of hear) b.addEventListener('click', () => {
+        const next = b.dataset.hear as 'before' | 'after';
+        if (next === current) return;
+        const was = sounds[current], now = sounds[next], playing = !was.paused;
+        now.currentTime = was.currentTime;
+        was.pause();
+        current = next;
+        if (playing) now.play().catch(() => {});
+        for (const o of hear) o.setAttribute('aria-pressed', String(o === b));
+        // the waveform shown follows the sound heard
+        if (range) { range.value = next === 'after' ? '0' : '100'; range.dispatchEvent(new Event('input')); }
+        label();
+      });
     }
   });
 </script>
