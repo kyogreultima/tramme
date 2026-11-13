@@ -86,7 +86,7 @@ The landing page gets a strip of three proofs, each a poster that opens its proo
 
 - [ ] Captions, word by word
 - [ ] Silences and hesitations cut
-- [ ] A clean voice
+- [x] A clean voice (a street interview from Wikimedia Commons, CC BY 3.0: background noise from −41 to −57 dB, the voice's level unchanged)
 
 ## Step 4. Whole edits
 

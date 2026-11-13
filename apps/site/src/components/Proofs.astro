@@ -19,9 +19,9 @@ import { pick, type Locale, type Localised } from '../lib/i18n';
 interface Props { locale: Locale }
 const { locale } = Astro.props;
 
-const COPY: Localised<{ title: string; more: string; drag: string; footage: string; licence: string; picture: string; video: string; sound: string; settings: string; play: string; pause: string; before: string; after: string; features: string }> = {
-  en: { title: 'Before and after', more: 'Tramme’s features applied to free footage. Drag the line to compare the two versions.', drag: 'Move the line between before and after', footage: 'Footage', licence: 'licence', picture: 'Picture', video: 'Video', sound: 'Sound', settings: 'Settings', play: 'Play', pause: 'Pause', before: 'Before', after: 'After', features: 'Features shown' },
-  fr: { title: 'Avant et après', more: 'Les fonctionnalités de Tramme appliquées à des vidéos libres. Faites glisser la ligne pour comparer les deux versions.', drag: 'Déplacer la ligne entre avant et après', footage: 'Images', licence: 'licence', picture: 'Image', video: 'Vidéo', sound: 'Son', settings: 'Réglages', play: 'Lire', pause: 'Pause', before: 'Avant', after: 'Après', features: 'Fonctionnalités montrées' },
+const COPY: Localised<{ title: string; more: string; drag: string; footage: string; soundSource: string; colon: string; licence: (name: string) => string; picture: string; video: string; sound: string; settings: string; play: string; pause: string; before: string; after: string; features: string }> = {
+  en: { title: 'Before and after', more: 'Tramme’s features applied to free footage. Drag the line to compare the two versions.', drag: 'Move the line between before and after', footage: 'Footage', soundSource: 'Sound', colon: ': ', licence: (name) => `${name} licence`, picture: 'Picture', video: 'Video', sound: 'Sound', settings: 'Settings', play: 'Play', pause: 'Pause', before: 'Before', after: 'After', features: 'Features shown' },
+  fr: { title: 'Avant et après', more: 'Les fonctionnalités de Tramme appliquées à des vidéos libres. Faites glisser la ligne pour comparer les deux versions.', drag: 'Déplacer la ligne entre avant et après', footage: 'Images', soundSource: 'Son', colon: ' : ', licence: (name) => `licence ${name}`, picture: 'Image', video: 'Vidéo', sound: 'Son', settings: 'Réglages', play: 'Lire', pause: 'Pause', before: 'Avant', after: 'Après', features: 'Fonctionnalités montrées' },
 };
 const c = pick(locale, COPY);
 const SIZES = '(min-width: 1100px) 62vw, 100vw';
@@ -88,7 +88,7 @@ const SIZES = '(min-width: 1100px) 62vw, 100vw';
             {p.measure && <p class="measure">{pick(locale, p.measure)}</p>}
             <p class="where">{pick(locale, p.where)}</p>
             {p.settings && <details><summary>{c.settings}</summary><p>{pick(locale, p.settings)}</p></details>}
-            <p class="credit">{c.footage}: <a href={p.source.page} rel="noopener" target="_blank">{p.source.author}</a>, <a href={p.source.licenceUrl} rel="noopener" target="_blank">{p.source.licence} {c.licence}</a></p>
+            <p class="credit">{p.kind === 'sound' ? c.soundSource : c.footage}{c.colon}<a href={p.source.page} rel="noopener" target="_blank">{p.source.author}</a>, <a href={p.source.licenceUrl} rel="noopener" target="_blank">{c.licence(p.source.licence)}</a></p>
           </div>
         </article>
       ))}
@@ -195,16 +195,27 @@ const SIZES = '(min-width: 1100px) 62vw, 100vw';
       let current: 'before' | 'after' = 'before';
       const playLabel = play.getAttribute('aria-label')!, pauseLabel = play.dataset.pauseLabel!;
       const label = () => { const on = !sounds[current].paused; play.toggleAttribute('data-playing', on); play.setAttribute('aria-label', on ? pauseLabel : playLabel); };
-      play.addEventListener('click', () => { const s = sounds[current]; if (s.paused) s.play().catch(() => {}); else s.pause(); setTimeout(label, 0); });
+      play.addEventListener('click', () => {
+        const s = sounds[current];
+        if (s.paused) {
+          // the other version loads too (a few hundred KB), so a switch lands on the same instant even where the server sends no ranges
+          const other = sounds[current === 'before' ? 'after' : 'before'];
+          if (other.readyState === 0) { other.preload = 'auto'; other.load(); }
+          s.play().catch(() => {});
+        } else s.pause();
+        setTimeout(label, 0);
+      });
       for (const s of Object.values(sounds)) { s.addEventListener('pause', label); s.addEventListener('play', label); s.addEventListener('ended', label); }
       for (const b of hear) b.addEventListener('click', () => {
         const next = b.dataset.hear as 'before' | 'after';
         if (next === current) return;
-        const was = sounds[current], now = sounds[next], playing = !was.paused;
-        now.currentTime = was.currentTime;
+        const was = sounds[current], now = sounds[next], playing = !was.paused, at = was.currentTime;
         was.pause();
         current = next;
-        if (playing) now.play().catch(() => {});
+        // the same instant: a sound not loaded yet takes its time once it knows its length
+        const go = () => { now.currentTime = at; if (playing) now.play().catch(() => {}); };
+        if (now.readyState >= 1) go();
+        else { now.addEventListener('loadedmetadata', go, { once: true }); now.load(); }
         for (const o of hear) o.setAttribute('aria-pressed', String(o === b));
         // the waveform shown follows the sound heard
         if (range) { range.value = next === 'after' ? '0' : '100'; range.dispatchEvent(new Event('input')); }
