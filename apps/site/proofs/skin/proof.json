@@ -1,0 +1,39 @@
+{
+  "id": "skin",
+  "order": 12,
+  "kind": "picture",
+  "compare": "sweep",
+  "name": { "en": "Skin, smoothed", "fr": "Peau adoucie" },
+  "text": {
+    "en": "A close-up portrait filmed in 4K, shown here at 100 %, its skin as the camera saw it. Tramme finds the face in every frame, in the browser, draws a mask of the skin alone and softens it under that mask at the default strength, light: the eyes, the brows, the lips and the hair stay sharp. The after is retouched.",
+    "fr": "Un portrait en gros plan filmé en 4K, montré ici à 100 %, sa peau telle que la caméra l’a vue. Tramme trouve le visage à chaque image, dans le navigateur, dessine un masque de la peau seule et l’adoucit sous ce masque à la force par défaut, légère : les yeux, les sourcils, les lèvres et les cheveux restent nets. L’après est retouché."
+  },
+  "where": {
+    "en": "Type / and run Smooth the skin on the clip.",
+    "fr": "Tapez / et lancez Lisser la peau sur le plan."
+  },
+  "settings": {
+    "en": "Smooth the skin: strength 0.3, the default; the clip shown at 100 % around the face.",
+    "fr": "Lisser la peau : force 0,3, celle par défaut ; le plan montré à 100 % autour du visage."
+  },
+  "beforeLabel": { "en": "The skin as filmed", "fr": "La peau telle que filmée" },
+  "afterLabel": { "en": "Retouched in Tramme", "fr": "Retouchée dans Tramme" },
+  "videoLabel": { "en": "The portrait at 100 %, the skin as filmed and then smoothed, a line sweeping between them", "fr": "Le portrait à 100 %, la peau telle que filmée puis adoucie, une ligne balayant de l’une à l’autre" },
+  "source": {
+    "page": "https://www.pexels.com/video/close-up-video-of-a-woman-looking-at-the-camera-showing-no-emotions-6665217/",
+    "file": "https://www.pexels.com/download/video/6665217/",
+    "sha256": "7fd59f03016d7cdab54db90ee84e241b2d7e70509f007ec46dcdbd1f1d3664bc",
+    "type": "video",
+    "author": "Anna Shvets",
+    "licence": "Pexels",
+    "licenceUrl": "https://www.pexels.com/license/",
+    "start": 2,
+    "duration": 6,
+    "props": { "size": [3840, 2160] },
+    "position": [870, 780]
+  },
+  "still": 2,
+  "editor": [
+    { "tool": "skin", "input": { "layer": "$layer" } }
+  ]
+}

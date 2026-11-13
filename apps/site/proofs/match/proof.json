@@ -1,0 +1,52 @@
+{
+  "id": "match",
+  "order": 14,
+  "kind": "picture",
+  "compare": "sweep",
+  "name": { "en": "Two shots, one look", "fr": "Deux plans, un seul rendu" },
+  "text": {
+    "en": "The same bridge on the same kind of day, filmed by two people with two cameras: on the right the sky turns cyan and the reds push, on the left they stay as the eye saw them. Cut one after the other, they jump. Tramme reads the colours of both pictures and puts colour wheels (lift, gamma, gain) on the second so it takes the look of the first; the wheels stay visible and can be changed.",
+    "fr": "Le même pont par le même genre de journée, filmé par deux personnes avec deux caméras : à droite le ciel tire vers le cyan et les rouges ressortent, à gauche ils restent tels que l’œil les a vus. Montés l’un après l’autre, ils sautent. Tramme lit les couleurs des deux images et pose des roues chromatiques (lift, gamma, gain) sur le second pour qu’il prenne le rendu du premier ; les roues restent visibles et modifiables."
+  },
+  "measure": {
+    "en": "The mean colour of the two shots, ΔE 10.4 apart before and 8.6 after; the rest of the gap is what each shows, a lawn on the left, a dark tree on the right.",
+    "fr": "La couleur moyenne des deux plans, à ΔE 10,4 l’une de l’autre avant et 8,6 après ; le reste de l’écart tient à ce que chacun montre, une pelouse à gauche, un arbre sombre à droite."
+  },
+  "where": {
+    "en": "Select the two clips, the reference first, then in the clip menu, Match the look of the first selected clip.",
+    "fr": "Sélectionnez les deux plans, la référence d’abord, puis dans le menu du plan, Caler l’étalonnage sur le premier plan sélectionné."
+  },
+  "settings": {
+    "en": "Match the look of a shot: the left shot as the reference, the pictures read at 2 s.",
+    "fr": "Caler l’étalonnage sur un plan : le plan de gauche comme référence, les images lues à 2 s."
+  },
+  "beforeLabel": { "en": "The two shots as filmed", "fr": "Les deux plans tels que filmés" },
+  "afterLabel": { "en": "The right one matched to the left, in Tramme", "fr": "Celui de droite raccordé à celui de gauche, dans Tramme" },
+  "videoLabel": { "en": "The two shots side by side, as filmed and then matched, a line sweeping between them", "fr": "Les deux plans côte à côte, tels que filmés puis raccordés, une ligne balayant de l’un à l’autre" },
+  "source": {
+    "page": "https://www.pexels.com/video/golden-gate-bridge-on-a-sunny-day-32191519/",
+    "file": "https://www.pexels.com/download/video/32191519/",
+    "sha256": "e676dbae3cef22c4a68e049039cba9e9ae24a212a33af5e5b1927aedcc4956f0",
+    "type": "video",
+    "author": "aero yx",
+    "licence": "Pexels",
+    "licenceUrl": "https://www.pexels.com/license/",
+    "start": 0,
+    "duration": 6
+  },
+  "second": {
+    "page": "https://www.pexels.com/video/stunning-view-of-golden-gate-bridge-in-spring-36179618/",
+    "file": "https://www.pexels.com/download/video/36179618/",
+    "sha256": "fbfa29bd161ae6ce9f58dc2fb359a975dcfaebba247380a38e3856ba6f0a7580",
+    "type": "video",
+    "author": "AP Vibes",
+    "licence": "Pexels",
+    "licenceUrl": "https://www.pexels.com/license/",
+    "start": 0,
+    "duration": 6
+  },
+  "still": 2,
+  "editor": [
+    { "tool": "match_look", "at": 2, "input": { "clips": ["$layer", "$layer2"] } }
+  ]
+}

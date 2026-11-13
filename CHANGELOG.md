@@ -24,10 +24,12 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 - The anime example is a new film, Paper Wings: a paper plane at sunset in four shots, drawn frame by frame (clouds lit from the side, the plane banking, telephone wires, a town with its windows lit), animated with sequences, parallax and a camera push.
 - A proof of the assistant's work: one message turned a NASA raw take of 60 s into a 48 s film (cuts, captions, keywords, pictures over the talk, a title, sound) in 12.7 minutes, shown first, with its sound.
 - A second proof of the assistant's work: one message turned five minutes of a NASA talk into three vertical shorts (42, 21 and 33 s), each framed on the speaker, captioned word by word, opening on a hook, in 42 minutes for $1.04; the clip plays the start of each in turn.
+- Seven more proofs on real footage: a label that follows a car (tracking), a 16:9 walk made vertical with the frame on the man (reframe), a leap at a quarter speed with the frames between made by Tramme (slow motion), a portrait's skin smoothed at 100 % (retouch), a 640 × 480 photo enlarged by Real-ESRGAN (upscaling), two shots of one bridge by two cameras given one look (matching), and the pauses of a live answer cut (silences, 60 s to 55.4 s).
 - The landing page shows three of the proofs, each opening its comparison on the features page.
 - The features page shows features on real footage, before and after (Before and after): a line dragged between the two pictures, the clip, where the tool is in the app and the footage's credit. The first are colour grading on an ungraded Apple Log clip, keying on a green-screen take, a photo in 2.5D a title passing behind a person filmed without a green screen (all from Pexels), and a voice cleaned of a street's noise, 15 dB lower, played before or after at the same instant (from Wikimedia Commons), and word-by-word captions on a NASA interview.
 
 ### Changed
+- Matching the look of a shot matches a camera's cast whole and its brightness and contrast only so far (0.1 and ×0.8 to ×1.25), black kept within 0.05: two angles of one scene show different things, and matching their spread whole lifted and tinted the blacks of the darker one (a tree against the sky turned olive).
 
 - A layer's GLSL effects in a row run as one chain on the GPU: the layer is uploaded once and the effects hand their result to each other in half floats, so a grade, curves and a LUT stacked lose nothing between them; the result is dithered as it goes back to 8 bits, so a pushed sky no longer bands.
 - A large effect's settings are folded into groups in the inspector (a grade's light, its presence, its colour wheels…), and an effect has a button that puts it back at rest. A curve's square double-clicked goes back to rest too.
@@ -36,6 +38,8 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 - The chroma key reads a green or blue screen by colour difference: hair and motion blur come out half transparent, and the screen's colour is taken out of those edges, which keep the subject's own colour.
 
 ### Fixed
+- Matching the look of a clip just added reads its picture once the preview has loaded it: run at once, it said "the picture cannot be read yet".
+- The first frame of a render waits up to 2 minutes for its videos, the others 20 s: two render pages opening a 4K source of 170 MB at once stopped on "frame 0 never finished". A segments' folder Windows still holds no longer hides the render's own error.
 
 - A long tool call made through the companion stays open while the editor is at work on it: transcribing a 5-minute video took more than the 15 minutes the companion waited, and the assistant got "the editor did not answer". The editor now says every minute that the tool is still running; the 15 minutes count from its last word.
 - The command line's picture checks measure text closer to how it is drawn: capitals, a heavy weight and the tracking make it wider, narrow letters and spaces thinner. A keyword in black capitals running to the frame's edges passed the safe-zone check; a title in lower case was flagged when it fitted.

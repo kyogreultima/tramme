@@ -88,7 +88,7 @@ const SIZES = '(min-width: 1100px) 62vw, 100vw';
             {p.measure && <p class="measure">{pick(locale, p.measure)}</p>}
             <p class="where">{pick(locale, p.where)}</p>
             {p.settings && <details><summary>{c.settings}</summary><p>{pick(locale, p.settings)}</p></details>}
-            <p class="credit">{p.kind === 'sound' ? c.soundSource : c.footage}{c.colon}<a href={p.source.page} rel="noopener" target="_blank">{p.source.author}</a>, <a href={p.source.licenceUrl} rel="noopener" target="_blank">{c.licence(p.source.licence)}</a></p>
+            <p class="credit">{p.kind === 'sound' ? c.soundSource : c.footage}{c.colon}<a href={p.source.page} rel="noopener" target="_blank">{p.source.author}</a>, <a href={p.source.licenceUrl} rel="noopener" target="_blank">{c.licence(p.source.licence)}</a>{p.second && <>; <a href={p.second.page} rel="noopener" target="_blank">{p.second.author}</a>, <a href={p.second.licenceUrl} rel="noopener" target="_blank">{c.licence(p.second.licence)}</a></>}</p>
           </div>
         </article>
       ))}

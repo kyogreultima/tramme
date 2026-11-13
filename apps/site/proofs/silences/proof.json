@@ -1,7 +1,6 @@
 {
   "id": "silences",
   "order": 8,
-  "draft": "the NASA passage has music under the voice: the pauses do not show in the waveform and each cut makes the music jump (24.0 s down to 22.4 s, four pauses); waits for a voice recorded alone",
   "kind": "sound",
   "compare": "sweep",
   "name": {
@@ -9,8 +8,12 @@
     "fr": "Silences coupés"
   },
   "text": {
-    "en": "An astronaut telling his story, with the pauses of someone thinking aloud. Tramme hears where the voice is, on the machine (Silero, a voice detector), splits the clip at every pause longer than half a second and lays the spoken parts back to back, keeping a breath around each cut. The waveforms show the pauses gone.",
-    "fr": "Un astronaute qui raconte son parcours, avec les pauses de quelqu’un qui réfléchit à voix haute. Tramme entend où est la voix, sur la machine (Silero, un détecteur de voix), coupe le plan à chaque pause de plus d’une demi-seconde et remet les passages parlés bout à bout, en gardant un souffle autour de chaque coupe. Les formes d’onde montrent les pauses disparues."
+    "en": "Two crew members of a NASA analogue mission answering students live, from inside their habitat, with the pauses of people thinking aloud. Tramme hears where the voice is, on the machine (Silero, a voice detector), splits the clip at every pause longer than half a second and lays the spoken parts back to back, keeping a breath around each cut. The waveforms show the pauses gone.",
+    "fr": "Deux membres d’équipage d’une mission analogue de la NASA qui répondent en direct à des élèves, depuis leur habitat, avec les pauses de gens qui réfléchissent à voix haute. Tramme entend où est la voix, sur la machine (Silero, un détecteur de voix), coupe le plan à chaque pause de plus d’une demi-seconde et remet les passages parlés bout à bout, en gardant un souffle autour de chaque coupe. Les formes d’onde montrent les pauses disparues."
+  },
+  "measure": {
+    "en": "60 s of answer to 55.4 s: 4.6 s of pauses taken out in 7 cuts.",
+    "fr": "60 s de réponse pour 55,4 s : 4,6 s de pauses retirées en 7 coupes."
   },
   "where": {
     "en": "Type / and run Cut the silences on the clip.",
@@ -29,15 +32,15 @@
     "fr": "Ses silences coupés dans Tramme"
   },
   "source": {
-    "page": "https://images.nasa.gov/details/ksc_122210_itow_melvin",
-    "file": "https://images-assets.nasa.gov/video/ksc_122210_itow_melvin/ksc_122210_itow_melvin~orig.mp4",
-    "sha256": "59c4807dc9c32bfbd2d97e7bfd400373ccc4eaa14ee14f3ba7f5aa88914cdc51",
+    "page": "https://images.nasa.gov/details/jsc2023m000100_HERA_Groundlink_C6M4_230407-MP4",
+    "file": "https://images-assets.nasa.gov/video/jsc2023m000100_HERA_Groundlink_C6M4_230407-MP4/jsc2023m000100_HERA_Groundlink_C6M4_230407-MP4~large.mp4",
+    "sha256": "ec9ea99d592d8d58eef5483fab8c80d5069f147e9ca8e2834103bf933e68be82",
     "type": "video",
     "author": "NASA",
     "licence": "NASA",
     "licenceUrl": "https://www.nasa.gov/nasa-brand-center/images-and-media/",
-    "start": 305,
-    "duration": 24
+    "start": 100,
+    "duration": 60
   },
   "still": 4,
   "editor": [

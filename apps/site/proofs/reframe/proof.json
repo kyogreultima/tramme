@@ -1,0 +1,40 @@
+{
+  "id": "reframe",
+  "order": 10,
+  "kind": "picture",
+  "compare": "side",
+  "view": "video",
+  "afterRoot": "made",
+  "name": { "en": "Vertical, on the subject", "fr": "En vertical, sur le sujet" },
+  "text": {
+    "en": "A man walking along a river, filmed wide in 16:9, drifting from one side of the frame to the other. Tramme finds him in the picture every quarter of a second, in the browser, and makes a 9:16 version whose frame moves with him, smoothly, so he stays in it from the first second to the last.",
+    "fr": "Un homme qui marche le long d’une rivière, filmé en large au format 16:9, qui dérive d’un côté de l’image à l’autre. Tramme le repère dans l’image tous les quarts de seconde, dans le navigateur, et fait une version 9:16 dont le cadre se déplace avec lui, en douceur, pour qu’il y reste de la première à la dernière seconde."
+  },
+  "where": {
+    "en": "Type / and run Find the people on the clip, then Cut shorts with the passage to keep, vertical.",
+    "fr": "Tapez / et lancez Trouver les personnes sur le plan, puis Couper en shorts avec le passage à garder, en vertical."
+  },
+  "settings": {
+    "en": "Find the people: a look every 0.25 s; Cut shorts: the whole clip, vertical 1080 × 1920, no title.",
+    "fr": "Trouver les personnes : un regard toutes les 0,25 s ; Couper en shorts : tout le plan, vertical 1080 × 1920, sans titre."
+  },
+  "beforeLabel": { "en": "The 16:9 shot", "fr": "Le plan 16:9" },
+  "afterLabel": { "en": "Its 9:16 version, in Tramme", "fr": "Sa version 9:16, dans Tramme" },
+  "videoLabel": { "en": "The 16:9 shot beside its 9:16 version, the frame following the man", "fr": "Le plan 16:9 à côté de sa version 9:16, le cadre suivant l’homme" },
+  "source": {
+    "page": "https://www.pexels.com/video/a-man-walking-on-the-sidewalk-4571406/",
+    "file": "https://www.pexels.com/download/video/4571406/",
+    "sha256": "ab79d4f990dd038568787ce7cf93338b3c4466cccabdbc55781c58110cf7cf54",
+    "type": "video",
+    "author": "ArtHouse Studio",
+    "licence": "Pexels",
+    "licenceUrl": "https://www.pexels.com/license/",
+    "start": 0,
+    "duration": 7.5
+  },
+  "still": 3,
+  "editor": [
+    { "tool": "subjects", "input": { "asset": "$asset", "every": 0.25 } },
+    { "tool": "shorts", "input": { "asset": "$asset", "format": "vertical", "plan": [{ "from": 0, "to": 7.5 }] } }
+  ]
+}

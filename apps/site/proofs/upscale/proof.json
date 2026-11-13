@@ -1,0 +1,37 @@
+{
+  "id": "upscale",
+  "order": 13,
+  "kind": "picture",
+  "compare": "sweep",
+  "name": { "en": "A small picture, enlarged", "fr": "Une petite image, agrandie" },
+  "text": {
+    "en": "A street photographed in 2008 with a compact camera, 640 by 480 pixels, shown here at 300 %: soft edges, blocks of compression. Tramme enlarges it twice in the browser with a Real-ESRGAN network, which draws the edges and the fine texture again. On the left, the same picture enlarged by the browser as any page does. A video is enlarged by the engine's Lanczos: a network over every frame would take hours.",
+    "fr": "Une rue photographiée en 2008 avec un compact, 640 par 480 pixels, montrée ici à 300 % : des bords mous, des blocs de compression. Tramme l’agrandit deux fois dans le navigateur avec un réseau Real-ESRGAN, qui redessine les bords et la texture fine. À gauche, la même image agrandie par le navigateur, comme le fait toute page. Une vidéo est agrandie par le Lanczos du moteur : un réseau sur chaque image prendrait des heures."
+  },
+  "where": {
+    "en": "Choose Real-ESRGAN in Settings, Models, Enlarging a picture, then type / and run Enlarge a picture or a video on the picture.",
+    "fr": "Choisissez Real-ESRGAN dans Paramètres, Modèles, Agrandir une image, puis tapez / et lancez Agrandir une image ou une vidéo sur l’image."
+  },
+  "settings": {
+    "en": "Enlarge: Real-ESRGAN general x4 v3, the picture made twice its size; both shown at 300 %.",
+    "fr": "Agrandir : Real-ESRGAN general x4 v3, l’image faite deux fois plus grande ; les deux montrées à 300 %."
+  },
+  "beforeLabel": { "en": "Enlarged by the browser", "fr": "Agrandie par le navigateur" },
+  "afterLabel": { "en": "Enlarged by Tramme", "fr": "Agrandie par Tramme" },
+  "videoLabel": { "en": "The street at 300 %, enlarged by the browser and by Tramme, a line sweeping between them", "fr": "La rue à 300 %, agrandie par le navigateur et par Tramme, une ligne balayant de l’une à l’autre" },
+  "source": {
+    "page": "https://commons.wikimedia.org/wiki/File:Coolidge_street.JPG",
+    "file": "https://upload.wikimedia.org/wikipedia/commons/5/52/Coolidge_street.JPG",
+    "sha256": "3a4ee603cba96501d4b57bea8a6bc9d08617c068c181816fce7a3490770b0f66",
+    "type": "image",
+    "author": "Lothar1976",
+    "licence": "Public domain",
+    "licenceUrl": "https://commons.wikimedia.org/wiki/File:Coolidge_street.JPG",
+    "duration": 6
+  },
+  "still": 1,
+  "preferences": { "models": { "upscale": "realesr-general-x4v3" } },
+  "editor": [
+    { "tool": "upscale", "input": { "asset": "$asset" } }
+  ]
+}

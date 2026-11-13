@@ -1,0 +1,39 @@
+{
+  "id": "slowmo",
+  "order": 11,
+  "kind": "picture",
+  "compare": "side",
+  "view": "video",
+  "name": { "en": "Smooth slow motion", "fr": "Ralenti fluide" },
+  "text": {
+    "en": "A dog leaping for a frisbee, filmed at 30 frames a second, slowed to a quarter of its speed. On the left each frame is shown four times and the leap jerks along; on the right Tramme has made the three frames between each pair, in the browser, from the motion it measures between them. The frames it makes come from block-matching motion; a learned interpolation (RIFE) is planned.",
+    "fr": "Un chien qui saute attraper un frisbee, filmé à 30 images par seconde, ralenti au quart de sa vitesse. À gauche chaque image est montrée quatre fois et le saut avance par à-coups ; à droite Tramme a fabriqué les trois images entre chaque paire, dans le navigateur, à partir du mouvement qu’il mesure entre elles. Les images fabriquées viennent d’une estimation du mouvement par blocs ; une interpolation apprise (RIFE) est prévue."
+  },
+  "where": {
+    "en": "Type / and run Smooth slow motion on the clip, then slow its layer under 1×.",
+    "fr": "Tapez / et lancez Ralenti fluide sur le plan, puis ralentissez son calque sous 1×."
+  },
+  "settings": {
+    "en": "Smooth slow motion: 4 times as many frames; the layer at 0.25×, from 2.8 s of the clip.",
+    "fr": "Ralenti fluide : 4 fois plus d’images ; le calque à 0,25×, à partir de 2,8 s du plan."
+  },
+  "beforeLabel": { "en": "Slowed, frames repeated", "fr": "Ralenti, images répétées" },
+  "afterLabel": { "en": "Slowed, frames made by Tramme", "fr": "Ralenti, images fabriquées par Tramme" },
+  "videoLabel": { "en": "The leap at a quarter speed, frames repeated on the left, frames made on the right", "fr": "Le saut au quart de la vitesse, images répétées à gauche, images fabriquées à droite" },
+  "source": {
+    "page": "https://www.pexels.com/video/border-collie-catching-frisbee-in-snowy-field-35235652/",
+    "file": "https://www.pexels.com/download/video/35235652/",
+    "sha256": "54a3c8cc3ff8689475d598a6a274292f5640d154ef487eb657b6fb17601c0478",
+    "type": "video",
+    "author": "Michal Petráš",
+    "licence": "Pexels",
+    "licenceUrl": "https://www.pexels.com/license/",
+    "start": 2.8,
+    "duration": 8,
+    "props": { "rate": 0.25 }
+  },
+  "still": 3.3,
+  "editor": [
+    { "tool": "interpolate", "input": { "layer": "$layer", "factor": 4 } }
+  ]
+}

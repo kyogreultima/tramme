@@ -2,7 +2,7 @@
 
 Each major feature shown working on real footage that does not already show the result, before and after, on the site's features page (the Before and after section, `apps/site/src/components/Proofs.astro`, fed by `apps/site/src/lib/proofs.ts`). A proof is what a visitor can check with their own eyes; a sentence on a page is a claim.
 
-Status: step 0 done (the stage, the manifests, the script, the landing's strip). Shown on the site: a talk edited by the assistant, three shorts from a long video, colour grading, keying, a photo in 2.5D, a title behind a person, a clean voice, word-by-word captions. Drafts, with what they wait for: stabilisation, silences. Each proof so far found and fixed a defect of the feature it shows (see each box).
+Status: step 0 done (the stage, the manifests, the script, the landing's strip). Shown on the site: a talk edited by the assistant, three shorts from a long video, colour grading, keying, a photo in 2.5D, a title behind a person, a background removed, matching two shots, skin retouch, tracking, a vertical reframe, slow motion, upscaling, a clean voice, word-by-word captions, silences cut. One draft, with what it waits for: stabilisation (a handheld shot of a still scene; the clips tried are steady). Most proofs found and fixed a defect of the feature they show (see each box).
 
 ## Why
 
@@ -57,8 +57,8 @@ The landing page gets a strip of three proofs, each a poster that opens its proo
 - [x] Cut-out without a green screen (a Pexels walk along a river; it led to footage holding its frame across the motion blur's shutter)
 - [x] Background removed from photos (a Pexels camera on wooden planks: the camera kept, the plant left out, the wood's colour taken out of the edge)
 - [x] A photo in 2.5D (a Pexels lake photo; it led to the parallax following the camera's pan, mirrored edges, the framing for the drift and a gentler depth of field)
-- [ ] Matching two shots
-- [ ] Skin retouch
+- [x] Matching two shots (two Pexels shots of the Golden Gate Bridge by two people; it led to the matching keeping black near black, a camera's cast matched whole and the brightness and contrast only so far, and to the tool waiting for the preview to load a clip just added; ΔE of the mean colours 10.4 to 8.6, the rest is what each shows)
+- [x] Skin retouch (a Pexels neutral portrait in 4K, shown at 100 %, the default strength 0.3, labelled retouched)
 
 ## Step 2. Motion
 
@@ -70,11 +70,11 @@ The landing page gets a strip of three proofs, each a poster that opens its proo
 | Slow motion | the long jobs' frame interpolation | A fast action at 25 or 30 fps (a jump, water) | Pexels, Pixabay | Video, side by side: frames repeated against frames made | — |
 | Upscaling | the long jobs' upscaling (the engine in use is named) | Low-resolution archive film | The Prelinger Archives (public domain) | Picture, a crop at 200 % | — |
 
-- [ ] Stabilisation. First try (a walk filmed looking down, Pexels 4405576): no gain, the jitter 28.1 px before and 46.8 after a 1.5x zoom (`node scripts/proof-shake.ts`); the legs crossing the frame move with the ground the tracker follows. Needs a handheld source of a still scene, and the tool to set moving subjects aside (outliers by region). The manifest stays as a draft.
-- [ ] Tracking
-- [ ] Vertical reframe
+- [ ] Stabilisation. First try (a walk filmed looking down, Pexels 4405576): no gain, the jitter 28.1 px before and 46.8 after a 1.5x zoom (`node scripts/proof-shake.ts`); the legs crossing the frame move with the ground the tracker follows. Needs a handheld source of a still scene, and the tool to set moving subjects aside (outliers by region). The manifest stays as a draft. A second search (2026-11-13): four church interiors and a clip sold as handheld measured 0.1 to 1.5 px, steady; the free libraries describe no camera movement, so each candidate has to be downloaded and measured.
+- [x] Tracking (a Pexels red coupé crossing a street, filmed by hand; it led to the first frame of a render waiting for a 4K source to open, and to the clips held under 4 MB by a two-pass encode)
+- [x] Vertical reframe (the Pexels walk along a river, the man drifting across the 16:9, the 9:16 frame following him)
 - [ ] Slow motion (said honestly: block-matching motion until RIFE runs)
-- [ ] Upscaling (said honestly: Lanczos until Real-ESRGAN runs)
+- [x] Upscaling (a 640 × 480 photo from Wikimedia Commons, public domain, enlarged by Real-ESRGAN in the browser; a video stays with Lanczos, said under it)
 
 ## Step 3. Speech and sound
 
@@ -85,7 +85,7 @@ The landing page gets a strip of three proofs, each a poster that opens its proo
 | A clean voice | `denoise` | A voice recorded in a noisy place (street, wind, hum) | Freesound (CC0, CC BY), Commons, LibriVox (some readings are noisy) | Sound: the Before / After player | Noise floor, dB |
 
 - [x] Captions, word by word (a NASA interview, public domain: transcribed by Whisper in the browser, the spoken word lit)
-- [ ] Silences and hesitations cut. First try (a NASA interview): it found three defects of the tool, fixed (only 0.24 s was taken from each pause; a clip showing part of its file got an invalid document; word timings stretched over the pauses hid them, the sound is now heard by the voice detector). The passage has music under the voice, so the manifest stays a draft until a voice recorded alone is found.
+- [x] Silences and hesitations cut (a NASA HERA Groundlink, two crew members answering live, the voice recorded alone: 60 s to 55.4 s, 7 cuts). The first try, a NASA interview with music under the voice, found three defects of the tool, fixed (only 0.24 s was taken from each pause; a clip showing part of its file got an invalid document; word timings stretched over the pauses hid them, the sound is now heard by the voice detector).
 - [x] A clean voice (a street interview from Wikimedia Commons, CC BY 3.0: background noise from −41 to −57 dB, the voice's level unchanged)
 
 ## Step 4. Whole edits

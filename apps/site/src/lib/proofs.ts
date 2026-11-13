@@ -31,6 +31,8 @@ export interface Proof {
   afterLabel: Localised<string>;
   videoLabel?: Localised<string>;
   source: { page: string; author: string; licence: string; licenceUrl: string; duration: number; width?: number; height?: number };
+  /** a second shot beside the first (two shots matched), credited after it */
+  second?: { page: string; author: string; licence: string; licenceUrl: string };
   before: ImageMetadata;
   after: ImageMetadata;
   /** a sound proof's two sounds */

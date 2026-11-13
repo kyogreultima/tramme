@@ -1,0 +1,39 @@
+{
+  "id": "tracking",
+  "order": 9,
+  "kind": "picture",
+  "compare": "after",
+  "view": "video",
+  "name": { "en": "A label that follows", "fr": "Une étiquette qui suit" },
+  "text": {
+    "en": "A red coupé crossing a street, filmed by hand: the car moves across the frame and the camera turns after it. Tramme follows the car through every frame, in the browser, from one region given at 2 s, then hangs brackets and a label on it that stay on the car as it goes.",
+    "fr": "Un coupé rouge qui traverse une rue, filmé à la main : la voiture traverse l’image et la caméra tourne pour la suivre. Tramme suit la voiture à chaque image, dans le navigateur, à partir d’une zone donnée à 2 s, puis y accroche des crochets et une étiquette qui restent sur elle pendant qu’elle avance."
+  },
+  "where": {
+    "en": "Type / and run Track an object on the clip, with a rectangle drawn over the car, then Callout.",
+    "fr": "Tapez / et lancez Suivre un objet sur le plan, avec un rectangle tracé sur la voiture, puis Annotation."
+  },
+  "settings": {
+    "en": "Track an object: the region 24, 37, 38, 21 % at 2 s, a look every 0.1 s; Callout: the label and its detail, the side chosen by Tramme.",
+    "fr": "Suivre un objet : la zone 24, 37, 38, 21 % à 2 s, un regard toutes les 0,1 s ; Annotation : l’étiquette et son détail, le côté choisi par Tramme."
+  },
+  "beforeLabel": { "en": "The clip", "fr": "Le plan" },
+  "afterLabel": { "en": "The label on the car, in Tramme", "fr": "L’étiquette sur la voiture, dans Tramme" },
+  "videoLabel": { "en": "The car crossing the street, its label following it", "fr": "La voiture qui traverse la rue, son étiquette qui la suit" },
+  "source": {
+    "page": "https://www.pexels.com/video/a-red-car-is-driving-down-the-street-27028866/",
+    "file": "https://www.pexels.com/download/video/27028866/",
+    "sha256": "1d8a3335f3a1465a785c945f18645080d290be6ada9ed7eca6500d101d2b6ee7",
+    "type": "video",
+    "author": "WeStarMoney Rec",
+    "licence": "Pexels",
+    "licenceUrl": "https://www.pexels.com/license/",
+    "start": 0,
+    "duration": 11
+  },
+  "still": 6,
+  "editor": [
+    { "tool": "track", "at": 2, "input": { "video": "$layer", "region": "24, 37, 38, 21", "name": "car" } },
+    { "tool": "callout", "input": { "label": "THE CAR", "detail": "red coupé · 1960s" } }
+  ]
+}
