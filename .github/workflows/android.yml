@@ -42,7 +42,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       TRAMME_ENV: ${{ inputs.environment }}
-      TAURI_CONFIG: ${{ inputs.tauri-config }}
+      # not TAURI_CONFIG: tauri-build parses it whenever it is set, and an empty one (the stable app) fails
+      # as "EOF while parsing"; the flavour's step exports it only when there is one
+      FLAVOUR_CONFIG: ${{ inputs.tauri-config }}
       # audience measurement of the app (apps/desktop/src-tauri/src/analytics.rs): without it nothing is counted
       TRAMME_GA_API_SECRET: ${{ secrets.TRAMME_GA_API_SECRET }}
       # whether the four signing secrets are all there (a secret cannot be tested in an `if` directly)
@@ -71,9 +73,10 @@ jobs:
       # init and build are given the same file.
       - name: The flavour's configuration
         run: |
-          if [ -n "$TAURI_CONFIG" ]; then
-            printf '%s' "$TAURI_CONFIG" > "$RUNNER_TEMP/flavour.conf.json"
+          if [ -n "$FLAVOUR_CONFIG" ]; then
+            printf '%s' "$FLAVOUR_CONFIG" > "$RUNNER_TEMP/flavour.conf.json"
             echo "FLAVOUR=--config $RUNNER_TEMP/flavour.conf.json" >> "$GITHUB_ENV"
+            echo "TAURI_CONFIG=$FLAVOUR_CONFIG" >> "$GITHUB_ENV"
           fi
       # the generated Gradle project calls the CLI back through `pnpm tauri` (package.json's "tauri" script)
       - name: Generate the Android project
