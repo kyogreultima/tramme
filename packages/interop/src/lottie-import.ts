@@ -18,7 +18,8 @@ export interface ImportResult {
 }
 
 const r4 = (x: number) => Math.round(x * 1e4) / 1e4;
-const hex = (c: number[]) => '#' + c.slice(0, 3).map((x) => Math.round(Math.max(0, Math.min(1, x)) * 255).toString(16).padStart(2, '0')).join('').toUpperCase()
+/** a Lottie colour (0..1 channels) as #RRGGBB, with its alpha when it is not opaque */
+export const hex = (c: number[]) => '#' + c.slice(0, 3).map((x) => Math.round(Math.max(0, Math.min(1, x)) * 255).toString(16).padStart(2, '0')).join('').toUpperCase()
   + (c.length > 3 && c[3] < 1 ? Math.round(c[3] * 255).toString(16).padStart(2, '0').toUpperCase() : '');
 
 const staticIs = (p: L | undefined, v: number[] | number) => !p || (p.a !== 1 && JSON.stringify([p.k].flat().slice(0, Array.isArray(v) ? v.length : 1)) === JSON.stringify([v].flat()));

@@ -16,16 +16,19 @@ import { api, type Voice } from '../api.ts';
 import { EffortPicker, ModelPicker } from './ModelPicker.tsx';
 import { aiSettings, type AiSettings, aiStatus, connectProvider, disconnectProvider, ensureStatus, providersChanged, refreshStatus, removeCustomProvider, saveCustomProvider, serverName, setAiSettings, statusLabels } from '../ai/index.ts';
 import { allowNotifications, notificationState } from '../notify.ts';
+import { planFreesWatermark } from '../watermark.ts';
 import { preview, previewInfo } from '../preview.ts';
 import { DEFAULT_PREFERENCES, prefs, resetPrefs, setLanguage, setPrefs, settingsOpen, settingsSection, THEMES, type Preferences, type SettingsSection, type ThemeInfo } from '../settings.ts';
 import { S, toast } from '../state.ts';
 import { Modal, NumberField, Select, Seg, Toggle } from './controls.tsx';
 import { Icon } from './icons.tsx';
+import { useListen } from './listen.ts';
+import { shortlistFor, withoutVoice, withVoice } from '../voice-shortlist.ts';
 import { resetSeen, setAutoTours, toursState } from '../tours/index.ts';
 import { LOCALES, locale, m, t } from '../i18n/index.ts';
 import { vaultOrigin } from '../mode.ts';
 import { answerConsent, consent } from '../analytics.ts';
-import { tauri } from '../tauri.ts';
+import { platform, tauri } from '../tauri.ts';
 import { fromVault } from '../vault/link.ts';
 import { Providers as ProviderList, type ProviderActions } from './Providers.tsx';
 import { ViewSwitch } from './views.tsx';
@@ -147,24 +150,6 @@ function Level({ value, min, max, step = 1, unit = 'dB', onChange }: { value: nu
   return <div class="set-number"><NumberField value={value} min={min} max={max} step={step} unit={unit} onCommit={onChange} /></div>;
 }
 
-/** one sound listened to at a time: play(key, url) starts it, or stops it when it is the one playing */
-function useListen() {
-  const [playing, setPlaying] = useState<string | null>(null);
-  const audio = useRef<HTMLAudioElement | null>(null);
-  useEffect(() => () => audio.current?.pause(), []);
-  const stop = () => { audio.current?.pause(); setPlaying(null); };
-  const play = (key: string, url: string) => {
-    audio.current?.pause();
-    if (playing === key) { setPlaying(null); return; }
-    const a = new Audio(url);
-    a.onended = () => setPlaying(null);
-    a.play().catch(() => setPlaying(null));
-    audio.current = a;
-    setPlaying(key);
-  };
-  return { playing, play, stop };
-}
-
 /** the sounds kept in the library shared by the projects: listened to, deleted */
 function SoundLibrary() {
   const [list, setList] = useState<{ name: string; entry?: unknown }[] | null>(null);
@@ -201,6 +186,26 @@ function SoundLibrary() {
   );
 }
 
+/** the voices the voice-over panel offers first, for the provider that speaks: each removed here, added from the search below */
+function VoiceShortlist({ provider }: { provider?: string }) {
+  const p = prefs.value;
+  if (!provider) return null;
+  const list = shortlistFor(provider, p.voiceShortlist, null);
+  return (
+    <Row label={t('settings.voiceShort')} hint={t('settings.voiceShortHint')} stack>
+      <div class="voiceover-short">
+        {list.map((v) => (
+          <span key={v.id} class="tag">
+            {v.name}
+            <button class="icon-btn sm" title={t('settings.voiceShortRemove')} aria-label={t('settings.voiceShortRemove')} onClick={() => setPrefs({ voiceShortlist: withoutVoice(p.voiceShortlist, provider, v.id) })}><Icon name="x" /></button>
+          </span>
+        ))}
+        {!list.length && <span class="faint">{t('settings.voiceShortEmpty')}</span>}
+      </div>
+    </Row>
+  );
+}
+
 /** the voices of the provider chosen, searched by words, language and accent, listened to, one taken for the voice-overs */
 function VoicePicker() {
   const p = prefs.value;
@@ -229,6 +234,9 @@ function VoicePicker() {
               {p.voice === v.id
                 ? <span class="tag ok"><Icon name="check" />{t('settings.voiceChosen')}</span>
                 : <button class="btn sm" onClick={() => setPrefs({ voice: v.id, voiceProvider: v.provider as Preferences['voiceProvider'] })}>{t('settings.voiceUse')}</button>}
+              {!shortlistFor(v.provider, p.voiceShortlist, null).some((x) => x.id === v.id) && (
+                <button class="btn sm ghost" onClick={() => setPrefs({ voiceShortlist: withVoice(p.voiceShortlist, v.provider, { id: v.id, name: v.name }) })}>{t('settings.voiceShortAdd')}</button>
+              )}
             </li>
           ))}
         </ul>
@@ -290,6 +298,7 @@ function Sound() {
           <Select value={voiceModels[p.voiceModel] ? p.voiceModel : ''} options={Object.entries(voiceModels).map(([id, name], i) => [i ? id : '', i ? name : t('settings.voiceModelDefault', { name })])} onChange={(v) => setPrefs({ voiceModel: v })} />
         </Row>
       )}
+      <VoiceShortlist provider={speaker} />
       <VoicePicker />
       <SoundLibrary />
     </Section>
@@ -406,6 +415,9 @@ function Behavior() {
   // a mode that changes the document without asking waits for the user's confirmation below its row
   const [confirming, setConfirming] = useState<'turn' | 'all' | null>(null);
   const [permission, setPermission] = useState(notificationState);
+  // the watermark's switch: only a Plus or Pro plan turns it off
+  const [freed, setFreed] = useState(false);
+  useEffect(() => { void planFreesWatermark().then(setFreed); }, []);
   const notifyOn = (on: boolean) => {
     setAiSettings({ notify: on });
     // asked from the click: the browser shows its question only then
@@ -416,16 +428,22 @@ function Behavior() {
       <Row label={t('settings.notifyDone')} hint={t(NOTIFY_HINT[permission])}>
         <Toggle on={a.notify} onChange={notifyOn} />
       </Row>
-      {tauri && (
+      {platform === 'desktop' && (
         <Row label={t('settings.quickLauncher')} hint={t('settings.quickLauncherHint')}>
           <Toggle on={prefs.value.quickLauncher} onChange={(on) => setPrefs({ quickLauncher: on })} />
         </Row>
       )}
+      <Row label={t('settings.watermark')} hint={freed ? t('settings.watermarkHint') : t('settings.watermarkBasic')}>
+        {freed ? <Toggle on={prefs.value.watermark} onChange={(on) => setPrefs({ watermark: on })} /> : <span class="faint">{t('settings.watermarkAlways')}</span>}
+      </Row>
       <Row label={t('settings.assistantTranscribes')} hint={t('settings.assistantTranscribesHint')}>
         <Toggle on={prefs.value.assistantTranscribes} onChange={(on) => setPrefs({ assistantTranscribes: on })} />
       </Row>
       <Row label={t('settings.assistantFetchesReal')} hint={t('settings.assistantFetchesRealHint')}>
         <Toggle on={prefs.value.assistantFetchesReal} onChange={(on) => setPrefs({ assistantFetchesReal: on })} />
+      </Row>
+      <Row label={t('settings.acceptReadings')} hint={t('settings.acceptReadingsHint')}>
+        <Toggle on={prefs.value.acceptReadings} onChange={(on) => setPrefs({ acceptReadings: on })} />
       </Row>
       <Row label={t('settings.resume')} hint={t('settings.resumeHint')}>
         <Toggle on={a.resume} onChange={(on) => setAiSettings({ resume: on })} />
@@ -524,12 +542,14 @@ function About() {
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <span class="mono">{APP_VERSION}</span>
           {found && <a class="btn sm primary" href={downloadOf(found).href} target="_blank" rel="noopener"><Icon name="download" />{downloadOf(found).direct ? t('update.download') : t('update.release')}</a>}
-          <button class="btn sm" disabled={state === 'looking'} onClick={look}><Icon name={state === 'looking' ? 'spinner' : 'search'} />{state === 'looking' ? t('update.checking') : t('settings.checkNow')}</button>
+          {platform !== 'android' && <button class="btn sm" disabled={state === 'looking'} onClick={look}><Icon name={state === 'looking' ? 'spinner' : 'search'} />{state === 'looking' ? t('update.checking') : t('settings.checkNow')}</button>}
         </div>
       </Row>
-      <Row label={t('settings.checkUpdates')} hint={t('settings.checkUpdatesHint')}>
-        <Toggle on={p.checkUpdates} onChange={(on) => setPrefs({ checkUpdates: on })} />
-      </Row>
+      {platform !== 'android' && (
+        <Row label={t('settings.checkUpdates')} hint={t('settings.checkUpdatesHint')}>
+          <Toggle on={p.checkUpdates} onChange={(on) => setPrefs({ checkUpdates: on })} />
+        </Row>
+      )}
       <Row label={t('settings.usageStats')} hint={t('settings.usageStatsHint')}>
         <Toggle on={consent.value} onChange={(on) => void answerConsent(on)} />
       </Row>
@@ -551,8 +571,8 @@ const GROUPS: { title: () => string; panes: Pane[] }[] = [
       { id: 'models', icon: 'download', title: () => t('localModels.title'), body: LocalModels },
       { id: 'plugins', icon: 'code', title: () => t('plugins.title'), body: Plugins },
       { id: 'tours', icon: 'help', title: () => t('common.guidedTours'), body: Tours },
-      // the native app only: the projects live in a folder of this computer
-      ...(tauri ? [{ id: 'storage' as SettingsSection, icon: 'folder', title: () => t('settings.storage'), body: Storage }] : []),
+      // the computer's app only: the projects live in a folder of this computer (a phone keeps them in the app)
+      ...(platform === 'desktop' ? [{ id: 'storage' as SettingsSection, icon: 'folder', title: () => t('settings.storage'), body: Storage }] : []),
     ],
   },
   {
@@ -562,7 +582,8 @@ const GROUPS: { title: () => string; panes: Pane[] }[] = [
       { id: 'providers', icon: 'key', title: () => t('settings.providers'), body: Providers },
       { id: 'model', icon: 'wand', title: () => t('settings.model'), body: Model },
       { id: 'behavior', icon: 'chat', title: () => t('settings.behavior'), body: Behavior },
-      { id: 'connection', icon: 'link', title: () => t('settings.connection'), body: Connection },
+      // the local companion is a program of a computer: none on a phone
+      ...(platform === 'android' ? [] : [{ id: 'connection' as SettingsSection, icon: 'link', title: () => t('settings.connection'), body: Connection }]),
     ],
   },
   { title: () => t('settings.about'), panes: [{ id: 'about', icon: 'help', title: () => t('settings.about'), body: About }] },

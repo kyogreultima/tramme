@@ -3,13 +3,16 @@
 // (ChatGPT) or the Antigravity CLI. It streams the turn back as NDJSON; each tool
 // call is run here and its result posted back.
 
-import type { ClaudeModel, Engine } from '@tramme/assistant';
+import type { ClaudeModel, Engine, ToolResult } from '@tramme/assistant';
 import type { AiEvent } from '../api.ts';
 import type { ToolRunner } from './tools.ts';
 import { runCall, uid } from './calls.ts';
 import { t } from '../i18n/index.ts';
 
 export interface CompanionLink { url: string; token: string }
+
+/** how often a tool still at work says so to the companion */
+const ALIVE_EVERY = 60_000;
 
 const headers = (link: CompanionLink) => ({ authorization: `Bearer ${link.token}`, 'content-type': 'application/json' });
 
@@ -110,7 +113,10 @@ export async function* companionTurn(
       const id = texts.get(ev.key);
       if (id) yield { type: 'text', id, delta: ev.delta };
     } else if (ev.type === 'tool') {
-      const result = yield* runCall(runner, ev.name, ev.input ?? {}, signal);
+      // told every minute that the tool is still at work, the companion keeps the call open past its silence limit
+      const alive = setInterval(() => { fetch(`${link.url}/tool-alive`, { method: 'POST', headers: headers(link), body: JSON.stringify({ callId: ev.callId }), signal }).catch(() => {}); }, ALIVE_EVERY);
+      let result: ToolResult;
+      try { result = yield* runCall(runner, ev.name, ev.input ?? {}, signal); } finally { clearInterval(alive); }
       await fetch(`${link.url}/tool-result`, { method: 'POST', headers: headers(link), body: JSON.stringify({ callId: ev.callId, result }), signal });
     } else if (ev.type === 'usage') yield { type: 'usage', usage: ev.usage };
     else if (ev.type === 'error') yield { type: 'error', message: ev.message };

@@ -10,8 +10,8 @@
 // When the environment isolates errors (the editor's preview), a layer that
 // fails is drawn as a red frame and reported; the rest of the frame renders.
 
-import { applyMat, DEFAULT_PERSPECTIVE, isTilted, layerMatrix, pathD, tiltPoint, type BlendMode, type Quad, type Lut3D, type PathValue, type EvaluatedFrame, type EvaluatedLayer, type EvaluatedTransform, type Host, type Registry } from '@tramme/core';
-import { glPass, nodeContext, resizeNode, warpQuad } from './gpu.ts';
+import { applyMat, DEFAULT_PERSPECTIVE, isTilted, layerMatrix, pathD, tiltPoint, type BlendMode, type Quad, type Lut3D, type EffectType, type PathValue, type EvaluatedFrame, type EvaluatedLayer, type EvaluatedTransform, type Host, type Registry } from '@tramme/core';
+import { glChain, nodeContext, resizeNode, warpQuad } from './gpu.ts';
 
 const BLEND: Record<BlendMode, GlobalCompositeOperation> = {
   normal: 'source-over', multiply: 'multiply', screen: 'screen', overlay: 'overlay',
@@ -261,20 +261,7 @@ function drawLayer(ctx: CanvasRenderingContext2D, L: EvaluatedLayer, env: DrawEn
     if (masks.length) applyMasks(off, masks, at, env);
     // effect sizes are in composition pixels: they follow the render scale
     const k = env.scale ? (env.scale[0] + env.scale[1]) / 2 : 1;
-    for (const { e, type } of fx) {
-      try {
-        if (type!.gl) {
-          // the layers named by the effect's layer props, drawn alone beside it
-          const inputs: Record<string, CanvasRenderingContext2D | null> = {};
-          for (const [name, d] of Object.entries(type!.props)) if (d.type === 'layer' && typeof e.props[name] === 'string' && e.props[name] !== L.id) inputs[name] = layerPicture(off, e.props[name] as string, env);
-          glPass(off, type!.gl.code, type!.props, e.props, env.t ?? 0, k, Object.fromEntries(Object.entries(inputs).map(([n, c]) => [n, c?.canvas ?? null])), L.layer.in ?? 0, lutsOf(env, L.id));
-          for (const c of Object.values(inputs)) if (c) env.pool.release(c);
-        } else type!.canvas2d?.apply?.(off, e.props, k, env.host(L.id));
-      } catch (err) {
-        if (!env.onError) throw err;
-        env.onError(L.id, new Error(`effect ${e.type}: ${(err as Error).message}`));
-      }
-    }
+    runEffects(off, fx, L, env, k);
     const filter = fx.map(({ e, type }) => type!.canvas2d?.filter?.(e.props, k) ?? '').filter(Boolean).join(' ');
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha *= L.transform.opacity;
@@ -349,6 +336,52 @@ export function filterBox(L: EvaluatedLayer, env: DrawEnv, at: DOMMatrix, fx: { 
   return { x: x0, y: y0, w: Math.max(0, x1 - x0), h: Math.max(0, y1 - y0) };
 }
 
+type LayerFx = { e: EvaluatedLayer['effects'][number]; type: EffectType | null }[];
+
+/**
+ * A layer's effects on its picture, in order. The GLSL ones that follow each
+ * other run as one chain (gpu.ts): uploaded once, passed between in half
+ * floats, so a grade, curves and a LUT in a row lose no precision between
+ * them. An effect drawn by the canvas breaks the chain.
+ */
+function runEffects(off: CanvasRenderingContext2D, fx: LayerFx, L: EvaluatedLayer, env: DrawEnv, k: number) {
+  const fail = (type: string, err: unknown) => {
+    if (!env.onError) throw err;
+    env.onError(L.id, new Error(`effect ${type}: ${(err as Error).message}`));
+  };
+  let run: LayerFx = [];
+  const flush = () => {
+    if (!run.length) return;
+    const chain = run;
+    run = [];
+    // the layers named by the effects' layer props, drawn alone beside it
+    const held: CanvasRenderingContext2D[] = [];
+    try {
+      const steps = chain.map(({ e, type }) => {
+        const layers: Record<string, CanvasImageSource | null> = {};
+        for (const [name, d] of Object.entries(type!.props)) {
+          if (d.type !== 'layer' || typeof e.props[name] !== 'string' || e.props[name] === L.id) continue;
+          const c = layerPicture(off, e.props[name] as string, env);
+          if (c) held.push(c);
+          layers[name] = c?.canvas ?? null;
+        }
+        return { code: type!.gl!.code, schema: type!.props, props: e.props, layers, dither: type!.gl!.dither };
+      });
+      glChain(off, steps, env.t ?? 0, k, L.layer.in ?? 0, lutsOf(env, L.id), env.onError ? (i, err) => fail(chain[i].e.type, err) : undefined);
+    } catch (err) {
+      fail(chain.map((x) => x.e.type).join(' + '), err);
+    } finally {
+      for (const c of held) env.pool.release(c);
+    }
+  };
+  for (const x of fx) {
+    if (x.type!.gl) { run.push(x); continue; }
+    flush();
+    try { x.type!.canvas2d?.apply?.(off, x.e.props, k, env.host(L.id)); } catch (err) { fail(x.e.type, err); }
+  }
+  flush();
+}
+
 /** draw layers over what the context already holds (nested compositions) */
 export function drawLayers(ctx: CanvasRenderingContext2D, layers: EvaluatedLayer[], env: DrawEnv) {
   for (const L of layers) {
@@ -373,19 +406,7 @@ function adjustOver(ctx: CanvasRenderingContext2D, L: EvaluatedLayer, env: DrawE
   off.drawImage(ctx.canvas, 0, 0);
   // effect sizes are in composition pixels: they follow the render scale
   const k = env.scale ? (env.scale[0] + env.scale[1]) / 2 : 1;
-  for (const { e, type } of fx) {
-    try {
-      if (type!.gl) {
-        const inputs: Record<string, CanvasRenderingContext2D | null> = {};
-        for (const [name, d] of Object.entries(type!.props)) if (d.type === 'layer' && typeof e.props[name] === 'string' && e.props[name] !== L.id) inputs[name] = layerPicture(off, e.props[name] as string, env);
-        glPass(off, type!.gl.code, type!.props, e.props, env.t ?? 0, k, Object.fromEntries(Object.entries(inputs).map(([n, c]) => [n, c?.canvas ?? null])), L.layer.in ?? 0, lutsOf(env, L.id));
-        for (const c of Object.values(inputs)) if (c) env.pool.release(c);
-      } else type!.canvas2d?.apply?.(off, e.props, k, env.host(L.id));
-    } catch (err) {
-      if (!env.onError) throw err;
-      env.onError(L.id, new Error(`effect ${e.type}: ${(err as Error).message}`));
-    }
-  }
+  runEffects(off, fx, L, env, k);
   const filter = fx.map(({ e, type }) => type!.canvas2d?.filter?.(e.props, k) ?? '').filter(Boolean).join(' ');
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);

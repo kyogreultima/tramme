@@ -1,5 +1,5 @@
 ---
-// The desktop app, every system's installers side by side, from the latest
+// The app, every system's installers side by side, from the latest
 // release on GitHub (lib/download.ts): where the download button leads when
 // the visitor's system cannot be told (Platform.astro), and where another
 // system's app is chosen. The visitor's system, when known, comes first.
@@ -25,11 +25,13 @@ const FIRST: Localised<Record<Os, string>> = {
     windows: 'Windows may warn about an unknown publisher the first time: choose More info, then Run anyway.',
     mac: 'The app is not notarized by Apple yet. If macOS will not open it, go to System Settings, Privacy & Security, and choose Open Anyway.',
     linux: 'Make the AppImage executable (chmod +x), then run it. The .deb installs with your package manager.',
+    android: 'Android asks to allow installs from your browser the first time. This app and the one on the Play Store cannot update each other: to switch, uninstall one first, and export your projects before, as they live in the app.',
   },
   fr: {
     windows: 'Windows peut signaler un éditeur inconnu au premier lancement : choisissez Informations complémentaires, puis Exécuter quand même.',
     mac: 'L’application n’est pas encore notariée par Apple. Si macOS refuse de l’ouvrir, allez dans Réglages Système, Confidentialité et sécurité, et choisissez Ouvrir quand même.',
     linux: 'Rendez l’AppImage exécutable (chmod +x), puis lancez-la. Le .deb s’installe avec votre gestionnaire de paquets.',
+    android: 'Android demande d’autoriser les installations depuis votre navigateur la première fois. Cette application et celle du Play Store ne peuvent pas se mettre à jour l’une l’autre : pour passer de l’une à l’autre, désinstallez d’abord la première, après avoir exporté vos projets, car ils vivent dans l’application.',
   },
 };
 // what the desktop app and the CLI do about the watermark until the desktop can sign in
@@ -38,8 +40,8 @@ const WATERMARK: Localised<string> = {
   fr: 'Tant que l’application de bureau ne peut pas se connecter à un compte, l’application de bureau et la CLI gardent le filigrane Tramme sur les films exportés, comme avec Basic.',
 };
 const WORDS: Localised<Record<string, string>> = {
-  en: { meta: `The Tramme desktop app for ${systemsLine('en')}: projects in a folder of your computer, keys in its keychain.`, title: 'Download Tramme.', yours: 'Your system', soon: 'Not in this release yet:', releases: 'see the releases', all: 'All releases on GitHub', browser: 'open it in the browser', lead: 'The editor as a desktop app: your projects in a folder of your computer, your keys in its keychain.', version: 'Version', news: 'what is new', or: 'Or', nothing: 'with nothing to install', none: 'There is no release of the desktop app yet. Until then,', none2: 'open Tramme in the browser', none3: ', or follow its', none4: 'releases on GitHub' },
-  fr: { meta: `L’application de bureau Tramme pour ${systemsLine('fr')} : vos projets dans un dossier de votre ordinateur, vos clés dans son trousseau.`, title: 'Télécharger Tramme.', yours: 'Votre système', soon: 'Pas encore dans cette version :', releases: 'voir les versions', all: 'Toutes les versions sur GitHub', browser: 'ouvrez-le dans le navigateur', lead: 'L’éditeur en application de bureau : vos projets dans un dossier de votre ordinateur, vos clés dans son trousseau.', version: 'Version', news: 'les nouveautés', or: 'Ou', nothing: 'sans rien installer', none: 'Il n’y a pas encore de version de l’application de bureau. D’ici là,', none2: 'ouvrez Tramme dans le navigateur', none3: ', ou suivez ses', none4: 'versions sur GitHub' },
+  en: { meta: `The Tramme app for ${systemsLine('en')}: your projects on your device, your keys in its secure storage.`, title: 'Download Tramme.', yours: 'Your system', soon: 'Not in this release yet:', releases: 'see the releases', all: 'All releases on GitHub', browser: 'open it in the browser', lead: 'The editor as an app: your projects on your device, your keys in its secure storage.', version: 'Version', news: 'what is new', or: 'Or', nothing: 'with nothing to install', none: 'There is no release of the desktop app yet. Until then,', none2: 'open Tramme in the browser', none3: ', or follow its', none4: 'releases on GitHub' },
+  fr: { meta: `L’application Tramme pour ${systemsLine('fr')} : vos projets sur votre appareil, vos clés dans son stockage sécurisé.`, title: 'Télécharger Tramme.', yours: 'Votre système', soon: 'Pas encore dans cette version :', releases: 'voir les versions', all: 'Toutes les versions sur GitHub', browser: 'ouvrez-le dans le navigateur', lead: 'L’éditeur en application : vos projets sur votre appareil, vos clés dans son stockage sécurisé.', version: 'Version', news: 'les nouveautés', or: 'Ou', nothing: 'sans rien installer', none: 'Il n’y a pas encore de version de l’application de bureau. D’ici là,', none2: 'ouvrez Tramme dans le navigateur', none3: ', ou suivez ses', none4: 'versions sur GitHub' },
 };
 // a visitor on a Mac, when the macOS app is withheld (apps/desktop/downloads.ts): why there is none, and where to go
 const MAC: Localised<string> = {
@@ -122,10 +124,12 @@ const mb = (bytes: number) => `${Math.round(bytes / 1e6)} MB`;
   /* the visitor's system first, and marked */
   :global(:root[data-os='windows']) [data-for='windows'],
   :global(:root[data-os='mac']) [data-for='mac'],
-  :global(:root[data-os='linux']) [data-for='linux'] { order: -1; border-color: var(--accent); }
+  :global(:root[data-os='linux']) [data-for='linux'],
+  :global(:root[data-os='android']) [data-for='android'] { order: -1; border-color: var(--accent); }
   :global(:root[data-os='windows']) [data-for='windows'] .yours,
   :global(:root[data-os='mac']) [data-for='mac'] .yours,
-  :global(:root[data-os='linux']) [data-for='linux'] .yours { display: inline-block; }
+  :global(:root[data-os='linux']) [data-for='linux'] .yours,
+  :global(:root[data-os='android']) [data-for='android'] .yours { display: inline-block; }
 
   .none { max-width: 40rem; margin-top: clamp(40px, 5vw, 64px); padding: 24px; border: 1px solid var(--line); border-radius: var(--r); background: var(--panel); color: var(--ink-2); }
   /* only a visitor on a Mac sees why there is no app for them */

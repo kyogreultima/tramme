@@ -4,7 +4,7 @@
 
 import { useEffect, useState } from 'preact/hooks';
 import {
-  account, billing, changePassword, checkout, deleteAccount, exportData, linkUrl, manageSubscription, messageFor, plans, PROVIDERS, providerName, refreshAccount,
+  account, billing, changePassword, checkout, deleteAccount, exportData, linkUrl, manageSubscription, messageFor, plans, PROVIDERS, providerName, refreshAccount, sellsHere,
   resendVerification, revokeOtherSessions, signOut, unlinkProvider, updateProfile, type Billing, type PlanTerms, type Provider, type Reply, type UserJson,
 } from '../accounts.ts';
 import { saveBlob } from '../download.ts';
@@ -64,7 +64,7 @@ function PlanSection({ user }: { user: UserJson }) {
   const [offers, setOffers] = useState<PlanTerms[]>([]);
   const [interval, setInterval] = useState<'month' | 'year'>('month');
   const [busy, setBusy] = useState(false);
-  useEffect(() => { billing().then((r) => { if (r.ok) setInfo(r.data); }); plans().then((r) => { if (r.ok) setOffers(r.data.filter((p) => p.id !== 'basic')); }); }, [user.id]);
+  useEffect(() => { billing().then((r) => { if (r.ok) setInfo(r.data); }); if (sellsHere()) plans().then((r) => { if (r.ok) setOffers(r.data.filter((p) => p.id !== 'basic')); }); }, [user.id]);
   if (!info) return null;
 
   const go_ = async (start: Promise<Reply<{ url?: string }>>) => {
@@ -81,10 +81,10 @@ function PlanSection({ user }: { user: UserJson }) {
   }[info.status];
 
   return (
-    <Section title={t('account.space.plan')} hint={t('account.space.planHint')}>
+    <Section title={t('account.space.plan')} hint={sellsHere() ? t('account.space.planHint') : t('account.space.planHintHere')}>
       <Row label={t('account.space.currentPlan')} hint={status}><b>{planName(info.plan)}</b></Row>
       <Row label={t('account.space.credits')} hint={t('account.space.creditsHint')}><span class="mono">{t('account.space.creditsValue', { n: info.credits.toLocaleString(locale) })}</span></Row>
-      {info.status === 'free' || info.status === 'canceled' ? (
+      {!sellsHere() ? null : info.status === 'free' || info.status === 'canceled' ? (
         <>
           <Row label={t('account.space.billingPeriod')}>
             <Seg size="sm" value={interval} options={[['month', t('account.space.monthly')], ['year', t('account.space.yearly')]]} onChange={(v) => setInterval(v as 'month' | 'year')} />

@@ -1,12 +1,12 @@
 {
   "name": "@tramme/worker",
-  "version": "0.22.0",
+  "version": "0.25.0",
   "license": "FSL-1.1-ALv2",
   "private": true,
   "type": "module",
   "dependencies": {
     "@cloudflare/containers": "^0.3.7",
-    "@tramme/api": "*",
-    "@tramme/project": "*"
+    "@tramme/api": "workspace:*",
+    "@tramme/project": "workspace:*"
   }
 }

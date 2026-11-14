@@ -1,0 +1,56 @@
+{
+  "id": "silences",
+  "order": 8,
+  "kind": "sound",
+  "compare": "sweep",
+  "name": {
+    "en": "Silences cut",
+    "fr": "Silences coupés"
+  },
+  "text": {
+    "en": "Two crew members of a NASA analogue mission answering students live, from inside their habitat, with the pauses of people thinking aloud. Tramme hears where the voice is, on the machine (Silero, a voice detector), splits the clip at every pause longer than half a second and lays the spoken parts back to back, keeping a breath around each cut. The waveforms show the pauses gone.",
+    "fr": "Deux membres d’équipage d’une mission analogue de la NASA qui répondent en direct à des élèves, depuis leur habitat, avec les pauses de gens qui réfléchissent à voix haute. Tramme entend où est la voix, sur la machine (Silero, un détecteur de voix), coupe le plan à chaque pause de plus d’une demi-seconde et remet les passages parlés bout à bout, en gardant un souffle autour de chaque coupe. Les formes d’onde montrent les pauses disparues."
+  },
+  "measure": {
+    "en": "60 s of answer to 55.4 s: 4.6 s of pauses taken out in 7 cuts.",
+    "fr": "60 s de réponse pour 55,4 s : 4,6 s de pauses retirées en 7 coupes."
+  },
+  "where": {
+    "en": "Type / and run Cut the silences on the clip.",
+    "fr": "Tapez / et lancez Couper les silences sur le plan."
+  },
+  "settings": {
+    "en": "Cut the silences: pauses longer than 0.5 s, 0.12 s kept on each side of a cut.",
+    "fr": "Couper les silences : pauses de plus de 0,5 s, 0,12 s gardé de chaque côté d’une coupe."
+  },
+  "beforeLabel": {
+    "en": "The answer as filmed",
+    "fr": "La réponse telle que filmée"
+  },
+  "afterLabel": {
+    "en": "Its silences cut",
+    "fr": "Ses silences coupés"
+  },
+  "source": {
+    "page": "https://images.nasa.gov/details/jsc2023m000100_HERA_Groundlink_C6M4_230407-MP4",
+    "file": "https://images-assets.nasa.gov/video/jsc2023m000100_HERA_Groundlink_C6M4_230407-MP4/jsc2023m000100_HERA_Groundlink_C6M4_230407-MP4~large.mp4",
+    "sha256": "ec9ea99d592d8d58eef5483fab8c80d5069f147e9ca8e2834103bf933e68be82",
+    "type": "video",
+    "author": "NASA",
+    "licence": "NASA",
+    "licenceUrl": "https://www.nasa.gov/nasa-brand-center/images-and-media/",
+    "start": 100,
+    "duration": 60
+  },
+  "still": 4,
+  "editor": [
+    {
+      "tool": "silences",
+      "input": {
+        "video": "$asset",
+        "min": 0.5,
+        "keep": 0.12
+      }
+    }
+  ]
+}

@@ -121,10 +121,10 @@ const ENTRIES: Entry[] = [
   },
   {
     topic: 'general',
-    q: q('Which systems does the desktop app run on?', 'Sur quels systèmes tourne l\'application de bureau ?'),
+    q: q('Which systems does the app run on?', 'Sur quels systèmes tourne l\'application ?'),
     a: both(
-      `${systemsLine('en')}. The installers are not signed by a known publisher yet, so the system may ask you to confirm the first launch: the download page says how. On a Mac, Tramme runs in the browser.`,
-      `${systemsLine('fr')}. Les installateurs ne sont pas encore signés par un éditeur connu : le système peut demander de confirmer le premier lancement, la page de téléchargement explique comment. Sur Mac, Tramme fonctionne dans le navigateur.`,
+      `${systemsLine('en')}. The installers are not signed by a known publisher yet, so the system may ask you to confirm the first launch: the download page says how. On a Mac or an iPhone, Tramme runs in the browser.`,
+      `${systemsLine('fr')}. Les installateurs ne sont pas encore signés par un éditeur connu : le système peut demander de confirmer le premier lancement, la page de téléchargement explique comment. Sur Mac ou iPhone, Tramme fonctionne dans le navigateur.`,
     ),
   },
 ];

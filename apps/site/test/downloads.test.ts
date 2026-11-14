@@ -10,18 +10,27 @@ afterEach(() => vi.unstubAllGlobals());
 describe('the systems the app is offered for', () => {
   it('leave macOS out while its app cannot be installed (it is not signed)', () => {
     expect(WITHHELD).toEqual(['mac']);
-    expect(OFFERED_SYSTEMS).toEqual(['windows', 'linux']);
-    expect(OFFERED_INSTALLERS.map((i) => i.os)).toEqual(['windows', 'linux', 'linux']);
+    expect(OFFERED_SYSTEMS).toEqual(['windows', 'linux', 'android']);
+    expect(OFFERED_INSTALLERS.map((i) => i.os)).toEqual(['windows', 'linux', 'linux', 'android']);
   });
 
   it('are still all built: the release carries every installer, so that offering one again is a change of one line', () => {
     expect(INSTALLERS.some((i) => i.os === 'mac')).toBe(true);
-    expect(Object.keys(SYSTEMS)).toEqual(['windows', 'mac', 'linux']);
+    expect(Object.keys(SYSTEMS)).toEqual(['windows', 'mac', 'linux', 'android']);
   });
 
   it('are named in a line, in each language', () => {
-    expect(systemsLine('en')).toBe('Windows and Linux');
-    expect(systemsLine('fr')).toBe('Windows et Linux');
+    expect(systemsLine('en')).toBe('Windows, Linux and Android');
+    expect(systemsLine('fr')).toBe('Windows, Linux et Android');
+  });
+});
+
+describe('the Android app', () => {
+  it('is the signed .apk of the release, under its stable name, named by the CI that built it', () => {
+    expect(OFFERED_INSTALLERS.some((i) => i.file === 'tramme-android.apk')).toBe(true);
+    const apk = INSTALLERS.find((i) => i.os === 'android')!;
+    expect(apk).toMatchObject({ suffix: '.apk', kind: 'APK', built: '' });
+    expect(SYSTEMS.android).toBe('Android');
   });
 });
 
@@ -31,7 +40,7 @@ describe('the release the site offers', () => {
     vi.stubGlobal('fetch', async () => new Response(JSON.stringify({ tag_name: 'v1.2.3', html_url: 'https://example.test/r', assets }), { status: 200 }));
     const { latestRelease } = await import('../src/lib/download');
     const release = await latestRelease(() => {});
-    expect(release?.installers.map((i) => i.os)).toEqual(['windows', 'linux', 'linux']);
+    expect(release?.installers.map((i) => i.os)).toEqual(['windows', 'linux', 'linux', 'android']);
     expect(release?.installers.every((i) => !/macos|\.dmg/i.test(i.href))).toBe(true);
   });
 });
@@ -67,6 +76,43 @@ describe('the release the beta site offers', () => {
 
   it('is never offered by the stable site, which keeps GitHub\'s latest release', async () => {
     serve([release('v1.3.0-beta.7', { prerelease: true })], release('v1.2.3'));
+    const { latestRelease } = await import('../src/lib/download');
+    expect((await latestRelease(() => {}))?.version).toBe('1.2.3');
+  });
+});
+
+describe('the release a workflow has just published (RELEASE_TAG)', () => {
+  const assets = INSTALLERS.map((i) => ({ name: i.file, size: 1_000_000 }));
+  const release = (tag: string, over: object = {}) => ({ tag_name: tag, html_url: `https://example.test/${tag}`, assets, draft: false, prerelease: false, ...over });
+  // GitHub's list and "latest" still show the release before; the new one is only found by its tag
+  const serve = (just: unknown, before: unknown) => vi.stubGlobal('fetch', async (url: string) => {
+    const u = String(url);
+    if (u.includes('/releases/tags/')) return new Response(JSON.stringify(just), { status: 200 });
+    return new Response(JSON.stringify(u.endsWith('/releases/latest') ? before : [before]), { status: 200 });
+  });
+  afterEach(() => vi.unstubAllEnvs());
+
+  it('is the beta site\'s build, though GitHub\'s list does not show it yet', async () => {
+    vi.stubEnv('RELEASE_TAG', 'v1.3.0-beta.11');
+    serve(release('v1.3.0-beta.11', { prerelease: true }), release('v1.3.0-beta.8', { prerelease: true }));
+    const { latestRelease } = await import('../src/lib/download');
+    const found = await latestRelease(() => {}, 'beta');
+    expect(found?.version).toBe('1.3.0-beta.11');
+    expect(found?.installers.every((i) => i.href.includes('/releases/download/v1.3.0-beta.11/'))).toBe(true);
+  });
+
+  it('is the stable site\'s release, though GitHub\'s "latest" is still the one before, and linked through "latest"', async () => {
+    vi.stubEnv('RELEASE_TAG', 'v1.3.0');
+    serve(release('v1.3.0'), release('v1.2.3'));
+    const { latestRelease } = await import('../src/lib/download');
+    const found = await latestRelease(() => {});
+    expect(found?.version).toBe('1.3.0');
+    expect(found?.installers.every((i) => i.href.includes('/releases/latest/download/'))).toBe(true);
+  });
+
+  it('is passed over when it is not of the site\'s channel', async () => {
+    vi.stubEnv('RELEASE_TAG', 'v1.3.0-beta.11');
+    serve(release('v1.3.0-beta.11', { prerelease: true }), release('v1.2.3'));
     const { latestRelease } = await import('../src/lib/download');
     expect((await latestRelease(() => {}))?.version).toBe('1.2.3');
   });

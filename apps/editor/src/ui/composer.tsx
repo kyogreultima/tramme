@@ -61,7 +61,7 @@ export function useCommandMenu(text: string, commands: Command[], onPick: (c: Co
  * says whether the key was the menu's; `sync` reads the caret again after the
  * user typed or moved it.
  */
-export function useMentionMenu(area: RefObject<HTMLTextAreaElement>, text: string, setText: (v: string) => void, list: Mentionable[]) {
+export function useMentionMenu(area: RefObject<HTMLTextAreaElement | null>, text: string, setText: (v: string) => void, list: Mentionable[]) {
   const [q, setQ] = useState<{ from: number; query: string } | null>(null);
   const [hi, setHi] = useState(0);
   const sync = () => { const el = area.current; setQ(el ? mentionQuery(el.value, el.selectionStart ?? el.value.length) : null); setHi(0); };
@@ -172,7 +172,7 @@ export interface ComposerProps {
   /** the studio's list of retouches: the words become an item (true when taken), what waits, and the way to send it all */
   list?: { count: number; onAdd: (text: string, voice: boolean) => boolean; onSendAll: () => void };
   /** the box, for those who focus it from outside */
-  area?: RefObject<HTMLTextAreaElement>;
+  area?: RefObject<HTMLTextAreaElement | null>;
   /** the tour's name for the box */
   tour?: string;
 }
@@ -244,7 +244,7 @@ export function Composer({ placeholder, anchor, tools, context, onSent, area: gi
         <textarea ref={area} rows={1} value={text}
           onPaste={(e) => { const imgs = Array.from(e.clipboardData?.files ?? []).filter((f) => f.type.startsWith('image/')); if (imgs.length) { e.preventDefault(); join(imgs); } }}
           placeholder={available ? placeholder : t('assistant.unavailableSlash')}
-          role="combobox" aria-expanded={menu} aria-autocomplete="list"
+          aria-autocomplete="list"
           onInput={(e) => { setText((e.target as HTMLTextAreaElement).value); commandMenu.typed(); mention.sync(); }}
           onClick={mention.sync}
           onKeyDown={keyDown} />

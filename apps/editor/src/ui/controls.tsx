@@ -28,6 +28,30 @@ export type MenuItem = MenuEntry | { section: string } | 'sep';
 
 const menuState = signal<{ x: number; y: number; items: MenuItem[] } | null>(null);
 
+/** beyond this many entries a menu gets a search field, and its height is capped */
+const LONG_MENU = 14;
+
+const isEntry = (it: MenuItem): it is MenuEntry => it !== 'sep' && !('section' in it);
+const fold = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+
+/** whether an entry's label or detail holds the query (case and accents ignored) */
+export const menuMatches = (it: MenuEntry, query: string): boolean => fold(`${it.label} ${it.detail ?? ''}`).includes(fold(query.trim()));
+
+/** the entries whose label or detail holds the query, each under its section (the separators go); all of them for an empty query */
+export function filterMenu(items: MenuItem[], query: string): MenuItem[] {
+  if (!query.trim()) return items;
+  const out: MenuItem[] = [];
+  let section: MenuItem | null = null;
+  for (const it of items) {
+    if (it === 'sep') continue;
+    if (!isEntry(it)) { section = it; continue; }
+    if (!menuMatches(it, query)) continue;
+    if (section) { out.push(section); section = null; }
+    out.push(it);
+  }
+  return out;
+}
+
 export function openMenu(e: { clientX: number; clientY: number } | DOMRect, items: MenuItem[]) {
   const x = 'clientX' in e ? e.clientX : e.left;
   const y = 'clientY' in e ? e.clientY : e.bottom + 4;
@@ -99,12 +123,21 @@ export function MenuHost() {
   const m = menuState.value;
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ x: 0, y: 0 });
+  const [query, setQuery] = useState('');
+  const long = !!m && m.items.filter(isEntry).length > LONG_MENU;
   useLayoutEffect(() => {
     if (!m || !ref.current) return;
-    const r = ref.current.getBoundingClientRect();
-    setPos({ x: Math.max(8, Math.min(m.x, innerWidth - r.width - 8)), y: Math.max(8, Math.min(m.y, innerHeight - r.height - 8)) });
-    // the keyboard starts on the first entry
-    setTimeout(() => ref.current?.querySelector<HTMLButtonElement>('.menu-item:not([disabled])')?.focus());
+    setQuery('');
+    // inside the window, placed again when it changes size (a phone's keyboard)
+    const place = () => {
+      const r = ref.current?.getBoundingClientRect();
+      if (r) setPos({ x: Math.max(8, Math.min(m.x, innerWidth - r.width - 8)), y: Math.max(8, Math.min(m.y, innerHeight - r.height - 8)) });
+    };
+    place();
+    addEventListener('resize', place);
+    // the keyboard starts on the search of a long menu, else on the first entry; a touch screen focuses nothing (its keyboard would cover the menu)
+    if (!handheld()) setTimeout(() => ref.current?.querySelector<HTMLElement>(long ? '.menu-search input' : '.menu-item:not([disabled])')?.focus());
+    return () => removeEventListener('resize', place);
   }, [m]);
   useEffect(() => {
     if (!m) return;
@@ -119,11 +152,26 @@ export function MenuHost() {
   if (!m) return null;
   // when some items have an icon, the others keep its place: labels stay aligned
   const iconed = m.items.some((it) => it !== 'sep' && !('section' in it) && it.icon && it.icon !== 'check');
+  const shown = long ? filterMenu(m.items, query) : m.items;
   return (
-    <div class="menu" ref={ref} style={{ left: pos.x, top: pos.y }} role="menu">
-      {m.items.map((it, i) => it === 'sep' ? <hr key={i} /> : 'section' in it ? <div class="menu-label" key={i}>{it.section}</div> : (
-        <MenuButton key={i} it={it} iconed={iconed} onPick={() => { menuState.value = null; it.onClick(); }} />
-      ))}
+    <div class={`menu${long ? ' long' : ''}`} ref={ref} style={{ left: pos.x, top: pos.y }} role="menu">
+      {long && (
+        <div class="menu-search">
+          <div class="field">
+            <Icon name="search" />
+            <input value={query} placeholder={t('common.findInMenu')} aria-label={t('common.findInMenu')} spellcheck={false}
+              onInput={(e) => setQuery((e.target as HTMLInputElement).value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { const first = filterMenu(m.items, query).find(isEntry); if (first && !first.disabled) { menuState.value = null; first.onClick(); } } }} />
+          </div>
+        </div>
+      )}
+      {/* a long menu scrolls its entries under a search that stays put */}
+      <div class={long ? 'menu-list' : 'menu-entries'}>
+        {long && !shown.some(isEntry) && <div class="menu-label">{t('common.noMatch')}</div>}
+        {shown.map((it, i) => it === 'sep' ? <hr key={i} /> : 'section' in it ? <div class="menu-label" key={i}>{it.section}</div> : (
+          <MenuButton key={i} it={it} iconed={iconed} onPick={() => { menuState.value = null; it.onClick(); }} />
+        ))}
+      </div>
     </div>
   );
 }
@@ -145,18 +193,39 @@ export function bandOf(el: Element, from: { clientX: number; clientY: number }, 
   return { band, ids };
 }
 
+/** the phone's layout (one column, the tabs at the bottom): the width the editor's stylesheets switch at */
+export const phoneLayout = (): boolean => typeof matchMedia === 'function' && matchMedia('(max-width: 760px)').matches;
+
+/** a touch screen (a phone, a tablet): fingers rather than a pointer, a keyboard that covers half the screen when a field takes the focus */
+export const handheld = (): boolean => typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+
 // ── popover ──────────────────────────────────────────────────
 export function Popover({ anchor, onClose, children, class: cls = '', align = 'left' }: { anchor: HTMLElement; onClose: () => void; children: ComponentChildren; class?: string; align?: 'left' | 'right' }) {
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ x: number; top?: number; bottom?: number; max: number } | null>(null);
   useLayoutEffect(() => {
-    const a = anchor.getBoundingClientRect(), r = ref.current!.getBoundingClientRect();
-    let x = align === 'right' ? a.right - r.width : a.left;
-    x = Math.max(8, Math.min(x, innerWidth - r.width - 8));
-    // below the anchor when it fits, otherwise above; neither: the side with more room, scrolled inside
-    const below = innerHeight - a.bottom - 14, above = a.top - 14;
-    const down = r.height <= below || (r.height > above && below >= above);
-    setPos(down ? { x, top: a.bottom + 6, max: below } : { x, bottom: innerHeight - a.top + 6, max: above });
+    const place = () => {
+      const el = ref.current;
+      if (!el) return;
+      // its natural size, not the one a previous placement capped
+      const capped = el.style.maxHeight;
+      el.style.maxHeight = '';
+      const a = anchor.getBoundingClientRect(), r = el.getBoundingClientRect();
+      el.style.maxHeight = capped;
+      let x = align === 'right' ? a.right - r.width : a.left;
+      x = Math.max(8, Math.min(x, innerWidth - r.width - 8));
+      // below the anchor when it fits, otherwise above; neither: the side with more room, scrolled inside
+      const below = innerHeight - a.bottom - 14, above = a.top - 14;
+      const down = r.height <= below || (r.height > above && below >= above);
+      setPos(down ? { x, top: a.bottom + 6, max: below } : { x, bottom: innerHeight - a.top + 6, max: above });
+    };
+    place();
+    // placed again when the window changes size (a phone's keyboard opening or closing halves or doubles the room)
+    // and when its content does (a list arriving after it opened)
+    addEventListener('resize', place);
+    const grown = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => place());
+    if (ref.current) grown?.observe(ref.current);
+    return () => { removeEventListener('resize', place); grown?.disconnect(); };
   }, [anchor]);
   useEffect(() => {
     const close = (e: Event) => { if (!ref.current?.contains(e.target as Node) && !anchor.contains(e.target as Node)) onClose(); };
@@ -302,7 +371,7 @@ export function Select({ value, options, onChange, title }: { value: string; opt
   const [open, setOpen] = useState<HTMLElement | null>(null);
   const [active, setActive] = useState(-1);
   const listRef = useRef<HTMLDivElement>(null);
-  const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+  const coarse = handheld();
   const entries = options.map((o) => ({ value: optValue(o), label: optLabel(o) }));
   const current = entries.find((o) => o.value === value);
   useEffect(() => {
@@ -461,14 +530,15 @@ export function useSize(key: string, initial: number, min: number, max: number) 
 }
 
 /** a dialog over the page; Escape or a click outside closes it */
-export function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: ComponentChildren; wide?: boolean }) {
+/** `above`: over the popovers and menus too, for a dialog that answers a gesture made in one (the phone's save sheet after an export) */
+export function Modal({ title, onClose, children, wide, above }: { title: string; onClose: () => void; children: ComponentChildren; wide?: boolean; above?: boolean }) {
   useEffect(() => {
     const key = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     addEventListener('keydown', key);
     return () => removeEventListener('keydown', key);
   }, [onClose]);
   return (
-    <div class="modal-back" onPointerDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div class={`modal-back${above ? ' above' : ''}`} onPointerDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div class={`modal${wide ? ' wide' : ''}`} role="dialog" aria-label={title}>
         <div class="modal-head"><span>{title}</span><button class="icon-btn sm" title={t('common.close')} onClick={onClose}><Icon name="x" /></button></div>
         {children}

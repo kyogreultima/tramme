@@ -22,7 +22,7 @@ describe('keys kept without a server (the key vault)', () => {
   it('names no server secret when there is no server', async () => {
     expect((await loadKeys(store())).how(['openai'])).toBe('connect it in Settings, Providers');
     const withSecrets = await loadKeys(store(), { read: () => undefined, name: (p) => `${p.toUpperCase()}_API_KEY` });
-    expect(withSecrets.how(['openai', 'gemini'], 'one')).toBe('connect one in Settings, Providers (or npx wrangler secret put OPENAI_API_KEY or GEMINI_API_KEY)');
+    expect(withSecrets.how(['openai', 'gemini'], 'one')).toBe('connect one in Settings, Providers (or pnpm exec wrangler secret put OPENAI_API_KEY or GEMINI_API_KEY)');
   });
 });
 

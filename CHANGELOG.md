@@ -8,6 +8,110 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-11-14
+
+### Added
+
+- **The Tramme watermark**: exported films (MP4, WebM, GIF, PNG, 10 bits) carry the Tramme mark, all white, in the bottom right corner; every 12 s the whole logo opens from it, stays for a few seconds and closes back. It is always there on Basic and without an account; on Plus and Pro it is on by default and a switch in Settings, Behavior turns it off. The first export that carries it says so. The command line's renders and stills carry it too.
+- **Talking videos dressed on the words**: before the first insert, the assistant sets one graphic charter for the whole video (a plate, an accent and a backdrop taken from the colours of the room, the grain over it), then reads the moments of what is said (the figures, comparisons, lists, names, questions and new parts, each with the moment its words are said) and builds full-frame inserts that replace the face and tell a small story on those words. Section titles can be written with the voice, each word appearing as it is said. The check now names a keyword that appears after its word is said, an insert that holds still for 2.5 s while the voice goes on, and two inserts in a row built the same way; the review does not pass a talking video until they are fixed, and holds it to 3 s of stillness instead of 4.
+- **A voice-over from words**, next to the microphone in the timeline: type what to say, pick one of five voices chosen to differ (warm, deep narrator, lively, soft, clear), each heard on a sample sentence in your language (made once, kept in the sound library), and the take lands on a new voice track at the playhead, the music ducked under it and the voice cleanup on it, in one undo. The whole library stays one click away, and the five voices offered are a list you edit in the Sound settings.
+- **Smooth slow motion with RIFE**: in the Models settings, the slow motion can make its frames with RIFE, a network that learned how things move between two frames (21.6 MB, MIT), instead of the built-in block matching. It runs in the browser, on the graphics card, and goes on on the processor if the card stops. The frames are made at the film's size (a 4K clip in a 1080p film at 1080p), and in overlapping tiles above 1080p.
+- Menus and panels that grow after they open (a list arriving) are placed again, so they never run off the screen.
+- **Remake a reference** (`/remake`): give a video, a gif or a Lottie you like, add your logo, screens, footage and words, and the assistant makes the same video around them. It reads how the reference is made (its shots cut to the frame, its music, the places where content sits, its moves, its transitions, its colours and its type, the camera measured on its pixels), shows you that reading scene by scene to correct (an asset to choose for each place, a scene to remove or merge), then plans the film on it, timed on your own music when you give one. The review checks the film against the reference: the scenes, their lengths, the cuts on the beats, the places filled, and never a word, a logo or a picture of the reference. A setting goes on without showing the reading first.
+
+## [0.24.0] - 2026-11-13
+
+### Added
+
+- Colour grading as a colourist's tools do it, in a new Colour category of effects:
+  - **Colour grading** (`fx.grade`) develops a clip: a camera's log (Sony S-Log3, Panasonic V-Log, ARRI LogC3, Apple Log, Canon Log 3, HLG) read into scene light with its gamut, then brought to the screen with its hues kept: colours outside the screen's range pulled in instead of turning cyan, highlights rolling off toward white instead of clipping; white balance (temperature, tint); exposure in stops; contrast, highlights, shadows, whites and blacks, masked by the brightness around each pixel so a window does not halo the wall beside it; texture, clarity and dehaze; vibrance that spares the skin, and saturation; colour wheels over the shadows, mid tones and highlights, and a global one, with their balance and blending; a fade.
+  - **HSL** (`fx.hsl`) moves each of eight colours alone (hue, saturation, luminance), the greys untouched.
+  - **Hue curves** (`fx.huecurves`): hue against hue, saturation and luminance, saturation by luminance and by saturation, edited on a curve with the hues along its foot.
+  - **Colour isolation** (`fx.secondary`) picks a colour with the dropper (a sky, a skin, a shirt), softens its matte, and corrects it alone, or everything but it; its matte can be viewed.
+  - **Film look** (`fx.film`: halation, bloom, grain in the mid tones) and a **Vignette** for a clip (`fx.vignette`).
+  - Eight **colour looks**, ready-made grades put on the selected clips in one tap (Natural pop, Teal and orange, Warm film, Golden hour, Cool night, Bleach bypass, Faded matte, Black and white); on a phone they are tiles of the Effects tab.
+  - The scopes add the RGB parade and the histogram beside the waveform (the one chosen is remembered), and show for every effect of the Colour category.
+- The assistant knows when to use each grading effect, and reads a camera's log through `fx.grade` instead of a conversion LUT.
+- The anime example is a new film, Paper Wings: a paper plane at sunset in four shots, drawn frame by frame (clouds lit from the side, the plane banking, telephone wires, a town with its windows lit), animated with sequences, parallax and a camera push.
+- A proof of the assistant's work: one message turned a NASA raw take of 60 s into a 48 s film (cuts, captions, keywords, pictures over the talk, a title, sound) in 12.7 minutes, shown first, with its sound.
+- A second proof of the assistant's work: one message turned five minutes of a NASA talk into three vertical shorts (42, 21 and 33 s), each framed on the speaker, captioned word by word, opening on a hook, in 42 minutes for $1.04; the clip plays the start of each in turn.
+- Seven more proofs on real footage: a label that follows a car (tracking), a 16:9 walk made vertical with the frame on the man (reframe), a leap at a quarter speed with the frames between made by Tramme (slow motion), a portrait's skin smoothed at 100 % (retouch), a 640 × 480 photo enlarged by Real-ESRGAN (upscaling), two shots of one bridge by two cameras given one look (matching), and the pauses of a live answer cut (silences, 60 s to 55.4 s).
+- The landing page shows three of the proofs, each opening its comparison on the features page.
+- The features page shows features on real footage, before and after (Before and after): a line dragged between the two pictures, the clip, where the tool is in the app and the footage's credit. The first are colour grading on an ungraded Apple Log clip, keying on a green-screen take, a photo in 2.5D a title passing behind a person filmed without a green screen (all from Pexels), and a voice cleaned of a street's noise, 15 dB lower, played before or after at the same instant (from Wikimedia Commons), and word-by-word captions on a NASA interview.
+
+### Changed
+- The landing shows an editor at work: in Features, an edit playing on real footage (a viewer cutting to the shot under a playhead, a title and a grade clip over it, a click moves the playhead); each Animation card shows its idea moving (a key easing along its curve, a wiggle, a loop and a spring, a layer following another, a palette the shapes follow); one selection going through the toolbox, tool after tool; Export plays a shot beside its formats, each holding its frame (the vector ones drawn, Lottie moving); the platform shows one project on a computer and a phone. Everything plays only on screen, stands still with reduced motion, and loads only as it comes near: a video's poster now waits too.
+- Online (personal mode), the providers in the settings sit on the dialog's own background: the key vault's page drew a grey slab of its own over the glass themes' translucent dialog (the theme's wallpaper, then an opaque fill meant to hide it), where the editor run locally draws them itself.
+- A proof's line shows one picture on each side, up to the frame's rounded edge: the before was whole under the after, and its colour bled through the smoothed edge (a thin green line around the keyed take).
+- The 2.5D proof compares the photo flat and in relief at one framing (the same scale, the parallax taken off the before) from a source twice as wide, so its picture is as sharp as the photo: the after was the photo enlarged by a third beside the whole photo, and read as softer.
+- A photo in 2.5D takes no depth of field by default: a blurred background read as a softer picture, not as depth (fx.depthBlur stays at hand). The depth parallax leaves the photo as it is at rest: a pan moves the near more than the far, a push in grows the near by as much as it zooms, and nothing shrinks the far. It used to grow the near around the middle even when the camera only panned (a rock at the frame's edge, pushed 120 px off the water, left its outline echoed over it), and to shrink the far past the frame's edge (a mountain mirrored into the sky).
+- Matching the look of a shot matches a camera's cast whole and its brightness and contrast only so far (0.1 and ×0.8 to ×1.25), black kept within 0.05: two angles of one scene show different things, and matching their spread whole lifted and tinted the blacks of the darker one (a tree against the sky turned olive).
+
+- A layer's GLSL effects in a row run as one chain on the GPU: the layer is uploaded once and the effects hand their result to each other in half floats, so a grade, curves and a LUT stacked lose nothing between them; the result is dithered as it goes back to 8 bits, so a pushed sky no longer bands.
+- A large effect's settings are folded into groups in the inspector (a grade's light, its presence, its colour wheels…), and an effect has a button that puts it back at rest. A curve's square double-clicked goes back to rest too.
+- LUT, Curves, Colour wheels and Colour correction sit in the Colour category, and the menu that adds an effect is in sections by category.
+- On a phone, the colour wheels and curves are larger, for a finger.
+- The chroma key reads a green or blue screen by colour difference: hair and motion blur come out half transparent, and the screen's colour is taken out of those edges, which keep the subject's own colour.
+
+### Fixed
+- The closing section of the site's pages stays centred: its title and line were styled by a bare h2 and p, which weigh as much as the global reset, and whichever loaded last won.
+- Matching the look of a clip just added reads its picture once the preview has loaded it: run at once, it said "the picture cannot be read yet".
+- The first frame of a render waits up to 2 minutes for its videos, the others 20 s: two render pages opening a 4K source of 170 MB at once stopped on "frame 0 never finished". A segments' folder Windows still holds no longer hides the render's own error.
+
+- A long tool call made through the companion stays open while the editor is at work on it: transcribing a 5-minute video took more than the 15 minutes the companion waited, and the assistant got "the editor did not answer". The editor now says every minute that the tool is still running; the 15 minutes count from its last word.
+- The command line's picture checks measure text closer to how it is drawn: capitals, a heavy weight and the tracking make it wider, narrow letters and spaces thinner. A keyword in black capitals running to the frame's edges passed the safe-zone check; a title in lower case was flagged when it fitted.
+- A photo in 2.5D moves in depth as the camera pans: the parallax follows the camera's pan (it followed only its zoom, so a sideways drift slid the whole photo in one piece), the near shifting more than the far. A depth pushed past the picture's edge shows the picture mirrored instead of a smeared edge, the photo is framed for the drift as well as for its relief, and its depth of field keeps the near subject sharp with a light blur far away (it blurred everything but the middle depth).
+- Footage holds its own frame across the motion blur's shutter: with the composition's motion blur on (the editor's default), a filmed clip blended two of its frames where the shutter straddled them, which doubled a face and showed a title through a cut-out subject.
+- The French interface writes 2,5D with a decimal comma.
+- Cut the silences takes the pauses out: it removed only 0.24 s from the middle of each, whatever its length; it hears where the voice is in the sound (the voice detector the hesitations use), since a transcript's word timings stretch over the pauses and hid most of them, so it no longer needs a transcription first; and it works on a clip that shows part of its file, where it made an invalid document.
+- The editor no longer stops saving after one of its own saves met another: a save asked (Ctrl+S, a version, leaving for the home) while the automatic one was on its way was refused as a change made elsewhere, and the saving stopped for the rest of the session, every later change lost. The saves now go one after the other, each naming the version the last one made.
+- A nested composition is heard: the sounds of the videos and sounds inside it play in the film that holds it, in the preview and the exports, at its time, speed and loop (they were silent).
+- A long film renders again in the editor and from the command line: its document, a few hundred thousand values well under 64 MB, was refused by the plugins' sandbox as too large (the launch film among the examples).
+
+## [0.23.0] - 2026-11-12
+
+### Added
+
+- Tramme on Android: the desktop app's crate also builds as an Android app (`.apk` offered by the site, `.aab` for the Play Store), built and signed on CI only. The editor runs in local mode with the projects and the keys on the phone (the keys under the Android Keystore), imports from the gallery, exports a long video to a file instead of memory, then saves it to the gallery or the downloads or shares it; the back button closes, goes back, then leaves. It sells nothing and shows no update notice.
+- `remove-bg` cuts a whole set of pictures out in one call (`images`), each saved as its own asset.
+- The assistant's `write_file` changes a passage of a file (`find`) instead of writing a long plugin whole again.
+- A plugin's tool reads the project's pictures, sounds and fonts with `ctx.readFile(path)`, through the editor: in the desktop app its sandbox could not fetch them (Origyn: a plugin written five times over).
+- A film plan written again takes only what changes (`change` for some scenes, by name); the rest of the plan is kept.
+- `node bench/run.ts <brief>` runs a brief of the bench alone on the trial server, through the companion, and stops the turn once its cost passes a cap; three short briefs join the bench (a logo sting, a short data film, vertical kinetic type).
+- The critic measures the film's rhythm on its rendered frames: a stretch of 4 s or more where nothing moves, or a film standing still more than half its time, is a defect it never lets pass; how much of the frame the subject fills and how many different pictures the film shows are given to it to weigh. The bench records the same measures for each run (`--pictures` picks the picture provider of a run), and a brief that dresses a filmed talking-head video joins it, its footage kept on the machine.
+- The Windows installer has its own icon: the app's tile rising from an open box.
+
+### Changed
+
+- The critic is harsh: it scores idea, composition, scale, material, rhythm, motion and finish, and a film is done only when every one reaches 8. It no longer takes a small subject in an empty frame, a long hold or flat plates for a choice of style, and it judges a dressed video on what its inserts show and how often the picture changes.
+- The assistant's guide holds what makes a film look made in any style (one visual idea that comes back, a dominant element that uses the frame, scale changing from shot to shot, something new every 2 to 4 s), and how a talking video is edited like the big channels (inserts that show what is said, in varied forms, the speaker's framing changing, a look taken from the room).
+- Claude works at the Medium effort by default instead of High: on the bench, with the changes below, four films of different kinds cost 62 % less and came out at least as good. A level chosen for a model stays as it is.
+- The assistant costs less per film, for the same work:
+  - its system prompt no longer changes with the project: the brief, the film plan and the installed plugins travel with the message, again only when they changed, so writing a brief or a plan no longer throws the conversation out of the cache;
+  - the guides only some work needs (a video where someone speaks, shorts, sources, clips, node plugins, stock, sequences, tracking…) are read on demand, and the system prompt that every request reads is a third shorter;
+  - the inputs of the tools the instructions name ride in the cached prompt, so the model no longer fetches their schemas mid-turn;
+  - the vocabulary's full entries leave out what only the interface uses (a field's panel group, its slider step, a label repeating its name);
+  - a scene built apart is no longer sent to read the whole film plan, its own beats being in its message;
+  - a proposal's answer carries the quality checks of its composition, so the contact sheet is asked for once a scene is built rather than after every proposal;
+  - a tool's input with a plain slip (an object where a text is wanted, a single value where a list is, a number written as text, an option in another case, a number past its bound) is read and told, not refused;
+  - a portrait still, contact sheet or motion strip is sized by its longest side, like a landscape one, instead of being three times heavier.
+- The dependencies are on their latest stable versions, Preact 11 among them. The command boxes are plain text boxes to screen readers, as HTML allows a text area to be, no longer comboboxes.
+- The repository works with pnpm instead of npm (`pnpm install`, `pnpm dev`, `pnpm test`; `corepack enable` gives the version package.json names): each package declares what it imports, only the dependencies the project needs run install scripts, and no version younger than a day is taken.
+
+### Fixed
+
+- Style frames and pictures made by Gemini work again: the picture model is now read from Google's list instead of a name that no longer existed, which made every style frame fail.
+- The style frames and the end of a scene find a scene by its name or a word only it holds, not only by its exact id.
+- A turn stopped half way keeps the line of what it spent.
+- A plugin's check with the name of one of its tools runs (the stick figure's pose check said it was "a tool, called as a check" in every review).
+- A film's music made by ElevenLabs is no longer refused when its prompt is long, nor for being asked as instrumental beside its plan.
+- The site offers the build that has just come out: it read GitHub's list of releases, which can still show the one before for a minute.
+
+### Security
+
+- The desktop app writes its archives with zip 9, past four advisories of the zip crate (RUSTSEC-2026-0367, -0368, -0369, -0429).
+- No dependency carries a known vulnerability: undici and Puppeteer are raised under the web scenes' engine, which stays on its pinned version.
+
 ## [0.22.0] - 2026-11-10
 
 ### Added
@@ -788,7 +892,10 @@ First public release.
 
 - Cloudflare Worker serving the editor and the API, projects stored in R2, access protected by Cloudflare Access.
 
-[Unreleased]: ../../compare/v0.22.0...HEAD
+[Unreleased]: ../../compare/v0.25.0...HEAD
+[0.25.0]: ../../compare/v0.24.0...v0.25.0
+[0.24.0]: ../../compare/v0.23.0...v0.24.0
+[0.23.0]: ../../compare/v0.22.0...v0.23.0
 [0.22.0]: ../../compare/v0.21.0...v0.22.0
 [0.21.0]: ../../compare/v0.20.0...v0.21.0
 [0.20.0]: ../../compare/v0.19.0...v0.20.0

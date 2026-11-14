@@ -270,6 +270,17 @@ class Preview {
     if (this.wanted !== this.applied) this.sync();
   }
 
+  /** once the document shown is the latest one, its files loaded (a clip just added, a tool reading its picture); `limit` ms at most */
+  async settled(limit = 60_000): Promise<boolean> {
+    const t0 = performance.now();
+    if (!this.renderer) return false;
+    while (this.busy || this.wanted !== this.applied) {
+      if (performance.now() - t0 > limit) return false;
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    return true;
+  }
+
   /** load a module asset again (a plugin edited on disk) */
   async reload(assetIds: string[]) {
     if (!this.renderer) return;
@@ -427,6 +438,8 @@ class Preview {
       } else {
         const frame = r.render(t, { samples: 1, checker: true });
         this.docSamples = frame.motionBlur.samples;
+        // a project heavier than the room: the pictures of the next seconds are brought in
+        if (S.playing.peek()) r.prefetch(t);
         // a video frame still decoding: drawn again as soon as it is there
         if (r.incomplete) r.settle().then((waited) => { if (waited && !S.playing.peek()) this.invalidate(); });
         // a layer or effect that failed is drawn as a red frame: say which and why

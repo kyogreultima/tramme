@@ -1,0 +1,23 @@
+# The project's packages (pnpm, see CONTRIBUTING.md): the apps and the libraries.
+packages:
+  - apps/*
+  - packages/*
+
+# The dependencies whose install scripts run: each fetches or builds something the
+# project uses (esbuild's binary, wrangler's workerd, Puppeteer's Chrome for the web
+# scenes, ffmpeg, onnxruntime-node's native library). protobufjs only checks its version.
+allowBuilds:
+  esbuild: true
+  ffmpeg-static: true
+  onnxruntime-node: true
+  protobufjs: false
+  puppeteer: true
+  workerd: true
+
+# Versions forced below a dependency, past known vulnerabilities: the web scenes'
+# engine stays on its pinned version (docs/web-scenes-roadmap.md), its undici and
+# Puppeteer do not; wrangler's miniflare takes the same undici.
+overrides:
+  '@hyperframes/engine>undici': 7.30.2
+  '@hyperframes/engine>puppeteer': 25.17.0
+  'miniflare>undici': 7.30.2

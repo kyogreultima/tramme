@@ -6,6 +6,7 @@ import Page from '../../components/Page.astro';
 import Hero from '../../components/Hero.astro';
 import Showcase from '../../components/Showcase.astro';
 import Materials from '../../components/Materials.astro';
+import ProofStrip from '../../components/ProofStrip.astro';
 import Inside from '../../components/Inside.astro';
 import Tools from '../../components/Tools.astro';
 import Render from '../../components/Render.astro';
@@ -32,6 +33,7 @@ const data = landingData(Astro.site!, previewUrl(Astro.site), systems, locale);
   <Showcase locale={locale} />
   */}
   <Materials locale={locale} />
+  <ProofStrip locale={locale} />
   <Inside locale={locale} />
   <Tools locale={locale} />
   <Render locale={locale} />

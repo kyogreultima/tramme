@@ -4,6 +4,17 @@ fn main() {
     tauri_build::build();
     backend_origin();
     measurement_id();
+    android_pages();
+}
+
+/// The Android library's segments aligned on 16 KB pages: Google Play requires it of the
+/// 64-bit libraries, and Android 15 devices with 16 KB pages refuse to load one aligned on
+/// 4 KB, which NDK r27 does unless asked. A link argument of the build script, not a
+/// rustflag: the Tauri CLI sets its own RUSTFLAGS, which override a .cargo/config's.
+fn android_pages() {
+    if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("android") {
+        println!("cargo:rustc-link-arg=-Wl,-z,max-page-size=16384");
+    }
 }
 
 /// The audience-measurement property's id, written once, in brand/analytics.ts

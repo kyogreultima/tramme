@@ -1,11 +1,11 @@
 {
   "name": "@tramme/assistant",
-  "version": "0.22.0",
+  "version": "0.25.0",
   "license": "FSL-1.1-ALv2",
   "private": true,
   "type": "module",
   "exports": { ".": "./src/index.ts" },
   "dependencies": {
-    "zod": "^4.6.5"
+    "zod": "^4.6.7"
   }
 }

@@ -1,6 +1,6 @@
 # Packs
 
-The plugin packs that ship with the editor: one self-contained file each in `plugins/`, added to a project from the Code section, their commands in the `/` menu from the home screen on. Each brings nodes (layers only it can draw), tools (a whole thing laid out in one move) and checks (what the review flags). This page is generated from the packs themselves by `npm run packs:index` — do not edit it by hand.
+The plugin packs that ship with the editor: one self-contained file each in `plugins/`, added to a project from the Code section, their commands in the `/` menu from the home screen on. Each brings nodes (layers only it can draw), tools (a whole thing laid out in one move) and checks (what the review flags). This page is generated from the packs themselves by `pnpm packs:index` — do not edit it by hand.
 
 ## Motion loops
 

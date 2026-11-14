@@ -10,7 +10,7 @@
 
 - [ ] The base branch is `develop` (`main` only for a release or an urgent fix)
 - [ ] The title follows Conventional Commits (`feat(editor): …`): it becomes the commit
-- [ ] `npm test` and `npm run typecheck` pass
+- [ ] `pnpm test` and `pnpm typecheck` pass
 - [ ] New interface text goes through `t()` with a key in `en.json` and `fr.json`
 - [ ] Works on small screens and touch, if the interface changed
 - [ ] `CHANGELOG.md` updated, if users will notice the change

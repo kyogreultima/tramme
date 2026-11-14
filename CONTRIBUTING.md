@@ -12,16 +12,16 @@ By taking part, you agree to the [code of conduct](CODE_OF_CONDUCT.md). For a se
 
 ## Setup
 
-Node 24 or newer. Chrome is needed for command-line renders. Rust is needed for the desktop storage test: without `cargo` on the PATH those tests are skipped, and CI (which has Rust) makes sure they still run somewhere.
+Node 24 or newer, and pnpm: `corepack enable` gives the version `packageManager` names in package.json. Chrome is needed for command-line renders. Rust is needed for the desktop storage test: without `cargo` on the PATH those tests are skipped, and CI (which has Rust) makes sure they still run somewhere.
 
 ```sh
-npm install
-npm test            # unit tests (Vitest)
-npm run typecheck
-npm run dev         # the editor on http://localhost:8787/
+pnpm install
+pnpm test  # unit tests (Vitest)
+pnpm typecheck
+pnpm dev   # the editor on http://localhost:8787/
 ```
 
-`npm run dev` runs the Worker locally with simulated storage in `.wrangler/state`. Model keys for the assistant go in `apps/worker/.dev.vars` (copy `apps/worker/.dev.vars.example`), which git ignores. More in [docs/deploy.md](docs/deploy.md).
+`pnpm dev` runs the Worker locally with simulated storage in `.wrangler/state`. Model keys for the assistant go in `apps/worker/.dev.vars` (copy `apps/worker/.dev.vars.example`), which git ignores. More in [docs/deploy.md](docs/deploy.md).
 
 ## Where things are
 
@@ -67,7 +67,7 @@ Nobody pushes to `develop` or `main` directly: everything goes through a pull re
 
 1. Fork the repository (or, with write access, work in the repository itself) and create a branch from `develop`: `git switch -c feat/timeline-snapping origin/develop`.
 2. Keep each pull request focused on one change. Open it as a draft for early feedback.
-3. Make sure `npm test` and `npm run typecheck` pass.
+3. Make sure `pnpm test` and `pnpm typecheck` pass.
 4. Open the pull request against `develop`. Its title follows [Conventional Commits](https://www.conventionalcommits.org/): `type(scope): summary`, the type among `feat`, `fix`, `docs`, `test`, `refactor`, `perf`, `chore`, `ci`, `build`, `style`, `revert`, the scope optional (`editor`, `core`, `render`, `cli`, `worker`, `desktop`, `site`…). A check enforces it: pull requests are squashed, so the title becomes the commit on `develop`. The branch's own commits can say anything.
 5. Add a line to the `Unreleased` section of [CHANGELOG.md](CHANGELOG.md) when the change is visible to users.
 6. Describe what changed and why, and how you tested it. Add a screenshot for interface changes.
@@ -85,6 +85,25 @@ Maintainers release what `develop` holds:
 The desktop workflow ([.github/workflows/desktop.yml](.github/workflows/desktop.yml)) then finds a version on `main` without a tag: it builds the app on Windows, macOS and Linux, publishes the GitHub release `v0.12.0` with that changelog section as its notes, and deploys the site again. No tag to push by hand: the workflow makes it.
 
 An urgent fix to the released version starts from `main` instead: a `fix/…` branch with the fix and a patch version (`node scripts/version.ts 0.11.2`), merged into `main`, which releases it the same way. A pull request from `main` into `develop` (a merge commit too) then brings it back; in the changelog, keep both sides.
+
+## Android
+
+The Android app is the desktop crate built for Android (`apps/desktop`, the Kotlin in `apps/desktop/plugin-device`). The released `.apk` and `.aab` are built and signed on CI only: the generated Android project is not committed, CI makes it and builds it ([.github/workflows/android.yml](.github/workflows/android.yml), called by the desktop and desktop-beta workflows).
+
+**On a phone, from your machine.** Install JDK 17, the Android command-line tools (platform-tools, `platforms;android-36`, `build-tools;36.0.0`, `ndk;27.2.12479018`, the same NDK as CI) and `rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android`; set `JAVA_HOME`, `ANDROID_HOME` and `NDK_HOME`; on Windows, turn on the developer mode (the CLI links the built library into the project). Then, once, `pnpm tauri android init --ci` and copy `apps/desktop/src-tauri/icons/android/` over `apps/desktop/src-tauri/gen/android/app/src/main/res/` (as CI does). With the phone plugged in, USB debugging on: `pnpm android:build --apk --debug --target aarch64` then `adb install -r` the `.apk` it names, or `pnpm android:dev`; `adb logcat` tells why the app stops. Without a USB driver for the phone, wireless debugging works: `adb pair <ip:port> <code>` (the port `adb mdns services` lists), then `adb connect <ip:port>`. The Android icons are written by `node scripts/app-icons.ts`.
+
+**The upload key, once.** Set the repository secrets `ANDROID_KEYSTORE_PASSWORD` and `ANDROID_KEY_PASSWORD`, run the workflow *Android upload key* by hand (it makes `upload.jks`, certificate `CN=Tramme, O=Qualris`, alias `tramme`), download its artifact, and store `base64 -w0 upload.jks` as `ANDROID_KEYSTORE_BASE64` and `tramme` as `ANDROID_KEY_ALIAS`. Keep a copy of the file offline and delete the artifact. If the key is lost, Google can reset the upload key (Play App Signing holds the real one).
+
+**What a run produces.**
+
+- With the four secrets (`ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`): a signed `tramme-android.apk`, published in the GitHub release next to the computers' installers (the stable one from `main`, a prerelease from `develop` for the beta), which the site offers on its download page; and a signed `tramme-<version>.aab` in the run's artifacts (`android-private`), for the Play Console. The signing step fails unless the certificate names Qualris.
+- Without them: an unsigned debug `.apk` in the run's artifacts, a notice, and nothing Android in the release. The rest of the release goes on.
+
+**The Play Console.** Download `android-private` from the run of the release, upload the `.aab` to a release of the app (Play App Signing on). The beta is its own product, *Tramme Beta* (`app.tramme.beta`), installable next to the stable app; the store listing, the privacy policy and the content rating are the owner's.
+
+**The `.apk` of the site and the Play Store's cannot update each other** (not signed by the same key): moving from one to the other means uninstalling first, and the projects stored in the app go with it unless exported. The download page says so.
+
+**Checks on a phone**, with the `.apk` from the site: create a project; import a video from the gallery; edit; export a 9:16 video of at least 60 seconds without a crash; find it in the gallery and share it; sign in to the account; save a provider key, close the app and reopen it, the assistant still works; the back button closes a menu or a dialog first, then goes back, then leaves the app; no purchase entry point shows anywhere.
 
 ## License and sign-off
 

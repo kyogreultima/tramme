@@ -8,7 +8,7 @@
 
 import { installed, offIn } from '../installed.ts';
 import { computed, signal } from '@preact/signals';
-import { addUsage, claudeModels, defaultClaudeModel, parseApiModels, setClaudeModels, type ClaudeModel, type Usage, CLI_DEFAULT, COMPANION_PORT, EFFORTS, effortFor, effortLevels, ENGINE_MODELS, ENGINES, engineOf, LOCAL_URL, modelLabel, modelName, NO_USAGE, pickModel, PROVIDER_LABEL, providerOf, readableModel, REMOTE, setModelLabels, joinSystem, queuedPrompt, setTranslator, slotOf, systemParts, userPrompt, type Effort, type Engine, type TurnContext } from '@tramme/assistant';
+import { addUsage, claudeModels, defaultClaudeModel, parseApiModels, setClaudeModels, type ClaudeModel, type Usage, CLI_DEFAULT, COMPANION_PORT, EFFORTS, effortFor, effortLevels, ENGINE_MODELS, ENGINES, engineOf, LOCAL_URL, modelLabel, modelName, NO_USAGE, pickModel, PROVIDER_LABEL, providerOf, readableModel, REMOTE, setModelLabels, joinSystem, namedTools, queuedPrompt, setTranslator, slotOf, systemParts, userPrompt, withProject, type Effort, type Engine, type TurnContext } from '@tramme/assistant';
 import { CHAT, CHAT_INDEX, chatPath } from '@tramme/project';
 import type { TrammeDoc } from '@tramme/core';
 import reference from '../../../../docs/document.md';
@@ -16,13 +16,17 @@ import { api, type AiEvent, type ChatItem, type KeyedProvider, type KeyStatus, t
 import { propose, S, toast } from '../state.ts';
 import { companionModels, companionTurn, NO_ENGINES, pairCompanion, probeCompanion, stopCompanion, type CompanionState, type Engines } from './companion.ts';
 import { passes, pause, recallDetails, ServerSession, type Message } from './server.ts';
-import { harvestNote, realNote } from './answers.ts';
+import { harvestNote, realNote, toolSignatures } from './answers.ts';
 import { realWanted } from '../stock.ts';
 import { ToolRunner } from './tools.ts';
+import { BRIEF_PATH } from '../brief.ts';
 import { criticModel, freshTurn, type Via } from './consult.ts';
 import { assemblyNote, runScenes } from './scenes-run.ts';
 import { todoScenes, type PlanScene } from '../filmplan.ts';
-import { consultsOf, resetCritic, setCriticHost } from '../critic/tool.ts';
+import { consultsOf, countConsult, resetCritic, setCriticHost } from '../critic/tool.ts';
+import { setReadingHost } from '../reading/tool.ts';
+import { alone, askReading } from '../confirm.ts';
+import { prefs } from '../settings.ts';
 import { runCall, uid } from './calls.ts';
 import { clip } from '../model.ts';
 import { FILM_PLAN_PATH, parsePlan, planText } from '../filmplan.ts';
@@ -42,7 +46,7 @@ export interface AiSettings {
   token: string;
   /** where local models answer (OpenAI format): Ollama by default, LM Studio on :1234 */
   localUrl: string;
-  /** the effort level chosen for each model that has levels; none chosen: high for Claude, the model's own default for the others */
+  /** the effort level chosen for each model that has levels; none chosen: DEFAULT_EFFORT (medium) for Claude, the model's own default for the others */
   efforts: Record<string, Effort>;
   /** tell the user when a turn is over (a notification when the editor is in the background) */
   notify: boolean;
@@ -355,7 +359,8 @@ export function watchCompanion(): () => void {
 export interface ChatMeta { id: string; title: string; created: string; modified: string; count: number }
 
 const runner = new ToolRunner();
-let session: { companion?: string; server: ServerSession } = { server: new ServerSession() };
+/** given: the project's note (brief, plan, installed plugins) as this conversation last read it, sent again only when it changes */
+let session: { companion?: string; server: ServerSession; given?: string } = { server: new ServerSession() };
 let created = '';
 
 export const chat = signal<ChatItem[]>([]);
@@ -525,6 +530,7 @@ function viaFor(route: Route, model: string): Via {
   };
 }
 setCriticHost({ via: criticVia, rounds: () => aiSettings.peek().criticRounds });
+setReadingHost({ via: criticVia, counted: countConsult, accepted: () => prefs.peek().acceptReadings || alone(), ask: (r, stills, assets) => askReading(r, stills, assets.map((x) => ({ id: x.id, name: x.name ?? x.id }))) });
 
 /** one user message; yields the assistant's events */
 export async function* ask(p: AskPayload, signal: AbortSignal): AsyncGenerator<AiEvent> {
@@ -562,11 +568,11 @@ export async function* ask(p: AskPayload, signal: AbortSignal): AsyncGenerator<A
   // a conversation saved before the engines holds Claude's session alone
   const kept = session.companion && !session.companion.includes(':') ? `claude:${session.companion}` : session.companion;
   const resumed = route === 'companion' && engine && kept?.startsWith(`${engine}:`) ? kept.slice(engine.length + 1) : undefined;
-  if (route === 'companion' ? !resumed : !session.server.messages.length) notes.unshift(...earlier());
-  const prompt = p.queued ? queuedPrompt(p.queued.map((m) => ({ text: m.text, ctx: m.context })), notes) : userPrompt(p.text, p.context, notes);
-  // the project's brief, when there is one, rides in the system prompt: the assistant follows it from the first word
-  let brief: string | null = null;
-  try { brief = (await api.readText(project.id, 'assets/brief.json'))?.text ?? null; } catch { brief = null; }
+  const fresh = route === 'companion' ? !resumed : !session.server.messages.length;
+  if (fresh) notes.unshift(...earlier());
+  // the project's brief, when there is one, is given with the first message: the assistant follows it from the first word
+  const readBrief = async () => (await api.readText(project.id, BRIEF_PATH).catch(() => null))?.text ?? undefined;
+  const brief = await readBrief();
   if (!current()) return;
   // the film plan rides beside it: the kinds of picture, the scenes and the direction the assistant follows
   let plan: string | undefined;
@@ -577,8 +583,13 @@ export async function* ask(p: AskPayload, signal: AbortSignal): AsyncGenerator<A
   const mine = installed.peek().filter((x) => x.enabled && !offHere.includes(x.manifest.id)).map((x) => `${x.manifest.name}${x.manifest.description ? `: ${x.manifest.description}` : ''}`);
   // the packs that ship with the editor, each entry in a line by need: reachable without being in the project
   const packs = await shippedPacks();
-  // the part that is the same for every project first: the Messages API caches it apart; the other routes get the same text in one piece
-  const system = systemParts(reference, brief ?? undefined, mine, packLines(packs), plan);
+  // the inputs of the editor's own tools the prompt names: the same for every project, they ride in the cached part
+  const signatures = toolSignatures(S.registry.peek(), namedTools(reference));
+  // the system prompt is the part that is the same for every project and every turn; the project's part goes with the message, when it changed
+  const parts = systemParts(reference, brief, mine, packLines(packs), plan, signatures), system = { fixed: parts.fixed, variable: '' };
+  const told = fresh || session.given !== parts.variable ? parts.variable : '';
+  session.given = parts.variable;
+  const prompt = withProject(p.queued ? queuedPrompt(p.queued.map((m) => ({ text: m.text, ctx: m.context })), notes) : userPrompt(p.text, p.context, notes), told);
   const target = route === 'local' ? { url: localBase() } : route === 'remote' ? { url: `/api/llm/${encodeURIComponent(slotOf(model))}` } : undefined;
   // Claude by its model id; a command line by its own model name, none for its default
   const asked = engine === 'claude' ? model : modelName(model) === CLI_DEFAULT ? '' : modelName(model);
@@ -598,48 +609,65 @@ export async function* ask(p: AskPayload, signal: AbortSignal): AsyncGenerator<A
   /** the tool calls of the scenes built apart: their own lines hold them, the director's does not */
   let apart = 0;
   if (!current()) return;
-  yield* resuming(attempt, signal, tally);
-  if (!current()) return;
-  // a film planned this turn with scenes to build is built scene by scene, each in a fresh context, then assembled in this one
-  if (aiSettings.peek().scenesApart === 'auto' && !signal.aborted) {
-    const readPlan = async () => {
-      const result = await api.readText(project.id, FILM_PLAN_PATH).catch(() => null);
-      return current() ? parsePlan(result?.text) : null;
-    };
-    const planned = await readPlan();
+  // the turn, then its scenes built apart and their assembly; a stop ends it, and the usage line below still tells what was spent
+  const work = async function* (): AsyncGenerator<AiEvent> {
+    yield* resuming(attempt, signal, tally);
     if (!current()) return;
-    // the plan must be this turn's: an old plan does not start a run on an unrelated message
-    if (planned && Date.parse(planned.updated) >= started && todoScenes(planned, runner.liveDoc()).run.length >= 3) {
-      const sceneSystem = systemParts(reference, brief ?? undefined, mine, packLines(packs), planText(planned));
-      const via = viaFor(route, model);
-      // what each scene's turn used, for its own line and to leave out of the director's
-      const sceneUse = new Map<string, { tools: number; images: number }>();
-      const sceneTurn = (scenePrompt: string, scene: PlanScene) => (async function* (): AsyncGenerator<AiEvent> {
-        if (!current()) return;
-        const own = new ServerSession(), mine2: Tally = { usage: NO_USAGE, seen: 0, reported: false }, before = runner.calls;
-        let sid: string | undefined;
-        runner.scope = { comp: scene.comp!, root: S.doc.peek().root, tokens: [] };
-        try {
-          yield* resuming((again) => freshTurn({ prompt: again && (route !== 'companion' || sid) ? again : scenePrompt, system: sceneSystem, tools: true, via, runner, signal, effort, cacheTtl, session: own, sessionId: again ? sid : undefined, onSession: (id) => { sid = id; } }), signal, mine2);
-        } finally { runner.scope = null; sceneUse.set(scene.id, { tools: runner.calls - before, images: mine2.seen }); }
-        yield { type: 'usage', usage: mine2.usage };
-      })();
-      const result = yield* runScenes({
-        plan: planned, doc: () => runner.liveDoc(), turn: sceneTurn, read: readPlan,
-        save: async (p) => {
-          if (!current()) throw new Error('the project changed while the plan was being saved');
-          await api.write(project.id, FILM_PLAN_PATH, JSON.stringify(p, null, 1));
-          if (!current()) throw new Error('the project changed while the plan was being saved');
-        },
-        line: (scene, u, ms) => ({ ...u, tools: sceneUse.get(scene.id)?.tools ?? 0, images: sceneUse.get(scene.id)?.images ?? 0, ms, model, route: USAGE_ROUTE[route], scene: scene.name }),
-        signal,
-      });
+    // a film planned this turn with scenes to build is built scene by scene, each in a fresh context, then assembled in this one
+    if (aiSettings.peek().scenesApart === 'auto' && !signal.aborted) {
+      const readPlan = async () => {
+        const result = await api.readText(project.id, FILM_PLAN_PATH).catch(() => null);
+        return current() ? parsePlan(result?.text) : null;
+      };
+      const planned = await readPlan();
       if (!current()) return;
-      for (const u of sceneUse.values()) apart += u.tools;
-      if (!signal.aborted) yield* resuming(attempt, signal, tally, assemblyNote(result));
+      // the plan must be this turn's: an old plan does not start a run on an unrelated message
+      if (planned && Date.parse(planned.updated) >= started && todoScenes(planned, runner.liveDoc()).run.length >= 3) {
+        // the brief and the plan as the director left them: each scene reads them with its first message, under the same system prompt as every turn
+        const briefNow = (await readBrief()) ?? brief;
+        if (!current()) return;
+        const sceneParts = systemParts(reference, briefNow, mine, packLines(packs), planText(planned, { scene: true }), signatures);
+        const via = viaFor(route, model);
+        // what each scene's turn used, for its own line and to leave out of the director's
+        const sceneUse = new Map<string, { tools: number; images: number }>();
+        const sceneTurn = (scenePrompt: string, scene: PlanScene) => (async function* (): AsyncGenerator<AiEvent> {
+          if (!current()) return;
+          const own = new ServerSession(), mine2: Tally = { usage: NO_USAGE, seen: 0, reported: false }, before = runner.calls;
+          let sid: string | undefined;
+          runner.scope = { comp: scene.comp!, root: S.doc.peek().root, tokens: [] };
+          try {
+            yield* resuming((again) => freshTurn({ prompt: again && (route !== 'companion' || sid) ? again : withProject(scenePrompt, sceneParts.variable), system, tools: true, via, runner, signal, effort, cacheTtl, session: own, sessionId: again ? sid : undefined, onSession: (id) => { sid = id; } }), signal, mine2);
+          } finally {
+            runner.scope = null;
+            sceneUse.set(scene.id, { tools: runner.calls - before, images: mine2.seen });
+            apart += runner.calls - before;
+          }
+          yield { type: 'usage', usage: mine2.usage };
+        })();
+        const result = yield* runScenes({
+          plan: planned, doc: () => runner.liveDoc(), turn: sceneTurn, read: readPlan,
+          save: async (p) => {
+            if (!current()) throw new Error('the project changed while the plan was being saved');
+            await api.write(project.id, FILM_PLAN_PATH, JSON.stringify(p, null, 1));
+            if (!current()) throw new Error('the project changed while the plan was being saved');
+          },
+          line: (scene, u, ms) => ({ ...u, tools: sceneUse.get(scene.id)?.tools ?? 0, images: sceneUse.get(scene.id)?.images ?? 0, ms, model, route: USAGE_ROUTE[route], scene: scene.name }),
+          signal,
+        });
+        if (!current()) return;
+        if (!signal.aborted) {
+          // the director assembles with the plan as the scenes left it, told only when it moved
+          const after = systemParts(reference, briefNow, mine, packLines(packs), planText((await readPlan()) ?? planned), signatures).variable;
+          if (!current()) return;
+          const changed = after !== session.given ? after : '';
+          session.given = after;
+          yield* resuming(attempt, signal, tally, withProject(assemblyNote(result), changed));
+        }
+      }
     }
-  }
-  if (!current()) return;
+  };
+  try { yield* work(); } catch (e) { if (!signal.aborted) throw e; }
+  if (!sameFileProject(project)) return;
   const { usage, seen, reported } = tally;
   const harvest = harvestNote([...runner.wrotePlugins]);
   if (harvest) yield { type: 'item', item: { id: uid(), role: 'assistant', text: harvest } };

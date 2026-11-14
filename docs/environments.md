@@ -4,7 +4,7 @@ Where Tramme lives, by environment. Every link from the site to the app (sign up
 
 | Environment | Website | App | When |
 |---|---|---|---|
-| `local` | `http://localhost:4321` | `http://localhost:8787` | `npm run site` and `npm run dev`: a dev server means local |
+| `local` | `http://localhost:4321` | `http://localhost:8787` | `pnpm site` and `pnpm dev`: a dev server means local |
 | `beta` | `https://beta.tramme.dev` | `https://beta.app.tramme.dev` | `TRAMME_ENV=beta` |
 | `production` | `https://tramme.dev` | `https://app.tramme.dev` | a build with no `TRAMME_ENV` |
 
@@ -17,9 +17,9 @@ Tramme has two deployed environments, beta and production. Their addresses are i
 - Without any: `local` while a dev server runs, `production` for a build.
 
 ```
-TRAMME_ENV=beta npm run site:build                    # the site's links lead to beta.app.tramme.dev
-TRAMME_ENV=beta node apps/editor/build.ts             # the app's links lead to beta.tramme.dev
-TRAMME_ENV=local TRAMME_APP_URL=http://localhost:8790 npm run site   # the app is on another port here
+TRAMME_ENV=beta pnpm site:build                                  # the site's links lead to beta.app.tramme.dev
+TRAMME_ENV=beta node apps/editor/build.ts                        # the app's links lead to beta.tramme.dev
+TRAMME_ENV=local TRAMME_APP_URL=http://localhost:8790 pnpm site  # the app is on another port here
 ```
 
 ## What reads it
@@ -40,10 +40,10 @@ For `local`, the backend's `.env.example` (private repository) and `apps/worker/
 
 Two repositories deploy beta, on every push to `develop`. This one is public; the accounts backend and the billing live in the private `tramme-platform`, which holds this one as its `tramme` submodule.
 
-- The site: `.github/workflows/beta.yml` here, once the checks pass (`npm run site:deploy:beta`: Worker `tramme-site-beta`, custom domain `beta.tramme.dev`, built with `TRAMME_ENV=beta`).
+- The site: `.github/workflows/beta.yml` here, once the checks pass (`pnpm site:deploy:beta`: Worker `tramme-site-beta`, custom domain `beta.tramme.dev`, built with `TRAMME_ENV=beta`).
 - The app: the same workflow then sends the event `public-develop` to `tramme-platform`, whose Beta workflow builds the editor with `TRAMME_ENV=beta`, builds the backend's image and deploys the Worker `tramme-beta` (`beta.app.tramme.dev`, and `cles.beta.app.tramme.dev` for the key vault) from `deploy/wrangler.jsonc`, with this repository's Worker as is.
 
-Secrets: `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` in both repositories; `PLATFORM_DISPATCH_TOKEN` here (a fine-grained token with Contents read and write on `tramme-platform` only). The backend's own secrets are given once, in Cloudflare: `npx wrangler secret put <NAME> --env beta -c deploy/wrangler.jsonc` from the platform repository, for `APP_KEY`, `DATABASE_URL` (its own database), `EDGE_SECRET`, `INTERNAL_SECRET`, `SMTP_PASSWORD` (and the OAuth ones when they exist).
+Secrets: `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` in both repositories; `PLATFORM_DISPATCH_TOKEN` here (a fine-grained token with Contents read and write on `tramme-platform` only). The backend's own secrets are given once, in Cloudflare: `pnpm exec wrangler secret put <NAME> --env beta -c deploy/wrangler.jsonc` from the platform repository, for `APP_KEY`, `DATABASE_URL` (its own database), `EDGE_SECRET`, `INTERNAL_SECRET`, `SMTP_PASSWORD` (and the OAuth ones when they exist).
 
 ## Which backend each build talks to
 
@@ -54,4 +54,4 @@ Secrets: `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` in both repositories
 
 `.github/workflows/desktop-beta.yml`, run on `develop` when the app's version changes (`tauri.conf.json`), and by hand from the Actions tab: the checks, then Windows and Linux builds with `TRAMME_ENV=beta`, published as the prerelease `vX.Y.Z-beta.N`, then the beta site deployed again so that it offers it (`apps/site/src/lib/download.ts` takes the latest prerelease on the beta, GitHub's latest release on production; with no prerelease yet the beta offers the latest release).
 
-The beta app is its own product, **Tramme Beta** (identifier `app.tramme.desktop.beta`, set through `TAURI_CONFIG`): it installs beside Tramme and does not replace it. Both associate with `.tramme` files; the last one installed opens them. macOS is left out, as in the stable release, until the app is signed. The stable app never sees a beta build: its update check, like the site's, reads GitHub's latest release, which skips prereleases.
+The beta app is its own product, **Tramme Beta** (identifier `app.tramme.desktop.beta`, set through `TAURI_CONFIG`, which the workflows hand to the Tauri CLI as `--config`: the CLI does not read the variable, and an installer built without it is Tramme's, replacing the stable app): it installs beside Tramme and does not replace it. Both associate with `.tramme` files; the last one installed opens them. macOS is left out, as in the stable release, until the app is signed. The stable app never sees a beta build: its update check, like the site's, reads GitHub's latest release, which skips prereleases.

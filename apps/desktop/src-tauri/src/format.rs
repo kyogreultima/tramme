@@ -3,7 +3,6 @@
 // (manifest, paths, mime, ids, a fresh project). The meaning of the document
 // stays checked by the editor, where it runs — this side only parses JSON.
 
-use rand::Rng;
 use serde::{Deserialize, Serialize};
 use unicode_normalization::UnicodeNormalization;
 
@@ -248,8 +247,7 @@ pub fn new_id(name: &str) -> String {
     let base: String = base.chars().take(40).collect();
     let base = if base.chars().count() < 3 { "project" } else { base.as_str() };
     const DIGITS: &[u8] = b"0123456789abcdefghijklmnopqrstuvwxyz";
-    let mut rng = rand::thread_rng();
-    let suffix: String = (0..6).map(|_| DIGITS[rng.gen_range(0..36)] as char).collect();
+    let suffix: String = (0..6).map(|_| DIGITS[rand::random_range(0..36)] as char).collect();
     format!("{base}-{suffix}")
 }
 
@@ -377,8 +375,8 @@ mod tests {
 
     #[test]
     fn ids_read_from_the_name() {
-        assert_eq!(new_id("Mon Projet Été!").starts_with("mon-projet-ete-"), true);
-        assert_eq!(new_id("ab").starts_with("project-"), true);
+        assert!(new_id("Mon Projet Été!").starts_with("mon-projet-ete-"));
+        assert!(new_id("ab").starts_with("project-"));
         let id = new_id("x");
         assert!(valid_id(&id), "{id}");
     }

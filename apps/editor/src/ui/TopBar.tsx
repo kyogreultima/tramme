@@ -6,7 +6,7 @@ import { pointer, stringifyDoc, type TrammeDoc } from '@tramme/core';
 import { DOCUMENT } from '@tramme/project';
 import { api } from '../api.ts';
 import { confirmWith } from '../confirm.ts';
-import { saveBlob } from '../download.ts';
+import { saveBlob, saveLabel } from '../download.ts';
 import { fileProject, requireFileProject, sameFileProject, safeName, takenPaths, upload, type FileProject } from '../files.ts';
 import { canRedo, canUndo, comp, commit, redo, redoLabel, S, saveNow, toast, undo, undoLabel } from '../state.ts';
 import { ago, contentEnd, fmtSeconds, snap } from '../model.ts';
@@ -281,8 +281,8 @@ function ExportPop({ anchor, onClose }: { anchor: HTMLElement; onClose: () => vo
         <div style={{ color: 'var(--ok)' }}>{t('topbar.doneInSS', { s: state.seconds.toFixed(1) })}</div>
         <div class="mono faint" style={{ fontSize: 11, userSelect: 'text', wordBreak: 'break-all' }}>{state.name} · {t('topbar.nMb', { n: (state.blob.size / 1e6).toFixed(2) })}</div>
         {state.warnings.length > 0 && <ul class="export-warn">{state.warnings.map((w) => <li key={w}>{w}</li>)}</ul>}
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-          <button class="btn sm" onClick={() => saveBlob(state.blob, state.name)}><Icon name="download" />{t('topbar.saveToComputer')}</button>
+        <div class="export-saves">
+          <button class="btn sm" onClick={() => saveBlob(state.blob, state.name)}><Icon name="download" />{saveLabel()}</button>
           {state.saved
             ? <span class="faint" style={{ fontSize: 11 }}>{t('topbar.keptInPath', { path: state.saved })}</span>
             : <button class="btn sm" onClick={() => keep(state)}><Icon name="folder" />{t('topbar.keepInTheProject')}</button>}

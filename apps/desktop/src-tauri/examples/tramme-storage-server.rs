@@ -213,7 +213,7 @@ fn respond(stream: &mut TcpStream, status: u16, meta: Option<&serde_json::Value>
     };
     let mut head = format!("HTTP/1.1 {status} {reason}\r\nConnection: close\r\nContent-Length: {}\r\n", body.len());
     if let Some(m) = meta {
-        const SET: &percent_encoding::AsciiSet = &percent_encoding::NON_ALPHANUMERIC;
+        const SET: &percent_encoding::AsciiSet = percent_encoding::NON_ALPHANUMERIC;
         head.push_str(&format!("X-Tramme-Meta: {}\r\n", percent_encoding::utf8_percent_encode(&m.to_string(), SET)));
     }
     head.push_str("\r\n");

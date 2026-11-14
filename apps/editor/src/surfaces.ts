@@ -174,6 +174,16 @@ export const SURFACES: Record<SurfaceKind, Surface> = {
   },
 };
 
+/** a surface as a shader layer covering a frame of this size, in the colours given (A, B) */
+export function surfaceLayer(kind: SurfaceKind, size: { width: number; height: number }, colors: [string, string], opts: { amount?: number; speed?: number; name?: string; span?: { in: number; out: number } } = {}): Record<string, unknown> {
+  const s = SURFACES[kind], [p1, p2, p3, p4] = s.params;
+  return {
+    type: 'shader', name: opts.name ?? kind, ...(opts.span ? { in: +opts.span.in.toFixed(3), out: +opts.span.out.toFixed(3) } : {}),
+    blend: s.blend, transform: { position: [size.width / 2, size.height / 2] },
+    props: { code: s.code, size: [size.width, size.height], colorA: colors[0], colorB: colors[1], p1: opts.amount ?? p1, p2: opts.speed ?? p2, p3, p4 },
+  };
+}
+
 interface Input { kind?: SurfaceKind; colors?: [string, string]; amount?: number; speed?: number; at?: number; duration?: number; name?: string }
 
 const surface: ToolType<Input> = {
@@ -201,15 +211,10 @@ const surface: ToolType<Input> = {
     const doc = ctx.doc, c = doc.compositions[ctx.compId];
     const token = (n: string) => doc.tokens?.[n]?.type === 'color';
     const [colorA, colorB] = a.colors ?? [token('plate') ? '@plate' : s.colors[0], token('accent') ? '@accent' : s.colors[1]];
-    const [p1, p2, p3, p4] = s.params;
     const id = freshId({ ...c.layers }, a.name ?? a.kind);
-    const span = a.at !== undefined || a.duration !== undefined;
     const from = a.at ?? 0;
-    const layer = {
-      type: 'shader', name: a.name ?? a.kind, ...(span ? { in: +from.toFixed(3), out: +Math.min(c.duration, from + (a.duration ?? c.duration)).toFixed(3) } : {}),
-      blend: s.blend, transform: { position: [c.width / 2, c.height / 2] },
-      props: { code: s.code, size: [c.width, c.height], colorA, colorB, p1: a.amount ?? p1, p2: a.speed ?? p2, p3, p4 },
-    };
+    const span = a.at !== undefined || a.duration !== undefined ? { in: from, out: Math.min(c.duration, from + (a.duration ?? c.duration)) } : undefined;
+    const layer = surfaceLayer(a.kind, c, [colorA, colorB], { amount: a.amount, speed: a.speed, name: a.name, span });
     const ops: Op[] = [
       { op: 'add', path: pointer('compositions', ctx.compId, 'layers', id), value: layer },
       { op: 'add', path: pointer('compositions', ctx.compId, 'order', s.under ? '0' : '-'), value: id },

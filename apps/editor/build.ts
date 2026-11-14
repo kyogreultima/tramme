@@ -20,7 +20,7 @@ import { originsFromEnv } from '../../brand/environments.ts';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '../..');
-// TRAMME_DIST: build elsewhere (benchmarks, without touching a running `npm run dev`)
+// TRAMME_DIST: build elsewhere (benchmarks, without touching a running `pnpm dev`)
 const DIST = process.env.TRAMME_DIST ? path.resolve(process.env.TRAMME_DIST) : path.join(HERE, 'dist');
 const dev = process.argv.includes('--dev');
 const personal = process.argv.includes('--personal');
@@ -154,6 +154,17 @@ function writeExamples() {
   return list.length;
 }
 
+/** the installed version of a package of the editor's, read beside the file it resolves to */
+function versionOf(name: string): string {
+  let dir = path.dirname(createRequire(path.join(HERE, 'package.json')).resolve(name));
+  while (!fs.existsSync(path.join(dir, 'package.json')) || (JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8')) as { name?: string }).name !== name) {
+    const up = path.dirname(dir);
+    if (up === dir) throw new Error(`no package.json of ${name}`);
+    dir = up;
+  }
+  return (JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8')) as { version: string }).version;
+}
+
 const options: esbuild.BuildOptions = {
   entryPoints: { main: path.join(HERE, 'src/main.tsx'), vault: path.join(HERE, 'src/vault/main.tsx') },
   outdir: path.join(DIST, 'assets'),
@@ -162,7 +173,8 @@ const options: esbuild.BuildOptions = {
   bundle: true, splitting: !dev, chunkNames: 'chunk-[hash]', format: 'esm', platform: 'browser', target: 'chrome120',
   minify: !dev && !process.env.TRAMME_NOMINIFY, sourcemap: 'linked', metafile: true, logLevel: 'warning',
   jsx: 'automatic', jsxImportSource: 'preact',
-  define: { __TRAMME_SITE__: JSON.stringify(ORIGINS.site) },
+  // MediaPipe's WebAssembly is fetched from a CDN (faces.ts): the version of the package bundled with it
+  define: { __TRAMME_SITE__: JSON.stringify(ORIGINS.site), __MEDIAPIPE__: JSON.stringify(versionOf('@mediapipe/tasks-vision')) },
   loader: { '.ttf': 'file', '.woff2': 'file', '.md': 'text', '.svg': 'text' },
   legalComments: 'linked',
 };
@@ -280,13 +292,13 @@ if (!dev) {
   await Promise.all([ctx.rebuild(), sw.rebuild(), sandbox.rebuild(), sceneRuntime.rebuild()]);
   await Promise.all([ctx.watch(), sw.watch(), sandbox.watch(), sceneRuntime.watch()]);
   const port = process.env.PORT ?? '8787';
-  // TRAMME_STATE: projects stored elsewhere (trials beside a running `npm run dev`)
+  // TRAMME_STATE: projects stored elsewhere (trials beside a running `pnpm dev`)
   const state = process.env.TRAMME_STATE ?? '.wrangler/state';
   // personal mode: the editor on localhost, the key vault on 127.0.0.1 (another origin, as cles.<domain> in production)
   const mode = personal
     ? ['-c', personalDevConfig(), '--env', 'personal', '--var', `APP_ORIGIN:http://localhost:${port}`, '--var', `VAULT_ORIGIN:http://127.0.0.1:${port}`]
     : ['-c', 'apps/worker/wrangler.jsonc', '--var', 'DEV_OPEN:1'];
-  const wrangler = spawn('npx', ['wrangler', 'dev', '--port', port, ...mode, '--persist-to', state], { cwd: ROOT, stdio: 'inherit', shell: process.platform === 'win32' });
+  const wrangler = spawn('pnpm', ['exec', 'wrangler', 'dev', '--port', port, ...mode, '--persist-to', state], { cwd: ROOT, stdio: 'inherit', shell: process.platform === 'win32' });
   // the assistant's local companion, paired by itself with this editor (TRAMME_NO_COMPANION=1: without it)
   let companion: ReturnType<typeof spawn> | null = null, elsewhere = false;
   if (!process.env.TRAMME_NO_COMPANION) {

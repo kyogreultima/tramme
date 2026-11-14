@@ -9,6 +9,7 @@ import { BLOCK_TOOLS } from './blocks.ts';
 import { BRIEF_TOOLS } from './brief.ts';
 import { SCENE_TOOLS } from './scene-tools.ts';
 import { FILM_PLAN_TOOLS } from './filmplan.ts';
+import { READING_TOOLS } from './reading/tool.ts';
 import { STYLE_FRAME_TOOLS } from './styleframes.ts';
 import { CAMERA_TOOLS } from './camera.ts';
 import { PIN_TOOLS } from './pin.ts';
@@ -44,6 +45,8 @@ import { STABILIZE_TOOLS } from './stabilize.ts';
 import { COMPONENT_TOOLS } from './components.ts';
 import { DENOISE_TOOLS } from './denoise.ts';
 import { FILLERS_TOOLS } from './fillers.ts';
+import { CHARTER_TOOLS } from './charter.ts';
+import { MOMENT_TOOLS } from './moments.ts';
 import { SKIN_TOOLS } from './faces.ts';
 import { LONG_TOOLS } from './longtools.ts';
 import { PROXY_TOOLS } from './proxy.ts';
@@ -79,7 +82,7 @@ export const EDITOR_PROMPTS: PromptType[] = [
   },
   {
     name: 'dress', title: 'Dress a talking video', description: 'cuts, captions, titles and keywords on a video where someone speaks',
-    prompt: 'Dress the talking video of this project, following your guide for talking videos: ask about the format and the tone if I have not said them, read the transcript, cut the silences and hesitations, add captions, section titles and keywords at the right moments, then check with frames.',
+    prompt: 'Dress the talking video of this project, following your guide for talking videos: ask about the format and the tone if I have not said them, read the transcript, cut the silences and hesitations, set the charter, read the moments and build the inserts on their words, add captions and section titles written with the voice, then check with frames.',
   },
   {
     name: 'review', title: 'Review the composition', description: 'checks the key moments and fixes what is wrong',
@@ -110,6 +113,10 @@ export const EDITOR_PROMPTS: PromptType[] = [
     prompt: 'Make the edit land on the music: run the beats tool on the sound of the composition (use_tool "beats"), read its tempo, beats, bars and sections, then tell me in a few lines what you would put on the strong moments — entrances on beats, a change of scene on a section. When the composition is simple, go ahead and move them; otherwise wait for my word. Then check.',
   },
   {
+    name: 'remake', title: 'Remake a reference', description: 'the same video as a reference you give (a video, a gif or a Lottie), made with your logo, screens, footage and words',
+    prompt: 'Make the same video as the reference I give, with my content, following the remake guide: find the reference (the video, gif or Lottie I name or attach; ask which one when the project holds several and I said nothing), make sure my assets are in the project (ask for my logo, screens, footage and words when none are there), then read it (use_tool "read-reference" with it): I correct or accept the reading. Write the film plan from it (film-plan with reference), bring in the nearest typeface, build each scene at the places, timing, moves and transitions with my assets in its slots and my words in its text, then critique and fix what it measures. Never show the reference or any of its words, logos or pictures. End by naming the slots you filled without an asset of mine.',
+  },
+  {
     name: 'still', title: 'Save a still', description: 'a picture of the composition at a moment, saved as an image asset (cover, thumbnail)',
     prompt: 'Save a still of this composition (use_tool "still") at the moment I name — or, if I have not said one, look at a few candidates first and save the one that reads best: one clear subject, room for a title. Tell me where it was saved and what it shows. Place it as a layer only if I asked for a cover on the timeline.',
   },
@@ -117,5 +124,5 @@ export const EDITOR_PROMPTS: PromptType[] = [
 
 /** the base vocabulary of the editor, before a document's plugins */
 export function editorRegistry() {
-  return builtinRegistry().registerTool(...EDITOR_TOOLS, ...SVG_TOOLS, ...RECIPE_TOOLS, ...TYPEFACE_TOOLS, ...FIGURE_TOOLS, ...EVENT_TOOLS, ...PERCEPTION_TOOLS, ...TRACKING_TOOLS, ...STABILIZE_TOOLS, ...PROXY_TOOLS, ...COMPONENT_TOOLS, ...DENOISE_TOOLS, ...SKIN_TOOLS, ...LONG_TOOLS, ...CUTOUT_TOOLS, ...DEPTH_TOOLS, ...MODEL_TOOLS, ...REMOVEBG_TOOLS, ...LIPSYNC_TOOLS, ...CUTS_TOOLS, ...MONTAGE_TOOLS, ...FILLERS_TOOLS, ...REVIEW_TOOLS, ...CRITIC_TOOLS, ...REFERENCE_TOOLS, ...SOUND_TOOLS, ...MIXING_TOOLS, ...IMAGE_TOOLS, ...VIDEO_TOOLS, ...SHORTS_TOOLS, ...SOURCE_TOOLS, ...BLOCK_TOOLS, ...BRIEF_TOOLS, ...SCENE_TOOLS, ...FILM_PLAN_TOOLS, ...STYLE_FRAME_TOOLS, ...SURFACE_TOOLS, ...STOCK_TOOLS, ...PIN_TOOLS, ...CAMERA_TOOLS, ...LIBRARY_TOOLS).registerPrompt(...EDITOR_PROMPTS).registerKit(...BUILTIN_KITS).registerPreset(...EDITOR_PRESETS);
+  return builtinRegistry().registerTool(...EDITOR_TOOLS, ...SVG_TOOLS, ...RECIPE_TOOLS, ...TYPEFACE_TOOLS, ...FIGURE_TOOLS, ...EVENT_TOOLS, ...PERCEPTION_TOOLS, ...TRACKING_TOOLS, ...STABILIZE_TOOLS, ...PROXY_TOOLS, ...COMPONENT_TOOLS, ...DENOISE_TOOLS, ...SKIN_TOOLS, ...LONG_TOOLS, ...CUTOUT_TOOLS, ...DEPTH_TOOLS, ...MODEL_TOOLS, ...REMOVEBG_TOOLS, ...LIPSYNC_TOOLS, ...CUTS_TOOLS, ...MONTAGE_TOOLS, ...FILLERS_TOOLS, ...CHARTER_TOOLS, ...MOMENT_TOOLS, ...REVIEW_TOOLS, ...CRITIC_TOOLS, ...REFERENCE_TOOLS, ...SOUND_TOOLS, ...MIXING_TOOLS, ...IMAGE_TOOLS, ...VIDEO_TOOLS, ...SHORTS_TOOLS, ...SOURCE_TOOLS, ...BLOCK_TOOLS, ...BRIEF_TOOLS, ...SCENE_TOOLS, ...FILM_PLAN_TOOLS, ...READING_TOOLS, ...STYLE_FRAME_TOOLS, ...SURFACE_TOOLS, ...STOCK_TOOLS, ...PIN_TOOLS, ...CAMERA_TOOLS, ...LIBRARY_TOOLS).registerPrompt(...EDITOR_PROMPTS).registerKit(...BUILTIN_KITS).registerPreset(...EDITOR_PRESETS);
 }

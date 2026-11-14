@@ -11,6 +11,7 @@ import { Evaluator, getAt, modsOf, resolveTokens, sampleKeyframes, type Bezier, 
 import { comp, commit, draft, cancelDraft, S, setTime, viewDoc, uiTime } from '../state.ts';
 import { assetData, preview } from '../preview.ts';
 import { pluginHost } from '../plugins/index.ts';
+import { plainRenderMessage } from '../render-message.ts';
 import { ensureDeclared, ensureSandboxDoc, moduleItemsOf } from '../plugins/sandbox-draw.ts';
 import { fileProject, sameFileProject } from '../files.ts';
 import { sandboxedDoc } from '../installed.ts';
@@ -316,7 +317,7 @@ export function GraphEditor() {
         <><div class="empty" style={{ height: '100%' }}><Icon name="curve" />{t('curves.selectAnAnimatedLayer')}</div><SpeedPresets empty /></>
       ) : (
         <>
-          {isolated && currentRemote?.error && <div class="hint" style={{ position: 'absolute', top: 4, right: 8, zIndex: 2 }}>{t('curves.isolatedUnavailable', { error: currentRemote.error })}</div>}
+          {isolated && currentRemote?.error && <div class="hint" style={{ position: 'absolute', top: 4, right: 8, zIndex: 2 }}>{t('curves.isolatedUnavailable', { error: plainRenderMessage(currentRemote.error) })}</div>}
           <svg onPointerDown={bgDown}>
             {band && <rect class="lasso" x={band.x} y={band.y} width={band.w} height={band.h} />}
             {Array.from({ length: Math.floor((tb - ta) / tStep) + 2 }, (_, i) => Math.ceil(ta / tStep) * tStep + i * tStep).filter((x) => x <= tb).map((x) => (

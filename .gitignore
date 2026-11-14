@@ -14,6 +14,9 @@ coverage/
 .eslintcache
 .cache/
 
+# Footage of the bench's local briefs: the user's own videos, never committed
+bench/local/
+
 # Example renders and local project state
 examples/*/renders/
 examples/*/.tramme/
@@ -24,6 +27,8 @@ examples/*/.tramme/
 # Desktop (Tauri)
 apps/desktop/src-tauri/target/
 apps/desktop/src-tauri/gen/schemas/
+# the Android project is generated on CI (tauri android init), never committed
+apps/desktop/src-tauri/gen/android/
 
 # Secrets (the *.example models stay in git)
 .dev.vars

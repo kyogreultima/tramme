@@ -1,15 +1,19 @@
 ---
 import { FEATURES, wordsOf } from '../lib/features';
 import { pathIn, t, type Locale } from '../lib/i18n';
+import EditDesk from './EditDesk.astro';
 interface Props { locale: Locale }
 const { locale } = Astro.props;
 ---
 <section class="materials wrap">
-  <div class="intro" data-reveal>
-    <span class="section-label">{t(locale, 'nav.features')}</span>
-    <h2>{t(locale, 'landing.materials.title')}</h2>
-    <p>{t(locale, 'landing.pillars.more')}</p>
-    <a class="btn btn-ghost" href={pathIn(locale, '/features/')}>{t(locale, 'landing.pillars.learn')}</a>
+  <div class="top">
+    <div class="intro" data-reveal>
+      <span class="section-label">{t(locale, 'nav.features')}</span>
+      <h2>{t(locale, 'landing.materials.title')}</h2>
+      <p>{t(locale, 'landing.pillars.more')}</p>
+      <a class="btn btn-ghost" href={pathIn(locale, '/features/')}>{t(locale, 'landing.pillars.learn')}</a>
+    </div>
+    <EditDesk locale={locale} />
   </div>
   <ul class="collection" role="list" data-stagger>
     {FEATURES.map((f) => <li>
@@ -22,9 +26,11 @@ const { locale } = Astro.props;
 </section>
 <style>
   .materials { padding-top: 36px; padding-bottom: var(--section); }
-  .intro { border-top: 1px solid var(--line); padding-top: 28px; }
+  /* the words on the left, the edit playing on the right; one above the other on a narrow screen */
+  .top { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: clamp(28px, 4vw, 64px); align-items: start; border-top: 1px solid var(--line); padding-top: 28px; }
+  @media (max-width: 900px) { .top { grid-template-columns: minmax(0, 1fr); } }
   .section-label { font-size: 0.6875rem; color: var(--ink-2); }
-  h2 { max-width: 19ch; margin-top: 32px; font-size: clamp(2rem, 3.6vw, 3.7rem); }
+  .materials h2 { max-width: 19ch; margin-top: 32px; font-size: clamp(2rem, 3.6vw, 3.7rem); }
   .intro p { max-width: 36ch; margin-top: 20px; font-size: 0.875rem; color: var(--ink-2); }
   .intro > a { margin-top: 24px; }
   .collection { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; margin: 64px 0 0; padding: 0; list-style: none; }

@@ -1,22 +1,22 @@
 {
   "$schema": "../../node_modules/wrangler/config-schema.json",
-  // The private deployment (npm run deploy): one user behind Cloudflare Access, projects and keys in R2.
-  // The public one is the "personal" environment below (npm run deploy:personal). See docs/deploy.md.
+  // The private deployment (pnpm run deploy): one user behind Cloudflare Access, projects and keys in R2.
+  // The public one is the "personal" environment below (pnpm deploy:personal). See docs/deploy.md.
   "name": "tramme-private",
   "main": "src/index.ts",
   "compatibility_date": "2026-09-25",
-  // the editor (npm run build) served as a single-page app; /api goes to the Worker
+  // the editor (pnpm build) served as a single-page app; /api goes to the Worker
   "assets": {
     "directory": "../editor/dist",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
     "run_worker_first": ["/api/*", "/project-sandbox.html", "/project-sandbox"]
   },
-  // the projects (npx wrangler r2 bucket create tramme-projects)
+  // the projects (pnpm exec wrangler r2 bucket create tramme-projects)
   "r2_buckets": [{ "binding": "FILES", "bucket_name": "tramme-projects" }],
   // Cloudflare Access protecting the app: team domain (equipe.cloudflareaccess.com)
   // and the application's audience tag (AUD), from the Zero Trust dashboard.
-  // The model keys are secrets: npx wrangler secret put ANTHROPIC_API_KEY (and OPENAI_API_KEY,
+  // The model keys are secrets: pnpm exec wrangler secret put ANTHROPIC_API_KEY (and OPENAI_API_KEY,
   // GEMINI_API_KEY, OPENROUTER_API_KEY, ZAI_API_KEY for the other providers, each optional)
   "vars": {
     "ACCESS_TEAM_DOMAIN": "",
@@ -53,7 +53,7 @@
       "ratelimits": [{ "name": "RELAY_LIMIT", "namespace_id": "1001", "simple": { "limit": 120, "period": 60 } }],
       // the relay passes keys in its requests: no invocation logs (they record the requests)
       "observability": { "enabled": true, "logs": { "invocation_logs": false } },
-      // branch builds (npx wrangler preview --env personal) inherit none of the above:
+      // branch builds (pnpm exec wrangler preview --env personal) inherit none of the above:
       // the same vars (a preview's own address sends to APP_ORIGIN), limit and logs
       "previews": {
         "vars": {

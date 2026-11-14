@@ -92,10 +92,10 @@ export async function readJson(ctx: ToolContext, id: string): Promise<unknown> {
   try { return await (await fetch(ctx.assetUrl(id), { cache: 'no-store' })).json(); } catch (e) { throw new Error(`${id} could not be read: ${(e as Error).message}`); }
 }
 
-/** the analyses of the project (the JSON assets these tools save) and its event lists, loaded for the checks, the sounds' moments and the expressions that read them */
+/** the analyses of the project (the JSON assets these tools save), its event lists and its transcripts, loaded for the checks, the sounds' moments and the expressions that read them */
 export async function analyses(ctx: ToolContext): Promise<(id: string) => unknown> {
   const loaded = new Map<string, unknown>();
-  await Promise.all(Object.entries(ctx.doc.assets).filter(([id, a]) => a.type === 'json' && /^(analysis|subjects|shots|events|space)-/.test(id)).map(async ([id]) => {
+  await Promise.all(Object.entries(ctx.doc.assets).filter(([id, a]) => a.type === 'json' && /^(analysis|subjects|shots|events|space|transcription)-/.test(id)).map(async ([id]) => {
     try { loaded.set(id, await readJson(ctx, id)); } catch { /* unreadable: left out */ }
   }));
   return (id) => loaded.get(id);
@@ -152,6 +152,24 @@ export const distance = (a: Float32Array, b: Float32Array) => { let s = 0; for (
 /** a change of picture this large (their distance) is a cut */
 export const CUT = 0.3;
 
+/** how often the cut detection looks at a video (s) */
+export const SHOT_STEP = 0.2;
+
+/**
+ * The cuts in a run of picture changes (the histogram distance from the look
+ * before, `step` s apart): a jump well above its neighbourhood, at least 0.6 s
+ * from the previous one, placed between the two looks.
+ */
+export function cutsOf(diffs: { t: number; d: number }[], sensitivity = 0.5, step = SHOT_STEP): number[] {
+  const threshold = 0.5 - 0.35 * sensitivity, cuts: number[] = [];
+  diffs.forEach(({ t: at, d }, k) => {
+    const around = diffs.slice(Math.max(0, k - 5), k + 6).filter((_, j) => j !== Math.min(5, k)).map((x) => x.d);
+    const base = around.length ? around.reduce((s, x) => s + x, 0) / around.length : 0;
+    if (d > threshold && d > base * 2.5 && (!cuts.length || at - cuts.at(-1)! >= 0.6)) cuts.push(+(at - step / 2).toFixed(2));
+  });
+  return cuts;
+}
+
 const shots: ToolType<{ asset?: string; sensitivity?: number }> = {
   name: 'shots', title: 'Find the shots', description: 'finds the cuts between shots in a video',
   input: {
@@ -165,13 +183,13 @@ const shots: ToolType<{ asset?: string; sensitivity?: number }> = {
   async run({ asset: wanted, sensitivity = 0.5 }, ctx) {
     const asset = mediaOf(ctx, wanted, ['video']), a = ctx.doc.assets[asset];
     const input = new Input({ source: new UrlSource(ctx.assetUrl(asset)), formats: ALL_FORMATS });
-    const diffs: { t: number; d: number }[] = [];
+    const diffs: { t: number; d: number }[] = [], step = SHOT_STEP;
     let duration = 0;
     try {
       const track = await input.getPrimaryVideoTrack();
       if (!track) throw new Error('this file has no picture');
       duration = await input.computeDuration();
-      const W = 48, H = 27, step = 0.2, sink = new CanvasSink(track, { width: W, height: H, fit: 'fill', poolSize: 2 });
+      const W = 48, H = 27, sink = new CanvasSink(track, { width: W, height: H, fit: 'fill', poolSize: 2 });
       const { g } = canvas(W, H);
       const times = Array.from({ length: Math.floor(duration / step) }, (_, i) => +(i * step).toFixed(3));
       let prev: Float32Array | null = null, i = 0;
@@ -188,13 +206,7 @@ const shots: ToolType<{ asset?: string; sensitivity?: number }> = {
     } finally {
       input.dispose();
     }
-    // a cut: a jump well above its neighbourhood, at least 0.6 s from the previous one
-    const threshold = 0.5 - 0.35 * sensitivity, cuts: number[] = [];
-    diffs.forEach(({ t: at, d }, k) => {
-      const around = diffs.slice(Math.max(0, k - 5), k + 6).filter((_, j) => j !== Math.min(5, k)).map((x) => x.d);
-      const base = around.length ? around.reduce((s, x) => s + x, 0) / around.length : 0;
-      if (d > threshold && d > base * 2.5 && (!cuts.length || at - cuts.at(-1)! >= 0.6)) cuts.push(+(at - 0.1).toFixed(2));
-    });
+    const cuts = cutsOf(diffs, sensitivity, step);
     const bounds = [0, ...cuts, +duration.toFixed(2)];
     const data = { version: 1, kind: 'shots', source: asset, duration: +duration.toFixed(3), cuts, shots: bounds.slice(1).map((to, k) => ({ from: bounds[k], to })) };
     const { id, ops, reload } = await save(ctx, asset, 'shots', data, `Shots · ${a.name ?? asset}`);
@@ -329,7 +341,26 @@ const subjects: ToolType<{ asset?: string; every?: number }> = {
 };
 
 // ── colours of the picture ───────────────────────────────────
-const hex = ([r, g, b]: [number, number, number]) => `#${[r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('').toUpperCase()}`;
+/** an image, or a video's frame at `at` (s), drawn on a 96 × 96 canvas */
+export async function pictureCanvas(ctx: ToolContext, asset: string, at = 0): Promise<CanvasRenderingContext2D> {
+  const { g } = canvas(96, 96);
+  if (ctx.doc.assets[asset]?.type === 'image') {
+    g.drawImage(await loadImage(ctx.assetUrl(asset)), 0, 0, 96, 96);
+    return g;
+  }
+  const input = new Input({ source: new UrlSource(ctx.assetUrl(asset)), formats: ALL_FORMATS });
+  try {
+    const track = await input.getPrimaryVideoTrack();
+    if (!track) throw new Error('this file has no picture');
+    const f = await new CanvasSink(track, { width: 96, height: 96, fit: 'fill' }).getCanvas(at);
+    if (!f) throw new Error(`no frame at ${at} s`);
+    g.drawImage(f.canvas as CanvasImageSource, 0, 0, 96, 96);
+  } finally { input.dispose(); }
+  return g;
+}
+
+/** a colour as #RRGGBB */
+export const hex = ([r, g, b]: [number, number, number]) => `#${[r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('').toUpperCase()}`;
 const saturation = ([r, g, b]: [number, number, number]) => { const mx = Math.max(r, g, b), mn = Math.min(r, g, b); return mx ? (mx - mn) / mx : 0; };
 const luma = ([r, g, b]: [number, number, number]) => (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
 
@@ -367,20 +398,7 @@ const palette: ToolType<{ asset?: string; t?: number; tokens?: boolean }> = {
   ai: { when: 'dressing footage or a photo: graphics in the colours of the picture look designed for it; also on a picture you generated when the project has no palette yet: its colours become the tokens of the project (a picture in the right colours first, then the palette from it)' },
   async run({ asset: wanted, t: at = 0, tokens = true }, ctx) {
     const asset = mediaOf(ctx, wanted, ['image', 'video']), a = ctx.doc.assets[asset];
-    const { g } = canvas(96, 96);
-    if (a.type === 'image') {
-      g.drawImage(await loadImage(ctx.assetUrl(asset)), 0, 0, 96, 96);
-    } else {
-      const input = new Input({ source: new UrlSource(ctx.assetUrl(asset)), formats: ALL_FORMATS });
-      try {
-        const track = await input.getPrimaryVideoTrack();
-        if (!track) throw new Error('this file has no picture');
-        const f = await new CanvasSink(track, { width: 96, height: 96, fit: 'fill' }).getCanvas(at);
-        if (!f) throw new Error(`no frame at ${at} s`);
-        g.drawImage(f.canvas as CanvasImageSource, 0, 0, 96, 96);
-      } finally { input.dispose(); }
-    }
-    const p = paletteOf(g, 96, 96), { colours } = p;
+    const p = paletteOf(await pictureCanvas(ctx, asset, at), 96, 96), { colours } = p;
     const ops: Op[] = tokens ? paletteOps(p, asset) : [];
     return {
       ops, label: `Colours of ${a.name ?? asset}`,

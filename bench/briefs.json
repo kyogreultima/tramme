@@ -113,6 +113,70 @@
       "format": "16:9",
       "seconds": 25,
       "prompt": "Product video for Sentinel, a cloud security platform: it scans 10,000 assets in minutes, ranks the real risks, and fixes them in one click. Serious, technical, dark blue with alert reds."
+    },
+    {
+      "id": "logo-sting",
+      "split": "test",
+      "format": "16:9",
+      "seconds": 5,
+      "prompt": "Une intro de 5 secondes pour Kestrel Freight, une société de transport aérien de marchandises, à placer au début de toutes nos vidéos. Le logo est dans assets/kestrel-mark.svg : respecte-le tel quel. Sobre, précise, avec une signature sonore.",
+      "files": [
+        "assets/kestrel-mark.svg"
+      ]
+    },
+    {
+      "id": "data-short",
+      "split": "test",
+      "format": "16:9",
+      "seconds": 15,
+      "prompt": "15 seconds on our water results for LinkedIn: the Ndiaye bottling plant now uses 2.1 litres of water per litre bottled, down from 3.4 in 2021, and recycles 68% of it. Calm and factual, our colours are deep green and sand."
+    },
+    {
+      "id": "kinetic-quote",
+      "split": "test",
+      "format": "9:16",
+      "seconds": 12,
+      "prompt": "Typographie animée verticale pour Instagram, 12 secondes, sur cette phrase de notre fondatrice : « On ne vend pas des chaises. On vend le temps que vous passez assis. » — Léa Morel, Assise. Rien que du texte, mais qu'il vive."
+    },
+    {
+      "id": "talking-head",
+      "split": "test",
+      "format": "16:9",
+      "seconds": 60,
+      "files": [
+        "local/talking-head.mp4"
+      ],
+      "prompt": "Habille cette vidéo face caméra pour ma chaîne YouTube (assets/talking-head.mp4), au niveau des grandes chaînes : coupe les silences et les hésitations, ajoute des mots-clés, des plans de coupe qui illustrent ce que je dis et un peu de son. Garde le format 16:9, en français."
+    },
+    {
+      "id": "talking-head-2",
+      "split": "test",
+      "format": "16:9",
+      "seconds": 48,
+      "files": [
+        "local/talking-head-2.mp4"
+      ],
+      "prompt": "Habille cette vidéo face caméra pour ma chaîne YouTube (assets/talking-head-2.mp4), au niveau des grandes chaînes : coupe les silences et les hésitations, ajoute des mots-clés, des plans de coupe qui illustrent ce que je dis et un peu de son. Garde le format 16:9 ; les textes à l’écran dans la langue de la vidéo."
+    },
+    {
+      "id": "nasa-talk",
+      "split": "proof",
+      "format": "16:9",
+      "seconds": 60,
+      "files": [
+        "local/nasa-talk.mp4"
+      ],
+      "prompt": "Monte cette vidéo face caméra (assets/nasa-talk.mp4) au niveau des grandes chaînes YouTube : coupe les silences et les hésitations, ajoute des sous-titres mot à mot, des mots-clés, des plans de coupe qui montrent ce qu’il raconte et un peu de son. Garde le format 16:9. Il parle anglais : les textes à l’écran en anglais."
+    },
+    {
+      "id": "nasa-shorts",
+      "split": "proof",
+      "format": "9:16",
+      "seconds": 30,
+      "files": [
+        "local/nasa-long.mp4"
+      ],
+      "prompt": "Tire trois shorts verticaux de cette vidéo de 5 minutes (assets/nasa-long.mp4), comme les grandes chaînes : les trois meilleurs moments, chacun de 20 à 40 secondes, recadrés en 9:16 sur l’astronaute, avec sous-titres mot à mot et une accroche dans les premières secondes. Il parle anglais : les textes à l’écran en anglais."
     }
   ]
 }

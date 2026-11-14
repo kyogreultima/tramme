@@ -31,14 +31,38 @@ describe('silences', () => {
     const c = doc.compositions.main;
     const spans = c.order.filter((id) => c.layers[id].props?.video === 'talk');
     expect(spans).toHaveLength(2);
-    // the first span keeps the layer: it ends where the cut happens; the second picks the file up after the gap
+    // the first span keeps the layer: it ends 0.12 s after the last word; the second picks the file up 0.12 s before the next one
     const [a, b] = spans;
-    expect(c.layers[a].out).toBeCloseTo(2.58, 2);
+    expect(c.layers[a].out).toBeCloseTo(2.12, 2);
     expect(c.layers[b].in as number).toBeCloseTo(c.layers[a].out as number, 2);
-    expect((c.layers[b].props as { start: number }).start).toBeCloseTo(7.82, 2);
+    expect((c.layers[b].props as { start: number }).start).toBeCloseTo(8.28, 2);
     // the caption after the cut is left alone
     expect(c.layers.caption.out).toBe(5);
     expect(validate(doc, reg)).toEqual([]);
+  });
+
+  it('cut only inside the part of the file the layer shows, the transcript running past it on both sides', async () => {
+    let doc = project();
+    doc = { ...doc, assets: { ...doc.assets, talk: { type: 'video', src: 'assets/talk.mp4' } } };
+    doc = applyOps(doc, [
+      { op: 'add', path: '/compositions/main/layers/talk', value: { type: 'video', in: 0, out: 10, props: { video: 'talk', size: [1080, 1920], start: 80 } } },
+      { op: 'replace', path: '/compositions/main/order', value: ['talk'] },
+    ]).doc;
+    // the whole file transcribed: words long before 80 s and after 90 s, with gaps there too; inside, one 2 s gap at 84-86
+    const transcript = { version: 1, duration: 200, words: [
+      { w: 'early', s: 10, e: 11 }, { w: 'words', s: 30, e: 31 }, { w: 'before', s: 78, e: 80.5 },
+      { w: 'inside', s: 80.5, e: 84 }, { w: 'again', s: 86, e: 90.5 }, { w: 'after', s: 120, e: 121 },
+    ] };
+    doc = await use(doc, transcript, 'silences', { video: 'talk', min: 0.5, keep: 0.12 });
+    expect(validate(doc, reg)).toEqual([]);
+    const c = doc.compositions.main, spans = c.order.filter((id) => c.layers[id].props?.video === 'talk');
+    expect(spans).toHaveLength(2);
+    for (const id of spans) expect((c.layers[id].out as number) > (c.layers[id].in ?? 0)).toBe(true);
+    // the file from 80 s: the first span to the cut in the 84-86 gap, the second from it to 90 s
+    expect((c.layers[spans[0]].props as { start: number }).start).toBe(80);
+    // the 2 s gap loses all but 0.12 s on each side: 1.76 s shorter
+    expect((c.layers[spans[1]].props as { start: number }).start).toBeCloseTo(85.88, 2);
+    expect(c.layers[spans[1]].out as number).toBeCloseTo(10 - 1.76, 2);
   });
 
   it('refuse what it cannot cut', async () => {

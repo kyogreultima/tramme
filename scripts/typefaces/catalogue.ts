@@ -3,7 +3,7 @@
 // tags their data gives (tags.ts) and the character written by hand (character.json).
 // Nothing is written unless everything was read.
 //
-//   npm run typefaces:catalogue
+//   pnpm typefaces:catalogue
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import type { Catalogue, Typeface } from '../../apps/editor/src/typefaces/catalogue.ts';

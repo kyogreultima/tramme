@@ -1,6 +1,6 @@
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { TOOLS } from '@tramme/assistant';
@@ -47,6 +47,24 @@ describe('the tools served to the command lines', () => {
     expect(r.content).toEqual([{ type: 'text', text: 'ran get_document' }, { type: 'image', data: 'AAAA', mimeType: 'image/jpeg' }]);
     expect(sent.find((e) => e.type === 'tool')).toMatchObject({ name: 'get_document', input: { path: '/tokens' } });
     await client.close();
+  });
+});
+
+describe('a tool call the editor runs for long', () => {
+  it('stays open while the editor says it is at work, and ends after a silence', async () => {
+    vi.useFakeTimers();
+    try {
+      const { callEditor } = await import('../src/agents.ts');
+      const turn: Turn = { send: () => {}, pending: new Map(), alive: new Map(), abort: new AbortController(), key: 'k', stop: () => {} };
+      let result: unknown = null;
+      void callEditor(turn, 'get_transcript', {}).then((r) => { result = r; });
+      const [callId] = [...turn.alive!.keys()];
+      for (let m = 0; m < 30; m++) { await vi.advanceTimersByTimeAsync(60_000); turn.alive!.get(callId)!(); }
+      expect(result).toBeNull();
+      await vi.advanceTimersByTimeAsync(15 * 60_000);
+      expect(result).toMatchObject({ isError: true, content: [{ text: 'the editor did not answer' }] });
+      expect(turn.pending.size + turn.alive!.size).toBe(0);
+    } finally { vi.useRealTimers(); }
   });
 });
 

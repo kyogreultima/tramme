@@ -1,13 +1,13 @@
 # The desktop app (apps/desktop) for Windows, macOS and Linux, each built on
-# its own system, and its releases. main's version (scripts/version.ts) is
-# released as soon as it has no tag: the three are published as one GitHub
+# its own system, and the Android app (android.yml), and their releases. main's version (scripts/version.ts) is
+# released as soon as it has no tag: the installers (and the signed Android .apk) are published as one GitHub
 # release vX.Y.Z, under the stable names of apps/desktop/downloads.ts that the
 # site links to, with the changelog's section as notes, and the site is
 # deployed again so its version and sizes follow. A manual run on main does the
 # same if the version is still unreleased; elsewhere it only builds, kept as the
 # run's artifacts.
 
-name: Desktop app
+name: Desktop and Android apps
 
 on:
   push:
@@ -31,8 +31,8 @@ jobs:
       build: ${{ steps.plan.outputs.build }}
       tag: ${{ steps.plan.outputs.tag }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
       - id: plan
@@ -79,40 +79,55 @@ jobs:
             args: --bundles appimage,deb
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
         with:
           rust-targets: ${{ matrix.rust-targets }}
-      - run: npm ci
       - name: Build the editor and the app
         env:
           # audience measurement of the desktop app (apps/desktop/src-tauri/src/analytics.rs): without it nothing is counted
           TRAMME_GA_API_SECRET: ${{ secrets.TRAMME_GA_API_SECRET }}
-        run: npm run desktop:build -- ${{ matrix.args }}
+        run: pnpm desktop:build ${{ matrix.args }}
       - name: Name the installers for the release
         run: node scripts/desktop-release.ts out ${{ needs.plan.outputs.tag }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: desktop-${{ matrix.name }}
           path: out/
           if-no-files-found: error
 
+  # the Android app, built and signed by one reusable workflow (without the signing secrets: nothing Android is released)
+  android:
+    name: Android
+    needs: [plan, checks]
+    if: needs.plan.outputs.build == 'true'
+    uses: ./.github/workflows/android.yml
+    with:
+      environment: production
+      tauri-config: ''
+    secrets: inherit
+
   release:
     name: Release
-    needs: [plan, build]
-    if: needs.plan.outputs.tag != ''
+    needs: [plan, build, android]
+    # the desktop builds must have succeeded, Android too or not run: a failed Android build stops the release, a missing one does not
+    if: >-
+      always() && needs.plan.outputs.tag != '' && needs.build.result == 'success'
+      && (needs.android.result == 'success' || needs.android.result == 'skipped')
     runs-on: ubuntu-latest
     permissions:
       contents: write
     env:
       TAG: ${{ needs.plan.outputs.tag }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
+          # the installers only: the Android .aab is a private artifact of the run
+          pattern: desktop-*
           path: out
           merge-multiple: true
       - name: Publish
@@ -125,15 +140,16 @@ jobs:
 
   site:
     name: Deploy the site
-    needs: release
+    needs: [plan, release]
     # the site is deployed at launch only: set the repository variable SITE_DEPLOY=on then
     if: vars.SITE_DEPLOY == 'on'
     runs-on: ubuntu-latest
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      # the site reads the latest release (apps/site/src/lib/download.ts)
+      # the site reads the latest release (apps/site/src/lib/download.ts): the one just published, by its tag
       GITHUB_TOKEN: ${{ github.token }}
+      RELEASE_TAG: ${{ needs.plan.outputs.tag }}
     steps:
       - name: Cloudflare's secrets
         run: |
@@ -141,10 +157,8 @@ jobs:
             echo "::error::the repository's secrets CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are missing (Settings, Secrets and variables, Actions): the release is out, the site was not deployed"
             exit 1
           fi
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
         with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - run: npm run site:deploy
+          rust: 'false'
+      - run: pnpm site:deploy

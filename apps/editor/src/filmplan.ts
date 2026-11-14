@@ -5,7 +5,7 @@
 // The style frames drawn from the directions, and the one kept as the film's
 // target, are recorded in the same file.
 
-import { pointer, type Op, type ToolType, type TrammeDoc } from '@tramme/core';
+import { parseReading, pointer, retime, sceneText, type Op, type Reading, type ToolContext, type ToolType, type TrammeDoc } from '@tramme/core';
 import { m, t } from './i18n/index.ts';
 import { slug } from './model.ts';
 
@@ -35,7 +35,12 @@ export const KIND_LABEL: Record<PictureKind, string> = {
 export interface Direction { name: string; type: string; palette: string; light: string; materials: string; framing: string }
 /** Scene-local seconds. The action names measurable travel, anticipation or overshoot. */
 export interface MotionBeat { subject: string; start: number; end: number; action: string; easing?: string; settle?: number; soundAt?: number }
-export interface PlanScene { id: string; name: string; kind: PictureKind; idea: string; hero?: boolean; comp?: string; seconds?: number; status?: 'todo' | 'built' | 'failed'; brief?: string; motion?: MotionBeat[] }
+export interface PlanScene {
+  id: string; name: string; kind: PictureKind; idea: string; hero?: boolean; comp?: string; seconds?: number; status?: 'todo' | 'built' | 'failed'; brief?: string; motion?: MotionBeat[];
+  /** made from a reference: the id of the reading's scene it follows, and that scene as its builder reads it (slots, assets, moves) */
+  follows?: string;
+  reference?: string;
+}
 export interface StyleFrame { path: string; direction: string; scene: string; provider: string; model: string }
 export interface FilmPlan {
   version: 1;
@@ -52,6 +57,8 @@ export interface FilmPlan {
   target?: string;
   /** The ending returns to the opening rather than asking for a closing card. */
   loop?: boolean;
+  /** made the same way as a reference: the asset id of its reading */
+  reference?: string;
 }
 export const isPlan = (x: unknown): x is FilmPlan => !!x && typeof x === 'object' && (x as FilmPlan).kind === 'film-plan';
 
@@ -63,8 +70,13 @@ export function parsePlan(raw: string | null | undefined): FilmPlan | null {
 const FIELDS = ['type', 'palette', 'light', 'materials', 'framing'] as const;
 
 /** what is wrong with the variety of a plan: empty when the scenes alternate enough */
-export function planIssues(plan: Pick<FilmPlan, 'kinds' | 'scenes' | 'example'>): string[] {
+export function planIssues(plan: Pick<FilmPlan, 'kinds' | 'scenes' | 'example' | 'reference'>): string[] {
   const { kinds, scenes, example } = plan, n = scenes.length, out: string[] = [];
+  // a film made from a reference alternates as the reference does: only its scenes' kinds are checked
+  if (plan.reference) {
+    for (const s of scenes) if (!kinds.includes(s.kind)) out.push(`The scene "${s.name}" is a ${s.kind}, which the plan's kinds do not list.`);
+    return out;
+  }
   const least = n === 1 ? 1 : 2;
   if (kinds.length < least || kinds.length > 5) out.push(`Name ${least} to 5 kinds of picture (there are ${kinds.length}).`);
   for (const s of scenes) if (!kinds.includes(s.kind)) out.push(`The scene "${s.name}" is a ${s.kind}, which the plan's kinds do not list.`);
@@ -112,16 +124,21 @@ export function directionIssues(directions: Direction[]): string[] {
 const LIMIT = 2500;
 const directionText = (d: Direction) => `${d.name}: ${FIELDS.map((f) => `${f} ${d[f]}`).join('; ')}`;
 
-/** the plan as the model reads it in the system prompt, at most 2 500 characters, the scenes' ideas clipped first */
-export function planText(plan: FilmPlan): string {
+/**
+ * The plan as the model reads it with its message, at most 2 500 characters, the
+ * scenes' ideas clipped first. For a scene built apart (`scene`), its own beats
+ * are in its message: it is not sent to the file for them.
+ */
+export function planText(plan: FilmPlan, opts: { scene?: boolean } = {}): string {
   const head = [`Idea: ${plan.idea}`, `Kinds: ${plan.kinds.join(', ')}.`];
   if (plan.loop) head.push('Seamless loop: the ending returns to the opening; no closing card unless the brief asks for one.');
-  if (plan.scenes.some((s) => s.motion?.length)) head.push(`Timed motion beats are in ${FILM_PLAN_PATH}; read each scene's motion before building it.`);
+  if (!opts.scene && plan.scenes.some((s) => s.motion?.length)) head.push(`Timed motion beats are in ${FILM_PLAN_PATH}; read each scene's motion before building it.`);
   if (plan.example) head.push(`Example from the user (${plan.example.kind}, one kind among the others): ${plan.example.what}`);
   const kept = plan.directions[0];
   const tail = [...(kept ? [`${plan.target ? 'Kept' : 'First'} direction: ${directionText(kept)}`] : []), ...(plan.target ? [`Target (style frame): ${plan.target}`] : [])];
   const fixed = [...head, ...tail].join('\n').length + 'Scenes:\n'.length;
-  const names = plan.scenes.map((s) => `- ${s.name}: ${s.kind}${s.status && s.status !== 'todo' ? ` [${s.status}]` : ''}`);
+  if (plan.reference) head.push(`Made the same way as the reference read in "${plan.reference}": each scene follows a scene of the reading, at its slots, timing, moves and transition, with the user's assets; never the reference's words or pictures.`);
+  const names = plan.scenes.map((s) => `- ${s.name}: ${s.kind}${s.follows ? ` (follows ${s.follows}${s.seconds ? `, ${s.seconds} s` : ''})` : ''}${s.status && s.status !== 'todo' ? ` [${s.status}]` : ''}`);
   const room = LIMIT - fixed - names.reduce((a, l) => a + l.length + 3, 0);
   const each = Math.max(0, Math.floor(room / Math.max(1, plan.scenes.length)));
   const lines = plan.scenes.map((s, i) => {
@@ -143,6 +160,15 @@ export function todoScenes(plan: FilmPlan, doc: TrammeDoc): { run: PlanScene[]; 
   return { run, skipped };
 }
 
+/** a scene of the plan by its id, its name, or a word only its id or name holds ("record" for "ton-record-battu"); undefined when none or several */
+export function sceneNamed(plan: FilmPlan, asked: string): PlanScene | undefined {
+  const w = asked.trim().toLowerCase();
+  const exact = plan.scenes.find((s) => s.id === w || s.name.toLowerCase() === w);
+  if (exact) return exact;
+  const holding = plan.scenes.filter((s) => s.id.includes(w) || s.name.toLowerCase().includes(w));
+  return holding.length === 1 ? holding[0] : undefined;
+}
+
 /** the plan with one scene's state changed */
 export const setStatus = (plan: FilmPlan, id: string, status: PlanScene['status']): FilmPlan => ({ ...plan, updated: new Date().toISOString(), scenes: plan.scenes.map((s) => (s.id === id ? { ...s, status } : s)) });
 
@@ -162,9 +188,74 @@ function sceneIds(names: string[]): string[] {
   });
 }
 
-interface FilmPlanInput { idea: string; kinds: PictureKind[]; scenes: Omit<PlanScene, 'id'>[]; directions: Direction[]; example?: { kind: PictureKind; what: string }; loop?: boolean }
+type SceneInput = Omit<PlanScene, 'id'>;
+/** a first plan gives its idea, kinds, scenes and directions; a plan written again gives only what changes, the rest kept */
+interface FilmPlanInput { idea?: string; kinds?: PictureKind[]; scenes?: SceneInput[]; change?: (Partial<SceneInput> & { name: string })[]; directions?: Direction[]; example?: { kind: PictureKind; what: string }; loop?: boolean; reference?: string }
+
+/** the music the user's film plays: the beats of an analysis of a sound of the project that is no reference; undefined when there is none */
+export async function userMusic(ctx: Pick<ToolContext, 'doc' | 'readText'>): Promise<{ beats: number[]; bars: number[] } | undefined> {
+  for (const [id, a] of Object.entries(ctx.doc.assets)) {
+    if (a.type !== 'json' || !id.startsWith('analysis-')) continue;
+    const source = ctx.doc.assets[id.slice('analysis-'.length)];
+    if (!source || source.reference) continue;
+    try {
+      const x = JSON.parse((await ctx.readText(a.src)) ?? 'null') as { beats?: number[]; downbeats?: number[] } | null;
+      if (x?.beats?.length && x.downbeats?.length) return { beats: x.beats, bars: x.downbeats };
+    } catch { /* unreadable: the next */ }
+  }
+  return undefined;
+}
+
+/** the direction a reading gives: the reference's palette and type, its grounds, its framing */
+export function readingDirection(r: Reading): Direction {
+  const grounds = [...new Set(r.scenes.map((s) => s.ground).filter((g): g is string => !!g))].slice(0, 4);
+  const slots = r.scenes.flatMap((s) => s.slots), full = slots.filter((sl) => sl.box[2] * sl.box[3] > 0.5).length;
+  return {
+    name: `As "${r.name}"`,
+    type: `${r.type.description}${r.type.nearest?.length ? `; nearest typefaces: ${r.type.nearest.join(', ')}` : ''}`,
+    palette: r.palette.length ? `the reference's colours, the most present first: ${r.palette.join(', ')}` : "the reference's colours, read from its frames",
+    light: grounds.length ? `as the reference's grounds: ${grounds.join('; ')}` : 'as the reference: flat, even, no light of its own',
+    materials: grounds.length ? `the reference's surfaces: ${grounds.join('; ')}` : "the reference's flat surfaces",
+    framing: `the reference's slots at their places and sizes (${full} of ${slots.length} slots fill most of the frame); its moves and transitions`,
+  };
+}
+
+/** the scenes a reading gives a plan: one per scene of the reading, timed on the user's music when there is one */
+export function readingScenes(r: Reading, music?: { beats: number[]; bars: number[] }): SceneInput[] {
+  const timing = retime(r, music);
+  return r.scenes.map((s, i) => ({
+    name: s.id, kind: (PICTURE_KINDS as string[]).includes(s.kind) ? (s.kind as PictureKind) : 'type', idea: s.what,
+    seconds: +(timing[i].end - timing[i].start).toFixed(3), follows: s.id, reference: sceneText(s),
+  }));
+}
 
 const kindProp = { type: 'string', enum: PICTURE_KINDS };
+/** a scene of the plan, as the tool takes it */
+const SCENE_ITEM = {
+  type: 'object',
+  properties: {
+    name: { type: 'string', description: 'a short name' }, kind: kindProp, idea: { type: 'string', description: 'what the scene shows and does, in a sentence' },
+    hero: { type: 'boolean', description: 'the scene the film is remembered for: its style frame is drawn first' },
+    seconds: { type: 'number', description: 'how long it lasts, when known' },
+    comp: { type: 'string', description: 'the id of the composition the scene is built in (the root plays it)' },
+    brief: { type: 'string', description: 'what the builder of this scene needs beyond the plan: the words, names and figures it shows, the sources it uses, its length and where it sits in the root' },
+    follows: { type: 'string', description: "made from a reference: the id of the reading's scene it follows (s1, s2…)" },
+    motion: {
+      type: 'array', description: 'up to 16 measurable motion beats, in scene-local seconds; include camera moves and a hold for reading',
+      items: { type: 'object', properties: {
+        subject: { type: 'string', description: 'the subject or camera that moves' },
+        start: { type: 'number', description: 'motion starts, seconds from the scene start' },
+        end: { type: 'number', description: 'motion reaches its destination, scene-local seconds' },
+        action: { type: 'string', description: 'travel, destination, anticipation and overshoot in measurable terms, e.g. rise 120 px, overshoot 7%' },
+        easing: { type: 'string', description: 'curve or spring parameters; linear when intentionally mechanical' },
+        settle: { type: 'number', description: 'time by which motion has settled, at or after end' },
+        soundAt: { type: 'number', description: 'optional sound cue time in scene-local seconds' },
+      }, required: ['subject', 'start', 'end', 'action'] },
+    },
+  },
+  required: ['name', 'kind', 'idea'],
+};
+
 const filmPlan: ToolType<FilmPlanInput> = {
   name: 'film-plan', title: 'Film plan', description: `writes the plan of a film (assets/film-plan.json): its idea, the 2 to 5 kinds of picture it alternates (${PICTURE_KINDS.map((k) => `${k}: ${KIND_LINE[k]}`).join('; ')}), each scene with its kind and its idea, and one to three directions written precisely (type, palette, light, materials, framing); it says when the scenes would look alike`,
   input: {
@@ -173,31 +264,14 @@ const filmPlan: ToolType<FilmPlanInput> = {
       idea: { type: 'string', title: 'Idea', description: 'the idea of the film in two or three sentences: the story it tells and why it is worth watching' },
       kinds: { type: 'array', items: kindProp, title: 'Kinds', description: 'the 2 to 5 kinds of picture the film alternates; one kind is enough for a single shot' },
       loop: { type: 'boolean', title: 'Loop', description: 'a seamless loop: the last moment continues into the first' },
+      reference: { type: 'string', title: 'Reference', description: "the asset id of a reading (read-reference): the plan follows it, one scene per scene of the reading, timed on the user's music, its direction from the reference unless you give one; give the idea, and scenes only to set their ideas and briefs" },
       scenes: {
         type: 'array', title: 'Scenes', description: 'the scenes in order, each with the kind of picture it is and what happens in it; no kind twice in a row, none on more than half the scenes',
-        items: {
-          type: 'object',
-          properties: {
-            name: { type: 'string', description: 'a short name' }, kind: kindProp, idea: { type: 'string', description: 'what the scene shows and does, in a sentence' },
-            hero: { type: 'boolean', description: 'the scene the film is remembered for: its style frame is drawn first' },
-            seconds: { type: 'number', description: 'how long it lasts, when known' },
-            comp: { type: 'string', description: 'the id of the composition the scene is built in (the root plays it)' },
-            brief: { type: 'string', description: 'what the builder of this scene needs beyond the plan: the words, names and figures it shows, the sources it uses, its length and where it sits in the root' },
-            motion: {
-              type: 'array', description: 'up to 16 measurable motion beats, in scene-local seconds; include camera moves and a hold for reading',
-              items: { type: 'object', properties: {
-                subject: { type: 'string', description: 'the subject or camera that moves' },
-                start: { type: 'number', description: 'motion starts, seconds from the scene start' },
-                end: { type: 'number', description: 'motion reaches its destination, scene-local seconds' },
-                action: { type: 'string', description: 'travel, destination, anticipation and overshoot in measurable terms, e.g. rise 120 px, overshoot 7%' },
-                easing: { type: 'string', description: 'curve or spring parameters; linear when intentionally mechanical' },
-                settle: { type: 'number', description: 'time by which motion has settled, at or after end' },
-                soundAt: { type: 'number', description: 'optional sound cue time in scene-local seconds' },
-              }, required: ['subject', 'start', 'end', 'action'] },
-            },
-          },
-          required: ['name', 'kind', 'idea'],
-        },
+        items: SCENE_ITEM,
+      },
+      change: {
+        type: 'array', title: 'Change', description: 'a plan written again: only the scenes that change, each by its name with the fields that change (the others and their fields stay)',
+        items: { ...SCENE_ITEM, required: ['name'] },
       },
       directions: {
         type: 'array', title: 'Directions', description: 'one to three directions, different from each other and from what you would do by default',
@@ -217,20 +291,50 @@ const filmPlan: ToolType<FilmPlanInput> = {
         properties: { kind: kindProp, what: { type: 'string' } }, required: ['kind', 'what'],
       },
     },
-    required: ['idea', 'kinds', 'scenes', 'directions'],
   },
   ai: {
-    when: 'before building a film or dressing a video, after reading the sources and the brief; again when the user changes the story',
+    when: 'before building a film or dressing a video, after reading the sources and the brief; again when the user changes the story, then with only what changes (change for some scenes)',
     avoid: 'one kind of picture for every scene; a kind used as a layout (a kind says what the picture is, not where things sit)',
   },
   async run(input, ctx) {
     const prev = parsePlan(await ctx.readText(FILM_PLAN_PATH).catch(() => null));
-    const ids = sceneIds(input.scenes.map((s) => s.name));
+    const refId = input.reference ?? prev?.reference;
+    let reading: Reading | null = null;
+    if (refId) {
+      const a = ctx.doc.assets[refId];
+      reading = a ? parseReading(await ctx.readText(a.src).catch(() => null)) : null;
+      if (!reading) throw new Error(`${refId}: no reading of that name (read the reference first: use_tool "read-reference")`);
+      if (!reading.accepted) throw new Error(`the reading "${refId}" is not accepted yet: the user corrects or accepts it first (read-reference again)`);
+    }
+    // a plan from a reading: its scenes follow the reading's; the ideas and briefs the model gives are kept, by the scene they follow or by order
+    const fromReading = reading && (input.reference !== undefined || !prev?.scenes.length) ? readingScenes(reading, await userMusic(ctx)) : null;
+    if (fromReading && input.scenes?.length) {
+      fromReading.forEach((s, i) => {
+        const given = input.scenes!.find((g) => g.follows === s.follows) ?? (input.scenes!.length === fromReading.length ? input.scenes![i] : undefined);
+        if (given) Object.assign(s, { ...given, kind: given.kind ?? s.kind, follows: s.follows, reference: s.reference, seconds: s.seconds });
+      });
+    }
+    // a plan written again keeps what is not given: its idea, kinds, scenes and directions
+    const idea = input.idea ?? prev?.idea;
+    const directions = input.directions ?? prev?.directions ?? (reading ? [readingDirection(reading)] : undefined);
+    const scenes: SceneInput[] = [...(fromReading ?? input.scenes ?? prev?.scenes.map(({ id: _id, ...s }) => s) ?? [])];
+    // a plan from a reading written again with all its scenes: each keeps the reading's scene it followed, by order
+    if (reading && !fromReading && input.scenes && prev) scenes.forEach((s, i) => { const had = prev.scenes[i]; if (had?.follows && !s.follows) Object.assign(s, { follows: had.follows, reference: had.reference, seconds: s.seconds ?? had.seconds }); });
+    const kinds = reading ? [...new Set(scenes.map((s) => s.kind))] : input.kinds ?? prev?.kinds;
+    if (!idea || !kinds?.length || !scenes.length || !directions) throw new Error('a first plan gives its idea, kinds, scenes and directions');
+    // the scenes that change, by name, with the fields that change
+    for (const c of input.change ?? []) {
+      const i = scenes.findIndex((s) => s.name === c.name);
+      if (i < 0) throw new Error(`${c.name}: no scene of that name (the plan's scenes: ${scenes.map((s) => s.name).join(', ')})`);
+      scenes[i] = { ...scenes[i], ...c };
+    }
+    const ids = sceneIds(scenes.map((s) => s.name));
     const written: FilmPlan = {
-      version: 1, kind: 'film-plan', updated: new Date().toISOString(), idea: input.idea, kinds: input.kinds,
-      scenes: input.scenes.map((s, i) => { const had = prev?.scenes.find((p) => p.id === ids[i]); return { ...(had?.status ? { status: had.status } : {}), ...(had?.comp ? { comp: had.comp } : {}), ...(had?.brief ? { brief: had.brief } : {}), ...(had?.seconds !== undefined ? { seconds: had.seconds } : {}), ...(had?.motion ? { motion: had.motion } : {}), ...s, id: ids[i] }; }), directions: input.directions,
+      version: 1, kind: 'film-plan', updated: new Date().toISOString(), idea, kinds,
+      scenes: scenes.map((s, i) => { const had = prev?.scenes.find((p) => p.id === ids[i]); return { ...(had?.status ? { status: had.status } : {}), ...(had?.comp ? { comp: had.comp } : {}), ...(had?.brief ? { brief: had.brief } : {}), ...(had?.seconds !== undefined ? { seconds: had.seconds } : {}), ...(had?.motion ? { motion: had.motion } : {}), ...s, id: ids[i] }; }), directions,
       ...((input.loop ?? prev?.loop) !== undefined ? { loop: input.loop ?? prev?.loop } : {}),
-      ...(input.example ? { example: input.example } : {}),
+      ...((input.example ?? prev?.example) ? { example: input.example ?? prev?.example } : {}),
+      ...(refId ? { reference: refId } : {}),
       ...(prev?.frames?.length ? { frames: prev.frames } : {}), ...(prev?.target ? { target: prev.target } : {}),
     };
     const invalid = motionIssues(written.scenes.map((s) => ({ ...s, seconds: s.seconds ?? ctx.doc.compositions[s.comp ?? '']?.duration })));
@@ -239,7 +343,7 @@ const filmPlan: ToolType<FilmPlanInput> = {
     const issues = [...planIssues(written), ...directionIssues(written.directions)];
     return {
       ops: [planOp(ctx.doc)], label: t('filmPlan.written'),
-      text: `The film plan is at ${path}${prev ? ' (the style frames and the target kept before are kept)' : ''}:\n${planText(written)}\n${issues.length ? `To fix:\n${issues.map((l) => `- ${l}`).join('\n')}\nCall film-plan again with these fixed.\n` : ''}Next: have the directions drawn (style-frames), then build each scene in its kind.`,
+      text: `The film plan is at ${path}${prev ? ' (the style frames and the target kept before are kept)' : ''}:\n${planText(written)}\n${issues.length ? `To fix:\n${issues.map((l) => `- ${l}`).join('\n')}\nCall film-plan again with only what changes to fix them.\n` : ''}Next: have the directions drawn (style-frames), then build each scene in its kind.`,
     };
   },
 };
@@ -252,9 +356,10 @@ const sceneDone: ToolType<{ scene: string; note?: string }> = {
   async run({ scene, note }, ctx) {
     const plan = parsePlan(await ctx.readText(FILM_PLAN_PATH).catch(() => null));
     if (!plan) throw new Error('there is no film plan: write it first (use_tool "film-plan")');
-    if (!plan.scenes.some((s) => s.id === scene)) throw new Error(`${scene}: no such scene (the plan's scenes: ${plan.scenes.map((s) => s.id).join(', ')})`);
-    await ctx.writeFile(FILM_PLAN_PATH, JSON.stringify(setStatus(plan, scene, 'built'), null, 1));
-    return { ops: [planOp(ctx.doc)], label: `${scene} built`, text: `${scene} is marked built${note ? ` (${note})` : ''}. Stop here: do not summarise.` };
+    const found = sceneNamed(plan, scene);
+    if (!found) throw new Error(`${scene}: no such scene (the plan's scenes: ${plan.scenes.map((s) => s.id).join(', ')})`);
+    await ctx.writeFile(FILM_PLAN_PATH, JSON.stringify(setStatus(plan, found.id, 'built'), null, 1));
+    return { ops: [planOp(ctx.doc)], label: `${found.id} built`, text: `${found.id} is marked built${note ? ` (${note})` : ''}. Stop here: do not summarise.` };
   },
 };
 

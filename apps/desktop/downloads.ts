@@ -1,15 +1,16 @@
-// The desktop app's installers, as each release on GitHub carries them
-// (.github/workflows/desktop.yml, gathered by scripts/desktop-release.ts): one
-// stable name per file, so the site links to the latest release's files
+// The app's installers, as each release on GitHub carries them
+// (.github/workflows/desktop.yml, gathered by scripts/desktop-release.ts, and
+// android.yml for the phone's .apk): one stable name per file, so the site links to the latest release's files
 // without knowing its version (apps/site/src/lib/download.ts).
 
-export type Os = 'windows' | 'mac' | 'linux';
+export type Os = 'windows' | 'mac' | 'linux' | 'android';
 
 export interface Installer {
   os: Os;
   /** its name on the release */
   file: string;
-  /** where `tauri build` writes it, under src-tauri/target, and how its name ends */
+  /** where `tauri build` writes it, under src-tauri/target, and how its name ends; '' when the CI already named the file
+   *  (the Android job signs it and uploads it as `tramme-android.apk`: scripts/desktop-release.ts leaves it alone) */
   built: string;
   suffix: string;
   /** what it is, and what it runs on, as the download page says it */
@@ -23,10 +24,11 @@ export const INSTALLERS: Installer[] = [
   { os: 'mac', file: 'tramme-macos-universal.dmg', built: 'universal-apple-darwin/release/bundle/dmg', suffix: '.dmg', kind: 'Disk image', runs: 'Apple silicon and Intel' },
   { os: 'linux', file: 'tramme-linux-x86_64.AppImage', built: 'release/bundle/appimage', suffix: '.AppImage', kind: 'AppImage', runs: 'Most distributions, x86-64' },
   { os: 'linux', file: 'tramme-linux-amd64.deb', built: 'release/bundle/deb', suffix: '.deb', kind: 'Debian package', runs: 'Debian, Ubuntu and their kin, x86-64' },
+  { os: 'android', file: 'tramme-android.apk', built: '', suffix: '.apk', kind: 'APK', runs: 'Android 8 and newer' },
 ];
 
 /** the systems, in the order they are offered, by their names */
-export const SYSTEMS: Record<Os, string> = { windows: 'Windows', mac: 'macOS', linux: 'Linux' };
+export const SYSTEMS: Record<Os, string> = { windows: 'Windows', mac: 'macOS', linux: 'Linux', android: 'Android' };
 
 /**
  * The systems whose app is built with every release but not offered, on the site

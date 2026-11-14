@@ -9,7 +9,8 @@ import { useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { chapterList, chaptersOf, cutsOf, isLocked, layerActive, pointer, rippleTrimOps, rollOps, slideOps, slipOps, staticValue, toSequenceOps, type Composition, type Keyframe, type Layer, type Op, type SequenceTrack } from '@tramme/core';
 import { clickSelect, comp, commit, draft, cancelDraft, S, select, selectAll, setTime, frameStep, toast, toggleFold, uiTime, viewDoc } from '../state.ts';
 import { animatedProps, contentEnd, crossfadeOps, flatTree, freshId, keysOf, layerName, parentOf, parseTime, propPath, rawProp, rulerLabel, shiftLayerOps, snap, splitLayerOps, subtree, timecode, topLayers, trimInOps, type TreeItem } from '../model.ts';
-import { bandOf, longPress, noBrowserMenu, openMenu, Seg, useSize } from './controls.tsx';
+import { bandOf, longPress, noBrowserMenu, openMenu, Popover, Seg, useSize } from './controls.tsx';
+import { VoiceoverPanel } from './VoiceoverPanel.tsx';
 import { Icon, kindColor, kindIcon } from './icons.tsx';
 import { assetData, fileLength, preview } from '../preview.ts';
 import { Tabs } from './timeline/Tabs.tsx';
@@ -57,6 +58,7 @@ function snapShift(edges: number[], targets: number[], tol: number): { d: number
 export function Transport() {
   const c = comp.value, now = S.time.value, playing = S.playing.value;
   const [text, setText] = useState<string | null>(null);
+  const [voiceover, setVoiceover] = useState<HTMLElement | null>(null);
   const frames = Math.round(c.duration * c.fps);
   const tab = S.bottomTab.value;
   return (
@@ -69,6 +71,8 @@ export function Transport() {
         <button class="icon-btn" data-step="end" title={t('timeline.endEnd')} onClick={() => setTime(c.duration)}><Icon name="end" /></button>
         <button class={`icon-btn${S.loop.value ? ' on' : ''}`} title={t('timeline.loop')} onClick={() => { S.loop.value = !S.loop.value; }}><Icon name="loop" /></button>
         <button class={`icon-btn rec${recording.value ? ' on' : ''}`} data-tour="record" title={t('timeline.recordHint')} aria-label={t('timeline.recordVoiceover')} onClick={() => { void toggleVoiceover(); }}><Icon name="mic" /></button>
+        <button class={`icon-btn${voiceover ? ' on' : ''}`} title={t('voiceover.open')} aria-label={t('voiceover.open')} onClick={(e) => setVoiceover(voiceover ? null : (e.currentTarget as HTMLElement))}><Icon name="chat" /></button>
+        {voiceover && <Popover anchor={voiceover} onClose={() => setVoiceover(null)} class="voiceover-pop"><VoiceoverPanel onDone={() => setVoiceover(null)} /></Popover>}
         {recording.value && <span class="rec-state mono">{recording.value.stage === 'count' ? t('timeline.countIn', { n: recording.value.n }) : recording.value.stage === 'record' ? t('timeline.recordingNow') : t('timeline.savingTake')}</span>}
       </div>
       <Tabs />

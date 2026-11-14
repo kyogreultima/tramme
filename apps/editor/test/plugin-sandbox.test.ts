@@ -214,6 +214,13 @@ describe('the plugin sandbox', () => {
     expect(() => host.setDoc({ doc: {}, docUrl: DOC_URL, images: {}, json: { huge }, fonts: [] })).toThrow('sandbox message exceeds 64 MB');
     expect(sent).toHaveLength(0);
   });
+  it('sends a long film’s document: hundreds of thousands of values well under the byte limit', () => {
+    const sent: unknown[] = [];
+    const { host } = connectHost((message) => sent.push(message), () => DOC_URL);
+    // 2,000 layers of 60 keys each, about 250,000 values, a few MB
+    const layers = Object.fromEntries(Array.from({ length: 2000 }, (_, i) => [`l${i}`, { type: 'shape.rect', transform: { position: { $k: Array.from({ length: 60 }, (_, k) => ({ t: k / 30, v: [k, i] })) } } }]));
+    expect(() => host.setDoc({ doc: { compositions: { main: { layers } } }, docUrl: DOC_URL, images: {}, json: {}, fonts: [] })).not.toThrow();
+  });
   it('bounds bitmap memory separately from plain-data messages in both directions', async () => {
     class Bitmap { width = 8192; height = 8192; }
     vi.stubGlobal('ImageBitmap', Bitmap);
@@ -946,5 +953,51 @@ describe('the recording path', () => {
     expect(sandboxDeclaration('stars')?.meta?.name).toBe('stars');
     resetSandbox();
     expect(sandboxDeclaration('stars')).toBeNull();
+  });
+});
+
+describe('a tool and a check of one name', () => {
+  it('runs the one asked for, the check as a check and the tool as a tool', async () => {
+    const twin: PluginModule = {
+      meta: { name: 'twin' } as never,
+      tools: [{ name: 'twin.figure', description: 'lays a figure', run: () => 'the tool ran' }],
+      checks: [{ name: 'twin.figure', run: () => [{ check: 'twin.figure', severity: 'warning', message: 'the check ran' }] }],
+    } as never;
+    const { host } = pair(new Map([['blob:twin', twin]]));
+    await host.ensure([{ id: 'twin', url: 'blob:twin' }]);
+    const issues = await host.runCheck('twin.figure', { doc: doc().doc, compId: 'root', comp: {}, samples: [], step: 1 } as unknown as CheckContext);
+    expect(JSON.stringify(issues)).toContain('the check ran');
+    expect(toolOutput(await host.runTool('twin.figure', {}, toolCtx(doc().doc))).text).toBe('the tool ran');
+    host.dispose();
+  });
+});
+
+describe("a project's file read from the sandbox", () => {
+  const reader: PluginModule = {
+    meta: { name: 'reader' } as never,
+    tools: [{ name: 'reader.size', description: 'reads a picture', run: async ({ path }: { path: string }, ctx: ToolContext) => {
+      const b = await ctx.readFile!(path);
+      return b ? `${b.type} ${b.size}` : 'none';
+    } }],
+  } as never;
+
+  it('comes through the page as bytes, without network access', async () => {
+    const { host } = pair(new Map([['blob:reader', reader]]));
+    await host.ensure([{ id: 'reader', url: 'blob:reader' }]);
+    const asked: string[] = [];
+    const readFile = async (path: string) => { asked.push(path); return path === 'assets/logo.png' ? new Blob([new Uint8Array([1, 2, 3])], { type: 'image/png' }) : null; };
+    expect(toolOutput(await host.runTool('reader.size', { path: 'assets/logo.png' }, toolCtx(doc().doc, { readFile }))).text).toBe('image/png 3');
+    expect(toolOutput(await host.runTool('reader.size', { path: 'assets/none.png' }, toolCtx(doc().doc, { readFile }))).text).toBe('none');
+    expect(asked).toEqual(['assets/logo.png', 'assets/none.png']);
+    host.dispose();
+  });
+
+  it('never leaves the project', async () => {
+    const { host } = pair(new Map([['blob:reader', reader]]));
+    await host.ensure([{ id: 'reader', url: 'blob:reader' }]);
+    const readFile = vi.fn(async () => null);
+    await expect(host.runTool('reader.size', { path: '../secrets.json' }, toolCtx(doc().doc, { readFile }))).rejects.toThrow('invalid project path');
+    expect(readFile).not.toHaveBeenCalled();
+    host.dispose();
   });
 });

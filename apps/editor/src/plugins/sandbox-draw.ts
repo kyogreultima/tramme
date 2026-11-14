@@ -253,7 +253,7 @@ export function blitSandboxFrame(r: Renderer, bitmap: unknown, t: number, checke
   try {
     r.compositor.begin();
     r.compositor.add(bitmap as OffscreenCanvas, 1);
-    r.compositor.finish({ bloom: 0, bloomThreshold: 0.85, vignette: 0, grain: 0, exposure: 1 }, { bg: null, checker }, 1, { t, toFbo, scale: r.scale, onError: (e: Error) => { throw e; } });
+    r.compositor.finish({ bloom: 0, bloomThreshold: 0.85, vignette: 0, grain: 0, exposure: 1 }, { bg: null, checker }, 1, { hud: r.stamp?.(t) ?? null, t, toFbo, scale: r.scale, onError: (e: Error) => { throw e; } });
   } finally { (bitmap as { close?(): void }).close?.(); }
 }
 

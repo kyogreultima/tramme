@@ -41,6 +41,8 @@ export interface Preferences {
   paidPerTurn: number;
   /** voice-overs: the provider (auto: the first the server has a key for) and the voice ('' for its own) */
   voiceProvider: 'auto' | 'elevenlabs' | 'openai' | 'gemini' | 'hydracept';
+  /** the voices the voice-over panel offers first, per provider (none kept: its default list, voice-shortlist.ts) */
+  voiceShortlist: Record<string, { id: string; name: string; tone?: 'warm' | 'narrator' | 'lively' | 'soft' | 'clear' }[]>;
   voice: string;
   /** the ElevenLabs voice model ('' for the newest, Eleven v4) */
   voiceModel: string;
@@ -55,6 +57,8 @@ export interface Preferences {
   pluginsOff: string[];
   /** the assistant may start a transcription (a recording is sent to a speech model) without asking, also in a turn left alone */
   assistantTranscribes: boolean;
+  /** a video made from a reference goes on without showing its reading first (the outline) */
+  acceptReadings: boolean;
   /** the assistant may fetch a real brand's logo, a real person or product from Wikimedia Commons without asking, also in a turn left alone */
   assistantFetchesReal: boolean;
   /** the studio: after an area is drawn, the layers it proposes are confirmed always, only when more than three, or never */
@@ -79,13 +83,17 @@ export interface Preferences {
   videoSeconds: 4 | 6 | 8;
   /** where a dictation is transcribed: the downloaded model (this browser, the default), the companion, or the server */
   dictation: DictationSource;
+  /** the Tramme logo in a corner of the exported films; only Plus and Pro can turn it off (watermark.ts) */
+  watermark: boolean;
+  /** the first export carrying the watermark has said why */
+  watermarkTold: boolean;
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
   language: 'auto', theme: 'studio', view: 'studio', motion: 'auto', still: 'display', blur: 'document', exactFrames: true, scrubAudio: true, sandboxPreview: false,
-  effectsDb: -8, musicDb: -14, duckDb: -12, varySounds: true, confirmPaid: true, paidPerTurn: 10, voiceProvider: 'auto', voice: '', voiceModel: '', previewVolume: 1, previewMuted: false, proxies: true, models: {}, pluginsOff: [], areaConfirm: 'always', assistantTranscribes: false, assistantFetchesReal: false, checkUpdates: true, lastUpdateCheck: 0, updateNotified: '', recentCommands: [], quickLauncher: false,
+  effectsDb: -8, musicDb: -14, duckDb: -12, varySounds: true, confirmPaid: true, paidPerTurn: 10, voiceProvider: 'auto', voiceShortlist: {}, voice: '', voiceModel: '', previewVolume: 1, previewMuted: false, proxies: true, models: {}, pluginsOff: [], areaConfirm: 'always', assistantTranscribes: false, assistantFetchesReal: false, acceptReadings: false, checkUpdates: true, lastUpdateCheck: 0, updateNotified: '', recentCommands: [], quickLauncher: false,
   pictureProvider: 'auto', pictureQuality: 'auto', pictureSize: 'large', styleFrames: 2,
-  videoProvider: 'auto', videoSeconds: 8, dictation: 'local',
+  videoProvider: 'auto', videoSeconds: 8, dictation: 'local', watermark: true, watermarkTold: false,
 };
 
 // ── themes and views ─────────────────────────────────────────
@@ -145,6 +153,9 @@ function load(): Preferences {
     p.previewMuted = p.previewMuted === true;
     if (!VOICE_PROVIDERS.includes(p.voiceProvider)) p.voiceProvider = d.voiceProvider;
     if (typeof p.voice !== 'string') p.voice = d.voice;
+    p.voiceShortlist = p.voiceShortlist && typeof p.voiceShortlist === 'object' && !Array.isArray(p.voiceShortlist)
+      ? Object.fromEntries(Object.entries(p.voiceShortlist).filter(([, l]) => Array.isArray(l)).map(([k, l]) => [k, l.filter((v) => v && typeof v.id === 'string' && typeof v.name === 'string').slice(0, 10)]))
+      : {};
     if (typeof p.voiceModel !== 'string') p.voiceModel = d.voiceModel;
     p.proxies = p.proxies !== false;
     const models = p.models && typeof p.models === 'object' ? p.models : {};
@@ -152,6 +163,7 @@ function load(): Preferences {
     p.pluginsOff = Array.isArray(p.pluginsOff) ? p.pluginsOff.filter((x) => typeof x === 'string') : [];
     p.areaConfirm = p.areaConfirm === 'many' || p.areaConfirm === 'never' ? p.areaConfirm : 'always';
     p.assistantTranscribes = p.assistantTranscribes === true;
+    p.acceptReadings = p.acceptReadings === true;
     p.assistantFetchesReal = p.assistantFetchesReal === true;
     p.checkUpdates = p.checkUpdates !== false;
     p.lastUpdateCheck = Number.isFinite(p.lastUpdateCheck) ? p.lastUpdateCheck : 0;

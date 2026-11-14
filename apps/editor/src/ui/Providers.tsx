@@ -65,13 +65,15 @@ function ProviderForm({ fields, link, onSave, onClose }: { fields: FormField[]; 
   };
   return (
     <form class="set-confirm set-form" onSubmit={submit}>
-      {fields.map((f, i) => (
-        <label key={f.name} class="set-form-field">
+      {fields.map((f, i) => {
+        const field = { autoComplete: 'off', spellcheck: false, autoFocus: i === 0, value: values[f.name], placeholder: f.placeholder,
+          onInput: (e: Event) => setValues({ ...values, [f.name]: (e.target as HTMLInputElement).value }) };
+        // a password field and a text one are two kinds of input to Preact's types
+        return <label key={f.name} class="set-form-field">
           <span>{f.label}</span>
-          <div class="field"><input type={f.secret ? 'password' : 'text'} autoComplete="off" spellcheck={false} autoFocus={i === 0} value={values[f.name]} placeholder={f.placeholder}
-            onInput={(e) => setValues({ ...values, [f.name]: (e.target as HTMLInputElement).value })} /></div>
-        </label>
-      ))}
+          <div class="field">{f.secret ? <input type="password" {...field} /> : <input type="text" {...field} />}</div>
+        </label>;
+      })}
       {error && <span class="set-form-error">{error}</span>}
       <div class="set-confirm-actions">
         {link && <a class="btn ghost sm set-form-link" href={link} target="_blank" rel="noopener noreferrer">{t('settings.getAKey')}</a>}

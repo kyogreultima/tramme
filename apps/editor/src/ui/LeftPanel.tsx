@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { addLayer, applyOps, isLocked, layerActive, moveLayer, pointer, propKind, removeLayer, staticValue, type Asset, type KeyframedProp, type Prop, type StaticProp, type Vec2, type TrammeDoc, type Layer, type NodeType, type Op, type PresetType, type TokenType } from '@tramme/core';
 import { clickSelect, comp, commit, foldAll, S, select, toggleFold, viewDoc, toast, uiTime } from '../state.ts';
 import { fitCompOps, flatTree, freshId, layerName, shiftProp, parentOf, SOUND_GROUP, soundGroupOf, subtree, topLayers, commonStem, folderOf, imagesIn, wholeFile } from '../model.ts';
-import { ColorField, longPress, openMenu, Seg, Swatch, TextInput, resolveColor, type MenuItem } from './controls.tsx';
+import { ColorField, longPress, menuMatches, openMenu, phoneLayout, Seg, Swatch, TextInput, resolveColor, type MenuEntry, type MenuItem } from './controls.tsx';
 import { Icon, kindColor, kindIcon } from './icons.tsx';
 import { ASSET_MIME, chosenAsset, COMP_MIME, sourceOpen } from './timeline/assets-drag.ts';
 import { newSequenceFromAsset } from './timeline/place.ts';
@@ -145,26 +145,32 @@ export async function assetLayer(id: string, a: Asset): Promise<{ layer: Layer; 
   return null;
 }
 
-export function addLayerMenu(e: MouseEvent | DOMRect) {
+/** what can be added to the composition, by section: the layers of the registry and the ready-made ones (the editor's, the plugins') */
+export function layerChoices(): { section: string; entries: MenuEntry[] }[] {
   const reg = S.registry.peek();
   const groups = new Map<string, NodeType[]>();
   for (const n of reg.listNodes()) { if (!groups.has(n.category)) groups.set(n.category, []); groups.get(n.category)!.push(n); }
-  const items: MenuItem[] = [];
-  for (const [cat, nodes] of groups) {
-    items.push({ section: t(cat) });
-    for (const n of nodes) items.push({ label: t(n.title), icon: kindIcon(n.type), onClick: () => insertLayer(newLayer(S.doc.peek(), S.compId.peek(), n)) });
-  }
+  // one section per name: a category of layers and one of ready-made layers that share a name (Print) are one
+  const sections = new Map<string, MenuEntry[]>();
+  const into = (cat: string, entry: MenuEntry) => { const name = t(cat); if (!sections.has(name)) sections.set(name, []); sections.get(name)!.push(entry); };
+  for (const [cat, nodes] of groups) for (const n of nodes) into(cat, { label: t(n.title), icon: kindIcon(n.type), onClick: () => insertLayer(newLayer(S.doc.peek(), S.compId.peek(), n)) });
   // ready-made layers: the editor's and the project's plugins'
   const presets = reg.listPresets().filter(({ preset }) => (preset.layer ? reg.hasNode(preset.layer.type) : !!preset.effects?.length));
-  const sections = new Map<string, typeof presets>();
-  for (const p of presets) { const cat = p.preset.category ?? m('panel.presets'); if (!sections.has(cat)) sections.set(cat, []); sections.get(cat)!.push(p); }
-  for (const [cat, list] of sections) {
-    items.push({ section: t(cat) });
-    for (const { preset } of list) items.push(preset.effects
-      ? { label: tr(preset.title ?? preset.name), icon: 'effects' as const, onClick: () => applyStack(preset) }
-      : { label: tr(preset.title ?? preset.name), icon: kindIcon(preset.layer!.type), onClick: () => insertLayer(presetLayer(preset), preset.name) });
+  for (const { preset } of presets) {
+    const cat = preset.category ?? m('panel.presets'), label = tr(preset.title ?? preset.name);
+    // a ready-made layer named as the layer it is made of (Bar chart) says what it holds
+    const detail = preset.description && sections.get(t(cat))?.some((e) => e.label === label) ? tr(preset.description) : undefined;
+    into(cat, preset.effects
+      ? { label, detail, icon: 'effects' as const, onClick: () => applyStack(preset) }
+      : { label, detail, icon: kindIcon(preset.layer!.type), onClick: () => insertLayer(presetLayer(preset), preset.name) });
   }
-  openMenu(e as MouseEvent, items);
+  return [...sections].map(([section, entries]) => ({ section, entries }));
+}
+
+/** adding a layer: a menu at the pointer on a computer; on a phone, the Effects tab (a floating list of sixty entries is a computer's gesture) */
+export function addLayerMenu(e: MouseEvent | DOMRect) {
+  if (phoneLayout()) { S.mobileTab.value = 'effects'; return; }
+  openMenu(e as MouseEvent, layerChoices().flatMap(({ section, entries }): MenuItem[] => [{ section }, ...entries]));
 }
 
 export function deleteSelection() {
@@ -831,6 +837,48 @@ function Tokens() {
           </div>
         ))}
       </>}
+    </div>
+  );
+}
+
+/**
+ * The phone's Effects tab (App.tsx), as a video app's: the sections as a row of tabs that scrolls, the
+ * chosen one's layers and ready-made layers as tiles, a search across all of them. A tile adds its layer
+ * and shows the picture, where it now is.
+ */
+export function LayerLibrary() {
+  const choices = layerChoices();
+  const [section, setSection] = useState(choices[0]?.section ?? '');
+  const [query, setQuery] = useState('');
+  const searching = !!query.trim();
+  const shown = searching
+    ? choices.map((c) => ({ ...c, entries: c.entries.filter((it) => menuMatches(it, query)) })).filter((c) => c.entries.length)
+    : choices.filter((c) => c.section === section);
+  return (
+    <div class="layer-library">
+      <div class="library-head">
+        <div class="field"><Icon name="search" /><input value={query} placeholder={t('common.findInMenu')} aria-label={t('common.findInMenu')} spellcheck={false} onInput={(e) => setQuery((e.target as HTMLInputElement).value)} /></div>
+      </div>
+      {!searching && (
+        <div class="library-sections" role="tablist">
+          {choices.map((c) => <button key={c.section} role="tab" aria-selected={c.section === section} class={`chip${c.section === section ? ' on' : ''}`} onClick={() => setSection(c.section)}>{c.section}</button>)}
+        </div>
+      )}
+      <div class="library-body">
+        {searching && !shown.length && <div class="empty">{t('common.noMatch')}</div>}
+        {shown.map((c) => (
+          <section key={c.section}>
+            {searching && <div class="menu-label">{c.section}</div>}
+            <div class="library-grid">
+              {c.entries.map((it) => (
+                <button key={`${it.label}${it.detail ?? ''}`} class="library-tile" disabled={it.disabled} onClick={() => { it.onClick(); S.mobileTab.value = 'viewport'; }}>
+                  {it.icon && <Icon name={it.icon} />}<span class="library-name">{it.label}</span>{it.detail && <span class="library-detail">{it.detail}</span>}
+                </button>
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
     </div>
   );
 }

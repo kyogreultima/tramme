@@ -27,6 +27,31 @@ those videos, not general.
 6. Run the same brief a second time in a new project: the two films are scored
    apart, then side by side for variety.
 
+### Running a brief unattended
+
+`node bench/run.ts <brief id>` does the steps above alone, on the trial server
+(port 8790, its own state in `.wrangler/state-bench`) with the companion:
+
+```
+pnpm exec wrangler dev -c apps/worker/wrangler.jsonc --port 8790 --var DEV_OPEN:1 --persist-to .wrangler/state-bench
+node packages/cli/src/main.ts agent --origin http://localhost:8790
+node bench/run.ts logo-sting --series baseline --cap 6 --effort high
+```
+
+The turn goes through Claude Code, so it spends the subscription's quota: it is
+stopped once its cost, read live from Claude Code's transcripts at the API's
+prices, passes `--cap` dollars. `--dry` opens the project and checks the
+companion answers without sending anything. The run leaves in
+`out/bench/<series>/<brief>-<n>/` the conversations (for `usage.ts`), the
+transcripts and `run.json`; the project stays on the trial server to be watched
+and scored. A brief's `files` (paths under `bench/`) are put in the project's
+`assets/` first.
+
+`node bench/series.ts <series> [<other series>]` lists a series' runs (cost,
+requests, time, stopped at the cap or not), or compares two series brief by
+brief. It reads `run.json`, whose cost comes from the transcripts: a turn
+stopped at its cap is counted whole, where its usage line may be missing.
+
 ### What a run costs, and what a change did to it
 
 `node bench/usage.ts <project>` prints, for each turn, its tokens, the share
@@ -85,9 +110,9 @@ decoding or the transfer). The GPU works asynchronously: its share of a frame
 is paid when the pixels are read back.
 
 ```
-npm run tramme -- load --json before.json          # before a change
-npm run tramme -- load --before before.json        # after: each figure with its change
-npm run tramme -- load video4k --frames 30         # one case, its first second
+pnpm tramme load --json before.json    # before a change
+pnpm tramme load --before before.json  # after: each figure with its change
+pnpm tramme load video4k --frames 30   # one case, its first second
 ```
 
 The figures depend on the machine (a real GPU or a software one, the cores):

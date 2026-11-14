@@ -15,6 +15,7 @@ import { uploads } from '../files.ts';
 import { transcriptions } from '../speech.ts';
 import { SettingsDialog } from './Settings.tsx';
 import { settingsOpen } from '../settings.ts';
+import { DeviceSaveSheet } from './DeviceSaveSheet.tsx';
 import { QuestionDialog } from './QuestionDialog.tsx';
 import { SourceMonitor } from './Source.tsx';
 import { MulticamPanel } from './Multicam.tsx';
@@ -100,5 +101,5 @@ export function Toasts() {
 
 /** the settings, the questions asked, the menus and the toasts, over any page (the question last: it waits on top) */
 export function Overlays() {
-  return <><SettingsDialog /><MenuHost /><Toasts /><QuestionDialog /><SourceMonitor /><MulticamPanel /><FillerCutsPanel /></>;
+  return <><SettingsDialog /><MenuHost /><Toasts /><QuestionDialog /><DeviceSaveSheet /><SourceMonitor /><MulticamPanel /><FillerCutsPanel /></>;
 }

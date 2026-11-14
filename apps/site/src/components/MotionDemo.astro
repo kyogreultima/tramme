@@ -1,0 +1,121 @@
+---
+// What an animation card says, shown moving: a key easing along its curve,
+// the usual behaviours, a layer following another, a palette the shapes
+// follow. CSS only, played while on screen (scripts/live.ts); with reduced
+// motion each stands in its own still state.
+export type DemoKind = 'curve' | 'behaviours' | 'follow' | 'style';
+interface Props { kind: DemoKind }
+const { kind } = Astro.props;
+// the curve of the graph editor, the same ease the square moves with
+const CURVE = 'M12 84 C 88 84, 112 16, 188 16';
+---
+
+<div class:list={['demo', kind]} data-live aria-hidden="true">
+  {kind === 'curve' && (
+    <>
+      <svg class="graph" viewBox="0 0 200 100">
+        <path class="handle" d="M12 84 L88 84 M188 16 L112 16" />
+        <circle class="grip" cx="88" cy="84" r="3" /><circle class="grip" cx="112" cy="16" r="3" />
+        <path class="ease" d={CURVE} />
+        <rect class="key" x="7" y="79" width="10" height="10" transform="rotate(45 12 84)" />
+        <rect class="key" x="183" y="11" width="10" height="10" transform="rotate(45 188 16)" />
+        <circle class="now" r="4.5" style={`offset-path: path('${CURVE}')`} />
+      </svg>
+      <div class="lane"><span class="mover"></span></div>
+    </>
+  )}
+  {kind === 'behaviours' && (
+    <div class="row">
+      <span class="cell"><span class="shape wiggle"></span></span>
+      <span class="cell"><span class="orbit"><span class="shape dot"></span></span></span>
+      <span class="cell"><span class="shape spring"></span></span>
+    </div>
+  )}
+  {kind === 'follow' && (
+    <div class="stage">
+      <span class="shape leader"></span>
+      <span class="shape follower"></span>
+    </div>
+  )}
+  {kind === 'style' && (
+    <div class="palette">
+      <div class="swatches"><span class="sw a"></span><span class="sw b"></span><span class="sw c"></span></div>
+      <div class="shapes"><span class="shape a"></span><span class="shape b round"></span><span class="shape a wide"></span><span class="shape c round"></span><span class="shape a round"></span></div>
+    </div>
+  )}
+</div>
+
+<script>
+  import '../scripts/live.ts';
+</script>
+
+<style>
+  .demo { position: relative; height: 150px; margin-bottom: 12px; overflow: hidden; border-radius: calc(var(--r-lg) - 6px); background: var(--bg); box-shadow: inset 0 0 0 1px var(--line); }
+  .shape { display: block; width: 26px; height: 26px; border-radius: 7px; background: var(--accent); }
+
+  /* keyframes and curves: the graph above, the square below moving at the speed it gives */
+  .graph { position: absolute; inset: 12px 16px 46px; width: calc(100% - 32px); height: calc(100% - 58px); overflow: visible; }
+  .graph .ease { fill: none; stroke: var(--accent); stroke-width: 2; }
+  .graph .handle { stroke: var(--ink-3); stroke-width: 1; }
+  .graph .grip { fill: var(--bg); stroke: var(--ink-3); }
+  .graph .key { fill: var(--ink); }
+  .graph .now { fill: var(--accent); offset-distance: 100%; }
+  .lane { position: absolute; left: 16px; right: 16px; bottom: 12px; height: 24px; border-radius: 6px; background: var(--panel); }
+  .mover { position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 5px; background: var(--accent); translate: calc(100cqw - 24px) 0; }
+  .lane { container-type: inline-size; }
+
+  /* the usual behaviours: a wiggle, a loop, a spring */
+  .row { display: grid; grid-template-columns: repeat(3, 1fr); height: 100%; }
+  .cell { display: grid; place-items: center; }
+  .cell + .cell { box-shadow: inset 1px 0 0 var(--line); }
+  .orbit { display: grid; place-items: start center; width: 64px; height: 64px; border-radius: 50%; box-shadow: inset 0 0 0 1px var(--line-2); }
+  .dot { width: 16px; height: 16px; margin-top: -8px; border-radius: 50%; }
+
+  /* properties that follow: the second takes the first's position, a moment later */
+  .stage { position: absolute; inset: 0; }
+  .leader, .follower { position: absolute; left: 20%; top: 50%; margin: -13px 0 0 -13px; }
+  .follower { border-radius: 50%; background: transparent; box-shadow: inset 0 0 0 2px var(--accent); }
+
+  /* a style named once: the first swatch changes, every shape of its colour follows */
+  .palette { display: grid; align-content: center; gap: 18px; height: 100%; padding-inline: 20px; }
+  .swatches { display: flex; gap: 8px; }
+  .sw { width: 22px; height: 22px; border-radius: 6px; }
+  .shapes { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+  .shape.round { border-radius: 50%; }
+  .shape.wide { width: 54px; }
+  .a { background: var(--accent); }
+  .b { background: var(--ink-2); }
+  .c { background: var(--ink-3); }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .graph .now { animation: along 2.6s cubic-bezier(0.65, 0, 0.35, 1) infinite alternate; }
+    .mover { animation: across 2.6s cubic-bezier(0.65, 0, 0.35, 1) infinite alternate; }
+    .wiggle { animation: wiggle 1.4s ease-in-out infinite; }
+    .orbit { animation: turn 2.4s linear infinite; }
+    .spring { animation: spring 2.2s infinite; }
+    .leader { animation: path 4s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+    /* the same move, a third of a second later */
+    .follower { animation: path 4s cubic-bezier(0.45, 0, 0.55, 1) 0.35s infinite; }
+    .a { animation: restyle 5s steps(1) infinite; }
+  }
+  @keyframes along { from { offset-distance: 0%; } to { offset-distance: 100%; } }
+  @keyframes across { from { translate: 0 0; } to { translate: calc(100cqw - 24px) 0; } }
+  @keyframes wiggle {
+    0% { transform: translate(0, 0) rotate(0); } 12% { transform: translate(3px, -2px) rotate(6deg); } 24% { transform: translate(-2px, 3px) rotate(-4deg); }
+    36% { transform: translate(2px, 2px) rotate(3deg); } 48% { transform: translate(-3px, -1px) rotate(-7deg); } 60% { transform: translate(1px, -3px) rotate(4deg); }
+    72% { transform: translate(-1px, 2px) rotate(-2deg); } 84% { transform: translate(3px, 1px) rotate(5deg); }
+  }
+  @keyframes turn { to { rotate: 1turn; } }
+  @keyframes spring {
+    0% { transform: translateY(-34px) scale(0.9, 1.1); animation-timing-function: cubic-bezier(0.5, 0, 1, 0.6); }
+    22% { transform: translateY(0) scale(1.18, 0.82); animation-timing-function: ease-out; }
+    36% { transform: translateY(-12px) scale(0.95, 1.05); animation-timing-function: ease-in; }
+    48% { transform: translateY(0) scale(1.06, 0.94); animation-timing-function: ease-out; }
+    58% { transform: translateY(-3px); animation-timing-function: ease-in; }
+    66%, 100% { transform: translateY(0); }
+  }
+  @keyframes path {
+    0%, 100% { left: 20%; top: 50%; } 25% { left: 50%; top: 28%; } 50% { left: 80%; top: 50%; } 75% { left: 50%; top: 72%; }
+  }
+  @keyframes restyle { 0% { background: var(--accent); } 33% { background: var(--accent-2); } 66% { background: var(--ink); } }
+</style>

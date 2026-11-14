@@ -35,6 +35,9 @@ export interface ConsultRequest {
   signal: AbortSignal;
 }
 
+/** a data URL as the parts a request takes; null when it is none */
+export const dataImage = (url: string) => { const m = /^data:([^;]+);base64,(.*)$/.exec(url); return m ? { mediaType: m[1], data: m[2] } : null; };
+
 /** the strongest Claude listed now (the one recommended, else the newest Opus) on the server and with the companion's Claude, the turn's own model on every other route, and when none is listed */
 export function criticModel(route: ConsultRoute, turnModel: string): string {
   return route === 'server' || (route === 'companion' && engineOf(turnModel) === 'claude') ? defaultClaudeModel() ?? turnModel : turnModel;

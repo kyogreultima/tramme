@@ -15,8 +15,11 @@ import { DOCUMENT } from '@tramme/project';
 import { upgradeDoc, type TrammeDoc } from '@tramme/core';
 import { api } from './api.ts';
 import { preview } from './preview.ts';
-import { commit, hooks, load, S, select, setTime, undo } from './state.ts';
-import { loadChats, runTool, watchCompanion } from './ai/index.ts';
+import { comp, commit, hooks, load, S, select, setTime, undo } from './state.ts';
+import { measureRhythm } from './critic/rhythm.ts';
+import { transcribeAsset } from './speech.ts';
+import { aiRoute, chat, chatId, loadChats, runTool, watchCompanion } from './ai/index.ts';
+import { running, send, stop } from './ai/conversation.ts';
 import { App } from './ui/App.tsx';
 import { Home } from './ui/Home.tsx';
 import { normalize, route, SPA_PATHS, startRouter } from './router.ts';
@@ -45,6 +48,7 @@ import { startProject } from './start.ts';
 import { t } from './i18n/index.ts';
 import { boot } from './mode.ts';
 import { initDesktop } from './desktop.ts';
+import { carryBodies, followBars, startBackButton } from './device.ts';
 import { watchUpdates } from './version.ts';
 import { copiesFor, startInstalled } from './installed.ts';
 import { lift } from './nav.ts';
@@ -95,8 +99,11 @@ async function openProject(id: string) {
   hooks.afterSave = () => { thumbnail(); };
   hooks.copies = copiesFor;
   if (!info.manifest.thumbnail) setTimeout(() => thumbnail(true), 1500);
-  // a handle for measurements and automated checks (tramme bench); runTool runs a tool of the / menu, its events returned
-  (window as any).__tramme = { S, preview, select, setTime, undo, commit, runTool, exportQueue };
+  // a handle for measurements and automated checks (tramme bench, bench/run.ts); runTool runs a tool of the / menu, its events returned;
+  // send, running, chat and stop drive a turn of the assistant as the message box does; rhythm measures the composition on screen as the critic does
+  const rhythm = () => measureRhythm(comp.peek().duration, (t) => preview.thumbnail(t, 480));
+  // transcribe starts a media's transcription as its Transcribe button does (the proofs, scripts/proofs.ts)
+  (window as any).__tramme = { S, preview, select, setTime, undo, commit, runTool, transcribe: transcribeAsset, exportQueue, send, running, chat, chatId, stop, aiRoute, rhythm };
 }
 
 const query = new URLSearchParams(location.search);
@@ -128,6 +135,8 @@ async function answerNotices(q: URLSearchParams) {
 }
 
 const m = location.pathname.match(/^\/p\/([a-z0-9][a-z0-9-]{2,63})\/?$/);
+// on the phone, a request's body goes to the app through the IPC: set before the first request
+carryBodies();
 boot().then(() => {
   // the quick bubble's own window: the bubble alone, none of the app around it
   if (location.pathname === '/quick') {
@@ -140,6 +149,8 @@ boot().then(() => {
   void startMeasuring();
   // the native app: a .tramme handed by the system imports like a dropped one
   initDesktop();
+  startBackButton();
+  followBars();
   // the plugins installed on this device, read once from where they are kept
   startInstalled();
   // the local companion, found whenever it starts, on the home page and in the editor

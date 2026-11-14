@@ -5,18 +5,19 @@
 // only changes through proposals the user applies.
 
 import { copiesFor, copyId, installedTypes, sandboxedDoc } from '../installed.ts';
-import { applyOps, getAt, isTranscript, pointer, remapTranscript, silences, toolInputIssues, toolOutput, validate, type TrammeDoc, type Op, type Registry, type ToolContext, type Transcript } from '@tramme/core';
+import { applyOps, getAt, isTranscript, pointer, remapTranscript, silences, repairToolInput, toolInputIssues, toolOutput, validate, type TrammeDoc, type Op, type Registry, type ToolContext, type Transcript } from '@tramme/core';
 import { editorEvaluator } from '../evaluator.ts';
 import { DOCUMENT, isChatPath, MANIFEST, pathIssue, srcPath } from '@tramme/project';
 import { VideoFrames } from '@tramme/render';
 import { Stills } from '../frames.ts';
-import type { ToolResult } from '@tramme/assistant';
+import { guidesOf, type ToolResult } from '@tramme/assistant';
+import reference from '../../../../docs/document.md';
 import { inputIssues, vocabularyDetail, vocabularyIndex } from './answers.ts';
 import { uid } from './calls.ts';
 import { isSceneTextPath } from '../scene-tools.ts';
 import { bumpScene } from '../webscene-preview.ts';
 import { api, type AiEvent } from '../api.ts';
-import { describeOp, freshId } from '../model.ts';
+import { describeOp, fitLongest, freshId, replaceOnce } from '../model.ts';
 import { analyses, jpegOf, loadImage } from '../perception.ts';
 import { fileProject, requireFileProject, sameFileProject, safeName } from '../files.ts';
 import { transcriptFor, transcriptIdOf } from '../speech.ts';
@@ -28,10 +29,12 @@ import { approvedProjectResource, readLimitedBody } from '../plugins/host.ts';
 import { pluginHost } from '../plugins/index.ts';
 import { ensureDeclared, ensureSandboxDoc, moduleItemsOf } from '../plugins/sandbox-draw.ts';
 import { preview } from '../preview.ts';
+import { checksText } from '../review.ts';
 import { prefs } from '../settings.ts';
 
 const text =(s: string, isError = false): ToolResult => ({ content: [{ type: 'text', text: s }], isError });
-const STILL_WIDTH = 768;
+/** the longest side of a still the assistant sees */
+const STILL_SIDE = 768;
 const TEXT_FILE = /\.(js|mjs|json|svg|md|markdown)$/i;
 /** a file read in parts of this many characters (about 15k tokens) */
 const READ_PART = 50_000;
@@ -203,7 +206,7 @@ export class ToolRunner {
       source = f.image; w = frames.width; h = frames.height;
     } else return text(`${assetId}: a video or an image is expected`, true);
     requireFileProject(project);
-    const url = jpegOf(source, w, h, Math.min(1, STILL_WIDTH / w));
+    const url = jpegOf(source, w, h, fitLongest(w, h, STILL_SIDE)[0] / w);
     this.events.push({ type: 'item', item: { id: uid(), role: 'assistant', image: { url, caption: `${a.name ?? assetId}${a.type === 'video' ? ` · ${t.toFixed(2)} s` : ''}` } } });
     return { content: [{ type: 'image', data: url.slice(url.indexOf(',') + 1), mimeType: 'image/jpeg' }] };
   }
@@ -317,7 +320,10 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
           return text(JSON.stringify(editorEvaluator(doc, reg, { data }).value(String(input.address), Number(input.t), compId)));
         }
         case 'render_still': return await this.still(Number(input.t), input.compId, input.caption);
-        case 'propose_changes': return await this.propose(String(input.label ?? 'Change'), input.ops as Op[]);
+        case 'propose_changes': {
+          const r = await this.propose(String(input.label ?? 'Change'), input.ops as Op[]);
+          return r.isError ? r : await this.withChecks(r);
+        }
         case 'discard_proposal': {
           // a scene builder drops its own changes: the director's root and the scenes built before it stay proposed
           if (this.scoped && this.before) {
@@ -336,7 +342,11 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
           return text(files.map((f) => `${f.path}\t${f.size} bytes`).join('\n') || '(no files)');
         }
         case 'read_file': return await this.read(String(input.path ?? ''), Number(input.offset ?? 0));
-        case 'write_file': return await this.write(String(input.path ?? ''), String(input.content ?? ''));
+        case 'read_guide': {
+          const guides = guidesOf(reference), guide = guides.find((g) => g.name === String(input.name ?? '').trim().toLowerCase());
+          return guide ? text(guide.text) : text(`no guide named "${input.name}": ${guides.map((g) => g.name).join(', ')}`, true);
+        }
+        case 'write_file': return await this.write(String(input.path ?? ''), String(input.content ?? ''), typeof input.find === 'string' ? input.find : undefined);
         case 'get_transcript': return await this.transcript(String(input.asset ?? ''), input.from, input.to, !!input.words);
         case 'media_frame': return await this.mediaFrame(String(input.asset ?? ''), Number(input.t ?? 0));
         case 'cut_media': return await this.cut(input);
@@ -358,7 +368,8 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
   /** a still of the live document, as a JPEG data URL */
   private stillUrl(t: number, compId?: string): Promise<string> {
     const doc = this.liveDoc();
-    return this.stills.still(doc, t, compId && doc.compositions[compId] ? compId : this.scoped ? this.compOf(doc) : doc.root, STILL_WIDTH);
+    const id = compId && doc.compositions[compId] ? compId : this.scoped ? this.compOf(doc) : doc.root, c = doc.compositions[id];
+    return this.stills.still(doc, t, id, c ? fitLongest(c.width, c.height, STILL_SIDE)[0] : STILL_SIDE);
   }
 
   private async still(t: number, compId: string | undefined, caption?: string): Promise<ToolResult> {
@@ -402,6 +413,13 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
       selection: S.selection.peek().filter((id) => doc.compositions[compId].layers[id]),
       assetUrl: (id) => { current(); const a = doc.assets[id]; if (!a) throw new Error(`unknown asset: ${id}`); const url = urlOf(a.src); assetPath(a.src); return url; },
       readText: async (path) => { const value = await readProjectText(projectId, isSceneTextPath(path) ? projectPath(path) : assetPath(path)); current(); return value; },
+      readFile: async (path) => {
+        const r = await fetch(urlOf(assetPath(path)), { cache: 'no-store' });
+        current();
+        if (r.status === 404) return null;
+        if (!r.ok) throw new Error(`${path} could not be read (HTTP ${r.status})`);
+        return new Blob([(await readLimitedBody(r, 64 * 1024 * 1024, path)) as Uint8Array<ArrayBuffer>], { type: r.headers.get('content-type') ?? '' });
+      },
       folderFiles: async (folder) => { current(); const value = (await api.info(projectId)).files.filter(({ path }) => path.startsWith(`${folder}/`) && !pathIssue(path) && !/[%#]/.test(path)).map(({ path, size }) => ({ path, size })); current(); return value; },
       files: async () => { current(); const value = (await api.info(projectId)).files.filter(({ path }) => path.startsWith('assets/') && !pathIssue(path) && !/[%#]/.test(path)).map(({ path, size }) => ({ path, size })); current(); return value; },
       fileUrl: (path) => urlOf(assetPath(path)),
@@ -428,7 +446,7 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
   }
 
   /** a tool of the project's plugins: its text and images for the assistant, its operations added to the proposal */
-  private async useTool(name: string, input: unknown): Promise<ToolResult> {
+  private async useTool(name: string, given: unknown): Promise<ToolResult> {
     this.notice = '';
     const projectId = S.project.peek().id, docUrl = S.docUrl.peek();
     const current = () => S.project.peek()?.id === projectId && S.docUrl.peek() === docUrl;
@@ -440,6 +458,8 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
       return text(`unknown tool: ${name}. ${names.length ? `Tools of this project: ${names.join(', ')}.` : 'This project has no tools (list_nodes).'}`, true);
     }
     const { tool, from } = reg.tool(name);
+    // a slip whose meaning is plain is put right here rather than costing the model another call; it is told how its input was read
+    const { input, repaired } = repairToolInput(tool.input, given);
     const issues = toolInputIssues(tool.input, input);
     if (issues.length) return text(`input refused by ${name}:\n${issues.join('\n')}`, true);
     let out;
@@ -465,8 +485,23 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
       if (r.isError) return text([said, ...lines].join('\n'), true);
       lines.push(said);
     }
+    if (repaired.length) lines.push(`(input read as: ${repaired.join('; ')})`);
     content.unshift({ type: 'text', text: lines.join('\n') || `${name}: done.` });
     return { content };
+  }
+
+  /**
+   * A proposal's answer with the picture's quality checks of the composition as it now
+   * stands: the model reads what is wrong without another call. The contact sheet and the
+   * sound stay with the check tool. Checks that cannot run leave the answer as it was.
+   */
+  private async withChecks(r: ToolResult): Promise<ToolResult> {
+    try {
+      const doc = this.liveDoc(), ctx = this.toolContext(doc, await this.registry(doc));
+      const checks = await checksText(ctx);
+      const said = r.content[0]?.type === 'text' ? r.content[0].text : '';
+      return { ...r, content: [{ type: 'text', text: `${said}\nChecks of "${ctx.compId}" with it: ${checks}` }, ...r.content.slice(1)] };
+    } catch { return r; }
   }
 
   private async propose(label: string, ops: Op[], current?: () => boolean): Promise<ToolResult> {
@@ -522,12 +557,20 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
     return text(`[${path}: characters ${offset} to ${end} of ${body.length}${more}]\n${body.slice(offset, end)}`);
   }
 
-  private async write(path: string, content: string): Promise<ToolResult> {
+  private async write(path: string, given: string, find?: string): Promise<ToolResult> {
     const project = fileProject();
     const bad = pathIssue(path) ?? (/%|#/.test(path) ? 'invalid project path' : null);
     if (bad) return text(`${path}: ${bad}`, true);
     const ok = (/^plugins\/.+\.(js|mjs)$/i.test(path)) || (/^assets\/.+\.(json|svg)$/i.test(path));
     if (!ok) return text('allowed writes: plugins/*.js|mjs and assets/*.json|svg. The document changes through propose_changes.', true);
+    // with find, only that part changes: the file is read, the passage replaced, and the whole written back
+    let content = given;
+    if (find !== undefined) {
+      const body = await readProjectText(project.id, path);
+      requireFileProject(project);
+      if (body === null) return text(`${path} not found: write it whole, without find`, true);
+      content = replaceOnce(body, find, given, path);
+    }
     await api.write(project.id, path, content, { type: /\.(js|mjs)$/i.test(path) ? 'text/javascript' : undefined });
     requireFileProject(project);
     if (path.startsWith('plugins/')) this.wrotePlugins.add(path);

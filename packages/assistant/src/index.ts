@@ -6,13 +6,14 @@
 import { z } from 'zod';
 import { claudeModel, EFFORTS, type Effort } from './claude-models.ts';
 import { listedLabel, readableModel } from './model-names.ts';
+import { splitGuides, type Guide } from './guides.ts';
 
 // The Claude models are not listed here: they come from the Agent SDK or the Anthropic API, as they are now
 export * from './claude-models.ts';
 export { readableModel, setModelLabels } from './model-names.ts';
 
-/** Claude's level when none is chosen; the other models keep their own default */
-export const DEFAULT_EFFORT: Effort = 'high';
+/** Claude's level when none is chosen (the bench made films as good for 62 % less at medium than at high, bench/ledger.md); the other models keep their own default */
+export const DEFAULT_EFFORT: Effort = 'medium';
 
 // ── other models ─────────────────────────────────────────────
 // Claude goes through the companion or the server's Anthropic key. The others
@@ -127,7 +128,7 @@ export function effortLevels(model: string, reasons = false): Effort[] {
   }
 }
 
-/** the level a model works at: the one chosen for it, otherwise high for Claude (when its listing gives it levels) and nothing for the others (their own default) */
+/** the level a model works at: the one chosen for it, otherwise DEFAULT_EFFORT for Claude (when its listing gives it levels) and nothing for the others (their own default) */
 export function effortFor(model: string, chosen: Record<string, Effort | undefined>, reasons = false): Effort | undefined {
   const levels = effortLevels(model, reasons);
   if (!levels.length) return undefined;
@@ -226,11 +227,18 @@ export const TOOLS: ToolDef[] = [
     label: (i) => t('Reading {path}', { path: i.path }),
   },
   {
+    name: 'read_guide',
+    description: 'A guide of the instructions, by its name in the index at the end of the system prompt: read it before the work it covers, once in a conversation.',
+    schema: z.object({ name: z.string().describe('the guide\'s name, e.g. speaking') }),
+    label: (i) => t('Reading the guide {name}', { name: i.name }),
+  },
+  {
     name: 'write_file',
-    description: 'Writes a text file of the project: a plugin in plugins/ (.js or .mjs), or data in assets/ (.json, .svg). The document is never written this way: it changes through propose_changes. A plugin already in use is reloaded in the preview.',
+    description: 'Writes a text file of the project: a plugin in plugins/ (.js or .mjs), or data in assets/ (.json, .svg). With find, changes only that part of an existing file: use it to correct a file rather than writing it whole again. The document is never written this way: it changes through propose_changes. A plugin already in use is reloaded in the preview.',
     schema: z.object({
       path: z.string().describe('e.g. plugins/star.js'),
-      content: z.string(),
+      content: z.string().describe('the whole file; with find, the text that replaces it'),
+      find: z.string().optional().describe('text copied exactly from the existing file, which must occur once'),
     }),
     label: (i) => t('Writing {path}', { path: i.path }),
   },
@@ -308,7 +316,7 @@ Rules:
 - Every change to the document goes through the propose_changes tool (JSON Patch operations). The user sees your proposal as a preview, then applies or rejects it.
 - propose_changes adds up to your pending proposal (operations chain on the validated document plus your previous operations of this turn). discard_proposal starts over.
 - When the request is about "this", "this layer", "here", "now": it means the selection and the current time given in the message context.
-- Check your work: after a proposal, run the check tool (use_tool "check": quality checks and a contact sheet of the key moments) and fix the warnings that matter; use the motion tool to judge an entrance or a transition, render_still for one precise frame. Be thrifty: no more pictures than needed.
+- Check your work: a proposal's answer carries the quality checks of its composition; fix the warnings that matter. Look at the picture (use_tool "check": the contact sheet of the key moments, and the sound) once a scene or a change is built, not after every proposal; the motion tool judges an entrance or a transition, render_still one precise frame. Be thrifty: no more pictures than needed.
 - Direct motion before building: in film-plan, give each important scene timed motion beats (subject, start/end in scene-local seconds, measurable travel and destination, easing, settle time and optional sound cue). Name anticipation, overshoot and reading holds precisely; include camera and light moves when they carry the shot. A single-shot loop needs one kind of picture and loop: true. Read the saved beats before building; review their start, peak and settled result, then make timestamped corrections. The brief wins over stock rules about palette, depth, cut frequency and constant motion.
 - Use the existing design tokens (colors, curves) rather than hard-coded values, and follow the style already in the document.
 - If the project has a brief (assets/brief.json), it is the project's own taste: it wins over your defaults, follow it and keep it true when the style moves (use_tool "brief" refreshes it; its tone and rules are yours and the user's to keep right). Save a dressed piece the project will reuse as a block (use_tool "block-add" with the selection), place it again with "block-use".
@@ -371,6 +379,13 @@ Whole films: a video made from a brief or from sources (a launch, an announcemen
 - When the scenes are built, assemble: the transitions between them, the sound, the review (use_tool "critique"), then the summary.
 - Then look (use_tool "check" on each scene, the motion tool on the entrances and transitions that matter), fix what matters and look again.
 
+Composition and rhythm: what makes a film look made, in any style.
+- One visual idea carries the film: a motif, a device or a transformation that comes back and grows (a line of light that every scene follows, a shape that turns into the next thing). Not one literal picture per sentence.
+- Every frame has a dominant element and uses the frame: fill it, go closer, crop past the edge, set a huge element against a small one. A small subject alone in the middle of an empty frame reads unfinished; emptiness is kept only when it is designed.
+- Scale changes from one shot to the next (close, wide, detail), and so do placement and framing: two neighbouring scenes never share a layout.
+- Something new happens every 2 to 4 s: a move, a change of scale, a new element, a cut. A hold is short and chosen, and even then something drifts. The critic measures stretches where nothing moves: 4 s is a defect.
+- One system holds it together: one or two typefaces, one accent, one material, so variety in framing never looks like a collage.
+
 Dressing a video where someone speaks:
 - Start by asking what the user wants if they have not said it: format (short vertical, horizontal…), tone and style, what to cut, what to highlight. One short question, with suggestions.
 - Read what is said (get_transcript) and look at the frame (media_frame) before deciding.
@@ -378,9 +393,15 @@ Dressing a video where someone speaks:
 - Cuts (cut_media): remove long silences, hesitations ("um", "uh"), false starts and retakes; keep 0.1 to 0.2 s of air around sentences. Then place everything on the transcript of the edit.
 - The "uh"s and "um"s the transcript leaves out: use_tool "fillers" (after the transcript, before the captions); it lists each cut with its moment: give the user the ones to listen to, and put back a word cut by mistake (restore).
 - Captions (apply_template "captions") on the transcript of the edit, placed so they do not cover the face.
-- Section titles when the subject changes, keywords at the exact moment they are said (the word's time in the transcript), a name and role lower third at the start if the person introduces themselves. Not too much: one strong element every few seconds at most, never two overlapping.
+- Before the first insert, set the charter (use_tool "charter"): one plate, one display face, one accent for the whole video, taken from the footage unless the brief gives colours, and a backdrop composition. Every insert keeps to it, from the first to the recap: the same world, never a new look per insert.
+- Then read the moments (use_tool "moments"): the figures, comparisons, lists, names, questions and new parts of what is said, each with the time of the words it turns on. Choose the inserts among them: about one every 5 to 10 s, the strongest.
+- The video alternates the face and full-frame inserts: the face speaks for a few sentences, then an insert replaces it for 3 to 10 s and carries the idea (laid on the backdrop: charter with backdrop spans), then the face comes back. Keywords and lower thirds over the face are the lesser form, never the main one.
+- An insert tells a small story on the words: the figure said is written as it is said, then its comparison lands on its word (A then B); a list adds one element per item; an interface does what is described (a box ticked, a bar filling, a cursor clicking), then the camera pushes in on the detail that matters and the rest dims. Something new every 2 s: the check measures an insert holding still 2.5 s.
+- Every element lands on its word (the word's time in the moments or the transcript): the check measures a word on screen more than 0.5 s after it is said. Section titles are written with the voice (kinetic-title with spoken), their last words in the accent.
+- Vary the forms: a figure, A then B, an interface, an object for a metaphor, a diagram, footage, a section title. Two inserts in a row never share a form and a place: the check names them.
+- The speaker's framing changes too: a push in on the strong sentence, back wide after. Near the end, a recap brings back the inserts seen, about 2 s each, around the idea that ties them.
 - Fit the composition to the requested format (size, video framed as "cover") before dressing.
-- Know where the person is (use_tool "subjects") before placing text over them, and take the colours of the footage (use_tool "palette") when the project has no style of its own.
+- Know where the person is (use_tool "subjects") before placing text over them.
 - Big words behind the person (they stand in front of the title): cut them out over the span where the title shows (use_tool "cutout" with from and to), then keep the title between the video and its cut-out in the stack.
 - To name or point at something that moves in the footage (a car, a person, a product): track it (use_tool "track", with the object's name or its region in % of the picture at a moment where it shows clearly), check the strip it returns, then add a callout (use_tool "callout").
 - Check (use_tool "check"), fix, then sum up what you propose.
@@ -423,9 +444,10 @@ export interface SystemParts { fixed: string; variable: string }
  * project's own taste (assets/brief.json), when there is one; plan is the film
  * plan as text (assets/film-plan.json), when there is one; installed: the
  * plugins installed on the user's device, one line each (name: what it is for);
- * packs: the lines of the editor's packs' entries by need (the same for every project).
+ * packs: the lines of the editor's packs' entries by need (the same for every project);
+ * signatures: the inputs of the editor's own tools the prompt names (namedTools), one line each (the same for every project).
  */
-export function systemParts(reference: string, brief?: string, installed?: string[], packs?: string[], plan?: string): SystemParts {
+export function systemParts(reference: string, brief?: string, installed?: string[], packs?: string[], plan?: string, signatures?: string[]): SystemParts {
   const variable = [
     installed?.length ? `Plugins installed on this device, offered in every project (their nodes and tools are not in the list_nodes index: search them with list_nodes { query }; a layer of one copies the plugin into the project):\n${installed.map((x) => `- ${x}`).join('\n')}` : '',
     brief ? `The brief of the project (assets/brief.json), the taste of this project, over your defaults where they differ:\n${brief}` : '',
@@ -433,7 +455,28 @@ export function systemParts(reference: string, brief?: string, installed?: strin
   ].filter(Boolean).join('\n\n');
   // the editor's packs are the same for every project: they ride with the cached part
   const entries = packs?.length ? `\n\nEntries of the editor's packs, by need (usable even when the project holds none; the first use adds the pack to the project; list_nodes { types } gives the full entry):\n${packs.map((x) => `- ${x}`).join('\n')}` : '';
-  return { fixed: `${INSTRUCTIONS}\n\n${reference}${entries}`, variable };
+  const inputs = signatures?.length ? `\n\nInputs of the tools named above (use_tool; ? marks an optional one; list_nodes { types } says what each means):\n${signatures.map((x) => `- ${x}`).join('\n')}` : '';
+  return { fixed: `${splitGuides(INSTRUCTIONS, reference).core}${entries}${inputs}`, variable };
+}
+
+/** the names quoted in what every request reads ("check", "remove-bg"…): the tools among them get their inputs in the prompt */
+export function namedTools(reference: string): Set<string> {
+  return new Set([...splitGuides(INSTRUCTIONS, reference).core.matchAll(/"([a-z][a-z0-9._-]*)"/g)].map((m) => m[1]));
+}
+
+/** the guides read on demand (read_guide), cut from the instructions and the reference */
+export const guidesOf = (reference: string): Guide[] => splitGuides(INSTRUCTIONS, reference).guides;
+export type { Guide } from './guides.ts';
+
+/**
+ * A message with the project's part of the prompt (its brief, plan, installed
+ * plugins) put in front: that part travels in the conversation rather than in the
+ * system prompt, so the system prompt stays the same from one turn and one
+ * project to the next and the conversation stays in the cache when the brief or
+ * the plan changes. It is given again only when it changed; the latest one wins.
+ */
+export function withProject(prompt: string, variable: string): string {
+  return variable ? `<project>\nThe project as it stands now (it replaces any earlier version of this note):\n\n${variable}\n</project>\n\n${prompt}` : prompt;
 }
 
 /** the two parts as one text (the routes that cache by themselves, or not at all) */
@@ -525,7 +568,7 @@ export interface ToolResult {
   isError?: boolean;
 }
 
-export { CRITIC_SYSTEM, criticSystem, parseVerdict, type Fix, type Verdict } from './critic.ts';
+export { CRITIC_AXES, CRITIC_SYSTEM, DONE_BAR, criticSystem, parseVerdict, type Axis, type Fix, type Verdict } from './critic.ts';
 
 // ── what a turn costs ────────────────────────────────────────
 /** the tokens of a turn's requests: fresh input, input read from the cache, input written to it (cacheWrite1h: the share kept an hour, priced apart), output */

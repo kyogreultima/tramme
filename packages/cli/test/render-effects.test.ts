@@ -94,6 +94,34 @@ function wheeled(fill: string, props: Record<string, unknown>) {
   };
 }
 
+/** a frame red on its left half and blue on its right, through the grading effects given (in a row, one chain) */
+function colourised(effects: { type: string; props?: Record<string, unknown> }[], left = '#FF0000', right = '#0000FF') {
+  const half = (x: number, fill: string) => ({ type: 'shape.rect', transform: { position: [x, 90] }, props: { size: [160, 180], fill } });
+  return {
+    schema: 'tramme/1', meta: { title: 'grade' }, tokens: {}, assets: {}, root: 'main',
+    compositions: { main: { name: 'Main', width: 320, height: 180, fps: 30, duration: 1, background: '#000000', motionBlur: { samples: 1, shutter: 0 }, order: ['frame'], layers: {
+      frame: { type: 'group', children: ['l', 'r'], effects: effects.map((e, i) => ({ id: `e${i}`, props: {}, ...e })) },
+      l: half(80, left), r: half(240, right),
+    } } },
+  };
+}
+const GRADES: Record<string, Parameters<typeof colourised>> = {
+  'grade-same': [[{ type: 'fx.grade' }], '#808080', '#FF0000'],
+  'grade-stop': [[{ type: 'fx.grade', props: { exposure: 1 } }], '#808080'],
+  'grade-warm': [[{ type: 'fx.grade', props: { temperature: 0.6 } }], '#808080'],
+  // 18 % grey as S-Log3 writes it (41 %), brought to the screen through the filmic shoulder
+  'grade-slog3': [[{ type: 'fx.grade', props: { source: 'slog3' } }], '#686868'],
+  'grade-shadows': [[{ type: 'fx.grade', props: { shadows: 1 } }], '#202020', '#E0E0E0'],
+  'grade-wheel': [[{ type: 'fx.grade', props: { shadowsColor: [1, 0] } }], '#202020'],
+  'grade-chain': [[{ type: 'fx.grade' }, { type: 'fx.hsl' }, { type: 'fx.huecurves' }, { type: 'fx.curves' }, { type: 'fx.wheels' }], '#808080', '#3366CC'],
+  'hsl-reds': [[{ type: 'fx.hsl', props: { redSaturation: -1 } }]],
+  'curves-hue': [[{ type: 'fx.huecurves', props: { hueSaturation: { v: [[0, 0], [1, 0]], closed: false } } }]],
+  'isolate-red': [[{ type: 'fx.secondary', props: { color: '#FF0000', saturation: -1, refine: 0 } }]],
+  'isolate-matte': [[{ type: 'fx.secondary', props: { color: '#FF0000', view: 'matte', refine: 0 } }]],
+  'vignette': [[{ type: 'fx.vignette', props: { amount: 1, feather: 0.2 } }], '#808080', '#808080'],
+  'film': [[{ type: 'fx.film', props: { grain: 0 } }], '#808080', '#808080'],
+};
+
 /** a 440 Hz tone of 2 s, 16-bit mono WAV at 48 kHz */
 function tone(): Buffer {
   const rate = 48000, n = rate * 2, out = Buffer.alloc(44 + n * 2);
@@ -209,6 +237,7 @@ describe.skipIf(!CHROME)('effects, rendered', () => {
     fs.writeFileSync(path.join(dir, 'curves-cast.tramme.json'), JSON.stringify(toned({ blue: { v: [[0, 0], [1, 0]], closed: false } })));
     fs.writeFileSync(path.join(dir, 'lut.tramme.json'), JSON.stringify(graded(1)));
     fs.writeFileSync(path.join(dir, 'lut-half.tramme.json'), JSON.stringify(graded(0.5)));
+    for (const [name, args] of Object.entries(GRADES)) fs.writeFileSync(path.join(dir, `${name}.tramme.json`), JSON.stringify(colourised(...args)));
     for (const [name, masks] of Object.entries(MASKS)) fs.writeFileSync(path.join(dir, `mask-${name}.tramme.json`), JSON.stringify(masked(masks)));
     fs.writeFileSync(path.join(dir, 'key-matte.tramme.json'), JSON.stringify(keyed('matte')));
     fs.writeFileSync(path.join(dir, 'badges.tramme.json'), JSON.stringify(badges()));
@@ -329,6 +358,52 @@ describe.skipIf(!CHROME)('effects, rendered', () => {
     expect(warm[0]).toBeGreaterThan(30);
     expect(warm[1]).toBeLessThan(5);
     expect(warm[2]).toBeLessThan(5);
+  }, 60_000);
+
+  it('grades a clip: the identity at rest, a stop, the warmth, a log curve, the shadows, a wheel', async () => {
+    const same = await still('grade-same', 0.5);
+    expect(near(same(80, 90), [128, 128, 128])).toBe(true);
+    expect(near(same(240, 90), RED)).toBe(true);
+    // one stop more: twice the light (128 is 0.216 in light, 0.432 is 174 on screen)
+    expect(near((await still('grade-stop', 0.5))(80, 90), [174, 174, 174])).toBe(true);
+    const warm = (await still('grade-warm', 0.5))(80, 90);
+    expect(warm[0] - warm[2]).toBeGreaterThan(20);
+    // log footage's grey lands at a mid grey on screen, not the flat 104 it was written at
+    const slog = (await still('grade-slog3', 0.5))(80, 90);
+    expect(slog[0]).toBeGreaterThan(112);
+    expect(slog[0]).toBeLessThan(140);
+    const opened = await still('grade-shadows', 0.5);
+    expect(opened(80, 90)[0]).toBeGreaterThan(40);
+    expect(Math.abs(opened(240, 90)[0] - 224)).toBeLessThanOrEqual(8);
+    const tinted = (await still('grade-wheel', 0.5))(80, 90);
+    expect(tinted[0]).toBeGreaterThan(tinted[1] + 6);
+  }, 120_000);
+
+  it('runs a chain of grading effects at rest as the identity', async () => {
+    const px = await still('grade-chain', 0.5);
+    expect(near(px(80, 90), [128, 128, 128])).toBe(true);
+    expect(near(px(240, 90), [0x33, 0x66, 0xCC])).toBe(true);
+  }, 60_000);
+
+  it('moves one colour alone: HSL, a hue curve, an isolated colour and its matte', async () => {
+    const reds = await still('hsl-reds', 0.5);
+    expect(Math.max(...reds(80, 90)) - Math.min(...reds(80, 90))).toBeLessThan(12);
+    expect(near(reds(240, 90), BLUE)).toBe(true);
+    const flat = await still('curves-hue', 0.5);
+    expect(Math.max(...flat(240, 90)) - Math.min(...flat(240, 90))).toBeLessThan(12);
+    const iso = await still('isolate-red', 0.5);
+    expect(Math.max(...iso(80, 90)) - Math.min(...iso(80, 90))).toBeLessThan(12);
+    expect(near(iso(240, 90), BLUE)).toBe(true);
+    const matte = await still('isolate-matte', 0.5);
+    expect(near(matte(80, 90), [255, 255, 255])).toBe(true);
+    expect(near(matte(240, 90), [0, 0, 0])).toBe(true);
+  }, 60_000);
+
+  it('darkens the corners with a vignette and keeps a flat grey under the film look', async () => {
+    const v = await still('vignette', 0.5);
+    expect(near(v(160, 90), [128, 128, 128])).toBe(true);
+    expect(v(2, 2)[0]).toBeLessThan(60);
+    expect(near((await still('film', 0.5))(160, 90), [128, 128, 128])).toBe(true);
   }, 60_000);
 
   it('moves a voice’s pitch and keeps its length, the same worklet as the preview’s', async () => {

@@ -45,7 +45,8 @@ export interface PropDef {
   /** null accepted as a value (paint: no fill) */
   nullable?: boolean;
   /** text props: edited as code (monospace); path props: a tone curve (points in 0..1, a curve editor, a 1D texture in GL effects); vec2 props: a colour wheel (its angle the hue, its length the amount, up to 1) */
-  format?: 'code' | 'curve' | 'wheel';
+  /** 'curve': a tone curve (x and y 0..1); 'hue-curve': a curve over the hues (x the hue around the circle, 0.5 leaving it as it is); 'wheel': a vec2 on a colour wheel */
+  format?: 'code' | 'curve' | 'hue-curve' | 'wheel';
   /**
    * number props: the evaluated layer also carries, under this name, the
    * integral of the value from the layer's in point to t (a speed curve's
@@ -94,6 +95,12 @@ export interface Host {
   layerIn?: number;
   /** composition time (s), frame index at the composition rate */
   t: number;
+  /**
+   * During motion blur, how far this sub-frame is from the frame's own time
+   * (s). Footage holds its frame across the shutter (it carries its own blur):
+   * a video reads its picture at t − shutter, or two of its frames would blend.
+   */
+  shutter?: number;
   frame: number;
   fps: number;
   width: number;
@@ -251,7 +258,11 @@ export interface EffectType<P = any> {
    * runs on the layer drawn alone (sRGB); as a finishing effect, on the
    * composed frame in linear light, before the glow and the grain.
    */
-  gl?: { code: string };
+  gl?: {
+    code: string;
+    /** on a layer, the 8-bit result smoothed by less than a step of noise, so a pushed gradient does not band (grades) */
+    dither?: boolean;
+  };
 }
 
 /** a tool and who brought it ('tramme', or a plugin's id) */

@@ -15,7 +15,10 @@ const DATA_LIMIT = 8 * 1024 * 1024;
 const IMAGE_LIMIT = 32 * 1024 * 1024;
 const MAX_ACTIVE_ASSETS = 8;
 const MAX_IMAGE_PIXELS = 16 * 1024 * 1024;
+/** the decoded pixels kept at once: the isolated project's (what the sandbox can take) and the trusted page's (768 MB) */
 const MAX_RETAINED_IMAGE_PIXELS = 64 * 1024 * 1024;
+const RETAINED_IMAGE_PIXELS = 192 * 1024 * 1024;
+const MAX_IMAGE_SIDE = 8192;
 const MAX_PROJECT_ASSETS = 4096;
 
 async function boundedBytes(response: Response, limit: number, label: string): Promise<ArrayBuffer> {
@@ -61,6 +64,19 @@ async function svgBitmap(url: string): Promise<ImageBitmap> {
   } finally { URL.revokeObjectURL(blob); }
 }
 
+/** a picture brought down on decode still says what it was: the nodes lay it out from the original's size (a source box, a scale of one) and draw the smaller bitmap over it */
+function withNaturalSize<T extends object>(bitmap: T, width: number, height: number): T {
+  Object.defineProperties(bitmap, { naturalWidth: { value: width }, naturalHeight: { value: height } });
+  return bitmap;
+}
+
+/** what a node draws for a picture still on its way: nothing */
+function blankImage(): unknown {
+  const c = typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(1, 1) : (document.createElement('canvas') as HTMLCanvasElement);
+  c.width = 1; c.height = 1;
+  return c;
+}
+
 export class AssetStore {
   private loaded = new Map<string, { key: string; entry: Asset; value: unknown }>();
   private doc: TrammeDoc;
@@ -82,6 +98,108 @@ export class AssetStore {
     if (entry.type !== 'image' || !value || typeof value !== 'object') return 0;
     const image = value as { width?: number; height?: number };
     return Number(image.width) * Number(image.height) || 0;
+  }
+
+  /** the decoded pixels the loaded images hold, those of `except` not counted */
+  private retainedPixels(except?: string): number {
+    let sum = 0;
+    for (const [id, old] of this.loaded) if (id !== except) sum += this.imagePixels(old.entry, old.value);
+    return sum;
+  }
+
+  // ── a project heavier than the room ──
+  // Pictures are kept decoded up to a budget of pixels. Past it the rest wait
+  // (cold) and come when a frame asks for them, the pictures not shown in that
+  // frame making room in least-recently-used order: a project of any weight
+  // plays, as the frames it shows at one time fit.
+
+  /** the longest side a picture is kept at: a larger one is brought down as it is decoded (the renderer sets it from its compositions' size) */
+  keptSide = MAX_IMAGE_SIDE;
+  /** images not kept for lack of room: id → what it was */
+  private cold = new Map<string, string>();
+  /** the last use of each image (a counter), and the frame it was last used in */
+  private touched = new Map<string, number>();
+  private usedIn = new Map<string, number>();
+  private tick = 0;
+  private frameNo = 0;
+  private asking = new Map<string, Promise<void>>();
+  private blank: unknown = null;
+
+  private get budget(): number { return this.sandboxModules ? MAX_RETAINED_IMAGE_PIXELS : RETAINED_IMAGE_PIXELS; }
+
+  /** a new frame begins: what it uses is not made room from */
+  beginFrame(): void { this.frameNo++; }
+
+  /** whether some images wait for a frame to ask for them */
+  get hasCold(): boolean { return this.cold.size > 0; }
+
+  /** the images that are not kept (their ids) */
+  coldIds(): string[] { return [...this.cold.keys()]; }
+  isCold(id: string): boolean { return this.cold.has(id) && !this.loaded.has(id); }
+
+  /**
+   * An image for a node drawing a frame. Kept: itself. Waiting or sent away:
+   * a blank picture now, and the load handed to `defer` (the frame is drawn
+   * again once it has come, as it is for a video frame).
+   */
+  use<T>(id: string, defer: (p: Promise<unknown>) => void): T {
+    const e = this.loaded.get(id);
+    if (e) { this.touched.set(id, ++this.tick); this.usedIn.set(id, this.frameNo); return e.value as T; }
+    const a = this.doc.assets[id];
+    if (a?.type === 'image' && a.of === undefined && this.failed.get(id) !== this.keyOf(a)) {
+      this.usedIn.set(id, this.frameNo);
+      defer(this.request(id));
+      return (this.blank ??= blankImage()) as T;
+    }
+    return this.get<T>(id);
+  }
+
+  /** loads an image on demand (once at a time), making room for it */
+  request(id: string): Promise<void> {
+    let p = this.asking.get(id);
+    if (!p) {
+      const a = this.info(id), key = this.keyOf(a);
+      p = (async () => {
+        try {
+          const value = await this.load(id, a);
+          if (this.doc.assets[id] === a) this.keep(id, a, key, value, true);
+          else this.release(a, value);
+        } catch (e) { this.failed.set(id, key); this.offline.set(id, (e as Error).message); } finally { this.asking.delete(id); }
+      })();
+      this.asking.set(id, p);
+    }
+    return p;
+  }
+
+  /** the pictures not used since `frameNo` began, the longest unused first, set aside until `px` more fit; false when they cannot */
+  private makeRoom(px: number, except: string): boolean {
+    const order = [...this.loaded.entries()].filter(([id, v]) => id !== except && v.entry.type === 'image' && this.usedIn.get(id) !== this.frameNo)
+      .sort((x, y) => (this.touched.get(x[0]) ?? 0) - (this.touched.get(y[0]) ?? 0));
+    let held = this.retainedPixels(except);
+    for (const [id, old] of order) {
+      if (held + px <= this.budget) break;
+      held -= this.imagePixels(old.entry, old.value);
+      this.release(old.entry, old.value);
+      this.loaded.delete(id);
+      this.cold.set(id, old.key);
+    }
+    return held + px <= this.budget;
+  }
+
+  /** an image decoded: kept when it fits (after making room, when asked to), else waits cold */
+  private keep(id: string, a: Asset, key: string, value: unknown, evict: boolean): boolean {
+    const px = this.imagePixels(a, value), old = this.loaded.get(id);
+    if (old) { this.release(old.entry, old.value); this.loaded.delete(id); }
+    if (this.retainedPixels(id) + px > this.budget && !(evict && this.makeRoom(px, id))) {
+      this.release(a, value);
+      this.cold.set(id, key);
+      return false;
+    }
+    this.cold.delete(id);
+    this.loaded.set(id, { key, entry: a, value });
+    this.offline.delete(id); this.failed.delete(id);
+    this.touched.set(id, ++this.tick);
+    return true;
   }
 
   private release(entry: Asset, value: unknown): void {
@@ -138,6 +256,7 @@ export class AssetStore {
     this.doc = doc;
     for (const [id, old] of this.loaded) if (!doc.assets[id]) { this.release(old.entry, old.value); this.loaded.delete(id); }
     for (const id of [...this.offline.keys()]) if (!doc.assets[id]) { this.offline.delete(id); this.failed.delete(id); }
+    for (const id of [...this.cold.keys()]) if (!doc.assets[id]) this.cold.delete(id);
     const refused: string[] = [];
     if (reload.length) this.version++;
     for (let start = 0; start < entries.length; start += MAX_ACTIVE_ASSETS) await Promise.all(entries.slice(start, start + MAX_ACTIVE_ASSETS).map(async ([id, a]) => {
@@ -154,18 +273,18 @@ export class AssetStore {
       }
       const key = this.keyOf(a);
       if (tolerate && this.failed.get(id) === key && !reload.includes(id)) return;
+      // not kept for lack of room, and unchanged: it waits for a frame to ask
+      if (a.type === 'image' && this.cold.get(id) === key && !reload.includes(id)) return;
       try {
         const value = await this.load(id, a);
-        if (this.sandboxModules && a.type === 'image') {
-          const retained = [...this.loaded.entries()].reduce((sum, [otherId, old]) => sum + (otherId === id ? 0 : this.imagePixels(old.entry, old.value)), 0);
-          if (retained + this.imagePixels(a, value) > MAX_RETAINED_IMAGE_PIXELS) {
-            this.release(a, value);
-            throw new Error('images exceed 256 MB of retained decoded pixels');
-          }
+        if (a.type === 'image') {
+          // an image the budget cannot hold waits cold (no error): a frame that shows it asks for it
+          this.keep(id, a, key, value, false);
+        } else {
+          if (have) this.release(have.entry, have.value);
+          this.loaded.set(id, { key, entry: a, value });
+          this.offline.delete(id); this.failed.delete(id);
         }
-        if (have) this.release(have.entry, have.value);
-        this.loaded.set(id, { key, entry: a, value });
-        this.offline.delete(id); this.failed.delete(id);
       } catch (e) {
         const why = `asset "${id}" (${a.src}): ${(e as Error).message}`;
         if (have) this.release(have.entry, have.value);
@@ -200,10 +319,12 @@ export class AssetStore {
           const img = new Image();
           img.src = source;
           await img.decode();
-          if (this.sandboxModules && (!img.naturalWidth || !img.naturalHeight || img.naturalWidth > 8192 || img.naturalHeight > 8192 || img.naturalWidth * img.naturalHeight > MAX_IMAGE_PIXELS)) {
-            throw new Error('image exceeds 8192 pixels per side or 16 million pixels total');
-          }
-          try { return await createImageBitmap(img); } catch (e) { if (!/svg/i.test((e as Error).message)) throw e; }
+          const w = img.naturalWidth, h = img.naturalHeight;
+          if (this.sandboxModules && (!w || !h)) throw new Error('the picture has no size');
+          // kept no larger than the frames can show (and, isolated, than the sandbox takes): brought down as it is decoded
+          const k = w && h ? Math.min(1, this.keptSide / Math.max(w, h), this.sandboxModules ? Math.sqrt(MAX_IMAGE_PIXELS / (w * h)) : 1) : 1;
+          const resize = k < 1 ? { resizeWidth: Math.max(1, Math.floor(w * k)), resizeHeight: Math.max(1, Math.floor(h * k)), resizeQuality: 'high' as const } : undefined;
+          try { const bitmap = await (resize ? createImageBitmap(img, resize) : createImageBitmap(img)); return resize ? withNaturalSize(bitmap, w, h) : bitmap; } catch (e) { if (!/svg/i.test((e as Error).message)) throw e; }
           return await svgBitmap(source);
         } finally { if (source !== url) URL.revokeObjectURL(source); }
       }

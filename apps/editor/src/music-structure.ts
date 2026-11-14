@@ -3,6 +3,11 @@ import type { MusicCutPlan } from './music-plan.ts';
 export interface MusicChunk { text: string; duration_ms: number; positive_styles: string[]; negative_styles: string[]; context_adherence: 'high' }
 export interface MusicStructure { chunks: MusicChunk[] }
 
+/** the words of a music prompt as the provider's styles: short pieces (a style holds 500 characters at most, a section 50 styles) */
+export function promptStyles(prompt: string): string[] {
+  return prompt.split(/[,;\n]+|\.\s+/).map((s) => s.trim().replace(/\.$/, '')).filter(Boolean).map((s) => s.slice(0, 200)).slice(0, 40);
+}
+
 /** A duration-bounded instrumental score, with sections at the picture's strongest moments. */
 export function musicSections(film: MusicCutPlan, prompt: string): MusicStructure {
   const total = Math.round(film.duration * 1000);
@@ -41,7 +46,7 @@ export function musicSections(film: MusicCutPlan, prompt: string): MusicStructur
         : name === 'End card' ? 'A decisive final hit, then resolve cleanly for the end card.'
           : 'Gradually rise in energy toward the next picture change.';
     return { text: `[${name}] ${direction}`, duration_ms: end - start,
-      positive_styles: [prompt, ...(film.tempo ? [`${film.tempo} BPM`] : []), 'instrumental', name === 'Intro' ? 'restrained' : name === 'Reveal' ? 'accented' : name === 'End card' ? 'resolved' : 'building'],
+      positive_styles: [...promptStyles(prompt), ...(film.tempo ? [`${film.tempo} BPM`] : []), 'instrumental', name === 'Intro' ? 'restrained' : name === 'Reveal' ? 'accented' : name === 'End card' ? 'resolved' : 'building'],
       negative_styles: ['vocals', 'lyrics'], context_adherence: 'high' };
   });
   if (chunks.length > 30 || chunks.some((chunk) => chunk.duration_ms < 3000 || chunk.duration_ms > 120000)) throw new Error('film cannot fit the provider section limits');

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Registry, toolInputIssues, toolOutput, type ToolType } from '../src/index.ts';
+import { Registry, repairToolInput, toolInputIssues, toolOutput, type ToolType } from '../src/index.ts';
 
 const stars: ToolType = {
   name: 'demo.stars', description: 'scatters stars',
@@ -40,6 +40,26 @@ describe('plugin tools', () => {
     expect(toolInputIssues({ type: 'object', properties: { r: { type: 'number' } } }, { r: 2 })).toEqual([]);
     expect(toolInputIssues(undefined, [])).toEqual(['the input must be an object']);
     expect(toolInputIssues(undefined, { anything: true })).toEqual([]);
+  });
+
+  it('puts right the slips whose meaning is plain, and says so', () => {
+    const schema = { type: 'object', properties: {
+      about: { type: 'string' }, sources: { type: 'array' }, count: { type: 'integer', minimum: 1, maximum: 6 },
+      loud: { type: 'boolean' }, role: { type: 'string', enum: ['display', 'text'] },
+    } };
+    const { input, repaired } = repairToolInput(schema, { about: { subject: 'Deskkup', audience: 'offices' }, sources: 'the PDF', count: '12', loud: 'true', role: 'Display' });
+    expect(input).toEqual({ about: 'subject: Deskkup\naudience: offices', sources: ['the PDF'], count: 6, loud: true, role: 'display' });
+    // the count twice: read as a number, then brought to its bound
+    expect(repaired).toHaveLength(6);
+    expect(toolInputIssues(schema, input)).toEqual([]);
+  });
+
+  it('leaves alone what it cannot read for sure', () => {
+    const schema = { type: 'object', properties: { role: { type: 'string', enum: ['display', 'text'] }, n: { type: 'number' } } };
+    const { input, repaired } = repairToolInput(schema, { role: 'both', n: 'many', other: 1 });
+    expect(input).toEqual({ role: 'both', n: 'many', other: 1 });
+    expect(repaired).toEqual([]);
+    expect(repairToolInput(schema, { role: 'text' })).toEqual({ input: { role: 'text' }, repaired: [] });
   });
 
   it('reads any result in one shape', () => {

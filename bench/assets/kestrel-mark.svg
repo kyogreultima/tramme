@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" width="240" height="240">
+  <!-- Kestrel Freight's mark (an invented brand, for the bench): a wing folded over a square -->
+  <rect x="40" y="40" width="160" height="160" rx="18" fill="#12355B"/>
+  <path d="M64 168 L120 72 L176 168 L148 168 L120 120 L92 168 Z" fill="#F2A541"/>
+  <path d="M120 120 L148 168 L92 168 Z" fill="#FFFFFF"/>
+</svg>

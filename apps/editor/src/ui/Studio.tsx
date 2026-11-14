@@ -107,7 +107,7 @@ function TakePill() {
 }
 
 /** what the note will be about, and the pin */
-function DirectBar({ area }: { area: RefObject<HTMLTextAreaElement> }) {
+function DirectBar({ area }: { area: RefObject<HTMLTextAreaElement | null> }) {
   const pin = studio.pins.value.length > 0, pinning = studio.pinning.value, f = focused.value, fps = comp.value.fps;
   const placeholder = pin ? t('studio.placeholderPin') : f ? t('studio.placeholderScene', { name: f.name }) : t('studio.placeholder');
   const context = (
@@ -144,7 +144,7 @@ function Invitation() {
 }
 
 /** the studio's own keys: N writes a note, P pins the next one, Escape lets go of the pin and the focus */
-function useStudioKeys(area: RefObject<HTMLTextAreaElement>) {
+function useStudioKeys(area: RefObject<HTMLTextAreaElement | null>) {
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement;

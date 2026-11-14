@@ -1,4 +1,4 @@
-// Gathers the desktop app's installers built on this machine (npm run
+// Gathers the desktop app's installers built on this machine (pnpm
 // desktop:build) under their release names (apps/desktop/downloads.ts), for
 // .github/workflows/desktop.yml and desktop-beta.yml:
 //   node scripts/desktop-release.ts <out dir> [tag]
@@ -25,6 +25,8 @@ if (tag && tag !== `v${version}` && !new RegExp(`^v${version.replaceAll('.', '\\
 fs.mkdirSync(out, { recursive: true });
 let found = 0;
 for (const i of INSTALLERS) {
+  // already named by the CI that built it (the signed Android .apk): it is in the release's files as it is
+  if (!i.built) continue;
   const dir = path.join(tauri, 'target', i.built);
   const file = fs.existsSync(dir) ? fs.readdirSync(dir).find((f) => f.includes(`_${version}_`) && f.endsWith(i.suffix)) : undefined;
   if (!file) continue;

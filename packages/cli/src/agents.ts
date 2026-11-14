@@ -25,6 +25,8 @@ export interface Turn {
   send: (ev: Out) => void;
   /** tool calls waiting for the editor's result */
   pending: Map<string, (r: ToolResult) => void>;
+  /** the calls still running in the editor, each told so (a long transcription keeps its call open) */
+  alive?: Map<string, () => void>;
   abort: AbortController;
   /** the key of this turn's MCP address (the command lines reach the tools through it) */
   key: string;
@@ -46,6 +48,7 @@ export interface TurnRequest {
   tools?: boolean;
 }
 
+/** how long the editor may stay silent on a call: it says a running tool is still at work every minute */
 const TOOL_TIMEOUT = 15 * 60_000;
 /** where the command lines run: a folder of their own, so their sessions are found again */
 const WORKDIR = path.join(os.homedir(), '.tramme', 'engines');
@@ -58,8 +61,10 @@ export async function callEditor(t: Turn, name: string, input: unknown): Promise
   const callId = crypto.randomUUID();
   t.send({ type: 'tool', callId, name, input });
   return new Promise<ToolResult>((resolve) => {
-    const timer = setTimeout(() => { t.pending.delete(callId); resolve({ content: [{ type: 'text', text: 'the editor did not answer' }], isError: true }); }, TOOL_TIMEOUT);
-    t.pending.set(callId, (x) => { clearTimeout(timer); resolve(x); });
+    const silent = () => { t.pending.delete(callId); t.alive?.delete(callId); resolve({ content: [{ type: 'text', text: 'the editor did not answer' }], isError: true }); };
+    let timer = setTimeout(silent, TOOL_TIMEOUT);
+    t.alive?.set(callId, () => { clearTimeout(timer); timer = setTimeout(silent, TOOL_TIMEOUT); });
+    t.pending.set(callId, (x) => { clearTimeout(timer); t.alive?.delete(callId); resolve(x); });
   });
 }
 

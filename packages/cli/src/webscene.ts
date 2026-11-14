@@ -183,7 +183,7 @@ export async function serveScene(root: string, css: string, projectDir: string, 
 
 /** the pinned @hyperframes/engine, driven by seek capture (its higher-level render freezes custom-seek scenes) */
 export const engineCapture: SceneCapturer = async ({ dir, entry, size, fps, frames, out, css, projectDir, params }) => {
-  const engine = await import('@hyperframes/engine').catch(() => { throw new Error('web scenes need @hyperframes/engine, which is not installed (npm install)'); });
+  const engine = await import('@hyperframes/engine').catch(() => { throw new Error('web scenes need @hyperframes/engine, which is not installed (pnpm install)'); });
   // the videos of the page, extracted to pictures at the scene's rate; removed when the capture is done
   const entryFile = path.join(dir, entry), extractDir = `${out}.media`;
   const videos = fs.existsSync(entryFile) ? scanSceneMedia(fs.readFileSync(entryFile, 'utf8'), path.relative(projectDir, dir).split(path.sep).join('/')).filter((m) => m.tag === 'video') : [];

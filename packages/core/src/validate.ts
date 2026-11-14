@@ -61,6 +61,7 @@ class Checker {
       if (a.type !== 'audio' && a.type !== 'video') this.err(pointer('assets', id, 'clean'), 'only a sound or a video has a cleaned voice');
       else if (doc.assets[a.clean]?.type !== 'audio' || a.clean === id) this.err(pointer('assets', id, 'clean'), `the cleaned voice "${a.clean}" must be another sound asset`);
     }
+    for (const [id, a] of Object.entries(doc.assets)) if (a.reference && a.type !== 'video' && a.type !== 'image' && a.type !== 'json') this.err(pointer('assets', id, 'reference'), 'a reference is a video, a gif or a Lottie');
     for (const [id, a] of Object.entries(doc.assets)) {
       if (a.of === undefined && a.range === undefined) continue;
       const of = a.of === undefined ? undefined : doc.assets[a.of];
@@ -429,6 +430,7 @@ class Checker {
         if (typeof v !== 'string') return 'asset id expected';
         const a = this.doc.assets[v];
         if (!a) return `unknown asset "${v}"`;
+        if (a.reference) return `"${v}" is a reference: the film is made the way it is made, it is never shown`;
         // a sound layer plays the sound of a video file as well (a video's sound detached onto its own layer)
         return !def.assetType || a.type === def.assetType || (def.assetType === 'audio' && a.type === 'video') ? null : `asset of type ${def.assetType} expected ("${v}" is ${a.type})`;
       }

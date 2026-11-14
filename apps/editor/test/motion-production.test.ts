@@ -27,6 +27,11 @@ describe('timed motion direction', () => {
     expect(prompt).toContain('loop');
   });
 
+  it('sends the director to the file for the beats, never a scene builder that has its own in its message', () => {
+    expect(plans.planText(plan())).toContain(`Timed motion beats are in ${plans.FILM_PLAN_PATH}`);
+    expect(plans.planText(plan(), { scene: true })).not.toContain(plans.FILM_PLAN_PATH);
+  });
+
   it('rejects motion outside the scene or settling before the movement ends', () => {
     const bad = { ...scene, motion: [{ ...beat, end: 8, settle: 1.5 }] };
     expect(plans.motionIssues([bad]).join('\n')).toMatch(/Product.*6 s/);
@@ -88,5 +93,41 @@ describe('art direction is not a measured defect', () => {
     doc.compositions[doc.root].layers = { title: { type: 'text', props: { text: 'TODO', size: 12 } } };
     const issues = doneIssues(doc, doc.root, builtinRegistry(), null, [{ check: 'text-size', severity: 'warning', message: 'Too small', layers: ['title'] }]);
     expect(issues.filter((i) => i.blocking).map((i) => i.id)).toEqual(['provisional', 'readable']);
+  });
+});
+
+describe('a plan written again', () => {
+  it('takes only what changes, a scene by its name, and keeps the rest', async () => {
+    const { doc } = project('Again');
+    const files = new Map<string, string>();
+    const ctx = { doc, readText: async (p: string) => files.get(p) ?? null, writeFile: async (p: string, v: string) => { files.set(p, v); return p; } } as unknown as ToolContext;
+    await plans.FILM_PLAN_TOOLS[0].run(plan(), ctx);
+    await plans.FILM_PLAN_TOOLS[0].run({ change: [{ name: 'Product', idea: 'One product turns, then lands' }] }, ctx);
+    const again = plans.parsePlan(files.get(plans.FILM_PLAN_PATH))!;
+    expect(again.idea).toBe('A product loop');
+    expect(again.loop).toBe(true);
+    expect(again.scenes).toMatchObject([{ name: 'Product', kind: '3d', idea: 'One product turns, then lands', motion: [beat] }]);
+  });
+
+  it('says which scenes it knows when a change names another, and asks a first plan for all of it', async () => {
+    const { doc } = project('Again');
+    const files = new Map<string, string>();
+    const ctx = { doc, readText: async (p: string) => files.get(p) ?? null, writeFile: async (p: string, v: string) => { files.set(p, v); return p; } } as unknown as ToolContext;
+    await expect(plans.FILM_PLAN_TOOLS[0].run({ change: [{ name: 'Product', idea: 'x' }] }, ctx)).rejects.toThrow('a first plan gives');
+    await plans.FILM_PLAN_TOOLS[0].run(plan(), ctx);
+    await expect(plans.FILM_PLAN_TOOLS[0].run({ change: [{ name: 'Nope', idea: 'x' }] }, ctx)).rejects.toThrow("the plan's scenes: Product");
+  });
+});
+
+describe('a scene named loosely', () => {
+  const p = () => ({ ...plan(), scenes: [{ ...scene, id: 'ton-record-battu', name: 'Ton record battu' }, { ...scene, id: 'l-app', name: "L'app" }, { ...scene, id: 'ton-rythme', name: 'Ton rythme' }] });
+  it('is found by its id, its name, or a word only it holds', () => {
+    expect(plans.sceneNamed(p(), 'l-app')?.id).toBe('l-app');
+    expect(plans.sceneNamed(p(), 'Ton rythme')?.id).toBe('ton-rythme');
+    expect(plans.sceneNamed(p(), 'record')?.id).toBe('ton-record-battu');
+  });
+  it('is not guessed when the word names several, or none', () => {
+    expect(plans.sceneNamed(p(), 'ton')).toBeUndefined();
+    expect(plans.sceneNamed(p(), 'drop')).toBeUndefined();
   });
 });

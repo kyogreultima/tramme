@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { applyOps, Evaluator, validate, type TrammeDoc } from '@tramme/core';
 import { newProject } from '@tramme/project';
-import { depthLayers, photo25dOps, scaleFor, steadyDepth, withDepthBlur } from '../src/depth.ts';
+import { depthLayers, photo25dOps, scaleFor, steadyDepth } from '../src/depth.ts';
 import { fieldsOf, inputOf } from '../src/ai/commands.ts';
 import { editorRegistry } from '../src/vocabulary.ts';
 
@@ -37,7 +37,7 @@ describe('the depth of a picture', () => {
     expect(m).toMatchObject({ type: 'image', visible: false, props: { image: 'depth-photo', fit: { $link: 'photo.fit' }, box: [25, 12.5, 75, 37.5] } });
     expect(m.transform?.position).toEqual({ $link: 'photo.transform.position' });
     // the parallax: the camera's settings and the layer's own depth, so the camera's move is not counted twice
-    expect(c.layers.photo.effects).toEqual([{ id: 'parallax', type: 'fx.parallax', props: { source: depth, perspective: { $link: '$comp.camera.perspective' }, zoom: { $link: '$comp.camera.zoom' }, at: { $link: 'photo.transform.depth' } } }]);
+    expect(c.layers.photo.effects).toEqual([{ id: 'parallax', type: 'fx.parallax', props: { source: depth, perspective: { $link: '$comp.camera.perspective' }, zoom: { $link: '$comp.camera.zoom' }, pan: { $link: '$comp.camera.pan' }, at: { $link: 'photo.transform.depth' } } }]);
     // the map follows the photo
     const ev = new Evaluator(out, reg);
     for (const t of [0, 5, 9.9]) expect(ev.layerAt(depth, t, root).transform).toEqual(ev.layerAt('photo', t, root).transform);
@@ -100,8 +100,10 @@ describe('the depth of a picture', () => {
 
   it('moves a photo in 2.5D: the camera drifts, only once', () => {
     const doc = project(), root = doc.root;
-    const { ops, added } = photo25dOps(doc, root);
+    const { ops, added, margin } = photo25dOps(doc, root);
     expect(added).toBe(true);
+    // the photo needs room for the drift on each side: twice its farthest pan, as a share of the frame
+    expect(margin).toBeCloseTo(0.128, 5);
     const out = applyOps(doc, ops).doc, c = out.compositions[root];
     expect(validate(out, reg)).toEqual([]);
     // the drift: an arc of uneven keys, eased
@@ -115,20 +117,7 @@ describe('the depth of a picture', () => {
     const twice = photo25dOps(out, root);
     expect(twice.added).toBe(false);
     expect(twice.ops).toEqual([]);
-  });
-
-  it('keeps the parallax when the photo takes its depth of field in the same run', () => {
-    const doc = project(), root = doc.root, l = doc.compositions[root].layers.photo;
-    const wired = depthLayers(doc, root, 'photo', 'depth-photo');
-    const ops = withDepthBlur(wired.ops, l, root, 'photo', wired.depth);
-    expect(ops.filter((o) => o.path.endsWith('/layers/photo/effects'))).toHaveLength(1);
-    const out = applyOps(doc, ops).doc;
-    expect(validate(out, reg)).toEqual([]);
-    // both read the hidden map layer
-    expect(out.compositions[root].layers.photo.effects!.map((e) => [e.type, e.props?.source])).toEqual([['fx.parallax', wired.depth], ['fx.depthBlur', wired.depth]]);
-    // run again: neither is added twice
-    const again = withDepthBlur(depthLayers(out, root, 'photo', 'depth-photo').ops, out.compositions[root].layers.photo, root, 'photo', wired.depth);
-    expect(again).toEqual([]);
+    expect(twice.margin).toBe(0);
   });
 
   it('asks for nothing that it can work out: the layer, the photo', () => {

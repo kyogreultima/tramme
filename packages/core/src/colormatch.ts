@@ -78,17 +78,36 @@ function split(v: Rgb): { level: number; chroma: Rgb } {
   return { level, chroma: [v[0] - level, v[1] - level, v[2] - level] };
 }
 
+/** how far the brightness of a shot is moved toward the reference's, at most: the rest of a gap is what each shows (a sky, a dark tree), not its camera */
+const MAX_LEVEL_SHIFT = 0.1;
+/** how much its contrast is changed, at most, for the same reason */
+const CONTRAST_RANGE: [number, number] = [0.8, 1.25];
+/** how far black itself moves, at most: a lifted or tinted black is the first thing a matched shot gives away */
+const MAX_BLACK_SHIFT = 0.05;
+
 /**
  * The wheels that bring a shot's look to a reference's: for each colour the
  * line y = a·x + b that sends the shot's mean and spread to the reference's,
  * read as gain and lift (gain·(x + lift·(1 − x))), then split into a brightness
  * (the level) and a colour (the wheel). Gamma is left alone. A look too far to
  * reach is brought as near as the wheels go.
+ *
+ * The colour of each channel against the brightness (a camera's cast) is
+ * matched whole. The brightness and the contrast are moved only so far
+ * (MAX_LEVEL_SHIFT, CONTRAST_RANGE): two angles of one scene show different
+ * things, and matching their spread whole lifts the blacks of the darker one.
  */
 export function matchGrade(ref: LookStats, src: LookStats): WheelsParams {
   const gain: Rgb = [1, 1, 1], lift: Rgb = [0, 0, 0];
+  const refY = dot(ref.mean, LUMA), srcY = dot(src.mean, LUMA), refS = dot(ref.std, LUMA), srcS = dot(src.std, LUMA);
+  const contrast = srcS > 1e-4 && refS > 1e-4 ? clamp(refS / srcS, ...CONTRAST_RANGE) : 1;
+  const level = srcY + clamp(refY - srcY, -MAX_LEVEL_SHIFT, MAX_LEVEL_SHIFT);
   for (let c = 0; c < 3; c++) {
-    const a = src.std[c] > 1e-4 ? ref.std[c] / src.std[c] : 1, b = ref.mean[c] - a * src.mean[c];
+    // each channel spread against the brightness as the reference's is, the whole contrast within its range
+    const rel = src.std[c] > 1e-4 && ref.std[c] > 1e-4 && srcS > 1e-4 && refS > 1e-4 ? (ref.std[c] / refS) / (src.std[c] / srcS) : 1;
+    const target = level + (ref.mean[c] - refY), a0 = contrast * rel;
+    // black stays near black (MAX_BLACK_SHIFT): what the line asks beyond it goes into the channel's gain, its mean still sent where it should
+    const b = clamp(target - a0 * src.mean[c], -MAX_BLACK_SHIFT, MAX_BLACK_SHIFT), a = src.mean[c] > 1e-4 ? (target - b) / src.mean[c] : a0;
     gain[c] = Math.max(0.05, a + b);
     lift[c] = b / gain[c];
   }

@@ -14,13 +14,15 @@ import { deepCodec, encodeWav, i420p10, mixComposition, Renderer, SETTLE_LIMIT }
 import { containsExpression } from '@tramme/project';
 
 import { AVC_FROM_STREAM } from './avc.ts';
-import { tauri } from './tauri.ts';
+import { deviceTarget, keepAwake } from './device.ts';
+import { platform, tauri } from './tauri.ts';
 import type { WebFormat } from './formats.ts';
 import { filterModule, pluginHost } from './plugins/index.ts';
 import { blitSandboxFrame, declarationsModule, ensureDeclared, ensureSandboxDoc, moduleItemsOf, primeSandboxExports, sandboxDeclaration, sandboxVideoFrames } from './plugins/sandbox-draw.ts';
 import { prefs } from './settings.ts';
 import { sandboxedDoc } from './installed.ts';
 import { t } from './i18n/index.ts';
+import { watermarkStamp } from './watermark-draw.ts';
 
 export interface WebExportOptions {
   compId: string;
@@ -35,6 +37,8 @@ export interface WebExportOptions {
   depth?: 8 | 10;
   /** [from, to] in seconds: only that part of the film, and of its sound */
   range?: [number, number];
+  /** the Tramme logo in a corner of the picture; the plan and the setting decide when it is not given (watermark.ts) */
+  watermark?: boolean;
 }
 
 export interface WebExportResult { blob: Blob; ext: string; warnings: string[] }
@@ -64,7 +68,13 @@ function encoderStep<T>(p: Promise<T>, signal?: AbortSignal): Promise<T> {
   });
 }
 
+/** an export; on a phone the screen stays on while it runs (device.ts) */
 export async function exportInBrowser(doc: TrammeDoc, base: string, format: WebFormat, opts: WebExportOptions): Promise<WebExportResult> {
+  keepAwake(true);
+  try { return await exportOnce(doc, base, format, opts); } finally { keepAwake(false); }
+}
+
+async function exportOnce(doc: TrammeDoc, base: string, format: WebFormat, opts: WebExportOptions): Promise<WebExportResult> {
   if (format !== 'wav' && Object.values(doc.compositions).some((comp) => Object.values(comp.layers).some((layer) => layer.type === 'webscene'))) {
     throw new Error(tauri ? t('export.websceneDesktopApp') : t('export.websceneDesktopOnly'));
   }
@@ -100,6 +110,8 @@ export async function exportInBrowser(doc: TrammeDoc, base: string, format: WebF
       if (!sound) throw new Error(t('export.noSoundLayerIn'));
       return { blob: wav(sound), ext: 'wav', warnings: [] };
     }
+    // the watermark: drawn at the frame's size for each frame's time (the logo opens now and then), laid over it by the renderer
+    if (opts.watermark ?? await (await import('./watermark.ts')).watermarkForExport()) r.stamp = await watermarkStamp(W, H);
     const frames = span.f1 - span.f0;
     // straight RGBA of frame f (alpha kept)
     const rgba = new Uint8Array(W * H * 4);
@@ -127,7 +139,7 @@ export async function exportInBrowser(doc: TrammeDoc, base: string, format: WebF
     const readFrame = async (f: number) => {
       if (sandboxed) {
         const bmp = await sandboxFrame(f);
-        try { readCtx.drawImage(bmp, 0, 0, W, H); }
+        try { readCtx.drawImage(bmp, 0, 0, W, H); if (r.stamp) readCtx.drawImage(r.stamp(f / fps) as CanvasImageSource, 0, 0, W, H); }
         finally { bmp.close(); }
         rgba.set(readCtx.getImageData(0, 0, W, H).data);
         return rgba;
@@ -186,8 +198,10 @@ export async function exportInBrowser(doc: TrammeDoc, base: string, format: WebF
     const sound = await mixAudio(r, opts.range && span);
     const audioCodec = webm ? 'opus' : (await canEncodeAudio('aac')) ? 'aac' : 'opus';
     const encode = async (hardwareAcceleration: 'no-preference' | 'prefer-software'): Promise<Blob> => {
-      const target = new BufferTarget();
-      const output = new Output({ format: webm ? new WebMOutputFormat() : new Mp4OutputFormat({ fastStart: 'in-memory' }), target });
+      // on a phone the film goes to a file as it is encoded (a long one would not fit in memory): the MP4 is patched in place, so no fast start
+      const device = platform === 'android' ? await deviceTarget(`export-${Date.now().toString(36)}.${webm ? 'webm' : 'mp4'}`) : null;
+      const target = device?.target ?? new BufferTarget();
+      const output = new Output({ format: webm ? new WebMOutputFormat() : new Mp4OutputFormat({ fastStart: device ? false : 'in-memory' }), target });
       const quality = new Quality('very-high');
       // 10 bits: I420P10 planes from the 16-bit frame; MP4: the visible canvas (opaque); WebM: straight RGBA frames, alpha kept
       const video = deep
@@ -234,7 +248,7 @@ export async function exportInBrowser(doc: TrammeDoc, base: string, format: WebF
         output.cancel().catch(() => {});
         throw e;
       }
-      return new Blob([target.buffer!], { type: webm ? 'video/webm' : 'video/mp4' });
+      return device ? device.finish() : new Blob([(target as BufferTarget).buffer!], { type: webm ? 'video/webm' : 'video/mp4' });
     };
     const ext = webm ? 'webm' : 'mp4';
     try {

@@ -137,6 +137,22 @@ describe('sandbox document assets', () => {
   });
 });
 
+describe('sandbox web scenes', () => {
+  it('a web scene not captured yet leaves its place empty instead of failing the frame', async () => {
+    const doc = project();
+    const main = doc.compositions[doc.root];
+    main.layers.scene = { type: 'webscene', props: {} };
+    main.layers.hero = { type: 'test.paint', props: { size: 80 } };
+    main.order = ['scene', 'hero'];
+    const mod: PluginModule = { nodes: [{ type: 'test.paint', title: 'Paint', category: 'Test', props: { size: { type: 'number', default: 80 } }, render: { canvas2d: (ctx, p) => ctx.fillRect(10, 10, p.size, p.size) } }] };
+    const side = makeSandboxDraw(new Map([['paint', mod]]));
+    side.setDoc({ doc, docUrl: 'https://tramme.test/doc.json', images: {}, json: {}, fonts: [] });
+    const result = await side.renderFrame({ compId: doc.root, t: 0, scale: 0.5, width: 1920, height: 1080 });
+    expect(result.err).toBeUndefined();
+    expect(paint.some((p) => p.op === 'fill' && p.args[2] === 80)).toBe(true);
+  });
+});
+
 describe('sandbox video rendering', () => {
   it('draws a transparent nested composition over the existing picture without clearing or resetting its transform', async () => {
     const doc = project();

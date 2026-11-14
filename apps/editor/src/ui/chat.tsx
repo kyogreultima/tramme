@@ -6,6 +6,7 @@
 
 import type { ComponentChildren } from 'preact';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
+import { handheld } from './controls.tsx';
 import type { ChatItem, TurnUsage } from '../api.ts';
 import { engineOf, modelLabel, providerOf } from '@tramme/assistant';
 import { aiSettings, aiStatus, CLI_SETUP, cliUnavailable, providerLabel, refreshStatus, setAiSettings } from '../ai/index.ts';
@@ -15,6 +16,7 @@ import { S, toast } from '../state.ts';
 import { answer, chatShown, choose, question, type Question } from '../confirm.ts';
 import { attachmentUrl, type Attachment } from '../attachments.ts';
 import { Icon } from './icons.tsx';
+import { ReadingOutline } from './ReadingOutline.tsx';
 import { TranscribeButton } from './Transcribe.tsx';
 import { locale, t } from '../i18n/index.ts';
 
@@ -81,6 +83,12 @@ export function QuestionCard() {
   const q = question.value;
   useEffect(() => { chatShown.value++; return () => { chatShown.value--; }; }, []);
   if (!q?.inChat) return null;
+  if (q.outline) return (
+    <div class="proposal question">
+      <div class="proposal-head"><Icon name="film" /><span class="ptitle">{t('reading.title')}</span></div>
+      <ReadingOutline q={q} />
+    </div>
+  );
   return (
     <div class="proposal question">
       <div class="proposal-head"><Icon name="alert" /><span class="ptitle">{q.title}</span></div>
@@ -181,8 +189,6 @@ export function Lightbox() {
   return lightbox.value ? <div class="lightbox" onClick={() => { lightbox.value = null; }}><img src={lightbox.value} alt="" /></div> : null;
 }
 
-/** a phone or a tablet: nothing to start a companion with */
-const handheld = () => matchMedia('(pointer: coarse)').matches;
 
 /** a command to type in a terminal, copied on click */
 export function Command({ text }: { text: string }) {
@@ -190,7 +196,7 @@ export function Command({ text }: { text: string }) {
 }
 
 /** the command that starts the local companion for this editor */
-export const CompanionCommand = () => <Command text={/^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? 'npm run dev' : `npm run tramme -- agent --origin ${location.origin}`} />;
+export const CompanionCommand = () => <Command text={/^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? 'pnpm dev' : `pnpm tramme agent --origin ${location.origin}`} />;
 
 /** how to reach a model, right in the conversation when the assistant cannot answer: an AI account first, the companion for those who run one */
 export function Access() {
@@ -244,6 +250,7 @@ export function Access() {
       <b>{t('assistant.noAiConnected')}</b>
       <span>{t('assistant.connectAnAiHint')}</span>
       {connect}
+      {/* a phone or a tablet: nothing to start a companion with */}
       {!handheld() && (
         <details class="access-more">
           <summary>{t('assistant.orTheCompanion')}</summary>

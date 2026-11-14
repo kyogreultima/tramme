@@ -10,6 +10,7 @@ import { OFFERED_INSTALLERS, type Os } from '../../desktop/downloads.ts';
 import { prefs, setPrefs } from './settings.ts';
 import { toast } from './state.ts';
 import { t } from './i18n/index.ts';
+import { platform } from './tauri.ts';
 
 /** the version this build was made at (the editor's own package, set with the others by scripts/version.ts) */
 export const APP_VERSION: string = pkg.version;
@@ -86,6 +87,8 @@ export async function autoCheck(): Promise<void> {
 
 /** looks at the start, then every half hour for as long as the app stays open (a look is only made when twelve hours have passed): an app left open for days still learns of a new version */
 export function watchUpdates(): void {
+  // the phone's app is updated by its store, and shows no notice of its own
+  if (platform === 'android') return;
   void autoCheck();
   setInterval(() => void autoCheck(), 30 * 60_000);
 }

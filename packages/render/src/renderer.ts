@@ -23,6 +23,8 @@ export interface RenderOptions {
 
 /** how long a complete frame waits for what it lacks (a video frame being decoded, a plugin's picture from the sandbox) */
 export const SETTLE_LIMIT = 20_000;
+/** the first frame of a render opens its files and decoders (a 4K source of 150 MB, several pages at once): it waits longer */
+export const FIRST_SETTLE_LIMIT = 120_000;
 
 /** sample times inside the shutter, never straddling a cut marker or the ends */
 export function subTimes(t: number, n: number, shutter: number, comp: Composition): number[] {
@@ -106,10 +108,14 @@ export class Renderer {
   private sy = 1;
   /** seed of the last finished frame (for the YUV / RGBA dither) */
   lastSeed = 0;
+  /** the picture laid over every frame this renderer finishes, by the frame's time, at the render's size, straight alpha: the watermark of an export (null: none) */
+  stamp: ((t: number) => TexImageSource) | null = null;
   /** time spent evaluating, drawing and waiting for video since the last reset (ms; readback and send are the export's) */
   times: FrameParts = noParts();
   /** what the last frame drawn was missing (video frames being decoded) */
   private pending: Promise<unknown>[] = [];
+  /** the sub-frame being drawn, from the frame's own time (s): Host.shutter */
+  private shutterOffset = 0;
   private preserve = true;
   private isolate = false;
   private pluginModule?: RendererOptions['pluginModule'];
@@ -157,6 +163,8 @@ export class Renderer {
       const parsed = DocSchema.safeParse(doc);
       if (!parsed.success) throw new Error(`invalid document: ${parsed.error.issues[0]?.message}`);
     }
+    // pictures are kept no larger than the frames can show: three times the largest composition's side, at most
+    this.assets.keptSide = Math.min(8192, 3 * Math.max(1, ...Object.values(doc.compositions).map((c) => Math.max(c.width, c.height))));
     // the preview goes on without a file that is missing; an export refuses, naming every one
     await this.assets.sync(doc, reload, this.isolate);
     const samePlugins = this.registry && !fresh && !reload.length && doc.plugins === this.doc?.plugins && (doc.plugins || []).every((id) => doc.assets[id] === this.doc.assets[id]);
@@ -226,8 +234,8 @@ export class Renderer {
     const comp = this.evaluator.comp(compId);
     return (layerId: string): Host => ({
       layerId, layerIn: comp.layers[layerId]?.in ?? 0,
-      t: f.t, frame: f.frame, fps: comp.fps, width: comp.width, height: comp.height, duration: comp.duration,
-      asset: <T>(id: string) => assets.get<T>(id),
+      t: f.t, frame: f.frame, shutter: this.shutterOffset, fps: comp.fps, width: comp.width, height: comp.height, duration: comp.duration,
+      asset: <T>(id: string) => assets.use<T>(id, (p) => { this.pending.push(p); }),
       assetInfo: (id: string) => assets.info(id),
       assetUrl: (id: string) => assets.url(id),
       compositionSize: (id: string) => { const c = this.doc.compositions[id]; return c ? { width: c.width, height: c.height, duration: c.duration } : null; },
@@ -309,6 +317,33 @@ export class Renderer {
     drawFrame(this.sctx, frame, this.env(frame));
   }
 
+  /** the images the layers show between `from` and `to` (a nested composition: all of its own), by id */
+  private imagesBetween(compId: string, from: number, to: number, out = new Set<string>(), seen = new Set<string>()): Set<string> {
+    const comp = this.doc.compositions[compId];
+    if (!comp || seen.has(compId)) return out;
+    seen.add(compId);
+    const scan = (v: unknown, depth = 0) => {
+      if (typeof v === 'string') { if (this.doc.assets[v]?.type === 'image') out.add(v); }
+      else if (depth < 4 && v && typeof v === 'object') for (const x of Object.values(v)) scan(x, depth + 1);
+    };
+    for (const layer of Object.values(comp.layers)) {
+      if ((layer.in ?? 0) >= to || (layer.out ?? comp.duration) <= from) continue;
+      scan(layer.props); for (const e of layer.effects ?? []) scan(e.props);
+      if (layer.type === 'comp' && typeof layer.props?.comp === 'string') this.imagesBetween(layer.props.comp, 0, Infinity, out, seen);
+    }
+    return out;
+  }
+
+  /**
+   * A project heavier than the room keeps some pictures away: those the next
+   * seconds will show are brought in now, so a cut does not wait for them.
+   * Nothing to do (and nothing scanned) while every picture is kept.
+   */
+  prefetch(t: number, ahead = 1.5): void {
+    if (!this.assets.hasCold) return;
+    for (const id of this.imagesBetween(this.compId, t, t + ahead)) if (this.assets.isCold(id)) void this.assets.request(id);
+  }
+
   /** the last frame drawn lacked something still loading (a video frame): draw it again once settled */
   get incomplete() { return this.pending.length > 0; }
 
@@ -357,10 +392,10 @@ export class Renderer {
    * is the exact one (exports, stills). What never comes is waited for
    * SETTLE_LIMIT at most: the frame is then drawn with what it has.
    */
-  async renderComplete(t: number, opts: RenderOptions & { signal?: AbortSignal } = {}): Promise<EvaluatedFrame> {
+  async renderComplete(t: number, opts: RenderOptions & { signal?: AbortSignal; settleLimit?: number } = {}): Promise<EvaluatedFrame> {
     this.late = false;
     let frame = this.render(t, opts);
-    for (let i = 0; i < 30 && (await this.settle(SETTLE_LIMIT, opts.signal)); i++) frame = this.render(t, opts);
+    for (let i = 0; i < 30 && (await this.settle(opts.settleLimit ?? SETTLE_LIMIT, opts.signal)); i++) frame = this.render(t, opts);
     return frame;
   }
 
@@ -386,14 +421,16 @@ export class Renderer {
     const times = subTimes(t, n, opts.shutter ?? frame.motionBlur.shutter, this.comp);
     let i = 0;
     return () => {
-      if (i === 0) { this.compositor.begin(); this.pending = []; this.errors.clear(); }
+      if (i === 0) { this.compositor.begin(); this.pending = []; this.errors.clear(); this.assets.beginFrame(); }
       if (i < times.length) {
         const ts = times[i++];
         const e1 = performance.now();
         const sub = ts === t ? frame : this.evaluator.frame(ts, this.compId);
         const d0 = performance.now();
         this.times.evaluate += d0 - e1;
-        this.drawScene(sub);
+        // footage holds the frame's own picture across the shutter (Host.shutter)
+        this.shutterOffset = ts - t;
+        try { this.drawScene(sub); } finally { this.shutterOffset = 0; }
         this.compositor.add(this.scene, 1 / times.length);
         this.times.draw += performance.now() - d0;
         if (i < times.length) return null;
@@ -415,7 +452,7 @@ export class Renderer {
       return type?.stage === 'finish' && type.gl ? [{ code: type.gl.code, schema: type.props, props: e.props }] : [];
     });
     const onError = this.isolate ? (e: Error) => { this.errors.set('$comp.effects', e.message); } : (e: Error) => { throw e; };
-    this.compositor.finish(fx, look, seed, { hud: opts.hud ?? null, toFbo: opts.toFbo, passes, t: frame.t, scale: (this.sx + this.sy) / 2, onError });
+    this.compositor.finish(fx, look, seed, { hud: opts.hud ?? this.stamp?.(frame.t) ?? null, toFbo: opts.toFbo, passes, t: frame.t, scale: (this.sx + this.sy) / 2, onError });
     this.lastSeed = seed;
     return frame;
   }

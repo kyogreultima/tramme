@@ -9,6 +9,7 @@
 
 import { signal } from '@preact/signals';
 import { locale, m, t } from './i18n/index.ts';
+import { platform } from './tauri.ts';
 
 export interface UserJson {
   id: string;
@@ -163,6 +164,10 @@ export interface Billing {
   endsAt?: string;
   credits: number;
 }
+
+/** whether this app sells anything: the Android app shows the plan and the credits, never a way to buy
+ *  (the store's rules); one switch for every purchase entry point */
+export const sellsHere = (): boolean => platform !== 'android';
 
 export const billing = () => call<Billing>('GET', '/api/billing');
 export const plans = () => call<PlanTerms[]>('GET', '/api/billing/plans');

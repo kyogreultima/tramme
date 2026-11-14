@@ -14,7 +14,9 @@ import { FILM_PLAN_PATH, parsePlan } from './filmplan.ts';
 import { formLinesForReview } from './forms.ts';
 import { t } from './i18n/index.ts';
 import { prefs } from './settings.ts';
+import { fitLongest } from './model.ts';
 
+/** the longest side of a cell of a sheet or a strip: a portrait frame costs the model what a landscape one does */
 const CELL = 360;
 
 /** Numeric motion figures for the strip, evaluated where project code runs. */
@@ -66,7 +68,7 @@ export async function stills(ctx: ToolContext, times: number[], compId: string) 
 async function sheet(ctx: ToolContext, times: number[], cols: number, compId: string): Promise<string> {
   const c = ctx.doc.compositions[compId];
   const images = await stills(ctx, times, compId);
-  return sheetOf(images.map((image, i) => ({ image, label: `${times[i].toFixed(2)} s` })), CELL, Math.round((CELL * c.height) / c.width), cols);
+  return sheetOf(images.map((image, i) => ({ image, label: `${times[i].toFixed(2)} s` })), ...fitLongest(c.width, c.height, CELL), cols);
 }
 
 /** the moments worth looking at: just after entrances, markers, problems, and enough to cover the whole */
@@ -100,6 +102,23 @@ export function issueReport(issues: QualityIssue[], doc: TrammeDoc, compId: stri
   const notice = groups.slice(0, REPORT_MAX).map((g) => `- ${g.worst.say ? t(g.worst.say.text, g.worst.say.params) : g.worst.message}${g.count > 1 ? ` ${t('review.similar', { n: g.count - 1 })}` : ''}`);
   if (hidden) notice.push(`- ${t('review.moreKinds', { n: hidden })}`);
   return { lines, notice };
+}
+
+/** the warnings a proposal's answer shows at most: the rest is counted, the check tool has it all */
+const ANSWER_WARNINGS = 4;
+
+/**
+ * The picture's quality checks of the context's composition as a proposal's
+ * answer carries them: the counts and the first warnings only, without the
+ * notes, the contact sheet or the sound (the check tool gives those). A piece
+ * still being built has warnings it is about to fix: a short line keeps the
+ * model from chasing each of them call by call.
+ */
+export async function checksText(ctx: ToolContext): Promise<string> {
+  const issues = await qualityChecksOf(ctx, ctx.compId, await analyses(ctx));
+  const warnings = issues.filter((i) => i.severity === 'warning');
+  const lines = reportLines(groupIssues(warnings), { doc: ctx.doc, compId: ctx.compId, max: ANSWER_WARNINGS });
+  return [reportHead(issues), ...lines.lines, ...(lines.hidden ? [`(${lines.hidden} more kinds of warning: use_tool "check")`] : [])].join('\n');
 }
 
 const check: ToolType<{ frames?: number }> = {
@@ -144,7 +163,7 @@ const motion: ToolType<{ t: number; span?: number; steps?: number }> = {
     const to = Math.min(c.duration, from + span);
     const times = Array.from({ length: steps }, (_, i) => +Math.min(c.duration - 0.01, from + (span * i) / (steps - 1)).toFixed(3));
     const images = await stills(ctx, times, ctx.compId);
-    const url = sheetOf(images.map((image, i) => ({ image, label: `${times[i].toFixed(2)} s` })), CELL, Math.round((CELL * c.height) / c.width), Math.min(steps, 6));
+    const url = sheetOf(images.map((image, i) => ({ image, label: `${times[i].toFixed(2)} s` })), ...fitLongest(c.width, c.height, CELL), Math.min(steps, 6));
     // the same evaluation the render uses, so the figures are the movement's
     const report = await motionReportOf(ctx, from, to);
     const figs = report.figures.map(({ address, figures: f }) => {

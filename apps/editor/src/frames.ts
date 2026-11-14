@@ -43,7 +43,7 @@ export class Stills {
     return this.renderer;
   }
 
-  /** the frame at t, at most `width` pixels wide, as a JPEG data URL */
+  /** the frame at t, at most `width` pixels wide, as a JPEG data URL (fitLongest gives the width for a longest side) */
   async still(doc: TrammeDoc, t: number, compId: string, width: number, quality = 0.86): Promise<string> {
     const r = await this.rendererFor(doc, compId);
     const c = doc.compositions[compId];

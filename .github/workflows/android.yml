@@ -1,0 +1,164 @@
+# The Android app (apps/desktop, the same Tauri crate as the computers' app),
+# built, signed and handed to the workflow that calls it (desktop.yml for the
+# stable app, desktop-beta.yml for Tramme Beta). Nothing Android is built
+# anywhere else: no toolchain on a developer's machine.
+#
+# The Android project is not committed: `tauri android init` generates it here
+# on every build (apps/desktop/plugin-device brings our Kotlin, and
+# tauri.android.conf.json the application id). Signing is done after the build,
+# on the produced files, so the generated Gradle files are never patched.
+#
+# With the four signing secrets (ANDROID_KEYSTORE_BASE64,
+# ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD; the
+# keystore is made once by android-keystore.yml):
+#   - artifact desktop-Android: the signed tramme-android.apk, which the calling
+#     workflow's release job publishes with the computers' installers, the site
+#     offering it (apps/desktop/downloads.ts);
+#   - artifact android-private: the signed tramme-<version>.aab, for the Play
+#     Console, never published.
+# Without them: an unsigned debug .apk as the private artifact, a notice, and no
+# desktop-Android, so nothing unsigned is ever released and the release goes on.
+
+name: Android app
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: The environment the app is built for (brand/environments.ts), where its links lead
+        type: string
+        required: true
+      tauri-config:
+        description: A JSON merged over tauri.conf.json and tauri.android.conf.json ('' for the stable app)
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build (Android)
+    runs-on: ubuntu-latest
+    env:
+      TRAMME_ENV: ${{ inputs.environment }}
+      TAURI_CONFIG: ${{ inputs.tauri-config }}
+      # audience measurement of the app (apps/desktop/src-tauri/src/analytics.rs): without it nothing is counted
+      TRAMME_GA_API_SECRET: ${{ secrets.TRAMME_GA_API_SECRET }}
+      # whether the four signing secrets are all there (a secret cannot be tested in an `if` directly)
+      SIGNED: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' && secrets.ANDROID_KEYSTORE_PASSWORD != '' && secrets.ANDROID_KEY_ALIAS != '' && secrets.ANDROID_KEY_PASSWORD != '' }}
+      NDK: 27.2.12479018
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+        with:
+          rust-targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 17
+      # its default list asks for "tools", a package the SDK no longer ships: sdkmanager fails on it
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools
+      - name: The NDK
+        run: |
+          sdkmanager "ndk;$NDK"
+          echo "NDK_HOME=$ANDROID_HOME/ndk/$NDK" >> "$GITHUB_ENV"
+      # The CLI takes the flavour (Tramme Beta) from --config only: TAURI_CONFIG alone reaches the Rust
+      # build but not the generated project, and a project generated as app.tramme around a library
+      # built as app.tramme.beta crashes on launch (its Kotlin classes find none of their native methods).
+      # init and build are given the same file.
+      - name: The flavour's configuration
+        run: |
+          if [ -n "$TAURI_CONFIG" ]; then
+            printf '%s' "$TAURI_CONFIG" > "$RUNNER_TEMP/flavour.conf.json"
+            echo "FLAVOUR=--config $RUNNER_TEMP/flavour.conf.json" >> "$GITHUB_ENV"
+          fi
+      # the generated Gradle project calls the CLI back through `pnpm tauri` (package.json's "tauri" script)
+      - name: Generate the Android project
+        working-directory: apps/desktop
+        run: pnpm tauri android init --ci $FLAVOUR
+      # init lays Tauri's own launcher icons; ours (`tauri icon`, src-tauri/icons/android) go over them
+      - name: The app's icons
+        run: cp -r apps/desktop/src-tauri/icons/android/. apps/desktop/src-tauri/gen/android/app/src/main/res/
+      - name: Build, unsigned
+        if: env.SIGNED == 'true'
+        run: pnpm android:build --aab --apk $FLAVOUR
+      - name: Build without the signing secrets
+        if: env.SIGNED != 'true'
+        run: |
+          echo "::notice::the Android signing secrets are not set: an unsigned debug .apk is built, kept as a private artifact, and nothing Android is released"
+          pnpm android:build --apk --debug $FLAVOUR
+      # the Kotlin half and the Rust half must name the same package, or the app closes as soon as it opens
+      - name: The app's two halves agree
+        run: |
+          set -euo pipefail
+          package=$(sed -n 's/^ *namespace *= *"\(.*\)"/\1/p' apps/desktop/src-tauri/gen/android/app/build.gradle.kts)
+          symbol="Java_${package//./_}_Rust_onCreate"
+          apk=$(find apps/desktop/src-tauri/gen/android -name '*.apk' | head -1)
+          unzip -p "$apk" lib/arm64-v8a/libtramme_desktop_lib.so > "$RUNNER_TEMP/lib.so"
+          grep -aq "$symbol" "$RUNNER_TEMP/lib.so" \
+            || { echo "::error::the Rust library does not answer the package $package ($symbol missing)"; exit 1; }
+          echo "package $package, $symbol present"
+          # Google Play and Android 15's 16 KB-page devices refuse a library aligned on 4 KB (build.rs asks the linker)
+          readelf="$NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
+          for align in $("$readelf" -lW "$RUNNER_TEMP/lib.so" | awk '$1 == "LOAD" { print $NF }'); do
+            [ $((align)) -ge 16384 ] || { echo "::error::the Rust library is not aligned on 16 KB pages (a segment on $align)"; exit 1; }
+          done
+          echo "16 KB pages"
+
+      - name: Sign
+        if: env.SIGNED == 'true'
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          version=$(node -p "require('./apps/desktop/src-tauri/tauri.conf.json').version")
+          tools=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          keystore="$RUNNER_TEMP/upload.jks"
+          # the keystore exists for this step only
+          trap 'rm -f "$keystore"' EXIT
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$keystore"
+          mkdir -p public private
+
+          apk=$(find apps/desktop/src-tauri/gen/android -name '*release-unsigned.apk' | head -1)
+          aab=$(find apps/desktop/src-tauri/gen/android -name '*.aab' | head -1)
+          [ -n "$apk" ] && [ -n "$aab" ] || { echo "::error::the release .apk or .aab was not produced"; exit 1; }
+
+          "$tools/zipalign" -p 4 "$apk" "$RUNNER_TEMP/aligned.apk"
+          "$tools/apksigner" sign --ks "$keystore" --ks-key-alias "$ANDROID_KEY_ALIAS" \
+            --ks-pass env:ANDROID_KEYSTORE_PASSWORD --key-pass env:ANDROID_KEY_PASSWORD \
+            --out public/tramme-android.apk "$RUNNER_TEMP/aligned.apk"
+          jarsigner -keystore "$keystore" -storepass:env ANDROID_KEYSTORE_PASSWORD -keypass:env ANDROID_KEY_PASSWORD \
+            -sigalg SHA256withRSA -digestalg SHA-256 -signedjar "private/tramme-$version.aab" "$aab" "$ANDROID_KEY_ALIAS"
+
+          # the certificate must name Qualris, or nothing goes out
+          "$tools/apksigner" verify --print-certs public/tramme-android.apk | tee certs-apk.txt
+          keytool -printcert -jarfile "private/tramme-$version.aab" | tee certs-aab.txt
+          grep -q 'O=Qualris' certs-apk.txt || { echo "::error::the .apk is not signed with the Qualris certificate"; exit 1; }
+          grep -q 'O=Qualris' certs-aab.txt || { echo "::error::the .aab is not signed with the Qualris certificate"; exit 1; }
+          rm -f certs-apk.txt certs-aab.txt
+
+      - name: Keep the unsigned build
+        if: env.SIGNED != 'true'
+        run: |
+          mkdir -p private
+          version=$(node -p "require('./apps/desktop/src-tauri/tauri.conf.json').version")
+          cp "$(find apps/desktop/src-tauri/gen/android -name '*debug*.apk' | head -1)" "private/tramme-$version-debug.apk"
+
+      # the .apk alone, under its release name: the release job takes every desktop-* artifact
+      - uses: actions/upload-artifact@v7
+        if: env.SIGNED == 'true'
+        with:
+          name: desktop-Android
+          path: public/tramme-android.apk
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v7
+        with:
+          name: android-private
+          path: private/
+          if-no-files-found: error

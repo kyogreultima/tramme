@@ -84,7 +84,7 @@ describe('assistant, server path', () => {
     const { body, headers } = sent[0];
     expect(body.max_tokens).toBe(64000);
     expect(body.thinking).toEqual({ type: 'adaptive', display: 'summarized', block_binding: { prefix_mismatch_behavior: 'drop_block' } });
-    expect(body.output_config).toEqual({ effort: 'high' });
+    expect(body.output_config).toEqual({ effort: 'medium' });
     expect(body.context_management.edits[0]).toMatchObject({ type: 'clear_tool_uses_20250919', exclude_tools: expect.arrayContaining(['propose_changes']) });
     expect(body.fallbacks).toBe('default');
     expect(body.system[0].cache_control).toEqual({ type: 'ephemeral', ttl: '1h' });
@@ -229,7 +229,7 @@ describe('assistant, server path', () => {
     expect(sent[0].body.context_management).toBeDefined();
     expect(sent[1].body.context_management).toBeUndefined();
     expect(sent[1].headers['anthropic-beta']).not.toContain('context-management');
-    expect(sent[1].body.output_config).toEqual({ effort: 'high' });
+    expect(sent[1].body.output_config).toEqual({ effort: 'medium' });
     expect(sent[2].body.context_management).toBeUndefined();
   });
 

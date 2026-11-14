@@ -2,7 +2,7 @@
 
 How Tramme's assistant reaches the production level of the `marketing` reference from a prompt alone, with no asset given, and dresses a talking video as a human editor would. The design is [the spec](superpowers/specs/2026-10-29-taste-and-finish-design.md): the bar is the level of finish, never the look or the genre. Each step gets its own plan in `docs/superpowers/plans/`, lands on its own and is measured before the next; tick the boxes as they land.
 
-Status: steps 1 to 5 built, waiting for their measure (the baseline of step 0 is the user's to run, from the `taste-baseline` tag).
+Status: steps 1 to 9 built, waiting for their measure (the baseline of step 0 is the user's to run, from the `taste-baseline` tag).
 
 ## Measuring
 
@@ -67,3 +67,10 @@ On the bilal project as the run of 2026-10-28 left it (the check the assistant r
 
 - [x] Annotated in words, never as copied media: what makes a frame or a cut work, and the faults to avoid.
 - [ ] Two dev briefs on the trial server: which references were read, whether the direction cites a principle, whether the critic's fixes name a fault of the list, the cost the tool calls add. Spends quota, waits for the user's go.
+
+### Step 9. A talking video edited on its words
+
+Scored 4 out of 10 on 2026-11-14 (`bench/ledger.md`, Scores): "the level of an amateur trying the app", the timing wrong and some elements used badly. Measured against a channel's edit of the same kind (34 cuts in its last 213 s): the face and full-frame graphics alternate, one graphic world holds the whole video, titles are written with the voice, an interface tells a small story with a change about every 2 s, two-step comparisons land on their words.
+
+- [x] A charter set before the first insert (`charter`), the moments of what is said with the time of each word (`moments`), section titles written with the voice (`kinetic-title` with `spoken`), and three checks that block the review: a word on screen after it is said, an insert holding still 2.5 s, two inserts in a row built alike; over a talking video the review's stillness defect starts at 3 s. The guide for talking videos is rewritten on them.
+- [ ] Run the talking-head brief again and one talking video not seen yet, scored blind against the 4 of 2026-11-14. Spends the user's quota, waits for their go.

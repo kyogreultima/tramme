@@ -44,6 +44,7 @@ pub fn providers() -> &'static BTreeMap<String, Provider> {
     LIST.get_or_init(|| serde_json::from_str(KEYED).expect("packages/api/src/keyed-providers.json"))
 }
 
+#[cfg(desktop)]
 const SERVICE: &str = "tramme";
 
 /// the changes of the keys, one at a time (each request runs on its own thread)
@@ -57,13 +58,16 @@ pub trait Secrets: Send + Sync {
 }
 
 /// the system keychain
+#[cfg(desktop)]
 pub struct Keychain;
 
+#[cfg(desktop)]
 fn keychain_err(e: keyring::Error) -> HttpError {
     eprintln!("desktop: keychain error: {e}");
     HttpError { status: 500, message: "the system keychain refused the key".into() }
 }
 
+#[cfg(desktop)]
 impl Secrets for Keychain {
     fn get(&self, slot: &str) -> Option<String> {
         keyring::Entry::new(SERVICE, slot).ok()?.get_password().ok().filter(|k| !k.is_empty())
@@ -79,11 +83,19 @@ impl Secrets for Keychain {
     }
 }
 
+#[cfg(desktop)]
 static KEYCHAIN: Keychain = Keychain;
 
 /// the system keychain, for what else the app keeps in it (the account's session, account.rs)
+#[cfg(desktop)]
 pub fn keychain() -> &'static dyn Secrets {
     &KEYCHAIN
+}
+
+/// the secrets of a phone's app: the device plugin's Keystore (device_secrets.rs)
+#[cfg(mobile)]
+pub fn keychain() -> &'static dyn Secrets {
+    &crate::device_secrets::DeviceSecrets
 }
 
 /// a provider of the OpenAI chat format added by the user
@@ -154,7 +166,7 @@ impl KeyStore {
     /// the keys of the app: the system keychain, the custom providers in the app's settings
     pub fn system() -> Res<KeyStore> {
         let Some(settings) = store::settings_path() else { return http_err(500, "no settings folder on this machine") };
-        Ok(KeyStore { secrets: &KEYCHAIN, settings })
+        Ok(KeyStore { secrets: keychain(), settings })
     }
 
     #[cfg(test)]

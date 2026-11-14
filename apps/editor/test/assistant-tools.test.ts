@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { effortFor, effortLevels, pickModel } from '@tramme/assistant';
 import { listClaude, unlistClaude } from './claude-listed.ts';
 import { builtinRegistry } from '@tramme/nodes';
-import { harvestNote, realNote, inputIssues, vocabularyDetail, vocabularyIndex } from '../src/ai/answers.ts';
+import { harvestNote, realNote, inputIssues, toolSignatures, vocabularyDetail, vocabularyIndex } from '../src/ai/answers.ts';
 import { REVIEW_TOOLS } from '../src/review.ts';
 
 describe('effort levels', () => {
@@ -32,10 +32,10 @@ describe('effort levels', () => {
     expect(effortLevels('antigravity:claude-sonnet-4-6')).toEqual([]);
   });
 
-  it('follow the choice made for each model; otherwise high for Claude, the model\'s own for the others', () => {
+  it('follow the choice made for each model; otherwise medium for Claude, the model\'s own for the others', () => {
     const chosen = { 'claude-opus-5-5': 'max', 'openai:gpt-5': 'low', 'gemini:gemini-2.5-pro': 'xhigh' } as const;
     expect(effortFor('claude-opus-5-5', chosen)).toBe('max');
-    expect(effortFor('claude-sonnet-5-5', chosen)).toBe('high');
+    expect(effortFor('claude-sonnet-5-5', chosen)).toBe('medium');
     expect(effortFor('openai:gpt-5', chosen)).toBe('low');
     expect(effortFor('openai:o4-mini', chosen)).toBeUndefined();
     // a level the model does not have: its default
@@ -99,9 +99,24 @@ describe("the assistant's tools", () => {
     const type = reg.listNodes()[0].type;
     const detail = JSON.parse(vocabularyDetail(reg, [type, 'check', 'nothing-like-it']));
     expect(detail.nodes.map((n: { type: string }) => n.type)).toEqual([type]);
-    expect(detail.nodes[0].props).toEqual(reg.listNodes()[0].props);
+    expect(Object.keys(detail.nodes[0].props)).toEqual(Object.keys(reg.listNodes()[0].props));
     expect(detail.tools[0]).toMatchObject({ name: 'check', input: { type: 'object' } });
     expect(detail.unknown).toEqual(['nothing-like-it']);
+  });
+
+  it("leaves out of the full entries what only the interface uses, never what says what a field does", () => {
+    const reg = builtinRegistry().registerTool(...REVIEW_TOOLS);
+    const { nodes } = JSON.parse(vocabularyDetail(reg, ['shape.path', 'image']));
+    const path = nodes.find((n: { type: string }) => n.type === 'shape.path').props, image = nodes.find((n: { type: string }) => n.type === 'image').props;
+    // the panel's group and slider step go; a label that repeats the name goes
+    expect(path.trimStart).not.toHaveProperty('group');
+    expect(path.trimStart).not.toHaveProperty('step');
+    expect(path.trimStart).not.toHaveProperty('label');
+    // what it means, its range and its default stay
+    expect(path.trimStart).toMatchObject({ type: 'number', default: 0, min: 0, max: 1 });
+    expect(path.trimStart.description).toMatch(/fraction of the outline/);
+    // a label that says more than the name stays
+    expect(image.size.label).toBe('Frame');
   });
 });
 
@@ -130,5 +145,21 @@ describe('the plugins written in a turn', () => {
     expect(note.match(/a\.js/g)).toHaveLength(1);
     expect(note).toContain('Keep a plugin in the library');
     expect(note).not.toContain('library-add');
+  });
+});
+
+describe("the inputs of the tools the prompt names", () => {
+  it("gives the editor's own tools named in the prompt in a line each, never a project's plugin", async () => {
+    const { namedTools } = await import('@tramme/assistant');
+    const fs = await import('node:fs');
+    const reference = fs.readFileSync(new URL('../../../docs/document.md', import.meta.url), 'utf8');
+    const reg = builtinRegistry().registerTool(...REVIEW_TOOLS);
+    reg.use({ tools: [{ name: 'check-brand', description: 'a plugin of the project', run: () => '' }] }, 'brand');
+    const lines = toolSignatures(reg, new Set([...namedTools(reference), 'check-brand']));
+    expect(lines).toContain('motion(t:number, span?:number, steps?:integer)');
+    expect(lines.some((l) => l.startsWith('check('))).toBe(true);
+    expect(lines.some((l) => l.startsWith('check-brand('))).toBe(false);
+    // in the same order whatever the registry's
+    expect(lines).toEqual([...lines].sort());
   });
 });

@@ -2,6 +2,7 @@
 // sub-frames are averaged in linear light. Their props animate like any other.
 
 import type { EffectType } from '@tramme/core';
+import { WHEEL_GLSL } from './grading.ts';
 
 export const vignette: EffectType = {
   type: 'look.vignette', title: 'Vignette', category: 'Finishing', stage: 'finish',
@@ -86,7 +87,7 @@ export const glow: EffectType<{ color: string; radius: number; strength: number 
 };
 
 export const color: EffectType<{ brightness: number; contrast: number; saturation: number; hue: number }> = {
-  type: 'fx.color', title: 'Color correction', category: 'Effects', stage: 'layer',
+  type: 'fx.color', title: 'Color correction', category: 'Colour', stage: 'layer',
   props: {
     brightness: { type: 'number', default: 1, min: 0, step: 0.01, unit: 'x', label: 'Brightness' },
     contrast: { type: 'number', default: 1, min: 0, step: 0.01, unit: 'x', label: 'Contrast' },
@@ -204,7 +205,7 @@ export const displace: EffectType<{ source: string | null; amount: number }> = {
  * camera's own move of the layer is left out (`at`, the layer's depth), so
  * linking the camera's settings gives the exact camera math, per pixel.
  */
-export const parallax: EffectType<{ source: string | null; plane: number; range: number; amount: number; perspective: number; zoom: number; at: number }> = {
+export const parallax: EffectType<{ source: string | null; plane: number; range: number; amount: number; perspective: number; zoom: number; at: number; pan: [number, number] }> = {
   type: 'fx.parallax', title: 'Depth parallax', category: 'Effects', stage: 'layer',
   description: 'a 2.5D relief from a depth map (the depth tool makes one): near grows, far shrinks as the camera moves',
   props: {
@@ -215,14 +216,24 @@ export const parallax: EffectType<{ source: string | null; plane: number; range:
     perspective: { type: 'number', default: 1000, min: 50, step: 10, unit: 'px', label: 'Perspective', description: "the composition camera's: link to $comp.camera.perspective" },
     zoom: { type: 'number', default: 1, min: 0.05, step: 0.01, unit: 'x', label: 'Zoom', description: "the composition camera's: link to $comp.camera.zoom" },
     at: { type: 'number', default: 0, step: 10, unit: 'px', label: 'Layer depth', description: "the layer's own transform.depth, so the camera's move is not counted twice: link to it" },
+    pan: { type: 'vec2', default: [0, 0], unit: 'px', label: 'Camera pan', description: "the composition camera's: link to $comp.camera.pan; a sideways move then shifts the near depths more than the far, as a tracking shot does" },
   },
   gl: {
-    code: `vec4 effect(vec2 uv) {
+    code: `// a point read mirrored past the picture's edge: a depth pushed out of the frame shows the picture's own texture, never a smeared edge
+vec2 mirrored(vec2 p) { return 1.0 - abs(1.0 - abs(p)); }
+vec4 effect(vec2 uv) {
   vec4 m = texture(u_source, uv);
   float d = m.a > 0.0 ? dot(m.rgb / m.a, vec3(0.2126, 0.7152, 0.0722)) : u_plane;
   float z = (u_plane - d) * u_range;
   float k = (z - u_at) / max(u_zoom * u_perspective, 1.0) * u_amount;
-  return texture(uImage, uv + (uv - 0.5) * k);
+  // the camera's pan moves the far less than the near
+  vec2 shift = vec2(u_pan.x, -u_pan.y) * uScale / uRes * k;
+  // its push in grows the near around the middle, by as much as it zooms: at rest (zoom 1) the picture is the photo itself, a pan
+  // alone grows nothing (a rock at the frame's edge pushed 120 px off the water left its outline echoed over it). The far is not
+  // shrunk: the layer is drawn in the frame's size, and a far depth shrinking toward the middle reads past the frame's edge,
+  // where there is only the mirror (a mountain mirrored into the sky)
+  float grow = min(k * (1.0 - 1.0 / max(u_zoom, 0.05)), 0.0);
+  return texture(uImage, mirrored(uv + (uv - 0.5) * grow - shift));
 }`,
   },
 };
@@ -391,9 +402,21 @@ export const key: EffectType<{ color: string; tolerance: number; softness: numbe
   gl: {
     code: `vec2 chroma(vec3 c) { return vec2(-0.1146 * c.r - 0.3854 * c.g + 0.5 * c.b, 0.5 * c.r - 0.4542 * c.g - 0.0458 * c.b); }
 vec3 straight(vec4 p) { return p.a > 0.0 ? p.rgb / p.a : vec3(0.0); }
+// the key's own channel (green, blue or red) and how far it stands above the two others: a screen when it stands well above
+int screenChannel() { vec3 s = u_color.rgb; return s.g >= s.r && s.g >= s.b ? 1 : s.b >= s.r ? 2 : 0; }
+float excess(vec3 c, int ch) { return ch == 1 ? c.g - max(c.r, c.b) : ch == 2 ? c.b - max(c.r, c.g) : c.r - max(c.g, c.b); }
 float kept(vec2 uv, vec2 k) {
   vec4 p = texture(uImage, uv);
-  float d = length(chroma(straight(p)) - k);
+  vec3 c = straight(p);
+  int ch = screenChannel();
+  float screen = excess(u_color.rgb, ch);
+  if (screen > 0.15) {
+    // a green or blue screen, by colour difference: how much of the screen's excess the pixel has is how much of the
+    // screen it holds, so a hair or a hand in motion blur is as transparent as it is mixed
+    float raw = 1.0 - clamp(excess(c, ch) / screen, 0.0, 1.0);
+    return p.a * clamp((raw - u_tolerance) / max(max(u_softness, 0.0001) * 4.0, 0.0001), 0.0, 1.0);
+  }
+  float d = length(chroma(c) - k);
   return p.a * smoothstep(u_tolerance, u_tolerance + max(u_softness, 0.0001), d);
 }
 vec4 effect(vec2 uv) {
@@ -410,6 +433,10 @@ vec4 effect(vec2 uv) {
     }
   }
   if (u_view > 0.5) return vec4(vec3(a), 1.0);
+  // an edge half kept (hair, a hand in motion blur) is the subject mixed with the screen: the screen's share taken out,
+  // so its colour is the subject's, without a green or olive fringe
+  float m = p.a > 0.0 ? clamp(a / p.a, 0.0, 1.0) : 0.0;
+  if (m < 0.999) c = clamp((c - (1.0 - m) * u_color.rgb) / max(m, 0.2), 0.0, 1.0);
   // spill: the part of the colour's chroma that goes the key's way, taken out (its brightness kept)
   vec2 dir = length(k) > 0.0001 ? normalize(k) : vec2(0.0), q = chroma(c);
   float toward = max(0.0, dot(q, dir)) * u_spill;
@@ -423,13 +450,14 @@ vec4 effect(vec2 uv) {
 
 /** a LUT: the colours of the layer through a .cube table (a grade, a log footage's conversion), at a strength */
 export const lut: EffectType<{ lut: string | null; strength: number }> = {
-  type: 'fx.lut', title: 'LUT', category: 'Effects', stage: 'layer',
+  type: 'fx.lut', title: 'LUT', category: 'Colour', stage: 'layer',
   description: 'the colours through a .cube table: a look, or the conversion of log footage',
   props: {
     lut: { type: 'asset', default: null, nullable: true, assetType: 'lut', label: 'LUT', animatable: false, description: 'a .cube file imported into the project' },
     strength: { type: 'number', default: 1, min: 0, max: 1, step: 0.01, label: 'Strength' },
   },
   gl: {
+    dither: true,
     code: `vec4 effect(vec2 uv) {
   vec4 p = texture(uImage, uv);
   if (u_lut_size < 2.0 || p.a <= 0.0) return p;
@@ -446,7 +474,7 @@ const IDENTITY = { v: [[0, 0], [1, 1]], closed: false };
 
 /** tone curves: the master curve on the three channels, then one curve each for red, green and blue */
 export const curves: EffectType<{ master: unknown; red: unknown; green: unknown; blue: unknown; strength: number }> = {
-  type: 'fx.curves', title: 'Curves', category: 'Effects', stage: 'layer',
+  type: 'fx.curves', title: 'Curves', category: 'Colour', stage: 'layer',
   description: 'tone curves: contrast, a lifted black, a colour cast, by points on a curve',
   props: {
     master: { type: 'path', format: 'curve', default: IDENTITY, label: 'Master', description: 'the brightness: points from 0 (black) to 1 (white)' },
@@ -456,6 +484,7 @@ export const curves: EffectType<{ master: unknown; red: unknown; green: unknown;
     strength: { type: 'number', default: 1, min: 0, max: 1, step: 0.01, label: 'Strength' },
   },
   gl: {
+    dither: true,
     code: `float through(sampler2D curve, float x) { return texture(curve, vec2(clamp(x, 0.0, 1.0) * (255.0 / 256.0) + 0.5 / 256.0, 0.5)).r; }
 vec4 effect(vec2 uv) {
   vec4 p = texture(uImage, uv);
@@ -476,7 +505,7 @@ const W0: [number, number] = [0, 0];
  * its distance from the centre) and a level, as a colourist grades.
  */
 export const wheels: EffectType<{ lift: [number, number]; liftLevel: number; gamma: [number, number]; gammaLevel: number; gain: [number, number]; gainLevel: number }> = {
-  type: 'fx.wheels', title: 'Colour wheels', category: 'Effects', stage: 'layer',
+  type: 'fx.wheels', title: 'Colour wheels', category: 'Colour', stage: 'layer',
   description: 'lift, gamma and gain: the shadows, the mid tones and the highlights pushed toward a colour, and their levels',
   props: {
     lift: { type: 'vec2', format: 'wheel', default: W0, label: 'Lift', group: 'Shadows', description: 'the colour the shadows lean toward' },
@@ -487,21 +516,15 @@ export const wheels: EffectType<{ lift: [number, number]; liftLevel: number; gam
     gainLevel: { type: 'number', default: 0, min: -1, max: 1, step: 0.005, label: 'Gain level', group: 'Highlights', description: 'brightens (or dims) the whites' },
   },
   gl: {
-    code: `// a wheel's colour: its hue at full saturation, made neutral in brightness, times its amount
-vec3 tint(vec2 w) {
-  float k = min(length(w), 1.0);
-  if (k <= 0.0) return vec3(0.0);
-  float h = atan(w.y, w.x) / 6.2831853;
-  vec3 c = clamp(abs(mod(h * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0);
-  return (c - dot(c, vec3(0.2126, 0.7152, 0.0722))) * k;
-}
+    dither: true,
+    code: `${WHEEL_GLSL}
 vec4 effect(vec2 uv) {
   vec4 p = texture(uImage, uv);
   if (p.a <= 0.0) return p;
   vec3 c = p.rgb / p.a;
-  vec3 lift = u_liftLevel + tint(u_lift) * 0.25;
-  vec3 gain = 1.0 + u_gainLevel + tint(u_gain) * 0.5;
-  vec3 gamma = max(vec3(0.05), 1.0 + u_gammaLevel + tint(u_gamma) * 0.5);
+  vec3 lift = u_liftLevel + wheelTint(u_lift) * 0.25;
+  vec3 gain = 1.0 + u_gainLevel + wheelTint(u_gain) * 0.5;
+  vec3 gamma = max(vec3(0.05), 1.0 + u_gammaLevel + wheelTint(u_gamma) * 0.5);
   vec3 o = clamp(gain * (c + lift * (1.0 - c)), 0.0, 1.0);
   return vec4(pow(o, 1.0 / gamma) * p.a, p.a);
 }`,

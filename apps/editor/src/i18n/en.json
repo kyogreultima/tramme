@@ -6,6 +6,8 @@
     "low": "Low (dB)", "mid": "Mid (dB)", "midFreq": "Mid frequency (Hz)", "midQ": "Mid Q", "high": "High (dB)", "amount": "Amount", "frequency": "Frequency (Hz)", "wet": "Wet", "time": "Time", "feedback": "Feedback", "drive": "Drive", "tone": "Tone (Hz)", "timeUnit": "Time unit", "milliseconds": "Milliseconds", "tempo": "Tempo (BPM)", "tempoUnset": "Not set", "tempoNeeded": "Set a tempo to enable this note delay"
   },
   "common": {
+    "findInMenu": "Find…",
+    "noMatch": "Nothing matches.",
     "pickInViewport": "Pick in the viewport (Escape: cancel)",
     "companionHttpStatus": "companion: HTTP {status}",
     "companion": "Companion",
@@ -719,6 +721,17 @@
     "noProjectNamed": "Nothing named “{query}”."
   },
   "inspector": {
+    "resetEffect": "Reset the effect",
+    "sourceRec709": "Rec.709 / sRGB (video)",
+    "sourceSlog3": "Sony S-Log3",
+    "sourceVlog": "Panasonic V-Log",
+    "sourceLogc3": "ARRI LogC3",
+    "sourceApplelog": "Apple Log (iPhone)",
+    "sourceClog3": "Canon Log 3",
+    "sourceHlg": "HLG (HDR phones)",
+    "viewResult": "Result",
+    "viewMatte": "Matte",
+    "viewIsolated": "Colour alone",
     "sceneParamsRead": "Read the scene parameters",
     "sceneReadParams": "Read the parameters from scene.json",
     "sceneParamsCurrent": "The parameters already match scene.json.",
@@ -868,6 +881,7 @@
     "camera": "Camera (2.5D)"
   },
   "panel": {
+    "colourLooks": "Colour looks",
     "keepInLibrary": "Keep in the library",
     "componentWith": "A component: {params}",
     "component": "component",
@@ -991,6 +1005,10 @@
     "cliDefault": "Its default model"
   },
   "settings": {
+    "watermark": "Watermark",
+    "watermarkHint": "The Tramme logo in a corner of your exported films. Your plan lets you turn it off.",
+    "watermarkBasic": "The Tramme logo in a corner of your exported films. Plus and Pro can turn it off.",
+    "watermarkAlways": "Always",
     "playProxies": "Play proxies",
     "playProxiesHint": "a video with a proxy (the proxy tool) plays its lighter copy here; the exports always use the original",
     "adaptsToTheMachine": "Adapts to the machine: smaller if playback slows down, larger when there is room.",
@@ -1084,6 +1102,8 @@
     "varySoundsHint": "A sound placed on several moments alternates its variants, so it does not sound copied.",
     "assistantTranscribes": "Let the assistant transcribe without asking",
     "assistantTranscribesHint": "When it needs what is said in a recording, it transcribes it on its own, also when it works while you are away. The recording is sent to the speech model you chose. Off: it asks first, and does without when nobody answers.",
+    "acceptReadings": "Make videos from a reference without showing its reading first",
+    "acceptReadingsHint": "The assistant reads how the reference is made and goes on to make your video the same way. Off: it shows you the reading first, to correct or accept.",
     "assistantFetchesReal": "Let the assistant fetch real logos and people without asking",
     "assistantFetchesRealHint": "A real brand's logo, a real person or product, taken from a free image library with its licence recorded in the project. Off: it asks first, and sets the name in the film's type when nobody answers.",
     "confirmPaid": "Ask before a paid sound",
@@ -1096,6 +1116,11 @@
     "voiceModel": "Voice model (ElevenLabs)",
     "voiceModelHint": "Eleven v4 and v3 follow how a line is said, accent included (the Style of a voice-over). Multilingual v2 is the steadiest on long texts, Flash the cheapest.",
     "voiceModelDefault": "{name} (newest)",
+    "voiceShort": "Voices offered first",
+    "voiceShortHint": "The five voices the voice-over panel of the timeline offers for this provider. Add others from the search below.",
+    "voiceShortRemove": "Remove from the voices offered first",
+    "voiceShortEmpty": "None: the panel offers the provider's first voices.",
+    "voiceShortAdd": "Offer first",
     "voicePicker": "Choose a voice",
     "voicePickerHint": "The voices of the provider above: the account's and the shared library's for ElevenLabs. Listen, then use one.",
     "voiceSearch": "Words: warm, narrator…",
@@ -1119,7 +1144,7 @@
     "quickLauncherHint": "A small floating button over your other apps while Tramme is behind them. With no project open it starts a film; with one open it takes files dropped on it, asks the assistant and shows the playback as a ring. Drag it where you like.",
     "noMatch": "No setting for \"{query}\".",
     "effort": "Effort",
-    "effortHint": "How hard the chosen model works on each message: deeper thinking and more checks as it rises, but slower and costlier. Kept for each model. Claude: High by default, which suits most work.",
+    "effortHint": "How hard the chosen model works on each message: deeper thinking and more checks as it rises, but slower and costlier. Kept for each model. Claude: Medium by default, which makes films as good as High for much less; raise it for the hardest work.",
     "effortNone": "This model has no effort levels.",
     "effortOfName": "Effort of {name}",
     "effortIs": "Effort: {level}",
@@ -1385,6 +1410,7 @@
     "doneInSS": "Done in {s} s",
     "nMb": "{n} MB",
     "saveToComputer": "Save to computer",
+    "saveOnDevice": "Save or share",
     "keptInPath": "kept in {path}",
     "keepInTheProject": "Keep in the project",
     "exportReady": "An exported file waits in the export popover",
@@ -1425,6 +1451,10 @@
     "hdrUnavailable": "HDR: this browser's canvas cannot hold it yet, the export stays SDR"
   },
   "viewport": {
+    "scopes": "Scopes",
+    "hideScopes": "Hide the scopes",
+    "parade": "Parade",
+    "histogram": "Histogram",
     "sceneLive": "Live preview of the web scene {folder}",
     "sceneProblem": "Web scene {folder}: {problem}",
     "websceneCaptured": "Web scene {folder}: its pictures are made when you export with tramme render",
@@ -1449,6 +1479,7 @@
     "safeZones": "Safe zones",
     "grid": "Grid",
     "onionSkin": "Onion skin (previous red, next green, at rest)",
+    "heavyProject": "This project is heavy: some pictures are shown at a reduced size to keep the preview smooth. Your project is untouched.",
     "loadingAssets": "Loading assets…",
     "proposalPreview": "Proposal preview",
     "proposalHidden": "Proposal hidden",
@@ -1461,6 +1492,9 @@
     "removeAVertex": "Remove a vertex"
   },
   "export": {
+    "watermarkTitle": "Tramme watermark",
+    "watermarkBasic": "Your film carries the Tramme logo in a corner. Plus and Pro can turn it off.",
+    "watermarkPaid": "Your film carries the Tramme logo in a corner. Turn it off in Settings, Behavior.",
     "noTenBit": "This browser cannot encode 10-bit video at this size",
     "tenBitPlugins": "The project's plugins draw at 8 bits: the film was exported at 8 bits",
     "tenBitWith": "10 bits, in {codec}",
@@ -1536,6 +1570,44 @@
   },
   "brief": {
     "written": "Brief of the project written (assets/brief.json)."
+  },
+  "reading": {
+    "label": "Reading of {name}",
+    "done": "Reference read: {scenes} scene(s). The film can now be made the same way with your content.",
+    "declined": "The reading was not accepted: tell the assistant what to change.",
+    "shots": "Finding the shots",
+    "frames": "Looking at the shots",
+    "title": "How the reference is made",
+    "text": "Check the reading before your video is made the same way with your content. Correct what a scene does, choose the asset for each place, remove a scene or merge it with the next.",
+    "accept": "Make my video this way",
+    "seconds": "{s} s",
+    "onBeat": "cut on bar {bar}",
+    "what": "What the scene does",
+    "remove": "Remove",
+    "merge": "Merge with the next",
+    "words": "Your words",
+    "built": "Drawn in the film",
+    "missing": "Nothing of yours yet",
+    "role": { "logo": "Logo", "headline": "Title", "text": "Text", "screenshot": "Screen", "photo": "Photo", "video": "Video", "product": "Product", "person": "Person", "figure": "Figure", "shape": "Shape" }
+  },
+  "voiceover": {
+    "open": "Voice-over from words",
+    "title": "A voice-over",
+    "wordsPlaceholder": "The words to say",
+    "voices": "Voices",
+    "noProvider": "No provider makes voice-overs: connect ElevenLabs, OpenAI, Gemini or Hydracept in the settings.",
+    "library": "All voices",
+    "make": "Make the voice-over",
+    "sample": "Here is how this voice sounds over your film.",
+    "sampleTitle": "Hear this voice?",
+    "sampleText": "A short sample of {voice} is made once by the provider and kept in the sound library. It costs a little.",
+    "sampleYes": "Make the sample",
+    "takeTitle": "Make the voice-over?",
+    "takeText": "The provider says your words with the voice {voice}. It costs money.",
+    "takeYes": "Make it",
+    "takeName": "Voice-over · {voice}",
+    "label": "Voice-over with {voice}",
+    "tone": { "warm": "warm", "narrator": "deep narrator", "lively": "lively", "soft": "soft", "clear": "clear" }
   },
   "perception": {
     "beatsDone": "Music analysed: {tempo} bpm, {beats} beats, {bars} bars, {sections} section change(s). The assistant can now cut and animate on the beat.",
@@ -1810,10 +1882,22 @@
   },
   "removebg": {
     "reading": "reading the subject",
-    "done": "The background of {name} is cut out."
+    "refining": "refining the edge",
+    "done": "The background of {name} is cut out.",
+    "doneMany": "{n} backgrounds cut out."
   },
   "cuts": {
     "done": "\"{name}\" tightened: {saved} saved."
+  },
+  "device": {
+    "ready": "Your file is ready",
+    "saveToGallery": "Save to the gallery",
+    "saveToDownloads": "Save to the downloads",
+    "share": "Share",
+    "saved": "Saved",
+    "saveFailed": "The file could not be saved. Check that the phone has room left.",
+    "shareFailed": "The file could not be shared.",
+    "exportNeedsTramme": "The export stops while Tramme is not on screen. Come back to finish it."
   },
   "dictation": {
     "start": "Dictate: speak, then click again to write what you said",
@@ -1876,6 +1960,8 @@
     "dictationCompanion": "Companion",
     "dictationServer": "Server",
     "upscale": "Enlarging a picture",
+    "interpolate": "Frames between frames (smooth slow motion)",
+    "noteRife": "Learned motion: holds up on fast and crossing movement where the built-in matching smears; downloads 22 MB, faster with a graphics card",
     "noteEsrgan": "Rebuilds fine texture in pictures; slow (a few seconds per 128 px tile on this computer); videos always use the built-in engine",
     "builtIn": "built in"
   },
@@ -1907,6 +1993,13 @@
     "heard": "heard, not written",
     "noTool": "The fillers tool is not available",
     "review": "Review the cuts…"
+  },
+  "charter": {
+    "set": "Charter set.",
+    "kept": "The charter stays as it is."
+  },
+  "moments": {
+    "done": "{n} moment(s) found for inserts"
   },
   "skin": {
     "finding": "Finding the faces",
@@ -2119,6 +2212,7 @@
       "mailLanguage": "Language of our emails",
       "plan": "Plan and credits",
       "planHint": "What your account includes, and how to change it.",
+      "planHintHere": "What your account includes.",
       "currentPlan": "Plan",
       "planBasic": "Basic",
       "planPlus": "Plus",

@@ -6,7 +6,7 @@
 
 import { lookStatsOf, matchGrade, staticValue, type Layer, type LookStats, type Op, type TrammeDoc, type VideoAsset } from '@tramme/core';
 import { commit, S, toast } from './state.ts';
-import { assetData } from './preview.ts';
+import { assetData, preview } from './preview.ts';
 import { matchLookOps } from './looks.ts';
 import { t } from './i18n/index.ts';
 
@@ -41,6 +41,8 @@ export async function lookPlan(doc: TrammeDoc, compId: string, ids: string[], no
   const clips = ids.filter((id) => c.layers[id]?.type === 'video' || c.layers[id]?.type === 'image');
   if (clips.length < 2) return { ops: [], notes: [{ kind: 'few' }] };
   const where = (id: string) => { const l = c.layers[id], a = l.in ?? 0, b = l.out ?? c.duration; return now >= a && now < b ? now : (a + b) / 2; };
+  // a clip just added is read once the preview has its file
+  await preview.settled();
   const [first, ...rest] = clips, ref = await statsOf(c.layers[first], where(first));
   if (!ref) return { ops: [], notes: [{ kind: 'nopicture', clip: first }] };
   const ops: Op[] = [];

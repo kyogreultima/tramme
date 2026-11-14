@@ -1,13 +1,29 @@
 ---
+// The platform: one project on a computer and on a phone, the same shot in
+// both (the reframe proof's 16:9 shot and its vertical version), then what
+// the account gives.
+import { Image } from 'astro:assets';
 import Head from './Head.astro';
-import { pathIn, t, type Locale } from '../lib/i18n';
+import { proofOf } from '../lib/proofs';
+import { pathIn, pick, t, type Locale, type Localised } from '../lib/i18n';
 interface Props { locale: Locale }
 const { locale } = Astro.props;
 const items = ['devices', 'visibility', 'export'];
+const reframe = proofOf('reframe');
+const LABEL: Localised<string> = {
+  en: 'The same project open on a computer and on a phone: a man walking along a river, wide on the computer, vertical on the phone.',
+  fr: 'Le même projet ouvert sur un ordinateur et sur un téléphone : un homme qui marche le long d’une rivière, en large sur l’ordinateur, en vertical sur le téléphone.',
+};
 ---
 <section class="platform wrap" id="platform">
   <span class="section-label">{t(locale, 'nav.cloud')}</span>
-  <Head title={t(locale, 'landing.platform.title')} more={t(locale, 'landing.platform.more')} />
+  <div class="top">
+    <Head title={t(locale, 'landing.platform.title')} more={t(locale, 'landing.platform.more')} />
+    <div class="screens" role="img" aria-label={pick(locale, LABEL)}>
+      <div class="computer" data-reveal><Image src={reframe.before} alt="" widths={[480, 960]} sizes="(min-width: 900px) 40vw, 90vw" loading="lazy" /></div>
+      <div class="phone" data-reveal><Image src={reframe.after} alt="" widths={[320, 640]} sizes="160px" loading="lazy" /></div>
+    </div>
+  </div>
   <ul class="details" role="list" data-stagger>
     {items.map((id) => <li><h3>{t(locale, `landing.platform.${id}.title`)}</h3><p>{t(locale, `landing.platform.${id}.text`)}</p><a href={pathIn(locale, '/features/#cloud')}>{t(locale, 'landing.pillars.learn')}</a></li>)}
   </ul>
@@ -16,6 +32,15 @@ const items = ['devices', 'visibility', 'export'];
   .platform { padding-top: 28px; padding-bottom: var(--section); border-top: 1px solid var(--line); }
   .section-label { display: block; margin-bottom: 32px; font-size: 0.6875rem; color: var(--ink-2); }
   .platform :global(.head p) { max-width: 42ch; }
+  /* the words on the left, the two screens on the right */
+  .top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(28px, 4vw, 64px); align-items: center; }
+  @media (max-width: 900px) { .top { grid-template-columns: minmax(0, 1fr); } }
+  .screens { position: relative; padding: 0 12% 14% 0; }
+  .computer { padding: 8px; border-radius: var(--r-lg); background: var(--panel); box-shadow: inset 0 0 0 1px var(--line-2); }
+  .computer :global(img) { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; border-radius: calc(var(--r-lg) - 6px); }
+  /* the phone over the computer's corner, its picture the vertical version */
+  .phone { position: absolute; right: 0; bottom: 0; width: 26%; padding: 5px; border-radius: 22px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line-2), 0 18px 40px var(--scrim); }
+  .phone :global(img) { display: block; width: 100%; height: auto; aspect-ratio: 9 / 16; object-fit: cover; border-radius: 17px; }
   .details { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 40px; list-style: none; margin: 32px 0 0; padding: 0; }
   h3 { font-size: 0.9375rem; line-height: 1.3; }
   .details p { max-width: 38ch; margin-top: 12px; font-size: 0.8125rem; color: var(--ink-2); }

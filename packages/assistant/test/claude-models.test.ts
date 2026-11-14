@@ -113,9 +113,9 @@ describe('what the registry of Claude models tells the rest of the assistant', (
     expect(isAdaptive('claude-haiku-4-5-20251001')).toBe(false);
   });
 
-  it('gives a Claude model the high level by default when it has levels, and nothing when it has none', () => {
+  it('gives a Claude model the medium level by default when it has levels, and nothing when it has none', () => {
     setClaudeModels(parseSdkModels(SDK_ROWS));
-    expect(effortFor('claude-opus-5-5', {})).toBe('high');
+    expect(effortFor('claude-opus-5-5', {})).toBe('medium');
     expect(effortFor('claude-opus-5-5', { 'claude-opus-5-5': 'max' })).toBe('max');
     expect(effortFor('claude-haiku-4-5-20251001', { 'claude-haiku-4-5-20251001': 'high' })).toBeUndefined();
   });

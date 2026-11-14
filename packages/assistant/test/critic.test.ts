@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CRITIC_SYSTEM, parseVerdict } from '../src/index.ts';
+import { CRITIC_AXES, CRITIC_SYSTEM, parseVerdict } from '../src/index.ts';
 
 const fix = (n: number) => ({ scene: `Scene ${n}`, what: `change ${n}`, why: `gain ${n}` });
 
@@ -11,9 +11,11 @@ describe('the critic\'s instructions', () => {
     expect(CRITIC_SYSTEM).toContain('at most three');
   });
 
-  it('defers to the brief and describes the limits of sampled evidence', () => {
-    expect(CRITIC_SYSTEM).toContain('The brief and kept direction define success');
-    expect(CRITIC_SYSTEM).toContain('Flat graphics and empty space are valid');
+  it('is harsh, scores every axis, and describes the limits of sampled evidence', () => {
+    expect(CRITIC_SYSTEM).toContain('Be a harsh director, not a proud author');
+    for (const a of CRITIC_AXES) expect(CRITIC_SYSTEM).toContain(`- ${a}:`);
+    expect(CRITIC_SYSTEM).toContain('every axis is 8 or more');
+    expect(CRITIC_SYSTEM).toContain('dresses a filmed video');
     expect(CRITIC_SYSTEM).toContain('Sound is optional');
     expect(CRITIC_SYSTEM).toContain('Do not claim to see motion between samples');
   });
@@ -58,6 +60,16 @@ describe('the verdict', () => {
     const v = parseVerdict(JSON.stringify({ verdict: 'done', score: 8, fixes: [fix(1)] }));
     expect(v.verdict).toBe('not yet');
     expect(v.fixes).toHaveLength(1);
+  });
+
+  it('scores the lowest axis, and is not done while an axis is under 8', () => {
+    const axes = { idea: 9, composition: 8, scale: 7, material: 9, rhythm: 8, motion: 9, finish: 9 };
+    const v = parseVerdict(JSON.stringify({ verdict: 'done', score: 9, axes, fixes: [] }));
+    expect(v.score).toBe(7);
+    expect(v.verdict).toBe('not yet');
+    expect(v.axes).toEqual(axes);
+    expect(parseVerdict(JSON.stringify({ verdict: 'done', axes: { ...axes, scale: 8 }, fixes: [] }))).toMatchObject({ verdict: 'done', score: 8 });
+    expect(parseVerdict(JSON.stringify({ verdict: 'not yet', axes: { idea: 14, colour: 2 }, fixes: [] })).axes).toEqual({ idea: 10 });
   });
 
   it('drops a fix with no change in it, and keeps the scene it names when it names one', () => {

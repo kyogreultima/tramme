@@ -1,12 +1,13 @@
 ---
-// A desktop system's logo (apps/desktop/downloads.ts, Os)
+// A system's logo (apps/desktop/downloads.ts, Os)
 import WindowsLogo from '@phosphor-icons/core/assets/fill/windows-logo-fill.svg';
 import AppleLogo from '@phosphor-icons/core/assets/fill/apple-logo-fill.svg';
 import LinuxLogo from '@phosphor-icons/core/assets/fill/linux-logo-fill.svg';
+import AndroidLogo from '@phosphor-icons/core/assets/fill/android-logo-fill.svg';
 import type { Os } from '../../../desktop/downloads.ts';
 
 interface Props { os: Os }
-const Icon = { windows: WindowsLogo, mac: AppleLogo, linux: LinuxLogo }[Astro.props.os];
+const Icon = { windows: WindowsLogo, mac: AppleLogo, linux: LinuxLogo, android: AndroidLogo }[Astro.props.os];
 ---
 
 <Icon aria-hidden="true" />

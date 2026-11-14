@@ -1,15 +1,16 @@
 ---
-// What a section shows, as the app's cards: an icon, a short name, a line.
+// What a section shows, as the app's cards: an icon (or the idea shown moving), a short name, a line.
 // Surfaces on the ground with gutters between, never hairlines.
-interface Item { Icon: (props: Record<string, unknown>) => unknown; title: string; text: string }
+import MotionDemo, { type DemoKind } from './MotionDemo.astro';
+interface Item { Icon: (props: Record<string, unknown>) => unknown; title: string; text: string; demo?: DemoKind }
 interface Props { items: Item[]; columns?: number }
 const { items, columns = 3 } = Astro.props;
 ---
 
 <ul class="cards" role="list" style={`--cols: ${columns}`} data-reveal data-stagger>
-  {items.map(({ Icon, title, text }) => (
+  {items.map(({ Icon, title, text, demo }) => (
     <li class="surface">
-      <span class="icon"><Icon aria-hidden="true" /></span>
+      {demo ? <MotionDemo kind={demo} /> : <span class="icon"><Icon aria-hidden="true" /></span>}
       <strong>{title}</strong>
       <p>{text}</p>
     </li>

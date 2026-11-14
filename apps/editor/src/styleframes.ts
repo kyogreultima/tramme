@@ -7,7 +7,7 @@
 import type { ToolContext, ToolOutput, ToolType } from '@tramme/core';
 import type { MadeImage } from './api.ts';
 import { alone, chooseAmong } from './confirm.ts';
-import { FILM_PLAN_PATH, parsePlan, planOp, type Direction, type FilmPlan, type PlanScene, type StyleFrame } from './filmplan.ts';
+import { FILM_PLAN_PATH, parsePlan, planOp, sceneNamed, type Direction, type FilmPlan, type PlanScene, type StyleFrame } from './filmplan.ts';
 import { CHANGERS, FRAMES_DIR, drawTakes, holdTakes, ratioOf, referenceOf, takeHeld, takeSheet } from './images.ts';
 import { extOf } from './media.ts';
 import { clip, slug } from './model.ts';
@@ -92,7 +92,7 @@ const styleFrames: ToolType<Input> = {
     }
 
     if (!p.styleFrames) return text(`Style frames are off in the settings: ${BUILD_FROM_WORDS}.`);
-    const scene = a.scene ? plan.scenes.find((s) => s.id === a.scene) : plan.scenes.find((s) => s.hero) ?? plan.scenes[0];
+    const scene = a.scene ? sceneNamed(plan, a.scene) : plan.scenes.find((s) => s.hero) ?? plan.scenes[0];
     if (!scene) throw new Error(a.scene ? `${a.scene}: no such scene in the film plan (${plan.scenes.map((s) => s.id).join(', ')})` : 'the film plan has no scene');
     if (!plan.directions.length) return text('The film plan has no direction to draw: write them with film-plan.');
     const provider = a.provider ?? (p.pictureProvider !== 'auto' ? p.pictureProvider : undefined);
