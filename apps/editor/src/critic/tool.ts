@@ -5,7 +5,7 @@
 // agrees. It counts its rounds and each scene's failures within the turn, and
 // asks for takes of a scene that fails twice.
 
-import { pointer, likeness, type Op, type ToolContext, type ToolType } from '@tramme/core';
+import { isTalking, pointer, likeness, type Op, type ToolContext, type ToolType } from '@tramme/core';
 import { qualityChecksOf } from '../isolated-checks.ts';
 import { criticSystem, DONE_BAR, NO_USAGE, addUsage, parseVerdict, type Usage } from '@tramme/assistant';
 import { loadReferences, type Reference } from '../references/catalogue.ts';
@@ -18,7 +18,7 @@ import { scenesOf } from '../scenes.ts';
 import { t } from '../i18n/index.ts';
 import { doneIssues, type DoneIssue } from './done.ts';
 import { gather, type Evidence } from './evidence.ts';
-import { measureRhythm, rhythmLines, type Rhythm } from './rhythm.ts';
+import { FROZEN_MOST, measureRhythm, rhythmLines, TALKING_FROZEN_MOST, type Rhythm } from './rhythm.ts';
 
 /** what the tool needs from the assistant's turn: kept apart so the tool does not import the engine that registers it */
 export interface CriticHost {
@@ -110,7 +110,7 @@ const critique: ToolType<Input> = {
     const issues = await qualityChecksOf(ctx, id, await analyses(ctx));
     const beats = { data: await analyses(ctx), analysisIds: Object.keys(ctx.doc.assets).filter((a) => /^analysis-/.test(a)) };
     // the rhythm on the rendered frames: what cannot be read in the document (a frame that cannot be drawn leaves it out)
-    const rhythm = takes?.length ? null : await host.rhythm(ctx, id).then(rhythmLines).catch((e) => { if (ctx.signal.aborted) throw e; return null; });
+    const rhythm = takes?.length ? null : await host.rhythm(ctx, id).then((r) => rhythmLines(r, isTalking(ctx.doc, id) ? TALKING_FROZEN_MOST : FROZEN_MOST)).catch((e) => { if (ctx.signal.aborted) throw e; return null; });
     // a film made from a reference: measured against its reading (the takes are compared with each other, not with it)
     const versus = plan && !takes?.length ? await host.reference(ctx, plan).catch((e) => { if (ctx.signal.aborted) throw e; return null; }) : null;
     const found: DoneIssue[] = [

@@ -45,6 +45,8 @@ import { STABILIZE_TOOLS } from './stabilize.ts';
 import { COMPONENT_TOOLS } from './components.ts';
 import { DENOISE_TOOLS } from './denoise.ts';
 import { FILLERS_TOOLS } from './fillers.ts';
+import { CHARTER_TOOLS } from './charter.ts';
+import { MOMENT_TOOLS } from './moments.ts';
 import { SKIN_TOOLS } from './faces.ts';
 import { LONG_TOOLS } from './longtools.ts';
 import { PROXY_TOOLS } from './proxy.ts';
@@ -80,7 +82,7 @@ export const EDITOR_PROMPTS: PromptType[] = [
   },
   {
     name: 'dress', title: 'Dress a talking video', description: 'cuts, captions, titles and keywords on a video where someone speaks',
-    prompt: 'Dress the talking video of this project, following your guide for talking videos: ask about the format and the tone if I have not said them, read the transcript, cut the silences and hesitations, add captions, section titles and keywords at the right moments, then check with frames.',
+    prompt: 'Dress the talking video of this project, following your guide for talking videos: ask about the format and the tone if I have not said them, read the transcript, cut the silences and hesitations, set the charter, read the moments and build the inserts on their words, add captions and section titles written with the voice, then check with frames.',
   },
   {
     name: 'review', title: 'Review the composition', description: 'checks the key moments and fixes what is wrong',
@@ -122,5 +124,5 @@ export const EDITOR_PROMPTS: PromptType[] = [
 
 /** the base vocabulary of the editor, before a document's plugins */
 export function editorRegistry() {
-  return builtinRegistry().registerTool(...EDITOR_TOOLS, ...SVG_TOOLS, ...RECIPE_TOOLS, ...TYPEFACE_TOOLS, ...FIGURE_TOOLS, ...EVENT_TOOLS, ...PERCEPTION_TOOLS, ...TRACKING_TOOLS, ...STABILIZE_TOOLS, ...PROXY_TOOLS, ...COMPONENT_TOOLS, ...DENOISE_TOOLS, ...SKIN_TOOLS, ...LONG_TOOLS, ...CUTOUT_TOOLS, ...DEPTH_TOOLS, ...MODEL_TOOLS, ...REMOVEBG_TOOLS, ...LIPSYNC_TOOLS, ...CUTS_TOOLS, ...MONTAGE_TOOLS, ...FILLERS_TOOLS, ...REVIEW_TOOLS, ...CRITIC_TOOLS, ...REFERENCE_TOOLS, ...SOUND_TOOLS, ...MIXING_TOOLS, ...IMAGE_TOOLS, ...VIDEO_TOOLS, ...SHORTS_TOOLS, ...SOURCE_TOOLS, ...BLOCK_TOOLS, ...BRIEF_TOOLS, ...SCENE_TOOLS, ...FILM_PLAN_TOOLS, ...READING_TOOLS, ...STYLE_FRAME_TOOLS, ...SURFACE_TOOLS, ...STOCK_TOOLS, ...PIN_TOOLS, ...CAMERA_TOOLS, ...LIBRARY_TOOLS).registerPrompt(...EDITOR_PROMPTS).registerKit(...BUILTIN_KITS).registerPreset(...EDITOR_PRESETS);
+  return builtinRegistry().registerTool(...EDITOR_TOOLS, ...SVG_TOOLS, ...RECIPE_TOOLS, ...TYPEFACE_TOOLS, ...FIGURE_TOOLS, ...EVENT_TOOLS, ...PERCEPTION_TOOLS, ...TRACKING_TOOLS, ...STABILIZE_TOOLS, ...PROXY_TOOLS, ...COMPONENT_TOOLS, ...DENOISE_TOOLS, ...SKIN_TOOLS, ...LONG_TOOLS, ...CUTOUT_TOOLS, ...DEPTH_TOOLS, ...MODEL_TOOLS, ...REMOVEBG_TOOLS, ...LIPSYNC_TOOLS, ...CUTS_TOOLS, ...MONTAGE_TOOLS, ...FILLERS_TOOLS, ...CHARTER_TOOLS, ...MOMENT_TOOLS, ...REVIEW_TOOLS, ...CRITIC_TOOLS, ...REFERENCE_TOOLS, ...SOUND_TOOLS, ...MIXING_TOOLS, ...IMAGE_TOOLS, ...VIDEO_TOOLS, ...SHORTS_TOOLS, ...SOURCE_TOOLS, ...BLOCK_TOOLS, ...BRIEF_TOOLS, ...SCENE_TOOLS, ...FILM_PLAN_TOOLS, ...READING_TOOLS, ...STYLE_FRAME_TOOLS, ...SURFACE_TOOLS, ...STOCK_TOOLS, ...PIN_TOOLS, ...CAMERA_TOOLS, ...LIBRARY_TOOLS).registerPrompt(...EDITOR_PROMPTS).registerKit(...BUILTIN_KITS).registerPreset(...EDITOR_PRESETS);
 }

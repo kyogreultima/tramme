@@ -6,10 +6,11 @@
 // vocabulary: the assistant runs it (use_tool), the user too (/ menu).
 
 import type { EaseSpec, KitType, Op, ToolContext, ToolType, TrammeDoc, Vec2 } from '@tramme/core';
-import { pointer } from '@tramme/core';
+import { pointer, spokenTimes } from '@tramme/core';
 import { adder } from './templates.ts';
 import { clip, isToolAsset, mediaAssetsOf } from './model.ts';
 import { slugOf } from './typefaces/files.ts';
+import { spokenOf } from './moments.ts';
 
 // ── the look of the document ─────────────────────────────────
 type Bezier = [number, number, number, number];
@@ -74,7 +75,7 @@ export const compOf = (ctx: ToolContext) => ctx.doc.compositions[ctx.compId];
 const atOf = (ctx: ToolContext, at?: number) => r(at ?? ctx.time);
 
 // ── kinetic title ────────────────────────────────────────────
-interface TitleArgs { text: string; at?: number; duration?: number; style?: 'rise' | 'pop' | 'slide' | 'blur'; place?: 'top' | 'center' | 'bottom'; emphasis?: number; size?: number }
+interface TitleArgs { text: string; at?: number; duration?: number; style?: 'rise' | 'pop' | 'slide' | 'blur'; place?: 'top' | 'center' | 'bottom'; emphasis?: number; size?: number; spoken?: boolean }
 
 const kineticTitle: ToolType<TitleArgs> = {
   name: 'kinetic-title', title: 'Kinetic title', description: 'a title whose words enter one after the other (rise, pop, slide or blur), one word in the accent colour',
@@ -88,61 +89,73 @@ const kineticTitle: ToolType<TitleArgs> = {
       duration: { type: 'number', minimum: 0.5, title: 'Duration (s)' },
       place: { enum: ['top', 'center', 'bottom'], title: 'Place' },
       size: { type: 'number', minimum: 8, title: 'Size (px)' },
+      spoken: { type: 'boolean', title: 'With the voice', description: 'each word enters as it is said (the transcript of the composition, near the start given); it stays 1.5 s after the last unless a duration is given' },
     },
     required: ['text'],
   },
-  ai: { when: 'titles and key phrases that deserve energy: rise for a calm tone, pop for a punchy one, blur for a cinematic one; 2 to 7 words', avoid: 'whole sentences of more than 10 words' },
+  ai: { when: 'titles and key phrases that deserve energy: rise for a calm tone, pop for a punchy one, blur for a cinematic one; 2 to 7 words. Over someone speaking, a section title or a key phrase they say: spoken, so it is written with the voice', avoid: 'whole sentences of more than 10 words' },
   run(a, ctx) {
-    const doc = ctx.doc, c = compOf(ctx), s = style(doc), at = atOf(ctx, a.at), end = r(at + (a.duration ?? 3));
-    const u = Math.min(c.width, c.height), size = a.size ?? Math.round(u * (c.height > c.width ? 0.1 : 0.085)), weight = 800;
-    const words = a.text.split(/\s+/).filter(Boolean);
-    if (!words.length) throw new Error('kinetic-title: text is empty');
-    // lines within 84 % of the width
-    const space = measure(doc, ' ', size, weight, s.display), max = c.width * 0.84;
-    const lines: { word: string; w: number; i: number }[][] = [[]];
-    let lineW = 0;
-    words.forEach((word, i) => {
-      const w = measure(doc, word, size, weight, s.display);
-      if (lines.at(-1)!.length && lineW + space + w > max) { lines.push([]); lineW = 0; }
-      lineW += (lines.at(-1)!.length ? space : 0) + w;
-      lines.at(-1)!.push({ word, w, i });
+    if (!a.spoken) return kineticOf(a, ctx);
+    return spokenOf(ctx).then((words) => {
+      const found = spokenTimes(words, a.text, a.at ?? ctx.time, 15);
+      if (!found) throw new Error(`kinetic-title: "${a.text}" is not said near ${r(a.at ?? ctx.time)} s: give the start where it is said, or leave spoken out`);
+      const times = found.times.map((x) => r(Math.max(0, x - 0.08))), at = times[0];
+      return kineticOf({ ...a, at, duration: a.duration ?? Math.max(1, r(found.said.e + 1.5 - at)) }, ctx, times);
     });
-    const lh = size * 1.12, y = a.place === 'top' ? c.height * 0.22 : a.place === 'bottom' ? c.height * 0.74 : c.height * 0.48;
-    const { add, done } = adder(doc, ctx.compId);
-    const children: string[] = [];
-    const kind = a.style ?? 'rise';
-    lines.forEach((line, li) => {
-      const total = line.reduce((t, x, k) => t + x.w + (k ? space : 0), 0);
-      let x = -total / 2;
-      for (const { word, w, i } of line) {
-        const t0 = r(at + i * s.stagger), t1 = r(t0 + s.pace), cx = r(x + w / 2), cy = r(li * lh - ((lines.length - 1) * lh) / 2);
-        const pos: Vec2 = [cx, cy];
-        const transform: Record<string, unknown> = {
-          anchor: [r(w / 2), 0],
-          opacity: { $k: [{ t: t0, v: 0, ease: s.enter }, { t: r(t0 + s.pace * 0.6), v: 1 }] },
-        };
-        const effects: unknown[] = [];
-        if (kind === 'rise') transform.position = { $k: [{ t: t0, v: [cx, r(cy + size * 0.55)], ease: s.enter }, { t: t1, v: pos }] };
-        else if (kind === 'slide') transform.position = { $k: [{ t: t0, v: [r(cx - size * 0.6), cy], ease: s.enter }, { t: t1, v: pos }] };
-        else transform.position = pos;
-        if (kind === 'pop') transform.scale = { $k: [{ t: t0, v: [0.45, 0.45], ease: POP }, { t: t1, v: [1, 1] }] };
-        if (kind === 'blur') effects.push({ id: 'blur', type: 'fx.blur', props: { radius: { $k: [{ t: t0, v: Math.round(size * 0.25), ease: s.enter }, { t: r(t1 + 0.1), v: 0 }] } } });
-        children.push(add(`word-${i + 1}`, {
-          type: 'text', name: word, transform, ...(effects.length ? { effects } : {}),
-          props: { text: word, size, weight, align: 'left', baseline: 'middle', tracking: -0.01, color: a.emphasis === i + 1 ? s.accent : s.ink, ...(s.display ? { font: s.display } : {}) },
-        }, false));
-        x += w + space;
-      }
-    });
-    // the whole title leaves together
-    add('kinetic-title', {
-      type: 'group', name: clip(a.text, 39), in: at, out: end,
-      transform: { position: [r(c.width / 2), r(y)], opacity: { $k: [{ t: r(end - 0.35), v: 1, ease: s.exit }, { t: end, v: 0 }] } },
-      children,
-    });
-    return { ops: done(), label: `Kinetic title "${a.text}"`, text: `Kinetic title (${kind}), ${words.length} word(s) on ${lines.length} line(s), from ${at} to ${end} s.` };
   },
 };
+
+/** the kinetic title's layers; `times`: when each word enters (with the voice), else one after the other from the start */
+function kineticOf(a: TitleArgs, ctx: ToolContext, times?: number[]) {
+  const doc = ctx.doc, c = compOf(ctx), s = style(doc), at = atOf(ctx, a.at), end = r(at + (a.duration ?? 3));
+  const u = Math.min(c.width, c.height), size = a.size ?? Math.round(u * (c.height > c.width ? 0.1 : 0.085)), weight = 800;
+  const words = a.text.split(/\s+/).filter(Boolean);
+  if (!words.length) throw new Error('kinetic-title: text is empty');
+  // lines within 84 % of the width
+  const space = measure(doc, ' ', size, weight, s.display), max = c.width * 0.84;
+  const lines: { word: string; w: number; i: number }[][] = [[]];
+  let lineW = 0;
+  words.forEach((word, i) => {
+    const w = measure(doc, word, size, weight, s.display);
+    if (lines.at(-1)!.length && lineW + space + w > max) { lines.push([]); lineW = 0; }
+    lineW += (lines.at(-1)!.length ? space : 0) + w;
+    lines.at(-1)!.push({ word, w, i });
+  });
+  const lh = size * 1.12, y = a.place === 'top' ? c.height * 0.22 : a.place === 'bottom' ? c.height * 0.74 : c.height * 0.48;
+  const { add, done } = adder(doc, ctx.compId);
+  const children: string[] = [];
+  const kind = a.style ?? 'rise';
+  lines.forEach((line, li) => {
+    const total = line.reduce((t, x, k) => t + x.w + (k ? space : 0), 0);
+    let x = -total / 2;
+    for (const { word, w, i } of line) {
+      const t0 = times ? Math.min(times[i] ?? at, r(end - 0.5)) : r(at + i * s.stagger), t1 = r(t0 + s.pace), cx = r(x + w / 2), cy = r(li * lh - ((lines.length - 1) * lh) / 2);
+      const pos: Vec2 = [cx, cy];
+      const transform: Record<string, unknown> = {
+        anchor: [r(w / 2), 0],
+        opacity: { $k: [{ t: t0, v: 0, ease: s.enter }, { t: r(t0 + s.pace * 0.6), v: 1 }] },
+      };
+      const effects: unknown[] = [];
+      if (kind === 'rise') transform.position = { $k: [{ t: t0, v: [cx, r(cy + size * 0.55)], ease: s.enter }, { t: t1, v: pos }] };
+      else if (kind === 'slide') transform.position = { $k: [{ t: t0, v: [r(cx - size * 0.6), cy], ease: s.enter }, { t: t1, v: pos }] };
+      else transform.position = pos;
+      if (kind === 'pop') transform.scale = { $k: [{ t: t0, v: [0.45, 0.45], ease: POP }, { t: t1, v: [1, 1] }] };
+      if (kind === 'blur') effects.push({ id: 'blur', type: 'fx.blur', props: { radius: { $k: [{ t: t0, v: Math.round(size * 0.25), ease: s.enter }, { t: r(t1 + 0.1), v: 0 }] } } });
+      children.push(add(`word-${i + 1}`, {
+        type: 'text', name: word, transform, ...(effects.length ? { effects } : {}),
+        props: { text: word, size, weight, align: 'left', baseline: 'middle', tracking: -0.01, color: a.emphasis === i + 1 ? s.accent : s.ink, ...(s.display ? { font: s.display } : {}) },
+      }, false));
+      x += w + space;
+    }
+  });
+  // the whole title leaves together
+  add('kinetic-title', {
+    type: 'group', name: clip(a.text, 39), in: at, out: end,
+    transform: { position: [r(c.width / 2), r(y)], opacity: { $k: [{ t: r(end - 0.35), v: 1, ease: s.exit }, { t: end, v: 0 }] } },
+    children,
+  });
+  return { ops: done(), label: `Kinetic title "${a.text}"`, text: `Kinetic title (${kind}), ${words.length} word(s) on ${lines.length} line(s), from ${at} to ${end} s${times ? `, each word as it is said (${times.map((x) => `${x} s`).join(', ')})` : ''}.` };
+}
 
 // ── bar chart ────────────────────────────────────────────────
 /** "Label: 12, Other: 30" or "12, 30, 45" */

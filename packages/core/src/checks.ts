@@ -9,12 +9,13 @@ import { instanceTime, type Instance, type Placement } from './components.ts';
 import { Evaluator, nestedTime, type EvaluatedLayer, type NestedTiming } from './evaluate.ts';
 import { asKeyframed, modsOf, propKind } from './props.ts';
 import { animatedSlots, motionFigures, motionStretches, pathDeviation, sampleAddress, spanOf } from './motion.ts';
-import { layerMatrix, matMul, type Mat2D } from './math.ts';
+import { layerMatrix, matMul, overlapArea, type Mat2D } from './math.ts';
 import { DEFAULT_PERSPECTIVE, isTilted, quadBounds, tiltQuad } from './perspective.ts';
 import { mediaTime, pictureRect } from './track.ts';
 import type { Host, NodeType, Rect, Registry } from './registry.ts';
 import { compositionOf, s2 } from './check-report.ts';
 import { sequenceCheck } from './montage-checks.ts';
+import { speakerIn, TALKING_CHECKS } from './talking-checks.ts';
 import type { Composition, Layer, TrammeDoc, Vec2 } from './types.ts';
 
 export interface QualityIssue {
@@ -360,7 +361,6 @@ export function spaceOn(p: PlacedLayer, t: number, data: (id: string) => unknown
   return cells;
 }
 
-const overlapArea = (a: Rect, b: Rect) => Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)) * Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
 
 /** a paint's luminance, 0 black to 1 white: hex and rgb()/rgba() colours and their @tokens; null for gradients and unknown names */
 export function paintLuma(paint: unknown, tokens?: Record<string, { type: string; value: unknown }>): number | null {
@@ -501,24 +501,9 @@ const coverage: CheckType = {
   name: 'coverage', title: 'Coverage', description: 'a stretch of a talking video with nothing on screen but the speaker',
   texts: ['Only the speaker is on screen from {from} s to {to} s ({len} s)'],
   run({ comp, samples, doc }) {
-    const frame = comp.width * comp.height, whole: Rect = { x: 0, y: 0, w: comp.width, h: comp.height };
-    // the media of a layer: a sub-clip is its media's
-    const mediaOf = (p: PlacedLayer) => { const id = String(p.props.video); return doc.assets[id]?.of ?? id; };
-    // the speaker is the media that fills the frame in most of the samples: a talking video, however it was cut
-    const filled = new Map<string, number>();
-    for (const s of samples) {
-      const here = new Set<string>();
-      for (const p of s.layers) if (p.node.type === 'video' && p.opacity > 0.3 && p.box && overlapArea(p.box, whole) >= 0.6 * frame) here.add(mediaOf(p));
-      for (const a of here) filled.set(a, (filled.get(a) ?? 0) + 1);
-    }
-    const [speaker, n] = [...filled.entries()].sort((a, b) => b[1] - a[1])[0] ?? [];
-    if (speaker === undefined || n < samples.length / 2) return [];
-    // what is on screen all film long (a logo, a frame, a progress bar) covers nothing
-    const seen = new Map<string, number>();
-    for (const s of samples) for (const p of s.layers) if (p.opacity > 0.3) seen.set(p.id, (seen.get(p.id) ?? 0) + 1);
-    const isSpeaker = (p: PlacedLayer) => p.node.type === 'video' && mediaOf(p) === speaker;
-    const covers = (p: PlacedLayer) => p.opacity > 0.3 && !isSpeaker(p) && p.node.type !== 'audio' && p.node.type !== 'captions'
-      && p.node.composes !== 'adjust' && !p.node.container && (seen.get(p.id) ?? 0) <= 0.8 * samples.length;
+    // the speaker: the media that fills the frame in most of the samples, however it was cut
+    const speaker = speakerIn(samples, doc, comp);
+    if (!speaker) return [];
     const out: QualityIssue[] = [];
     let from = -1;
     const close = (to: number) => {
@@ -532,7 +517,7 @@ const coverage: CheckType = {
     };
     for (const s of samples) {
       // bare: the speaker is there and nothing else is (a screen without the speaker is no stretch of the speaker)
-      const bare = s.layers.some((p) => isSpeaker(p) && p.opacity > 0.3) && !s.layers.some(covers);
+      const bare = s.layers.some((p) => speaker.is(p) && p.opacity > 0.3) && !s.layers.some(speaker.dresses);
       if (bare && from < 0) from = s.t;
       else if (!bare && from >= 0) { close(s.t); from = -1; }
     }
@@ -896,7 +881,7 @@ const repeated: CheckType = {
   },
 };
 
-export const BUILTIN_CHECKS: CheckType[] = [textSize, textTime, safeZone, overlap, crossing, overSubject, overDetail, textContrast, coverage, crowd, stillness, linearTravel, springSettle, twinMotion, abruptEntrance, straightTravel, uniformStagger, repeated, sequenceCheck];
+export const BUILTIN_CHECKS: CheckType[] = [textSize, textTime, safeZone, overlap, crossing, overSubject, overDetail, textContrast, coverage, crowd, stillness, linearTravel, springSettle, twinMotion, abruptEntrance, straightTravel, uniformStagger, repeated, sequenceCheck, ...TALKING_CHECKS];
 
 /** every check of the registry on one composition, the failures of a check reported as issues */
 export async function runChecks(doc: TrammeDoc, registry: Registry, compId = doc.root, { step = 0.25, only, data = () => undefined, allowExpressions = true }: { step?: number; only?: string[]; data?: (assetId: string) => unknown; allowExpressions?: boolean } = {}): Promise<QualityIssue[]> {

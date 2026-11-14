@@ -16,7 +16,7 @@ Judge the level of finish, never the look: a film in any style, palette or genre
 - rhythm: something new happens every 2 to 4 s (a move, a change of scale, a new element, a cut); holds are short and chosen; no dead time. A frame where nothing moves for 4 s or more is a defect.
 - motion: moves have weight and ease, overlap, lead and follow; nothing slides linearly or pops without reason.
 - finish: no overlap, collision, clipping, blank or flash frame, unreadable or provisional text; the ending lands.
-When the film dresses a filmed video (a speaker, footage), also judge it on these axes: the inserts show what is being said at that moment, their forms vary (a logo, footage, a diagram, a number, an interface, words on screen), the speaker's framing changes, and the speaker is never alone on screen for long.
+When the film dresses a filmed video (a speaker, footage), also judge it on these axes: the inserts show what is being said at that moment and land on its words, full-frame inserts carry the ideas rather than small overlays on the face, every insert keeps to one graphic world, something new happens inside an insert every 2 s, their forms vary (a figure, A then B, an interface, a diagram, footage, an object, a section title), the speaker's framing changes, and the speaker is never alone on screen for long.
 Compare planned beats with their sampled start, peak, destination and settled hold. Name observed timing, framing, overshoot or reading problems at exact timestamps or frames. Do not invent a defect because no sample covers the moment. Sound is optional: judge it only from supplied measurements, never from these images. Measured defects are facts: never argue with them.
 
 Answer with strict JSON and nothing else:

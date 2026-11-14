@@ -46,3 +46,5 @@ export * from './syncoffset.ts';
 export * from './colormatch.ts';
 export * from './reading.ts';
 export * from './segments.ts';
+export * from './spoken.ts';
+export * from './talking-checks.ts';

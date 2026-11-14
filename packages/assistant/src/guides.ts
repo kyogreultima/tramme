@@ -20,6 +20,7 @@ const REFERENCE_GUIDES: Record<string, Part> = {
   'Typefaces': { name: 'typefaces', line: 'the font assets the typefaces tools bring in, and their records' },
   'Film plan and style frames': { name: 'film-plan', line: 'the film plan\'s file, its kinds of picture and the style frames, before writing a plan' },
   'Surfaces': { name: 'surfaces', line: 'the surfaces under and over a scene (paper, gradients, grain, glows): their presets' },
+  'The charter and the moments': { name: 'speaking', line: '' },
   'Stock': { name: 'stock', line: 'the free libraries (photos, clips, textures, environments, models) and their credits' },
   'Tilts, the corner pin and the push-in': { name: 'tilts', line: 'layers turned in perspective, a picture pinned on four corners, the push-in' },
   'Interface pieces, finance charts and the comparison': { name: 'interface', line: 'interface pieces (device frames, rows, cards, toasts, tables), finance charts, the comparison with a style frame' },
@@ -38,7 +39,7 @@ const SUBSECTION_GUIDES: Record<string, Part> = {
 
 /** the chapters of the instructions (by the start of their first line) read on demand */
 const INSTRUCTION_GUIDES: Record<string, Part> = {
-  'Dressing a video where someone speaks:': { name: 'speaking', line: 'a video where someone speaks: cuts, fillers, captions, titles, cut-outs, tracking' },
+  'Dressing a video where someone speaks:': { name: 'speaking', line: 'a video where someone speaks: cuts, fillers, captions, the charter, the moments, inserts on the words, titles, cut-outs, tracking' },
   'A story that keeps score': { name: 'events', line: 'a story that keeps score (money, points): the event list, its file, counters, tags, receipts and events() in expressions' },
   'Clips:': { name: 'clips', line: 'a clip made from words or from a still (generate-video)' },
   'Hydracept:': { name: 'hydracept', line: 'pictures, clips, sounds and voices made through Hydracept' },

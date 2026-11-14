@@ -51,3 +51,26 @@ effort is the next lever, and the one that can move the quality.
 
 The projects stay on the trial server (`.wrangler/state-bench`, port 8790),
 `run.json` of each run holds its link.
+
+## Scores
+
+Scored by the user on 2026-11-14, 1 to 10 against the marketing (Axiom) promo,
+seeing which series made each film (not blind). The taste series (2026-11-12,
+effort medium) is the one after the taste study.
+
+| Brief | baseline | levers | medium | taste |
+|---|---|---|---|---|
+| `logo-sting` | 4 | 4 | 4 | 5 |
+| `kinetic-quote` | 5 | 6 | 5 | 6 |
+| `data-short` | 5 | 7 | 5 | 6 |
+| `fitness-app` | 5 | 6 | 6 | 6 |
+| Mean | 4.75 | 5.75 | 5.0 | 5.75 |
+| `talking-head` | | | | 4 |
+
+- The levers did not cost quality (5.75 against 4.75); the medium effort did
+  (5.0 against 5.75 at high, the same code otherwise), and the taste series won
+  it back at medium (5.75).
+- No film reaches 8. The best is `data-short` with the levers (7).
+- The talking head (a YouTube video edited from its rushes): "the level of an
+  amateur trying the app". The timing and the use of some elements are wrong;
+  even a simple edit has a level to reach.

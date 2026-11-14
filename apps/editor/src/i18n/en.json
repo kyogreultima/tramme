@@ -1987,6 +1987,13 @@
     "noTool": "The fillers tool is not available",
     "review": "Review the cuts…"
   },
+  "charter": {
+    "set": "Charter set.",
+    "kept": "The charter stays as it is."
+  },
+  "moments": {
+    "done": "{n} moment(s) found for inserts"
+  },
   "skin": {
     "finding": "Finding the faces",
     "maskName": "Skin · {name}",

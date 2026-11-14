@@ -3,7 +3,7 @@
 // one form, and when a scene is built in another kind than the film plan gave
 // it. The kinds are the film plan's (filmplan.ts).
 
-import { sampleAt, type Registry, type ToolContext, type TrammeDoc } from '@tramme/core';
+import { pictureKindOfType, sampleAt, type Registry, type ToolContext, type TrammeDoc } from '@tramme/core';
 import { editorEvaluator } from './evaluator.ts';
 import { sandboxedDoc } from './installed.ts';
 import { samplePlacedTimes } from './isolated-placed.ts';
@@ -22,9 +22,6 @@ const TYPE_SHARE = 0.08;
 const PHOTO_SHARE = 0.5;
 
 const NONE: Form = { kind: null, why: '' };
-const kindOfType = (type: string): PictureKind | null =>
-  type.startsWith('ui.') ? 'interface' : type.startsWith('chart.') || type === 'text.counter' ? 'data' : type.startsWith('diagram.') ? 'diagram'
-    : type === 'model.3d' || type === 'solid.3d' ? '3d' : type.startsWith('map.') ? 'map' : null;
 
 /** the share of the frame a placed layer covers (a layer with no bounds counts for a twentieth) */
 function share(p: Pick<PlacedSample, 'box'>, w: number, h: number): number {
@@ -56,7 +53,7 @@ export function formOfPlaced(doc: TrammeDoc, compId: string, layers: PlacedSampl
   let biggestText = 0, textArea = 0;
   for (const p of layers) {
     if (p.opacity < 0.05) continue;
-    const type = p.type, a = share(p, comp.width, comp.height), kind = kindOfType(type);
+    const type = p.type, a = share(p, comp.width, comp.height), kind = pictureKindOfType(type);
     if (kind) add(kind, a, type);
     else if (type === 'image' || type === 'video') add(a >= PHOTO_SHARE ? 'photo' : 'object', a, `${type} over ${Math.round(a * 100)} % of the frame`);
     else if (type === 'text' && p.hasText) { biggestText = Math.max(biggestText, (p.textSize ?? 0) / comp.height); textArea += a; }

@@ -1,6 +1,7 @@
 // Scalar helpers, easing curves, seeded noise and 2D matrices. Everything
 // here is pure: the same input always gives the same output, on every machine.
 
+import type { Rect } from './registry.ts';
 import type { Vec2 } from './types.ts';
 
 export const clamp = (x: number, a = 0, b = 1) => (x < a ? a : x > b ? b : x);
@@ -8,6 +9,9 @@ export const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 /** normalized progress of t through [a, b], clamped */
 export const prog = (t: number, a: number, b: number) => clamp((t - a) / (b - a));
 export const smoothstep = (a: number, b: number, x: number) => { const t = prog(x, a, b); return t * t * (3 - 2 * t); };
+
+/** the area two boxes share (0 when they do not meet) */
+export const overlapArea = (a: Rect, b: Rect) => Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)) * Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
 
 export type EaseFn = (x: number) => number;
 

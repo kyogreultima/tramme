@@ -2495,6 +2495,18 @@
     "a stretch of a talking video with nothing on screen but the speaker": "un passage d'une vidéo parlée où il n'y a que l'intervenant à l'écran",
     "text whose colour sits too close to what is behind it (against a picture after the space tool, or the composition background)": "un texte dont la couleur est trop proche de ce qui est derrière (sur une image après l'outil de l'espace libre, ou le fond de la composition)",
     "Only the speaker is on screen from {from} s to {to} s ({len} s)": "Seul l'intervenant est à l'écran de {from} s à {to} s ({len} s)",
+    "Words off their voice": "Mots décalés de la voix",
+    "a keyword or a title over a talking video appearing after its words are said, or long before": "un mot-clé ou un titre sur une vidéo parlée qui apparaît après que ses mots sont dits, ou bien avant",
+    "Insert holding still": "Insert figé",
+    "an insert over a talking video where nothing new happens for 2.5 s while the voice goes on": "un insert sur une vidéo parlée où rien de nouveau n'arrive pendant 2,5 s alors que la voix continue",
+    "Inserts built alike": "Inserts construits pareil",
+    "two inserts in a row over a talking video built the same way (the same kind of picture in the same place)": "deux inserts à la suite sur une vidéo parlée construits de la même façon (le même genre d'image au même endroit)",
+    "\"{name}\" appears at {t} s, {late} s after \"{word}\" is said": "« {name} » apparaît à {t} s, {late} s après que « {word} » est dit",
+    "\"{name}\" appears at {t} s, {early} s before \"{word}\" is said": "« {name} » apparaît à {t} s, {early} s avant que « {word} » soit dit",
+    "the insert from {from} s holds still from {a} to {b} s ({len} s)": "l'insert de {from} s reste figé de {a} à {b} s ({len} s)",
+    "the inserts at {a} s and {b} s are both {form}": "les inserts à {a} s et à {b} s sont tous deux {form}",
+    "With the voice": "Avec la voix",
+    "each word enters as it is said (the transcript of the composition, near the start given); it stays 1.5 s after the last unless a duration is given": "chaque mot entre quand il est dit (la transcription de la composition, près du début donné) ; le titre reste 1,5 s après le dernier sauf si une durée est donnée",
     "\"{name}\" is hard to read at {t} s: its colour is too close to what is behind it (contrast {cr}:1)": "« {name} » se lit mal à {t} s : sa couleur est trop proche de ce qui est derrière (contraste {cr}:1)",
     "a filmic grade: a touch more contrast, colours held back, teal in the shadows": "un étalonnage de film : un peu plus de contraste, des couleurs retenues, du sarcelle dans les ombres",
     "Dreamy glow": "Lueur rêveuse",
@@ -3375,6 +3387,13 @@
     "heard": "entendue, non écrite",
     "noTool": "L'outil des hésitations n'est pas disponible",
     "review": "Revoir les coupes…"
+  },
+  "charter": {
+    "set": "Charte posée.",
+    "kept": "La charte reste telle quelle."
+  },
+  "moments": {
+    "done": "{n} moment(s) trouvé(s) pour des inserts"
   },
   "skin": {
     "finding": "Recherche des visages",

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SUBJECT_LEAST, rhythmLines, rhythmOf, rhythmTimes, type Frame } from '../src/critic/rhythm.ts';
+import { SUBJECT_LEAST, TALKING_FROZEN_MOST, rhythmLines, rhythmOf, rhythmTimes, type Frame } from '../src/critic/rhythm.ts';
 
 const W = 96, H = 54;
 /** a frame of one background with a filled box, its corners in cells of the frame */
@@ -36,6 +36,13 @@ describe('the rhythm of a film', () => {
     const r = film(10, (t) => frame(t, t < 8 ? [Math.round(t * 8), 5, Math.round(t * 8) + 30, 50] : [64, 5, 94, 50]));
     expect(r.still).toBeLessThan(0.1);
     expect(rhythmLines(r).defects).toEqual([]);
+  });
+
+  it('holds a talking video to a shorter still: the voice goes on', () => {
+    // moves 3 s, holds 3.5 s, moves to the end
+    const r = film(12, (t) => frame(t, t < 3 ? [Math.round(t * 8), 5, Math.round(t * 8) + 30, 50] : t < 6.5 ? [24, 5, 54, 50] : [Math.round((t - 3.5) * 8), 5, Math.round((t - 3.5) * 8) + 30, 50]));
+    expect(rhythmLines(r).defects).toEqual([]);
+    expect(rhythmLines(r, TALKING_FROZEN_MOST).defects.some((d) => d.startsWith('nothing moves for'))).toBe(true);
   });
 
   it('reads a small subject in a large empty frame, and a film that is one picture', () => {

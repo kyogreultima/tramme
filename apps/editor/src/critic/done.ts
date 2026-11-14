@@ -2,7 +2,7 @@
 // brief decides material, hierarchy, coverage, endings, cuts and silence;
 // provisional content and measured readability/audio defects block delivery.
 
-import { staticValue, type Layer, type QualityIssue, type Registry, type TrammeDoc } from '@tramme/core';
+import { staticValue, TALKING_CHECKS, type Layer, type QualityIssue, type Registry, type TrammeDoc } from '@tramme/core';
 import { filmTime, scenesOf, sceneAt, type Scene } from '../scenes.ts';
 import type { FilmPlan } from '../filmplan.ts';
 
@@ -21,6 +21,8 @@ const PROVISIONAL = /lorem|ipsum|placeholder|todo|tbd|xxx|\[[^\]]*\]/i;
 /** layers that are no picture: words, sound */
 const NOT_VISUAL = new Set(['text', 'captions', 'audio', 'sound', 'group']);
 const WORDS = new Set(['text', 'captions']);
+/** the checks of a dressed talking video, whose warnings block delivery */
+const TALKING = new Set(TALKING_CHECKS.map((c) => c.name));
 
 /** a prop's value: the first key of an animated one, the value of a static one */
 function valueOf(p: unknown): unknown {
@@ -114,5 +116,8 @@ export function doneIssues(doc: TrammeDoc, compId: string, registry: Registry, p
 
   // readable: the checks' warnings on text
   for (const i of issues.filter((x) => (x.check === 'text-size' || x.check === 'text-time') && x.severity === 'warning').slice(0, 3)) out.push({ id: 'readable', scene: where(i.t), line: i.message });
+
+  // a talking video: words after their voice, inserts holding still or built alike
+  for (const i of issues.filter((x) => TALKING.has(x.check) && x.severity === 'warning').slice(0, 4)) out.push({ id: i.check, scene: where(i.t), line: i.message, blocking: true });
   return out.map((i) => i.id === 'provisional' || i.id === 'readable' ? { ...i, blocking: true } : i);
 }

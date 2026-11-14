@@ -125,15 +125,17 @@ export async function measureRhythm(duration: number, render: (t: number) => Pro
 
 /** the gates of the rhythm: a film is not done while one of them holds */
 export const FROZEN_MOST = 4;
+/** over someone speaking, the voice goes on: a picture standing still reads dead sooner (s) */
+export const TALKING_FROZEN_MOST = 3;
 export const STILL_MOST = 0.5;
 /** under this share of the frame, the subject reads small */
 export const SUBJECT_LEAST = 0.3;
 
 /** what the rhythm says, as lines: the defects first (blocking), then what the critic weighs */
-export function rhythmLines(r: Rhythm): { defects: string[]; facts: string[] } {
+export function rhythmLines(r: Rhythm, frozenMost = FROZEN_MOST): { defects: string[]; facts: string[] } {
   const defects: string[] = [], facts: string[] = [];
   const s = (x: number) => `${x.toFixed(1)} s`;
-  if (r.frozen && r.frozen.to - r.frozen.from >= FROZEN_MOST) defects.push(`nothing moves for ${s(r.frozen.to - r.frozen.from)}, from ${s(r.frozen.from)} to ${s(r.frozen.to)}: something new must happen at least every 2 to 4 s (a move, a change of scale, a new element, a cut)`);
+  if (r.frozen && r.frozen.to - r.frozen.from >= frozenMost) defects.push(`nothing moves for ${s(r.frozen.to - r.frozen.from)}, from ${s(r.frozen.from)} to ${s(r.frozen.to)}: something new must happen at least every 2 to 4 s (a move, a change of scale, a new element, a cut)`);
   if (r.still > STILL_MOST) defects.push(`the film stands still ${Math.round(r.still * 100)} % of its time (its closing hold left out): give the holds a slow drift, a build or a change, and cut the dead time`);
   if (r.subject > 0 && r.subject < SUBJECT_LEAST) facts.push(`what stands out from the background fills ${Math.round(r.subject * 100)} % of the frame on average: the subject reads small; let it fill the frame, go closer, crop it at the edges or set scales against each other`);
   if (r.looks <= 1 && r.seconds > 6) facts.push(`the whole film is one picture (one composition from start to end): change the framing, the scale or the scene as the idea moves on`);
