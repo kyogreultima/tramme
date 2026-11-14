@@ -74,3 +74,18 @@ effort medium) is the one after the taste study.
 - The talking head (a YouTube video edited from its rushes): "the level of an
   amateur trying the app". The timing and the use of some elements are wrong;
   even a simple edit has a level to reach.
+
+### The talking videos on their words (2026-11-14, effort medium)
+
+After the charter, the moments and the talking-video checks (`d08e22f`,
+series `talking`), the same prompt, no asset given but the footage:
+
+| Brief | Before | After | Cost | Time |
+|---|---|---|---|---|
+| `talking-head` | 4 | 7 | $3.97 | 19 min |
+| `talking-head-2` (unseen) | | 7 | $3.21 | 15 min |
+
+- Both runs set a charter and read the moments; neither holds still (the
+  first `talking-head` held 3.5 s).
+- The user's next lever: a precise brief and the assets it needs (logos,
+  screens) given with the footage.

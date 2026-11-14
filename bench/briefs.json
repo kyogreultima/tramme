@@ -149,6 +149,16 @@
       "prompt": "Habille cette vidéo face caméra pour ma chaîne YouTube (assets/talking-head.mp4), au niveau des grandes chaînes : coupe les silences et les hésitations, ajoute des mots-clés, des plans de coupe qui illustrent ce que je dis et un peu de son. Garde le format 16:9, en français."
     },
     {
+      "id": "talking-head-2",
+      "split": "test",
+      "format": "16:9",
+      "seconds": 48,
+      "files": [
+        "local/talking-head-2.mp4"
+      ],
+      "prompt": "Habille cette vidéo face caméra pour ma chaîne YouTube (assets/talking-head-2.mp4), au niveau des grandes chaînes : coupe les silences et les hésitations, ajoute des mots-clés, des plans de coupe qui illustrent ce que je dis et un peu de son. Garde le format 16:9 ; les textes à l’écran dans la langue de la vidéo."
+    },
+    {
       "id": "nasa-talk",
       "split": "proof",
       "format": "16:9",
