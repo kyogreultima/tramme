@@ -1953,6 +1953,8 @@
     "dictationCompanion": "Companion",
     "dictationServer": "Server",
     "upscale": "Enlarging a picture",
+    "interpolate": "Frames between frames (smooth slow motion)",
+    "noteRife": "Learned motion: holds up on fast and crossing movement where the built-in matching smears; downloads 22 MB, faster with a graphics card",
     "noteEsrgan": "Rebuilds fine texture in pictures; slow (a few seconds per 128 px tile on this computer); videos always use the built-in engine",
     "builtIn": "built in"
   },

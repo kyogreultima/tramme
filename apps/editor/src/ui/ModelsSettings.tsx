@@ -27,12 +27,14 @@ const TASK: Record<ModelTask, string> = {
   vad: m('localModels.vad'),
   face: m('localModels.face'),
   upscale: m('localModels.upscale'),
+  interpolate: m('localModels.interpolate'),
 };
 
 /** what to know before choosing a model, by its id */
 const NOTE: Record<string, string> = {
   'u2netp-person': m('localModels.noteU2netpPerson'),
   u2net: m('localModels.noteU2net'),
+  rife: m('localModels.noteRife'),
   'isnet-general': m('localModels.noteIsnet'),
   'yolos-small': m('localModels.noteYolosSmall'),
   'depth-anything-v2-base': m('localModels.noteNonCommercial'),

@@ -73,7 +73,7 @@ The landing page gets a strip of three proofs, each a poster that opens its proo
 - [ ] Stabilisation. First try (a walk filmed looking down, Pexels 4405576): no gain, the jitter 28.1 px before and 46.8 after a 1.5x zoom (`node scripts/proof-shake.ts`); the legs crossing the frame move with the ground the tracker follows. Needs a handheld source of a still scene, and the tool to set moving subjects aside (outliers by region). The manifest stays as a draft. A second search (2026-11-13): four church interiors and a clip sold as handheld measured 0.1 to 1.5 px, steady; the free libraries describe no camera movement, so each candidate has to be downloaded and measured.
 - [x] Tracking (a Pexels red coupé crossing a street, filmed by hand; it led to the first frame of a render waiting for a 4K source to open, and to the clips held under 4 MB by a two-pass encode)
 - [x] Vertical reframe (the Pexels walk along a river, the man drifting across the 16:9, the 9:16 frame following him)
-- [ ] Slow motion (said honestly: block-matching motion until RIFE runs)
+- [x] Slow motion (a Pexels border collie leaping for a frisbee in 4K at 30 fps, four times as many frames made by RIFE in the browser; it led to the frames being made at the film's size, in overlapping tiles above 1080p, after a whole 4K frame hung the graphics card, to a fallback on the processor when the card stops, and to the frames RIFE makes losing a rounding that brightened them by one level)
 - [x] Upscaling (a 640 × 480 photo from Wikimedia Commons, public domain, enlarged by Real-ESRGAN in the browser; a video stays with Lanczos, said under it)
 
 ## Step 3. Speech and sound
@@ -103,7 +103,7 @@ These run the assistant, so they cost the user's quota: each waits for the user'
 ## Not proven here
 
 - **Lip sync and dubbing**: they change what a real person says; no proof on someone who has not agreed to it.
-- **Voice and music apart**: blocked (`docs/editing-roadmap.md`, no usable Demucs export).
+- **Voice and music apart**: blocked (`docs/editing-roadmap.md`: the one MIT export of HTDemucs measured does not put speech in its vocals).
 - **HDR export**: waits for a canvas above 8 bits.
 - **Features without a before and after** (transitions, packs, the studio's notes): shown by the examples and the showreel, not here.
 

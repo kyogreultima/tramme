@@ -45,3 +45,4 @@ export * from './chapters.ts';
 export * from './syncoffset.ts';
 export * from './colormatch.ts';
 export * from './reading.ts';
+export * from './segments.ts';

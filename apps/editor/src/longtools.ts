@@ -3,15 +3,17 @@
 // frames, so a slow motion plays smoothly. Each runs on this machine at
 // authoring time, through the long-job runner (an estimate, the progress, a
 // cancel, and a resume from the chunks done), and saves a new asset; the
-// original is kept. The engines are the core's, without a model (Lanczos and
-// a block-matching motion); RIFE and Real-ESRGAN would do better on hard
-// motion and fine texture.
+// original is kept. The engines are the core's by default, without a model
+// (Lanczos and a block-matching motion); the settings can choose a network
+// instead (Real-ESRGAN for a picture's fine texture, RIFE for hard motion),
+// and the core's engine takes over when the network cannot run.
 
-import { between, enlarge, flowField, pointer, type Op, type ToolType } from '@tramme/core';
+import { between, enlarge, flowField, pointer, type Op, type ToolType, type TrammeDoc } from '@tramme/core';
 import { canvasOf, jobId, rgbaOf, runVideoJob, type Frame } from './longjob.ts';
 import { canvas, loadImage } from './perception.ts';
 import { chosenModel } from './settings.ts';
 import { enlargeWithModel } from './esrgan-run.ts';
+import { RifeRun } from './rife.ts';
 import { madeBy } from './models.ts';
 import { t } from './i18n/index.ts';
 
@@ -68,8 +70,15 @@ const upscale: ToolType<{ asset?: string }> = {
   },
 };
 
+/** a source's size brought down until it just covers the largest composition (never up, even sides): the frames a film shows, not more */
+export function filmSize(doc: TrammeDoc, w: number, h: number): [number, number] {
+  const c = Object.values(doc.compositions).reduce((m, x) => (x.width * x.height > m.width * m.height ? x : m));
+  const s = Math.min(1, Math.max(c.width / w, c.height / h));
+  return [Math.round((w * s) / 2) * 2, Math.round((h * s) / 2) * 2];
+}
+
 const interpolate: ToolType<{ layer?: string; factor?: number }> = {
-  name: 'interpolate', title: 'Smooth slow motion', description: 'makes up the frames between a video\'s frames (2 or 4 times as many), saved as a copy linked to it: a layer of that video slowed under 1× (a speed curve, a ramp) plays the copy and slows smoothly instead of repeating frames. A long job: it says how long, and resumes where it stopped',
+  name: 'interpolate', title: 'Smooth slow motion', description: 'makes up the frames between a video\'s frames (2 or 4 times as many), saved as a copy linked to it, at the film\'s size (a larger source brought down to it): a layer of that video slowed under 1× (a speed curve, a ramp) plays the copy and slows smoothly instead of repeating frames. A long job: it says how long, and resumes where it stopped',
   input: {
     type: 'object',
     properties: {
@@ -81,16 +90,36 @@ const interpolate: ToolType<{ layer?: string; factor?: number }> = {
   async run(a, ctx) {
     const { asset, a: src } = targetOf(ctx, a.layer, ['video']);
     const k = a.factor === 4 ? 4 : 2, id = `${asset}-smooth`.slice(0, 64), had = !!ctx.doc.assets[id];
+    // the network the settings choose, when one is; the core's block matching when it is not, or from the moment it fails
+    const entry = chosenModel('interpolate');
+    let model = entry.adapter.kind === 'rife' ? new RifeRun(entry) : null, made = model ? madeBy(entry) : 'block matching', engine = '';
+    const ts = Array.from({ length: k - 1 }, (_, j) => (j + 1) / k);
     const { blob, resumed, chunks } = await runVideoJob(ctx, {
-      id: jobId(`interpolate-${asset}-${k}`, src), url: ctx.assetUrl(asset), step: t('longjob.interpolating'),
-      size: (w, h) => [Math.round(w / 2) * 2, Math.round(h / 2) * 2],
-      frames(f: Frame, next: Frame | null) {
+      // the engine is part of the job: chunks made by one are never resumed by the other
+      id: jobId(`interpolate-${asset}-${k}${model ? `-${entry.id}` : ''}`, src), url: ctx.assetUrl(asset), step: t('longjob.interpolating'),
+      readAt: (w, h) => filmSize(ctx.doc, w, h),
+      size: (w, h) => [w, h],
+      async *frames(f: Frame, next: Frame | null) {
         const step = f.duration / k;
-        if (!next) return [{ picture: f.picture, timestamp: f.timestamp, duration: f.duration }];
-        const A = rgbaOf(f.picture), B = rgbaOf(next.picture), flow = flowField(A, B);
-        return [{ picture: f.picture, timestamp: f.timestamp, duration: step }, ...Array.from({ length: k - 1 }, (_, j) => ({ picture: canvasOf(between(A, B, (j + 1) / k, flow)), timestamp: f.timestamp + (j + 1) * step, duration: step }))];
+        if (!next) { yield { picture: f.picture, timestamp: f.timestamp, duration: f.duration }; return; }
+        const A = rgbaOf(f.picture), B = rgbaOf(next.picture);
+        let middles: { width: number; height: number; data: Uint8ClampedArray }[] | null = null;
+        if (model) {
+          try { middles = await model.between(A, B, ts, ctx.signal); }
+          catch (e) {
+            if ((e as Error).name === 'AbortError') throw e;
+            // one engine for a whole video: block matching takes over only when the model made nothing yet; else the job stops, and runs again from the chunks done
+            if (model.made) throw new Error(`${entry.name} stopped after ${model.made} frames (${(e as Error).message}): run the slow motion again, it goes on from where it stopped`);
+            engine = `${entry.name} could not run (${(e as Error).message}): block matching used instead`; model = null;
+          }
+        }
+        if (!middles) { const flow = flowField(A, B); middles = ts.map((x) => between(A, B, x, flow)); }
+        yield { picture: f.picture, timestamp: f.timestamp, duration: step };
+        for (const [j, p] of middles.entries()) yield { picture: canvasOf(p), timestamp: f.timestamp + (j + 1) * step, duration: step };
       },
     });
+    if (engine) made = 'block matching';
+    else if (model?.cpu) engine = `the graphics card stopped on the way: ${entry.name} went on on the processor`;
     const path = await ctx.writeFile(`assets/interpolate/${asset}.mp4`, blob);
     return {
       ops: [
@@ -98,7 +127,7 @@ const interpolate: ToolType<{ layer?: string; factor?: number }> = {
         { op: 'add', path: pointer('assets', asset, 'interpolated'), value: id },
       ],
       reload: had ? [id] : [], label: t('longjob.interpolated'), notice: t('longjob.interpolated'),
-      text: `${asset} interpolated: ${k}× as many frames (asset "${id}", ${chunks} chunk(s)${resumed ? `, ${resumed} of them done before and resumed` : ''}). Its layers slowed under 1× play it now; above, the original. Look at a slow frame (render_still) for smears on fast motion.`,
+      text: `${asset} interpolated by ${made}: ${k}× as many frames (asset "${id}", ${chunks} chunk(s)${resumed ? `, ${resumed} of them done before and resumed` : ''}).${engine ? ` ${engine}.` : ''} Its layers slowed under 1× play it now; above, the original. Look at a slow frame (render_still) for smears on fast motion.`,
     };
   },
 };

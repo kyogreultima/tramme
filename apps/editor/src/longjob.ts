@@ -31,6 +31,8 @@ export interface VideoJob {
   url: string;
   /** the output's size from the source's */
   size(w: number, h: number): [number, number];
+  /** the size the source's frames are read at (the source's by default) */
+  readAt?(w: number, h: number): [number, number];
   /** the pictures one frame gives, with the next one when there is one (interpolation reads both) */
   frames(cur: Frame, next: Frame | null): AsyncIterable<Out> | Iterable<Out>;
   /** what the progress says it does */
@@ -59,7 +61,7 @@ export async function runVideoJob(ctx: ToolContext, job: VideoJob): Promise<{ bl
     const track = await input.getPrimaryVideoTrack();
     if (!track) throw new Error('this file has no picture');
     if (!(await track.canDecode())) throw new Error(`video codec not supported by this browser (${track.codec ?? 'unknown'})`);
-    const duration = await input.computeDuration(), iw = track.displayWidth, ih = track.displayHeight;
+    const duration = await input.computeDuration(), [iw, ih] = job.readAt?.(track.displayWidth, track.displayHeight) ?? [track.displayWidth, track.displayHeight];
     const [W, H] = job.size(iw, ih);
     // what was finished before, if the job is the same
     let m: Manifest | null = null;

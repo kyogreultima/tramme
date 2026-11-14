@@ -2959,7 +2959,7 @@
     "Enlarge a picture or a video": "Agrandir une image ou une vidéo",
     "makes a picture or a video twice its size (a small source in a large composition), saved as a new asset the layers showing it then use; the original is kept. A video is a long job: it says how long, and resumes where it stopped": "rend une image ou une vidéo deux fois plus grande (une petite source dans une grande composition), enregistrée comme une nouvelle ressource que les calques qui la montrent utilisent ensuite ; l'originale est gardée. Une vidéo est une longue tâche : elle dit combien de temps, et reprend là où elle s'est arrêtée",
     "Smooth slow motion": "Ralenti fluide",
-    "makes up the frames between a video's frames (2 or 4 times as many), saved as a copy linked to it: a layer of that video slowed under 1× (a speed curve, a ramp) plays the copy and slows smoothly instead of repeating frames. A long job: it says how long, and resumes where it stopped": "crée les images entre les images d'une vidéo (2 ou 4 fois plus), enregistrées dans une copie liée : un calque de cette vidéo ralenti sous 1× (une courbe de vitesse, une rampe) joue la copie et ralentit sans saccade au lieu de répéter des images. Une longue tâche : elle dit combien de temps, et reprend là où elle s'est arrêtée",
+    "makes up the frames between a video's frames (2 or 4 times as many), saved as a copy linked to it, at the film's size (a larger source brought down to it): a layer of that video slowed under 1× (a speed curve, a ramp) plays the copy and slows smoothly instead of repeating frames. A long job: it says how long, and resumes where it stopped": "crée les images entre les images d'une vidéo (2 ou 4 fois plus), enregistrées dans une copie liée, à la taille du film (une source plus grande y est ramenée) : un calque de cette vidéo ralenti sous 1× (une courbe de vitesse, une rampe) joue la copie et ralentit sans saccade au lieu de répéter des images. Une longue tâche : elle dit combien de temps, et reprend là où elle s'est arrêtée",
     "Picture or video": "Image ou vidéo",
     "the selected layer's by default": "celle du calque sélectionné par défaut",
     "times as many frames: 2 for a slow motion down to 0.5×, 4 down to 0.25×": "fois plus d'images : 2 pour un ralenti jusqu'à 0,5×, 4 jusqu'à 0,25×",
@@ -3342,6 +3342,8 @@
     "dictationCompanion": "Compagnon",
     "dictationServer": "Serveur",
     "upscale": "Agrandir une image",
+    "interpolate": "Images entre les images (ralenti fluide)",
+    "noteRife": "Mouvement appris : tient sur les mouvements rapides et croisés là où l’estimation intégrée bave ; télécharge 22 Mo, plus rapide avec une carte graphique",
     "noteEsrgan": "Recrée la texture fine des images ; lent (quelques secondes par carreau de 128 px) ; les vidéos gardent toujours le moteur intégré",
     "builtIn": "intégré"
   },

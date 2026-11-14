@@ -9,8 +9,8 @@
 // their model cards (licence, size, input) and stay marked "not tried" in the
 // settings until they are.
 
-export type ModelTask = 'cutout-person' | 'cutout-any' | 'detection' | 'depth' | 'transcription' | 'vad' | 'face' | 'upscale';
-export const MODEL_TASKS: ModelTask[] = ['cutout-person', 'cutout-any', 'detection', 'depth', 'transcription', 'vad', 'face', 'upscale'];
+export type ModelTask = 'cutout-person' | 'cutout-any' | 'detection' | 'depth' | 'transcription' | 'vad' | 'face' | 'upscale' | 'interpolate';
+export const MODEL_TASKS: ModelTask[] = ['cutout-person', 'cutout-any', 'detection', 'depth', 'transcription', 'vad', 'face', 'upscale', 'interpolate'];
 
 /** a matte network read with onnxruntime: a square picture in, a matte out */
 export interface MatteAdapter {
@@ -51,6 +51,8 @@ export interface EngineAdapter { kind: 'engine' }
 
 /** a super-resolution network read with onnxruntime: a fixed square tile in, the tile four times as large out (esrgan.ts cuts the picture in tiles); `more` are the other files of the model, its weights beside the graph */
 export interface EsrganAdapter { kind: 'esrgan'; tile: number; pad: number; more: string[] }
+/** a frame interpolation network read with onnxruntime: the two frames stacked (six planes) and a time between them in, the frame at that time out, any size */
+export interface RifeAdapter { kind: 'rife' }
 
 export interface ModelEntry {
   id: string;
@@ -68,7 +70,7 @@ export interface ModelEntry {
   commercial: boolean | null;
   /** tried with the tool in this version (what to know before choosing the others: the settings' notes) */
   checked: boolean;
-  adapter: MatteAdapter | PipelineAdapter | VadAdapter | MediaPipeAdapter | EngineAdapter | EsrganAdapter;
+  adapter: MatteAdapter | PipelineAdapter | VadAdapter | MediaPipeAdapter | EngineAdapter | EsrganAdapter | RifeAdapter;
 }
 
 /** the files a model keeps in the cache: its source, and the others of a model in several files; none for the built-in engine */
@@ -143,6 +145,15 @@ export const MODELS: ModelEntry[] = [
     id: 'realesr-general-x4v3', task: 'upscale', name: 'Real-ESRGAN general x4 v3', revision: '4c80f3da1a8a85f0757a9e7f79e08d0307220eb5',
     source: 'https://huggingface.co/TheGuy444/Real-ESRGAN-ONNX/resolve/4c80f3da1a8a85f0757a9e7f79e08d0307220eb5/onnx/model.onnx',
     mb: 4.9, licence: 'BSD-3-Clause', commercial: true, checked: true, adapter: { kind: 'esrgan', tile: 128, pad: 8, more: ['https://huggingface.co/TheGuy444/Real-ESRGAN-ONNX/resolve/4c80f3da1a8a85f0757a9e7f79e08d0307220eb5/onnx/model.data'] },
+  },
+  // the frames between two frames: the core's block-matching motion by default (nothing to download), RIFE for hard motion
+  { id: 'block-motion', task: 'interpolate', name: 'Block matching (built in)', source: '', revision: 'builtin', mb: 0, licence: '', commercial: true, checked: true, adapter: { kind: 'engine' } },
+  {
+    // RIFE (hzwer's Practical-RIFE weights, MIT, its README says) in FuryTMP's ONNX export, its time between the frames made an input; MIT.
+    // Another export (t9749/rife-4.25-lite-onnx) returned a frame given twice moved 2 px: measure a new one the same way before offering it
+    id: 'rife', task: 'interpolate', name: 'RIFE', revision: 'ee09066f9822f8b28b8477a1b4cc30f19d607590',
+    source: hub('walterlow/RIFE_fp32_timestep', 'ee09066f9822f8b28b8477a1b4cc30f19d607590', 'RIFE_fp32_timestep.onnx'),
+    mb: 21.6, licence: 'MIT', commercial: true, checked: true, adapter: { kind: 'rife' },
   },
 ];
 
