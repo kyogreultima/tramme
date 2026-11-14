@@ -8,6 +8,8 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-11-14
+
 ### Added
 
 - **The Tramme watermark**: exported films (MP4, WebM, GIF, PNG, 10 bits) carry the Tramme mark, all white, in the bottom right corner; every 12 s the whole logo opens from it, stays for a few seconds and closes back. It is always there on Basic and without an account; on Plus and Pro it is on by default and a switch in Settings, Behavior turns it off. The first export that carries it says so. The command line's renders and stills carry it too.
@@ -890,7 +892,8 @@ First public release.
 
 - Cloudflare Worker serving the editor and the API, projects stored in R2, access protected by Cloudflare Access.
 
-[Unreleased]: ../../compare/v0.24.0...HEAD
+[Unreleased]: ../../compare/v0.25.0...HEAD
+[0.25.0]: ../../compare/v0.24.0...v0.25.0
 [0.24.0]: ../../compare/v0.23.0...v0.24.0
 [0.23.0]: ../../compare/v0.22.0...v0.23.0
 [0.22.0]: ../../compare/v0.21.0...v0.22.0
