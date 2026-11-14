@@ -24,7 +24,7 @@ None of them needs a provider or a key. Most are code (a curve integrated, a sha
 
 ### Step 1. Models in the settings
 
-The models already in use are each fixed in their file: the cut-out's U²-Net (`apps/editor/src/cutout.ts`), the detector (`perception.ts`), the depth (`depth.ts`), and Whisper in the companion, changed only by an environment variable (`TRAMME_WHISPER_MODEL`, `packages/cli/src/speech.ts`). The models of the steps below join them in one place.
+The models already in use are each fixed in their file: the cut-out's U²-Net (`apps/editor/src/cutout.ts`), the detector (`perception.ts`), the depth (`depth.ts`), and Whisper in the companion, changed only by an environment variable (`TRAMME_WHISPER_MODEL`, `packages/companion/src/speech.ts`). The models of the steps below join them in one place.
 
 - [x] A "Models" section in the settings, one row per task (cut-out, detection, depth, transcription, then denoising, hesitations, faces, voice and music apart, upscaling, interpolation as they land): the default model named with its size and licence, and the models the user can download instead.
   `apps/editor/src/ui/ModelsSettings.tsx`, the choice kept per computer in the preferences (`models`). The cut-out has two rows, a person and any subject, as its tool has two models. Sizes are those of the model cards ("about"); the next box measures what is in the cache. To check on a device: the sizes, and every model not marked as tried.

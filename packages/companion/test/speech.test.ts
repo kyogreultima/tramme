@@ -16,3 +16,12 @@ describe('the model the companion transcribes with', () => {
     expect(whisperModel('Xenova/whisper-base', 'Xenova/whisper-medium')).toBe('Xenova/whisper-medium');
   });
 });
+
+describe('the transformers.js the published companion installs', () => {
+  it('is the version the editor uses', async () => {
+    const fs = await import('node:fs');
+    const { WHISPER_PACKAGE } = await import('../src/speech.ts');
+    const root = JSON.parse(fs.readFileSync(new URL('../../../package.json', import.meta.url), 'utf8'));
+    expect(WHISPER_PACKAGE).toBe(`@huggingface/transformers@${root.dependencies['@huggingface/transformers'].replace(/^[\^~]/, '')}`);
+  });
+});

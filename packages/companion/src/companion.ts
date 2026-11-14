@@ -1,4 +1,4 @@
-// The local companion: `tramme agent` runs the agents installed on this
+// The local companion: `npx tramme` (`pnpm tramme agent` in the repository) runs the agents installed on this
 // machine, each on the user's own login and without an API key, for the
 // editor open in the browser, deployed or local: Claude (the Agent SDK, the
 // Claude Code login), Codex (a ChatGPT login) or the Antigravity CLI (a Google

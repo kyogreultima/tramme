@@ -1,0 +1,21 @@
+{
+  "name": "@tramme/companion",
+  "version": "0.25.0",
+  "license": "FSL-1.1-ALv2",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/main.ts"
+  },
+  "scripts": {
+    "build": "node build.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.3.322",
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "@tramme/assistant": "workspace:*",
+    "@tramme/core": "workspace:*",
+    "cross-spawn": "^7.0.6",
+    "zod": "^4.6.7"
+  }
+}

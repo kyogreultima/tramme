@@ -14,7 +14,7 @@
 //   tramme check-media <file> [--width n --height n --fps n --frames n --duration s] [--json] [--timeout ms]
 //   tramme compare  <ref> <test> [--diff dir] [--threshold 16]     files, or folders paired by time
 //   tramme schema   [--out schema/tramme-1.schema.json]
-//   tramme agent    [--origin https://app.example] [--port 4317] [--renew]   the local companion of the editor's assistant (Claude Code, Codex or the Antigravity CLI of this computer)
+//   tramme agent    [--origin https://app.example] [--port 4317] [--renew]   the local companion of the editor's assistant (Claude Code, Codex or the Antigravity CLI of this computer), packages/companion
 // <doc> is a project folder (its document.tramme.json) or a document file.
 
 import fs from 'node:fs';
@@ -335,7 +335,7 @@ const COMMANDS: Record<string, () => Promise<void> | void> = {
     console.log(flags.json ? JSON.stringify(result, null, 2) : mediaReport(result));
     if (!result.ok) process.exitCode = 1;
   },
-  agent: async () => { const { startCompanion } = await import('./companion.ts'); await startCompanion({ port: num('port'), origins: str('origin')?.split(',').filter(Boolean), renew: !!flags.renew }); },
+  agent: async () => { const { companionCommand } = await import('@tramme/companion'); await companionCommand(rest); },
 };
 
 const run = COMMANDS[cmd];

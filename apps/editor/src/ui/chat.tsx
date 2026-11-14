@@ -8,7 +8,7 @@ import type { ComponentChildren } from 'preact';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { handheld } from './controls.tsx';
 import type { ChatItem, TurnUsage } from '../api.ts';
-import { engineOf, modelLabel, providerOf } from '@tramme/assistant';
+import { companionStart, engineOf, modelLabel, providerOf } from '@tramme/assistant';
 import { aiSettings, aiStatus, CLI_SETUP, cliUnavailable, providerLabel, refreshStatus, setAiSettings } from '../ai/index.ts';
 import { lightbox, running } from '../ai/conversation.ts';
 import { openSettings } from '../settings.ts';
@@ -196,7 +196,7 @@ export function Command({ text }: { text: string }) {
 }
 
 /** the command that starts the local companion for this editor */
-export const CompanionCommand = () => <Command text={/^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? 'pnpm dev' : `pnpm tramme agent --origin ${location.origin}`} />;
+export const CompanionCommand = () => <Command text={companionStart(location.origin)} />;
 
 /** how to reach a model, right in the conversation when the assistant cannot answer: an AI account first, the companion for those who run one */
 export function Access() {

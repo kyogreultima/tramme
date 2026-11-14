@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { claudeModel, EFFORTS, type Effort } from './claude-models.ts';
 import { listedLabel, readableModel } from './model-names.ts';
 import { splitGuides, type Guide } from './guides.ts';
+import { resolveOrigins } from '../../../brand/environments.ts';
 
 // The Claude models are not listed here: they come from the Agent SDK or the Anthropic API, as they are now
 export * from './claude-models.ts';
@@ -137,8 +138,22 @@ export function effortFor(model: string, chosen: Record<string, Effort | undefin
   return providerOf(model) === 'anthropic' ? DEFAULT_EFFORT : undefined;
 }
 
-/** default port of the local companion (tramme agent) */
+/** default port of the local companion (`npx tramme`, packages/companion) */
 export const COMPANION_PORT = 4317;
+
+/** the desktop app's page: its custom protocol as Windows (and Android) serve it, and as macOS and Linux do */
+export const DESKTOP_ORIGINS = ['http://tramme.localhost', 'tramme://localhost'];
+
+/** the editors a companion pairs by itself: the app of its environment (TRAMME_ENV, production by default) and the desktop app */
+export function companionOrigins(env: { TRAMME_ENV?: string; TRAMME_APP_URL?: string } = {}): string[] {
+  return [resolveOrigins({ env: env.TRAMME_ENV, app: env.TRAMME_APP_URL }).app, ...DESKTOP_ORIGINS];
+}
+
+/** the command that starts the companion for the editor served at this address (a local one starts it with `pnpm dev`) */
+export function companionStart(origin: string): string {
+  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return 'pnpm dev';
+  return companionOrigins().includes(origin) ? 'npx tramme' : `npx tramme --origin ${origin}`;
+}
 
 const Op = z.object({
   op: z.enum(['add', 'remove', 'replace', 'move', 'test']),

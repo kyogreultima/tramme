@@ -584,7 +584,7 @@
     "noConversationSavedIn": "Aucune conversation enregistrée dans ce projet.",
     "automaticTheLocalCompanion": "Automatique : le compagnon local s'il répond (votre connexion Claude Code, sans clé), sinon la clé du serveur.",
     "localCompanion": "Compagnon local",
-    "inTheTrammeFolder": "Dans le dossier de Tramme :",
+    "inATerminal": "Dans un terminal :",
     "tokenShownByThe": "Jeton affiché par le compagnon",
     "companionAddress": "Adresse du compagnon",
     "localModelsOllamaLm": "Modèles locaux (Ollama, LM Studio)",

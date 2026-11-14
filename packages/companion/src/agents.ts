@@ -54,7 +54,11 @@ const TOOL_TIMEOUT = 15 * 60_000;
 const WORKDIR = path.join(os.homedir(), '.tramme', 'engines');
 /** Antigravity's home of its own (the login stays in the system keyring): none of the user's plugins, skills, MCP servers or settings */
 const AGY_HOME = path.join(WORKDIR, 'antigravity', 'home');
-const AGY_ENV = { HOME: AGY_HOME, USERPROFILE: AGY_HOME };
+/**
+ * Its updater off: every quarter of an hour, a call of agy starts an update in the background, in a console of its
+ * own that Windows shows (a terminal window opening at a click in the editor). The user's own agy still updates itself.
+ */
+export const AGY_ENV = { HOME: AGY_HOME, USERPROFILE: AGY_HOME, AGY_CLI_DISABLE_AUTO_UPDATE: 'true' };
 
 /** a tool call handed to the editor, which runs it and posts the result back */
 export async function callEditor(t: Turn, name: string, input: unknown): Promise<ToolResult> {
