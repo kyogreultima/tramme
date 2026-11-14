@@ -11,10 +11,9 @@ The only thread: every roadmap in `docs/`, in the order they should be worked, a
 | 3 | [Taste and finish](taste-finish-roadmap.md) | 10 open, 19 done; steps 1 to 5 built, waiting for their measure | The autonomy goal. Run the measure first: it says whether the limit is the tools or the prompt, and sets the baseline before web scenes | No. Every open box is a run on the user's quota ("waits for the user's go") or a blind scoring |
 | 4 | Platform: accounts backend and billing | in progress; payment provider last | Needed for the commercial launch under FSL-1.1-ALv2 | Not in this repository. It lives in the private `tramme-platform` (`docs/accounts.md`, `docs/billing.md` there). Built since the first version of this file: the beta deployment of both repositories, the accounts in the web and desktop apps, the account mails. Left there: the payment provider, the sign-in with Google and GitHub, the cloud storage of projects |
 | 5 | [Installed plugins](installed-plugins-roadmap.md) | 5 open, 26 done; the marketplace waits for the API | Unblocked by 4 | No. The five boxes are the marketplace: catalogue, author accounts and signatures, reviews, revocation. They need the platform's API and decisions on who reviews |
-| 6 | [Sound parity](sound-parity-roadmap.md) | **Agent work complete:** 25 done, 4 open; steps 1–6 built, step 7 outside this queue | Catch-up on a competitor: useful, not blocking | Yes, all six steps. The providers are answered by fakes in the tests; trying them for real costs money and is the user's |
-| 7 | [Proofs](proofs-roadmap.md) | **Started:** 22 open; colour grading proven on ungraded Apple Log footage and shown on the features page | Shows on the site what the features do, on real footage, and tests each one on the material it exists for (the grading proof found a defect) | Yes for steps 0 to 3: the sources are free and the tools run on the machine. Step 4 runs the assistant on the user's quota and waits for the user's go |
-| 8 | [Start from a reference](reference-roadmap.md) | **Built:** 15 done, 2 open; steps 1 to 4 on 2026-11-13 | The same video as a reference the user gives, around the assets they add. After taste and finish: it builds on the film plan and the critic | No: the proof and the blind runs make films with the assistant, on the user's quota |
-| 9 | Loose ends | [Generation](generation-roadmap.md) 1, [Editing](editing-roadmap.md) 2, [Sound](sound-roadmap.md) 2, [Components](components-roadmap.md) 1, [Packs](packs-roadmap.md) 1 (decision 4), [Plugins](plugins-roadmap.md) 1 | Small leftovers. The Plugins one is the isolation work of item 1 | See below |
+| 6 | [Proofs](proofs-roadmap.md) | **Started:** 22 open; colour grading proven on ungraded Apple Log footage and shown on the features page | Shows on the site what the features do, on real footage, and tests each one on the material it exists for (the grading proof found a defect) | Yes for steps 0 to 3: the sources are free and the tools run on the machine. Step 4 runs the assistant on the user's quota and waits for the user's go |
+| 7 | [Start from a reference](reference-roadmap.md) | **Built:** 15 done, 2 open; steps 1 to 4 on 2026-11-13 | The same video as a reference the user gives, around the assets they add. After taste and finish: it builds on the film plan and the critic | No: the proof and the blind runs make films with the assistant, on the user's quota |
+| 8 | Loose ends | [Generation](generation-roadmap.md) 1, [Editing](editing-roadmap.md) 2, [Sound](sound-roadmap.md) 2, [Components](components-roadmap.md) 1, [Packs](packs-roadmap.md) 1 (decision 4), [Plugins](plugins-roadmap.md) 1 | Small leftovers. The Plugins one is the isolation work of item 1 | See below |
 
 The loose ends, one by one:
 
@@ -27,7 +26,7 @@ The loose ends, one by one:
 
 ## Done
 
-A roadmap with no open box is removed from `docs/`, and from the site's menu: its record is the changelog and the history. Five went that way (motion, performance, polish, shorts, taste). The performance figures they leave behind are in [bench/README.md](../bench/README.md): once web scenes exist, a load case for a scene is added there, since a scene is a render path the load cases do not cover.
+A roadmap with no open box is removed from `docs/`, and from the site's menu: its record is the changelog and the history. Six went that way (motion, performance, polish, shorts, taste, sound parity). The performance figures they leave behind are in [bench/README.md](../bench/README.md): once web scenes exist, a load case for a scene is added there, since a scene is a render path the load cases do not cover.
 
 ## Decisions
 
@@ -37,13 +36,13 @@ A roadmap with no open box is removed from `docs/`, and from the site's menu: it
 
 ## What an agent can work
 
-Of the open boxes of items 1 to 8, the ones an agent can land alone, in the order to take them:
+Of the open boxes of items 1 to 7, the ones an agent can land alone, in the order to take them:
 
-1. Sound parity, steps 1 to 6. Nothing waits for the user.
-2. Safe projects, steps 1 to 5. Nothing waits for the user to start; the devices' checks come back to them.
-3. Web scenes, step 0's prototypes and the user's engine decision are complete. Next: steps 1 to 4 and 6 to 8, step 9 for desktop and CLI, and step 5 after item 2 above.
-4. The Generation palette-tool box: done.
-5. Start from a reference, steps 1 to 4: done.
+1. Safe projects, steps 1 to 5. Nothing waits for the user to start; the devices' checks come back to them.
+2. Web scenes: what is left waits for a desktop build (the Chrome sidecar) and for the user's quota (the bench).
+3. The Generation palette-tool box: done.
+4. Start from a reference, steps 1 to 4: done.
+5. Sound parity: done, step 7 last (2026-11-14); the roadmap is removed.
 
 Everything else above waits for the user: a run on their quota, a blind scoring, a device, an independent review or a hand-picked set of recordings. The agent lists those as blocked and does not start them. The web scenes engine decision was recorded on 2026-11-06 from step 0's figures.
 

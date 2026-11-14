@@ -21,6 +21,8 @@ import { DEFAULT_PREFERENCES, prefs, resetPrefs, setLanguage, setPrefs, settings
 import { S, toast } from '../state.ts';
 import { Modal, NumberField, Select, Seg, Toggle } from './controls.tsx';
 import { Icon } from './icons.tsx';
+import { useListen } from './listen.ts';
+import { shortlistFor, withoutVoice, withVoice } from '../voice-shortlist.ts';
 import { resetSeen, setAutoTours, toursState } from '../tours/index.ts';
 import { LOCALES, locale, m, t } from '../i18n/index.ts';
 import { vaultOrigin } from '../mode.ts';
@@ -147,24 +149,6 @@ function Level({ value, min, max, step = 1, unit = 'dB', onChange }: { value: nu
   return <div class="set-number"><NumberField value={value} min={min} max={max} step={step} unit={unit} onCommit={onChange} /></div>;
 }
 
-/** one sound listened to at a time: play(key, url) starts it, or stops it when it is the one playing */
-function useListen() {
-  const [playing, setPlaying] = useState<string | null>(null);
-  const audio = useRef<HTMLAudioElement | null>(null);
-  useEffect(() => () => audio.current?.pause(), []);
-  const stop = () => { audio.current?.pause(); setPlaying(null); };
-  const play = (key: string, url: string) => {
-    audio.current?.pause();
-    if (playing === key) { setPlaying(null); return; }
-    const a = new Audio(url);
-    a.onended = () => setPlaying(null);
-    a.play().catch(() => setPlaying(null));
-    audio.current = a;
-    setPlaying(key);
-  };
-  return { playing, play, stop };
-}
-
 /** the sounds kept in the library shared by the projects: listened to, deleted */
 function SoundLibrary() {
   const [list, setList] = useState<{ name: string; entry?: unknown }[] | null>(null);
@@ -201,6 +185,26 @@ function SoundLibrary() {
   );
 }
 
+/** the voices the voice-over panel offers first, for the provider that speaks: each removed here, added from the search below */
+function VoiceShortlist({ provider }: { provider?: string }) {
+  const p = prefs.value;
+  if (!provider) return null;
+  const list = shortlistFor(provider, p.voiceShortlist, null);
+  return (
+    <Row label={t('settings.voiceShort')} hint={t('settings.voiceShortHint')} stack>
+      <div class="voiceover-short">
+        {list.map((v) => (
+          <span key={v.id} class="tag">
+            {v.name}
+            <button class="icon-btn sm" title={t('settings.voiceShortRemove')} aria-label={t('settings.voiceShortRemove')} onClick={() => setPrefs({ voiceShortlist: withoutVoice(p.voiceShortlist, provider, v.id) })}><Icon name="x" /></button>
+          </span>
+        ))}
+        {!list.length && <span class="faint">{t('settings.voiceShortEmpty')}</span>}
+      </div>
+    </Row>
+  );
+}
+
 /** the voices of the provider chosen, searched by words, language and accent, listened to, one taken for the voice-overs */
 function VoicePicker() {
   const p = prefs.value;
@@ -229,6 +233,9 @@ function VoicePicker() {
               {p.voice === v.id
                 ? <span class="tag ok"><Icon name="check" />{t('settings.voiceChosen')}</span>
                 : <button class="btn sm" onClick={() => setPrefs({ voice: v.id, voiceProvider: v.provider as Preferences['voiceProvider'] })}>{t('settings.voiceUse')}</button>}
+              {!shortlistFor(v.provider, p.voiceShortlist, null).some((x) => x.id === v.id) && (
+                <button class="btn sm ghost" onClick={() => setPrefs({ voiceShortlist: withVoice(p.voiceShortlist, v.provider, { id: v.id, name: v.name }) })}>{t('settings.voiceShortAdd')}</button>
+              )}
             </li>
           ))}
         </ul>
@@ -290,6 +297,7 @@ function Sound() {
           <Select value={voiceModels[p.voiceModel] ? p.voiceModel : ''} options={Object.entries(voiceModels).map(([id, name], i) => [i ? id : '', i ? name : t('settings.voiceModelDefault', { name })])} onChange={(v) => setPrefs({ voiceModel: v })} />
         </Row>
       )}
+      <VoiceShortlist provider={speaker} />
       <VoicePicker />
       <SoundLibrary />
     </Section>

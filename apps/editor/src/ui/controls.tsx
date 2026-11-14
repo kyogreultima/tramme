@@ -220,9 +220,12 @@ export function Popover({ anchor, onClose, children, class: cls = '', align = 'l
       setPos(down ? { x, top: a.bottom + 6, max: below } : { x, bottom: innerHeight - a.top + 6, max: above });
     };
     place();
-    // placed again when the window changes size: a phone's keyboard opening or closing halves or doubles the room
+    // placed again when the window changes size (a phone's keyboard opening or closing halves or doubles the room)
+    // and when its content does (a list arriving after it opened)
     addEventListener('resize', place);
-    return () => removeEventListener('resize', place);
+    const grown = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => place());
+    if (ref.current) grown?.observe(ref.current);
+    return () => { removeEventListener('resize', place); grown?.disconnect(); };
   }, [anchor]);
   useEffect(() => {
     const close = (e: Event) => { if (!ref.current?.contains(e.target as Node) && !anchor.contains(e.target as Node)) onClose(); };
