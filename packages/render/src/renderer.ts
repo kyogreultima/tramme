@@ -108,6 +108,8 @@ export class Renderer {
   private sy = 1;
   /** seed of the last finished frame (for the YUV / RGBA dither) */
   lastSeed = 0;
+  /** the picture laid over every frame this renderer finishes, by the frame's time, at the render's size, straight alpha: the watermark of an export (null: none) */
+  stamp: ((t: number) => TexImageSource) | null = null;
   /** time spent evaluating, drawing and waiting for video since the last reset (ms; readback and send are the export's) */
   times: FrameParts = noParts();
   /** what the last frame drawn was missing (video frames being decoded) */
@@ -450,7 +452,7 @@ export class Renderer {
       return type?.stage === 'finish' && type.gl ? [{ code: type.gl.code, schema: type.props, props: e.props }] : [];
     });
     const onError = this.isolate ? (e: Error) => { this.errors.set('$comp.effects', e.message); } : (e: Error) => { throw e; };
-    this.compositor.finish(fx, look, seed, { hud: opts.hud ?? null, toFbo: opts.toFbo, passes, t: frame.t, scale: (this.sx + this.sy) / 2, onError });
+    this.compositor.finish(fx, look, seed, { hud: opts.hud ?? this.stamp?.(frame.t) ?? null, toFbo: opts.toFbo, passes, t: frame.t, scale: (this.sx + this.sy) / 2, onError });
     this.lastSeed = seed;
     return frame;
   }

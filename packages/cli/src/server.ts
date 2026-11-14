@@ -129,7 +129,7 @@ export class Server {
     const options: esbuild.BuildOptions = {
       entryPoints: [entry], bundle: true, minify, format: 'esm', platform: 'browser', target: 'chrome120',
       outdir: path.join(HERE, '.out', name), write: false, sourcemap: sourcemap ? 'inline' : false, logLevel: 'error',
-      jsx: 'automatic', jsxImportSource: 'preact', loader: { '.ttf': 'file', '.woff2': 'file' },
+      jsx: 'automatic', jsxImportSource: 'preact', loader: { '.ttf': 'file', '.woff2': 'file', '.svg': 'text' },
     };
     if (!watch) { store(await esbuild.build(options)); return; }
     const ctx = await esbuild.context({ ...options, plugins: [{ name: 'store', setup: (b) => b.onEnd((r) => { if (!r.errors.length) store(r); }) }] });

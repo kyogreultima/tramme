@@ -16,6 +16,7 @@ import { api, type Voice } from '../api.ts';
 import { EffortPicker, ModelPicker } from './ModelPicker.tsx';
 import { aiSettings, type AiSettings, aiStatus, connectProvider, disconnectProvider, ensureStatus, providersChanged, refreshStatus, removeCustomProvider, saveCustomProvider, serverName, setAiSettings, statusLabels } from '../ai/index.ts';
 import { allowNotifications, notificationState } from '../notify.ts';
+import { planFreesWatermark } from '../watermark.ts';
 import { preview, previewInfo } from '../preview.ts';
 import { DEFAULT_PREFERENCES, prefs, resetPrefs, setLanguage, setPrefs, settingsOpen, settingsSection, THEMES, type Preferences, type SettingsSection, type ThemeInfo } from '../settings.ts';
 import { S, toast } from '../state.ts';
@@ -414,6 +415,9 @@ function Behavior() {
   // a mode that changes the document without asking waits for the user's confirmation below its row
   const [confirming, setConfirming] = useState<'turn' | 'all' | null>(null);
   const [permission, setPermission] = useState(notificationState);
+  // the watermark's switch: only a Plus or Pro plan turns it off
+  const [freed, setFreed] = useState(false);
+  useEffect(() => { void planFreesWatermark().then(setFreed); }, []);
   const notifyOn = (on: boolean) => {
     setAiSettings({ notify: on });
     // asked from the click: the browser shows its question only then
@@ -429,6 +433,9 @@ function Behavior() {
           <Toggle on={prefs.value.quickLauncher} onChange={(on) => setPrefs({ quickLauncher: on })} />
         </Row>
       )}
+      <Row label={t('settings.watermark')} hint={freed ? t('settings.watermarkHint') : t('settings.watermarkBasic')}>
+        {freed ? <Toggle on={prefs.value.watermark} onChange={(on) => setPrefs({ watermark: on })} /> : <span class="faint">{t('settings.watermarkAlways')}</span>}
+      </Row>
       <Row label={t('settings.assistantTranscribes')} hint={t('settings.assistantTranscribesHint')}>
         <Toggle on={prefs.value.assistantTranscribes} onChange={(on) => setPrefs({ assistantTranscribes: on })} />
       </Row>

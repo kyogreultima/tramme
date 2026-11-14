@@ -55,6 +55,8 @@ export async function checkExport(file: string, format: 'lottie' | 'svg', times:
   try {
     await openDoc(page, port, '/project/' + encodeURIComponent(path.basename(file)), compId);
     await page.evaluate((a) => (window as any).TRAMME.load(a.d, a.c), { d: plain as any, c: compId });
+    // like for like: the other player draws no watermark
+    await page.evaluate(() => (window as any).TRAMME.watermark(false));
     const other = await browser.newPage();
     await other.setViewport({ width: comp.width, height: comp.height });
     if (lottie) {

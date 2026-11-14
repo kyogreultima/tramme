@@ -83,13 +83,17 @@ export interface Preferences {
   videoSeconds: 4 | 6 | 8;
   /** where a dictation is transcribed: the downloaded model (this browser, the default), the companion, or the server */
   dictation: DictationSource;
+  /** the Tramme logo in a corner of the exported films; only Plus and Pro can turn it off (watermark.ts) */
+  watermark: boolean;
+  /** the first export carrying the watermark has said why */
+  watermarkTold: boolean;
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
   language: 'auto', theme: 'studio', view: 'studio', motion: 'auto', still: 'display', blur: 'document', exactFrames: true, scrubAudio: true, sandboxPreview: false,
   effectsDb: -8, musicDb: -14, duckDb: -12, varySounds: true, confirmPaid: true, paidPerTurn: 10, voiceProvider: 'auto', voiceShortlist: {}, voice: '', voiceModel: '', previewVolume: 1, previewMuted: false, proxies: true, models: {}, pluginsOff: [], areaConfirm: 'always', assistantTranscribes: false, assistantFetchesReal: false, acceptReadings: false, checkUpdates: true, lastUpdateCheck: 0, updateNotified: '', recentCommands: [], quickLauncher: false,
   pictureProvider: 'auto', pictureQuality: 'auto', pictureSize: 'large', styleFrames: 2,
-  videoProvider: 'auto', videoSeconds: 8, dictation: 'local',
+  videoProvider: 'auto', videoSeconds: 8, dictation: 'local', watermark: true, watermarkTold: false,
 };
 
 // ── themes and views ─────────────────────────────────────────

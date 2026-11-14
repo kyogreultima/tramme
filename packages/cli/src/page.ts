@@ -11,6 +11,7 @@ import { addParts, encodeWav, FIRST_SETTLE_LIMIT, formatParts, mixComposition, n
 import { blitSandboxFrame, declarationsModule, ensureDeclared, ensureSandboxDoc, sandboxDeclaration, sandboxVideoFrames } from '../../../apps/editor/src/plugins/sandbox-draw.ts';
 import { browserHost, type PluginHost } from '../../../apps/editor/src/plugins/host.ts';
 import { containsExpression } from '@tramme/project';
+import { watermarkStamp } from '../../../apps/editor/src/watermark-draw.ts';
 
 const q = new URLSearchParams(location.search);
 const docUrl = new URL(q.get('doc') || '', location.href).href;
@@ -38,6 +39,8 @@ async function init() {
       return declarationsModule(decl, id);
     } : undefined,
   });
+  // the command line follows the Basic plan's rule until it can sign in to an account: its films carry the watermark
+  renderer.stamp = await watermarkStamp(canvas().width, canvas().height);
 }
 
 /** the sandbox host whenever project code (plugins or expressions) can run */
@@ -78,6 +81,8 @@ const dataUrl = (c: HTMLCanvasElement, type = 'image/png', quality?: number) => 
 
 const api = {
   ready: init(),
+  /** the watermark over the frames: off for a comparison with another player (check-export), never for a film */
+  async watermark(on: boolean) { renderer.stamp = on ? await watermarkStamp(canvas().width, canvas().height) : null; },
   info() {
     const c = renderer.comp;
     return {

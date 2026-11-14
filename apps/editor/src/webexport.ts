@@ -22,6 +22,7 @@ import { blitSandboxFrame, declarationsModule, ensureDeclared, ensureSandboxDoc,
 import { prefs } from './settings.ts';
 import { sandboxedDoc } from './installed.ts';
 import { t } from './i18n/index.ts';
+import { watermarkStamp } from './watermark-draw.ts';
 
 export interface WebExportOptions {
   compId: string;
@@ -36,6 +37,8 @@ export interface WebExportOptions {
   depth?: 8 | 10;
   /** [from, to] in seconds: only that part of the film, and of its sound */
   range?: [number, number];
+  /** the Tramme logo in a corner of the picture; the plan and the setting decide when it is not given (watermark.ts) */
+  watermark?: boolean;
 }
 
 export interface WebExportResult { blob: Blob; ext: string; warnings: string[] }
@@ -107,6 +110,8 @@ async function exportOnce(doc: TrammeDoc, base: string, format: WebFormat, opts:
       if (!sound) throw new Error(t('export.noSoundLayerIn'));
       return { blob: wav(sound), ext: 'wav', warnings: [] };
     }
+    // the watermark: drawn at the frame's size for each frame's time (the logo opens now and then), laid over it by the renderer
+    if (opts.watermark ?? await (await import('./watermark.ts')).watermarkForExport()) r.stamp = await watermarkStamp(W, H);
     const frames = span.f1 - span.f0;
     // straight RGBA of frame f (alpha kept)
     const rgba = new Uint8Array(W * H * 4);
@@ -134,7 +139,7 @@ async function exportOnce(doc: TrammeDoc, base: string, format: WebFormat, opts:
     const readFrame = async (f: number) => {
       if (sandboxed) {
         const bmp = await sandboxFrame(f);
-        try { readCtx.drawImage(bmp, 0, 0, W, H); }
+        try { readCtx.drawImage(bmp, 0, 0, W, H); if (r.stamp) readCtx.drawImage(r.stamp(f / fps) as CanvasImageSource, 0, 0, W, H); }
         finally { bmp.close(); }
         rgba.set(readCtx.getImageData(0, 0, W, H).data);
         return rgba;

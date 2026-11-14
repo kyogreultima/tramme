@@ -1005,6 +1005,10 @@
     "cliDefault": "Son modèle par défaut"
   },
   "settings": {
+    "watermark": "Filigrane",
+    "watermarkHint": "Le logo Tramme dans un coin de vos films exportés. Votre offre permet de le retirer.",
+    "watermarkBasic": "Le logo Tramme dans un coin de vos films exportés. Plus et Pro peuvent le retirer.",
+    "watermarkAlways": "Toujours",
     "playProxies": "Lire les proxys",
     "playProxiesHint": "une vidéo qui a un proxy (l'outil proxy) lit ici sa copie allégée ; les exports utilisent toujours l'original",
     "adaptsToTheMachine": "S'adapte à la machine : plus petite si la lecture ralentit, plus grande s'il y a de la marge.",
@@ -1488,6 +1492,9 @@
     "removeAVertex": "Retirer un sommet"
   },
   "export": {
+    "watermarkTitle": "Filigrane Tramme",
+    "watermarkBasic": "Votre film porte le logo Tramme dans un coin. Plus et Pro peuvent le retirer.",
+    "watermarkPaid": "Votre film porte le logo Tramme dans un coin. Retirez-le dans Réglages, Comportement.",
     "noTenBit": "Ce navigateur ne sait pas encoder de vidéo 10 bits à cette taille",
     "tenBitPlugins": "Les modules du projet dessinent en 8 bits : le film a été exporté en 8 bits",
     "tenBitWith": "10 bits, en {codec}",
