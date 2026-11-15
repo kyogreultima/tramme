@@ -8,6 +8,8 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+## [0.27.0] - 2026-11-15
+
 ### Added
 
 - **Projects in your account**: on a deployment with accounts, signing in keeps your projects, libraries, conversations and provider keys in your account, the same in every browser you sign in from; signed out, they stay in the browser as before. The keys are kept sealed, and deleting the account deletes its files.
@@ -15,7 +17,6 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 - A save that cannot go through waits instead of failing: when the project was saved from another tab or device since it was opened, you choose which version stays; when your session ended, you sign in again and the changes are saved.
 - Your account's button in the project's top bar; the project is saved before you leave it for your space or sign out.
 - **The gallery**: a film you just exported as MP4 is published from the export's panel, with a still taken in its middle, a title and a few words, in the gallery or reachable by its link only, and the project offered for copying or not. It is signed with your public name, which you choose in your space. "Open in Tramme" on the site copies a published film's project into your projects (its code is asked about first, as any project from someone else). Visitors can report a film.
-- The app's space shows no offers or prices until the plans are sold, as the site.
 - **Export in the cloud**: signed in, "Export in the cloud" in the export's panel renders the project on a server as the desktop app renders it (`apps/renderer`, the command line with Chrome and ffmpeg, in a container); the page can be closed, and the film lands in the project's renders, to download. The jobs wait in a queue, one render at a time.
 - **Export by API and command line**: API tokens of the account, made and revoked in your space (shown once, only their hash kept), let `tramme cloud-export <project>` send a project to your account, have it rendered in the cloud and bring its film back. A token reaches the projects and their exports only.
 - **The plugins' marketplace**: on a deployment with accounts, the plugins settings have a "Discover" section: plugins published by their authors, installed through the same question as an import, their package checked against the catalogue's hash, newer versions offered. An installed plugin is published from its row under its author's public name; a plugin that reaches the network or keys is listed once the back-office has reviewed it. A plugin can be reported; a revoked version is turned off at the next check, and you are told which.
@@ -24,7 +25,11 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Changed
 
-- The site hides the prices until the payment opens: no pricing page or link to it, no price or credit question in the FAQ, no paid sections in the terms, no offers given to search engines. One switch brings them back (`PRICING_SHOWN` in `apps/site/src/lib/plans.ts`).
+- The site hides the prices until the payment opens: no pricing page or link to it, no price or credit question in the FAQ, no paid sections in the terms, no offers given to search engines; the app's space shows no offers either. One switch brings them back, on the site and in the app (`PAYMENT_OPEN` in `packages/plans`).
+
+### Removed
+
+- The deployment of the server mode on Cloudflare behind Cloudflare Access (`pnpm deploy`, its bucket and its documentation): the server mode is `pnpm dev`'s, on this machine. The public deployment is the personal mode (`pnpm deploy:personal`), and the deployments with accounts take its place for the projects kept on a server.
 
 ## [0.26.1] - 2026-11-15
 
@@ -928,7 +933,8 @@ First public release.
 
 - Cloudflare Worker serving the editor and the API, projects stored in R2, access protected by Cloudflare Access.
 
-[Unreleased]: ../../compare/v0.26.1...HEAD
+[Unreleased]: ../../compare/v0.27.0...HEAD
+[0.27.0]: ../../compare/v0.26.1...v0.27.0
 [0.26.1]: ../../compare/v0.26.0...v0.26.1
 [0.26.0]: ../../compare/v0.25.0...v0.26.0
 [0.25.0]: ../../compare/v0.24.0...v0.25.0
