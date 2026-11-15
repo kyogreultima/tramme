@@ -1,10 +1,10 @@
-// The companion's command line, the same for `npx tramme` (the published package) and the
+// The companion's command line, the same for `npx @qualris/tramme` and `tramme` (the published package) and the
 // repository's `pnpm tramme agent`:
 //   tramme [agent] [--origin https://app.example,…] [--port 4317] [--renew]
 // The editor of this environment and the desktop app are paired by themselves (companionOrigins);
 // --origin adds others.
 
-import { COMPANION_PORT, companionOrigins } from '@tramme/assistant';
+import { COMPANION_PACKAGE, COMPANION_PORT, companionOrigins } from '@tramme/assistant';
 import { startCompanion } from './companion.ts';
 
 const HELP = `Tramme companion: the editor's assistant with the agents of this computer,
@@ -47,4 +47,6 @@ export async function companionCommand(argv: string[], version = '') {
   if (args.help) { process.stdout.write(HELP); return; }
   if (args.version) { console.log(version || 'development'); return; }
   await startCompanion({ port: args.port, origins: [...new Set([...companionOrigins(process.env), ...args.origins])], renew: args.renew });
+  // started through npx: the short command, once it is installed
+  if (process.env.npm_command === 'exec') console.log(`to start it with \`tramme\` from now on: npm install -g ${COMPANION_PACKAGE}`);
 }

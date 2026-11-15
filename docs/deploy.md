@@ -50,7 +50,7 @@ Two paths, chosen in the editor (Assistant, settings):
 - **Local companion**: on your machine, with the login of an agent installed there (Claude Code, Codex with a ChatGPT login, or the Antigravity CLI with a Google login), no key.
 
   ```sh
-  npx tramme --origin https://<your editor's address>
+  npx @qualris/tramme --origin https://<your editor's address>
   ```
 
   The editor at that address pairs by itself, with no token to copy. The companion listens on `127.0.0.1` only and refuses pages from other origins; another local page must be given the pairing token it prints, by hand. Chrome may ask for permission to access the local network the first time.

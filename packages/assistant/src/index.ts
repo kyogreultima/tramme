@@ -138,7 +138,10 @@ export function effortFor(model: string, chosen: Record<string, Effort | undefin
   return providerOf(model) === 'anthropic' ? DEFAULT_EFFORT : undefined;
 }
 
-/** default port of the local companion (`npx tramme`, packages/companion) */
+/** the companion's npm package (packages/companion): started with `npx @qualris/tramme`, or installed once (`npm install -g @qualris/tramme`) and started with `tramme` */
+export const COMPANION_PACKAGE = '@qualris/tramme';
+
+/** default port of the local companion */
 export const COMPANION_PORT = 4317;
 
 /** the desktop app's page: its custom protocol as Windows (and Android) serve it, and as macOS and Linux do */
@@ -152,7 +155,7 @@ export function companionOrigins(env: { TRAMME_ENV?: string; TRAMME_APP_URL?: st
 /** the command that starts the companion for the editor served at this address (a local one starts it with `pnpm dev`) */
 export function companionStart(origin: string): string {
   if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return 'pnpm dev';
-  return companionOrigins().includes(origin) ? 'npx tramme' : `npx tramme --origin ${origin}`;
+  return companionOrigins().includes(origin) ? `npx ${COMPANION_PACKAGE}` : `npx ${COMPANION_PACKAGE} --origin ${origin}`;
 }
 
 const Op = z.object({

@@ -8,7 +8,7 @@
 
 import { installed, offIn } from '../installed.ts';
 import { computed, signal } from '@preact/signals';
-import { addUsage, claudeModels, defaultClaudeModel, parseApiModels, setClaudeModels, type ClaudeModel, type Usage, CLI_DEFAULT, COMPANION_PORT, EFFORTS, effortFor, effortLevels, ENGINE_MODELS, ENGINES, engineOf, LOCAL_URL, modelLabel, modelName, NO_USAGE, pickModel, PROVIDER_LABEL, providerOf, readableModel, REMOTE, setModelLabels, joinSystem, namedTools, queuedPrompt, setTranslator, slotOf, systemParts, userPrompt, withProject, type Effort, type Engine, type TurnContext } from '@tramme/assistant';
+import { addUsage, claudeModels, defaultClaudeModel, parseApiModels, setClaudeModels, type ClaudeModel, type Usage, CLI_DEFAULT, COMPANION_PORT, companionStart, EFFORTS, effortFor, effortLevels, ENGINE_MODELS, ENGINES, engineOf, LOCAL_URL, modelLabel, modelName, NO_USAGE, pickModel, PROVIDER_LABEL, providerOf, readableModel, REMOTE, setModelLabels, joinSystem, namedTools, queuedPrompt, setTranslator, slotOf, systemParts, userPrompt, withProject, type Effort, type Engine, type TurnContext } from '@tramme/assistant';
 import { CHAT, CHAT_INDEX, chatPath } from '@tramme/project';
 import type { TrammeDoc } from '@tramme/core';
 import reference from '../../../../docs/document.md';
@@ -544,7 +544,7 @@ export async function* ask(p: AskPayload, signal: AbortSignal): AsyncGenerator<A
   if (providerOf(aiSettings.peek().model) === 'anthropic') {
     await ensureClaudeModels();
     if (!current()) return;
-    if (!aiSettings.peek().model) { yield { type: 'error', message: t('ai.noClaudeModels') }; return; }
+    if (!aiSettings.peek().model) { yield { type: 'error', message: t('ai.noClaudeModels', { command: companionStart(location.origin) }) }; return; }
   }
   // a proposal neither applied nor refused is dropped at the next message
   const dropped = runner.pending && !p.decisions.some((d) => d.id === runner.pending!.id) ? runner.pending : null;
@@ -776,7 +776,7 @@ export function unavailableReason(): string {
   if (companion === 'checking') return t('ai.lookingForTheLocal');
   if (prefer === 'companion' || (prefer === 'auto' && !server)) {
     if (companion === 'unpaired') return t('ai.theLocalCompanionIs');
-    return t('ai.noAccessToClaude');
+    return t('ai.noAccessToClaude', { command: companionStart(location.origin) });
   }
   return t('ai.providerNotConnected', { provider: 'Anthropic' });
 }

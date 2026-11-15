@@ -49,14 +49,14 @@ The packs carry their data in the repository (`plugins/<pack>/`), read at author
 | [ws](https://github.com/websockets/ws) | MIT | Frame transfer from the render page |
 | [pngjs](https://github.com/pngjs/pngjs) | MIT | Image comparisons |
 | [@huggingface/transformers](https://github.com/huggingface/transformers.js) | Apache-2.0 | Local speech transcription (Whisper); the companion installs it at its first transcription |
-| [@anthropic-ai/claude-agent-sdk](https://www.npmjs.com/package/@anthropic-ai/claude-agent-sdk) | Proprietary (Anthropic) | The assistant's local companion (`npx tramme`, `tramme agent`) |
+| [@anthropic-ai/claude-agent-sdk](https://www.npmjs.com/package/@anthropic-ai/claude-agent-sdk) | Proprietary (Anthropic) | The assistant's local companion (`npx @qualris/tramme`, `tramme agent`) |
 | [@modelcontextprotocol/sdk](https://github.com/modelcontextprotocol/typescript-sdk) | MIT | The companion serves Tramme's tools to Codex and Antigravity as MCP |
 | [cross-spawn](https://github.com/moxystudio/node-cross-spawn) | MIT | The companion starts the agents' command lines on Windows |
 | [zod](https://github.com/colinhacks/zod) | MIT | The companion's tool schemas |
 
 **About ffmpeg-static (GPL).** ffmpeg runs as a separate program, called by the CLI. It is not linked into Tramme, so the GPL does not extend to Tramme's code. If you redistribute the ffmpeg binary itself, follow the ffmpeg license.
 
-**About the Claude Agent SDK.** It is not open source. Its use is subject to [Anthropic's terms](https://code.claude.com/docs/en/legal-and-compliance). It is only needed for the local companion; the editor, the engine and the CLI renderers work without it. The npm package `tramme` does not contain it: it names it as a dependency, and npm downloads it from Anthropic's own package on install.
+**About the Claude Agent SDK.** It is not open source. Its use is subject to [Anthropic's terms](https://code.claude.com/docs/en/legal-and-compliance). It is only needed for the local companion; the editor, the engine and the CLI renderers work without it. The npm package `@qualris/tramme` does not contain it: it names it as a dependency, and npm downloads it from Anthropic's own package on install.
 
 ## Development only
 

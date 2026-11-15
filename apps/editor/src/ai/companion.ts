@@ -1,4 +1,4 @@
-// The local path: the companion (`npx tramme`, `pnpm tramme agent` in the repository) runs an agent installed on
+// The local path: the companion (`npx @qualris/tramme`, `pnpm tramme agent` in the repository) runs an agent installed on
 // the user's machine, on their own login: Claude Code (the Agent SDK), Codex
 // (ChatGPT) or the Antigravity CLI. It streams the turn back as NDJSON; each tool
 // call is run here and its result posted back.

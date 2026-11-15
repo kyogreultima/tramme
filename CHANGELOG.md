@@ -10,7 +10,8 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Fixed
 
-- The assistant's panel said to start the companion "in the Tramme folder": it now says to start it in a terminal, with Node.js 20 or later, and the messages that ask to start it give the command, `npx tramme`.
+- **The companion's npm package is `@qualris/tramme`**: npm refused the name `tramme`, so the `npx tramme` that 0.26.0 shows started nothing. Start it with `npx @qualris/tramme`, or install it once with `npm install -g @qualris/tramme` and start it with `tramme`; the editor shows the new command.
+- The assistant's panel said to start the companion "in the Tramme folder": it now says to start it in a terminal, with Node.js 20 or later, and the messages that ask to start it give the command.
 
 ## [0.26.0] - 2026-11-15
 

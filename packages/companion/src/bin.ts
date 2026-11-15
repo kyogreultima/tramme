@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// `npx tramme`: the companion started from the published package (built by build.ts into dist/bin/).
+// `npx @qualris/tramme`, or `tramme` once installed: the companion started from the published package (built by build.ts into dist/bin/).
 
 import fs from 'node:fs';
 import { companionCommand } from './main.ts';

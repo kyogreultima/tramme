@@ -33,10 +33,10 @@ describe('the editors the companion pairs by itself', () => {
     expect(companionOrigins({ TRAMME_APP_URL: 'https://branch.example/' })[0]).toBe('https://branch.example');
   });
 
-  it('give the command the editor shows: npx tramme for the editors it pairs, the address named for another', () => {
-    expect(companionStart('https://app.tramme.dev')).toBe('npx tramme');
-    expect(companionStart('http://tramme.localhost')).toBe('npx tramme');
-    expect(companionStart('https://beta.app.tramme.dev')).toBe('npx tramme --origin https://beta.app.tramme.dev');
+  it('give the command the editor shows: npx @qualris/tramme for the editors it pairs, the address named for another', () => {
+    expect(companionStart('https://app.tramme.dev')).toBe('npx @qualris/tramme');
+    expect(companionStart('http://tramme.localhost')).toBe('npx @qualris/tramme');
+    expect(companionStart('https://beta.app.tramme.dev')).toBe('npx @qualris/tramme --origin https://beta.app.tramme.dev');
     expect(companionStart('http://localhost:8787')).toBe('pnpm dev');
   });
 });
