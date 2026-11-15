@@ -60,7 +60,8 @@ async function route(req: Request, env: Env, url: URL): Promise<Response> {
 }
 
 // the accounts backend, as a container behind this Worker (wrangler.jsonc, the `cloud` environment)
-export { AccountsContainer } from './container.ts';
+export { AccountsContainer, RendererContainer } from './container.ts';
+export { RenderQueue } from './renders.ts';
 
 export default {
   async fetch(req: Request, env: Env, ctx?: ExecutionContext) {

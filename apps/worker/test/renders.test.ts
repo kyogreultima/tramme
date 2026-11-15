@@ -1,0 +1,82 @@
+import { describe, expect, it } from 'vitest';
+import { memoryRecords, prefixedBucket, recordBucket, signEdge, storageRoute } from '@tramme/api';
+import worker from '../src/index.ts';
+import type { Env } from '../src/http.ts';
+import { nextJob, runJob, type Job } from '../src/renders.ts';
+
+const APP = 'https://app.example';
+const SECRET = 'edge-secret';
+const WS = 'aaaaaaaaaaaa';
+
+function setup(over: Record<string, unknown> = {}) {
+  const files = recordBucket(memoryRecords());
+  const queued: { workspaceId: string; job: string; priority: boolean }[] = [];
+  const env = {
+    MODE: 'personal', APP_ORIGIN: APP, VAULT_ORIGIN: 'https://vault.example',
+    ASSETS: { fetch: async () => new Response('<html><head></head></html>', { headers: { 'content-type': 'text/html' } }) },
+    ACCOUNTS_URL: 'http://backend.test', FILES: files, EDGE_SECRET: SECRET, INTERNAL_SECRET: 'i', KEYS_SECRET: 'k',
+    RENDER_QUEUE: { idFromName: () => 'q', get: () => ({ fetch: async (r: Request) => { queued.push(await r.json()); return new Response(null, { status: 202 }); } }) },
+    ...over,
+  } as unknown as Env;
+  return { env, files, queued };
+}
+const as = async (plan: 'basic' | 'pro' = 'basic') => `__Host-tramme-edge=${await signEdge({ userId: 'u', workspaceId: WS, sessionVersion: 1, plan }, SECRET)}`;
+const call = (env: Env, path: string, cookie: string, init: RequestInit = {}) =>
+  worker.fetch(new Request(`${APP}${path}`, { ...init, headers: { cookie } }), env);
+
+async function project(env: Env, cookie: string) {
+  return ((await (await call(env, '/api/projects', cookie, { method: 'POST', body: JSON.stringify({ name: 'Film' }) })).json()) as { id: string }).id;
+}
+
+describe('export in the cloud', () => {
+  it('queues a job for a project, Pro first, and tells where it is', async () => {
+    const { env, queued } = setup();
+    const cookie = await as('pro');
+    const id = await project(env, cookie);
+    const res = await call(env, `/api/projects/${id}/renders`, cookie, { method: 'POST', body: JSON.stringify({ quality: '1080p' }) });
+    expect(res.status).toBe(202);
+    const job = await res.json() as Job;
+    expect(job).toMatchObject({ project: id, quality: '1080p', status: 'queued', priority: true });
+    expect(queued).toEqual([expect.objectContaining({ workspaceId: WS, job: job.id, priority: true })]);
+    expect(((await (await call(env, `/api/renders/${job.id}`, cookie)).json()) as Job).status).toBe('queued');
+    expect(((await (await call(env, '/api/renders', cookie)).json()) as Job[]).map((j) => j.id)).toEqual([job.id]);
+  });
+
+  it('refuses a project that is not there, and 4K on a plan without it once the limits are on', async () => {
+    const { env } = setup({ PLAN_LIMITS: 'on' });
+    const cookie = await as('basic');
+    expect((await call(env, '/api/projects/nope-123/renders', cookie, { method: 'POST', body: '{}' })).status).toBe(404);
+    const big = ((await (await call(env, '/api/projects', cookie, { method: 'POST', body: JSON.stringify({ name: 'Big', width: 3840, height: 2160 }) })).json()) as { id: string }).id;
+    expect((await call(env, `/api/projects/${big}/renders`, cookie, { method: 'POST', body: '{}' })).status).toBe(403);
+    expect((await call(env, `/api/projects/${big}/renders`, await as('pro'), { method: 'POST', body: '{}' })).status).toBe(202);
+  });
+
+  it('renders a job: the project\'s archive in, the film kept with the project', async () => {
+    const { env, files } = setup();
+    const cookie = await as();
+    const id = await project(env, cookie);
+    const job = await (await call(env, `/api/projects/${id}/renders`, cookie, { method: 'POST', body: '{}' })).json() as Job;
+    let archiveSize = 0;
+    const done = await runJob(files, WS, job.id, async (archive) => { archiveSize = archive.byteLength; return new Uint8Array([1, 2, 3]).buffer; });
+    expect(archiveSize).toBeGreaterThan(0);
+    expect(done).toMatchObject({ status: 'done', file: `renders/cloud-${job.id}.mp4` });
+    const ws = prefixedBucket(files, `w/${WS}/`);
+    const url = new URL(`http://x/api/projects/${id}/files/renders/cloud-${job.id}.mp4`);
+    expect((await (await storageRoute(new Request(url), ws, url))!.arrayBuffer()).byteLength).toBe(3);
+  });
+
+  it('says why a job failed', async () => {
+    const { env, files } = setup();
+    const cookie = await as();
+    const id = await project(env, cookie);
+    const job = await (await call(env, `/api/projects/${id}/renders`, cookie, { method: 'POST', body: '{}' })).json() as Job;
+    const failed = await runJob(files, WS, job.id, async () => { throw new Error('Chrome stopped'); });
+    expect(failed).toMatchObject({ status: 'failed', error: 'Chrome stopped' });
+  });
+
+  it('takes the plans with a priority first, then the oldest', () => {
+    const a = { workspaceId: 'a', job: '1', priority: false, at: '1' }, b = { workspaceId: 'b', job: '2', priority: true, at: '2' };
+    expect(nextJob([a, b])).toBe(b);
+    expect(nextJob([a, { ...b, priority: false }])).toBe(a);
+  });
+});

@@ -238,6 +238,16 @@
     "uploadingName": "Uploading {name}",
     "properties": "Properties"
   },
+  "cloudRender": {
+    "start": "Export in the cloud",
+    "hint": "Rendered on a server as the desktop app renders it: you can close this page, the film lands in the project's renders.",
+    "queued": "Waiting for its turn on the server…",
+    "rendering": "Rendering on the server…",
+    "done": "The film rendered in the cloud is ready.",
+    "download": "Download the film",
+    "failed": "The export in the cloud did not finish: {error}",
+    "limit": "Exporting above 1080p in the cloud is not part of your plan."
+  },
   "admin": {
     "title": "Back-office",
     "lead": "The accounts and the gallery, for the people who run Tramme.",

@@ -20,6 +20,7 @@ import { pageAsset, rewrittenHeaders, type Env } from './http.ts';
 import { limitsOn, withinPlan } from './limits.ts';
 import { forgetWorkspace, myGalleryRoute } from './gallery.ts';
 import { moderationRoute } from './moderation.ts';
+import { enqueue, renderRoute } from './renders.ts';
 
 /** whether this deployment keeps signed-in people's projects: accounts, the bucket and the secrets */
 export const cloudOn = (env: Env): boolean => hasAccounts(env) && !!(env.FILES && env.EDGE_SECRET && env.KEYS_SECRET && env.INTERNAL_SECRET);
@@ -66,6 +67,10 @@ async function cloudRoute(req: Request, env: Env, edge: Edge, ctx?: ExecutionCon
   }
   if (parts[0] === 'account' && parts.length === 1 && m === 'DELETE') return deleteAccount(req, env, edge, ctx);
   if (parts[0] === 'keys') return keysRoute(req, keys, parts.slice(1).map(decodeURIComponent));
+  if (parts[0] === 'renders' || (parts[0] === 'projects' && parts[2] === 'renders' && parts.length === 3)) {
+    const res = await renderRoute(req, env, edge, files, enqueue(env));
+    if (res) return res;
+  }
   if (parts[0] === 'moderation' || parts[0] === 'admin') {
     const res = await moderationRoute(req, env, edge, env.FILES!);
     if (res) return res;
@@ -113,7 +118,7 @@ async function accountPage(res: Response): Promise<Response> {
 }
 
 /** the routes a signed-in person's page sends to the server: the ones a signed-out request is told to sign in for */
-export const CLOUD_ROUTES = [...STORAGE, 'keys', 'moderation', ...PROVIDER_ROUTES];
+export const CLOUD_ROUTES = [...STORAGE, 'keys', 'moderation', 'renders', ...PROVIDER_ROUTES];
 
 /** what /api/config of the personal mode adds: whether signing in brings the projects to the cloud */
 export const cloudConfig = (env: Env) => ({ cloud: cloudOn(env) });

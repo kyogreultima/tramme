@@ -34,6 +34,9 @@ export interface Env {
   /** private mode: projects, libraries and the keys of the settings, under projects/<id>/<path>, library/, config/;
    * with accounts, the files of every signed-in person, each workspace under w/<workspace>/ (cloud.ts) */
   FILES?: R2Bucket;
+  /** export in the cloud: the renderer container (container.ts) and the queue of the jobs (renders.ts) */
+  RENDERER?: DurableObjectNamespace;
+  RENDER_QUEUE?: DurableObjectNamespace;
   /** accounts: "on" holds signed-in people to their plan's limits (limits.ts); off until the payment exists */
   PLAN_LIMITS?: string;
   /** accounts: the secret the keys kept in a workspace are sealed with (`openssl rand -hex 32`); without it, no cloud */
