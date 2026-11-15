@@ -17,8 +17,8 @@
 
 import type { Env } from './http.ts';
 
-/** what the backend answers: sign-in, the account, billing and its providers' notices */
-const ACCOUNT_ROUTES = /^\/api\/(auth|account|billing)(\/|$)/;
+/** what the backend answers: sign-in, the account, billing and its providers' notices, the back-office */
+const ACCOUNT_ROUTES = /^\/api\/(auth|account|billing|admin)(\/|$)/;
 
 /** the name of the one container instance that serves everyone */
 const INSTANCE = 'accounts';

@@ -26,6 +26,7 @@ export function AccountMenu({ inProject }: { inProject?: boolean } = {}) {
         { label: user.name, detail: user.email, icon: 'home', disabled: true, onClick: () => {} },
         'sep',
         { label: t('account.yourSpace'), icon: 'gear', onClick: async () => { if (await leaving()) go('/space'); } },
+        ...(user.isAdmin ? [{ label: t('admin.title'), icon: 'key' as const, onClick: async () => { if (await leaving()) go('/admin'); } }] : []),
         { label: t('account.signOut'), icon: 'unlock', onClick: async () => { if (!(await leaving())) return; await signOut(); await landAt('/'); } },
       ])}>
       <span aria-hidden="true">{initial(user.name)}</span>

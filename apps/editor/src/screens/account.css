@@ -85,3 +85,6 @@
 
 /* publishing a film in the gallery (GalleryDialog) */
 .gallery-toggle { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--text); }
+
+/* the back-office (Admin.tsx): what visitors said of a reported film */
+.admin-reasons { display: flex; flex-direction: column; gap: 4px; margin: 6px 0 0; padding: 0; list-style: none; color: var(--text-2); }

@@ -12,13 +12,14 @@
 
 import {
   EDGE_COOKIE, SESSION_COOKIE, PROVIDER_ROUTES, cookieOf, edgeCookie, failure, HttpError, json, keysRoute, loadKeys,
-  prefixedBucket, providerRoute, providersConfig, purgePrefix, readJson, sealedKeyStore, STORAGE, storageRoute, verifyEdge, workspacePrefix, type Edge,
+  prefixedBucket, providerRoute, providersConfig, readJson, sealedKeyStore, STORAGE, storageRoute, verifyEdge, workspacePrefix, type Edge,
 } from '@tramme/api';
 import { LIMITS, PROJECT_FORMAT } from '@tramme/project';
 import { hasAccounts, internal } from './accounts.ts';
 import { pageAsset, rewrittenHeaders, type Env } from './http.ts';
 import { limitsOn, withinPlan } from './limits.ts';
-import { myGalleryRoute, unpublish } from './gallery.ts';
+import { forgetWorkspace, myGalleryRoute } from './gallery.ts';
+import { moderationRoute } from './moderation.ts';
 
 /** whether this deployment keeps signed-in people's projects: accounts, the bucket and the secrets */
 export const cloudOn = (env: Env): boolean => hasAccounts(env) && !!(env.FILES && env.EDGE_SECRET && env.KEYS_SECRET && env.INTERNAL_SECRET);
@@ -65,6 +66,10 @@ async function cloudRoute(req: Request, env: Env, edge: Edge, ctx?: ExecutionCon
   }
   if (parts[0] === 'account' && parts.length === 1 && m === 'DELETE') return deleteAccount(req, env, edge, ctx);
   if (parts[0] === 'keys') return keysRoute(req, keys, parts.slice(1).map(decodeURIComponent));
+  if (parts[0] === 'moderation' || parts[0] === 'admin') {
+    const res = await moderationRoute(req, env, edge, env.FILES!);
+    if (res) return res;
+  }
   if (parts[0] === 'gallery') {
     const res = await myGalleryRoute(req, env, edge, env.FILES!, files);
     if (res) return res;
@@ -89,13 +94,8 @@ async function deleteAccount(req: Request, env: Env, edge: Edge, ctx?: Execution
   const res = await internal(env, '/internal/account/delete', { body });
   if (res.status !== 200) return new Response(res.body, res);
   const { workspaces = [] } = (await res.json()) as { workspaces?: string[] };
-  const purge = Promise.all(workspaces.map(async (ws) => {
-    // the films it published leave the gallery with it
-    const mine = await env.FILES!.get(`${workspacePrefix(ws)}gallery.json`);
-    const published = mine ? Object.values(await mine.json<Record<string, string>>()) : [];
-    await Promise.all(published.map((id) => unpublish(env.FILES!, id)));
-    await purgePrefix(env.FILES!, workspacePrefix(ws));
-  }));
+  // its files go, and the films it published leave the gallery with it
+  const purge = Promise.all(workspaces.map((ws) => forgetWorkspace(env.FILES!, ws)));
   if (ctx) ctx.waitUntil(purge); else await purge;
   const headers = new Headers();
   for (const c of ENDED) headers.append('set-cookie', c);
@@ -113,7 +113,7 @@ async function accountPage(res: Response): Promise<Response> {
 }
 
 /** the routes a signed-in person's page sends to the server: the ones a signed-out request is told to sign in for */
-export const CLOUD_ROUTES = [...STORAGE, 'keys', ...PROVIDER_ROUTES];
+export const CLOUD_ROUTES = [...STORAGE, 'keys', 'moderation', ...PROVIDER_ROUTES];
 
 /** what /api/config of the personal mode adds: whether signing in brings the projects to the cloud */
 export const cloudConfig = (env: Env) => ({ cloud: cloudOn(env) });

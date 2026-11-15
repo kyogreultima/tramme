@@ -22,6 +22,8 @@ export interface UserJson {
   locale: string;
   /** the name public films are signed with; null until the first is published or one is chosen */
   handle?: string | null;
+  /** one of the people who run the platform: the back-office (/admin) is theirs */
+  isAdmin?: boolean;
   workspace: { id: string; name: string };
 }
 
@@ -85,7 +87,7 @@ export function errorCode(status: number, data: unknown): ErrorCode {
 /** the sentence for a code, in the interface's language */
 export const messageFor = (code: ErrorCode | undefined): string => t((code && SAYINGS[code]) || SAYINGS.generic);
 
-async function call<T = Record<string, unknown>>(method: string, path: string, body?: unknown): Promise<Reply<T>> {
+export async function call<T = Record<string, unknown>>(method: string, path: string, body?: unknown): Promise<Reply<T>> {
   let res: Response;
   try {
     res = await fetch(path, { method, headers: body === undefined ? undefined : { 'content-type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });

@@ -22,7 +22,7 @@
 //   POST   /api/gallery/mine/<project> {title, description, visibility, reusable, width, height, duration}
 //   DELETE /api/gallery/mine/<project>                unpublish: the entry and its files go
 
-import { HttpError, json, prefixedBucket, readJson, storageRoute, type Bucket, type Edge } from '@tramme/api';
+import { HttpError, json, prefixedBucket, purgePrefix, readJson, storageRoute, workspacePrefix, type Bucket, type Edge } from '@tramme/api';
 import { termsOf } from '@tramme/plans';
 import { internal } from './accounts.ts';
 import type { Env } from './http.ts';
@@ -222,6 +222,14 @@ export async function myGalleryRoute(req: Request, env: Env, edge: Edge, files: 
     return new Response(null, { status: 204 });
   }
   throw new HttpError(404, 'unknown route');
+}
+
+/** a workspace's files gone, and the films it published with them (an account deleted or closed) */
+export async function forgetWorkspace(files: Bucket, workspaceId: string) {
+  const mine = await files.get(`${workspacePrefix(workspaceId)}${MINE}`);
+  const published = mine ? Object.values(await mine.json<Record<string, string>>()) : [];
+  await Promise.all(published.map((id) => unpublish(files, id)));
+  await purgePrefix(files, workspacePrefix(workspaceId));
 }
 
 /** a film off the gallery: its entry and its files */

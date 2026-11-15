@@ -27,6 +27,7 @@ import { useEffect } from 'preact/hooks';
 import { effect } from '@preact/signals';
 import { AuthPage, type AuthMode } from './ui/AuthPage.tsx';
 import { SpacePage } from './ui/Space.tsx';
+import { AdminPage } from './ui/Admin.tsx';
 import { Quick } from './ui/Quick.tsx';
 import { messageFor, refreshAccount, verifyEmail } from './accounts.ts';
 import { toast } from './state.ts';
@@ -113,11 +114,12 @@ const AUTH_PAGES = new Set(['/login', '/signup', '/forgot']);
 function Pages() {
   const { path, search } = route.value;
   const q = new URLSearchParams(search);
-  const isHome = !AUTH_PAGES.has(path) && path !== '/space' && !(path === '/' && q.get('reset'));
+  const isHome = !AUTH_PAGES.has(path) && path !== '/space' && path !== '/admin' && !(path === '/' && q.get('reset'));
   // a page of the home page's has taken what the address carried (the words of the site): it goes back to being just "/"
   useEffect(() => { if (isHome && search) history.replaceState(null, '', '/'); }, [isHome, search]);
   if (AUTH_PAGES.has(path)) return <AuthPage key={path} mode={path.slice(1) as AuthMode} prompt={q.get('prompt') ?? undefined} />;
   if (path === '/space') return <SpacePage />;
+  if (path === '/admin') return <AdminPage />;
   // the link of the mail of a forgotten password
   if (path === '/' && q.get('reset')) return <AuthPage key="reset" mode="reset" token={q.get('reset') ?? ''} />;
   return <Home />;

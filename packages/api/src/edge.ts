@@ -19,6 +19,8 @@ export interface Edge {
   sessionVersion: number;
   /** the account's plan when the token was signed (Basic when the token says none) */
   plan: PlanId;
+  /** one of the people who run the platform (the back-office) */
+  admin?: boolean;
   /** when it expires, seconds since 1970 */
   exp: number;
 }
@@ -57,7 +59,7 @@ export async function verifyEdge(token: string, secret: string, now = Date.now()
     const p = JSON.parse(new TextDecoder().decode(fromBase64Url(parts[1])));
     if (typeof p?.sub !== 'string' || !p.sub || typeof p.ws !== 'string' || !/^[a-z0-9]{12}$/.test(p.ws)) return null;
     if (typeof p.sv !== 'number' || typeof p.exp !== 'number' || p.exp * 1000 <= now) return null;
-    return { userId: p.sub, workspaceId: p.ws, sessionVersion: p.sv, plan: PLAN_IDS.includes(p.pl) ? p.pl : 'basic', exp: p.exp };
+    return { userId: p.sub, workspaceId: p.ws, sessionVersion: p.sv, plan: PLAN_IDS.includes(p.pl) ? p.pl : 'basic', ...(p.ad === true ? { admin: true } : {}), exp: p.exp };
   } catch {
     return null;
   }
@@ -70,7 +72,7 @@ export const EDGE_LIFETIME = 600;
 export async function signEdge(edge: Omit<Edge, 'exp' | 'plan'> & { plan?: PlanId }, secret: string, now = Date.now()): Promise<string> {
   const iat = Math.floor(now / 1000);
   const part = (v: object) => toBase64Url(encoder.encode(JSON.stringify(v)));
-  const unsigned = `${part({ alg: 'HS256', typ: 'JWT' })}.${part({ sub: edge.userId, ws: edge.workspaceId, sv: edge.sessionVersion, pl: edge.plan ?? 'basic', iat, exp: iat + EDGE_LIFETIME })}`;
+  const unsigned = `${part({ alg: 'HS256', typ: 'JWT' })}.${part({ sub: edge.userId, ws: edge.workspaceId, sv: edge.sessionVersion, pl: edge.plan ?? 'basic', ...(edge.admin ? { ad: true } : {}), iat, exp: iat + EDGE_LIFETIME })}`;
   const signature = new Uint8Array(await crypto.subtle.sign('HMAC', await keyOf(secret, 'sign'), encoder.encode(unsigned)));
   return `${unsigned}.${toBase64Url(signature)}`;
 }

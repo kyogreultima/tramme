@@ -25,10 +25,10 @@ import { Row, Section } from './SettingsRows.tsx';
 
 const eur = (n: number) => new Intl.NumberFormat(locale, { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n);
 const day = (iso?: string) => (iso ? new Intl.DateTimeFormat(locale, { dateStyle: 'long' }).format(new Date(iso)) : '');
-const planName = (id: PlanTerms['id']) => t(id === 'pro' ? m('account.space.planPro') : id === 'plus' ? m('account.space.planPlus') : m('account.space.planBasic'));
+export const planName = (id: PlanTerms['id']) => t(id === 'pro' ? m('account.space.planPro') : id === 'plus' ? m('account.space.planPlus') : m('account.space.planBasic'));
 
 /** what to say after a call: its error, or `done` */
-function report(r: Reply, done?: string): boolean {
+export function report(r: Pick<Reply, 'ok' | 'error'>, done?: string): boolean {
   if (r.ok) { if (done) toast(done); return true; }
   toast(messageFor(r.error), 'error');
   return false;

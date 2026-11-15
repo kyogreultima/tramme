@@ -71,7 +71,8 @@ export default {
     // the routes of accounts come first, in every mode: a visitor has no session yet, and the personal
     // deployment can have accounts (without ACCOUNTS or ACCOUNTS_URL they do not exist)
     // (deleting an account in the cloud is the Worker's: its files go with it, cloud.ts)
-    const deletion = req.method === 'DELETE' && url.pathname === '/api/account' && cloudOn(env);
+    // and closing one from the back-office
+    const deletion = req.method === 'DELETE' && (url.pathname === '/api/account' || /^\/api\/admin\/users\/[^/]+$/.test(url.pathname)) && cloudOn(env);
     if (url.pathname.startsWith('/api/') && !deletion) {
       try {
         const account = await accountRoute(req, env);

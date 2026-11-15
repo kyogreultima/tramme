@@ -24,7 +24,7 @@ describe('the pages that change without a load', () => {
   it('are the home page and the pages of the account, and not a project', async () => {
     page('http://localhost:8787/');
     const { SPA_PATHS, isSpaUrl } = await load();
-    expect([...SPA_PATHS].sort()).toEqual(['/', '/forgot', '/login', '/signup', '/space']);
+    expect([...SPA_PATHS].sort()).toEqual(['/', '/admin', '/forgot', '/login', '/signup', '/space']);
     for (const url of ['/', '/login', '/signup?prompt=a', '/space/', 'http://localhost:8787/forgot', '/login#top']) expect(isSpaUrl(url), url).toBe(true);
     for (const url of ['/p/abc-123', '/api/auth/github/redirect', 'https://tramme.dev/terms/', 'http://localhost:8790/login', '/assets/main.js']) expect(isSpaUrl(url), url).toBe(false);
   });
