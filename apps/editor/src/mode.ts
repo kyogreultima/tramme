@@ -1,6 +1,6 @@
 // Where this editor keeps its projects and reaches the providers.
 //
-// - private (the Worker behind Cloudflare Access, or `wrangler dev`): the
+// - private (`pnpm dev`, the Worker's server mode): the
 //   server keeps the projects and the keys.
 // - personal (anyone, no account): the projects stay in this browser, served
 //   by the service worker (sw.ts) from IndexedDB; the keys stay in the key

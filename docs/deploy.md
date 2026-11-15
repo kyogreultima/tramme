@@ -1,95 +1,13 @@
 # Deploying Tramme on Cloudflare
 
-The same Worker deploys in one of two modes:
+The same Worker runs in one of two modes:
 
-- **Private** (sections 1 to 7): one user behind Cloudflare Access. The Worker serves the editor (static files from `apps/editor/dist`), the projects API (`/api/projects`, R2 storage) and the assistant relay (`/api/claude`), and keeps the providers' keys. On top of Access, the Worker checks the Access token on every API call, which also covers the addresses Access does not sit in front of.
-- **Personal** (section 8): a public deployment anyone uses without an account. The server keeps nothing: each visitor's projects stay in their browser, their keys in a key vault the editor cannot read, and their browser calls the providers itself.
+- **Personal** (the public deployment, the next section): anyone uses it without an account. The server keeps nothing: each visitor's projects stay in their browser, their keys in a key vault the editor cannot read, and their browser calls the providers itself.
+- **Server** (`pnpm dev`, [Local development](#local-development)): the Worker serves the editor, the projects API (`/api/projects`, R2 storage, simulated locally) and the assistant relay (`/api/claude`), and keeps the providers' keys. It is the mode of development on this machine; it is not deployed. A deployment of it would answer 503 on its API, since it lets in only the requests Cloudflare Access signs (`apps/worker/src/access.ts`).
 
-Configuration: [apps/worker/wrangler.jsonc](../apps/worker/wrangler.jsonc) (the private mode at the top level, the personal mode in `env.personal`).
+Configuration: [apps/worker/wrangler.jsonc](../apps/worker/wrangler.jsonc) (the server mode at the top level, the personal mode in `env.personal`). The deployments with accounts (beta, then production) take this same Worker with the accounts backend behind it; they are defined and deployed from the private platform repository.
 
-## 1. Account and storage
-
-```sh
-pnpm exec wrangler login
-pnpm exec wrangler r2 bucket create tramme-projects
-```
-
-The bucket name is the one in `r2_buckets` in `wrangler.jsonc`. Each project takes the prefix `projects/<id>/`.
-
-## 2. First deployment
-
-```sh
-pnpm run deploy  # builds the editor, then wrangler deploy
-```
-
-Until Cloudflare Access is configured, the API answers 503 ("access not configured"): the editor shows up but reads and writes no project. That is on purpose: nothing is open by default.
-
-## 3. Cloudflare Access
-
-In the Cloudflare dashboard, Zero Trust:
-
-1. **Access, Applications, Add an application, Self-hosted.** Domain: the Worker's (a custom domain, or `tramme-private.<account>.workers.dev`). For `workers.dev`, the Worker's page also offers to enable Access directly (Settings, Domains & Routes).
-2. **Policy**: Allow, Include, Emails: your address. Sign in with a code sent by email (One-time PIN) or with the identity provider of your choice.
-3. Note the application's **Application Audience (AUD) Tag**, and the **team domain** (Settings, Custom Pages: `<team>.cloudflareaccess.com`).
-
-Put them in `apps/worker/wrangler.jsonc`:
-
-```jsonc
-"vars": {
-  "ACCESS_TEAM_DOMAIN": "<team>.cloudflareaccess.com",
-  "ACCESS_AUD": "<AUD tag>"
-}
-```
-
-then `pnpm run deploy`. The Worker then checks the signature (the team's public keys), the audience, the issuer and the expiry of the `Cf-Access-Jwt-Assertion` token, and refuses write requests coming from another origin.
-
-## 4. The assistant
-
-Two paths, chosen in the editor (Assistant, settings):
-
-- **Local companion**: on your machine, with the login of an agent installed there (Claude Code, Codex with a ChatGPT login, or the Antigravity CLI with a Google login), no key.
-
-  ```sh
-  npx @qualris/tramme --origin https://<your editor's address>
-  ```
-
-  The editor at that address pairs by itself, with no token to copy. The companion listens on `127.0.0.1` only and refuses pages from other origins; another local page must be given the pairing token it prints, by hand. Chrome may ask for permission to access the local network the first time.
-
-- **Anthropic key on the server** (fallback, when the companion is not running): connect Anthropic in the editor's **Settings, Providers** (see section 5).
-
-## 5. Providers and their keys
-
-Optional: the assistant can also use OpenAI, Gemini, OpenRouter or Z.AI (GLM) models, and any service of the OpenAI chat format added as a **custom provider** (name, base URL such as `https://api.deepseek.com/v1`, key). ElevenLabs makes sounds (section 6).
-
-Keys are connected in the editor: **Settings, Providers**, then *Connect* on a provider and paste its key. The editor sends it once to the Worker, which keeps it in R2 (`config/keys.json`, in the same bucket as the projects, behind Cloudflare Access) and adds it to each request to that provider. The browser never reads it back: it only learns which providers are connected. *Change key* replaces it, *Disconnect* deletes it.
-
-Cloudflare secrets still work, for a deployment configured from the command line; a key connected in the settings comes first:
-
-```sh
-pnpm exec wrangler secret put ANTHROPIC_API_KEY -c apps/worker/wrangler.jsonc
-pnpm exec wrangler secret put OPENAI_API_KEY -c apps/worker/wrangler.jsonc
-pnpm exec wrangler secret put GEMINI_API_KEY -c apps/worker/wrangler.jsonc
-pnpm exec wrangler secret put OPENROUTER_API_KEY -c apps/worker/wrangler.jsonc
-pnpm exec wrangler secret put ZAI_API_KEY -c apps/worker/wrangler.jsonc
-```
-
-A provider set this way shows as *Server secret* in the settings: it cannot be disconnected from the editor, only replaced by a key connected there.
-
-Only connected providers show up in the model menu. A custom provider is reached through the Worker, so its address must be public (a model on this machine goes through Local models instead). Local models (Ollama, LM Studio) need nothing on the server: the browser calls them directly; for the online editor, start Ollama with `OLLAMA_ORIGINS=https://<your editor's address>`.
-
-## 6. Sounds made by a provider
-
-Optional: the assistant's `generate-sound` tool makes sound effects, music beds and voice-overs at authoring time, saved in the project like any sound. ElevenLabs makes all three; a voice-over can also come from OpenAI or Gemini. Connect ElevenLabs in **Settings, Providers** like the others (or `pnpm exec wrangler secret put ELEVENLABS_API_KEY -c apps/worker/wrangler.jsonc`).
-
-Without any of these keys the assistant still has the sound library (recorded sounds shipped with Tramme, the user's own) and the sounds it writes as code. Each provider bills its own use.
-
-## 7. Transcription
-
-The Worker transcribes the speech of sounds and videos with Workers AI (`@cf/openai/whisper-large-v3-turbo`, the `AI` binding is already declared in `wrangler.jsonc`, about $0.0005 per minute of sound). Nothing more to configure. Without this binding, an OpenAI key connected in the settings transcribes (Whisper); without either, the editor goes through the local companion, which transcribes on the machine.
-
-Locally, Workers AI still runs at Cloudflare (`wrangler dev` requires you to be logged in) and usage is billed.
-
-## 8. Personal mode: a public deployment
+## Personal mode: a public deployment
 
 Anyone opens the address and works at once: no account, nothing kept on the server, and no key ever stored by you.
 
@@ -104,7 +22,7 @@ Anyone opens the address and works at once: no account, nothing kept on the serv
 ### Setting it up
 
 1. **A domain of yours on Cloudflare.** The editor and the vault must be two addresses of the same site, for example `tramme.example.com` and `cles.tramme.example.com`. Two `workers.dev` addresses would not do: `workers.dev` is shared by every Cloudflare customer, so browsers treat the vault as a third party and may clear its storage (Safari first).
-2. In [apps/worker/wrangler.jsonc](../apps/worker/wrangler.jsonc), under `env.personal`, set the two addresses and uncomment the routes:
+2. In [apps/worker/wrangler.jsonc](../apps/worker/wrangler.jsonc), under `env.personal`, set the two addresses and the routes:
 
    ```jsonc
    "vars": { "MODE": "personal", "APP_ORIGIN": "https://tramme.example.com", "VAULT_ORIGIN": "https://cles.tramme.example.com" },
@@ -117,10 +35,9 @@ Anyone opens the address and works at once: no account, nothing kept on the serv
 3. Deploy:
 
    ```sh
+   pnpm exec wrangler login
    pnpm deploy:personal  # builds the editor, then wrangler deploy --env personal
    ```
-
-   The personal Worker is `tramme`, the private one `tramme-private`: both can live side by side.
 
    The repository deploys it by itself: [.github/workflows/app.yml](../.github/workflows/app.yml) runs the checks on every push to `main`, then `pnpm deploy:personal`. It needs the repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` (the same two as the site's deploy). Do not connect the repository to Cloudflare's Workers Builds, on this Worker or the site's (`tramme-site`): it would build every branch, `develop` included, straight to production, past the checks and the launch switch of the workflows.
 
@@ -147,11 +64,25 @@ What a malicious plugin of a shared project could still do: spend the visitor's 
 ## Local development
 
 ```sh
-pnpm dev           # http://localhost:8787/
+pnpm dev           # the server mode, on http://localhost:8787/
 pnpm dev:personal  # the personal mode: the editor on http://localhost:8787/, the vault on http://127.0.0.1:8787/
 ```
 
-The assistant's companion starts along, paired with this editor (`TRAMME_NO_COMPANION=1` to go without it). The Worker runs in `wrangler dev`: R2 simulated in `.wrangler/state`, Access check lifted (the `DEV_OPEN` variable, honored only on `localhost`). Model keys, locally, are connected in **Settings, Providers** as on the deployed app (kept in the simulated R2), or go in `apps/worker/.dev.vars` (ignored by git; template to copy: `apps/worker/.dev.vars.example`). Fill in only the providers you use, then restart `pnpm dev`:
+The Worker runs in `wrangler dev`: R2 simulated in `.wrangler/state` (the bucket name of `wrangler.jsonc` only names the simulated one), the Access check lifted (the `DEV_OPEN` variable, honored only on `localhost`).
+
+### The assistant
+
+The companion starts along, paired with this editor (`TRAMME_NO_COMPANION=1` to go without it): the assistant runs on the login of an agent installed on this machine (Claude Code, Codex with a ChatGPT login, or the Antigravity CLI with a Google login), no key. Another local page is given the pairing token it prints, by hand; Chrome may ask for permission to access the local network the first time. Outside the repository, the same companion is `npx @qualris/tramme`.
+
+Without the companion, an Anthropic key connected in **Settings, Providers** serves the assistant.
+
+### Providers and their keys
+
+The assistant can also use OpenAI, Gemini, OpenRouter or Z.AI (GLM) models, and any service of the OpenAI chat format added as a **custom provider** (name, base URL such as `https://api.deepseek.com/v1`, key). ElevenLabs makes sounds (below).
+
+Keys are connected in the editor: **Settings, Providers**, then *Connect* on a provider and paste its key. The editor sends it once to the Worker, which keeps it in the simulated R2 (`config/keys.json`, beside the projects) and adds it to each request to that provider. The browser never reads it back: it only learns which providers are connected. *Change key* replaces it, *Disconnect* deletes it.
+
+They can also go in `apps/worker/.dev.vars` (ignored by git; template to copy: `apps/worker/.dev.vars.example`). Fill in only the providers you use, then restart `pnpm dev`; a key connected in the settings comes first:
 
 ```
 ANTHROPIC_API_KEY=
@@ -162,10 +93,20 @@ ZAI_API_KEY=
 ELEVENLABS_API_KEY=
 ```
 
-## Limits
+A provider set this way shows as *Server secret* in the settings: it cannot be disconnected from the editor, only replaced by a key connected there.
 
-Of the private mode (for the personal mode, see section 8):
+Only connected providers show up in the model menu. A custom provider is reached through the Worker. Local models (Ollama, LM Studio) need nothing on the server: the browser calls them directly.
+
+### Sounds made by a provider
+
+The assistant's `generate-sound` tool makes sound effects, music beds and voice-overs at authoring time, saved in the project like any sound. ElevenLabs makes all three; a voice-over can also come from OpenAI or Gemini. Without any of these keys the assistant still has the sound library (recorded sounds shipped with Tramme, the user's own) and the sounds it writes as code. Each provider bills its own use.
+
+### Transcription
+
+The Worker transcribes the speech of sounds and videos with Workers AI (`@cf/openai/whisper-large-v3-turbo`, the `AI` binding declared in `wrangler.jsonc`, about $0.0005 per minute of sound). Workers AI runs at Cloudflare even from `wrangler dev`, which requires you to be logged in, and its use is billed. Without this binding, an OpenAI key connected in the settings transcribes (Whisper); without either, the editor goes through the local companion, which transcribes on the machine.
+
+### Limits of the server mode
 
 - Files of 95 MB at most (the request size Workers accepts); heavier sounds and videos are uploaded in parts (R2 multipart, 32 MiB per part, 4 GiB per file); 2000 files per project.
-- A single user: no accounts or sharing; Access decides who gets in.
+- A single user, with no accounts or sharing.
 - Video exports happen in the browser (WebCodecs). ProRes and long renders go through the command line (`tramme render`, with Chrome and ffmpeg) on a project folder (`tramme unpack` of a downloaded archive).

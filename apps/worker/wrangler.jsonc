@@ -1,8 +1,10 @@
 {
   "$schema": "../../node_modules/wrangler/config-schema.json",
-  // The private deployment (pnpm run deploy): one user behind Cloudflare Access, projects and keys in R2.
-  // The public one is the "personal" environment below (pnpm deploy:personal). See docs/deploy.md.
-  "name": "tramme-private",
+  // The server mode, run by `pnpm dev` (wrangler dev): projects and keys in a simulated R2, the Access check
+  // lifted on localhost. It is not deployed: deployed, its API would answer only requests signed by Cloudflare
+  // Access (src/access.ts). The public deployment is the "personal" environment below (pnpm deploy:personal).
+  // See docs/deploy.md.
+  "name": "tramme-dev",
   "main": "src/index.ts",
   "compatibility_date": "2026-09-25",
   // the editor (pnpm build) served as a single-page app; /api goes to the Worker
@@ -12,12 +14,10 @@
     "not_found_handling": "single-page-application",
     "run_worker_first": ["/api/*", "/project-sandbox.html", "/project-sandbox"]
   },
-  // the projects (pnpm exec wrangler r2 bucket create tramme-projects)
+  // the projects, simulated in .wrangler/state (the name only names the simulated bucket)
   "r2_buckets": [{ "binding": "FILES", "bucket_name": "tramme-projects" }],
-  // Cloudflare Access protecting the app: team domain (equipe.cloudflareaccess.com)
-  // and the application's audience tag (AUD), from the Zero Trust dashboard.
-  // The model keys are secrets: pnpm exec wrangler secret put ANTHROPIC_API_KEY (and OPENAI_API_KEY,
-  // GEMINI_API_KEY, OPENROUTER_API_KEY, ZAI_API_KEY for the other providers, each optional)
+  // Cloudflare Access: empty, so nothing but localhost (DEV_OPEN) gets through. The model keys, locally,
+  // are connected in the settings or go in apps/worker/.dev.vars
   "vars": {
     "ACCESS_TEAM_DOMAIN": "",
     "ACCESS_AUD": ""

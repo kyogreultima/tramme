@@ -41,14 +41,7 @@ The same editor in a native window ([Tauri 2](https://v2.tauri.app/); Windows, m
 
 ## Deploying
 
-On Cloudflare, in one of two modes. **Private**: the Worker serves the editor and the API, projects live in R2, Cloudflare Access protects the whole. **Personal** (`pnpm deploy:personal`): a public deployment anyone uses without an account; projects stay in each visitor's browser, keys in a key vault the editor cannot read, and the browser calls the providers itself. Step by step in [docs/deploy.md](docs/deploy.md). The private mode, in short:
-
-```sh
-pnpm exec wrangler r2 bucket create tramme-projects
-# Cloudflare Access: an application on the domain, then ACCESS_TEAM_DOMAIN and ACCESS_AUD in apps/worker/wrangler.jsonc
-pnpm run deploy
-# optional: provider keys (Anthropic, OpenAI, Gemini, OpenRouter, Z.AI, ElevenLabs, Hydracept with its project ID, custom) in the editor's Settings, Providers
-```
+On Cloudflare, in personal mode (`pnpm deploy:personal`): a public deployment anyone uses without an account; projects stay in each visitor's browser, keys in a key vault the editor cannot read, and the browser calls the providers itself. Step by step in [docs/deploy.md](docs/deploy.md), with the server mode `pnpm dev` runs locally (projects in a simulated R2, keys kept by the Worker).
 
 ## Commands
 

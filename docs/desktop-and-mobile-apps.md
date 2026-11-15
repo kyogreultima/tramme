@@ -13,7 +13,7 @@ Recommended order: **desktop first (Windows, then macOS), in local mode.** Mobil
 
 ## Already in place: the personal mode
 
-The web's personal mode ([deploy.md](deploy.md), section 8) built most of what the app needs, behind interfaces a desktop app can implement differently:
+The web's personal mode ([deploy.md](deploy.md), personal mode) built most of what the app needs, behind interfaces a desktop app can implement differently:
 
 | Need | Web, personal mode | Tauri |
 |---|---|---|

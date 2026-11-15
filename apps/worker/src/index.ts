@@ -1,6 +1,6 @@
-// The deployed app, in one of two modes (MODE in wrangler.jsonc):
+// The app, in one of two modes (MODE in wrangler.jsonc):
 //
-// - private (default): one user behind Cloudflare Access. The editor's static
+// - private (default, `pnpm dev`): one user, locally; deployed, behind Cloudflare Access. The editor's static
 //   build, and under /api the projects (R2), the keys of the settings (R2) and
 //   the providers reached with them, speech to text (Workers AI).
 // - personal: anyone, without an account; the server keeps nothing. See
