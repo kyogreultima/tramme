@@ -153,7 +153,7 @@ Each of these runs on the machine, at authoring time, and saves a new asset; eac
 
 ## Notes of the montage work (2026-10-29)
 
-What the work on a track-based timeline (`docs/superpowers/plans/2026-10-28-nle-editing.md`) did about this file's open boxes:
+What the work on a track-based timeline did about this file's open boxes:
 
 - **Real-ESRGAN: done for pictures.** `realesr-general-x4v3` (BSD-3-Clause, 4.9 MB, `TheGuy444/Real-ESRGAN-ONNX` pinned to its revision) is a choice in the settings under "Enlarging a picture"; the tool cuts the picture in 128 px tiles, enlarges them four times and brings the result down to twice (`apps/editor/src/esrgan.ts`, geometry tested exactly; `esrgan-run.ts`, the session). Tried here: the model loads in onnxruntime-node and in headless Chrome, a 96×64 picture came back 192×128. A video keeps the Lanczos engine: a network over every frame would take hours.
 - **RIFE, DeepFilterNet, Demucs: not integrated.** Candidates exist today (`FuryTMP/RIFE_fp32` MIT; `soniqo/DeepFilterNet3-ONNX` MIT; for stems `nsosu/demucs-onnx` MIT, whose tags say open-unmix, and `MansfieldPlumbing/Demucs_v4_TRT` CC-BY-NC-4.0, not for commercial work), but none was checked end to end where this work ran: their inputs (an STFT done outside the graph for DeepFilterNet and the stem models, a timestep and padding for RIFE) need an adapter each, tried against a reference, and a licence read from the model card. The core's own engines (RNNoise, block matching) stay the defaults, and the stems stay "blocked: no export checked".
