@@ -8,6 +8,8 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-11-15
+
 ### Added
 
 - **The local companion on npm**: `npx tramme` starts it on any computer with Node.js 20 or later, with no repository to clone. It pairs by itself with the Tramme app and the desktop app (`--origin` adds another address), and the assistant's panel shows the command to type. The first transcription installs the local speech recognition once (about 150 MB, in `~/.tramme/whisper`). In the repository, `pnpm tramme agent` runs the same companion.
@@ -15,6 +17,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 ### Fixed
 
 - **No terminal window flashing on Windows** while the assistant works or lists its models: the Antigravity CLI started its own update in the background, at most every 15 minutes, and that update opened a window. The companion now runs Antigravity with its auto-update off.
+- **The Android app is in the release again**: the stable app's build stopped on an empty configuration ("EOF while parsing"), so the release carried no `tramme-android.apk`. It builds again, and the site offers it.
 
 ## [0.25.0] - 2026-11-14
 
@@ -900,7 +903,8 @@ First public release.
 
 - Cloudflare Worker serving the editor and the API, projects stored in R2, access protected by Cloudflare Access.
 
-[Unreleased]: ../../compare/v0.25.0...HEAD
+[Unreleased]: ../../compare/v0.26.0...HEAD
+[0.26.0]: ../../compare/v0.25.0...v0.26.0
 [0.25.0]: ../../compare/v0.24.0...v0.25.0
 [0.24.0]: ../../compare/v0.23.0...v0.24.0
 [0.23.0]: ../../compare/v0.22.0...v0.23.0
