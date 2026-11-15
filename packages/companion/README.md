@@ -7,7 +7,14 @@ The assistant of the [Tramme]({{site}}) editor, run by an agent of your computer
 With [Node.js](https://nodejs.org) 20 or later installed:
 
 ```sh
-npx tramme
+npx @qualris/tramme
+```
+
+To start it with `tramme` alone, install it once:
+
+```sh
+npm install -g @qualris/tramme
+tramme
 ```
 
 Leave the window open while you work. The Tramme app and the desktop app find the companion and pair with it by themselves; the assistant's model menu then lists the agents of this computer.
@@ -23,8 +30,10 @@ Each agent gets the editor's tools and nothing else: no shell, no files of your 
 ## Options
 
 ```text
-npx tramme [--origin <url>,…] [--port 4317] [--renew]
+tramme [--origin <url>,…] [--port 4317] [--renew]
 ```
+
+The same options follow `npx @qualris/tramme`.
 
 - `--origin` pairs another editor address by itself.
 - `--port` changes the port (the companion listens on 127.0.0.1 only).

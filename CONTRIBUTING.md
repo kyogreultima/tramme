@@ -35,7 +35,7 @@ pnpm dev   # the editor on http://localhost:8787/
 | `packages/assistant` | The assistant's models, prompt and tools |
 | `packages/plugin` | The types of a plugin (nodes, effects, tools…) and `definePlugin()`, for completion and checks while writing one |
 | `packages/api` | The `/api` routes wherever they run: storage over any bucket (R2, IndexedDB), providers reached with the user's keys |
-| `packages/companion` | The assistant's local companion, published on npm as `tramme` (see [The companion on npm](#the-companion-on-npm)) |
+| `packages/companion` | The assistant's local companion, published on npm as `@qualris/tramme` (see [The companion on npm](#the-companion-on-npm)) |
 | `packages/cli` | Command line: offline rendering, exports |
 | `apps/editor` | The web editor (Preact) |
 | `apps/worker` | The Cloudflare Worker: serves the editor, projects in R2, assistant relay |
@@ -89,10 +89,10 @@ An urgent fix to the released version starts from `main` instead: a `fix/…` br
 
 ### The companion on npm
 
-The assistant's local companion is published by hand on npm as `tramme`, which users start with `npx tramme`. `pnpm companion:build` ([packages/companion/build.ts](packages/companion/build.ts)) writes the package in `packages/companion/dist/`:
+The assistant's local companion is published by hand on npm as `@qualris/tramme` (npm refuses the bare name `tramme`, too close to an existing package). Users start it with `npx @qualris/tramme`, or install it once with `npm install -g @qualris/tramme` and start it with `tramme`: the package's command keeps that name. The name is `COMPANION_PACKAGE` in `packages/assistant`, which the build and the command the editor shows both read. `pnpm companion:build` ([packages/companion/build.ts](packages/companion/build.ts)) writes the package in `packages/companion/dist/`:
 
 - `bin/tramme.mjs` is the companion in one file, with Tramme's own packages inside it.
-- `package.json` is the published manifest: the name `tramme`, the version of `packages/companion` (the project's, set by `scripts/version.ts`), the licence, the author and the dependencies npm installs beside it (the Claude Agent SDK, the MCP SDK, cross-spawn, zod).
+- `package.json` is the published manifest: the name `@qualris/tramme`, the command `tramme`, public access, the version of `packages/companion` (the project's, set by `scripts/version.ts`), the licence, the author and the dependencies npm installs beside it (the Claude Agent SDK, the MCP SDK, cross-spawn, zod).
 - `README.md` is what npm shows ([packages/companion/README.md](packages/companion/README.md), with the site's address).
 - `LICENSE` is the root licence.
 
@@ -100,9 +100,8 @@ transformers.js stays out of the package: the companion installs it in `~/.tramm
 
 **Once, for the account.**
 
-1. Create the npm account of the publisher (Qualris) on [npmjs.com](https://www.npmjs.com/signup), and turn on two-factor authentication for login and publishing (Account, Two-Factor Authentication).
-2. Sign in on the computer that publishes: `npm login`, then `npm whoami` to check the account.
-3. `npm view tramme` answers 404 while the name is free; the first publish takes it for the account.
+1. The package lives in the scope of the npm account `qualris`. Create it on [npmjs.com](https://www.npmjs.com/signup) if it does not exist yet, and turn on two-factor authentication for login and publishing (Account, Two-Factor Authentication).
+2. Sign in on the computer that publishes: `npm login`, then `npm whoami` must answer `qualris`.
 
 **Each version.** Once the release has reached `main` (see above):
 
@@ -122,16 +121,16 @@ transformers.js stays out of the package: the companion installs it in `~/.tramm
    ```sh
    npm pack ./packages/companion/dist --pack-destination <empty folder>
    cd <empty folder>
-   npm install ./tramme-<version>.tgz
+   npm install ./qualris-tramme-<version>.tgz
    npx tramme --version
    npx tramme
    ```
 
    It must print the version, then `Tramme companion ready`, the agents found and `automatic pairing for: https://app.tramme.dev, http://tramme.localhost, tramme://localhost`. Open the app, check that the assistant pairs and that its model menu lists the agents, then stop the companion with Ctrl+C.
-6. Publish: `npm publish ./packages/companion/dist --access public`. npm asks for the two-factor code.
-7. Check: `npm view tramme version` gives the new version, and `npx tramme@latest --version` gives it too from another folder.
+6. Publish: `npm publish ./packages/companion/dist`. The access is public through the manifest; npm asks for the two-factor code.
+7. Check, from another folder: `npm view @qualris/tramme version` gives the new version, `npx @qualris/tramme@latest --version` gives it too, and after `npm install -g @qualris/tramme`, `tramme --version` as well.
 
-A published version can never be published again, even after it is removed. If a version is wrong, publish the fix as a patch version (after 0.26.0, `node scripts/version.ts 0.26.1`, as for an urgent fix) and mark the bad one with `npm deprecate tramme@<version> "<what to use instead>"`. `npm unpublish` works only in the first 72 hours, and only while no other package depends on that version.
+A published version can never be published again, even after it is removed. If a version is wrong, publish the fix as a patch version (after 0.26.0, `node scripts/version.ts 0.26.1`, as for an urgent fix) and mark the bad one with `npm deprecate @qualris/tramme@<version> "<what to use instead>"`. `npm unpublish` works only in the first 72 hours, and only while no other package depends on that version.
 
 ## Android
 

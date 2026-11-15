@@ -1,4 +1,4 @@
-// The published companion, `npx tramme`: one bundled file (Tramme's own packages inside it) and the
+// The published companion, `npx @qualris/tramme` (the command `tramme` once installed): one bundled file (Tramme's own packages inside it) and the
 // dependencies npm installs beside it, in dist/, ready for `npm publish packages/companion/dist`.
 //   node packages/companion/build.ts
 
@@ -7,6 +7,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as esbuild from 'esbuild';
 import { ENVIRONMENTS } from '../../brand/environments.ts';
+import { COMPANION_PACKAGE } from '@tramme/assistant';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '../..');
@@ -30,7 +31,7 @@ await esbuild.build({
 
 const site = ENVIRONMENTS.production.site;
 fs.writeFileSync(path.join(OUT, 'package.json'), JSON.stringify({
-  name: 'tramme',
+  name: COMPANION_PACKAGE,
   version: own.version,
   description: "Tramme's local companion: the editor's assistant with the agents of this computer (Claude Code, Codex, Antigravity), each on its own login",
   keywords: ['tramme', 'motion design', 'video', 'assistant', 'claude', 'codex', 'antigravity'],
@@ -41,8 +42,10 @@ fs.writeFileSync(path.join(OUT, 'package.json'), JSON.stringify({
   bin: { tramme: 'bin/tramme.mjs' },
   files: ['bin', 'README.md', 'LICENSE'],
   engines: { node: '>=20' },
+  // a scoped package is private by default on npm
+  publishConfig: { access: 'public' },
   dependencies,
 }, null, 2) + '\n');
 fs.copyFileSync(path.join(ROOT, 'LICENSE'), path.join(OUT, 'LICENSE'));
 fs.writeFileSync(path.join(OUT, 'README.md'), fs.readFileSync(path.join(HERE, 'README.md'), 'utf8').replaceAll('{{site}}', site));
-console.log(`tramme ${own.version} built in ${path.relative(ROOT, OUT)} (${(fs.statSync(path.join(OUT, 'bin/tramme.mjs')).size / 1024).toFixed(0)} KB)`);
+console.log(`${COMPANION_PACKAGE} ${own.version} built in ${path.relative(ROOT, OUT)} (${(fs.statSync(path.join(OUT, 'bin/tramme.mjs')).size / 1024).toFixed(0)} KB)`);

@@ -19,7 +19,7 @@ Some behaviors are documented limits, not vulnerabilities:
 - **Expressions are not a security sandbox.** They are isolated to stay deterministic, but a document from an unknown source should be evaluated in a worker.
 - **Project plugins and expressions run in the editor.** A project imported from someone else can carry JS modules (nodes, effects, modifiers) and expressions that run with the page's rights. The import asks first: it inventories the code of the archive (the plugins with their file and size, the expressions with their first addresses) and nothing runs before the answer, the default being the refusal — a refusal writes nothing to storage. The editor's own examples skip the question. What remains after the yes: the code still runs with the page's rights, so only accept projects from someone you trust.
 - **The deployed app has no user accounts.** Access is meant to be controlled by Cloudflare Access (see `docs/deploy.md`). A Worker deployed without it is open to anyone who knows its address.
-- **The local companion (`npx tramme`, `tramme agent` in the repository)** listens on `127.0.0.1` only, accepts the Tramme app of its environment, the desktop app, the origins given with `--origin` and localhost, and requires a pairing token, which only those named origins receive by themselves. Reports that bypass any of these are in scope.
+- **The local companion (`npx @qualris/tramme` or `tramme`, `tramme agent` in the repository)** listens on `127.0.0.1` only, accepts the Tramme app of its environment, the desktop app, the origins given with `--origin` and localhost, and requires a pairing token, which only those named origins receive by themselves. Reports that bypass any of these are in scope.
 
 ## Secrets
 
