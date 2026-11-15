@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 const { download, newer, updateOf, checkRevoked } = await import('../src/market.ts');
 const { installed } = await import('../src/installed.ts');
 
-const hex = async (b: Uint8Array) => [...new Uint8Array(await crypto.subtle.digest('SHA-256', b))].map((x) => x.toString(16).padStart(2, '0')).join('');
+const hex = async (b: Uint8Array<ArrayBuffer>) => [...new Uint8Array(await crypto.subtle.digest('SHA-256', b))].map((x) => x.toString(16).padStart(2, '0')).join('');
 const plugin = (sha256: string, version = '1.2.0') => ({
   id: 'ada/glow', name: 'Glow', author: { name: 'Ada', handle: 'ada' }, versions: [version],
   version: { version, permissions: { network: [], providers: [], files: [] }, kinds: [], size: 3, sha256 },
