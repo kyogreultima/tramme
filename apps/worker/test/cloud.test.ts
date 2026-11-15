@@ -140,6 +140,23 @@ describe('worker: projects in the cloud', () => {
     expect((await files.list({ prefix: 'w/aaaaaaaaaaaa/' })).objects.length).toBeGreaterThan(0);
   });
 
+  it('lets an API token reach the projects and their exports, and nothing else', async () => {
+    const { env } = setup();
+    const asked: string[] = [];
+    vi.stubGlobal('fetch', async (input: Request) => {
+      asked.push(input.url);
+      const { token } = await input.json() as { token: string };
+      return token.endsWith('a') ? Response.json({ userId: 'ua', workspaceId: 'aaaaaaaaaaaa', plan: 'pro', sessionVersion: 1 }) : Response.json({ error: 'invalid_token' }, { status: 401 });
+    });
+    const good = { authorization: `Bearer tr_${'a'.repeat(43)}` }, bad = { authorization: `Bearer tr_${'b'.repeat(43)}` };
+    expect((await call(env, '/api/projects', { method: 'POST', body: JSON.stringify({ name: 'By script' }), headers: good })).status).toBe(201);
+    expect((await call(env, '/api/projects', { headers: good })).status).toBe(200);
+    expect((await call(env, '/api/keys/openai', { method: 'PUT', body: '{"key":"x"}', headers: good })).status).toBe(403);
+    expect((await call(env, '/api/projects', { headers: bad })).status).toBe(401);
+    // a script's many requests ask the backend once a minute
+    expect(asked.filter((u) => u.endsWith('/internal/token'))).toHaveLength(2);
+  });
+
   it('is off without the keys secret: everyone gets the personal mode', async () => {
     const { env } = setup();
     delete (env as { KEYS_SECRET?: string }).KEYS_SECRET;

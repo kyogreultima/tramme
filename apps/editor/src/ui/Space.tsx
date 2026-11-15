@@ -4,7 +4,7 @@
 
 import { useEffect, useState } from 'preact/hooks';
 import {
-  account, billing, changePassword, landAt, checkout, deleteAccount, exportData, linkUrl, manageSubscription, messageFor, plans, PROVIDERS, providerName, refreshAccount, sellsHere,
+  account, apiTokens, billing, changePassword, landAt, makeApiToken, revokeApiToken, type ApiToken, checkout, deleteAccount, exportData, linkUrl, manageSubscription, messageFor, plans, PROVIDERS, providerName, refreshAccount, sellsHere,
   resendVerification, revokeOtherSessions, signOut, unlinkProvider, updateProfile, type Billing, type PlanTerms, type Provider, type Reply, type UserJson,
 } from '../accounts.ts';
 import type { Manifest } from '@tramme/project';
@@ -190,6 +190,40 @@ function DeleteDialog({ user, onClose }: { user: UserJson; onClose: () => void }
   );
 }
 
+/** the API tokens: made with a name, shown once, revoked (the command line's `tramme cloud-export`) */
+function Tokens() {
+  const [list, setList] = useState<ApiToken[]>([]);
+  const [name, setName] = useState('');
+  const [shown, setShown] = useState<string | null>(null);
+  const load = async () => { const r = await apiTokens(); if (r.ok) setList(r.data); };
+  useEffect(() => { void load(); }, []);
+  const make = async () => {
+    const r = await makeApiToken(name.trim());
+    if (report(r)) { setShown(r.data.token ?? null); setName(''); await load(); }
+  };
+  return (
+    <Section title={t('account.tokens.title')} hint={t('account.tokens.hint')}>
+      {shown && (
+        <div class="home-note"><Icon name="key" /><span>{t('account.tokens.once')}</span>
+          <span class="field"><input readOnly class="mono" value={shown} onFocus={(e) => (e.target as HTMLInputElement).select()} /></span>
+          <button class="btn sm" onClick={() => { void navigator.clipboard?.writeText(shown); toast(t('account.tokens.copied')); }}>{t('account.tokens.copy')}</button>
+        </div>
+      )}
+      {list.map((k) => (
+        <Row key={k.id} label={k.name} hint={k.lastUsedAt ? t('account.tokens.used', { date: day(k.lastUsedAt) }) : t('account.tokens.unused')}>
+          <button class="btn sm danger" onClick={async () => { if (report(await revokeApiToken(k.id), t('account.tokens.revoked'))) await load(); }}>{t('account.tokens.revoke')}</button>
+        </Row>
+      ))}
+      <Row label={t('account.tokens.new')}>
+        <div class="space-inline">
+          <span class="field"><input value={name} maxLength={100} placeholder={t('account.tokens.name')} onInput={(e) => setName((e.target as HTMLInputElement).value)} onKeyDown={(e) => { if (e.key === 'Enter' && name.trim()) void make(); }} /></span>
+          <button class="btn sm" disabled={!name.trim()} onClick={make}>{t('account.tokens.make')}</button>
+        </div>
+      </Row>
+    </Section>
+  );
+}
+
 function Data({ user }: { user: UserJson }) {
   const [deleting, setDeleting] = useState(false);
   const [bringing, setBringing] = useState<Manifest[] | null>(null);
@@ -250,6 +284,8 @@ export function SpacePage() {
             {/* the plans, once they are sold (packages/plans): until then, nothing of prices or credits */}
             {PAYMENT_OPEN && <PlanSection user={user} />}
             <SignInMethods user={user} />
+            {/* the API tokens: where the account's projects are in the cloud */}
+            {(cloud || tauri) && <Tokens />}
             <Data user={user} />
           </>
         )}

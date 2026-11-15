@@ -2,6 +2,7 @@
 //   tramme validate <doc>
 //   tramme check    <doc> [--comp id]                                  the picture checks, issues folded by cause
 //   tramme still    <doc> --t 0.5,1.2 [--out dir] [--samples n] [--comp id]
+//   tramme cloud-export <doc|project.tramme> [--app url] [--token tr_…] [--out film.mp4] [--comp id]   rendered in the cloud of an account (cloud-export.ts)
 //   tramme render   <doc> [--format mp4|mov|webm|gif|png] [--out file] [--samples n] [--from s] [--to s] [--crf 16] [--mute] [--comp id] [--pages n] [--depth 8|10]
 //   tramme export   <doc> --format lottie|svg|wav [--t s] [--comp id] [--out file]
 //   tramme import   <animation.json> [--out folder]                     Lottie to a Tramme project folder
@@ -315,6 +316,15 @@ const COMMANDS: Record<string, () => Promise<void> | void> = {
   import: () => cmdImport(pos[0]),
   pack: () => cmdPack(pos[0]),
   unpack: () => cmdUnpack(pos[0]),
+  'cloud-export': async () => {
+    const { cloudExport } = await import('./cloud-export.ts');
+    const src = pos[0];
+    if (!src || !fs.existsSync(src)) throw new Error(`project not found: ${src ?? '(none)'}`);
+    const files = fs.statSync(src).isDirectory() ? readFolder(src) : unpackProject(new Uint8Array(fs.readFileSync(src)));
+    const token = str('token') ?? process.env.TRAMME_TOKEN;
+    if (!token) throw new Error('an API token is needed: --token tr_… or TRAMME_TOKEN (made in the app, Your space, API tokens)');
+    await cloudExport(files, { app: str('app') ?? process.env.TRAMME_APP_URL ?? 'https://app.tramme.dev', token, out: str('out') ?? `${path.basename(src).replace(/\.(tramme|trame|emotion)$/, '')}.mp4`, comp: str('comp') });
+  },
   nodes: () => cmdNodes(pos[0]),
   bench: async () => { const { bench } = await import('./bench.ts'); await bench(pos[0], { layer: str('layer'), t: num('t'), width: num('width'), height: num('height'), dpr: num('dpr') }); },
   load: async () => { const { runLoad } = await import('./load.ts'); await runLoad(pos, { frames: num('frames'), out: str('out'), json: str('json'), before: str('before') }); },
@@ -340,7 +350,7 @@ const COMMANDS: Record<string, () => Promise<void> | void> = {
 
 const run = COMMANDS[cmd];
 if (!run) {
-  console.log('usage: tramme <validate|check|still|render|export|import|pack|unpack|nodes|compare|schema|bench|load|check-media|agent> ... (see the header of packages/cli/src/main.ts)');
+  console.log('usage: tramme <validate|check|still|render|export|import|pack|unpack|nodes|compare|schema|bench|load|check-media|cloud-export|agent> ... (see the header of packages/cli/src/main.ts)');
   process.exit(cmd ? 1 : 0);
 }
 try {

@@ -63,6 +63,7 @@ tramme pack     <folder> [--out project.tramme]        a project folder as a .tr
 tramme unpack   <project.tramme> [--out folder]        a .tramme archive as a project folder (checked)
 tramme nodes    [<doc>]                               the available vocabulary
 tramme agent    [--origin https://…] [--port 4317]    the assistant's local companion
+tramme cloud-export <doc> [--app url] [--token tr_…] [--out film.mp4]   rendered in the cloud of an account (API token from your space)
 tramme compare  <ref> <test> [--diff folder]          PSNR and an image of the differences
 tramme check-export <doc> --format lottie|svg --t …   export read back (lottie-web, Chrome) against Tramme
 tramme check-media <file> [--width n --height n --fps n --frames n --duration s] [--json]   decode and verify MP4, MOV or WebM delivery

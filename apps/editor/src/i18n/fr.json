@@ -3580,6 +3580,20 @@
     "signIn": "Se connecter",
     "signOut": "Se déconnecter",
     "yourSpace": "Votre espace",
+    "tokens": {
+      "title": "Jetons d'API",
+      "hint": "Pour la ligne de commande (tramme cloud-export) et vos scripts : ils exportent vos projets dans le cloud sans connexion. Gardez-les comme un mot de passe.",
+      "once": "Votre nouveau jeton, montré cette seule fois :",
+      "copy": "Copier",
+      "copied": "Jeton copié.",
+      "used": "dernier usage le {date}",
+      "unused": "jamais utilisé",
+      "revoke": "Révoquer",
+      "revoked": "Jeton révoqué.",
+      "new": "Un nouveau jeton",
+      "name": "À quoi il sert",
+      "make": "Le créer"
+    },
     "bring": {
       "title": "Projets gardés ici",
       "lead": "Projets faits ici avant votre connexion : {count}. Ajoutez-les à votre compte pour les retrouver partout où vous vous connectez.",

@@ -193,6 +193,12 @@ export interface Billing {
 export const sellsHere = (): boolean => platform !== 'android';
 
 export const billing = () => call<Billing>('GET', '/api/billing');
+
+/** an API token of the account (the command line's `tramme cloud-export`, a script): its value only when it is made */
+export interface ApiToken { id: string; name: string; createdAt: string; lastUsedAt: string | null; token?: string }
+export const apiTokens = () => call<ApiToken[]>('GET', '/api/account/tokens');
+export const makeApiToken = (name: string) => call<ApiToken>('POST', '/api/account/tokens', { name });
+export const revokeApiToken = (id: string) => call('DELETE', `/api/account/tokens/${encodeURIComponent(id)}`);
 export const plans = () => call<PlanTerms[]>('GET', '/api/billing/plans');
 export const checkout = (plan: 'plus' | 'pro', interval: 'month' | 'year') => call<{ url?: string }>('POST', '/api/billing/checkout', { plan, interval, locale });
 export const manageSubscription = () => call<{ url?: string }>('POST', '/api/billing/portal');

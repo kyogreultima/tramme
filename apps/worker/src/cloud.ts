@@ -15,6 +15,7 @@ import {
   prefixedBucket, providerRoute, providersConfig, readJson, sealedKeyStore, STORAGE, storageRoute, verifyEdge, workspacePrefix, type Edge,
 } from '@tramme/api';
 import { LIMITS, PROJECT_FORMAT } from '@tramme/project';
+import { termsOf } from '@tramme/plans';
 import { hasAccounts, internal } from './accounts.ts';
 import { pageAsset, rewrittenHeaders, type Env } from './http.ts';
 import { limitsOn, withinPlan } from './limits.ts';
@@ -33,6 +34,9 @@ export async function signedIn(req: Request, env: Env): Promise<Signed | null> {
   const token = cookieOf(req, EDGE_COOKIE);
   const edge = token ? await verifyEdge(token, env.EDGE_SECRET!) : null;
   if (edge) return { edge };
+  // an API token of the account (the command line, a script): what it stands for, asked of the backend
+  const bearer = /^Bearer (tr_[A-Za-z0-9_-]{43})$/.exec(req.headers.get('authorization') ?? '')?.[1];
+  if (bearer && !token) return tokenEdge(env, bearer);
   // expired or missing: the session, if it is still alive, buys a new one
   if (!cookieOf(req, SESSION_COOKIE)) return null;
   const res = await internal(env, '/internal/edge', { cookie: req.headers.get('cookie') });
@@ -41,6 +45,23 @@ export async function signedIn(req: Request, env: Env): Promise<Signed | null> {
   const renewed = fresh ? await verifyEdge(fresh, env.EDGE_SECRET!) : null;
   return renewed ? { edge: renewed, renewed: edgeCookie(fresh!) } : null;
 }
+
+/** what an API token stood for, kept a minute in this isolate: a script's many requests ask the backend once */
+const tokens = new Map<string, { edge: Edge; until: number }>();
+
+async function tokenEdge(env: Env, bearer: string): Promise<Signed | null> {
+  const kept = tokens.get(bearer);
+  if (kept && kept.until > Date.now()) return { edge: kept.edge };
+  const res = await internal(env, '/internal/token', { body: { token: bearer } });
+  if (res.status !== 200) { tokens.delete(bearer); return null; }
+  const said = (await res.json()) as { userId: string; workspaceId: string; plan: Edge['plan']; sessionVersion: number };
+  const edge: Edge = { ...said, viaToken: true, exp: Math.floor(Date.now() / 1000) + 60 };
+  tokens.set(bearer, { edge, until: Date.now() + 60_000 });
+  return { edge };
+}
+
+/** what an API token may reach: the projects and their exports in the cloud */
+const TOKEN_ROUTES = ['projects', 'renders'];
 
 /** the cookies that end a signed-in visit in this browser */
 const ENDED = [`${EDGE_COOKIE}=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Lax`, `${SESSION_COOKIE}=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Lax`];
@@ -56,6 +77,11 @@ export async function cloud(req: Request, env: Env, signed: Signed, ctx?: Execut
 
 async function cloudRoute(req: Request, env: Env, edge: Edge, ctx?: ExecutionContext): Promise<Response> {
   const url = new URL(req.url);
+  if (edge.viaToken) {
+    if (!TOKEN_ROUTES.includes(url.pathname.split('/')[2])) throw new HttpError(403, 'an API token reaches the projects and their exports only');
+    // the plans with the export by API, once the limits are on
+    if (limitsOn(env) && !termsOf(edge.plan).apiExport) return json({ error: 'plan_limit', limit: 'apiExport', max: false }, 403);
+  }
   if (!url.pathname.startsWith('/api/')) return accountPage(await pageAsset(env, req));
   const files = prefixedBucket(env.FILES!, workspacePrefix(edge.workspaceId));
   const keys = sealedKeyStore(files, env.KEYS_SECRET!, edge.workspaceId);

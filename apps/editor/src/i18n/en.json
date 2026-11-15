@@ -2215,6 +2215,20 @@
     "signIn": "Sign in",
     "signOut": "Sign out",
     "yourSpace": "Your space",
+    "tokens": {
+      "title": "API tokens",
+      "hint": "For the command line (tramme cloud-export) and your scripts: they export your projects in the cloud without signing in. Keep them like a password.",
+      "once": "Your new token, shown this once:",
+      "copy": "Copy",
+      "copied": "Token copied.",
+      "used": "last used {date}",
+      "unused": "never used",
+      "revoke": "Revoke",
+      "revoked": "Token revoked.",
+      "new": "A new token",
+      "name": "What it is for",
+      "make": "Make it"
+    },
     "bring": {
       "title": "Projects kept here",
       "lead": "Projects made here before you signed in: {count}. Bring them into your account to find them everywhere you sign in.",

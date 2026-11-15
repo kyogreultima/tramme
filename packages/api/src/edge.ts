@@ -21,6 +21,8 @@ export interface Edge {
   plan: PlanId;
   /** one of the people who run the platform (the back-office) */
   admin?: boolean;
+  /** the caller came with an API token of the account, not a browser's session (the command line, a script) */
+  viaToken?: boolean;
   /** when it expires, seconds since 1970 */
   exp: number;
 }
