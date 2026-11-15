@@ -13,6 +13,9 @@ const notchAtMost = (x: number) => [...NOTCHES].reverse().find((k) => k <= x + 1
 /** what the preview renders now, for the viewport and the settings: sizes as fractions of the composition */
 export const previewInfo = signal({ scale: 1, still: 1, motion: 0.5 });
 
+/** whether the preview's renderer is open (it follows Preview.renderer): what samples through it (the isolated readings) waits for it rather than failing */
+export const previewReady = signal(false);
+
 import { effect, signal } from '@preact/signals';
 import { audioClips, clipFileTime, curveAt, needsPitch, soundMix, type TrammeDoc, type EvaluatedFrame } from '@tramme/core';
 import { editorRegistry } from './vocabulary.ts';
@@ -40,7 +43,10 @@ const MIN_ELEMENT_RATE = 0.0625;
 class Preview {
   readonly meters = previewMeters;
   readonly canvas: HTMLCanvasElement;
-  renderer: Renderer | null = null;
+  private opened: Renderer | null = null;
+  /** the renderer, once open; previewReady follows it */
+  get renderer(): Renderer | null { return this.opened; }
+  set renderer(r: Renderer | null) { this.opened = r; previewReady.value = r !== null; }
   private applied: TrammeDoc | null = null;
   private wanted: TrammeDoc | null = null;
   private busy = false;
@@ -334,6 +340,7 @@ class Preview {
       const base = new URL(S.docUrl.peek(), location.href).href;
       const host = pluginHost(base);
       await ensureDeclared(host, moduleItemsOf(doc, base));
+      await r.bringImages(t);
       ensureSandboxDoc(host, { doc, docUrl: base, loaded: (id) => { try { return r.assets.get(id); } catch { return null; } } });
       const scale = Math.min(1, width / r.comp.width);
       const videos = await sandboxVideoFrames(r, doc, t);
@@ -478,6 +485,8 @@ class Preview {
       doc, docUrl,
       loaded: (id) => { try { return r.assets.get(id); } catch { return null; } },
     };
+    // the pictures this frame shows, brought in first: the sandbox only has those kept
+    await r.bringImages(t);
     ensureSandboxDoc(pluginHost(docUrl), ctx);
     const videos = await sandboxVideoFrames(r, doc, t);
     const pic = await pluginHost(docUrl).renderFrame({ compId: r.compId, t, scale, samples, width: c.width, height: c.height, videos });

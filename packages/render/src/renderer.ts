@@ -344,6 +344,22 @@ export class Renderer {
     for (const id of this.imagesBetween(this.compId, t, t + ahead)) if (this.assets.isCold(id)) void this.assets.request(id);
   }
 
+  /**
+   * The pictures frame t shows, all brought in: for a frame drawn away from
+   * this renderer (the plugins' sandbox), which only has the pictures kept and
+   * cannot ask for one as it draws. They count as this frame's, so bringing one
+   * in never sets another of them aside. Nothing to do while every picture is kept.
+   */
+  async bringImages(t: number, compId = this.compId): Promise<void> {
+    if (!this.assets.hasCold) return;
+    const waits: Promise<unknown>[] = [];
+    this.assets.beginFrame();
+    for (const id of this.imagesBetween(compId, t, t + 1e-3)) {
+      try { this.assets.use(id, (p) => waits.push(p)); } catch { /* a picture that failed to load: shown offline */ }
+    }
+    await Promise.all(waits);
+  }
+
   /** the last frame drawn lacked something still loading (a video frame): draw it again once settled */
   get incomplete() { return this.pending.length > 0; }
 

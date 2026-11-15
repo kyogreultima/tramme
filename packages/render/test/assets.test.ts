@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { newProject } from '@tramme/project';
 import { AssetStore, viewBoxSize, withSize } from '../src/assets.ts';
 import { VideoFrames, assertVideoDimensions } from '../src/video.ts';
+import { Renderer } from '../src/renderer.ts';
 
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
@@ -199,6 +200,22 @@ describe('isolated asset paths', () => {
     expect(loaded.has(wanted)).toBe(true);
     expect(retained()).toBeLessThanOrEqual(64 * 1024 * 1024);
     // the one that left is the one the frame did not use
+    expect(kept.slice(0, 3).every((id) => loaded.has(id))).toBe(true);
+    expect(loaded.has(kept[3])).toBe(false);
+  });
+
+  it('brings in the pictures a frame shows before the sandbox draws it, the others of the frame kept', async () => {
+    const { doc, loaded } = heavy(10);
+    await loaded.sync(doc);
+    const kept = Object.keys(doc.assets).filter((id) => loaded.has(id)), wanted = loaded.coldIds()[0];
+    // the frame at 0 shows three kept pictures and a waiting one; the fourth kept one only later
+    const comp = doc.compositions[doc.root];
+    [...kept.slice(0, 3), wanted].forEach((id, i) => { comp.layers[`l${i}`] = { type: 'image', in: 0, out: 0.5, props: { image: id } } as never; });
+    comp.layers.later = { type: 'image', in: 0.5, out: 1, props: { image: kept[3] } } as never;
+    const r = Object.assign(Object.create(Renderer.prototype) as Renderer, { doc, compId: doc.root });
+    Object.defineProperty(r, 'assets', { value: loaded });
+    await r.bringImages(0);
+    expect(loaded.has(wanted)).toBe(true);
     expect(kept.slice(0, 3).every((id) => loaded.has(id))).toBe(true);
     expect(loaded.has(kept[3])).toBe(false);
   });

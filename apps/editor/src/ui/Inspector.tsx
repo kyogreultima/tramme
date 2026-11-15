@@ -5,7 +5,8 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { Evaluator, getAt, pointer, propKind, staticValue, sheetIssues, TRANSFORM_SCHEMA, MOTION_BLUR_SCHEMA, CAMERA_SCHEMA, SOUND_MIX_SCHEMA, type TrammeDoc, type Op, type Paint, type Prop, type PropDef, type PropSchema, type Token, MASK_SCHEMA, curveTable, type PathValue } from '@tramme/core';
 import { comp, commit, draft, cancelDraft, S, viewDoc, select, toast, uiTime } from '../state.ts';
-import { assetData, preview } from '../preview.ts';
+import { assetData, previewReady } from '../preview.ts';
+import { readyRenderer } from '../render-message.ts';
 import { sandboxedDoc } from '../installed.ts';
 import { pluginHost } from '../plugins/index.ts';
 import { ensureDeclared, ensureSandboxDoc, moduleItemsOf } from '../plugins/sandbox-draw.ts';
@@ -48,18 +49,18 @@ function PropRow({ ctx, label, def, path, address }: { ctx: Ctx; label: string; 
   const kind = raw === undefined ? 'static' : propKind(raw);
   const keys = keysOf(raw);
   const local = evalSafe(ctx.ev, address, ctx.t, ctx.compId);
-  const needsRemote = ctx.isolated && !!local.error;
+  const needsRemote = ctx.isolated && !!local.error, ready = previewReady.value;
   const projectId = S.project.value?.id, docUrl = S.docUrl.value;
   const [remote, setRemote] = useState<{ doc: TrammeDoc; projectId: string; docUrl: string; compId: string; t: number; address: string; result: { v?: unknown; error?: string } } | null>(null);
   useEffect(() => {
-    if (!needsRemote) return;
+    // the preview still loading: the value waits for it (ready changes), shown pending meanwhile
+    if (!needsRemote || !ready) return;
     let live = true;
     const doc = ctx.doc, compId = ctx.compId, time = ctx.t;
     const project = fileProject();
     const timer = setTimeout(() => { void (async () => {
       try {
-        const renderer = preview.renderer;
-        if (!renderer) throw new Error('preview is not ready');
+        const renderer = readyRenderer();
         const base = new URL(project.docUrl, location.href).href;
         const host = pluginHost(base);
         await ensureDeclared(host, moduleItemsOf(doc, base));
@@ -72,7 +73,7 @@ function PropRow({ ctx, label, def, path, address }: { ctx: Ctx; label: string; 
       }
     })(); }, 40);
     return () => { live = false; clearTimeout(timer); };
-  }, [ctx.doc, ctx.compId, ctx.t, address, needsRemote, projectId, docUrl]);
+  }, [ctx.doc, ctx.compId, ctx.t, address, needsRemote, ready, projectId, docUrl]);
   const current = remote?.doc === ctx.doc && remote.projectId === projectId && remote.docUrl === docUrl && remote.compId === ctx.compId && remote.t === ctx.t && remote.address === address;
   const pendingValue = needsRemote && !current;
   const { v, error } = current ? remote.result : needsRemote ? { v: undefined } : local;
@@ -877,8 +878,7 @@ function MasksSection({ ctx, base, id, masks }: { ctx: Ctx; base: string; id: st
     if (ctx.isolated) {
       const project = fileProject();
       try {
-        const renderer = preview.renderer;
-        if (!renderer) throw new Error('preview is not ready');
+        const renderer = readyRenderer();
         const docUrl = new URL(project.docUrl, location.href).href, host = pluginHost(docUrl);
         await ensureDeclared(host, moduleItemsOf(ctx.doc, docUrl));
         if (!sameFileProject(project) || viewDoc.peek() !== ctx.doc) return;
