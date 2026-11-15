@@ -2,7 +2,7 @@
   "$schema": "../../node_modules/wrangler/config-schema.json",
   // The server mode, run by `pnpm dev` (wrangler dev): projects and keys in a simulated R2, the Access check
   // lifted on localhost. It is not deployed: deployed, its API would answer only requests signed by Cloudflare
-  // Access (src/access.ts). The public deployment is the "personal" environment below (pnpm deploy:personal).
+  // Access (src/access.ts). A deployment without accounts is the "personal" environment below (pnpm deploy:personal).
   // See docs/deploy.md.
   "name": "tramme-dev",
   "main": "src/index.ts",
@@ -27,10 +27,12 @@
   "observability": { "enabled": true },
   "env": {
     // Personal mode: anyone uses the app without an account, and nothing is kept on the server.
+    // Its addresses are an example to replace with your own domain's (docs/deploy.md): app.tramme.dev is the
+    // production deployment with accounts, made by the private platform repository under the Worker name "tramme".
     // Projects stay in each visitor's browser, keys in the key vault: another origin of the same
     // site (a subdomain), which the editor and its plugins cannot read. No R2, no Access, no Workers AI.
     "personal": {
-      "name": "tramme",
+      "name": "tramme-personal",
       "assets": {
         "directory": "../editor/dist",
         "binding": "ASSETS",
@@ -41,13 +43,13 @@
       // the two addresses, both on the same domain (same site: the vault keeps its storage)
       "vars": {
         "MODE": "personal",
-        "APP_ORIGIN": "https://app.tramme.dev",
-        "VAULT_ORIGIN": "https://cles.app.tramme.dev"
+        "APP_ORIGIN": "https://tramme.example.com",
+        "VAULT_ORIGIN": "https://cles.tramme.example.com"
       },
       // the same two hosts as custom domains of this Worker
       "routes": [
-        { "pattern": "app.tramme.dev", "custom_domain": true },
-        { "pattern": "cles.app.tramme.dev", "custom_domain": true }
+        { "pattern": "tramme.example.com", "custom_domain": true },
+        { "pattern": "cles.tramme.example.com", "custom_domain": true }
       ],
       // requests a visitor may send through the relay (Z.AI, custom providers), per minute
       "ratelimits": [{ "name": "RELAY_LIMIT", "namespace_id": "1001", "simple": { "limit": 120, "period": 60 } }],
@@ -58,8 +60,8 @@
       "previews": {
         "vars": {
           "MODE": "personal",
-          "APP_ORIGIN": "https://app.tramme.dev",
-          "VAULT_ORIGIN": "https://cles.app.tramme.dev"
+          "APP_ORIGIN": "https://tramme.example.com",
+          "VAULT_ORIGIN": "https://cles.tramme.example.com"
         },
         "ratelimits": [{ "name": "RELAY_LIMIT", "namespace_id": "1001", "simple": { "limit": 120, "period": 60 } }],
         "observability": { "enabled": true, "logs": { "invocation_logs": false } }

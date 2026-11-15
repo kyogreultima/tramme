@@ -39,7 +39,7 @@ Anyone opens the address and works at once: no account, nothing kept on the serv
    pnpm deploy:personal  # builds the editor, then wrangler deploy --env personal
    ```
 
-   The repository deploys it by itself: [.github/workflows/app.yml](../.github/workflows/app.yml) runs the checks on every push to `main`, then `pnpm deploy:personal`. It needs the repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` (the same two as the site's deploy). Do not connect the repository to Cloudflare's Workers Builds, on this Worker or the site's (`tramme-site`): it would build every branch, `develop` included, straight to production, past the checks and the launch switch of the workflows.
+   Tramme's own app at `app.tramme.dev` is not this deployment: it has accounts, and the private platform repository deploys it (the Worker `tramme`, with the accounts backend behind it) when `main` moves; [.github/workflows/app.yml](../.github/workflows/app.yml) tells it so ([environments](environments.md)). Do not connect the repository to Cloudflare's Workers Builds, on any Worker or the site's (`tramme-site`): it would build every branch, `develop` included, straight to production, past the checks and the launch switch of the workflows.
 
 Any other address of this Worker (its `workers.dev` one, previews) sends to `APP_ORIGIN`. Until both addresses are set, it answers 503.
 
