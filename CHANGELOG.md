@@ -11,6 +11,9 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 ### Added
 
 - **Projects in your account**: on a deployment with accounts, signing in keeps your projects, libraries, conversations and provider keys in your account, the same in every browser you sign in from; signed out, they stay in the browser as before. The keys are kept sealed, and deleting the account deletes its files.
+- After signing in, the projects made in this browser before can be brought into the account (offered once, and in your space); the copies in the browser stay.
+- A save that cannot go through waits instead of failing: when the project was saved from another tab or device since it was opened, you choose which version stays; when your session ended, you sign in again and the changes are saved.
+- Your account's button in the project's top bar; the project is saved before you leave it for your space or sign out.
 
 ### Changed
 

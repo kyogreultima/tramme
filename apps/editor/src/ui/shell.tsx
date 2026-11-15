@@ -23,6 +23,7 @@ import { FillerCutsPanel } from './FillerCuts.tsx';
 import { cancelVoiceover } from '../voiceover-run.ts';
 import { setRangeOps } from '../exportspan.ts';
 import { t } from '../i18n/index.ts';
+import { SaveHeldDialog } from './SaveHeld.tsx';
 
 /** the shortcuts of a project open, the same in the studio and the atelier */
 export function useShortcuts() {
@@ -101,5 +102,5 @@ export function Toasts() {
 
 /** the settings, the questions asked, the menus and the toasts, over any page (the question last: it waits on top) */
 export function Overlays() {
-  return <><SettingsDialog /><MenuHost /><Toasts /><QuestionDialog /><DeviceSaveSheet /><SourceMonitor /><MulticamPanel /><FillerCutsPanel /></>;
+  return <><SettingsDialog /><MenuHost /><Toasts /><QuestionDialog /><SaveHeldDialog /><DeviceSaveSheet /><SourceMonitor /><MulticamPanel /><FillerCutsPanel /></>;
 }

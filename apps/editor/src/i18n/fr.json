@@ -238,6 +238,18 @@
     "uploadingName": "Envoi de {name}",
     "properties": "Propriétés"
   },
+  "saveHeld": {
+    "conflictTitle": "Une autre version de ce projet",
+    "conflictLead": "Ce projet a été enregistré depuis un autre onglet ou un autre appareil depuis que vous l'avez ouvert. Quelle version garder ?",
+    "keep": "Garder celle-ci",
+    "take": "Prendre l'autre",
+    "takeConfirm": "Les modifications faites sur cette page depuis son ouverture seront perdues.",
+    "signedOutTitle": "Session terminée",
+    "signedOutLead": "Votre session a pris fin. Vos modifications sont toujours là : reconnectez-vous pour les enregistrer.",
+    "otherTab": "Connecté avec Google ou GitHub ?",
+    "openSignIn": "Connectez-vous dans un autre onglet, puis réessayez.",
+    "retry": "Réessayer"
+  },
   "editor": {
     "softwareGpu": "Aucune carte graphique ne dessine l'aperçu : c'est le processeur qui le fait, tout l'ordinateur peut ralentir. Vérifiez que l'accélération matérielle est active (réglages du navigateur) et que les pilotes graphiques sont à jour.",
     "installedRefused": "Un plugin installé n'a pas pu être chargé dans le bac à sable de ce projet : {error}. Ses outils sont indisponibles ici ; désactivez-le dans Réglages, Plugins.",
@@ -3488,6 +3500,20 @@
     "signIn": "Se connecter",
     "signOut": "Se déconnecter",
     "yourSpace": "Votre espace",
+    "bring": {
+      "title": "Projets de ce navigateur",
+      "lead": "Projets faits dans ce navigateur avant votre connexion : {count}. Ajoutez-les à votre compte pour les retrouver partout où vous vous connectez.",
+      "kept": "Les copies de ce navigateur restent où elles sont.",
+      "later": "Plus tard",
+      "submit": "Ajouter {count}",
+      "at": "{done} sur {total} : {name}",
+      "done": "Projets ajoutés à votre compte : {count}.",
+      "failed": "Ces projets n'ont pas pu être ajoutés : {names}",
+      "none": "Ce navigateur ne garde aucun projet à lui.",
+      "row": "Projets de ce navigateur",
+      "rowHint": "Les projets faits dans ce navigateur avant votre connexion, copiés dans votre compte.",
+      "button": "Les ajouter"
+    },
     "signedInAs": "Connecté en tant que {email}",
     "projects": "Projets",
     "name": "Nom",

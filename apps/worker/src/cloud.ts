@@ -12,11 +12,11 @@
 
 import {
   EDGE_COOKIE, SESSION_COOKIE, PROVIDER_ROUTES, cookieOf, edgeCookie, failure, HttpError, json, keysRoute, loadKeys,
-  prefixedBucket, providerRoute, providersConfig, purgePrefix, readJson, sealedKeyStore, storageRoute, verifyEdge, workspacePrefix, type Edge,
+  prefixedBucket, providerRoute, providersConfig, purgePrefix, readJson, sealedKeyStore, STORAGE, storageRoute, verifyEdge, workspacePrefix, type Edge,
 } from '@tramme/api';
 import { LIMITS, PROJECT_FORMAT } from '@tramme/project';
 import { hasAccounts, internal } from './accounts.ts';
-import type { Env } from './http.ts';
+import { pageAsset, rewrittenHeaders, type Env } from './http.ts';
 
 /** whether this deployment keeps signed-in people's projects: accounts, the bucket and the secrets */
 export const cloudOn = (env: Env): boolean => hasAccounts(env) && !!(env.FILES && env.EDGE_SECRET && env.KEYS_SECRET && env.INTERNAL_SECRET);
@@ -52,7 +52,7 @@ export async function cloud(req: Request, env: Env, signed: Signed, ctx?: Execut
 
 async function cloudRoute(req: Request, env: Env, edge: Edge, ctx?: ExecutionContext): Promise<Response> {
   const url = new URL(req.url);
-  if (!url.pathname.startsWith('/api/')) return accountPage(await env.ASSETS.fetch(req));
+  if (!url.pathname.startsWith('/api/')) return accountPage(await pageAsset(env, req));
   const files = prefixedBucket(env.FILES!, workspacePrefix(edge.workspaceId));
   const keys = sealedKeyStore(files, env.KEYS_SECRET!, edge.workspaceId);
   const parts = url.pathname.slice('/api/'.length).split('/');
@@ -90,13 +90,14 @@ async function deleteAccount(req: Request, env: Env, edge: Edge, ctx?: Execution
 async function accountPage(res: Response): Promise<Response> {
   if (!(res.headers.get('content-type') ?? '').startsWith('text/html')) return res;
   const html = (await res.text()).replace('<head>', '<head><meta name="tramme-account" content="1">');
-  const headers = new Headers(res.headers);
-  headers.delete('content-length');
-  headers.set('cache-control', 'no-store');
+  const headers = rewrittenHeaders(res.headers);
   // the personal mode's service worker never keeps this page for a visitor who is signed out (sw.ts)
   headers.set('x-tramme-account', '1');
   return new Response(html, { status: res.status, headers });
 }
+
+/** the routes a signed-in person's page sends to the server: the ones a signed-out request is told to sign in for */
+export const CLOUD_ROUTES = [...STORAGE, 'keys', ...PROVIDER_ROUTES];
 
 /** what /api/config of the personal mode adds: whether signing in brings the projects to the cloud */
 export const cloudConfig = (env: Env) => ({ cloud: cloudOn(env) });

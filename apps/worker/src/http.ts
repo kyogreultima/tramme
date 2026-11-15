@@ -3,6 +3,29 @@
 
 export { cookieOf as cookie, HttpError, json, readJson } from '@tramme/api';
 
+/**
+ * A file of the editor's build, for a page the Worker rewrites (the editor's page in each mode): asked without the
+ * browser's conditions, so a copy it kept of the page in another mode is never confirmed by a 304, and answered
+ * without the build's ETag, which named the file before it was rewritten.
+ */
+export async function pageAsset(env: Env, req: Request): Promise<Response> {
+  // the other files (scripts, pictures) keep their conditions: they are the same in every mode
+  const page = req.headers.get('sec-fetch-dest') === 'document' || (req.headers.get('accept') ?? '').includes('text/html');
+  if (!page) return env.ASSETS.fetch(req);
+  const headers = new Headers(req.headers);
+  headers.delete('if-none-match');
+  headers.delete('if-modified-since');
+  return env.ASSETS.fetch(new Request(req, { headers }));
+}
+
+/** the headers of a page the Worker rewrote: no length, no validator, never kept by a cache */
+export function rewrittenHeaders(from: Headers): Headers {
+  const headers = new Headers(from);
+  for (const h of ['content-length', 'etag', 'last-modified']) headers.delete(h);
+  headers.set('cache-control', 'no-store');
+  return headers;
+}
+
 export interface Env {
   /** the editor's static build (and the key vault's page) */
   ASSETS: Fetcher;

@@ -46,11 +46,33 @@ describe('worker: projects in the cloud', () => {
     expect(page.headers.get('x-tramme-account')).toBe('1');
   });
 
+  it('never lets the browser keep the page of the other mode: no 304 for a page, no build ETag on it', async () => {
+    const { env } = setup();
+    (env as { ASSETS: unknown }).ASSETS = {
+      fetch: async (r: Request) => (r.headers.has('if-none-match')
+        ? new Response(null, { status: 304 })
+        : new Response('<html><head></head></html>', { headers: { 'content-type': 'text/html', etag: '"build"' } })),
+    };
+    const page = { accept: 'text/html', 'if-none-match': '"build"' };
+    const signedInPage = await call(env, '/', { headers: page, cookie: await as(A) });
+    const signedOutPage = await call(env, '/', { headers: page });
+    for (const res of [signedInPage, signedOutPage]) {
+      expect(res.status).toBe(200);
+      expect(res.headers.get('etag')).toBeNull();
+      expect(res.headers.get('cache-control')).toBe('no-store');
+    }
+    expect(await signedInPage.text()).toContain('tramme-account');
+    expect(await signedOutPage.text()).toContain('tramme-vault');
+  });
+
   it('keeps the personal mode for a visitor who is not signed in, and tells them the cloud exists', async () => {
     const { env } = setup();
     const config = await (await call(env, '/api/config')).json() as { mode: string; cloud: boolean };
     expect(config).toMatchObject({ mode: 'personal', cloud: true });
-    expect((await call(env, '/api/projects')).status).toBe(404);
+    // a page of the cloud whose session ended is told to sign in (its saves wait), never answered as a loss
+    const out = await call(env, '/api/projects');
+    expect(out.status).toBe(401);
+    expect(await out.json()).toMatchObject({ error: 'signed_out' });
     expect(await (await call(env, '/')).text()).toContain('tramme-vault');
   });
 

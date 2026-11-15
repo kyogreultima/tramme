@@ -75,3 +75,10 @@
 @keyframes page-in { from { opacity: 0; } }
 .auth, .space, .home { animation: page-in 0.2s ease both; }
 @media (prefers-reduced-motion: reduce) { .auth, .space, .home { animation: none; } }
+
+/* the projects of this browser, offered to the account (BringDialog) */
+.bring-list { display: flex; flex-direction: column; gap: 2px; max-height: 280px; overflow: auto; margin: 0; padding: 0; list-style: none; }
+.bring-list label { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: var(--r-sm); color: var(--text); cursor: pointer; }
+.bring-list label:hover { background: var(--field-active); }
+.bring-list input { accent-color: var(--accent); }
+.bring-at { display: flex; flex-direction: column; gap: 6px; }

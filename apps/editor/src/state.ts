@@ -242,7 +242,17 @@ export const hooks = {
   copies: null as null | ((doc: TrammeDoc, ops: Op[]) => { ops: Op[]; files: [string, Blob][]; names: string[] } | null),
 };
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
-let conflict = false;
+/**
+ * Why the saves wait, when they do: another device or tab wrote the project since it was read (`conflict`), or the
+ * account's session ended (`signedOut`). The changes stay in the page; SaveHeld.tsx asks what to do.
+ */
+export const saveHeld = signal<null | 'conflict' | 'signedOut'>(null);
+
+/** a save that cannot go through as things are: held, never lost */
+class SaveHeld extends Error {
+  why: 'conflict' | 'signedOut';
+  constructor(why: 'conflict' | 'signedOut') { super(why); this.why = why; }
+}
 /** the save on its way: the next waits for it, so it names the version that save made (two at once would refuse each other as a conflict) */
 let writing: Promise<unknown> = Promise.resolve();
 
@@ -259,17 +269,15 @@ async function writeNow(doc: TrammeDoc) {
     docEtag = r.etag;
     S.project.value = { ...S.project.peek(), modified: r.modified };
   } catch (e) {
-    if (e instanceof ApiError && e.status === 412) {
-      conflict = true;
-      throw new Error(t('editor.theDocumentWasChanged'));
-    }
+    if (e instanceof ApiError && e.status === 412) throw new SaveHeld('conflict');
+    if (e instanceof ApiError && e.status === 401 && e.message === 'signed_out') throw new SaveHeld('signedOut');
     throw e;
   }
 }
 
 effect(() => {
   const doc = S.doc.value, state = S.save.value;
-  if (state !== 'dirty' || !doc || conflict) return;
+  if (state !== 'dirty' || !doc || saveHeld.value) return;
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(async () => {
     S.save.value = 'saving';
@@ -279,7 +287,8 @@ effect(() => {
       hooks.afterSave?.();
     } catch (e) {
       S.save.value = 'error';
-      toast(t('common.couldNotSaveError', { error: (e as Error).message }), 'error', 10000);
+      if (e instanceof SaveHeld) saveHeld.value = e.why;
+      else toast(t('common.couldNotSaveError', { error: (e as Error).message }), 'error', 10000);
     }
   }, 700);
 });
@@ -289,7 +298,34 @@ export async function saveNow() {
   if (S.save.peek() === 'saved') return;
   S.save.value = 'saving';
   try { await write(S.doc.peek()); S.save.value = 'saved'; hooks.afterSave?.(); }
-  catch (e) { S.save.value = 'error'; throw e; }
+  catch (e) {
+    S.save.value = 'error';
+    if (e instanceof SaveHeld) { saveHeld.value = e.why; throw new Error(e.why === 'conflict' ? t('editor.theDocumentWasChanged') : t('account.err.signed_out')); }
+    throw e;
+  }
+}
+
+/** a conflict settled by keeping this page's version: written over the other one */
+export async function keepThisVersion() {
+  docEtag = '';
+  saveHeld.value = null;
+  S.save.value = 'dirty';
+  await saveNow();
+}
+
+/** a conflict settled by taking the other version: the project read again, this page's changes dropped */
+export function takeTheOtherVersion() {
+  saveHeld.value = null;
+  // the reloaded page must not be asked to save what it drops
+  S.save.value = 'saved';
+  location.reload();
+}
+
+/** signed in again: the waiting changes go through */
+export async function resumeSaving() {
+  saveHeld.value = null;
+  S.save.value = 'dirty';
+  await saveNow();
 }
 
 /** unsaved changes when leaving the page */

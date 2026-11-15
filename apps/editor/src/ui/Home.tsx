@@ -39,6 +39,7 @@ import { IDEAS } from '../ideas.ts';
 import { t } from '../i18n/index.ts';
 import { go } from '../nav.ts';
 import { AccountMenu } from './AccountMenu.tsx';
+import { BringOffer } from './BringDialog.tsx';
 import { account, resendVerification } from '../accounts.ts';
 
 interface Example { file: string; name: string; description: string; width: number; height: number; duration: number; thumbnail?: string }
@@ -429,6 +430,7 @@ export function Home() {
         </div></div>
       )}
       {dialog?.kind === 'new' && <NewProject onClose={() => setDialog(null)} />}
+      <BringOffer onDone={refresh} />
       {dialog?.kind === 'rename' && <Rename project={dialog.m} onClose={() => setDialog(null)} onDone={refresh} />}
       {dialog?.kind === 'remove' && <Remove project={dialog.m} onClose={() => setDialog(null)} onDone={refresh} />}
       {dialog?.kind === 'failure' && <Failure error={dialog.error} onClose={() => setDialog(null)} />}

@@ -238,6 +238,18 @@
     "uploadingName": "Uploading {name}",
     "properties": "Properties"
   },
+  "saveHeld": {
+    "conflictTitle": "Another version of this project",
+    "conflictLead": "This project was saved from another tab or another device since you opened it. Which version should stay?",
+    "keep": "Keep this one",
+    "take": "Take the other one",
+    "takeConfirm": "The changes made on this page since it was opened will be lost.",
+    "signedOutTitle": "Signed out",
+    "signedOutLead": "Your session ended. Your changes are still here: sign in again to save them.",
+    "otherTab": "Signed in with Google or GitHub?",
+    "openSignIn": "Sign in in another tab, then retry.",
+    "retry": "Retry"
+  },
   "editor": {
     "softwareGpu": "No graphics card is drawing the preview: the processor does it, the whole computer may slow down. Check that hardware acceleration is on (browser settings) and that the graphics drivers are up to date.",
     "installedRefused": "An installed plugin could not be loaded in this project's sandbox: {error}. Its tools are unavailable here; turn it off in Settings, Plugins.",
@@ -2123,6 +2135,20 @@
     "signIn": "Sign in",
     "signOut": "Sign out",
     "yourSpace": "Your space",
+    "bring": {
+      "title": "Projects of this browser",
+      "lead": "Projects made in this browser before you signed in: {count}. Bring them into your account to find them everywhere you sign in.",
+      "kept": "The copies in this browser stay where they are.",
+      "later": "Not now",
+      "submit": "Bring {count}",
+      "at": "{done} of {total}: {name}",
+      "done": "Projects brought into your account: {count}.",
+      "failed": "These projects could not be brought: {names}",
+      "none": "This browser keeps no project of its own.",
+      "row": "Projects of this browser",
+      "rowHint": "The projects made in this browser before you signed in, copied into your account.",
+      "button": "Bring them"
+    },
     "signedInAs": "Signed in as {email}",
     "projects": "Projects",
     "name": "Name",

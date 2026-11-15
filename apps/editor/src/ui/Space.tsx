@@ -7,7 +7,11 @@ import {
   account, billing, changePassword, landAt, checkout, deleteAccount, exportData, linkUrl, manageSubscription, messageFor, plans, PROVIDERS, providerName, refreshAccount, sellsHere,
   resendVerification, revokeOtherSessions, signOut, unlinkProvider, updateProfile, type Billing, type PlanTerms, type Provider, type Reply, type UserJson,
 } from '../accounts.ts';
+import type { Manifest } from '@tramme/project';
+import { localProjects } from '../bring.ts';
 import { saveBlob } from '../download.ts';
+import { cloud } from '../mode.ts';
+import { BringDialog } from './BringDialog.tsx';
 import { locale, m, t } from '../i18n/index.ts';
 import { go } from '../nav.ts';
 import { toast } from '../state.ts';
@@ -174,6 +178,7 @@ function DeleteDialog({ user, onClose }: { user: UserJson; onClose: () => void }
 
 function Data({ user }: { user: UserJson }) {
   const [deleting, setDeleting] = useState(false);
+  const [bringing, setBringing] = useState<Manifest[] | null>(null);
   const download = async () => {
     const blob = await exportData();
     if (!blob) { toast(messageFor('generic'), 'error'); return; }
@@ -187,6 +192,11 @@ function Data({ user }: { user: UserJson }) {
         </Row>
       </Section>
       <Section title={t('account.space.data')} hint={t('account.space.dataHint')}>
+        {cloud && (
+          <Row label={t('account.bring.row')} hint={t('account.bring.rowHint')}>
+            <button class="btn sm" onClick={async () => { const list = await localProjects(); if (list.length) setBringing(list); else toast(t('account.bring.none')); }}><Icon name="upload" />{t('account.bring.button')}</button>
+          </Row>
+        )}
         <Row label={t('account.space.export')} hint={t('account.space.exportHint')}>
           <button class="btn sm" onClick={download}><Icon name="download" />{t('account.space.exportButton')}</button>
         </Row>
@@ -195,6 +205,7 @@ function Data({ user }: { user: UserJson }) {
         </Row>
       </Section>
       {deleting && <DeleteDialog user={user} onClose={() => setDeleting(false)} />}
+      {bringing && <BringDialog projects={bringing} onClose={() => setBringing(null)} onDone={() => {}} />}
     </>
   );
 }
