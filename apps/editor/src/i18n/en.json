@@ -248,6 +248,27 @@
     "failed": "The export in the cloud did not finish: {error}",
     "limit": "Exporting above 1080p in the cloud is not part of your plan."
   },
+  "market": {
+    "title": "Discover",
+    "hint": "Plugins published by their authors, checked, and reviewed when they reach the network or your keys. Installing asks the same question as an import.",
+    "empty": "No plugin is published yet.",
+    "emptyHint": "Authors publish theirs with an account.",
+    "install": "Install",
+    "update": "Update to {version}",
+    "installed": "installed",
+    "reaches": "reaches {reach}",
+    "report": "Report this plugin",
+    "reportWhy": "What is wrong with it?",
+    "send": "Send",
+    "reported": "Thank you: the report was sent.",
+    "unavailable": "The marketplace does not answer. Try again later.",
+    "altered": "The package of {name} is not the one the catalogue lists: it was not installed.",
+    "revoked": "These plugins were revoked by the marketplace and are turned off: {names}",
+    "publish": "Publish in the marketplace (its id starts with your public name)",
+    "published": "Published: the plugin is in the marketplace.",
+    "inReview": "Published: it reaches the network or keys, so it is listed once reviewed.",
+    "publishFailed": "The plugin could not be published: {error}"
+  },
   "admin": {
     "title": "Back-office",
     "lead": "The accounts and the gallery, for the people who run Tramme.",
@@ -281,7 +302,14 @@
     "restore": "Put back",
     "restored": "The film is shown again.",
     "dismiss": "Set aside",
-    "setAside": "Reports set aside."
+    "setAside": "Reports set aside.",
+    "plugins": "Plugins to review",
+    "pluginsHint": "Versions that reach the network or keys wait here before the marketplace lists them.",
+    "noPlugins": "No plugin waits for a review.",
+    "approve": "List it",
+    "approved": "The version is listed.",
+    "revoke": "Revoke",
+    "revoked": "The version is revoked: the installed copies turn off at their next check."
   },
   "gallery": {
     "title": "Publish in the gallery",

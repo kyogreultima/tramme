@@ -248,6 +248,27 @@
     "failed": "L'export dans le cloud n'a pas abouti : {error}",
     "limit": "L'export au-delà du 1080p dans le cloud ne fait pas partie de votre offre."
   },
+  "market": {
+    "title": "Découvrir",
+    "hint": "Des plugins publiés par leurs auteurs, vérifiés, et relus quand ils accèdent au réseau ou à vos clés. Les installer pose la même question qu'un import.",
+    "empty": "Aucun plugin n'est encore publié.",
+    "emptyHint": "Les auteurs publient les leurs avec un compte.",
+    "install": "Installer",
+    "update": "Mettre à jour en {version}",
+    "installed": "installé",
+    "reaches": "accède à {reach}",
+    "report": "Signaler ce plugin",
+    "reportWhy": "Quel est le problème ?",
+    "send": "Envoyer",
+    "reported": "Merci : le signalement est envoyé.",
+    "unavailable": "La marketplace ne répond pas. Réessayez plus tard.",
+    "altered": "Le paquet de {name} n'est pas celui du catalogue : il n'a pas été installé.",
+    "revoked": "Ces plugins ont été révoqués par la marketplace et sont désactivés : {names}",
+    "publish": "Publier dans la marketplace (son identifiant commence par votre nom public)",
+    "published": "Publié : le plugin est dans la marketplace.",
+    "inReview": "Publié : il accède au réseau ou à des clés, il sera listé après relecture.",
+    "publishFailed": "Le plugin n'a pas pu être publié : {error}"
+  },
   "admin": {
     "title": "Back-office",
     "lead": "Les comptes et la galerie, pour l'équipe qui fait tourner Tramme.",
@@ -281,7 +302,14 @@
     "restore": "Remettre",
     "restored": "Le film est de nouveau montré.",
     "dismiss": "Écarter",
-    "setAside": "Signalements écartés."
+    "setAside": "Signalements écartés.",
+    "plugins": "Plugins à relire",
+    "pluginsHint": "Les versions qui accèdent au réseau ou à des clés attendent ici avant que la marketplace les liste.",
+    "noPlugins": "Aucun plugin n'attend de relecture.",
+    "approve": "Le lister",
+    "approved": "La version est listée.",
+    "revoke": "Révoquer",
+    "revoked": "La version est révoquée : les copies installées se désactivent à leur prochaine vérification."
   },
   "gallery": {
     "title": "Publier dans la galerie",

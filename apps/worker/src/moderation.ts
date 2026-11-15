@@ -7,11 +7,14 @@
 //   POST   /api/moderation/films/<id>/takedown        out of the gallery and of its link
 //   POST   /api/moderation/films/<id>/restore         back as it was published
 //   DELETE /api/moderation/films/<id>/reports         the reports read and set aside
+//   GET    /api/moderation/plugins                    the plugins with a version waiting for its review
+//   POST   /api/moderation/plugins/<handle>/<name>/<version>/approve | revoke
 //   DELETE /api/admin/users/<id>                      (the backend's, then the purge here)
 
 import { HttpError, json, purgePrefix, type Bucket, type Edge } from '@tramme/api';
 import { accountRoute } from './accounts.ts';
 import { forgetWorkspace, readEntry, type Entry } from './gallery.ts';
+import { allRecords, readRecord, writeRecord } from './market.ts';
 import type { Env } from './http.ts';
 
 const REPORTS = 'gallery/reports/';
@@ -65,6 +68,17 @@ export async function moderationRoute(req: Request, env: Env, edge: Edge, files:
       return e ? { id, title: e.title, author: e.author, visibility: e.visibility, owner: e.owner.userId, reports: list.sort((a, b) => b.at.localeCompare(a.at)) } : null;
     }));
     return json(films.filter(Boolean).sort((a, b) => b!.reports.length - a!.reports.length));
+  }
+  if (parts[1] === 'plugins' && parts.length === 2 && m === 'GET') {
+    return json((await allRecords(files)).filter((r) => r.versions.some((v) => v.state === 'pending')).map(({ owner: _o, ...r }) => r));
+  }
+  if (parts[1] === 'plugins' && parts.length === 6 && m === 'POST' && (parts[5] === 'approve' || parts[5] === 'revoke')) {
+    const record = await readRecord(files, parts[2], parts[3]);
+    const v = record?.versions.find((x) => x.version === parts[4]);
+    if (!record || !v) throw new HttpError(404, 'not found');
+    v.state = parts[5] === 'approve' ? 'listed' : 'revoked';
+    await writeRecord(files, record);
+    return json(v);
   }
   const id = parts[2] ?? '';
   if (parts[1] === 'films' && parts.length === 4 && m === 'POST' && (parts[3] === 'takedown' || parts[3] === 'restore')) {

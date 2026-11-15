@@ -153,8 +153,8 @@ boot().then(() => {
   initDesktop();
   startBackButton();
   followBars();
-  // the plugins installed on this device, read once from where they are kept
-  startInstalled();
+  // the plugins installed on this device, read once from where they are kept; a version the marketplace revoked is turned off
+  void startInstalled().then(() => import('./market.ts')).then((m) => m.checkRevoked()).catch(() => {});
   // the local companion, found whenever it starts, on the home page and in the editor
   watchCompanion();
   // a newer version of the app, looked for on its own every twelve hours

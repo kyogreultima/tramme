@@ -82,6 +82,29 @@ function PersonDialog({ id, onClose, onChanged }: { id: string; onClose: () => v
   );
 }
 
+interface Waiting { id: string; name: string; author: { handle: string }; versions: { version: string; state: string; permissions: { network: string[]; providers: string[] } }[] }
+
+/** the plugins whose version waits for a review (they reach the network or keys) */
+function PluginReviews() {
+  const [list, setList] = useState<Waiting[] | null>(null);
+  const load = async () => { const r = await call<Waiting[]>('GET', '/api/moderation/plugins'); if (report(r)) setList(r.data); };
+  useEffect(() => { void load(); }, []);
+  const act = async (id: string, version: string, what: 'approve' | 'revoke') => { if (report(await call('POST', `/api/moderation/plugins/${id}/${encodeURIComponent(version)}/${what}`), what === 'approve' ? t('admin.approved') : t('admin.revoked'))) await load(); };
+  return (
+    <Section title={t('admin.plugins')} hint={t('admin.pluginsHint')}>
+      {list?.length === 0 && <p class="faint">{t('admin.noPlugins')}</p>}
+      {list?.flatMap((p) => p.versions.filter((v) => v.state === 'pending').map((v) => (
+        <Row key={`${p.id}@${v.version}`} label={`${p.name} ${v.version} · @${p.author.handle}`} hint={t('market.reaches', { reach: [...v.permissions.network, ...v.permissions.providers].join(', ') })}>
+          <div class="space-inline">
+            <button class="btn sm" onClick={() => act(p.id, v.version, 'approve')}>{t('admin.approve')}</button>
+            <button class="btn sm danger" onClick={() => act(p.id, v.version, 'revoke')}>{t('admin.revoke')}</button>
+          </div>
+        </Row>
+      )))}
+    </Section>
+  );
+}
+
 function Reports() {
   const [list, setList] = useState<Reported[] | null>(null);
   const load = async () => { const r = await call<Reported[]>('GET', '/api/moderation/reports'); if (report(r)) setList(r.data); };
@@ -120,7 +143,7 @@ export function AdminPage() {
       <main class="space-main">
         <div class="space-title"><h1>{t('admin.title')}</h1><p class="faint">{t('admin.lead')}</p></div>
         {state.status === 'in' && !admin && <p class="home-note"><Icon name="info" /><span>{t('admin.notYours')}</span></p>}
-        {admin && <><People /><Reports /></>}
+        {admin && <><People /><Reports /><PluginReviews /></>}
       </main>
       <Overlays />
     </div>

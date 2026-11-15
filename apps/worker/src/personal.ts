@@ -54,7 +54,7 @@ export async function personal(req: Request, env: Env): Promise<Response> {
         return json({ mode: 'personal', vault, format: PROJECT_FORMAT, limits: LIMITS, claude: { server: false }, transcribe: false, ...cloudConfig(env) });
       }
       // a page of the cloud (cloud.ts) whose session ended: its saves wait for a sign-in, never a 404 they would take for a loss
-      if (cloudOn(env) && (CLOUD_ROUTES.includes(url.pathname.split('/')[2]) || url.pathname.startsWith('/api/gallery/mine'))) throw new HttpError(401, 'signed_out');
+      if (cloudOn(env) && (CLOUD_ROUTES.includes(url.pathname.split('/')[2]) || url.pathname.startsWith('/api/gallery/mine') || url.pathname === '/api/market/publish')) throw new HttpError(401, 'signed_out');
       throw new HttpError(404, 'this server keeps nothing: projects and keys stay in the browser (personal mode)');
     }
     if (url.pathname === '/vault.html') throw new HttpError(404, 'not found');

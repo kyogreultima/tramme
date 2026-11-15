@@ -18,6 +18,7 @@ import { LIMITS, PROJECT_FORMAT } from '@tramme/project';
 import { accountRoute } from './accounts.ts';
 import { cloud, cloudOn, signedIn } from './cloud.ts';
 import { galleryRoute } from './gallery.ts';
+import { marketRoute } from './market.ts';
 import { guard } from './access.ts';
 import type { Env } from './http.ts';
 import { bucket, keyStore, workerKeys } from './keys.ts';
@@ -84,6 +85,10 @@ export default {
       // the gallery is everyone's, signed in or not (gallery.ts)
       if (cloudOn(env) && url.origin === env.APP_ORIGIN && url.pathname.startsWith('/api/gallery') && !url.pathname.startsWith('/api/gallery/mine')) {
         try { const res = await galleryRoute(req, env.FILES!); if (res) return res; } catch (e) { return failure(e); }
+      }
+      // and so is the plugins' marketplace (market.ts), but publishing in it
+      if (cloudOn(env) && url.origin === env.APP_ORIGIN && url.pathname.startsWith('/api/market') && url.pathname !== '/api/market/publish') {
+        try { const res = await marketRoute(req, env.FILES!); if (res) return res; } catch (e) { return failure(e); }
       }
       let signed = null;
       try { signed = url.origin === env.APP_ORIGIN ? await signedIn(req, env) : null; } catch (e) { return failure(e); }
