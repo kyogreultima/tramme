@@ -89,7 +89,7 @@ An urgent fix to the released version starts from `main` instead: a `fix/…` br
 
 ### The companion on npm
 
-The assistant's local companion is published by hand on npm as `@qualris/tramme` (npm refuses the bare name `tramme`, too close to an existing package). Users start it with `npx @qualris/tramme`, or install it once with `npm install -g @qualris/tramme` and start it with `tramme`: the package's command keeps that name. The name is `COMPANION_PACKAGE` in `packages/assistant`, which the build and the command the editor shows both read. `pnpm companion:build` ([packages/companion/build.ts](packages/companion/build.ts)) writes the package in `packages/companion/dist/`:
+The assistant's local companion is published on npm as `@qualris/tramme` (npm refuses the bare name `tramme`, too close to an existing package). Users start it with `npx @qualris/tramme`, or install it once with `npm install -g @qualris/tramme` and start it with `tramme`: the package's command keeps that name. The name is `COMPANION_PACKAGE` in `packages/assistant`, which the build and the command the editor shows both read. `pnpm companion:build` ([packages/companion/build.ts](packages/companion/build.ts)) writes the package in `packages/companion/dist/`:
 
 - `bin/tramme.mjs` is the companion in one file, with Tramme's own packages inside it.
 - `package.json` is the published manifest: the name `@qualris/tramme`, the command `tramme`, public access, the version of `packages/companion` (the project's, set by `scripts/version.ts`), the licence, the author and the dependencies npm installs beside it (the Claude Agent SDK, the MCP SDK, cross-spawn, zod).
@@ -98,12 +98,19 @@ The assistant's local companion is published by hand on npm as `@qualris/tramme`
 
 transformers.js stays out of the package: the companion installs it in `~/.tramme/whisper` at its first transcription, at the version the editor uses.
 
-**Once, for the account.**
+**On its own.** [.github/workflows/companion.yml](.github/workflows/companion.yml) runs when a push to `main` changes `packages/companion/package.json`, which every new version does. It checks the types, runs the companion's tests, builds the package, installs it from its archive in an empty folder and starts it, then publishes it if npm does not have that version yet. It publishes through npm's trusted publishing: GitHub proves the run to npm, no npm token is kept in the repository, and npm shows where the package was built (provenance). A manual run on `main` (Actions, Companion on npm, Run workflow) does the same, and publishes nothing when the version is already there.
+
+**Once, to let the workflow publish.** npm sets trusted publishing on an existing package, so the first version is published by hand (below), then:
+
+1. On [npmjs.com](https://www.npmjs.com), the package `@qualris/tramme`, Settings, Trusted Publisher: choose GitHub Actions and give the owner `kyogreultima`, the repository `tramme`, the workflow file `companion.yml`, no environment.
+2. In the same settings, Publishing access: *Require two-factor authentication and disallow tokens*. Only the workflow, and a maintainer with the two-factor code, can publish then.
+
+**By hand** (the first version, or when the workflow cannot run). The account:
 
 1. The package lives in the scope of the npm account `qualris`. Create it on [npmjs.com](https://www.npmjs.com/signup) if it does not exist yet, and turn on two-factor authentication for login and publishing (Account, Two-Factor Authentication).
 2. Sign in on the computer that publishes: `npm login`, then `npm whoami` must answer `qualris`.
 
-**Each version.** Once the release has reached `main` (see above):
+Then, once the release has reached `main` (see above):
 
 1. Check out `main` and make sure it holds the released version (`node -p "require('./packages/companion/package.json').version"`).
 2. Install and check:
