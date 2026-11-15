@@ -42,8 +42,8 @@ scope.addEventListener('activate', (e) => e.waitUntil((async () => {
 // a page opened without the worker (first visit, forced reload) asks to be taken over
 scope.addEventListener('message', (e) => { if (e.data === 'claim') e.waitUntil(scope.clients.claim()); });
 
-/** a whole answer of this origin, worth keeping (not a part of a file, not an error) */
-const keepable = (r: Response) => r.status === 200 && r.type === 'basic';
+/** a whole answer of this origin, worth keeping (not a part of a file, not an error, not a signed-in person's page) */
+const keepable = (r: Response) => r.status === 200 && r.type === 'basic' && !r.headers.has('x-tramme-account');
 
 /** the network first, its answer kept; the kept one when there is no network. Pages all share the shell's page (/). */
 async function networkFirst(req: Request, key: Request | string = req): Promise<Response> {

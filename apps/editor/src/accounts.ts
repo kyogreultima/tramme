@@ -10,6 +10,7 @@
 import { signal } from '@preact/signals';
 import { locale, m, t } from './i18n/index.ts';
 import { platform } from './tauri.ts';
+import { cloud, personal } from './mode.ts';
 
 export interface UserJson {
   id: string;
@@ -117,6 +118,22 @@ export async function signOut() {
   const r = await call('POST', '/api/auth/logout');
   if (r.ok) account.value = { status: 'out' };
   return r;
+}
+
+/** whether signing in here keeps the projects in the account: the personal mode of a deployment that has the cloud */
+async function cloudOffered(): Promise<boolean> {
+  if (!personal) return false;
+  try { return !!((await (await fetch('/api/config')).json()) as { cloud?: boolean }).cloud; } catch { return false; }
+}
+
+/**
+ * Where to go once signed in or out. When that changes where the projects are (this browser, the account),
+ * the page loads again, so the server gives it the right mode; otherwise the router changes the page.
+ */
+export async function landAt(to: string) {
+  const changes = account.value.status === 'in' ? await cloudOffered() : cloud;
+  // the router is the page's (it reads the window), loaded once it is needed
+  if (changes) location.assign(to); else (await import('./nav.ts')).go(to);
 }
 
 // ── the links of the mails ───────────────────────────────────

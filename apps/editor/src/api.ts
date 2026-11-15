@@ -74,8 +74,10 @@ export type AiEvent =
 export type { KeyedProvider, KeyStatus };
 
 export interface ServerConfig {
-  /** personal: projects and keys stay in the browser (mode.ts) */
-  mode?: 'private' | 'personal';
+  /** personal: projects and keys stay in the browser; cloud: in the signed-in person's account (mode.ts) */
+  mode?: 'private' | 'personal' | 'cloud';
+  /** personal mode: signing in keeps the projects in the account (the deployment has the cloud) */
+  cloud?: boolean;
   format: string;
   limits: { file: number; archive: number; files: number };
   claude: { server: boolean };

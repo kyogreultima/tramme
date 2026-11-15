@@ -4,7 +4,8 @@
 //   build, and under /api the projects (R2), the keys of the settings (R2) and
 //   the providers reached with them, speech to text (Workers AI).
 // - personal: anyone, without an account; the server keeps nothing. See
-//   personal.ts.
+//   personal.ts. With accounts, a signed-in person's projects and keys are
+//   kept in the cloud, under their workspace: cloud.ts.
 //
 // Private routes, besides those of @tramme/api (storage.ts, providers.ts, keys.ts):
 //   GET    /api/config                          what this server offers, the providers connected
@@ -15,6 +16,7 @@
 import { failure, HttpError, json, keysRoute, PROVIDER_ROUTES, providerRoute, providersConfig, storageRoute } from '@tramme/api';
 import { LIMITS, PROJECT_FORMAT } from '@tramme/project';
 import { accountRoute } from './accounts.ts';
+import { cloud, cloudOn, signedIn } from './cloud.ts';
 import { guard } from './access.ts';
 import type { Env } from './http.ts';
 import { bucket, keyStore, workerKeys } from './keys.ts';
@@ -60,20 +62,26 @@ async function route(req: Request, env: Env, url: URL): Promise<Response> {
 export { AccountsContainer } from './container.ts';
 
 export default {
-  async fetch(req, env) {
+  async fetch(req: Request, env: Env, ctx?: ExecutionContext) {
     const url = new URL(req.url);
     if ((url.pathname === '/project-sandbox.html' || url.pathname === '/project-sandbox') && (env.MODE !== 'personal' || url.origin === env.APP_ORIGIN)) {
       return projectSandbox(req, env);
     }
     // the routes of accounts come first, in every mode: a visitor has no session yet, and the personal
     // deployment can have accounts (without ACCOUNTS or ACCOUNTS_URL they do not exist)
-    if (url.pathname.startsWith('/api/')) {
+    // (deleting an account in the cloud is the Worker's: its files go with it, cloud.ts)
+    const deletion = req.method === 'DELETE' && url.pathname === '/api/account' && cloudOn(env);
+    if (url.pathname.startsWith('/api/') && !deletion) {
       try {
         const account = await accountRoute(req, env);
         if (account) return account;
       } catch (e) { return failure(e); }
     }
-    if (env.MODE === 'personal') return personal(req, env);
+    if (env.MODE === 'personal') {
+      let signed = null;
+      try { signed = url.origin === env.APP_ORIGIN ? await signedIn(req, env) : null; } catch (e) { return failure(e); }
+      return signed ? cloud(req, env, signed, ctx) : personal(req, env);
+    }
     if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(req);
     try {
       return (await guard(req, env)) ?? (await route(req, env, url));

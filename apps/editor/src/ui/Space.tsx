@@ -4,7 +4,7 @@
 
 import { useEffect, useState } from 'preact/hooks';
 import {
-  account, billing, changePassword, checkout, deleteAccount, exportData, linkUrl, manageSubscription, messageFor, plans, PROVIDERS, providerName, refreshAccount, sellsHere,
+  account, billing, changePassword, landAt, checkout, deleteAccount, exportData, linkUrl, manageSubscription, messageFor, plans, PROVIDERS, providerName, refreshAccount, sellsHere,
   resendVerification, revokeOtherSessions, signOut, unlinkProvider, updateProfile, type Billing, type PlanTerms, type Provider, type Reply, type UserJson,
 } from '../accounts.ts';
 import { saveBlob } from '../download.ts';
@@ -156,7 +156,7 @@ function DeleteDialog({ user, onClose }: { user: UserJson; onClose: () => void }
     // an address is typed, a password is not: either proves it is them
     const r = await deleteAccount(proof.includes('@') ? { email: proof } : { password: proof });
     setBusy(false);
-    if (r.ok) go('/'); else toast(messageFor(r.error), 'error');
+    if (r.ok) await landAt('/'); else toast(messageFor(r.error), 'error');
   };
   return (
     <Modal title={t('account.space.deleteTitle')} onClose={onClose}>
@@ -209,7 +209,7 @@ export function SpacePage() {
         <a class="brand" href="/" aria-label="Tramme"><Brand size={20} /></a>
         <span class="grow" />
         <a class="btn outline sm" href="/"><Icon name="home" /><span class="label">{t('account.projects')}</span></a>
-        {user && <button class="btn ghost sm" onClick={async () => { await signOut(); go('/'); }}>{t('account.signOut')}</button>}
+        {user && <button class="btn ghost sm" onClick={async () => { await signOut(); await landAt('/'); }}>{t('account.signOut')}</button>}
       </header>
       <main class="space-main">
         <div class="space-title"><h1>{t('account.space.title')}</h1><p class="faint">{t('account.space.lead')}</p></div>

@@ -1,15 +1,18 @@
 // What the Worker is given, and small helpers of its own (the shared ones
 // come from @tramme/api).
 
-export { HttpError, json, readJson } from '@tramme/api';
+export { cookieOf as cookie, HttpError, json, readJson } from '@tramme/api';
 
 export interface Env {
   /** the editor's static build (and the key vault's page) */
   ASSETS: Fetcher;
   /** 'personal': no storage, no keys on the server, everything in the visitor's browser; otherwise private (see docs/deploy.md) */
   MODE?: string;
-  /** private mode: projects, libraries and the keys of the settings, under projects/<id>/<path>, library/, config/ */
+  /** private mode: projects, libraries and the keys of the settings, under projects/<id>/<path>, library/, config/;
+   * with accounts, the files of every signed-in person, each workspace under w/<workspace>/ (cloud.ts) */
   FILES?: R2Bucket;
+  /** accounts: the secret the keys kept in a workspace are sealed with (`openssl rand -hex 32`); without it, no cloud */
+  KEYS_SECRET?: string;
   /** private mode, secrets: keys of the providers (optional; a key from the settings comes first, see @tramme/api keys.ts) */
   ANTHROPIC_API_KEY?: string;
   OPENAI_API_KEY?: string;
@@ -59,12 +62,4 @@ export interface Env {
   VAULT_ORIGIN?: string;
   /** personal mode: how many requests a visitor may send through the relay (rate limiting binding) */
   RELAY_LIMIT?: RateLimit;
-}
-
-export function cookie(req: Request, name: string): string | null {
-  for (const part of (req.headers.get('cookie') ?? '').split(';')) {
-    const [k, ...v] = part.trim().split('=');
-    if (k === name) return v.join('=');
-  }
-  return null;
 }

@@ -3,7 +3,7 @@
 // out). Nothing at all on a server without accounts.
 
 import { useEffect } from 'preact/hooks';
-import { account, refreshAccount, signOut } from '../accounts.ts';
+import { account, landAt, refreshAccount, signOut } from '../accounts.ts';
 import { t } from '../i18n/index.ts';
 import { go } from '../nav.ts';
 import { openMenu } from './controls.tsx';
@@ -22,7 +22,7 @@ export function AccountMenu() {
         { label: user.name, detail: user.email, icon: 'home', disabled: true, onClick: () => {} },
         'sep',
         { label: t('account.yourSpace'), icon: 'gear', onClick: () => go('/space') },
-        { label: t('account.signOut'), icon: 'unlock', onClick: async () => { await signOut(); go('/'); } },
+        { label: t('account.signOut'), icon: 'unlock', onClick: async () => { await signOut(); await landAt('/'); } },
       ])}>
       <span aria-hidden="true">{initial(user.name)}</span>
     </button>

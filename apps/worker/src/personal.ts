@@ -13,6 +13,7 @@ import { LIMITS, PROJECT_FORMAT } from '@tramme/project';
 import { BROWSER_DIRECT, failure, HttpError, json } from '@tramme/api';
 import type { Env } from './http.ts';
 import { relay } from './relay.ts';
+import { cloudConfig } from './cloud.ts';
 
 /** the vault's page: its own scripts, the providers it calls, framed by the editor only */
 function vaultPolicy(app: string) {
@@ -50,7 +51,7 @@ export async function personal(req: Request, env: Env): Promise<Response> {
     if (url.origin !== app) return Response.redirect(new URL(url.pathname + url.search, app).href, 301);
     if (url.pathname.startsWith('/api/')) {
       if (url.pathname === '/api/config' && req.method === 'GET') {
-        return json({ mode: 'personal', vault, format: PROJECT_FORMAT, limits: LIMITS, claude: { server: false }, transcribe: false });
+        return json({ mode: 'personal', vault, format: PROJECT_FORMAT, limits: LIMITS, claude: { server: false }, transcribe: false, ...cloudConfig(env) });
       }
       throw new HttpError(404, 'this server keeps nothing: projects and keys stay in the browser (personal mode)');
     }
