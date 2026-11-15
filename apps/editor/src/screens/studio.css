@@ -69,7 +69,9 @@
   background: var(--accent); color: var(--on-accent); font: 700 11px var(--mono); box-shadow: 0 0 0 2px var(--on-media), 0 6px 16px var(--media-scrim);
 }
 .pin:hover span { transform: scale(1.08); }
-.pin.new { pointer-events: none; }
+.pin.new { cursor: grab; touch-action: none; }
+.pin.new.dragging { cursor: grabbing; }
+.pin.new.dragging span { animation: none; transform: scale(1.12); }
 .pin.new span { animation: drop .32s var(--ease); }
 @keyframes drop { from { transform: translateY(-14px) scale(.6); opacity: 0; } }
 

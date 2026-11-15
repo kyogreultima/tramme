@@ -1,6 +1,6 @@
-// The watermark's picture: the Tramme mark, all white, in the bottom right
+// The watermark's picture: the Tramme mark, all white, in the top left
 // corner of every frame; at regular intervals the whole logo opens from it
-// (the mark slides left, the word appears), holds, and closes back into it.
+// (the word unrolls to the right of the mark), holds, and closes back into it.
 // Drawn for each frame's time and laid over it by the renderer
 // (Renderer.stamp). Shared by the editor's exports and the command line's
 // renders; whether a film carries it is watermark.ts's to say.
@@ -24,11 +24,11 @@ export function watermarkOpening(t: number): number {
   return x * x * (3 - 2 * x);
 }
 
-/** the logo's visible box in a frame of w × h, `opening` open: anchored bottom right, 4.5 % of the shorter side high, 3.5 % of it from the edges */
+/** the logo's visible box in a frame of w × h, `opening` open: anchored top left, 4.5 % of the shorter side high, 3.5 % of it from the edges */
 export function watermarkBox(w: number, h: number, opening = 0): { x: number; y: number; w: number; h: number; mark: number; full: number } {
   const u = Math.min(w, h), height = Math.round(u * 0.045), m = Math.round(u * 0.035);
   const full = (height * VIEW_W) / VIEW_H, mark = (height * MARK_W) / VIEW_H, width = mark + (full - mark) * opening;
-  return { x: w - m - width, y: h - m - height, w: width, h: height, mark, full };
+  return { x: m, y: m, w: width, h: height, mark, full };
 }
 
 let picture: Promise<HTMLImageElement> | null = null;
