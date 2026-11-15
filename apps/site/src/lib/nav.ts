@@ -5,6 +5,7 @@
 import { APP, REPO, repoFile, logIn, signUp } from './links';
 import { systemsLine } from '../../../desktop/downloads.ts';
 import { docHref } from './docs';
+import { PRICING_SHOWN } from './plans';
 import { pathIn, t, type Locale } from './i18n';
 
 export interface NavLink { label: string; href: string; hint?: string; /** it leads to the app: it opens in a tab of its own */ app?: true }
@@ -16,6 +17,9 @@ const page = (locale: Locale, key: string, href: string, hint = false): NavLink 
   href: pathIn(locale, href),
   ...(hint && { hint: t(locale, `nav.${key}Hint`, { systems: systemsLine(locale) }) }),
 });
+
+/** the pricing page's link, while the prices are shown (PRICING_SHOWN) */
+const pricing = (locale: Locale): NavLink[] => (PRICING_SHOWN ? [page(locale, 'pricing', '/pricing/')] : []);
 
 /** the menus of the top bar */
 export function menus(locale: Locale): NavMenu[] {
@@ -45,7 +49,7 @@ export function menus(locale: Locale): NavMenu[] {
 
 /** the links of the top bar that open a page, after the menus */
 export function barLinks(locale: Locale): NavLink[] {
-  return [page(locale, 'explore', '/explore/'), page(locale, 'pricing', '/pricing/'), { label: t(locale, 'nav.docs'), href: docHref('') }];
+  return [page(locale, 'explore', '/explore/'), ...pricing(locale), { label: t(locale, 'nav.docs'), href: docHref('') }];
 }
 
 /** the two buttons at the bar's end: log in, and start */
@@ -67,7 +71,7 @@ export function footerColumns(locale: Locale): NavMenu[] {
         { label: t(locale, 'nav.openApp'), href: APP, app: true },
         page(locale, 'features', '/features/'),
         page(locale, 'download', '/download/'),
-        page(locale, 'pricing', '/pricing/'),
+        ...pricing(locale),
       ],
     },
     {
@@ -82,7 +86,7 @@ export function footerColumns(locale: Locale): NavMenu[] {
         { label: t(locale, 'nav.docs'), href: docHref('') },
         { label: f('changelog'), href: docHref('changelog') },
         { label: f('roadmap'), href: pathIn(locale, '/roadmap/') },
-        page(locale, 'pricing', '/pricing/'),
+        ...pricing(locale),
       ],
     },
     {

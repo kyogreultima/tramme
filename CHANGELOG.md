@@ -8,6 +8,10 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+### Changed
+
+- The site hides the prices until the payment opens: no pricing page or link to it, no price or credit question in the FAQ, no paid sections in the terms, no offers given to search engines. One switch brings them back (`PRICING_SHOWN` in `apps/site/src/lib/plans.ts`).
+
 ## [0.26.1] - 2026-11-15
 
 ### Fixed

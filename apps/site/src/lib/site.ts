@@ -3,7 +3,7 @@
 
 import { APP, ORIGINS, QUALRIS, REPO, repoFile } from './links';
 import { faq } from './faq';
-import { plan } from './plans';
+import { plan, PRICING_SHOWN } from './plans';
 import type { Locale } from './i18n';
 
 export const SITE = {
@@ -35,7 +35,7 @@ export function landingData(site: URL, preview: string, systems: string[], local
         applicationCategory: 'MultimediaApplication',
         applicationSubCategory: 'Motion design',
         operatingSystem: ['Web browser', ...systems].join(', '),
-        offers: (['basic', 'plus', 'pro'] as const).map((id) => ({ '@type': 'Offer', name: id[0].toUpperCase() + id.slice(1), price: String(plan(id).price.month), priceCurrency: 'EUR' })),
+        ...(PRICING_SHOWN && { offers: (['basic', 'plus', 'pro'] as const).map((id) => ({ '@type': 'Offer', name: id[0].toUpperCase() + id.slice(1), price: String(plan(id).price.month), priceCurrency: 'EUR' })) }),
         license: repoFile('LICENSE'),
         sameAs: [REPO],
         author: { '@type': 'Organization', name: 'Qualris', url: QUALRIS, email: 'hello@qualris.com' },

@@ -10,6 +10,7 @@ import Microphone from '@phosphor-icons/core/assets/regular/microphone.svg';
 import Head from './Head.astro';
 import Cards from './Cards.astro';
 import { pathIn, pick, type Locale, type Localised } from '../lib/i18n';
+import { PRICING_SHOWN } from '../lib/plans';
 
 interface Props { locale: Locale }
 const { locale } = Astro.props;
@@ -52,7 +53,7 @@ const items = c.items.map(([title, text], i) => ({ Icon: ICONS[i], title, text }
     <Head title={c.title} more={c.more} />
     <div class="body">
       <Cards items={items} />
-      <p class="more" data-reveal><a href={pathIn(locale, '/pricing/')}>{c.plans}</a></p>
+      {PRICING_SHOWN && <p class="more" data-reveal><a href={pathIn(locale, '/pricing/')}>{c.plans}</a></p>}
     </div>
   </div>
 </section>

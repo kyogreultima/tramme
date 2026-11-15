@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { LOCALES } from '../src/lib/i18n';
-import { PLANS, PLAN_IDS, ROWS, formatPrice, plan } from '../src/lib/plans';
+import { PLANS, PLAN_IDS, PRICING_SHOWN, ROWS, formatPrice, plan } from '../src/lib/plans';
 import { faq } from '../src/lib/faq';
 
 describe('the plans', () => {
@@ -35,6 +35,7 @@ describe('the plans', () => {
     const credits = (v: unknown) => (typeof v === 'object' ? (v as { en: string }).en : '');
     expect(credits(ai.values.plus)).toContain('1 000');
     expect(credits(ai.values.pro)).toContain('4 000');
+    if (!PRICING_SHOWN) { expect(faq('en', ['billing', 'credits', 'cancelling'])).toEqual([]); return; }
     const answer = faq('en', ['credits'])[0].a;
     expect(answer).toContain('1 000');
     expect(answer).toContain('4 000');

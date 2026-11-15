@@ -4,6 +4,7 @@ import ArrowRight from '@phosphor-icons/core/assets/regular/arrow-right.svg';
 import textile from '../assets/hero-textile.png';
 import { signUp } from '../lib/links';
 import { pathIn, t, type Locale } from '../lib/i18n';
+import { PRICING_SHOWN } from '../lib/plans';
 interface Props { locale: Locale }
 const { locale } = Astro.props;
 ---
@@ -11,7 +12,7 @@ const { locale } = Astro.props;
   <div class="wrap">
     <h2>{t(locale, 'landing.closing.title')}</h2>
     <a class="btn btn-accent" href={signUp({ lang: locale })} target="_blank" rel="noopener">{t(locale, 'common.startFree')}<ArrowRight aria-hidden="true" /></a>
-    <p>{t(locale, 'landing.closing.basic')} <a href={pathIn(locale, '/pricing/')}>{t(locale, 'landing.closing.plans')}</a></p>
+    <p>{t(locale, 'landing.closing.basic')}{PRICING_SHOWN && <> <a href={pathIn(locale, '/pricing/')}>{t(locale, 'landing.closing.plans')}</a></>}</p>
     <div class="lens"><Image src={textile} alt="" widths={[640, 1280]} sizes="(max-width: 800px) 90vw, 70vw" loading="lazy" /></div>
   </div>
 </section>

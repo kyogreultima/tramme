@@ -1,6 +1,5 @@
 // The three plans, as data: what the pricing page, the landing's closing line
-// and the FAQ show, and what the payment will read. The table is the spec's
-// (docs/superpowers/specs/2026-10-31-site-platform-redesign-design.md, Pricing).
+// and the FAQ show, and what the payment will read.
 // Paid features are services the platform runs, not switches in the app's code.
 
 import type { Locale, Localised } from './i18n';
@@ -25,6 +24,13 @@ const LINES: Record<PlanId, Localised<string>> = {
   plus: { en: 'For the films you make every month.', fr: 'Pour les films que vous faites chaque mois.' },
   pro: { en: 'For studios and freelancers who deliver.', fr: 'Pour les studios et les indépendants qui livrent.' },
 };
+
+/**
+ * Whether the site shows the prices: the pricing page and its links, the price and credit questions of the
+ * FAQ, the paid sections of the terms and the offers given to search engines. Off until the payment opens;
+ * the plans stay written below, ready.
+ */
+export const PRICING_SHOWN = false;
 
 export const PLANS: Plan[] = PLAN_TERMS.map((t) => ({ id: t.id, price: t.price, credits: t.credits, line: LINES[t.id] }));
 

@@ -7,6 +7,7 @@ import { DOCS, docHref, docId } from '../lib/docs';
 import { APP, REPO } from '../lib/links';
 import { systemsLine } from '../../../desktop/downloads.ts';
 import { SITE } from '../lib/site';
+import { PRICING_SHOWN } from '../lib/plans';
 
 // the site's own pages, besides the docs
 const PAGES = [
@@ -18,7 +19,7 @@ const PAGES = [
   ['/about/', 'About', 'What Tramme is, its licence, how to take part'],
   ['/terms/', 'Terms', 'Terms of use and sale'],
   ['/privacy/', 'Privacy', 'What is kept where'],
-];
+].filter(([path]) => PRICING_SHOWN || path !== '/pricing/');
 
 export const GET: APIRoute = async ({ site }) => {
   const sections = await Promise.all(DOCS.map(async (group) => {
