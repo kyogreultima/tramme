@@ -238,6 +238,12 @@
     "uploadingName": "Uploading {name}",
     "properties": "Properties"
   },
+  "plans": {
+    "limit": {
+      "cloudProjects": "Your plan keeps {max} projects in your account. Delete one to make room for another.",
+      "privateProjects": "Private projects are not part of your plan: this project stays public."
+    }
+  },
   "saveHeld": {
     "conflictTitle": "Another version of this project",
     "conflictLead": "This project was saved from another tab or another device since you opened it. Which version should stay?",

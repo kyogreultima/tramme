@@ -11,6 +11,7 @@ import type { KeyedProvider, KeyStatus, Voice } from '@tramme/api';
 import type { Usage } from '@tramme/assistant';
 export type { Voice };
 import { vaultOrigin } from './mode.ts';
+import { t } from './i18n/index.ts';
 import { desktopFetch, tauri } from './tauri.ts';
 import { vaultFetch } from './vault/link.ts';
 import type { FileKind } from './sources.ts';
@@ -120,8 +121,10 @@ export const reach = (path: string, init?: RequestInit): Promise<Response> => (a
 /** the answer when it is a success; what the server said wrong otherwise, as an ApiError */
 async function answered(r: Response): Promise<Response> {
   if (r.ok) return r;
-  let body: { error?: string; issues?: { path: string; message: string }[] } = {};
+  let body: { error?: string; issues?: { path: string; message: string }[]; limit?: string; max?: number } = {};
   try { body = await r.json(); } catch { /* not JSON */ }
+  // a plan's limit, said in the person's language
+  if (body.error === 'plan_limit') throw new ApiError(r.status, body.limit === 'privateProjects' ? t('plans.limit.privateProjects') : t('plans.limit.cloudProjects', { max: body.max ?? 0 }));
   throw new ApiError(r.status, body.error ?? `HTTP ${r.status}`, body.issues);
 }
 

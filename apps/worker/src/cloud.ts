@@ -17,6 +17,7 @@ import {
 import { LIMITS, PROJECT_FORMAT } from '@tramme/project';
 import { hasAccounts, internal } from './accounts.ts';
 import { pageAsset, rewrittenHeaders, type Env } from './http.ts';
+import { limitsOn, withinPlan } from './limits.ts';
 
 /** whether this deployment keeps signed-in people's projects: accounts, the bucket and the secrets */
 export const cloudOn = (env: Env): boolean => hasAccounts(env) && !!(env.FILES && env.EDGE_SECRET && env.KEYS_SECRET && env.INTERNAL_SECRET);
@@ -66,6 +67,10 @@ async function cloudRoute(req: Request, env: Env, edge: Edge, ctx?: ExecutionCon
   if (PROVIDER_ROUTES.includes(parts[0])) {
     const res = await providerRoute(req, { keys: await loadKeys(keys), fetch: (input, init) => fetch(input, init) }, parts);
     if (res) return res;
+  }
+  if (limitsOn(env)) {
+    const held = await withinPlan(req, url, files, edge.plan);
+    if (held) return held;
   }
   const res = await storageRoute(req, files, url);
   if (res) return res;

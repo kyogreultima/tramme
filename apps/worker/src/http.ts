@@ -34,6 +34,8 @@ export interface Env {
   /** private mode: projects, libraries and the keys of the settings, under projects/<id>/<path>, library/, config/;
    * with accounts, the files of every signed-in person, each workspace under w/<workspace>/ (cloud.ts) */
   FILES?: R2Bucket;
+  /** accounts: "on" holds signed-in people to their plan's limits (limits.ts); off until the payment exists */
+  PLAN_LIMITS?: string;
   /** accounts: the secret the keys kept in a workspace are sealed with (`openssl rand -hex 32`); without it, no cloud */
   KEYS_SECRET?: string;
   /** private mode, secrets: keys of the providers (optional; a key from the settings comes first, see @tramme/api keys.ts) */

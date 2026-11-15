@@ -238,6 +238,12 @@
     "uploadingName": "Envoi de {name}",
     "properties": "Propriétés"
   },
+  "plans": {
+    "limit": {
+      "cloudProjects": "Votre offre garde {max} projets dans votre compte. Supprimez-en un pour faire de la place.",
+      "privateProjects": "Les projets privés ne font pas partie de votre offre : ce projet reste public."
+    }
+  },
   "saveHeld": {
     "conflictTitle": "Une autre version de ce projet",
     "conflictLead": "Ce projet a été enregistré depuis un autre onglet ou un autre appareil depuis que vous l'avez ouvert. Quelle version garder ?",

@@ -4,7 +4,7 @@ import { bucketKeyStore, memoryRecords, prefixedBucket, recordBucket, sealedKeyS
 
 const SECRET = 'test-secret';
 const NOW = 1_800_000_000_000;
-const edge = { userId: 'u1', workspaceId: 'abc123def456', sessionVersion: 2 };
+const edge = { userId: 'u1', workspaceId: 'abc123def456', sessionVersion: 2, plan: 'plus' as const };
 
 /** a token signed the way the backend signs it (apps/server/app/services/edge_token.ts, node:crypto) */
 function backendToken(payload: Record<string, unknown>, header: Record<string, unknown> = { alg: 'HS256', typ: 'JWT' }, secret = SECRET) {
@@ -16,12 +16,15 @@ const iat = Math.floor(NOW / 1000);
 
 describe('the edge token', () => {
   it('reads a token the backend signed', async () => {
-    const token = backendToken({ sub: 'u1', ws: 'abc123def456', sv: 2, iat, exp: iat + 600 });
+    const token = backendToken({ sub: 'u1', ws: 'abc123def456', sv: 2, pl: 'plus', iat, exp: iat + 600 });
     expect(await verifyEdge(token, SECRET, NOW)).toEqual({ ...edge, exp: iat + 600 });
+    // a token without a plan, or with one that does not exist, is Basic
+    expect((await verifyEdge(backendToken({ sub: 'u1', ws: 'abc123def456', sv: 2, iat, exp: iat + 600 }), SECRET, NOW))?.plan).toBe('basic');
+    expect((await verifyEdge(backendToken({ sub: 'u1', ws: 'abc123def456', sv: 2, pl: 'gold', iat, exp: iat + 600 }), SECRET, NOW))?.plan).toBe('basic');
   });
 
   it('signs as the backend does', async () => {
-    expect(await signEdge(edge, SECRET, NOW)).toBe(backendToken({ sub: 'u1', ws: 'abc123def456', sv: 2, iat, exp: iat + 600 }));
+    expect(await signEdge(edge, SECRET, NOW)).toBe(backendToken({ sub: 'u1', ws: 'abc123def456', sv: 2, pl: 'plus', iat, exp: iat + 600 }));
   });
 
   it('refuses a forged, expired, malformed or incomplete one', async () => {
