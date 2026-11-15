@@ -161,7 +161,9 @@ export const api = {
 
   // ── projects ───────────────────────────────────────────────
   list: () => call<Manifest[]>('/api/projects'),
-  create: (opts: { name: string; width?: number; height?: number; fps?: number; duration?: number; created?: string; empty?: boolean }) => call<Manifest>('/api/projects', jsonInit('POST', opts)),
+  /** `place: 'cloud'`: in the account, from the desktop app, whose own projects are in a folder (its cloud.rs) */
+  create: (opts: { name: string; width?: number; height?: number; fps?: number; duration?: number; created?: string; empty?: boolean }, place?: 'cloud') =>
+    call<Manifest>(place ? `/api/projects?place=${place}` : '/api/projects', jsonInit('POST', opts)),
   info: (id: string) => call<{ manifest: Manifest; files: ProjectFile[] }>(P(id)),
   update: (id: string, patch: { name?: string; thumbnail?: string | null }) => call<Manifest>(P(id), jsonInit('PATCH', patch)),
 

@@ -7,6 +7,7 @@ import { account } from '../accounts.ts';
 import { bring, localProjects, markOffered, wasOffered } from '../bring.ts';
 import { t } from '../i18n/index.ts';
 import { cloud } from '../mode.ts';
+import { tauri } from '../tauri.ts';
 import { toast } from '../state.ts';
 import { Modal } from './controls.tsx';
 
@@ -55,7 +56,8 @@ export function BringOffer({ onDone }: { onDone: () => void }) {
   const state = account.value;
   const userId = state.status === 'in' ? state.user.id : null;
   useEffect(() => {
-    if (!cloud || !userId || wasOffered(userId)) return;
+    // the browser's projects on a page of the cloud, the computer's in the desktop app
+    if (!(cloud || tauri) || !userId || wasOffered(userId)) return;
     void localProjects().then((list) => { if (list.length) setProjects(list); else markOffered(userId); });
   }, [userId]);
   if (!projects || !userId) return null;

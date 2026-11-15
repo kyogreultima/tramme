@@ -36,6 +36,7 @@ import { prefs, settingsOpen } from '../settings.ts';
 import { GLASS_THEMES } from '../theme/pref.ts';
 import { APP_VERSION, downloadOf, update } from '../version.ts';
 import { tauri } from '../tauri.ts';
+import { inAccount } from '../bring.ts';
 import { IDEAS } from '../ideas.ts';
 import { t } from '../i18n/index.ts';
 import { go } from '../nav.ts';
@@ -187,7 +188,7 @@ function Card({ m, onMenu }: { m: Manifest; onMenu: (e: MouseEvent | { clientX: 
       </div>
       <div class="card-meta">
         <div class="card-name" title={m.name}>{m.name}</div>
-        <div class="card-sub">{[dims(m), ago(m.modified)].filter(Boolean).join(' · ')}</div>
+        <div class="card-sub">{[dims(m), ago(m.modified), tauri && inAccount(m) ? t('home.inYourAccount') : ''].filter(Boolean).join(' · ')}</div>
       </div>
       <button class="icon-btn sm card-more" title={t('home.actions')} onClick={(e) => { e.stopPropagation(); onMenu(e); }}><Icon name="more" /></button>
     </div>

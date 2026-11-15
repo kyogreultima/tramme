@@ -9,6 +9,7 @@ import {
 } from '../accounts.ts';
 import type { Manifest } from '@tramme/project';
 import { localProjects } from '../bring.ts';
+import { tauri } from '../tauri.ts';
 import { PAYMENT_OPEN } from '@tramme/plans';
 import { saveBlob } from '../download.ts';
 import { cloud } from '../mode.ts';
@@ -205,7 +206,7 @@ function Data({ user }: { user: UserJson }) {
         </Row>
       </Section>
       <Section title={t('account.space.data')} hint={t('account.space.dataHint')}>
-        {cloud && (
+        {(cloud || tauri) && (
           <Row label={t('account.bring.row')} hint={t('account.bring.rowHint')}>
             <button class="btn sm" onClick={async () => { const list = await localProjects(); if (list.length) setBringing(list); else toast(t('account.bring.none')); }}><Icon name="upload" />{t('account.bring.button')}</button>
           </Row>

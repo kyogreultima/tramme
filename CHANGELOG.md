@@ -16,6 +16,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 - Your account's button in the project's top bar; the project is saved before you leave it for your space or sign out.
 - **The gallery**: a film you just exported as MP4 is published from the export's panel, with a still taken in its middle, a title and a few words, in the gallery or reachable by its link only, and the project offered for copying or not. It is signed with your public name, which you choose in your space. "Open in Tramme" on the site copies a published film's project into your projects (its code is asked about first, as any project from someone else). Visitors can report a film.
 - The app's space shows no offers or prices until the plans are sold, as the site.
+- **The desktop and Android apps signed in**: your account's projects are listed beside the ones of the device's folder, marked "in your account", and open and save in the account, their pictures, sounds and videos read in parts. The projects of the device are brought into the account from your space, through their archive; the copies on the device stay.
 
 ### Changed
 

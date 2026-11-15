@@ -134,6 +134,49 @@ fn forward(origin: &str, secrets: &dyn Secrets, req: &Request<Vec<u8>>) -> Body 
     out.body(bytes).unwrap_or_else(|_| json_body(502, json!({ "error": "the backend's answer could not be read" })))
 }
 
+// ── the projects of the account (cloud.rs) ──────────────────────────────────
+
+/// what the cloud answered: its status, the headers a file or a JSON needs, its body
+pub(crate) struct Answer {
+    pub status: u16,
+    pub headers: Vec<(String, String)>,
+    pub body: Vec<u8>,
+}
+
+/// whether this app holds a session of its environment's backend
+pub(crate) fn signed_in() -> bool {
+    Session::new(keys::keychain(), BACKEND).read().contains_key("__Host-tramme-session")
+}
+
+/// a request to the app of this build's environment (the Worker that keeps the account's projects), with the
+/// session; the cookies it sets are kept, as for the account's routes
+pub(crate) fn to_cloud(method: &str, path_and_query: &str, headers: &[(&str, String)], body: &[u8], max_answer: u64) -> Result<Answer, String> {
+    let session = Session::new(keys::keychain(), BACKEND);
+    let mut request = agent().request(method, &format!("{BACKEND}{path_and_query}")).set("origin", BACKEND).set("user-agent", AGENT);
+    for (name, value) in headers {
+        request = request.set(name, value);
+    }
+    if let Some(cookie) = session.header() {
+        request = request.set("cookie", &cookie);
+    }
+    let sent = if body.is_empty() && matches!(method, "GET" | "HEAD" | "DELETE") { request.call() } else { request.send_bytes(body) };
+    let res = match sent {
+        Ok(r) | Err(ureq::Error::Status(_, r)) => r,
+        Err(ureq::Error::Transport(e)) => return Err(e.to_string()),
+    };
+    session.take(res.all("set-cookie"));
+    let status = res.status();
+    let headers = ["content-type", "etag", "content-range", "accept-ranges", "content-disposition", "last-modified"]
+        .iter()
+        .filter_map(|name| res.header(name).map(|v| (name.to_string(), v.to_string())))
+        .collect();
+    let mut bytes = Vec::new();
+    if res.into_reader().take(max_answer + 1).read_to_end(&mut bytes).is_err() || bytes.len() as u64 > max_answer {
+        return Err("the answer is too large".into());
+    }
+    Ok(Answer { status, headers, body: bytes })
+}
+
 // ── the session ──────────────────────────────────────────────────────────────
 
 /// the cookies are read and changed one request at a time
