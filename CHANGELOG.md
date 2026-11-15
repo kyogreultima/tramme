@@ -8,6 +8,8 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+## [0.26.1] - 2026-11-15
+
 ### Fixed
 
 - **The companion's npm package is `@qualris/tramme`**: npm refused the name `tramme`, so the `npx tramme` that 0.26.0 shows started nothing. Start it with `npx @qualris/tramme`, or install it once with `npm install -g @qualris/tramme` and start it with `tramme`; the editor shows the new command.
@@ -908,7 +910,8 @@ First public release.
 
 - Cloudflare Worker serving the editor and the API, projects stored in R2, access protected by Cloudflare Access.
 
-[Unreleased]: ../../compare/v0.26.0...HEAD
+[Unreleased]: ../../compare/v0.26.1...HEAD
+[0.26.1]: ../../compare/v0.26.0...v0.26.1
 [0.26.0]: ../../compare/v0.25.0...v0.26.0
 [0.25.0]: ../../compare/v0.24.0...v0.25.0
 [0.24.0]: ../../compare/v0.23.0...v0.24.0
