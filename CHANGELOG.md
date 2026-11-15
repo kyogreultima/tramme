@@ -8,6 +8,14 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+### Added
+
+- **The local companion on npm**: `npx tramme` starts it on any computer with Node.js 20 or later, with no repository to clone. It pairs by itself with the Tramme app and the desktop app (`--origin` adds another address), and the assistant's panel shows the command to type. The first transcription installs the local speech recognition once (about 150 MB, in `~/.tramme/whisper`). In the repository, `pnpm tramme agent` runs the same companion.
+
+### Fixed
+
+- **No terminal window flashing on Windows** while the assistant works or lists its models: the Antigravity CLI started its own update in the background, at most every 15 minutes, and that update opened a window. The companion now runs Antigravity with its auto-update off.
+
 ## [0.25.0] - 2026-11-14
 
 ### Added

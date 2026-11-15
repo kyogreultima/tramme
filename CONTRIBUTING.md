@@ -35,7 +35,7 @@ pnpm dev   # the editor on http://localhost:8787/
 | `packages/assistant` | The assistant's models, prompt and tools |
 | `packages/plugin` | The types of a plugin (nodes, effects, tools…) and `definePlugin()`, for completion and checks while writing one |
 | `packages/api` | The `/api` routes wherever they run: storage over any bucket (R2, IndexedDB), providers reached with the user's keys |
-| `packages/companion` | The assistant's local companion, published on npm as `tramme` (`pnpm companion:build`, then `npm publish packages/companion/dist`) |
+| `packages/companion` | The assistant's local companion, published on npm as `tramme` (see [The companion on npm](#the-companion-on-npm)) |
 | `packages/cli` | Command line: offline rendering, exports |
 | `apps/editor` | The web editor (Preact) |
 | `apps/worker` | The Cloudflare Worker: serves the editor, projects in R2, assistant relay |
@@ -86,6 +86,52 @@ Maintainers release what `develop` holds:
 The desktop workflow ([.github/workflows/desktop.yml](.github/workflows/desktop.yml)) then finds a version on `main` without a tag: it builds the app on Windows, macOS and Linux, publishes the GitHub release `v0.12.0` with that changelog section as its notes, and deploys the site again. No tag to push by hand: the workflow makes it.
 
 An urgent fix to the released version starts from `main` instead: a `fix/…` branch with the fix and a patch version (`node scripts/version.ts 0.11.2`), merged into `main`, which releases it the same way. A pull request from `main` into `develop` (a merge commit too) then brings it back; in the changelog, keep both sides.
+
+### The companion on npm
+
+The assistant's local companion is published by hand on npm as `tramme`, which users start with `npx tramme`. `pnpm companion:build` ([packages/companion/build.ts](packages/companion/build.ts)) writes the package in `packages/companion/dist/`:
+
+- `bin/tramme.mjs` is the companion in one file, with Tramme's own packages inside it.
+- `package.json` is the published manifest: the name `tramme`, the version of `packages/companion` (the project's, set by `scripts/version.ts`), the licence, the author and the dependencies npm installs beside it (the Claude Agent SDK, the MCP SDK, cross-spawn, zod).
+- `README.md` is what npm shows ([packages/companion/README.md](packages/companion/README.md), with the site's address).
+- `LICENSE` is the root licence.
+
+transformers.js stays out of the package: the companion installs it in `~/.tramme/whisper` at its first transcription, at the version the editor uses.
+
+**Once, for the account.**
+
+1. Create the npm account of the publisher (Qualris) on [npmjs.com](https://www.npmjs.com/signup), and turn on two-factor authentication for login and publishing (Account, Two-Factor Authentication).
+2. Sign in on the computer that publishes: `npm login`, then `npm whoami` to check the account.
+3. `npm view tramme` answers 404 while the name is free; the first publish takes it for the account.
+
+**Each version.** Once the release has reached `main` (see above):
+
+1. Check out `main` and make sure it holds the released version (`node -p "require('./packages/companion/package.json').version"`).
+2. Install and check:
+
+   ```sh
+   pnpm install --frozen-lockfile
+   pnpm typecheck
+   pnpm exec vitest run packages/companion
+   ```
+
+3. Build: `pnpm companion:build`. It prints the version and the size of `bin/tramme.mjs` (about 160 KB).
+4. Look at what will be sent: `npm pack --dry-run ./packages/companion/dist`. It must list exactly `LICENSE`, `README.md`, `bin/tramme.mjs` and `package.json`, under the right version.
+5. Try it as a user, in an empty folder outside the repository, with no companion already running on port 4317:
+
+   ```sh
+   npm pack ./packages/companion/dist --pack-destination <empty folder>
+   cd <empty folder>
+   npm install ./tramme-<version>.tgz
+   npx tramme --version
+   npx tramme
+   ```
+
+   It must print the version, then `Tramme companion ready`, the agents found and `automatic pairing for: https://app.tramme.dev, http://tramme.localhost, tramme://localhost`. Open the app, check that the assistant pairs and that its model menu lists the agents, then stop the companion with Ctrl+C.
+6. Publish: `npm publish ./packages/companion/dist --access public`. npm asks for the two-factor code.
+7. Check: `npm view tramme version` gives the new version, and `npx tramme@latest --version` gives it too from another folder.
+
+A published version can never be published again, even after it is removed. If a version is wrong, publish the fix as a patch version (after 0.26.0, `node scripts/version.ts 0.26.1`, as for an urgent fix) and mark the bad one with `npm deprecate tramme@<version> "<what to use instead>"`. `npm unpublish` works only in the first 72 hours, and only while no other package depends on that version.
 
 ## Android
 
