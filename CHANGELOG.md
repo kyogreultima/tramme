@@ -8,6 +8,10 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+### Fixed
+
+- The assistant's panel said to start the companion "in the Tramme folder": it now says to start it in a terminal, with Node.js 20 or later, and the messages that ask to start it give the command, `npx tramme`.
+
 ## [0.26.0] - 2026-11-15
 
 ### Added
