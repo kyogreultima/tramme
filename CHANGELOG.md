@@ -8,6 +8,24 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+## [0.28.0] - 2026-11-16
+
+### Added
+
+- **Pins moved by hand**: in the studio, a pin of the note being written or of a retouch in the list is dragged by its number to another place of the picture; a path or an area moves whole and stays in the frame, and what it points at follows (the layer under a point or a path's start, the layers a selection takes in).
+
+### Changed
+
+- The assistant's work in progress (what it does, its stages, its last steps, pause and stop) sits at the bottom of the conversation and stays in sight while you scroll; the takes and the pictures it looked at stay above it.
+- The watermark is in the top left corner of exported films, and anyone can turn it off in Settings, Behavior, until accounts are open to all.
+- `app.tramme.dev` is the deployment with accounts, deployed by the platform when `main` moves; the personal environment's addresses in `apps/worker/wrangler.jsonc` are an example to replace with your own domain's.
+
+### Fixed
+
+- On a project with more pictures than the memory keeps, the storyboard, the preview, the home screen's picture and the exports of an isolated project drew a frame without some of its pictures, and the storyboard showed the engine's error over the film. The pictures a frame shows are loaded before it is drawn; a storyboard frame that cannot be drawn keeps its last picture.
+- While the preview was loading, the picture showed "Isolated selection could not be calculated: preview is not ready": the panels that read the layers through it now wait for it, and adding a mask or drawing an area at that moment says to try again in a moment.
+- The image of the export in the cloud failed to build: the build's own `node_modules` were copied into it (`.dockerignore`).
+
 ## [0.27.0] - 2026-11-15
 
 ### Added
@@ -933,7 +951,8 @@ First public release.
 
 - Cloudflare Worker serving the editor and the API, projects stored in R2, access protected by Cloudflare Access.
 
-[Unreleased]: ../../compare/v0.27.0...HEAD
+[Unreleased]: ../../compare/v0.28.0...HEAD
+[0.28.0]: ../../compare/v0.27.0...v0.28.0
 [0.27.0]: ../../compare/v0.26.1...v0.27.0
 [0.26.1]: ../../compare/v0.26.0...v0.26.1
 [0.26.0]: ../../compare/v0.25.0...v0.26.0
