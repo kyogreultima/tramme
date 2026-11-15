@@ -93,6 +93,11 @@ describe("Antigravity's agent for a request without tools", () => {
     expect(antigravityAgent(base)).toContain('tools: [view_file]');
     expect(antigravityAgent(base)).toContain('SYS');
   });
+
+  it('runs with its updater off, whose background update opens a terminal window on Windows', async () => {
+    const { AGY_ENV } = await import('../src/agents.ts');
+    expect(AGY_ENV.AGY_CLI_DISABLE_AUTO_UPDATE).toBe('true');
+  });
 });
 
 describe('where Codex is looked for besides the PATH', () => {

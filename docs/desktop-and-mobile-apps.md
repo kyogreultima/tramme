@@ -33,7 +33,7 @@ So the app's step 3 (assistant) was mostly a matter of answering `api.reach` in 
 | Large uploads in parts (R2 multipart) | `api.writeAny` | Not needed with local files: write in one go |
 | Assistant through the server (`/api/claude`, `/api/llm`, `/api/models`) | `apps/worker/src/claude.ts`, `llm.ts` | Call the providers directly, with keys stored on the device |
 | Speech to text (`/api/transcribe`, Workers AI Whisper) | `apps/worker/src/speech.ts` | The OpenAI key (`packages/api` transcribe.ts), or the companion's local Whisper |
-| Local companion (`tramme agent`, Node + Claude Agent SDK) | `packages/cli/src/companion.ts` | Desktop: can stay a separate program. Mobile: not possible |
+| Local companion (`npx tramme`, Node + Claude Agent SDK) | `packages/companion` | Desktop: can stay a separate program. Mobile: not possible |
 | Access control (Cloudflare Access) | `apps/worker/src/access.ts` | Not needed for a local app |
 | Video export (WebCodecs), compositor (WebGL2) | `apps/editor/src/webexport.ts`, `packages/render` | Depends on the webview (see the table below) |
 | Saving exports (`showSaveFilePicker`, downloads) | `apps/editor/src/download.ts` | Use Tauri's dialog and file system plugins |
@@ -71,7 +71,7 @@ Where the projects go: a `Tramme` folder in the user's documents by default, con
 - **Keys on the device.** The user enters their own provider keys in the settings. Store them with the OS keychain (a Tauri plugin such as `tauri-plugin-stronghold` or a keyring plugin), never in plain files or `localStorage`.
 - **Direct calls.** The editor already runs the tool loop in the page; only the transport changes, from the Worker relay to the provider's API. Check each provider's CORS rules for calls from a webview; if one refuses, route it through a Rust command.
 - **Local models** (Ollama, LM Studio) already work from the browser and keep working.
-- **Companion.** On desktop, `tramme agent` can keep running next to the app (it needs Node and an agent signed in: Claude Code, Codex or the Antigravity CLI). Bundling it as a sidecar means shipping Node: decide later.
+- **Companion.** On desktop, `npx tramme` runs next to the app and pairs with it by itself (it needs Node and an agent signed in: Claude Code, Codex or the Antigravity CLI). Bundling it as a sidecar means shipping Node: decide later.
 - **Transcription.** OpenAI Whisper with the user's key (done), or on desktop the companion's local Whisper.
 
 ## The webview per platform

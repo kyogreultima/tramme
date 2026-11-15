@@ -83,7 +83,7 @@ export function AccessSettings({ anchor, onClose }: { anchor: HTMLElement; onClo
           {st.companion === 'ok' && <div class="faint">{t('assistant.companionAgents', { list: ENGINES.filter((e) => st.engines[e]).map((e) => ENGINE_MODELS[e].label).join(', ') })}</div>}
           <Seg value={set.prefer} options={[['auto', t('common.automatic')], ['companion', t('common.companion')], ['server', serverName()]]} onChange={(v) => setAiSettings({ prefer: v as typeof set.prefer })} />
           <div class="faint">{t('assistant.automaticTheLocalCompanion')}</div>
-          {st.companion !== 'ok' && <div class="faint">{t('assistant.inTheTrammeFolder')} <CompanionCommand /></div>}
+          {st.companion !== 'ok' && <div class="faint">{t('assistant.inATerminal')} <CompanionCommand /></div>}
           <label class="lbl">{t('assistant.tokenShownByThe')}</label>
           <div class="field"><input type="password" value={token} placeholder={t('common.pairingToken')} onInput={(e) => setToken((e.target as HTMLInputElement).value.trim())} onChange={() => setAiSettings({ token })} /></div>
           <label class="lbl">{t('assistant.companionAddress')}</label>
