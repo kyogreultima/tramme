@@ -8,7 +8,7 @@ import type { ComponentChildren, RefObject } from 'preact';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { aiRoute } from '../ai/index.ts';
 import { running, runCommand, send, stop, type Anchor } from '../ai/conversation.ts';
-import { fieldsOf, inputOf, listCommands, matchCommands, parseCommand, ranked, ready, type Command, type Field } from '../ai/commands.ts';
+import { applyCommand, commandQuery, commandsIn, fieldsOf, inputOf, listCommands, matchCommands, parseCommand, piecesOf, ranked, ready, type Command, type Field } from '../ai/commands.ts';
 import { refreshLibrary } from '../library.ts';
 import { applyMention, assetMentions, describeAsset, expandMentions, matchMentions, mentionQuery, type Mentionable } from '../mentions.ts';
 import { attachFiles, attaching, draft, pending, removePending } from '../attachments.ts';
@@ -27,32 +27,45 @@ export const ATTACHABLE = 'image/*,audio/*,video/*,.pdf,application/pdf,.md,.mar
 /** files dropped or picked: joined to the next message */
 export const join = (list: FileList | File[] | null | undefined) => { const f = Array.from(list ?? []); if (f.length) attachFiles(f); };
 
+/** a query read at the caret, still the words it was read from (a box emptied or rewritten since drops it) */
+const still = (text: string, q: { from: number; query: string } | null, sign: string) => (q && text.slice(q.from, q.from + 1 + q.query.length) === sign + q.query ? q : null);
+
+/** the caret's place again after the words changed under it */
+const caretAt = (area: RefObject<HTMLTextAreaElement | null>, at: number) => requestAnimationFrame(() => { const el = area.current; if (el) { el.focus(); el.setSelectionRange(at, at); } });
+
 /**
  * The / menu of a box (the message box, the home's direction box): the
- * commands matching what is typed after a / at its start, tools first then
- * workflows (the order the keys move in). `keyDown` says whether the key was
- * the menu's; `typed` reopens it after the user typed.
+ * commands matching what is typed after a / at the caret (at the start or
+ * after a space, so a message can name several), tools first then workflows
+ * (the order the keys move in). `keyDown` says whether the key was the menu's;
+ * `sync` reads the caret again after the user typed or moved it.
  */
-export function useCommandMenu(text: string, commands: Command[], onPick: (c: Command) => void) {
+export function useCommandMenu(area: RefObject<HTMLTextAreaElement | null>, text: string, setText: (v: string) => void, commands: Command[], onPick?: (c: Command) => void) {
+  const [read, setQ] = useState<{ from: number; query: string } | null>(null);
   const [hi, setHi] = useState(0);
-  const [off, setOff] = useState(false);
-  const typing = /^\/([\w.-]*)$/.exec(text);
-  const found = typing && !off ? ranked(matchCommands(commands, typing[1], tr), prefs.value.recentCommands, typing[1]).slice(0, 30) : [];
+  const q = still(text, read, '/');
+  const sync = () => { const el = area.current; setQ(el ? commandQuery(el.value, el.selectionStart ?? el.value.length) : null); setHi(0); };
+  const found = q ? ranked(matchCommands(commands, q.query, tr), prefs.value.recentCommands, q.query).slice(0, 30) : [];
   const matches = [...found.filter((c) => c.kind === 'tool'), ...found.filter((c) => c.kind === 'prompt')];
   const open = matches.length > 0, at = Math.min(hi, matches.length - 1);
-  const pick = (c: Command) => { setHi(0); commandUsed(c.name); onPick(c); };
+  const pick = (c: Command) => {
+    if (!q) return;
+    const r = applyCommand(text, q, c.name);
+    setText(r.text); setQ(null); setHi(0);
+    commandUsed(c.name); onPick?.(c);
+    caretAt(area, r.caret);
+  };
   const keyDown = (e: KeyboardEvent) => {
     if (!open) return false;
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') setHi((i) => (i + (e.key === 'ArrowDown' ? 1 : matches.length - 1)) % matches.length);
     else if ((e.key === 'Enter' && !e.shiftKey) || e.key === 'Tab') pick(matches[at]);
-    else if (e.key === 'Escape') setOff(true);
+    else if (e.key === 'Escape') setQ(null);
     else return false;
     e.preventDefault();
     return true;
   };
-  const typed = () => { setOff(false); setHi(0); };
   const view = open ? <CommandMenu list={matches} hi={at} onHover={setHi} onPick={pick} /> : null;
-  return { open, view, keyDown, typed };
+  return { open, view, keyDown, sync };
 }
 
 /**
@@ -62,8 +75,9 @@ export function useCommandMenu(text: string, commands: Command[], onPick: (c: Co
  * user typed or moved it.
  */
 export function useMentionMenu(area: RefObject<HTMLTextAreaElement | null>, text: string, setText: (v: string) => void, list: Mentionable[]) {
-  const [q, setQ] = useState<{ from: number; query: string } | null>(null);
+  const [read, setQ] = useState<{ from: number; query: string } | null>(null);
   const [hi, setHi] = useState(0);
+  const q = still(text, read, '@');
   const sync = () => { const el = area.current; setQ(el ? mentionQuery(el.value, el.selectionStart ?? el.value.length) : null); setHi(0); };
   const matches = q ? matchMentions(list, q.query).slice(0, 30) : [];
   const open = matches.length > 0, at = Math.min(hi, matches.length - 1);
@@ -71,7 +85,7 @@ export function useMentionMenu(area: RefObject<HTMLTextAreaElement | null>, text
     if (!q) return;
     const r = applyMention(text, q, m.token);
     setText(r.text); setQ(null);
-    requestAnimationFrame(() => { const el = area.current; if (el) { el.focus(); el.setSelectionRange(r.caret, r.caret); } });
+    caretAt(area, r.caret);
   };
   const keyDown = (e: KeyboardEvent) => {
     if (!open) return false;
@@ -89,13 +103,46 @@ export function useMentionMenu(area: RefObject<HTMLTextAreaElement | null>, text
         {matches.map((m, i) => (
           <button key={m.token} role="option" aria-selected={i === at} class={`command-row${i === at ? ' on' : ''}`} onMouseDown={(e) => { e.preventDefault(); pick(m); }} onMouseEnter={() => setHi(i)}>
             <span class="command-icon"><Icon name={m.kind === 'image' ? 'image' : m.kind === 'video' ? 'film' : m.kind === 'audio' ? 'audio' : 'doc'} /></span>
-            <span class="command-text"><span class="command-line"><span class="command-title">{m.label}</span><span class="command-name">@{m.token}</span></span></span>
+            <span class="command-text"><span class="command-line"><span class="command-title">{m.label}</span><span class="command-name tag">@{m.token}</span></span></span>
           </button>
         ))}
       </div>
     </div>
   ) : null;
   return { open, view, keyDown, sync };
+}
+
+/**
+ * A box's words drawn again behind it, the /commands and @tags it knows
+ * marked (a command in the accent, a tag in another colour): the textarea's
+ * own text stays over them, clear, so typing and the caret are the field's.
+ * The layer takes the field's font, padding and width, and follows its scroll.
+ */
+export function MarkedField({ area, text, isCommand, isTag, children }: { area: RefObject<HTMLTextAreaElement | null>; text: string; isCommand: (name: string) => boolean; isTag: (token: string) => boolean; children: ComponentChildren }) {
+  const back = useRef<HTMLDivElement>(null);
+  const pieces = piecesOf(text, isCommand, isTag), marked = pieces.some((p) => p.kind);
+  useLayoutEffect(() => {
+    const el = area.current, b = back.current;
+    if (!el || !b) return;
+    const cs = getComputedStyle(el);
+    for (const k of ['font', 'letterSpacing', 'lineHeight', 'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'borderTopWidth', 'borderLeftWidth', 'tabSize'] as const) (b.style as unknown as Record<string, string>)[k] = cs[k];
+    b.style.width = `${el.clientWidth + parseFloat(cs.borderLeftWidth)}px`;
+    b.style.height = `${el.offsetHeight}px`;
+    b.scrollTop = el.scrollTop;
+  });
+  useEffect(() => {
+    const el = area.current;
+    if (!el) return;
+    const follow = () => { if (back.current) back.current.scrollTop = el.scrollTop; };
+    el.addEventListener('scroll', follow, { passive: true });
+    return () => el.removeEventListener('scroll', follow);
+  }, []);
+  return (
+    <div class="marked-field">
+      {marked && <div class="marked" ref={back} aria-hidden="true">{pieces.map((p, i) => (p.kind ? <mark key={i} class={p.kind}>{p.text}</mark> : p.text))}{'\n'}</div>}
+      {children}
+    </div>
+  );
 }
 
 /** the commands matching what follows the /, tools first then workflows (the order the keys move in) */
@@ -193,15 +240,16 @@ export function Composer({ placeholder, anchor, tools, context, onSent, area: gi
   const reg = S.registry.value;
   const commands = useMemo(() => listCommands(reg), [reg]);
   const [form, setForm] = useState<{ name: string; values: Record<string, unknown> }>({ name: '', values: {} });
-  const pick = (c: Command) => { setText(`/${c.name} `); setForm({ name: c.name, values: {} }); area.current?.focus(); };
-  const commandMenu = useCommandMenu(text, commands, pick), menu = commandMenu.open;
+  const commandMenu = useCommandMenu(area, text, setText, commands, (c) => setForm({ name: c.name, values: {} })), menu = commandMenu.open;
   // the @ menu: the project's assets, tagged in the words
   const assets = S.doc.value;
   const mentionList = useMemo(() => assetMentions(assets), [assets]);
   const mention = useMentionMenu(area, text, setText, mentionList);
   // the library's plugins, fresh for its pickers whenever the menu opens
   useEffect(() => { if (menu) refreshLibrary(); }, [menu]);
-  const parsed = menu ? null : parseCommand(text, commands);
+  // every command the words name; one alone at the start keeps its form (a tool runs from it at once)
+  const named = menu ? [] : commandsIn(text, commands);
+  const parsed = named.length === 1 ? parseCommand(text, commands) : null;
   const cmd = parsed?.cmd ?? null;
   const values = cmd && form.name === cmd.name ? form.values : {};
   const fields = cmd?.kind === 'tool' ? fieldsOf(cmd.input, S.doc.value, S.compId.value, reg, S.selection.value) : [];
@@ -212,17 +260,19 @@ export function Composer({ placeholder, anchor, tools, context, onSent, area: gi
     const v = text.trim();
     if (!v && !pending.peek().length) return;
     // a command is not queued: it waits for the end of the turn, in the box
-    if (busy && cmd) return;
+    if (busy && named.length) return;
     if (direct) { run(); return; }
     if (cmd?.kind === 'tool' && !parsed!.rest) { toast(t('assistant.fillRequired')); return; }
-    if (/^\/[\w.-]+$/.test(v) && !cmd) { toast(t('assistant.noCommand')); return; }
+    if (/^\/[\w.-]+$/.test(v) && !named.length) { toast(t('assistant.noCommand')); return; }
     if (!available) return;
     setText('');
     // a command typed whole and sent counts as used, as one picked from the menu
-    if (cmd) commandUsed(cmd.name);
-    send(expandMentions(v, describeAsset(S.doc.peek())), { command: cmd ? { cmd, input } : undefined, anchor: anchor?.() });
+    for (const c of named) commandUsed(c.name);
+    send(expandMentions(v, describeAsset(S.doc.peek())), { commands: named.map((c) => (c === cmd ? { cmd: c, input } : { cmd: c })), anchor: anchor?.() });
     onSent?.();
   };
+  const isCommand = (name: string) => commands.some((c) => c.name === name);
+  const isTag = (token: string) => !!describeAsset(assets)(token);
   const keyDown = (e: KeyboardEvent) => {
     if (commandMenu.keyDown(e) || mention.keyDown(e)) return;
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); }
@@ -241,13 +291,15 @@ export function Composer({ placeholder, anchor, tools, context, onSent, area: gi
             {attaching.value > 0 && <span class="file-chip"><Icon name="spinner" /><span class="file-name">{t('assistant.uploading')}</span></span>}
           </div>
         )}
-        <textarea ref={area} rows={1} value={text}
-          onPaste={(e) => { const imgs = Array.from(e.clipboardData?.files ?? []).filter((f) => f.type.startsWith('image/')); if (imgs.length) { e.preventDefault(); join(imgs); } }}
-          placeholder={available ? placeholder : t('assistant.unavailableSlash')}
-          aria-autocomplete="list"
-          onInput={(e) => { setText((e.target as HTMLTextAreaElement).value); commandMenu.typed(); mention.sync(); }}
-          onClick={mention.sync}
-          onKeyDown={keyDown} />
+        <MarkedField area={area} text={text} isCommand={isCommand} isTag={isTag}>
+          <textarea ref={area} rows={1} value={text}
+            onPaste={(e) => { const imgs = Array.from(e.clipboardData?.files ?? []).filter((f) => f.type.startsWith('image/')); if (imgs.length) { e.preventDefault(); join(imgs); } }}
+            placeholder={available ? placeholder : t('assistant.unavailableSlash')}
+            aria-autocomplete="list"
+            onInput={(e) => { setText((e.target as HTMLTextAreaElement).value); commandMenu.sync(); mention.sync(); }}
+            onClick={() => { commandMenu.sync(); mention.sync(); }}
+            onKeyDown={keyDown} />
+        </MarkedField>
         <div class="bar">
           <button class="icon-btn sm" title={t('assistant.attachImagesSoundsOr')} disabled={!available} onClick={() => files.current?.click()}><Icon name="attach" /></button>
           <input ref={files} type="file" multiple hidden accept={ATTACHABLE} onChange={(e) => { join((e.target as HTMLInputElement).files); (e.target as HTMLInputElement).value = ''; }} />
@@ -257,7 +309,7 @@ export function Composer({ placeholder, anchor, tools, context, onSent, area: gi
           {list && <button class="icon-btn sm add-retouch" title={t('studio.addToList')} disabled={!available} onClick={() => { if (list.onAdd(text, spoke.current)) { setText(''); spoke.current = false; } }}><Icon name="plus" /></button>}
           {list && list.count > 0 && <button class="btn sm primary send-all" title={t('studio.sendAllHint')} onClick={() => { if (text.trim() && list.onAdd(text, spoke.current)) { setText(''); spoke.current = false; } list.onSendAll(); }}><Icon name="send" />{t('studio.sendAll', { n: list.count + (text.trim() ? 1 : 0) })}</button>}
           {busy && <button class="send stop" title={t('assistant.stop')} onClick={stop}><Icon name="stop" /></button>}
-          <button class="send" title={t('assistant.sendEnter')} disabled={(!text.trim() && !pending.value.length) || attaching.value > 0 || (!available && !direct) || (busy && !!cmd)} onClick={submit}><Icon name="send" /></button>
+          <button class="send" title={t('assistant.sendEnter')} disabled={(!text.trim() && !pending.value.length) || attaching.value > 0 || (!available && !direct) || (busy && named.length > 0)} onClick={submit}><Icon name="send" /></button>
         </div>
       </div>
     </div>

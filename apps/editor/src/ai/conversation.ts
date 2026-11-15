@@ -8,7 +8,7 @@
 import { signal } from '@preact/signals';
 import type { AiEvent, ChatItem } from '../api.ts';
 import { aiSettings, ask, chat, decided, runTool, saveChat, stop as stopAi } from './index.ts';
-import { inputLine, type Command } from './commands.ts';
+import { inputLine, type Called, type Command } from './commands.ts';
 import { paused, uid } from './calls.ts';
 import { opLine } from './tools.ts';
 import { attaching, pending } from '../attachments.ts';
@@ -88,9 +88,9 @@ function gather(id: string, kind: 'text' | 'thinking', delta: string) {
   flushTimer ??= setTimeout(flushWords, STREAM_FLUSH);
 }
 
-/** a message for the assistant; command: the tool or workflow it was written with (/name); anchor: the scene and point of a studio note */
-export async function send(text: string, opts: { command?: { cmd: Command; input?: Record<string, unknown> }; anchor?: Anchor } = {}) {
-  const atts = pending.peek(), { command, anchor } = opts;
+/** a message for the assistant; commands: the tools and workflows it names (/name), in the order written; anchor: the scene and point of a studio note */
+export async function send(text: string, opts: { commands?: Called[]; anchor?: Anchor } = {}) {
+  const atts = pending.peek(), { anchor } = opts, command = opts.commands?.length ? opts.commands : undefined;
   if ((!text.trim() && !atts.length) || attaching.peek()) return;
   // a turn runs: the message waits for its end (a command stays unavailable meanwhile)
   if (running.peek()) { if (!command) enqueue(text, anchor); return; }
@@ -100,7 +100,7 @@ export async function send(text: string, opts: { command?: { cmd: Command; input
 }
 
 /** one turn of the agent for these messages (one, or the queue's), each shown as written and sent with its own context */
-export async function startTurn(messages: Queued[], command?: { cmd: Command; input?: Record<string, unknown> }) {
+export async function startTurn(messages: Queued[], commands?: Called[]) {
   held.value = false;
   chat.value = [...chat.value, ...messages.map((m): ChatItem => ({
     id: uid(), role: 'user', text: m.text, context: m.context, at: m.at,
@@ -121,7 +121,7 @@ export async function startTurn(messages: Queued[], command?: { cmd: Command; in
   });
   const last = messages.length - 1, attachments = messages.flatMap((m) => m.attachments);
   await consume((signal) => ask({
-    text: messages[last].text, context: contexts[last], doc: S.doc.peek(), decisions: ds, attachments, command: command?.cmd, commandInput: command?.input,
+    text: messages[last].text, context: contexts[last], doc: S.doc.peek(), decisions: ds, attachments, ...(commands?.length ? { commands } : {}),
     ...(messages.length > 1 ? { queued: messages.map((m, i) => ({ text: m.text, context: contexts[i] })) } : {}),
   }, signal), auto);
 }

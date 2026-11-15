@@ -19,7 +19,7 @@ import { kindOf } from '../sources.ts';
 import { S, toast } from '../state.ts';
 import { listCommands, type Command } from '../ai/commands.ts';
 import { packCommands, shippedPacks } from '../packs.ts';
-import { useCommandMenu, useMentionMenu } from './composer.tsx';
+import { MarkedField, useCommandMenu, useMentionMenu } from './composer.tsx';
 import { expandMentions } from '../mentions.ts';
 import { MicButton, writeInto } from './MicButton.tsx';
 import { handheld, Modal, longPress, openMenu, Seg } from './controls.tsx';
@@ -196,6 +196,9 @@ function Card({ m, onMenu }: { m: Manifest; onMenu: (e: MouseEvent | { clientX: 
 }
 
 /** the direction box: the words of the film, the material it is made from, the model that makes it, its format */
+/** the word that tags a file of the material: its name, its spaces made underscores */
+const tagOf = (p: Picked) => p.file.name.replace(/\s+/g, '_');
+
 export function DirectionBox({ busy, onStart }: { busy: boolean; onStart: (words: string, material: Picked[], format: [number, number]) => void }) {
   // the words of the site's box, carried through the sign-up (?prompt=)
   const [words, setWords] = useState(() => new URLSearchParams(location.search).get('prompt') ?? '');
@@ -207,16 +210,17 @@ export function DirectionBox({ busy, onStart }: { busy: boolean; onStart: (words
   useEffect(() => { const el = area.current; if (el) { el.style.height = 'auto'; el.style.height = `${Math.min(260, Math.max(92, el.scrollHeight))}px`; } }, [words]);
   const add = (list: Picked[]) => setMaterial((had) => [...had, ...list.filter((p) => !had.some((h) => h.path === p.path))]);
   const ready = !busy && (words.trim().length > 0 || material.length > 0);
-  const start = () => { if (!ready) return; const f = FILM_FORMATS.find(([id]) => id === format)!; onStart(expandMentions(words.trim(), (tok) => { const p = material.find((x) => x.file.name.replace(/s+/g, '_') === tok); return p ? `the attached file "${p.file.name}"` : null; }), material, [f[2], f[3]]); };
+  const start = () => { if (!ready) return; const f = FILM_FORMATS.find(([id]) => id === format)!; onStart(expandMentions(words.trim(), (tok) => { const p = material.find((x) => tagOf(x) === tok); return p ? `the attached file "${p.file.name}"` : null; }), material, [f[2], f[3]]); };
   // the / menu, as in the message box: a workflow starts the project with it, a tool waits in the editor's box with its form.
   // The shipped packs' commands come from the index, so the menu offers them before a project holds any pack.
   const [packCmds, setPackCmds] = useState<Command[]>([]);
   useEffect(() => { void shippedPacks().then((p) => setPackCmds(packCommands(p))); }, []);
   const commands = useMemo(() => [...listCommands(S.registry.value), ...packCmds], [S.registry.value, packCmds]);
-  const commandMenu = useCommandMenu(words, commands, (c) => { setWords(`/${c.name} `); area.current?.focus(); });
+  const commandMenu = useCommandMenu(area, words, setWords, commands);
   // the @ menu: the material added so far, tagged in the words
-  const tags = useMemo(() => material.map((p) => ({ token: p.file.name.replace(/s+/g, '_'), label: p.file.name, kind: kindOf(p.file) })), [material]);
+  const tags = useMemo(() => material.map((p) => ({ token: tagOf(p), label: p.file.name, kind: kindOf(p.file) })), [material]);
   const mention = useMentionMenu(area, words, setWords, tags);
+  const isCommand = (name: string) => commands.some((c) => c.name === name), isTag = (token: string) => tags.some((x) => x.token === token);
   const chosen = (e: Event) => { const input = e.target as HTMLInputElement, list = pickedOf(input.files ?? []); input.value = ''; add(list); };
   return (
     <div class="hero">
@@ -225,13 +229,15 @@ export function DirectionBox({ busy, onStart }: { busy: boolean; onStart: (words
       <form class="brief-box" data-tour="home-new" onSubmit={(e) => { e.preventDefault(); start(); }}
         onDragOver={(e) => { if (e.dataTransfer?.types.includes('Files')) { e.preventDefault(); e.stopPropagation(); } }}
         onDrop={(e) => { if (!e.dataTransfer) return; e.preventDefault(); e.stopPropagation(); droppedOf(e.dataTransfer).then((list) => add(list.filter((p) => isSourceFile(p.file)))); }}>
-        <textarea ref={area} value={words} placeholder={t('home.heroPlaceholder')}
-          // ready to type with a keyboard; on a touch screen the keyboard would cover the page as soon as it opens
-          autoFocus={!handheld()}
-          aria-autocomplete="list"
-          onInput={(e) => { setWords((e.target as HTMLTextAreaElement).value); commandMenu.typed(); mention.sync(); }}
-          onClick={mention.sync}
-          onKeyDown={(e) => { if (commandMenu.keyDown(e) || mention.keyDown(e)) return; if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); start(); } }} />
+        <MarkedField area={area} text={words} isCommand={isCommand} isTag={isTag}>
+          <textarea ref={area} value={words} placeholder={t('home.heroPlaceholder')}
+            // ready to type with a keyboard; on a touch screen the keyboard would cover the page as soon as it opens
+            autoFocus={!handheld()}
+            aria-autocomplete="list"
+            onInput={(e) => { setWords((e.target as HTMLTextAreaElement).value); commandMenu.sync(); mention.sync(); }}
+            onClick={() => { commandMenu.sync(); mention.sync(); }}
+            onKeyDown={(e) => { if (commandMenu.keyDown(e) || mention.keyDown(e)) return; if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); start(); } }} />
+        </MarkedField>
         {commandMenu.view}
         {mention.view}
         {material.length > 0 && (

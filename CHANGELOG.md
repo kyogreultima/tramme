@@ -8,6 +8,18 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+### Added
+
+- **Several commands in one message**: a `/command` can be written anywhere in a message (at its start or after a space), as many as needed; the assistant gets each of them, in the order written. One tool alone at the start keeps its form and runs at once, as before.
+
+### Changed
+
+- In the message boxes (the assistant, the studio, the home screen), the commands and tags the project knows are marked where they are written: a `/command` in the accent, an `@tag` in another colour; an unknown one stays plain words.
+
+### Fixed
+
+- On the home screen, a file's tag replaced the letters "s" of its name instead of its spaces.
+
 ## [0.28.0] - 2026-11-16
 
 ### Added

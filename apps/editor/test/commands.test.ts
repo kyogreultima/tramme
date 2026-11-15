@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { applyOps, validate, type ToolContext, type TrammeDoc } from '@tramme/core';
 import { newProject } from '@tramme/project';
-import { fieldsOf, inputOf, listCommands, matchCommands, parseCommand, ranked, ready, type Command } from '../src/ai/commands.ts';
+import { applyCommand, commandQuery, commandsIn, fieldsOf, inputOf, listCommands, matchCommands, parseCommand, piecesOf, ranked, ready, type Command } from '../src/ai/commands.ts';
 import { editorRegistry } from '../src/vocabulary.ts';
 
 const sky = {
@@ -97,5 +97,37 @@ describe('the dressings as tools', () => {
     expect(l.props?.source).toBe('beetle');
     expect(c.order).toContain(id);
     expect(l.in).toBe(1);
+  });
+});
+
+describe('several commands in one message', () => {
+  const reg = editorRegistry().clone().use(sky, 'sky');
+  const list = listCommands(reg);
+
+  it('opens the menu on a / at the caret, at the start or after a space, never inside a word', () => {
+    expect(commandQuery('/st', 3)).toEqual({ from: 0, query: 'st' });
+    expect(commandQuery('make it /ni', 11)).toEqual({ from: 8, query: 'ni' });
+    expect(commandQuery('1/2 of it', 3)).toBeNull();
+    expect(commandQuery('https://x', 9)).toBeNull();
+  });
+
+  it('puts the chosen name in place of what was typed, the caret after it', () => {
+    expect(applyCommand('make it /ni please', { from: 8, query: 'ni' }, 'night')).toEqual({ text: 'make it /night  please', caret: 15 });
+  });
+
+  it('finds every command a message names, once each, in order, the unknown ones left out', () => {
+    expect(commandsIn('/night with /demo.stars and /nothing, /night again', list).map((c) => c.name)).toEqual(['night', 'demo.stars']);
+    expect(commandsIn('a path a/night is no command', list)).toEqual([]);
+  });
+
+  it('marks the known commands and tags apart from the words', () => {
+    const isCommand = (n: string) => n === 'night', isTag = (t: string) => t === 'logo';
+    expect(piecesOf('/night over @logo, @nobody and /nope', isCommand, isTag)).toEqual([
+      { text: '/night', kind: 'command' },
+      { text: ' over ' },
+      { text: '@logo', kind: 'tag' },
+      { text: ', @nobody and /nope' },
+    ]);
+    expect(piecesOf('plain words', isCommand, isTag)).toEqual([{ text: 'plain words' }]);
   });
 });

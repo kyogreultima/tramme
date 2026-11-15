@@ -10,7 +10,7 @@
 
 import { aiRoute, chat, refreshStatus } from './ai/index.ts';
 import { send } from './ai/conversation.ts';
-import { listCommands, parseCommand } from './ai/commands.ts';
+import { commandsIn, listCommands, parseCommand } from './ai/commands.ts';
 import { draft, pending } from './attachments.ts';
 import { startKey, type Start } from './importer.ts';
 import { packCommands, shippedPacks } from './packs.ts';
@@ -47,7 +47,7 @@ function greet(text: string) {
 
 /**
  * The words the project was made with, sent at once with the workflow that
- * fits, or with the command they name (/name), as the message box sends it;
+ * fits, or with the commands they name (/name), as the message box sends them;
  * a tool named alone waits in the box with its form. No model to send them
  * to: they wait in the box.
  */
@@ -58,9 +58,11 @@ async function begin(words: string, workflow?: string) {
   const slash = named ? null : /^\/([A-Za-z][\w.-]*)/.exec(words.trim());
   if (slash && (await shippedPacks()).some((p) => (p.commands ?? []).some((c) => c.name === slash[1]))) { draft.value = words; return; }
   if (!aiRoute.peek()) await refreshStatus();
-  const cmd = named ?? (workflow ? commands.find((c) => c.name === workflow && c.kind === 'prompt') : undefined);
-  if (!aiRoute.peek()) { draft.value = cmd && !named ? `/${cmd.name} ${words}` : words; return; }
-  send(words, cmd ? { command: { cmd } } : {});
+  // every command the words name, or else the workflow that fits
+  const written = commandsIn(words, commands), fit = workflow ? commands.find((c) => c.name === workflow && c.kind === 'prompt') : undefined;
+  const cmds = written.length ? written : fit ? [fit] : [];
+  if (!aiRoute.peek()) { draft.value = fit && !written.length ? `/${fit.name} ${words}` : words; return; }
+  send(words, cmds.length ? { commands: cmds.map((cmd) => ({ cmd })) } : {});
 }
 
 export function startProject() {
