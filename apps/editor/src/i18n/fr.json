@@ -238,6 +238,34 @@
     "uploadingName": "Envoi de {name}",
     "properties": "Propriétés"
   },
+  "gallery": {
+    "title": "Publier dans la galerie",
+    "publishButton": "Publier dans la galerie",
+    "lead": "Ce film part dans la galerie avec une image prise en son milieu. Votre projet reste tel quel dans votre compte.",
+    "leadAgain": "Le film de ce projet est déjà dans la galerie : publier le remplace par cet export.",
+    "filmTitle": "Titre",
+    "description": "Quelques mots sur le film",
+    "visibility": "Qui le voit",
+    "public": "Dans la galerie",
+    "unlisted": "Par son lien seulement",
+    "publicHint": "Listé dans la galerie pour tout le monde, signé de votre nom.",
+    "unlistedHint": "Hors de la galerie : seules les personnes à qui vous donnez le lien le voient.",
+    "reusable": "D'autres peuvent copier le projet",
+    "publish": "Publier",
+    "update": "Publier à nouveau",
+    "takeOff": "Le retirer",
+    "takenOff": "Le film n'est plus dans la galerie.",
+    "stepStill": "Image du film…",
+    "stepArchive": "Préparation du projet…",
+    "stepUpload": "Envoi du film…",
+    "published": "Le film est dans la galerie. Son adresse :",
+    "copyLink": "Copier le lien",
+    "copied": "Lien copié.",
+    "see": "Le voir",
+    "failed": "Le film n'a pas pu être publié : {error}",
+    "copying": "Copie du projet du film…",
+    "notFound": "Ce film n'est plus dans la galerie, ou ne peut pas être copié."
+  },
   "plans": {
     "limit": {
       "cloudProjects": "Votre offre garde {max} projets dans votre compte. Supprimez-en un pour faire de la place.",
@@ -3593,7 +3621,9 @@
       "failed": "La connexion avec le fournisseur a échoué. Réessayez.",
       "disabled": "Cette façon de se connecter n’est pas disponible.",
       "no_email": "Le fournisseur n’a donné aucune adresse e-mail.",
-      "identity_taken": "Ce compte est déjà lié à un autre compte Tramme."
+      "identity_taken": "Ce compte est déjà lié à un autre compte Tramme.",
+      "handle_taken": "Quelqu'un signe déjà avec ce nom.",
+      "handle_invalid": "De 3 à 30 lettres minuscules, chiffres ou tirets, en commençant par une lettre ou un chiffre."
     },
     "space": {
       "title": "Votre espace",
@@ -3601,6 +3631,8 @@
       "profile": "Profil",
       "profileHint": "Qui vous êtes sur Tramme.",
       "nameHint": "Affiché dans votre compte et dans les e-mails que nous envoyons.",
+      "handle": "Nom public",
+      "handleHint": "Ce qui signe les films que vous publiez dans la galerie. Fait à partir de votre nom à votre première publication.",
       "save": "Enregistrer",
       "saved": "Enregistré.",
       "emailHint": "Là où nous vous écrivons. Elle ne peut pas encore être changée ici.",

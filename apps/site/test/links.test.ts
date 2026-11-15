@@ -46,7 +46,7 @@ describe('the addresses of the app', () => {
   });
 
   it('open a public project for reuse', () => {
-    expect(appProject('anime', 'fr')).toBe(`${APP}/p/anime?lang=fr`);
+    expect(appProject('anime', 'fr')).toBe(`${APP}/?remix=anime&lang=fr`);
     expect(logIn()).toBe(`${APP}/login`);
     expect(space('en')).toBe(`${APP}/space?lang=en`);
   });

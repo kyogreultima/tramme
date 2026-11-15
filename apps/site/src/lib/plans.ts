@@ -4,7 +4,7 @@
 
 import type { Locale, Localised } from './i18n';
 // the figures (prices, credits) are the platform's: one source (packages/plans), read by the payment too
-import { PLAN_TERMS, termsOf, type PlanId } from '@tramme/plans';
+import { PAYMENT_OPEN, PLAN_TERMS, termsOf, type PlanId } from '@tramme/plans';
 
 export type { PlanId };
 export const PLAN_IDS: PlanId[] = PLAN_TERMS.map((p) => p.id);
@@ -27,10 +27,10 @@ const LINES: Record<PlanId, Localised<string>> = {
 
 /**
  * Whether the site shows the prices: the pricing page and its links, the price and credit questions of the
- * FAQ, the paid sections of the terms and the offers given to search engines. Off until the payment opens;
- * the plans stay written below, ready.
+ * FAQ, the paid sections of the terms and the offers given to search engines. It follows PAYMENT_OPEN
+ * (packages/plans), the one switch of the site and the app.
  */
-export const PRICING_SHOWN = false;
+export const PRICING_SHOWN = PAYMENT_OPEN;
 
 export const PLANS: Plan[] = PLAN_TERMS.map((t) => ({ id: t.id, price: t.price, credits: t.credits, line: LINES[t.id] }));
 

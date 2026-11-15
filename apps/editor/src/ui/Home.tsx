@@ -14,6 +14,7 @@ import { saveBlob } from '../download.ts';
 import { safeName } from '../files.ts';
 import { ago } from '../model.ts';
 import { createFromWords, droppedOf, importArchive, ImportError, importFile, importSources, importVideo, isSourceFile, isVideoFile, pickedOf, type Picked, type Progress } from '../importer.ts';
+import { remix } from '../gallery.ts';
 import { kindOf } from '../sources.ts';
 import { S, toast } from '../state.ts';
 import { listCommands, type Command } from '../ai/commands.ts';
@@ -331,6 +332,23 @@ export function Home() {
     // shipped with the app, checked: their code never asks
     return importArchive(await r.blob(), p, { ask: null });
   });
+  // the site's "Open in Tramme" (?remix=<id>): an example of the app by its id, or a film of the gallery, copied into the projects
+  useEffect(() => {
+    const id = new URLSearchParams(location.search).get('remix');
+    if (!id) return;
+    history.replaceState(history.state, '', location.pathname);
+    run(t('gallery.copying'), async (p) => {
+      const list = await fetch('/examples/index.json').then((r) => (r.ok ? r.json() : [])).catch(() => []) as Example[];
+      const shipped = list.find((x) => x.file === `example-${id}.tramme`);
+      if (shipped) {
+        const r = await fetch(`/examples/${shipped.file}`);
+        if (r.ok) return importArchive(await r.blob(), p, { ask: null });
+      }
+      try { return await remix(id, p); } catch (e) {
+        throw e instanceof ApiError && e.status === 404 ? new Error(t('gallery.notFound')) : e;
+      }
+    });
+  }, []);
   const menu = (e: MouseEvent | { clientX: number; clientY: number }, m: Manifest) => openMenu(e, [
     { label: t('common.open'), icon: 'folder', onClick: () => open(m.id) },
     { label: t('common.rename'), icon: 'edit', onClick: () => setDialog({ kind: 'rename', m }) },

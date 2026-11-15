@@ -9,6 +9,7 @@ import {
 } from '../accounts.ts';
 import type { Manifest } from '@tramme/project';
 import { localProjects } from '../bring.ts';
+import { PAYMENT_OPEN } from '@tramme/plans';
 import { saveBlob } from '../download.ts';
 import { cloud } from '../mode.ts';
 import { BringDialog } from './BringDialog.tsx';
@@ -34,6 +35,12 @@ function report(r: Reply, done?: string): boolean {
 
 function Profile({ user }: { user: UserJson }) {
   const [name, setName] = useState(user.name);
+  const [handle, setHandle] = useState(user.handle ?? '');
+  const saveHandle = async () => {
+    setBusy(true);
+    report(await updateProfile({ handle: handle.trim() }), t('account.space.saved'));
+    setBusy(false);
+  };
   const [busy, setBusy] = useState(false);
   const save = async () => {
     setBusy(true);
@@ -46,6 +53,12 @@ function Profile({ user }: { user: UserJson }) {
         <div class="space-inline">
           <span class="field"><input value={name} maxLength={100} onInput={(e) => setName((e.target as HTMLInputElement).value)} onKeyDown={(e) => { if (e.key === 'Enter') save(); }} /></span>
           <button class="btn sm" disabled={busy || !name.trim() || name.trim() === user.name} onClick={save}>{t('account.space.save')}</button>
+        </div>
+      </Row>
+      <Row label={t('account.space.handle')} hint={t('account.space.handleHint')}>
+        <div class="space-inline">
+          <span class="field"><input value={handle} maxLength={30} spellcheck={false} placeholder="@" onInput={(e) => setHandle((e.target as HTMLInputElement).value.toLowerCase())} onKeyDown={(e) => { if (e.key === 'Enter') saveHandle(); }} /></span>
+          <button class="btn sm" disabled={busy || !handle.trim() || handle.trim() === (user.handle ?? '')} onClick={saveHandle}>{t('account.space.save')}</button>
         </div>
       </Row>
       <Row label={t('account.email')} hint={t('account.space.emailHint')}>
@@ -233,7 +246,8 @@ export function SpacePage() {
                 <button class="btn sm" onClick={async () => report(await resendVerification(), t('account.verify.sent'))}>{t('account.verify.resend')}</button></div>
             )}
             <Profile user={user} />
-            <PlanSection user={user} />
+            {/* the plans, once they are sold (packages/plans): until then, nothing of prices or credits */}
+            {PAYMENT_OPEN && <PlanSection user={user} />}
             <SignInMethods user={user} />
             <Data user={user} />
           </>

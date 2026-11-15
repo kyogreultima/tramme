@@ -20,6 +20,8 @@ export interface UserJson {
   hasPassword: boolean;
   providers: Provider[];
   locale: string;
+  /** the name public films are signed with; null until the first is published or one is chosen */
+  handle?: string | null;
   workspace: { id: string; name: string };
 }
 
@@ -59,6 +61,8 @@ const SAYINGS: Record<string, string> = {
   network: m('account.err.network'),
   generic: m('account.err.generic'),
   cancelled: m('account.err.cancelled'),
+  handle_taken: m('account.err.handle_taken'),
+  handle_invalid: m('account.err.handle_invalid'),
   failed: m('account.err.failed'),
   disabled: m('account.err.disabled'),
   no_email: m('account.err.no_email'),
@@ -145,7 +149,7 @@ export const resendVerification = () => call('POST', '/api/auth/verify/resend');
 
 // ── the space ────────────────────────────────────────────────
 
-export const updateProfile = async (changes: { name?: string; locale?: string }) => take(await call<{ user?: UserJson }>('PATCH', '/api/account', changes));
+export const updateProfile = async (changes: { name?: string; locale?: string; handle?: string }) => take(await call<{ user?: UserJson }>('PATCH', '/api/account', changes));
 export const changePassword = (next: string, current?: string) => call('PUT', '/api/account/password', { next, ...(current ? { current } : {}) });
 export const revokeOtherSessions = () => call('POST', '/api/account/sessions/revoke');
 export async function unlinkProvider(provider: Provider) {

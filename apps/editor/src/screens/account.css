@@ -82,3 +82,6 @@
 .bring-list label:hover { background: var(--field-active); }
 .bring-list input { accent-color: var(--accent); }
 .bring-at { display: flex; flex-direction: column; gap: 6px; }
+
+/* publishing a film in the gallery (GalleryDialog) */
+.gallery-toggle { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--text); }

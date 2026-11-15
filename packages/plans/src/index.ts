@@ -5,6 +5,12 @@
 // the numbers are the site's, the numbers are these. Paid features are services
 // the platform runs, not switches in the app's code.
 
+/**
+ * Whether the plans are sold: the prices shown on the site and the offers in the app's space. Off until the payment
+ * exists (the platform roadmap, D); the plans below stay written, ready.
+ */
+export const PAYMENT_OPEN = false;
+
 export type PlanId = 'basic' | 'plus' | 'pro';
 export type PaidPlanId = Exclude<PlanId, 'basic'>;
 export type Interval = 'month' | 'year';

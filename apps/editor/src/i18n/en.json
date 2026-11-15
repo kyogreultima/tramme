@@ -238,6 +238,34 @@
     "uploadingName": "Uploading {name}",
     "properties": "Properties"
   },
+  "gallery": {
+    "title": "Publish in the gallery",
+    "publishButton": "Publish in the gallery",
+    "lead": "This film goes to the gallery with a still taken in its middle. Your project in your account stays as it is.",
+    "leadAgain": "This project's film is already in the gallery: publishing replaces it with this export.",
+    "filmTitle": "Title",
+    "description": "A few words about the film",
+    "visibility": "Who sees it",
+    "public": "In the gallery",
+    "unlisted": "By its link only",
+    "publicHint": "Listed in the gallery for everyone, signed with your name.",
+    "unlistedHint": "Left out of the gallery: only people you give the link to see it.",
+    "reusable": "Others may copy the project",
+    "publish": "Publish",
+    "update": "Publish again",
+    "takeOff": "Take it off",
+    "takenOff": "The film is no longer in the gallery.",
+    "stepStill": "Taking the still…",
+    "stepArchive": "Packing the project…",
+    "stepUpload": "Sending the film…",
+    "published": "The film is in the gallery. Its address:",
+    "copyLink": "Copy the link",
+    "copied": "Link copied.",
+    "see": "See it",
+    "failed": "The film could not be published: {error}",
+    "copying": "Copying the film's project…",
+    "notFound": "This film is not in the gallery any more, or cannot be copied."
+  },
   "plans": {
     "limit": {
       "cloudProjects": "Your plan keeps {max} projects in your account. Delete one to make room for another.",
@@ -2228,7 +2256,9 @@
       "failed": "The sign-in with the provider failed. Try again.",
       "disabled": "This way of signing in is not available.",
       "no_email": "The provider gave no email address.",
-      "identity_taken": "This account is already linked to another Tramme account."
+      "identity_taken": "This account is already linked to another Tramme account.",
+      "handle_taken": "Someone already signs with this name.",
+      "handle_invalid": "3 to 30 lowercase letters, digits or dashes, starting with a letter or a digit."
     },
     "space": {
       "title": "Your space",
@@ -2236,6 +2266,8 @@
       "profile": "Profile",
       "profileHint": "Who you are on Tramme.",
       "nameHint": "Shown in your account and in the emails we send.",
+      "handle": "Public name",
+      "handleHint": "What the films you publish in the gallery are signed with. Made from your name when you first publish.",
       "save": "Save",
       "saved": "Saved.",
       "emailHint": "Where we write to you. It cannot be changed here yet.",

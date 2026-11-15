@@ -15,6 +15,7 @@
     "@tramme/core": "workspace:*",
     "@tramme/interop": "workspace:*",
     "@tramme/nodes": "workspace:*",
+    "@tramme/plans": "workspace:*",
     "@tramme/project": "workspace:*",
     "@tramme/render": "workspace:*",
     "zod": "^4.6.7"

@@ -14,6 +14,8 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 - After signing in, the projects made in this browser before can be brought into the account (offered once, and in your space); the copies in the browser stay.
 - A save that cannot go through waits instead of failing: when the project was saved from another tab or device since it was opened, you choose which version stays; when your session ended, you sign in again and the changes are saved.
 - Your account's button in the project's top bar; the project is saved before you leave it for your space or sign out.
+- **The gallery**: a film you just exported as MP4 is published from the export's panel, with a still taken in its middle, a title and a few words, in the gallery or reachable by its link only, and the project offered for copying or not. It is signed with your public name, which you choose in your space. "Open in Tramme" on the site copies a published film's project into your projects (its code is asked about first, as any project from someone else). Visitors can report a film.
+- The app's space shows no offers or prices until the plans are sold, as the site.
 
 ### Changed
 

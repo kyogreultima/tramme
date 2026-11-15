@@ -31,5 +31,5 @@ export function signUp({ prompt, lang }: { prompt?: string; lang?: string } = {}
 }
 export const logIn = (lang?: string) => withLang(`${APP}/login`, lang);
 export const space = (lang?: string) => withLang(`${APP}/space`, lang);
-/** a public project, opened in the app for reuse */
-export const appProject = (id: string, lang?: string) => withLang(`${APP}/p/${encodeURIComponent(id)}`, lang);
+/** a public project, copied into the visitor's projects in the app (its home reads ?remix=) */
+export const appProject = (id: string, lang?: string) => withLang(`${APP}/?remix=${encodeURIComponent(id)}`, lang);

@@ -301,6 +301,9 @@ importers:
       '@tramme/nodes':
         specifier: workspace:*
         version: link:../../packages/nodes
+      '@tramme/plans':
+        specifier: workspace:*
+        version: link:../../packages/plans
       '@tramme/project':
         specifier: workspace:*
         version: link:../../packages/project

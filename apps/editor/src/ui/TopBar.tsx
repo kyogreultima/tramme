@@ -13,6 +13,8 @@ import { ago, contentEnd, fmtSeconds, snap } from '../model.ts';
 import { shortsOf } from '../shorts.ts';
 import { openMenu, Popover, Select, Toggle, type MenuItem } from './controls.tsx';
 import { PublishPanel } from './PublishPanel.tsx';
+import { GalleryDialog } from './GalleryDialog.tsx';
+import { cloud } from '../mode.ts';
 import { hdrCapability } from '../hdr.ts';
 import { ExportQueueList } from './ExportQueueList.tsx';
 import { exportQueue } from '../export-queue.ts';
@@ -38,6 +40,9 @@ const FORMATS: [string, string, number, number][] = [
 ];
 
 interface Done { blob: Blob; name: string; seconds: number; warnings: string[]; project: ExportProject; saved?: string }
+
+/** a film just exported, on its way to the gallery (accounts in the cloud only): its dialog outlives the export popover */
+const galleryVideo = signal<Blob | null>(null);
 
 // ── the project's versions: named points one can come back to ──
 /** the saved document itself is the current version; the snapshots live beside it */
@@ -284,6 +289,7 @@ function ExportPop({ anchor, onClose }: { anchor: HTMLElement; onClose: () => vo
         {state.warnings.length > 0 && <ul class="export-warn">{state.warnings.map((w) => <li key={w}>{w}</li>)}</ul>}
         <div class="export-saves">
           <button class="btn sm" onClick={() => saveBlob(state.blob, state.name)}><Icon name="download" />{saveLabel()}</button>
+          {cloud && state.name.endsWith('.mp4') && <button class="btn sm" onClick={() => { galleryVideo.value = state.blob; }}><Icon name="upload" />{t('gallery.publishButton')}</button>}
           {state.saved
             ? <span class="faint" style={{ fontSize: 11 }}>{t('topbar.keptInPath', { path: state.saved })}</span>
             : <button class="btn sm" onClick={() => keep(state)}><Icon name="folder" />{t('topbar.keepInTheProject')}</button>}
@@ -410,6 +416,7 @@ export function TopBar() {
       <AccountMenu inProject />
       <WindowControls />
       {exp && <ExportPop anchor={exp} onClose={() => setExp(null)} />}
+      {galleryVideo.value && <GalleryDialog video={galleryVideo.value} onClose={() => { galleryVideo.value = null; }} />}
     </header>
   );
 }

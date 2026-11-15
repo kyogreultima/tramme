@@ -1,10 +1,12 @@
 // The community's public projects, as the site reads them: through listProjects
-// and getProject only. Today they are the repository's examples, credited to
-// "Tramme"; when the gallery API exists these two functions call it and
-// nothing else changes (the shape is the contract, point 2 of the platform
-// spec). No view count is invented: `views` stays unset until it is real.
+// and getProject only. They are the films published in the app's gallery
+// (GET /api/gallery of the app of this environment, apps/worker/src/gallery.ts),
+// read when a page is asked, and the repository's examples, credited to
+// "Tramme". An app without a gallery (no accounts) leaves the examples alone.
+// No view count is invented: `views` stays unset until it is real.
 
 import { IDS, example } from './examples';
+import { APP } from './links';
 
 export interface PublicProject {
   id: string;
@@ -53,14 +55,33 @@ const seed: PublicProject[] = IDS.map((id) => {
 
 export interface ListOptions { sort?: 'recent' | 'popular'; limit?: number }
 
+/** the app's answer, its files' addresses made whole; null when the app has no gallery or does not answer */
+async function fromApp<T>(path: string): Promise<T | null> {
+  try {
+    const res = await fetch(`${APP}${path}`, { signal: AbortSignal.timeout(4000), headers: { accept: 'application/json' } });
+    return res.ok ? ((await res.json()) as T) : null;
+  } catch { return null; }
+}
+
+/** a published film with its files at the app's address */
+const whole = (p: PublicProject): PublicProject => {
+  const at = (u?: string) => (u && u.startsWith('/') ? `${APP}${u}` : u);
+  return { ...p, video: { mp4: at(p.video.mp4), webm: at(p.video.webm) }, poster: at(p.poster) };
+};
+
 /** the public projects, most recent first (or most viewed, once views are counted) */
 export async function listProjects({ sort = 'recent', limit }: ListOptions = {}): Promise<PublicProject[]> {
   const byDate = (a: PublicProject, b: PublicProject) => b.publishedAt.localeCompare(a.publishedAt);
   const byViews = (a: PublicProject, b: PublicProject) => (b.views ?? 0) - (a.views ?? 0) || byDate(a, b);
-  const sorted = [...seed].sort(sort === 'popular' ? byViews : byDate);
+  const published = ((await fromApp<PublicProject[]>('/api/gallery?limit=200')) ?? []).map(whole);
+  const sorted = [...published, ...seed].sort(sort === 'popular' ? byViews : byDate);
   return limit === undefined ? sorted : sorted.slice(0, limit);
 }
 
 export async function getProject(id: string): Promise<PublicProject | undefined> {
-  return seed.find((p) => p.id === id);
+  const shipped = seed.find((p) => p.id === id);
+  if (shipped) return shipped;
+  if (!/^[a-z0-9]{12}$/.test(id)) return undefined;
+  const p = await fromApp<PublicProject>(`/api/gallery/${id}`);
+  return p ? whole(p) : undefined;
 }

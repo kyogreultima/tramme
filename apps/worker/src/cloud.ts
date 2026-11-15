@@ -18,6 +18,7 @@ import { LIMITS, PROJECT_FORMAT } from '@tramme/project';
 import { hasAccounts, internal } from './accounts.ts';
 import { pageAsset, rewrittenHeaders, type Env } from './http.ts';
 import { limitsOn, withinPlan } from './limits.ts';
+import { myGalleryRoute, unpublish } from './gallery.ts';
 
 /** whether this deployment keeps signed-in people's projects: accounts, the bucket and the secrets */
 export const cloudOn = (env: Env): boolean => hasAccounts(env) && !!(env.FILES && env.EDGE_SECRET && env.KEYS_SECRET && env.INTERNAL_SECRET);
@@ -64,6 +65,10 @@ async function cloudRoute(req: Request, env: Env, edge: Edge, ctx?: ExecutionCon
   }
   if (parts[0] === 'account' && parts.length === 1 && m === 'DELETE') return deleteAccount(req, env, edge, ctx);
   if (parts[0] === 'keys') return keysRoute(req, keys, parts.slice(1).map(decodeURIComponent));
+  if (parts[0] === 'gallery') {
+    const res = await myGalleryRoute(req, env, edge, env.FILES!, files);
+    if (res) return res;
+  }
   if (PROVIDER_ROUTES.includes(parts[0])) {
     const res = await providerRoute(req, { keys: await loadKeys(keys), fetch: (input, init) => fetch(input, init) }, parts);
     if (res) return res;
@@ -84,7 +89,13 @@ async function deleteAccount(req: Request, env: Env, edge: Edge, ctx?: Execution
   const res = await internal(env, '/internal/account/delete', { body });
   if (res.status !== 200) return new Response(res.body, res);
   const { workspaces = [] } = (await res.json()) as { workspaces?: string[] };
-  const purge = Promise.all(workspaces.map((ws) => purgePrefix(env.FILES!, workspacePrefix(ws))));
+  const purge = Promise.all(workspaces.map(async (ws) => {
+    // the films it published leave the gallery with it
+    const mine = await env.FILES!.get(`${workspacePrefix(ws)}gallery.json`);
+    const published = mine ? Object.values(await mine.json<Record<string, string>>()) : [];
+    await Promise.all(published.map((id) => unpublish(env.FILES!, id)));
+    await purgePrefix(env.FILES!, workspacePrefix(ws));
+  }));
   if (ctx) ctx.waitUntil(purge); else await purge;
   const headers = new Headers();
   for (const c of ENDED) headers.append('set-cookie', c);
