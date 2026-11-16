@@ -8,6 +8,8 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+## [0.29.0] - 2026-11-16
+
 ### Added
 
 - **Blocks of the script**: the prompter's Blocks tab gives each sentence of the script what to show over it (empty: the camera); `/blocks` builds them where each sentence is said, and proposes an idea for the empty ones first.
@@ -19,14 +21,20 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 - **Export on the server, in local**: `pnpm renderer` starts the renderer on this machine, and the export panel of `pnpm dev` offers "Export on the server", rendered as the desktop app renders it.
 - **Told when an export on the server is over**: a notification of the system (browser, desktop, phone) when the app is in the background, a message in it otherwise, followed from any page and after a reload; with an account, a mail too, with the way back to the project.
 - **Several commands in one message**: a `/command` can be written anywhere in a message (at its start or after a space), as many as needed; the assistant gets each of them, in the order written. One tool alone at the start keeps its form and runs at once, as before.
+- **Preferences kept with the account**: signed in, the theme, the view, the language and the other preferences are the account's, the same on the web, the desktop and the phone; an account without any takes those of the device it signs in on, and each change is sent back. What belongs to a device (its update checks, its quick launcher, its dictation's source) stays on it.
+- **Export in the cloud from the apps**: signed in, the desktop and phone apps offer "Export in the cloud" and "For Premiere Pro" for the projects of the account, followed and downloaded as on the web.
 
 ### Changed
 
+- The default theme is Liquid Glass, its surfaces bending the picture behind them; a theme already chosen stays.
+- Bringing the projects of a device into the account goes on behind: the dialog closes once they are chosen, the top bar shows how far it is, the end is told, and those that could not be brought can be tried again from there.
+- On a phone, the home screen's sign-in button is its icon alone, the size of the buttons beside it.
 - In the message boxes (the assistant, the studio, the home screen), the commands and tags the project knows are marked where they are written: a `/command` in the accent, an `@tag` in another colour; an unknown one stays plain words.
 
 ### Fixed
 
 - On the home screen, a file's tag replaced the letters "s" of its name instead of its spaces.
+- An export in the cloud failed with "Could not resolve @tramme/interop": the renderer's container now finds every package the render page takes from the editor.
 
 ## [0.28.0] - 2026-11-16
 
@@ -971,7 +979,8 @@ First public release.
 
 - Cloudflare Worker serving the editor and the API, projects stored in R2, access protected by Cloudflare Access.
 
-[Unreleased]: ../../compare/v0.28.0...HEAD
+[Unreleased]: ../../compare/v0.29.0...HEAD
+[0.29.0]: ../../compare/v0.28.0...v0.29.0
 [0.28.0]: ../../compare/v0.27.0...v0.28.0
 [0.27.0]: ../../compare/v0.26.1...v0.27.0
 [0.26.1]: ../../compare/v0.26.0...v0.26.1
