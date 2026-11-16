@@ -21,7 +21,7 @@ import { listCommands, type Command } from '../ai/commands.ts';
 import { packCommands, shippedPacks } from '../packs.ts';
 import { MarkedField, useCommandMenu, useMentionMenu } from './composer.tsx';
 import { listStyles, readStyle, styleWords } from '../style.ts';
-import { expandMentions } from '../mentions.ts';
+import { expandMentions, tagOfName } from '../mentions.ts';
 import { MicButton, writeInto } from './MicButton.tsx';
 import { handheld, Modal, longPress, openMenu, Seg, Select } from './controls.tsx';
 import { Icon } from './icons.tsx';
@@ -196,10 +196,10 @@ function Card({ m, onMenu }: { m: Manifest; onMenu: (e: MouseEvent | { clientX: 
   );
 }
 
-/** the direction box: the words of the film, the material it is made from, the model that makes it, its format */
-/** the word that tags a file of the material: its name, its spaces made underscores */
-const tagOf = (p: Picked) => p.file.name.replace(/\s+/g, '_');
+/** the word that tags a file of the material: its name, what a tag cannot hold made _ (mentions.ts) */
+const tagOf = (p: Picked) => tagOfName(p.file.name);
 
+/** the direction box: the words of the film, the material it is made from, the model that makes it, its format */
 export function DirectionBox({ busy, onStart }: { busy: boolean; onStart: (words: string, material: Picked[], format: [number, number]) => void }) {
   // the words of the site's box, carried through the sign-up (?prompt=)
   const [words, setWords] = useState(() => new URLSearchParams(location.search).get('prompt') ?? '');

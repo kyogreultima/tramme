@@ -8,8 +8,11 @@ import type { TrammeDoc } from '@tramme/core';
 export interface Mentionable { token: string; label: string; kind: string }
 
 /** what a tag is made of: letters of any language (a file named "Le secret derrière…"), digits, _ . and -; it ends on a letter, a digit or _ */
-export const TAG_CHARS = String.raw`[\p{L}\p{N}_.-]`;
-export const TAG = String.raw`${TAG_CHARS}*[\p{L}\p{N}_]`;
+export const TAG_CHARS = String.raw`[\p{L}\p{M}\p{N}_.-]`;
+export const TAG = String.raw`${TAG_CHARS}*[\p{L}\p{M}\p{N}_]`;
+
+/** a name as a tag: its accents composed, every run of what a tag cannot hold (spaces, commas, quotes, emoji) made one _ */
+export const tagOfName = (name: string) => name.normalize('NFC').replace(new RegExp(String.raw`[^\p{L}\p{M}\p{N}_.-]+`, 'gu'), '_').replace(/^[_.-]+|[_.-]+$/g, '') || 'file';
 
 /** the word being tagged at the caret: an @ at the start or after a space, and what follows it up to the caret */
 export function mentionQuery(text: string, caret: number): { from: number; query: string } | null {
