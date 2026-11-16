@@ -2017,6 +2017,9 @@
   "cuts": {
     "done": "\"{name}\" tightened: {saved} saved."
   },
+  "takes": {
+    "done": "{kept} of {total} sentences of the script kept, their last good take"
+  },
   "device": {
     "ready": "Your file is ready",
     "saveToGallery": "Save to the gallery",

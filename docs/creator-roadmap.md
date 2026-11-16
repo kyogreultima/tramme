@@ -4,9 +4,9 @@ What a creator who talks to the camera every week needs, taken from what works e
 
 ## A. The takes chosen against the script
 
-- [ ] A script given to the project (written, pasted or imported): kept as a document of the project, read by the assistant.
-- [ ] The recording transcribed (the transcription that exists), its words aligned on the script's sentences.
-- [ ] For each sentence, the last good take kept; the repeats, the false starts and the long silences cut; what was said off the script and is worth keeping kept. The cut is a take of the assistant, kept or set aside as any other.
+- [x] A script given to the project (written, pasted or imported): kept as a document of the project (`meta.script`), read by the assistant.
+- [x] The recording transcribed (the transcription that exists), its words aligned on the script's sentences (`takes`, apps/editor/src/takes.ts).
+- [x] For each sentence, the last good take kept; the repeats, the false starts and the words off the script cut, the sentences never said named. The cut is a take of the assistant, kept or set aside as any other. (Keeping what was said off the script and is worth it is left to the assistant's judgement, from the tool's report.)
 - [ ] Before and after on real footage, in the proofs.
 
 ## B. The script as a prompter

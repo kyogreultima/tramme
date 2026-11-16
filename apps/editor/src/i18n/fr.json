@@ -3418,6 +3418,9 @@
   "cuts": {
     "done": "« {name} » resserré : {saved} gagnées."
   },
+  "takes": {
+    "done": "{kept} phrases du script sur {total} gardées, leur dernière bonne prise"
+  },
   "device": {
     "ready": "Votre fichier est prêt",
     "saveToGallery": "Enregistrer dans la galerie",

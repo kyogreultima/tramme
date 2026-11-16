@@ -13,6 +13,39 @@ import { t } from './i18n/index.ts';
 
 const r = (x: number) => Math.round(x * 1000) / 1000;
 
+/**
+ * A video layer cut into spans of its file (file seconds), laid back to back
+ * from its in point: the first span keeps the layer (its transform, its
+ * effects, its links), the next ones are copies right after it in the stack.
+ * Shared by the silences and the takes chosen against a script.
+ */
+export function spliceLayer(ctx: ToolContext, lid: string, spans: { from: number; to: number }[]): { ops: Op[]; end: number; added: string[] } {
+  const comp = ctx.doc.compositions[ctx.compId], layer = comp.layers[lid];
+  const start = Number(layer.props?.start) || 0, rate = Number(layer.props?.rate) || 1, lin = layer.in ?? 0;
+  const ops: Op[] = [];
+  const taken: Record<string, unknown> = { ...comp.layers };
+  const name = layer.name ?? lid;
+  const added: string[] = [];
+  let cursorC = lin;
+  spans.forEach((s, i) => {
+    const outC = r(cursorC + (s.to - s.from) / rate);
+    if (i === 0) {
+      ops.push({ op: 'replace', path: pointer('compositions', ctx.compId, 'layers', lid, 'out'), value: outC });
+      if (s.from !== start) ops.push({ op: 'replace', path: pointer('compositions', ctx.compId, 'layers', lid, 'props', 'start'), value: r(s.from) });
+    } else {
+      const id = freshId(taken, `${lid}-${i + 1}`);
+      taken[id] = 1;
+      added.push(id);
+      ops.push({ op: 'add', path: pointer('compositions', ctx.compId, 'layers', id), value: { ...structuredClone(layer), name: `${name} · ${i + 1}`, in: r(cursorC), out: outC, props: { ...layer.props, start: r(s.from) } } });
+    }
+    cursorC = outC;
+  });
+  const order = [...comp.order];
+  order.splice(comp.order.indexOf(lid) + 1, 0, ...added);
+  if (added.length) ops.push({ op: 'replace', path: pointer('compositions', ctx.compId, 'order'), value: order });
+  return { ops, end: cursorC, added };
+}
+
 export const CUTS_TOOLS: ToolType[] = [
   {
     name: 'silences',
@@ -72,29 +105,8 @@ export const CUTS_TOOLS: ToolType[] = [
       spans.push({ from: cursor, to: usedTo });
       const removed = usedTo - usedFrom - spans.reduce((d, s) => d + (s.to - s.from), 0);
       if (removed < 0.2) throw new Error(`${asset}: no silence worth cutting (its gaps are all under ${min} s)`);
-      // the first span keeps the layer (its transform, its effects, its links); the next ones are new layers right after it
-      const ops: Op[] = [];
-      const taken: Record<string, unknown> = { ...comp.layers };
+      const { ops, end: cursorC } = spliceLayer(ctx, lid, spans);
       const name = layer.name ?? asset;
-      const added: string[] = [];
-      let cursorC = lin;
-      spans.forEach((s, i) => {
-        const outC = r(cursorC + (s.to - s.from) / rate);
-        if (i === 0) {
-          ops.push({ op: 'replace', path: pointer('compositions', ctx.compId, 'layers', lid, 'out'), value: outC });
-          if (s.from !== usedFrom) ops.push({ op: 'replace', path: pointer('compositions', ctx.compId, 'layers', lid, 'props', 'start'), value: r(s.from) });
-        } else {
-          const id = freshId(taken, `${lid}-${i + 1}`);
-          taken[id] = 1;
-          added.push(id);
-          ops.push({ op: 'add', path: pointer('compositions', ctx.compId, 'layers', id), value: { ...structuredClone(layer), name: `${name} · ${i + 1}`, in: r(cursorC), out: outC, props: { ...layer.props, start: r(s.from) } } });
-        }
-        cursorC = outC;
-      });
-      const idx = comp.order.indexOf(lid);
-      const order = [...comp.order];
-      order.splice(idx + 1, 0, ...added);
-      if (added.length) ops.push({ op: 'replace', path: pointer('compositions', ctx.compId, 'order'), value: order });
       const saved = `${removed.toFixed(2)} s`;
       return {
         ops, label: t('cuts.done', { name, saved }), notice: t('cuts.done', { name, saved }),
