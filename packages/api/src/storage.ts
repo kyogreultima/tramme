@@ -19,6 +19,7 @@
 //   DELETE /api/projects/:id/uploads/:upload?path
 //   GET    /api/library, /api/library/<name>.js the plugin library (GET, PUT, DELETE a plugin)
 //   GET    /api/sounds, /api/sounds/<name>      the sound library (GET, PUT with x-tramme-entry, DELETE a sound)
+//   GET    /api/styles, /api/styles/<name>.json the styles kept to start projects with (GET, PUT, DELETE)
 
 import type { Bucket } from './bucket.ts';
 import { HttpError, json } from './http.ts';
@@ -26,14 +27,14 @@ import { deleteFromShelf, getFromShelf, listShelf, putOnShelf, SHELVES } from '.
 import { abortUpload, completeUpload, createProject, deleteFile, deleteProject, duplicateProject, exportProject, getFile, listProjects, projectInfo, putFile, startUpload, updateProject, uploadPart } from './projects.ts';
 
 /** the routes of storage, under /api/ */
-export const STORAGE = ['projects', 'library', 'sounds'];
+export const STORAGE = ['projects', 'library', 'sounds', 'styles'];
 
 /** the answer of a storage route, or null when the request is not one */
 export async function storageRoute(req: Request, bucket: Bucket, url: URL): Promise<Response | null> {
   const parts = url.pathname.slice('/api/'.length).split('/');
   const m = req.method;
-  if (parts[0] === 'library' || parts[0] === 'sounds') {
-    const shelf = parts[0] === 'library' ? SHELVES.plugins : SHELVES.sounds;
+  if (parts[0] === 'library' || parts[0] === 'sounds' || parts[0] === 'styles') {
+    const shelf = parts[0] === 'library' ? SHELVES.plugins : parts[0] === 'styles' ? SHELVES.styles : SHELVES.sounds;
     const [, name] = parts;
     if (!name && m === 'GET') return listShelf(bucket, shelf);
     if (name && (m === 'GET' || m === 'HEAD')) return getFromShelf(bucket, shelf, name);

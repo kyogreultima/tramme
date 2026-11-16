@@ -27,6 +27,7 @@ import { useEffect } from 'preact/hooks';
 import { effect } from '@preact/signals';
 import { AuthPage, type AuthMode } from './ui/AuthPage.tsx';
 import { SpacePage } from './ui/Space.tsx';
+import { AdminPage } from './ui/Admin.tsx';
 import { Quick } from './ui/Quick.tsx';
 import { messageFor, refreshAccount, verifyEmail } from './accounts.ts';
 import { toast } from './state.ts';
@@ -44,6 +45,7 @@ import './screens/quick.css';
 import './theme/frost.css';
 import './theme/liquid-glass.css';
 import { offerTours } from './tours/index.ts';
+import { resumeRenders } from './ui/CloudRender.tsx';
 import { startProject } from './start.ts';
 import { t } from './i18n/index.ts';
 import { boot } from './mode.ts';
@@ -113,11 +115,12 @@ const AUTH_PAGES = new Set(['/login', '/signup', '/forgot']);
 function Pages() {
   const { path, search } = route.value;
   const q = new URLSearchParams(search);
-  const isHome = !AUTH_PAGES.has(path) && path !== '/space' && !(path === '/' && q.get('reset'));
+  const isHome = !AUTH_PAGES.has(path) && path !== '/space' && path !== '/admin' && !(path === '/' && q.get('reset'));
   // a page of the home page's has taken what the address carried (the words of the site): it goes back to being just "/"
   useEffect(() => { if (isHome && search) history.replaceState(null, '', '/'); }, [isHome, search]);
   if (AUTH_PAGES.has(path)) return <AuthPage key={path} mode={path.slice(1) as AuthMode} prompt={q.get('prompt') ?? undefined} />;
   if (path === '/space') return <SpacePage />;
+  if (path === '/admin') return <AdminPage />;
   // the link of the mail of a forgotten password
   if (path === '/' && q.get('reset')) return <AuthPage key="reset" mode="reset" token={q.get('reset') ?? ''} />;
   return <Home />;
@@ -151,12 +154,14 @@ boot().then(() => {
   initDesktop();
   startBackButton();
   followBars();
-  // the plugins installed on this device, read once from where they are kept
-  startInstalled();
+  // the plugins installed on this device, read once from where they are kept; a version the marketplace revoked is turned off
+  void startInstalled().then(() => import('./market.ts')).then((m) => m.checkRevoked()).catch(() => {});
   // the local companion, found whenever it starts, on the home page and in the editor
   watchCompanion();
   // a newer version of the app, looked for on its own every twelve hours
   watchUpdates();
+  // the exports on the server asked from this browser, followed until they are told over (CloudRender.tsx)
+  resumeRenders();
   if (m) {
     trackPage(location.pathname);
     openProject(m[1]).catch((e) => {

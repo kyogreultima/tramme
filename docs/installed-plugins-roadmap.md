@@ -81,8 +81,8 @@ Where the installed plugins live, per platform:
 
 Once Tramme has its API.
 
-- [ ] A catalogue served by the API: plugins with their manifest, screenshots or a short video, versions and changelog. The settings browse it in a "Discover" tab; installing downloads the package into the device's storage of step 1, through the same install question as an import.
-- [ ] Publishing: an author account, a package signed with the author's key, the manifest checked, the permissions shown to reviewers. A review before a plugin is listed, at least for those asking for network or keys.
-- [ ] Updates: the settings check the installed plugins against the catalogue and offer the new versions, with the change in permissions; never installed without the user.
-- [ ] Reporting and revocation: a plugin can be reported from the settings; a revoked version is disabled at the next check, the projects that copied it told so.
+- [x] A catalogue served by the API: plugins with their manifest, versions and changelog. The settings browse it in a "Discover" section; installing downloads the package into the device's storage of step 1, through the same install question as an import. Done: `apps/worker/src/market.ts`, `apps/editor/src/market.ts`. Left out: screenshots and a video of a plugin.
+- [x] Publishing: an author account, the manifest checked, the permissions shown to reviewers, a review before a plugin is listed when it asks for network or keys (the back-office). Done: published from the settings under the author's public name (the id must start with it), only newer versions. Instead of an author's key, the marketplace keeps each package's SHA-256 and the editor checks the bytes it downloads against it.
+- [x] Updates: the settings check the installed plugins against the catalogue and offer the new versions; the install question shows the change in permissions; never installed without the user.
+- [x] Reporting and revocation: a plugin can be reported from the settings; a revoked version is disabled at the next check (the app's start and the settings), the person told which. Left out: telling the projects that copied it.
 - [ ] The assistant can suggest a plugin of the catalogue when nothing installed does what is asked, and installs it only with the user's yes.

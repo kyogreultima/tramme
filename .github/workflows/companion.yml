@@ -1,0 +1,68 @@
+# The assistant's local companion (packages/companion) published on npm as soon as main's version is not
+# there yet: the same moment the desktop workflow releases the apps (scripts/version.ts sets every package's
+# version). It publishes through npm's trusted publishing: GitHub proves the run to npm (OIDC), no token is
+# kept in the repository, and npm adds the provenance of the package. The package's settings on npmjs.com
+# must name this repository and this file (CONTRIBUTING.md, "The companion on npm"). A manual run on main
+# does the same; elsewhere it only builds and tries the package.
+
+name: Companion on npm
+
+on:
+  push:
+    branches: [main]
+    # a new version always changes it
+    paths: [packages/companion/package.json]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: companion-${{ github.ref }}
+
+jobs:
+  publish:
+    name: Build, try and publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # trusted publishing: the run's identity, exchanged with npm for the right to publish
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+        with:
+          rust: 'false'
+      - run: pnpm typecheck
+      - run: pnpm exec vitest run packages/companion
+      - run: pnpm companion:build
+      - id: plan
+        name: Is this version on npm?
+        run: |
+          name=$(node -p "require('./packages/companion/dist/package.json').name")
+          version=$(node -p "require('./packages/companion/dist/package.json').version")
+          echo "package=$name@$version" >> "$GITHUB_OUTPUT"
+          if npm view "$name@$version" version > /dev/null 2>&1; then
+            echo "$name@$version is already on npm"
+          elif [ "$GITHUB_REF" != refs/heads/main ]; then
+            echo "a build of $GITHUB_REF_NAME, not published"
+          else
+            echo "$name@$version will be published"
+            echo publish=true >> "$GITHUB_OUTPUT"
+          fi
+      # the package as a user gets it: installed from its archive in an empty folder, started, stopped
+      - name: Try the package
+        run: |
+          npm pack ./packages/companion/dist --pack-destination "$RUNNER_TEMP"
+          mkdir "$RUNNER_TEMP/try" && cd "$RUNNER_TEMP/try"
+          npm init -y > /dev/null
+          npm install "$RUNNER_TEMP"/*.tgz --no-audit --no-fund
+          test "$(npx tramme --version)" = "$(node -p "require('$GITHUB_WORKSPACE/packages/companion/dist/package.json').version")"
+          (timeout 20 npx tramme --port 4399 || true) | tee out.txt
+          grep -q "Tramme companion ready" out.txt
+      # trusted publishing needs npm 11.5.1 or later
+      - name: Publish ${{ steps.plan.outputs.package }}
+        if: steps.plan.outputs.publish == 'true'
+        run: |
+          npm install -g npm@11
+          npm publish ./packages/companion/dist

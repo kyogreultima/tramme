@@ -7,7 +7,7 @@ import Page from '../../components/Page.astro';
 import PageHead from '../../components/PageHead.astro';
 import { localeOf, localePaths, pathIn } from '../../lib/i18n';
 import { repoFile } from '../../lib/links';
-import { PLANS, formatPrice } from '../../lib/plans';
+import { PLANS, PRICING_SHOWN, formatPrice } from '../../lib/plans';
 
 export const getStaticPaths = localePaths;
 
@@ -31,6 +31,7 @@ const price = (id: 'plus' | 'pro') => PLANS.find((p) => p.id === id)!.price;
         <h2>Le service</h2>
         <p>Tramme est un éditeur de motion design en ligne et sur le bureau, et une plateforme : un compte, un espace personnel, des projets publics ou privés, une galerie de la communauté, et des services que nous faisons tourner (stockage, hébergement, IA prête à l'emploi, export cloud). Les applications, le moteur et l'atelier sont disponibles sans compte, avec les règles de l'offre Basic.</p>
 
+        {PRICING_SHOWN && (<>
         <h2>Les offres et le paiement</h2>
         <p>Basic est gratuit. Plus coûte {formatPrice(locale, price('plus').month)} par mois ou {formatPrice(locale, price('plus').year)} par mois facturé à l'année ; Pro coûte {formatPrice(locale, price('pro').month)} par mois ou {formatPrice(locale, price('pro').year)} par mois facturé à l'année. Les prix sont en euros. Le contenu de chaque offre est celui de la <a href={pathIn(locale, '/pricing/')}>page des tarifs</a>. Le paiement est traité par [REVENDEUR DE RÉFÉRENCE : Paddle ou Lemon Squeezy, à décider], qui vend l'offre en son nom ou au nôtre selon le cas [À PRÉCISER].</p>
 
@@ -39,6 +40,7 @@ const price = (id: 'plus' | 'pro') => PLANS.find((p) => p.id === id)!.price;
 
         <h2>Résilier et rembourser</h2>
         <p>Vous pouvez résilier à tout moment depuis votre espace ; l'offre court jusqu'à la fin de la période payée. [Droit de rétractation et remboursements : À PRÉCISER selon le droit applicable et le revendeur de référence.]</p>
+        </>)}
 
         <h2>Ce que vous publiez</h2>
         <p>Vos projets sont à vous. En publiant un projet, vous nous autorisez à l'afficher publiquement, avec sa vidéo, sur le site et dans la galerie, et, si vous le permettez, à ce que d'autres le copient pour s'en servir. Vous pouvez dépublier un projet à tout moment. Ne publiez rien que vous n'avez pas le droit de publier. Nous pouvons retirer un projet public qui enfreint ces conditions ou la loi.</p>
@@ -63,6 +65,7 @@ const price = (id: 'plus' | 'pro') => PLANS.find((p) => p.id === id)!.price;
         <h2>The service</h2>
         <p>Tramme is a motion design editor, online and on the desktop, and a platform: an account, a personal space, public or private projects, a community gallery, and services we run for you (storage, hosting, AI ready to use, cloud export). The apps, the engine and the atelier are available without an account, under the Basic plan's rules.</p>
 
+        {PRICING_SHOWN && (<>
         <h2>Plans and payment</h2>
         <p>Basic is free. Plus costs {formatPrice(locale, price('plus').month)} a month, or {formatPrice(locale, price('plus').year)} a month billed yearly; Pro costs {formatPrice(locale, price('pro').month)} a month, or {formatPrice(locale, price('pro').year)} a month billed yearly. Prices are in euros. What each plan contains is what the <a href={pathIn(locale, '/pricing/')}>pricing page</a> says. Payment is handled by [MERCHANT OF RECORD: Paddle or Lemon Squeezy, to be decided], which sells the plan in its own name or in ours as the case may be [TO BE SPECIFIED].</p>
 
@@ -71,6 +74,7 @@ const price = (id: 'plus' | 'pro') => PLANS.find((p) => p.id === id)!.price;
 
         <h2>Cancelling and refunds</h2>
         <p>You can cancel at any time from your space; the plan runs until the end of the period you paid for. [Right of withdrawal and refunds: TO BE SPECIFIED according to the applicable law and the merchant of record.]</p>
+        </>)}
 
         <h2>What you publish</h2>
         <p>Your projects are yours. By publishing a project, you allow us to display it publicly, with its video, on the site and in the gallery, and, if you allow it, others to copy it to build on. You can unpublish a project at any time. Do not publish anything you have no right to publish. We may remove a public project that breaks these terms or the law.</p>

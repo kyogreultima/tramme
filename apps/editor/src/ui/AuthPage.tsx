@@ -8,7 +8,7 @@
 
 import type { ComponentChildren } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
-import { account, forgotPassword, messageFor, PROVIDERS, providerName, providersOn, refreshAccount, resetPassword, signIn, signUp, type Provider } from '../accounts.ts';
+import { account, forgotPassword, landAt, messageFor, PROVIDERS, providerName, providersOn, refreshAccount, resetPassword, signIn, signUp, type Provider } from '../accounts.ts';
 import { t } from '../i18n/index.ts';
 import { go } from '../nav.ts';
 import { SITE_URL } from '../site.ts';
@@ -48,7 +48,7 @@ export function AuthPage({ mode: first, token, prompt }: { mode: AuthMode; token
 
   // someone already in has nothing to do here; a server without accounts has no page of them
   useEffect(() => {
-    refreshAccount().then((a) => { if (a.status === 'in' && mode !== 'reset') go(homeWith(prompt)); });
+    refreshAccount().then((a) => { if (a.status === 'in' && mode !== 'reset') void landAt(homeWith(prompt)); });
     providersOn().then(setProviders);
   }, []);
 
@@ -71,11 +71,11 @@ export function AuthPage({ mode: first, token, prompt }: { mode: AuthMode; token
     try {
       if (mode === 'login') {
         const r = await signIn(clean, password);
-        if (r.ok) return go(homeWith(prompt));
+        if (r.ok) return landAt(homeWith(prompt));
         setError(messageFor(r.error));
       } else if (mode === 'signup') {
         const r = await signUp(name.trim(), clean, password);
-        if (r.ok) return go(homeWith(prompt));
+        if (r.ok) return landAt(homeWith(prompt));
         setError(messageFor(r.error));
       } else if (mode === 'forgot') {
         const r = await forgotPassword(clean);

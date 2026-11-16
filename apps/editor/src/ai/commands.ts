@@ -5,6 +5,7 @@
 
 import type { JsonSchema, Registry, TrammeDoc } from '@tramme/core';
 import { libraryList } from '../library.ts';
+import { TAG } from '../mentions.ts';
 
 export interface Command {
   kind: 'tool' | 'prompt';
@@ -18,6 +19,9 @@ export interface Command {
   /** workflows: the instructions for the assistant */
   prompt?: string;
 }
+
+/** a command a message names, with its tool's form when the user filled one in */
+export interface Called { cmd: Command; input?: Record<string, unknown> }
 
 export function listCommands(reg: Registry): Command[] {
   return [
@@ -46,6 +50,47 @@ export function parseCommand(text: string, list: Command[]): { cmd: Command; res
   const m = /^\/([A-Za-z][\w.-]*)(?:\s+([\s\S]*))?$/.exec(text.trim());
   const cmd = m && list.find((c) => c.name === m[1]);
   return cmd ? { cmd, rest: (m[2] ?? '').trim() } : null;
+}
+
+/** the command being typed at the caret: a / at the start or after a space, and the name typed so far up to the caret */
+export function commandQuery(text: string, caret: number): { from: number; query: string } | null {
+  const m = /(^|\s)\/([\w.-]*)$/.exec(text.slice(0, caret));
+  return m ? { from: caret - m[2].length - 1, query: m[2] } : null;
+}
+
+/** the text with the command typed so far replaced by the chosen name and a space, and where the caret goes */
+export function applyCommand(text: string, q: { from: number; query: string }, name: string): { text: string; caret: number } {
+  const insert = `/${name} `;
+  return { text: text.slice(0, q.from) + insert + text.slice(q.from + 1 + q.query.length), caret: q.from + insert.length };
+}
+
+/** every command a message names (/name at its start or after a space, known to the vocabulary), each once, in the order written */
+export function commandsIn(text: string, list: Command[]): Command[] {
+  const out: Command[] = [];
+  for (const m of text.matchAll(/(?:^|\s)\/([A-Za-z][\w.-]*)/g)) {
+    const c = list.find((x) => x.name === m[1]);
+    if (c && !out.includes(c)) out.push(c);
+  }
+  return out;
+}
+
+/** a piece of a message as the box shows it: plain words, a command the vocabulary knows, or a tag it can explain */
+export interface Piece { text: string; kind?: 'command' | 'tag' }
+
+/** the message cut into pieces, the known /commands and @tags apart (an unknown one stays plain words) */
+export function piecesOf(text: string, isCommand: (name: string) => boolean, isTag: (token: string) => boolean): Piece[] {
+  const out: Piece[] = [];
+  let at = 0;
+  // a tag takes letters of any language; a command's name stays plain letters, digits, _ . and -
+  for (const m of text.matchAll(new RegExp(String.raw`(^|\s)([/@])(${TAG})`, 'gu'))) {
+    const [, space, sign, word] = m, start = m.index! + space.length;
+    if (!(sign === '/' ? /^[A-Za-z][\w.-]*$/.test(word) && isCommand(word) : isTag(word))) continue;
+    if (start > at) out.push({ text: text.slice(at, start) });
+    out.push({ text: sign + word, kind: sign === '/' ? 'command' : 'tag' });
+    at = start + 1 + word.length;
+  }
+  if (at < text.length) out.push({ text: text.slice(at) });
+  return out;
 }
 
 export type FieldKind = 'number' | 'integer' | 'boolean' | 'enum' | 'asset' | 'layer' | 'kit' | 'plugin' | 'library' | 'string';

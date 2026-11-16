@@ -51,6 +51,7 @@ export class Stills {
     // the flag: the picture comes from the sandbox, videos decoded here
     if (sandboxedDoc(doc)) {
       const docUrl = new URL(S.docUrl.peek(), location.href).href;
+      await r.bringImages(t, compId);
       ensureSandboxDoc(pluginHost(docUrl), { doc, docUrl, loaded: (id) => { try { return r.assets.get(id); } catch { return null; } } });
       const videos = await sandboxVideoFrames(r, doc, t);
       const pic = await pluginHost(docUrl).renderFrame({ compId, t, scale: k, width: c.width, height: c.height, videos });
@@ -124,8 +125,8 @@ class Frames {
         if (w.doc !== this.current || this.cache.has(w.key) || !w.doc.compositions[w.compId]) continue;
         let url: string;
         try { url = await this.stills.still(w.doc, w.t, w.compId, this.width, 0.78); }
-        catch (e) { S.renderError.value = `storyboard: ${(e as Error).message}`; continue; }
-        if (S.renderError.peek()?.startsWith('storyboard:')) S.renderError.value = null;
+        // a frame of the storyboard that cannot be drawn keeps its last picture: the engine's sentence is for the log, never over the film
+        catch (e) { console.warn('storyboard frame', w.where, e); continue; }
         this.cache.set(w.key, url);
         this.last.set(w.where, url);
         // the oldest frames go first when there are many

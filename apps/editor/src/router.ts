@@ -1,5 +1,5 @@
 // Moving between the editor's own pages without loading it again: the home page
-// and the pages of the account (/login, /signup, /forgot, /space). A project
+// and the pages of the account (/login, /signup, /forgot, /space, /admin). A project
 // (/p/<id>) is not one of them: the editor of a film starts its engine from
 // nothing, so it is a page of its own, loaded whole.
 //
@@ -10,7 +10,7 @@
 import { signal } from '@preact/signals';
 
 /** the pages that change without a load */
-export const SPA_PATHS: ReadonlySet<string> = new Set(['/', '/login', '/signup', '/forgot', '/space']);
+export const SPA_PATHS: ReadonlySet<string> = new Set(['/', '/login', '/signup', '/forgot', '/space', '/admin']);
 
 export const normalize = (path: string): string => path.replace(/\/+$/, '') || '/';
 

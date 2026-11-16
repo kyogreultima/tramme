@@ -12,7 +12,7 @@ import { localMatrix } from '@tramme/render';
 import { comp, commit, draft, cancelDraft, S, select, viewDoc, previewDoc, toast, uiTime } from '../state.ts';
 import { decide } from '../ai/conversation.ts';
 import { editAtOps, flatTree, layerName, parentOf, propPath, rawProp } from '../model.ts';
-import { assetData, preview, previewInfo } from '../preview.ts';
+import { assetData, preview, previewInfo, previewReady } from '../preview.ts';
 import { prefs, setPrefs, settingsOpen, type Preferences } from '../settings.ts';
 import { sandboxedDoc } from '../installed.ts';
 import { pluginHost } from '../plugins/index.ts';
@@ -24,7 +24,7 @@ import { m, t } from '../i18n/index.ts';
 import { picking, pixelAt } from '../dropper.ts';
 import { grading, Scopes } from './Scopes.tsx';
 import { Loader } from './Logo.tsx';
-import { plainRenderMessage } from '../render-message.ts';
+import { plainRenderMessage, readyRenderer } from '../render-message.ts';
 import { WebSceneFrames } from './WebSceneFrames.tsx';
 
 /** a finger rather than a mouse: bigger handles */
@@ -139,20 +139,20 @@ export function Viewport({ bare = false, inset = INSET, overlay, intercept }: Vi
   const c = comp.value, doc = viewDoc.value, now = S.time.value, compId = S.compId.value;
   const projectId = S.project.value?.id, docUrl = S.docUrl.value;
   const reg = S.registry.value;
-  const isolated = prefs.value.sandboxPreview || sandboxedDoc(doc);
+  const isolated = prefs.value.sandboxPreview || sandboxedDoc(doc), ready = previewReady.value;
   const ev = useMemo(() => new Evaluator(doc, reg, { data: assetData, allowExpressions: !isolated }), [doc, reg, isolated]);
   const [remote, setRemote] = useState<{ doc: TrammeDoc; projectId: string; docUrl: string; compId: string; t: number; layers: Map<string, EvaluatedLayer>; error?: string } | null>(null);
   const currentRemote = remote?.doc === doc && remote.projectId === projectId && remote.docUrl === docUrl && remote.compId === compId && remote.t === now ? remote : null;
   useEffect(() => {
-    if (!isolated) return;
+    // the preview still loading: the reading waits for it (ready changes) and says nothing
+    if (!isolated || !ready) return;
     const ids = flatTree(c).map((item) => item.id);
     if (!ids.length) return;
     const project = fileProject();
     let live = true;
     const timer = setTimeout(() => { void (async () => {
       try {
-        const renderer = preview.renderer;
-        if (!renderer) throw new Error('preview is not ready');
+        const renderer = readyRenderer();
         const base = new URL(project.docUrl, location.href).href;
         const host = pluginHost(base);
         await ensureDeclared(host, moduleItemsOf(doc, base));
@@ -176,7 +176,7 @@ export function Viewport({ bare = false, inset = INSET, overlay, intercept }: Vi
       }
     })(); }, 40);
     return () => { live = false; clearTimeout(timer); };
-  }, [doc, compId, now, isolated, projectId, docUrl, reg]);
+  }, [doc, compId, now, isolated, ready, projectId, docUrl, reg]);
   const layerAt = (id: string): EvaluatedLayer | null => {
     if (isolated) return currentRemote?.layers.get(id) ?? null;
     return ev.layerAt(id, now, compId);

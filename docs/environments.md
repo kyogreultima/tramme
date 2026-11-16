@@ -8,7 +8,7 @@ Where Tramme lives, by environment. Every link from the site to the app (sign up
 | `beta` | `https://beta.tramme.dev` | `https://beta.app.tramme.dev` | `TRAMME_ENV=beta` |
 | `production` | `https://tramme.dev` | `https://app.tramme.dev` | a build with no `TRAMME_ENV` |
 
-Tramme has two deployed environments, beta and production. Their addresses are in that one file.
+Tramme has two deployed environments, beta (from `develop`) and production (from `main`). Their addresses are in that one file.
 
 ## Choosing
 
@@ -44,6 +44,15 @@ Two repositories deploy beta, on every push to `develop`. This one is public; th
 - The app: the same workflow then sends the event `public-develop` to `tramme-platform`, whose Beta workflow builds the editor with `TRAMME_ENV=beta`, builds the backend's image and deploys the Worker `tramme-beta` (`beta.app.tramme.dev`, and `cles.beta.app.tramme.dev` for the key vault) from `deploy/wrangler.jsonc`, with this repository's Worker as is.
 
 Secrets: `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` in both repositories; `PLATFORM_DISPATCH_TOKEN` here (a fine-grained token with Contents read and write on `tramme-platform` only). The backend's own secrets are given once, in Cloudflare: `pnpm exec wrangler secret put <NAME> --env beta -c deploy/wrangler.jsonc` from the platform repository, for `APP_KEY`, `DATABASE_URL` (its own database), `EDGE_SECRET`, `INTERNAL_SECRET`, `SMTP_PASSWORD` (and the OAuth ones when they exist).
+
+## Production deployment
+
+The same two halves as beta, from `main`:
+
+- The site: `tramme.dev`, deployed by this repository (`pnpm site:deploy`).
+- The app: on every push to `main`, once the checks pass, `.github/workflows/app.yml` sends the event `public-main` to `tramme-platform`, whose Production workflow builds the editor with `TRAMME_ENV=production`, builds the backend's image and deploys the Worker `tramme` (`app.tramme.dev`, and `cles.app.tramme.dev` for the key vault) from `deploy/wrangler.jsonc` (`--env production`). The Worker keeps the name of the personal deployment this repository made before, so the two domains move with it.
+
+Production has its own database, bucket (`tramme-files`, EU) and secrets, given once in Cloudflare like beta's (`--env production`). One backend per environment, never one shared: a beta build then runs beta's code against beta's data only, and a migration or a bug tried in beta never touches production's accounts.
 
 ## Which backend each build talks to
 

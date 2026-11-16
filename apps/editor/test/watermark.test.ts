@@ -2,16 +2,16 @@ import { describe, expect, it } from 'vitest';
 import { WATERMARK, watermarkBox, watermarkOpening } from '../src/watermark-draw.ts';
 
 describe('the watermark', () => {
-  it('is the mark alone in the bottom right corner, and the whole logo when open, anchored there', () => {
+  it('is the mark alone in the top left corner, and the whole logo when open, anchored there', () => {
     const shut = watermarkBox(1920, 1080, 0), open = watermarkBox(1920, 1080, 1);
     expect(shut.h).toBe(49);
     expect(Math.round(shut.w)).toBe(46);
     expect(Math.round(open.w)).toBe(196);
-    // the right and bottom edges stay where they are
-    for (const b of [shut, open]) expect([Math.round(1920 - b.x - b.w), 1080 - b.y - b.h]).toEqual([38, 38]);
+    // the left and top edges stay where they are
+    for (const b of [shut, open]) expect([b.x, b.y]).toEqual([38, 38]);
     // a vertical film: the same size and margins
     const v = watermarkBox(1080, 1920, 0);
-    expect([v.h, Math.round(1080 - v.x - v.w), 1920 - v.y - v.h]).toEqual([49, 38, 38]);
+    expect([v.h, v.x, v.y]).toEqual([49, 38, 38]);
   });
 
   it('opens at regular intervals, holds, and closes back into the mark', () => {

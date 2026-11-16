@@ -4,7 +4,7 @@
 // studio.ts and the pure parts in retouch.ts; these are the views and the gesture.
 
 import type { RefObject } from 'preact';
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { Evaluator, sampleAt, type Vec2 } from '@tramme/core';
 import { running } from '../ai/conversation.ts';
 import { draft } from '../attachments.ts';
@@ -13,8 +13,8 @@ import { sandboxedDoc } from '../installed.ts';
 import { pluginHost } from '../plugins/index.ts';
 import { ensureDeclared, ensureSandboxDoc, moduleItemsOf } from '../plugins/sandbox-draw.ts';
 import { fileProject, sameFileProject } from '../files.ts';
-import { preview } from '../preview.ts';
-import { addPin, cancelReview, confirmReview, editRetouch, moveRetouch, notes, removePin, removeRetouch, resetRetouch, sendRetouches, strokeDone, studio, toggleReview } from '../studio.ts';
+import { readyRenderer } from '../render-message.ts';
+import { addPin, cancelReview, confirmReview, editRetouch, movePin, moveRetouch, notes, removePin, removeRetouch, resetRetouch, sendRetouches, strokeDone, studio, toggleReview } from '../studio.ts';
 import { anchorPoint, summaryOf, type Pin, type Placed, type Pt } from '../retouch.ts';
 import { Icon } from './icons.tsx';
 import { t } from '../i18n/index.ts';
@@ -23,8 +23,7 @@ import { t } from '../i18n/index.ts';
 export async function placedNow(): Promise<Placed[]> {
   const doc = S.doc.peek(), id = S.compId.peek(), time = uiTime.peek();
   if (sandboxedDoc(doc)) {
-    const project = fileProject(), renderer = preview.renderer;
-    if (!renderer) throw new Error('preview is not ready');
+    const project = fileProject(), renderer = readyRenderer();
     const base = new URL(project.docUrl, location.href).href, host = pluginHost(base);
     await ensureDeclared(host, moduleItemsOf(doc, base));
     if (!sameFileProject(project) || S.doc.peek() !== doc || S.compId.peek() !== id || uiTime.peek() !== time) throw new Error(t('common.projectChangedDuringFile'));
@@ -106,10 +105,47 @@ export function PinChips() {
 /** a stroke as the points of an SVG shape, in the picture's own unit square */
 const shape = (pts: Pt[]) => pts.map((q) => `${q[0]},${q[1]}`).join(' ');
 
-/** the pins drawn over the picture: the ones of the list and of the note being written, numbered as the assistant will number them, and the notes left earlier near this moment */
+/** a pin shown `by` away from where it is (the drag under way): every point of it shifted */
+const shifted = (p: Pin, by: Pt): Pin => {
+  const s = (q: Pt): Pt => [q[0] + by[0], q[1] + by[1]];
+  return p.kind === 'point' ? { ...p, at: s(p.at) } : { ...p, points: p.points.map(s) };
+};
+
+/**
+ * A pin's badge taken by the pointer: the pin follows it as it moves and is
+ * set down where it lifts (movePin keeps it in the frame and finds what it is
+ * on there). A press that does not move leaves it as it was.
+ */
+function useDragPin(box: RefObject<HTMLDivElement | null>) {
+  const [drag, setDrag] = useState<{ id: string; by: Pt } | null>(null);
+  const down = (id: string) => (e: PointerEvent) => {
+    const el = box.current;
+    if (!el || e.button !== 0) return;
+    e.stopPropagation();
+    e.preventDefault();
+    S.playing.value = false;
+    const r = el.getBoundingClientRect(), from = [e.clientX, e.clientY];
+    let by: Pt = [0, 0];
+    const move = (ev: PointerEvent) => { by = [(ev.clientX - from[0]) / r.width, (ev.clientY - from[1]) / r.height]; setDrag({ id, by }); };
+    const done = (ev: Event) => {
+      removeEventListener('pointermove', move); removeEventListener('pointerup', done); removeEventListener('pointercancel', done);
+      if (ev.type === 'pointercancel' || Math.hypot(by[0], by[1]) < 0.004) { setDrag(null); return; }
+      const project = fileProject(), k = comp.peek(), frame = { w: k.width, h: k.height };
+      void placedNow().catch(() => [] as Placed[]).then((placed) => {
+        if (sameFileProject(project)) movePin(id, by, placed, frame);
+        setDrag(null);
+      });
+    };
+    addEventListener('pointermove', move); addEventListener('pointerup', done); addEventListener('pointercancel', done);
+  };
+  return { drag, down };
+}
+
+/** the pins drawn over the picture: the ones of the list and of the note being written, numbered as the assistant will number them, and the notes left earlier near this moment; each of the new ones dragged to move it */
 export function Marks() {
   const now = uiTime.value, draft = studio.pins.value, review = studio.review.value, drawing = studio.drawing.value;
-  const listed = studio.retouches.value.flatMap((r) => r.pins), all = [...listed, ...draft];
+  const box = useRef<HTMLDivElement>(null), { drag, down } = useDragPin(box);
+  const all = [...studio.retouches.value.flatMap((r) => r.pins), ...draft].map((p) => (drag?.id === p.id ? shifted(p, drag.by) : p));
   const near = notes.value.filter(({ note }) => note.pin && Math.abs(note.at! - now) < 0.75);
   const k = comp.value;
   const doc = S.doc.value, projectId = S.project.value?.id, docUrl = S.docUrl.value, compId = S.compId.value;
@@ -125,7 +161,7 @@ export function Marks() {
   const boxes = review && sample?.doc === doc && sample.projectId === projectId && sample.docUrl === docUrl && sample.compId === compId && sample.time === now
     ? sample.layers.filter((p) => p.box && review.candidates.some((c) => c.id === p.id)) : [];
   return (
-    <div class="pins">
+    <div class="pins" ref={box}>
       <svg class="strokes" viewBox="0 0 1 1" preserveAspectRatio="none">
         {all.map((p) => (p.kind === 'point' ? null : p.kind === 'path'
           ? <polyline key={p.id} class="stroke path" points={shape(p.points)} />
@@ -143,7 +179,10 @@ export function Marks() {
           <span>{n}</span>
         </button>
       ))}
-      {all.map((p, i) => { const [x, y] = anchorPoint(p); return <span key={p.id} class="pin new" style={{ left: `${x * 100}%`, top: `${y * 100}%` }}><span>{i + 1}</span></span>; })}
+      {all.map((p, i) => {
+        const [x, y] = anchorPoint(p);
+        return <span key={p.id} class={`pin new${drag?.id === p.id ? ' dragging' : ''}`} style={{ left: `${x * 100}%`, top: `${y * 100}%` }} title={t('studio.movePin')} onPointerDown={down(p.id)}><span>{i + 1}</span></span>;
+      })}
     </div>
   );
 }

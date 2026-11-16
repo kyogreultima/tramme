@@ -41,14 +41,7 @@ The same editor in a native window ([Tauri 2](https://v2.tauri.app/); Windows, m
 
 ## Deploying
 
-On Cloudflare, in one of two modes. **Private**: the Worker serves the editor and the API, projects live in R2, Cloudflare Access protects the whole. **Personal** (`pnpm deploy:personal`): a public deployment anyone uses without an account; projects stay in each visitor's browser, keys in a key vault the editor cannot read, and the browser calls the providers itself. Step by step in [docs/deploy.md](docs/deploy.md). The private mode, in short:
-
-```sh
-pnpm exec wrangler r2 bucket create tramme-projects
-# Cloudflare Access: an application on the domain, then ACCESS_TEAM_DOMAIN and ACCESS_AUD in apps/worker/wrangler.jsonc
-pnpm run deploy
-# optional: provider keys (Anthropic, OpenAI, Gemini, OpenRouter, Z.AI, ElevenLabs, Hydracept with its project ID, custom) in the editor's Settings, Providers
-```
+On Cloudflare, in personal mode (`pnpm deploy:personal`): a public deployment anyone uses without an account; projects stay in each visitor's browser, keys in a key vault the editor cannot read, and the browser calls the providers itself. Step by step in [docs/deploy.md](docs/deploy.md), with the server mode `pnpm dev` runs locally (projects in a simulated R2, keys kept by the Worker).
 
 ## Commands
 
@@ -63,6 +56,7 @@ tramme pack     <folder> [--out project.tramme]        a project folder as a .tr
 tramme unpack   <project.tramme> [--out folder]        a .tramme archive as a project folder (checked)
 tramme nodes    [<doc>]                               the available vocabulary
 tramme agent    [--origin https://…] [--port 4317]    the assistant's local companion
+tramme cloud-export <doc> [--app url] [--token tr_…] [--out film.mp4]   rendered in the cloud of an account (API token from your space)
 tramme compare  <ref> <test> [--diff folder]          PSNR and an image of the differences
 tramme check-export <doc> --format lottie|svg --t …   export read back (lottie-web, Chrome) against Tramme
 tramme check-media <file> [--width n --height n --fps n --frames n --duration s] [--json]   decode and verify MP4, MOV or WebM delivery

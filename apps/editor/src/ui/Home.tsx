@@ -14,14 +14,16 @@ import { saveBlob } from '../download.ts';
 import { safeName } from '../files.ts';
 import { ago } from '../model.ts';
 import { createFromWords, droppedOf, importArchive, ImportError, importFile, importSources, importVideo, isSourceFile, isVideoFile, pickedOf, type Picked, type Progress } from '../importer.ts';
+import { remix } from '../gallery.ts';
 import { kindOf } from '../sources.ts';
 import { S, toast } from '../state.ts';
 import { listCommands, type Command } from '../ai/commands.ts';
 import { packCommands, shippedPacks } from '../packs.ts';
-import { useCommandMenu, useMentionMenu } from './composer.tsx';
-import { expandMentions } from '../mentions.ts';
+import { MarkedField, useCommandMenu, useMentionMenu } from './composer.tsx';
+import { listStyles, readStyle, styleWords } from '../style.ts';
+import { expandMentions, tagOfName } from '../mentions.ts';
 import { MicButton, writeInto } from './MicButton.tsx';
-import { handheld, Modal, longPress, openMenu, Seg } from './controls.tsx';
+import { handheld, Modal, longPress, openMenu, Seg, Select } from './controls.tsx';
 import { Icon } from './icons.tsx';
 import { Brand } from './Logo.tsx';
 import { ModelPicker } from './ModelPicker.tsx';
@@ -35,10 +37,12 @@ import { prefs, settingsOpen } from '../settings.ts';
 import { GLASS_THEMES } from '../theme/pref.ts';
 import { APP_VERSION, downloadOf, update } from '../version.ts';
 import { tauri } from '../tauri.ts';
+import { inAccount } from '../bring.ts';
 import { IDEAS } from '../ideas.ts';
 import { t } from '../i18n/index.ts';
 import { go } from '../nav.ts';
 import { AccountMenu } from './AccountMenu.tsx';
+import { BringOffer } from './BringDialog.tsx';
 import { account, resendVerification } from '../accounts.ts';
 
 interface Example { file: string; name: string; description: string; width: number; height: number; duration: number; thumbnail?: string }
@@ -185,12 +189,15 @@ function Card({ m, onMenu }: { m: Manifest; onMenu: (e: MouseEvent | { clientX: 
       </div>
       <div class="card-meta">
         <div class="card-name" title={m.name}>{m.name}</div>
-        <div class="card-sub">{[dims(m), ago(m.modified)].filter(Boolean).join(' · ')}</div>
+        <div class="card-sub">{[dims(m), ago(m.modified), tauri && inAccount(m) ? t('home.inYourAccount') : ''].filter(Boolean).join(' · ')}</div>
       </div>
       <button class="icon-btn sm card-more" title={t('home.actions')} onClick={(e) => { e.stopPropagation(); onMenu(e); }}><Icon name="more" /></button>
     </div>
   );
 }
+
+/** the word that tags a file of the material: its name, what a tag cannot hold made _ (mentions.ts) */
+const tagOf = (p: Picked) => tagOfName(p.file.name);
 
 /** the direction box: the words of the film, the material it is made from, the model that makes it, its format */
 export function DirectionBox({ busy, onStart }: { busy: boolean; onStart: (words: string, material: Picked[], format: [number, number]) => void }) {
@@ -204,16 +211,27 @@ export function DirectionBox({ busy, onStart }: { busy: boolean; onStart: (words
   useEffect(() => { const el = area.current; if (el) { el.style.height = 'auto'; el.style.height = `${Math.min(260, Math.max(92, el.scrollHeight))}px`; } }, [words]);
   const add = (list: Picked[]) => setMaterial((had) => [...had, ...list.filter((p) => !had.some((h) => h.path === p.path))]);
   const ready = !busy && (words.trim().length > 0 || material.length > 0);
-  const start = () => { if (!ready) return; const f = FILM_FORMATS.find(([id]) => id === format)!; onStart(expandMentions(words.trim(), (tok) => { const p = material.find((x) => x.file.name.replace(/s+/g, '_') === tok); return p ? `the attached file "${p.file.name}"` : null; }), material, [f[2], f[3]]); };
+  // the styles kept from earlier projects (style.ts): one chosen is told to the assistant with the words
+  const [styles, setStyles] = useState<string[]>([]);
+  const [style, setStyle] = useState('');
+  useEffect(() => { void listStyles().then(setStyles); }, []);
+  const start = async () => {
+    if (!ready) return;
+    const f = FILM_FORMATS.find(([id]) => id === format)!;
+    const chosen = style ? await readStyle(style) : null;
+    const said = expandMentions(words.trim(), (tok) => { const p = material.find((x) => tagOf(x) === tok); return p ? `the attached file "${p.file.name}"` : null; });
+    onStart(chosen ? `${said}\n\n${styleWords(chosen)}` : said, material, [f[2], f[3]]);
+  };
   // the / menu, as in the message box: a workflow starts the project with it, a tool waits in the editor's box with its form.
   // The shipped packs' commands come from the index, so the menu offers them before a project holds any pack.
   const [packCmds, setPackCmds] = useState<Command[]>([]);
   useEffect(() => { void shippedPacks().then((p) => setPackCmds(packCommands(p))); }, []);
   const commands = useMemo(() => [...listCommands(S.registry.value), ...packCmds], [S.registry.value, packCmds]);
-  const commandMenu = useCommandMenu(words, commands, (c) => { setWords(`/${c.name} `); area.current?.focus(); });
+  const commandMenu = useCommandMenu(area, words, setWords, commands);
   // the @ menu: the material added so far, tagged in the words
-  const tags = useMemo(() => material.map((p) => ({ token: p.file.name.replace(/s+/g, '_'), label: p.file.name, kind: kindOf(p.file) })), [material]);
+  const tags = useMemo(() => material.map((p) => ({ token: tagOf(p), label: p.file.name, kind: kindOf(p.file) })), [material]);
   const mention = useMentionMenu(area, words, setWords, tags);
+  const isCommand = (name: string) => commands.some((c) => c.name === name), isTag = (token: string) => tags.some((x) => x.token === token);
   const chosen = (e: Event) => { const input = e.target as HTMLInputElement, list = pickedOf(input.files ?? []); input.value = ''; add(list); };
   return (
     <div class="hero">
@@ -222,13 +240,15 @@ export function DirectionBox({ busy, onStart }: { busy: boolean; onStart: (words
       <form class="brief-box" data-tour="home-new" onSubmit={(e) => { e.preventDefault(); start(); }}
         onDragOver={(e) => { if (e.dataTransfer?.types.includes('Files')) { e.preventDefault(); e.stopPropagation(); } }}
         onDrop={(e) => { if (!e.dataTransfer) return; e.preventDefault(); e.stopPropagation(); droppedOf(e.dataTransfer).then((list) => add(list.filter((p) => isSourceFile(p.file)))); }}>
-        <textarea ref={area} value={words} placeholder={t('home.heroPlaceholder')}
-          // ready to type with a keyboard; on a touch screen the keyboard would cover the page as soon as it opens
-          autoFocus={!handheld()}
-          aria-autocomplete="list"
-          onInput={(e) => { setWords((e.target as HTMLTextAreaElement).value); commandMenu.typed(); mention.sync(); }}
-          onClick={mention.sync}
-          onKeyDown={(e) => { if (commandMenu.keyDown(e) || mention.keyDown(e)) return; if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); start(); } }} />
+        <MarkedField area={area} text={words} isCommand={isCommand} isTag={isTag}>
+          <textarea ref={area} value={words} placeholder={t('home.heroPlaceholder')}
+            // ready to type with a keyboard; on a touch screen the keyboard would cover the page as soon as it opens
+            autoFocus={!handheld()}
+            aria-autocomplete="list"
+            onInput={(e) => { setWords((e.target as HTMLTextAreaElement).value); commandMenu.sync(); mention.sync(); }}
+            onClick={() => { commandMenu.sync(); mention.sync(); }}
+            onKeyDown={(e) => { if (commandMenu.keyDown(e) || mention.keyDown(e)) return; if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); start(); } }} />
+        </MarkedField>
         {commandMenu.view}
         {mention.view}
         {material.length > 0 && (
@@ -249,6 +269,7 @@ export function DirectionBox({ busy, onStart }: { busy: boolean; onStart: (words
           <input ref={files} type="file" multiple hidden accept="image/*,video/*,audio/*,.pdf,application/pdf,.md,.markdown,.json,.ttf,.otf,.woff,.woff2,.glb,.gltf" onChange={chosen} />
           <input ref={folder} type="file" multiple hidden {...{ webkitdirectory: true }} onChange={chosen} />
           <span class="grow" />
+          {styles.length > 0 && <Select value={style} options={[['', t('style.none')], ...styles.map((s) => [s, s.replace(/\.json$/, '')] as [string, string])]} onChange={setStyle} />}
           <ModelPicker />
           <Seg value={format} role="radiogroup" ariaLabel={t('common.format')}
             options={FILM_FORMATS.map(([id, , w, h]) => ({ value: id, label: <><i class="fmt" style={{ aspectRatio: `${w} / ${h}`, [w >= h ? 'width' : 'height']: '13px' }} />{id.replace('x', ':')}</> }))}
@@ -330,6 +351,23 @@ export function Home() {
     // shipped with the app, checked: their code never asks
     return importArchive(await r.blob(), p, { ask: null });
   });
+  // the site's "Open in Tramme" (?remix=<id>): an example of the app by its id, or a film of the gallery, copied into the projects
+  useEffect(() => {
+    const id = new URLSearchParams(location.search).get('remix');
+    if (!id) return;
+    history.replaceState(history.state, '', location.pathname);
+    run(t('gallery.copying'), async (p) => {
+      const list = await fetch('/examples/index.json').then((r) => (r.ok ? r.json() : [])).catch(() => []) as Example[];
+      const shipped = list.find((x) => x.file === `example-${id}.tramme`);
+      if (shipped) {
+        const r = await fetch(`/examples/${shipped.file}`);
+        if (r.ok) return importArchive(await r.blob(), p, { ask: null });
+      }
+      try { return await remix(id, p); } catch (e) {
+        throw e instanceof ApiError && e.status === 404 ? new Error(t('gallery.notFound')) : e;
+      }
+    });
+  }, []);
   const menu = (e: MouseEvent | { clientX: number; clientY: number }, m: Manifest) => openMenu(e, [
     { label: t('common.open'), icon: 'folder', onClick: () => open(m.id) },
     { label: t('common.rename'), icon: 'edit', onClick: () => setDialog({ kind: 'rename', m }) },
@@ -429,6 +467,7 @@ export function Home() {
         </div></div>
       )}
       {dialog?.kind === 'new' && <NewProject onClose={() => setDialog(null)} />}
+      <BringOffer onDone={refresh} />
       {dialog?.kind === 'rename' && <Rename project={dialog.m} onClose={() => setDialog(null)} onDone={refresh} />}
       {dialog?.kind === 'remove' && <Remove project={dialog.m} onClose={() => setDialog(null)} onDone={refresh} />}
       {dialog?.kind === 'failure' && <Failure error={dialog.error} onClose={() => setDialog(null)} />}

@@ -29,3 +29,9 @@ HYDRACEPT_PROJECT=
 # Accounts: the backend (pnpm server:dev, in the private platform repository) that answers /api/auth, /api/account and /api/billing.
 # Leave empty for no accounts. The editor then shows no sign-in.
 ACCOUNTS_URL=
+# Projects in the cloud for a signed-in person (pnpm dev:personal): the same EDGE_SECRET and INTERNAL_SECRET as the
+# backend's .env, and a secret of this Worker's own that seals the keys kept in each account (openssl rand -hex 32).
+# Without all three, a signed-in person's projects stay in the browser.
+EDGE_SECRET=
+INTERNAL_SECRET=
+KEYS_SECRET=

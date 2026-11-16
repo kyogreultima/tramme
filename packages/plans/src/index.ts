@@ -5,6 +5,12 @@
 // the numbers are the site's, the numbers are these. Paid features are services
 // the platform runs, not switches in the app's code.
 
+/**
+ * Whether the plans are sold: the prices shown on the site and the offers in the app's space. Off until the payment
+ * exists (the platform roadmap, D); the plans below stay written, ready.
+ */
+export const PAYMENT_OPEN = false;
+
 export type PlanId = 'basic' | 'plus' | 'pro';
 export type PaidPlanId = Exclude<PlanId, 'basic'>;
 export type Interval = 'month' | 'year';
@@ -26,12 +32,14 @@ export interface PlanTerms {
   watermark: 'always' | 'optional';
   export4k: boolean;
   priorityQueue: boolean;
+  /** export in the cloud by the API or the command line, with an API token of the account */
+  apiExport: boolean;
 }
 
 export const PLAN_TERMS: readonly PlanTerms[] = [
-  { id: 'basic', price: { month: 0, year: 0 }, credits: 0, rollover: false, cloudProjects: 3, privateProjects: false, historyDays: 7, watermark: 'always', export4k: false, priorityQueue: false },
-  { id: 'plus', price: { month: 12, year: 10 }, credits: 1000, rollover: false, cloudProjects: null, privateProjects: true, historyDays: 30, watermark: 'optional', export4k: false, priorityQueue: false },
-  { id: 'pro', price: { month: 35, year: 29 }, credits: 4000, rollover: false, cloudProjects: null, privateProjects: true, historyDays: null, watermark: 'optional', export4k: true, priorityQueue: true },
+  { id: 'basic', price: { month: 0, year: 0 }, credits: 0, rollover: false, cloudProjects: 3, privateProjects: false, historyDays: 7, watermark: 'always', export4k: false, priorityQueue: false, apiExport: false },
+  { id: 'plus', price: { month: 12, year: 10 }, credits: 1000, rollover: false, cloudProjects: null, privateProjects: true, historyDays: 30, watermark: 'optional', export4k: false, priorityQueue: false, apiExport: false },
+  { id: 'pro', price: { month: 35, year: 29 }, credits: 4000, rollover: false, cloudProjects: null, privateProjects: true, historyDays: null, watermark: 'optional', export4k: true, priorityQueue: true, apiExport: true },
 ];
 
 export const termsOf = (id: PlanId): PlanTerms => PLAN_TERMS.find((p) => p.id === id)!;

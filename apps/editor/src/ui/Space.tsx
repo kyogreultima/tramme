@@ -4,10 +4,16 @@
 
 import { useEffect, useState } from 'preact/hooks';
 import {
-  account, billing, changePassword, checkout, deleteAccount, exportData, linkUrl, manageSubscription, messageFor, plans, PROVIDERS, providerName, refreshAccount, sellsHere,
+  account, apiTokens, billing, changePassword, landAt, makeApiToken, revokeApiToken, type ApiToken, checkout, deleteAccount, exportData, linkUrl, manageSubscription, messageFor, plans, PROVIDERS, providerName, refreshAccount, sellsHere,
   resendVerification, revokeOtherSessions, signOut, unlinkProvider, updateProfile, type Billing, type PlanTerms, type Provider, type Reply, type UserJson,
 } from '../accounts.ts';
+import type { Manifest } from '@tramme/project';
+import { localProjects } from '../bring.ts';
+import { tauri } from '../tauri.ts';
+import { PAYMENT_OPEN } from '@tramme/plans';
 import { saveBlob } from '../download.ts';
+import { cloud } from '../mode.ts';
+import { BringDialog } from './BringDialog.tsx';
 import { locale, m, t } from '../i18n/index.ts';
 import { go } from '../nav.ts';
 import { toast } from '../state.ts';
@@ -19,10 +25,10 @@ import { Row, Section } from './SettingsRows.tsx';
 
 const eur = (n: number) => new Intl.NumberFormat(locale, { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n);
 const day = (iso?: string) => (iso ? new Intl.DateTimeFormat(locale, { dateStyle: 'long' }).format(new Date(iso)) : '');
-const planName = (id: PlanTerms['id']) => t(id === 'pro' ? m('account.space.planPro') : id === 'plus' ? m('account.space.planPlus') : m('account.space.planBasic'));
+export const planName = (id: PlanTerms['id']) => t(id === 'pro' ? m('account.space.planPro') : id === 'plus' ? m('account.space.planPlus') : m('account.space.planBasic'));
 
 /** what to say after a call: its error, or `done` */
-function report(r: Reply, done?: string): boolean {
+export function report(r: Pick<Reply, 'ok' | 'error'>, done?: string): boolean {
   if (r.ok) { if (done) toast(done); return true; }
   toast(messageFor(r.error), 'error');
   return false;
@@ -30,6 +36,12 @@ function report(r: Reply, done?: string): boolean {
 
 function Profile({ user }: { user: UserJson }) {
   const [name, setName] = useState(user.name);
+  const [handle, setHandle] = useState(user.handle ?? '');
+  const saveHandle = async () => {
+    setBusy(true);
+    report(await updateProfile({ handle: handle.trim() }), t('account.space.saved'));
+    setBusy(false);
+  };
   const [busy, setBusy] = useState(false);
   const save = async () => {
     setBusy(true);
@@ -42,6 +54,12 @@ function Profile({ user }: { user: UserJson }) {
         <div class="space-inline">
           <span class="field"><input value={name} maxLength={100} onInput={(e) => setName((e.target as HTMLInputElement).value)} onKeyDown={(e) => { if (e.key === 'Enter') save(); }} /></span>
           <button class="btn sm" disabled={busy || !name.trim() || name.trim() === user.name} onClick={save}>{t('account.space.save')}</button>
+        </div>
+      </Row>
+      <Row label={t('account.space.handle')} hint={t('account.space.handleHint')}>
+        <div class="space-inline">
+          <span class="field"><input value={handle} maxLength={30} spellcheck={false} placeholder="@" onInput={(e) => setHandle((e.target as HTMLInputElement).value.toLowerCase())} onKeyDown={(e) => { if (e.key === 'Enter') saveHandle(); }} /></span>
+          <button class="btn sm" disabled={busy || !handle.trim() || handle.trim() === (user.handle ?? '')} onClick={saveHandle}>{t('account.space.save')}</button>
         </div>
       </Row>
       <Row label={t('account.email')} hint={t('account.space.emailHint')}>
@@ -156,7 +174,7 @@ function DeleteDialog({ user, onClose }: { user: UserJson; onClose: () => void }
     // an address is typed, a password is not: either proves it is them
     const r = await deleteAccount(proof.includes('@') ? { email: proof } : { password: proof });
     setBusy(false);
-    if (r.ok) go('/'); else toast(messageFor(r.error), 'error');
+    if (r.ok) await landAt('/'); else toast(messageFor(r.error), 'error');
   };
   return (
     <Modal title={t('account.space.deleteTitle')} onClose={onClose}>
@@ -172,8 +190,43 @@ function DeleteDialog({ user, onClose }: { user: UserJson; onClose: () => void }
   );
 }
 
+/** the API tokens: made with a name, shown once, revoked (the command line's `tramme cloud-export`) */
+function Tokens() {
+  const [list, setList] = useState<ApiToken[]>([]);
+  const [name, setName] = useState('');
+  const [shown, setShown] = useState<string | null>(null);
+  const load = async () => { const r = await apiTokens(); if (r.ok) setList(r.data); };
+  useEffect(() => { void load(); }, []);
+  const make = async () => {
+    const r = await makeApiToken(name.trim());
+    if (report(r)) { setShown(r.data.token ?? null); setName(''); await load(); }
+  };
+  return (
+    <Section title={t('account.tokens.title')} hint={t('account.tokens.hint')}>
+      {shown && (
+        <div class="home-note"><Icon name="key" /><span>{t('account.tokens.once')}</span>
+          <span class="field"><input readOnly class="mono" value={shown} onFocus={(e) => (e.target as HTMLInputElement).select()} /></span>
+          <button class="btn sm" onClick={() => { void navigator.clipboard?.writeText(shown); toast(t('account.tokens.copied')); }}>{t('account.tokens.copy')}</button>
+        </div>
+      )}
+      {list.map((k) => (
+        <Row key={k.id} label={k.name} hint={k.lastUsedAt ? t('account.tokens.used', { date: day(k.lastUsedAt) }) : t('account.tokens.unused')}>
+          <button class="btn sm danger" onClick={async () => { if (report(await revokeApiToken(k.id), t('account.tokens.revoked'))) await load(); }}>{t('account.tokens.revoke')}</button>
+        </Row>
+      ))}
+      <Row label={t('account.tokens.new')}>
+        <div class="space-inline">
+          <span class="field"><input value={name} maxLength={100} placeholder={t('account.tokens.name')} onInput={(e) => setName((e.target as HTMLInputElement).value)} onKeyDown={(e) => { if (e.key === 'Enter' && name.trim()) void make(); }} /></span>
+          <button class="btn sm" disabled={!name.trim()} onClick={make}>{t('account.tokens.make')}</button>
+        </div>
+      </Row>
+    </Section>
+  );
+}
+
 function Data({ user }: { user: UserJson }) {
   const [deleting, setDeleting] = useState(false);
+  const [bringing, setBringing] = useState<Manifest[] | null>(null);
   const download = async () => {
     const blob = await exportData();
     if (!blob) { toast(messageFor('generic'), 'error'); return; }
@@ -187,6 +240,11 @@ function Data({ user }: { user: UserJson }) {
         </Row>
       </Section>
       <Section title={t('account.space.data')} hint={t('account.space.dataHint')}>
+        {(cloud || tauri) && (
+          <Row label={t('account.bring.row')} hint={t('account.bring.rowHint')}>
+            <button class="btn sm" onClick={async () => { const list = await localProjects(); if (list.length) setBringing(list); else toast(t('account.bring.none')); }}><Icon name="upload" />{t('account.bring.button')}</button>
+          </Row>
+        )}
         <Row label={t('account.space.export')} hint={t('account.space.exportHint')}>
           <button class="btn sm" onClick={download}><Icon name="download" />{t('account.space.exportButton')}</button>
         </Row>
@@ -195,6 +253,7 @@ function Data({ user }: { user: UserJson }) {
         </Row>
       </Section>
       {deleting && <DeleteDialog user={user} onClose={() => setDeleting(false)} />}
+      {bringing && <BringDialog projects={bringing} onClose={() => setBringing(null)} onDone={() => {}} />}
     </>
   );
 }
@@ -209,7 +268,7 @@ export function SpacePage() {
         <a class="brand" href="/" aria-label="Tramme"><Brand size={20} /></a>
         <span class="grow" />
         <a class="btn outline sm" href="/"><Icon name="home" /><span class="label">{t('account.projects')}</span></a>
-        {user && <button class="btn ghost sm" onClick={async () => { await signOut(); go('/'); }}>{t('account.signOut')}</button>}
+        {user && <button class="btn ghost sm" onClick={async () => { await signOut(); await landAt('/'); }}>{t('account.signOut')}</button>}
       </header>
       <main class="space-main">
         <div class="space-title"><h1>{t('account.space.title')}</h1><p class="faint">{t('account.space.lead')}</p></div>
@@ -222,8 +281,11 @@ export function SpacePage() {
                 <button class="btn sm" onClick={async () => report(await resendVerification(), t('account.verify.sent'))}>{t('account.verify.resend')}</button></div>
             )}
             <Profile user={user} />
-            <PlanSection user={user} />
+            {/* the plans, once they are sold (packages/plans): until then, nothing of prices or credits */}
+            {PAYMENT_OPEN && <PlanSection user={user} />}
             <SignInMethods user={user} />
+            {/* the API tokens: where the account's projects are in the cloud */}
+            {(cloud || tauri) && <Tokens />}
             <Data user={user} />
           </>
         )}

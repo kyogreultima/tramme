@@ -259,6 +259,8 @@ describe.skipIf(!CHROME)('effects, rendered', () => {
     close = async () => { await browser.close(); server.close(); };
     still = async (kind, t) => {
       await openDoc(page, port, `/project/${kind}.tramme.json`);
+      // the effects judged alone: the watermark (top left) would cover the pixels read there
+      await page.evaluate(() => (window as any).TRAMME.watermark(false));
       const url: string = await page.evaluate((x) => (window as any).TRAMME.still(x), t);
       const png = PNG.sync.read(Buffer.from(url.split(',')[1], 'base64'));
       return (x, y) => { const i = (y * png.width + x) * 4; return [png.data[i], png.data[i + 1], png.data[i + 2]]; };

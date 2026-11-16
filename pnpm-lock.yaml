@@ -301,6 +301,9 @@ importers:
       '@tramme/nodes':
         specifier: workspace:*
         version: link:../../packages/nodes
+      '@tramme/plans':
+        specifier: workspace:*
+        version: link:../../packages/plans
       '@tramme/project':
         specifier: workspace:*
         version: link:../../packages/project
@@ -310,6 +313,12 @@ importers:
       zod:
         specifier: ^4.6.7
         version: 4.6.7
+
+  apps/renderer:
+    dependencies:
+      '@tramme/cli':
+        specifier: workspace:*
+        version: link:../../packages/cli
 
   apps/site:
     dependencies:
@@ -352,12 +361,18 @@ importers:
       '@tramme/api':
         specifier: workspace:*
         version: link:../../packages/api
+      '@tramme/plans':
+        specifier: workspace:*
+        version: link:../../packages/plans
       '@tramme/project':
         specifier: workspace:*
         version: link:../../packages/project
 
   packages/api:
     dependencies:
+      '@tramme/plans':
+        specifier: workspace:*
+        version: link:../plans
       '@tramme/project':
         specifier: workspace:*
         version: link:../project

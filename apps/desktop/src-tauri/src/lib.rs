@@ -9,6 +9,7 @@ mod account;
 mod analytics;
 mod api;
 mod bodies;
+mod cloud;
 #[cfg(desktop)]
 mod desktop;
 #[cfg(mobile)]

@@ -1,16 +1,20 @@
-// Whether an exported film carries the watermark (the Tramme logo in a
-// corner, watermark-draw.ts): always on the Basic plan and without an account
-// (a server without accounts, the desktop app before it signs in); on Plus and
-// Pro it is on by default and a setting turns it off. The first export that
-// carries it says so, once.
+// Whether an exported film carries the watermark (the Tramme logo in the top
+// left corner, watermark-draw.ts): on by default, a setting turns it off.
+// Once accounts open, PLANS_ENFORCE_WATERMARK makes it mandatory on the Basic
+// plan and without an account; Plus and Pro keep the setting. The first
+// export that carries it says so, once.
 
 import { account, billing } from './accounts.ts';
 import { t } from './i18n/index.ts';
 import { notify } from './notify.ts';
 import { prefs, setPrefs } from './settings.ts';
 
-/** whether the plan lets the watermark be turned off: an account signed in on Plus or Pro */
+/** whether the plans decide: false until accounts are open to everyone, and then anyone can turn the watermark off */
+export const PLANS_ENFORCE_WATERMARK = false;
+
+/** whether the watermark can be turned off: always while the plans do not decide, then only an account signed in on Plus or Pro */
 export async function planFreesWatermark(): Promise<boolean> {
+  if (!PLANS_ENFORCE_WATERMARK) return true;
   if (account.peek().status !== 'in') return false;
   const r = await billing().catch(() => null);
   return !!r?.ok && (r.data.plan === 'plus' || r.data.plan === 'pro');

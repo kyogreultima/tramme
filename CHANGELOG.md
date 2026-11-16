@@ -8,6 +8,67 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+### Added
+
+- **Blocks of the script**: the prompter's Blocks tab gives each sentence of the script what to show over it (empty: the camera); `/blocks` builds them where each sentence is said, and proposes an idea for the empty ones first.
+- **A film from a voice**: `/from-voice` makes a film from a voice recording alone: transcribed, cleaned, cut, planned on its words, built, given its music and effects.
+- **My style**: "Keep as my style" in the direction keeps the project's palette, typefaces, tone and rules (in the account when signed in, on the device otherwise); the home screen then offers it, and the assistant follows it from the first turn.
+- **The prompter**: in the studio's bar and the atelier's timeline, the script written or pasted (kept with the project), then said to the camera while it scrolls at the pace chosen, after a count-in; the recording joins the project and the assistant's box is ready to keep its takes.
+- **The takes chosen against the script**: the `takes` tool (and the assistant, asked to) reads a talking video against its script, sentence by sentence: the last good take of each one is kept in the order of the script, the false starts, repeats and words off the script are cut, and the sentences never said are named. The script is kept with the project.
+- **Export for Premiere Pro**: "For Premiere Pro" in the export panel (on the server, and in the cloud with an account), or `tramme premiere <project>`: a zip with the timeline (Final Cut 7 XML, File > Import in Premiere), the footage and sounds with their cuts, offsets and levels (voices, music and effects on their own tracks), what is drawn under and over the footage as clips with alpha per scene (ProRes 4444), the captions as subtitles (SRT). After Effects imports the same clips.
+- **Export on the server, in local**: `pnpm renderer` starts the renderer on this machine, and the export panel of `pnpm dev` offers "Export on the server", rendered as the desktop app renders it.
+- **Told when an export on the server is over**: a notification of the system (browser, desktop, phone) when the app is in the background, a message in it otherwise, followed from any page and after a reload; with an account, a mail too, with the way back to the project.
+- **Several commands in one message**: a `/command` can be written anywhere in a message (at its start or after a space), as many as needed; the assistant gets each of them, in the order written. One tool alone at the start keeps its form and runs at once, as before.
+
+### Changed
+
+- In the message boxes (the assistant, the studio, the home screen), the commands and tags the project knows are marked where they are written: a `/command` in the accent, an `@tag` in another colour; an unknown one stays plain words.
+
+### Fixed
+
+- On the home screen, a file's tag replaced the letters "s" of its name instead of its spaces.
+
+## [0.28.0] - 2026-11-16
+
+### Added
+
+- **Pins moved by hand**: in the studio, a pin of the note being written or of a retouch in the list is dragged by its number to another place of the picture; a path or an area moves whole and stays in the frame, and what it points at follows (the layer under a point or a path's start, the layers a selection takes in).
+
+### Changed
+
+- The assistant's work in progress (what it does, its stages, its last steps, pause and stop) sits at the bottom of the conversation and stays in sight while you scroll; the takes and the pictures it looked at stay above it.
+- The watermark is in the top left corner of exported films, and anyone can turn it off in Settings, Behavior, until accounts are open to all.
+- `app.tramme.dev` is the deployment with accounts, deployed by the platform when `main` moves; the personal environment's addresses in `apps/worker/wrangler.jsonc` are an example to replace with your own domain's.
+
+### Fixed
+
+- On a project with more pictures than the memory keeps, the storyboard, the preview, the home screen's picture and the exports of an isolated project drew a frame without some of its pictures, and the storyboard showed the engine's error over the film. The pictures a frame shows are loaded before it is drawn; a storyboard frame that cannot be drawn keeps its last picture.
+- While the preview was loading, the picture showed "Isolated selection could not be calculated: preview is not ready": the panels that read the layers through it now wait for it, and adding a mask or drawing an area at that moment says to try again in a moment.
+- The image of the export in the cloud failed to build: the build's own `node_modules` were copied into it (`.dockerignore`).
+
+## [0.27.0] - 2026-11-15
+
+### Added
+
+- **Projects in your account**: on a deployment with accounts, signing in keeps your projects, libraries, conversations and provider keys in your account, the same in every browser you sign in from; signed out, they stay in the browser as before. The keys are kept sealed, and deleting the account deletes its files.
+- After signing in, the projects made in this browser before can be brought into the account (offered once, and in your space); the copies in the browser stay.
+- A save that cannot go through waits instead of failing: when the project was saved from another tab or device since it was opened, you choose which version stays; when your session ended, you sign in again and the changes are saved.
+- Your account's button in the project's top bar; the project is saved before you leave it for your space or sign out.
+- **The gallery**: a film you just exported as MP4 is published from the export's panel, with a still taken in its middle, a title and a few words, in the gallery or reachable by its link only, and the project offered for copying or not. It is signed with your public name, which you choose in your space. "Open in Tramme" on the site copies a published film's project into your projects (its code is asked about first, as any project from someone else). Visitors can report a film.
+- **Export in the cloud**: signed in, "Export in the cloud" in the export's panel renders the project on a server as the desktop app renders it (`apps/renderer`, the command line with Chrome and ffmpeg, in a container); the page can be closed, and the film lands in the project's renders, to download. The jobs wait in a queue, one render at a time.
+- **Export by API and command line**: API tokens of the account, made and revoked in your space (shown once, only their hash kept), let `tramme cloud-export <project>` send a project to your account, have it rendered in the cloud and bring its film back. A token reaches the projects and their exports only.
+- **The plugins' marketplace**: on a deployment with accounts, the plugins settings have a "Discover" section: plugins published by their authors, installed through the same question as an import, their package checked against the catalogue's hash, newer versions offered. An installed plugin is published from its row under its author's public name; a plugin that reaches the network or keys is listed once the back-office has reviewed it. A plugin can be reported; a revoked version is turned off at the next check, and you are told which.
+- **The back-office** (`/admin`), for the people who run Tramme: find an account by its address, name or public name, see its plan, end its sessions, give it a plan until a day or put it back on Basic, close it with its projects and films; read the gallery's reports, take a film down, put it back, set the reports aside.
+- **The desktop and Android apps signed in**: your account's projects are listed beside the ones of the device's folder, marked "in your account", and open and save in the account, their pictures, sounds and videos read in parts. The projects of the device are brought into the account from your space, through their archive; the copies on the device stay.
+
+### Changed
+
+- The site hides the prices until the payment opens: no pricing page or link to it, no price or credit question in the FAQ, no paid sections in the terms, no offers given to search engines; the app's space shows no offers either. One switch brings them back, on the site and in the app (`PAYMENT_OPEN` in `packages/plans`).
+
+### Removed
+
+- The deployment of the server mode on Cloudflare behind Cloudflare Access (`pnpm deploy`, its bucket and its documentation): the server mode is `pnpm dev`'s, on this machine. The public deployment is the personal mode (`pnpm deploy:personal`), and the deployments with accounts take its place for the projects kept on a server.
+
 ## [0.26.1] - 2026-11-15
 
 ### Fixed
@@ -910,7 +971,9 @@ First public release.
 
 - Cloudflare Worker serving the editor and the API, projects stored in R2, access protected by Cloudflare Access.
 
-[Unreleased]: ../../compare/v0.26.1...HEAD
+[Unreleased]: ../../compare/v0.28.0...HEAD
+[0.28.0]: ../../compare/v0.27.0...v0.28.0
+[0.27.0]: ../../compare/v0.26.1...v0.27.0
 [0.26.1]: ../../compare/v0.26.0...v0.26.1
 [0.26.0]: ../../compare/v0.25.0...v0.26.0
 [0.25.0]: ../../compare/v0.24.0...v0.25.0

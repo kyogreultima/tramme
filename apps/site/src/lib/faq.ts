@@ -5,7 +5,7 @@
 import { systemsLine } from '../../../desktop/downloads.ts';
 import { FORMATS } from './formats';
 import type { Locale, Localised } from './i18n';
-import { formatCredits, formatPrice, plan } from './plans';
+import { formatCredits, formatPrice, plan, PRICING_SHOWN } from './plans';
 
 export type Topic = 'billing' | 'credits' | 'cancelling' | 'watermark' | 'firstFilm' | 'data' | 'offline' | 'general';
 
@@ -130,8 +130,11 @@ const ENTRIES: Entry[] = [
 ];
 
 /** the questions in a language, all of them or those of some topics */
+/** the questions about prices and paying, kept out while the prices are hidden (PRICING_SHOWN) */
+const PRICED: Topic[] = ['billing', 'credits', 'cancelling'];
+
 export function faq(locale: Locale, topics?: Topic[]): Question[] {
-  return ENTRIES.filter((e) => !topics || topics.includes(e.topic)).map((e) => ({ q: e.q[locale], a: e.a(locale) }));
+  return ENTRIES.filter((e) => (!topics || topics.includes(e.topic)) && (PRICING_SHOWN || !PRICED.includes(e.topic))).map((e) => ({ q: e.q[locale], a: e.a(locale) }));
 }
 
 /** the topics the pricing page answers, the others being the landing's */

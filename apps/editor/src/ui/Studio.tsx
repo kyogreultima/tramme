@@ -27,6 +27,7 @@ import { SidePanel } from './Notes.tsx';
 import { TakeActions } from './thread.tsx';
 import { Overlays, useShortcuts } from './shell.tsx';
 import { Marks, PinChips, PinTools, pressPicture } from './Retouch.tsx';
+import { PrompterButton } from './Prompter.tsx';
 import { Storyboard } from './Storyboard.tsx';
 import { TopBar } from './TopBar.tsx';
 import { Viewport } from './Viewport.tsx';
@@ -119,7 +120,7 @@ function DirectBar({ area }: { area: RefObject<HTMLTextAreaElement | null> }) {
       <PinChips />
     </span>
   );
-  const tools = <PinTools />;
+  const tools = <><PinTools /><PrompterButton size="sm" /></>;
   const list = { count: studio.retouches.value.length, onAdd: (text: string, voice: boolean) => addRetouch(text, voice), onSendAll: () => { void sendRetouches(); } };
   return (
     <div class={`direct${pinning ? ' pinning' : ''}`} data-tour="direct">

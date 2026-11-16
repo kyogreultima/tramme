@@ -254,7 +254,9 @@ fs.copyFileSync(createRequire(import.meta.url).resolve('pdfjs-dist/build/pdf.wor
  * personal mode under `wrangler dev`: the Worker's config without the routes of
  * the deployment, which would give every request their address
  * (app.tramme.dev), so the Worker could not tell the editor from the vault;
- * written beside the Worker, its paths made absolute
+ * written beside the Worker, its paths made absolute. It keeps the simulated
+ * R2 bucket: with a backend (ACCOUNTS_URL and the secrets of .dev.vars), a
+ * signed-in person's projects go to the cloud there (apps/worker/src/cloud.ts)
  */
 function personalDevConfig(): string {
   const worker = path.join(ROOT, 'apps/worker');
@@ -263,6 +265,7 @@ function personalDevConfig(): string {
   const config = JSON.parse(text);
   delete config.$schema;
   delete config.env.personal.routes;
+  config.env.personal.r2_buckets = config.r2_buckets;
   config.main = path.join(worker, config.main);
   for (const c of [config, config.env.personal]) c.assets.directory = DIST;
   const file = path.join(worker, '.wrangler', 'personal-dev.json');

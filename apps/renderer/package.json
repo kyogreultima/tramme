@@ -1,0 +1,13 @@
+{
+  "name": "@tramme/renderer",
+  "version": "0.28.0",
+  "license": "FSL-1.1-ALv2",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.ts"
+  },
+  "dependencies": {
+    "@tramme/cli": "workspace:*"
+  }
+}

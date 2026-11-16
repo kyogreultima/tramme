@@ -9,7 +9,7 @@ import type { ChatItem } from './api.ts';
 import { chat } from './ai/index.ts';
 import { decide, send, type Anchor } from './ai/conversation.ts';
 import { flushQueue, held, queue, written } from './ai/queue.ts';
-import { areaCandidates, needsConfirm, simplify, type NewPin, type Pin, type Placed, type Pt, type Retouch, type Under } from './retouch.ts';
+import { areaCandidates, movedPin, needsConfirm, simplify, type NewPin, type Pin, type Placed, type Pt, type Retouch, type Under } from './retouch.ts';
 import { prefs } from './settings.ts';
 import { previewDoc, S } from './state.ts';
 import { sceneAt, scenesOf, type Scene } from './scenes.ts';
@@ -64,6 +64,13 @@ let pinCount = 0;
 /** a pin added to the note being written: a point, a path or an area; the others stay */
 export function addPin(pin: NewPin) {
   studio.pins.value = [...studio.pins.peek(), { ...pin, id: `pin-${++pinCount}` } as Pin];
+}
+
+/** a pin dragged on the picture, whether it belongs to the note being written or to a retouch of the list */
+export function movePin(id: string, by: Pt, placed: Placed[], frame: { w: number; h: number }) {
+  const move = (pins: Pin[]) => (pins.some((p) => p.id === id) ? pins.map((p) => (p.id === id ? movedPin(p, by, placed, frame) : p)) : pins);
+  studio.pins.value = move(studio.pins.peek());
+  studio.retouches.value = studio.retouches.peek().map((r) => { const pins = move(r.pins); return pins === r.pins ? r : { ...r, pins }; });
 }
 
 /** a pin taken away */

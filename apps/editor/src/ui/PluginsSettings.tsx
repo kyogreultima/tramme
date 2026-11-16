@@ -7,6 +7,8 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { PLUGIN_API } from '@tramme/core';
 import { asksMore, compareVersions } from '@tramme/project';
+import { catalogue, checkRevoked, download, publishPlugin, readCatalogue, report, updateOf, type MarketPlugin } from '../market.ts';
+import { account } from '../accounts.ts';
 import { backup, canPickFolder, copiesIn, stopped, copyId, copyOps, offIn, candidateOf, folderAccess, folderName, forgetFolder, install, installed, persistence, pickFolder, refreshInstalled, restoreBackup, setEnabled, storageKind, uninstall, type Candidate, type Installed } from '../installed.ts';
 import { platform, tauri } from '../tauri.ts';
 import { api } from '../api.ts';
@@ -42,6 +44,48 @@ async function ask(c: Candidate): Promise<boolean> {
     t('plugins.sandboxed'),
   ].filter(Boolean).join('\n');
   return confirmWith(t('plugins.installTitle', { name: m.name }), text, t('plugins.install'));
+}
+
+/** the marketplace (market.ts): its plugins, installed through the same question as an import, updates offered */
+function Discover() {
+  useEffect(() => { void readCatalogue(); void checkRevoked(); }, []);
+  const list = catalogue.value;
+  const [busy, setBusy] = useState<string | null>(null);
+  const [reporting, setReporting] = useState<{ id: string; reason: string } | null>(null);
+  if (!list) return null;
+  const take = async (p: MarketPlugin) => {
+    setBusy(p.id);
+    try { await importFiles([await download(p)]); } catch (e) { toast((e as Error).message, 'error'); }
+    setBusy(null);
+  };
+  const mine = installed.value;
+  return (
+    <Section title={t('market.title')} hint={t('market.hint')}>
+      {!list.length && <Row label={t('market.empty')} hint={t('market.emptyHint')}><span /></Row>}
+      {list.map((p) => {
+        const have = mine.find((x) => x.manifest.id === p.id);
+        const update = have ? updateOf(have, list) : null;
+        const reach = [...p.version.permissions.network, ...p.version.permissions.providers];
+        return (
+          <Row key={p.id} label={`${p.name} ${p.version.version}`} badge={`@${p.author.handle}`}
+            hint={[p.description, reach.length ? t('market.reaches', { reach: reach.join(', ') }) : '', p.licence].filter(Boolean).join(' · ')}>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {!have && <button class="btn sm" disabled={busy === p.id} onClick={() => take(p)}><Icon name="download" />{t('market.install')}</button>}
+              {update && <button class="btn sm primary" disabled={busy === p.id} onClick={() => take(p)}>{t('market.update', { version: p.version.version })}</button>}
+              {have && !update && <span class="faint" style={{ fontSize: 11 }}>{t('market.installed')}</span>}
+              <button class="icon-btn" title={t('market.report')} onClick={() => setReporting(reporting?.id === p.id ? null : { id: p.id, reason: '' })}><Icon name="alert" /></button>
+            </div>
+            {reporting?.id === p.id && (
+              <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                <span class="field" style={{ flex: 1 }}><input value={reporting.reason} placeholder={t('market.reportWhy')} onInput={(e) => setReporting({ id: p.id, reason: (e.target as HTMLInputElement).value })} /></span>
+                <button class="btn sm" onClick={async () => { toast((await report(p, reporting.reason)) ? t('market.reported') : t('market.unavailable'), 'info'); setReporting(null); }}>{t('market.send')}</button>
+              </div>
+            )}
+          </Row>
+        );
+      })}
+    </Section>
+  );
 }
 
 async function importFiles(list: FileList | File[]) {
@@ -88,6 +132,10 @@ function PluginRow({ p }: { p: Installed }) {
         {S.project.value && p.enabled && <span class="hint" style={{ fontSize: 11 }}>{t('plugins.inProject')}</span>}
         {S.project.value && p.enabled && <Toggle on={!offIn(S.doc.value).includes(m.id)} onChange={(v) => setInProject(m.id, v)} />}
         <Toggle on={p.enabled} onChange={(v) => setEnabled(p, v)} />
+        {/* its author publishes it, where there is a marketplace and an account */}
+        {catalogue.value && account.value.status === 'in' && !m.id.startsWith('local/') && (
+          <button class="icon-btn" title={t('market.publish')} onClick={() => publishPlugin(p).then((r) => toast(r.state === 'listed' ? t('market.published') : t('market.inReview'), 'info')).catch((e) => toast((e as Error).message, 'error'))}><Icon name="upload" /></button>
+        )}
         {sure
           ? <button class="btn sm danger" onClick={() => uninstall(p).catch((e) => toast((e as Error).message, 'error'))}>{t('plugins.removeSure')}</button>
           : <button class="icon-btn" title={t('common.remove')} onClick={() => setSure(true)}><Icon name="trash" /></button>}
@@ -138,6 +186,7 @@ export function Plugins() {
           </div>
         </Row>
       </Section>
+      <Discover />
       <Section title={t('plugins.installedTitle', { n: list.length })}>
         {list.length ? list.map((p) => <PluginRow key={p.file} p={p} />) : <Row label={t('plugins.none')} hint={t('plugins.noneHint')}><span /></Row>}
         {list.some(newer) && <Row label="" hint={t('plugins.duplicates')}><span /></Row>}

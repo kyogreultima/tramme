@@ -1,0 +1,21 @@
+# What a Docker build from this folder leaves out (apps/renderer/Dockerfile, also built from the
+# platform's deploy with this folder as its context). The image installs its own dependencies:
+# node_modules from the machine that builds (another pnpm store) would make that install fail.
+**/node_modules
+.git
+.wrangler
+**/dist
+**/out
+**/coverage
+**/*.tsbuildinfo
+bench/local
+apps/desktop/src-tauri/target
+apps/desktop/src-tauri/gen/android
+.dev.vars
+**/.env
+**/.env.*
+!**/.env.example
+.claude
+.kilo
+.zcode
+.neon

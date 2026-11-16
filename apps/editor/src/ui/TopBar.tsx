@@ -8,11 +8,14 @@ import { api } from '../api.ts';
 import { confirmWith } from '../confirm.ts';
 import { saveBlob, saveLabel } from '../download.ts';
 import { fileProject, requireFileProject, sameFileProject, safeName, takenPaths, upload, type FileProject } from '../files.ts';
-import { canRedo, canUndo, comp, commit, redo, redoLabel, S, saveNow, toast, undo, undoLabel } from '../state.ts';
+import { canRedo, canUndo, comp, commit, redo, redoLabel, S, saveHeld, saveNow, toast, undo, undoLabel } from '../state.ts';
 import { ago, contentEnd, fmtSeconds, snap } from '../model.ts';
 import { shortsOf } from '../shorts.ts';
 import { openMenu, Popover, Select, Toggle, type MenuItem } from './controls.tsx';
 import { PublishPanel } from './PublishPanel.tsx';
+import { GalleryDialog } from './GalleryDialog.tsx';
+import { CloudRender, serverRender } from './CloudRender.tsx';
+import { cloud } from '../mode.ts';
 import { hdrCapability } from '../hdr.ts';
 import { ExportQueueList } from './ExportQueueList.tsx';
 import { exportQueue } from '../export-queue.ts';
@@ -25,6 +28,7 @@ import { settingsOpen, prefs, VIEWS } from '../settings.ts';
 import { setView, VIEW_LABEL, ViewSwitch } from './views.tsx';
 import { HelpButton, helpMenu } from './Help.tsx';
 import { WindowControls, windowBar } from './WindowControls.tsx';
+import { AccountMenu } from './AccountMenu.tsx';
 import { locale, t } from '../i18n/index.ts';
 import { go } from '../nav.ts';
 
@@ -37,6 +41,9 @@ const FORMATS: [string, string, number, number][] = [
 ];
 
 interface Done { blob: Blob; name: string; seconds: number; warnings: string[]; project: ExportProject; saved?: string }
+
+/** a film just exported, on its way to the gallery (accounts in the cloud only): its dialog outlives the export popover */
+const galleryVideo = signal<Blob | null>(null);
 
 // ── the project's versions: named points one can come back to ──
 /** the saved document itself is the current version; the snapshots live beside it */
@@ -283,12 +290,14 @@ function ExportPop({ anchor, onClose }: { anchor: HTMLElement; onClose: () => vo
         {state.warnings.length > 0 && <ul class="export-warn">{state.warnings.map((w) => <li key={w}>{w}</li>)}</ul>}
         <div class="export-saves">
           <button class="btn sm" onClick={() => saveBlob(state.blob, state.name)}><Icon name="download" />{saveLabel()}</button>
+          {cloud && state.name.endsWith('.mp4') && <button class="btn sm" onClick={() => { galleryVideo.value = state.blob; }}><Icon name="upload" />{t('gallery.publishButton')}</button>}
           {state.saved
             ? <span class="faint" style={{ fontSize: 11 }}>{t('topbar.keptInPath', { path: state.saved })}</span>
             : <button class="btn sm" onClick={() => keep(state)}><Icon name="folder" />{t('topbar.keepInTheProject')}</button>}
         </div>
       </div>}
       {state && 'error' in state && <div class="prop-note err">{state.error}</div>}
+      {serverRender.value && <CloudRender disabled={running()} />}
       <ExportQueueList />
       </div>
       {running()
@@ -373,8 +382,8 @@ export function TopBar() {
           style={{ width: `${Math.max(6, project.name.length + 1)}ch` }}
           onChange={(e) => rename((e.target as HTMLInputElement).value)}
           onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
-        <span class={`save-state ${save === 'saved' ? '' : save === 'error' ? 'error' : 'dirty'}`} title={t('topbar.projectId', { id: project.id })}>
-          <i class="dot" /><span>{save === 'saved' ? t('topbar.saved') : save === 'saving' ? t('topbar.saving') : save === 'error' ? t('topbar.notSaved') : t('topbar.modified')}</span>
+        <span class={`save-state ${save === 'saved' ? '' : save === 'error' || saveHeld.value ? 'error' : 'dirty'}`} title={t('topbar.projectId', { id: project.id })}>
+          <i class="dot" /><span>{saveHeld.value === 'signedOut' ? t('saveHeld.signedOutTitle') : save === 'saved' ? t('topbar.saved') : save === 'saving' ? t('topbar.saving') : save === 'error' ? t('topbar.notSaved') : t('topbar.modified')}</span>
         </span>
         <button class="icon-btn" data-tour="versions" title={t('topbar.versions')} onClick={(e) => setVer(ver ? null : (e.currentTarget as HTMLElement))}><Icon name="clock" /></button>
         {ver && <VersionsPop anchor={ver} onClose={() => setVer(null)} />}
@@ -406,8 +415,10 @@ export function TopBar() {
       }}><Icon name="download" />{doneWaiting && <i class="export-dot" />}<span class="label">{t('common.export')}</span></button>
       {/* narrow screens: what no longer fits in the bar moves here */}
       <button class="icon-btn more-btn" title={t('topbar.moreOptions')} aria-label={t('topbar.moreOptions')} onClick={(e) => moreMenu(e as unknown as MouseEvent, choice, setVer)}><Icon name="more" /></button>
+      <AccountMenu inProject />
       <WindowControls />
       {exp && <ExportPop anchor={exp} onClose={() => setExp(null)} />}
+      {galleryVideo.value && <GalleryDialog video={galleryVideo.value} onClose={() => { galleryVideo.value = null; }} />}
     </header>
   );
 }

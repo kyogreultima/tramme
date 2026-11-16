@@ -100,6 +100,7 @@ fn route_inner(parts: &[String], req: Request<Vec<u8>>) -> Result<Body, store::H
         ("projects", _) => projects(&store, parts, req),
         ("library", _) => shelf(&store, "plugins", parts, req),
         ("sounds", _) => shelf(&store, "sounds", parts, req),
+        ("styles", _) => shelf(&store, "styles", parts, req),
         ("device", _) => device(parts, req),
         ("keys", _) => Ok(ok_json(KeyStore::system()?.route(method, &decode_segments(&parts[1..]), req.body())?)),
         // the account: sent to the backend of this build's environment (account.rs)
@@ -163,13 +164,41 @@ fn device(parts: &[String], req: Request<Vec<u8>>) -> Result<Body, store::HttpEr
     }
 }
 
+/// a request about one of the account's projects, or a project made in the account, sent to the cloud (cloud.rs)
+fn to_cloud(req: &Request<Vec<u8>>, path: &str) -> Result<Body, store::HttpError> {
+    let names = ["content-type", "accept", "range", "if-match", "if-none-match"];
+    let headers: Vec<(&str, Option<&str>)> = names.iter().map(|n| (*n, header(req, n))).collect();
+    let (status, answer_headers, body) = crate::cloud::forward(req.method().as_str(), path, &headers, req.body());
+    let mut out = Response::builder().status(StatusCode::from_u16(status).unwrap_or(StatusCode::BAD_GATEWAY)).header("cache-control", "no-store");
+    for (name, value) in &answer_headers {
+        out = out.header(name.as_str(), value.as_str());
+    }
+    out.body(body).map_err(response_err)
+}
+
 fn projects(store: &Store, parts: &[String], req: Request<Vec<u8>>) -> Result<Body, store::HttpError> {
     let method = req.method().as_str();
     let id = parts.get(1).map(|s| s.as_str()).unwrap_or("");
     let sub = parts.get(2).map(|s| s.as_str()).unwrap_or("");
+    // one of the account's: everything about it is the cloud's
+    if crate::cloud::is_cloud(id) {
+        // the path after /api/projects/<id>, as the page wrote it (still encoded)
+        let rest = req.uri().path().splitn(5, '/').nth(4).unwrap_or("");
+        let cloud_id = &id[crate::cloud::PREFIX.len()..];
+        let tail = if rest.is_empty() { String::new() } else { format!("/{rest}") };
+        let q = req.uri().query().map(|q| format!("?{q}")).unwrap_or_default();
+        return to_cloud(&req, &format!("/api/projects/{cloud_id}{tail}{q}"));
+    }
     if id.is_empty() {
         return match method {
-            "GET" => Ok(ok_json(serde_json::to_value(store.list_projects()?).unwrap())),
+            // the folder's projects, and the account's when signed in, the most recent first
+            "GET" => {
+                let mut all: Vec<serde_json::Value> = serde_json::to_value(store.list_projects()?).unwrap().as_array().cloned().unwrap_or_default();
+                all.extend(crate::cloud::list());
+                all.sort_by(|a, b| b["modified"].as_str().unwrap_or("").cmp(a["modified"].as_str().unwrap_or("")));
+                Ok(ok_json(serde_json::Value::Array(all)))
+            }
+            "POST" if query(&req).iter().any(|(k, v)| k == "place" && v == "cloud") => to_cloud(&req, "/api/projects"),
             "POST" => {
                 let body: store::CreateBody = request_json(&req)?;
                 Ok(json_response(201, &serde_json::to_value(store.create_project(body)?).unwrap()))
@@ -339,7 +368,7 @@ fn shelf(store: &Store, shelf: &str, parts: &[String], req: Request<Vec<u8>>) ->
 /// a name of the shelf: lower case letters, digits, - and _, then its extension
 fn decode_name(shelf: &str, raw: &str) -> Result<String, store::HttpError> {
     let name = percent_encoding::percent_decode_str(raw).decode_utf8_lossy().into_owned();
-    let exts = if shelf == "sounds" { "wav|mp3|ogg|m4a|flac|webm|opus" } else { "js|mjs" };
+    let exts = match shelf { "sounds" => "wav|mp3|ogg|m4a|flac|webm|opus", "styles" => "json", _ => "js|mjs" };
     let ok = {
         let mut chars = name.chars();
         let valid_start = matches!(chars.next(), Some(c) if c.is_ascii_lowercase() || c.is_ascii_digit());
@@ -361,6 +390,9 @@ fn decode_name(shelf: &str, raw: &str) -> Result<String, store::HttpError> {
 fn shelf_type(shelf: &str, name: &str) -> &'static str {
     if shelf == "plugins" {
         return "text/javascript; charset=utf-8";
+    }
+    if shelf == "styles" {
+        return "application/json; charset=utf-8";
     }
     match crate::format::mime_of(name) {
         "audio/wav" | "audio/mpeg" | "audio/ogg" | "audio/mp4" | "audio/flac" => crate::format::mime_of(name),
@@ -482,6 +514,8 @@ mod tests {
         assert!(decode_name("plugins", "Tool.js").is_err());
         assert!(decode_name("plugins", "a.exe").is_err());
         assert!(decode_name("sounds", "a.wav.exe").is_err());
+        assert_eq!(decode_name("styles", "my-style.json").unwrap(), "my-style.json");
+        assert!(decode_name("styles", "a.js").is_err());
     }
 
     #[test]

@@ -109,7 +109,7 @@
 .pipeline:hover .steps { color: var(--text-2); }
 .pipeline .steps svg.i { width: 11px; height: 11px; }
 /* the turn under way: what it does now, the model and the stage, the last steps, pause and stop */
-.run { display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: var(--r-lg); background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line-strong); }
+.run { position: sticky; bottom: 0; z-index: 2; display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: var(--r-lg); background: linear-gradient(var(--surface-2), var(--surface-2)), var(--raised); box-shadow: inset 0 0 0 1px var(--line-strong); }
 .run-head { display: flex; align-items: center; gap: 9px; min-width: 0; }
 .run-now { flex: 1; min-width: 0; overflow: hidden; color: var(--text-2); font-size: var(--fs-md); white-space: nowrap; text-overflow: ellipsis; }
 .run-head .mono { color: var(--text-3); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
@@ -119,7 +119,7 @@
 .run-bar i.done { background: var(--accent); }
 .run-bar i.now { background: var(--accent-line); }
 .run.paused .run-bar i.now { background: var(--text-4); }
-.run-steps { display: flex; flex-direction: column; gap: 7px; }
+.run-steps { display: flex; flex-direction: column; gap: 7px; max-height: 40vh; overflow-y: auto; }
 .run-actions { display: flex; align-items: center; gap: 6px; }
 .run-actions .grow { flex: 1; }
 .work-steps { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border-radius: var(--r-sm); background: var(--surface-2); }
@@ -214,6 +214,16 @@
 .command-title { font-size: var(--fs-md); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .command-name { flex: none; font-family: var(--mono); font-size: 10.5px; color: var(--text-3); }
 .command-row.on .command-name { color: var(--accent-text); }
+.command-name.tag, .command-row.on .command-name.tag { color: var(--expr); }
+/* a box's words drawn again under it (MarkedField): while something is marked they are the ones read, the field's own text clear over them */
+.marked-field { position: relative; }
+.marked-field > textarea { position: relative; z-index: 1; }
+.marked-field.on > textarea { color: transparent; caret-color: var(--text); }
+.marked { position: absolute; top: 0; left: 0; z-index: 0; box-sizing: border-box; overflow: hidden; border: 0 solid transparent; color: var(--text); white-space: pre-wrap; overflow-wrap: break-word; pointer-events: none; }
+/* a /command in the accent, an @tag in the colour of links to things; a pill that takes no room (a shadow, not a padding) */
+.marked mark { all: unset; border-radius: 4px; }
+.marked mark.tok-command { color: var(--accent-text); background: var(--accent-soft); box-shadow: 0 0 0 2px var(--accent-soft); }
+.marked mark.tok-tag { --tint: color-mix(in srgb, var(--expr) 14%, transparent); color: var(--expr); background: var(--tint); box-shadow: 0 0 0 2px var(--tint); }
 .command-desc { font-size: var(--fs-sm); color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .command-from { flex: none; max-width: 90px; height: 20px; display: inline-flex; align-items: center; padding: 0 7px; border-radius: 6px; background: var(--field); color: var(--text-2); font: 500 var(--fs-xs)/1 var(--ui); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .command-keys { flex: none; display: flex; gap: 14px; padding: 6px 12px; border-top: 1px solid var(--line); color: var(--text-3); font-size: var(--fs-xs); }

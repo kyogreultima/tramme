@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { anchorPoint, areaCandidates, isLoop, marksOf, needsConfirm, simplify, summaryOf, type Pin, type Placed } from '../src/retouch.ts';
+import { anchorPoint, areaCandidates, isLoop, layerUnder, marksOf, movedPin, needsConfirm, simplify, summaryOf, type Pin, type Placed } from '../src/retouch.ts';
 
 const placed = (id: string, box: [number, number, number, number] | null, extra: Partial<Placed> = {}): Placed => ({ id, name: id.toUpperCase(), type: 'shape.rect', box: box && { x: box[0], y: box[1], w: box[2], h: box[3] }, opacity: 1, ...extra });
 const FRAME = { w: 1000, h: 500 };
@@ -93,5 +93,37 @@ describe('pins as the list shows them and as the assistant reads them', () => {
     expect(anchorPoint(pins[1])).toEqual([0.1, 0.1]);
     const c = anchorPoint(pins[2]);
     expect(c[0]).toBeCloseTo(0.3, 2);
+  });
+});
+
+describe('a pin moved', () => {
+  const layers = [placed('bg', [0, 0, 1000, 500]), placed('logo', [600, 200, 100, 100]), placed('hidden', [600, 200, 100, 100], { opacity: 0 })];
+
+  it('finds the layer on top under a point, a hidden one left out', () => {
+    expect(layerUnder(layers, [0.65, 0.5], FRAME)?.id).toBe('logo');
+    expect(layerUnder(layers, [0.1, 0.1], FRAME)?.id).toBe('bg');
+    expect(layerUnder([], [0.1, 0.1], FRAME)).toBeNull();
+  });
+
+  it('carries a point to where it is set down, on the layer there', () => {
+    const p: Pin = { id: 'a', kind: 'point', at: [0.1, 0.1], under: { id: 'bg', name: 'BG', type: 'shape.rect' } };
+    const m = movedPin(p, [0.55, 0.4], layers, FRAME);
+    expect(m.kind === 'point' && m.at).toEqual([0.65, 0.5]);
+    expect(m.kind === 'point' && m.under?.id).toBe('logo');
+  });
+
+  it('moves a path whole and keeps it inside the frame', () => {
+    const p: Pin = { id: 'b', kind: 'path', points: [[0.2, 0.2], [0.8, 0.3]] };
+    const m = movedPin(p, [0.5, -0.5], layers, FRAME);
+    expect(m.kind === 'path' && m.points).toEqual([[0.4, 0], [1, 0.1]]);
+  });
+
+  it('takes in the layers under a selection again, and leaves a hint a hint', () => {
+    const sel: Pin = { id: 'c', kind: 'area', points: [[0, 0], [0.15, 0], [0.15, 0.3], [0, 0.3], [0, 0]], layers: [{ id: 'other', name: 'OTHER', type: 'shape.rect' }] };
+    const m = movedPin(sel, [0.58, 0.35], layers, FRAME);
+    expect(m.kind === 'area' && m.layers.map((l) => l.id)).not.toContain('other');
+    expect(m.kind === 'area' && m.layers.map((l) => l.id)).toContain('logo');
+    const hint: Pin = { ...sel, id: 'd', layers: [] };
+    expect((movedPin(hint, [0.58, 0.35], layers, FRAME) as Extract<Pin, { kind: 'area' }>).layers).toEqual([]);
   });
 });

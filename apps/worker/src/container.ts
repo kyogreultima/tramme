@@ -21,3 +21,13 @@ export class AccountsContainer extends Container<Env> {
     this.envVars = backendEnv(env);
   }
 }
+
+/**
+ * The renderer: the command line's renders (Chrome and ffmpeg) in a container of its own (apps/renderer), for the
+ * exports in the cloud (renders.ts). The queue sends it one project at a time; it sleeps when nobody exports.
+ */
+export class RendererContainer extends Container<Env> {
+  defaultPort = 8080;
+  sleepAfter = '10m';
+  pingEndpoint = 'localhost/health';
+}

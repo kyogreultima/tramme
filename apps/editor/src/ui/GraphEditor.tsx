@@ -9,9 +9,9 @@ import { signal } from '@preact/signals';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { Evaluator, getAt, modsOf, resolveTokens, sampleKeyframes, type Bezier, type EaseSpec, type Keyframe, type Op, type PropType } from '@tramme/core';
 import { comp, commit, draft, cancelDraft, S, setTime, viewDoc, uiTime } from '../state.ts';
-import { assetData, preview } from '../preview.ts';
+import { assetData, previewReady } from '../preview.ts';
 import { pluginHost } from '../plugins/index.ts';
-import { plainRenderMessage } from '../render-message.ts';
+import { plainRenderMessage, readyRenderer } from '../render-message.ts';
 import { ensureDeclared, ensureSandboxDoc, moduleItemsOf } from '../plugins/sandbox-draw.ts';
 import { fileProject, sameFileProject } from '../files.ts';
 import { sandboxedDoc } from '../installed.ts';
@@ -111,7 +111,7 @@ export function GraphEditor() {
   // modifiers keep moving after the last key (springs settle, loops repeat): show the whole composition
   if (shown.some((ch) => ch.modified)) { ta = 0; tb = c.duration; }
   const tp = (tb - ta) * 0.08; ta = Math.max(0, ta - tp); tb = Math.min(c.duration, tb + tp);
-  const isolated = prefs.value.sandboxPreview || sandboxedDoc(doc);
+  const isolated = prefs.value.sandboxPreview || sandboxedDoc(doc), ready = previewReady.value;
   const ev = useMemo(() => new Evaluator(doc, reg, { data: assetData, allowExpressions: !isolated }), [doc, reg, isolated]);
   const pathN = Math.min(300, Math.max(40, Math.round((size.w - 72) / 3)));
   const addresses = [...new Set(shown.filter((ch) => ch.modified).map((ch) => `${ch.layer}.${ch.prop}`))];
@@ -119,13 +119,13 @@ export function GraphEditor() {
   const [remote, setRemote] = useState<{ doc: typeof doc; projectId: string; docUrl: string; key: string; values: Map<string, Map<string, unknown>>; error?: string } | null>(null);
   const currentRemote = remote?.doc === doc && remote.projectId === projectId && remote.docUrl === docUrl && remote.key === seriesKey ? remote : null;
   useEffect(() => {
-    if (!isolated || !addresses.length) return;
+    // the preview still loading: the curves wait for it (ready changes) and say nothing
+    if (!isolated || !ready || !addresses.length) return;
     const project = fileProject();
     let live = true;
     const timer = setTimeout(() => { void (async () => {
       try {
-        const renderer = preview.renderer;
-        if (!renderer) throw new Error('preview is not ready');
+        const renderer = readyRenderer();
         const base = new URL(project.docUrl, location.href).href;
         const host = pluginHost(base);
         await ensureDeclared(host, moduleItemsOf(doc, base));
@@ -148,7 +148,7 @@ export function GraphEditor() {
       }
     })(); }, 40);
     return () => { live = false; clearTimeout(timer); };
-  }, [doc, compId, seriesKey, isolated, projectId, docUrl]);
+  }, [doc, compId, seriesKey, isolated, ready, projectId, docUrl]);
   const finalValue = (ch: Channel, tt: number) => {
     try {
       const value = isolated ? currentRemote?.values.get(`${ch.layer}.${ch.prop}`)?.get(tt.toFixed(9)) : ev.value(`${ch.layer}.${ch.prop}`, tt, compId);

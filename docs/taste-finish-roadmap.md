@@ -1,6 +1,6 @@
 # Taste and finish roadmap
 
-How Tramme's assistant reaches the production level of the `marketing` reference from a prompt alone, with no asset given, and dresses a talking video as a human editor would. The design is [the spec](superpowers/specs/2026-10-29-taste-and-finish-design.md): the bar is the level of finish, never the look or the genre. Each step gets its own plan in `docs/superpowers/plans/`, lands on its own and is measured before the next; tick the boxes as they land.
+How Tramme's assistant reaches the production level of the `marketing` reference from a prompt alone, with no asset given, and dresses a talking video as a human editor would. The design is [the spec](superpowers/specs/2026-10-29-taste-and-finish-design.md): the bar is the level of finish, never the look or the genre. Each step lands on its own and is measured before the next; tick the boxes as they land.
 
 Status: steps 1 to 9 built, waiting for their measure (the baseline of step 0 is the user's to run, from the `taste-baseline` tag).
 
@@ -16,7 +16,7 @@ Every step is measured on the bench: the grid of [bench/README.md](../bench/READ
 - [ ] Add the two dressing briefs to `bench/briefs.json` (dev: the bilal talk; test: `out/ammm/export.mp4`, unseen) and a way to show the films shuffled and unnamed.
 - [ ] Score the eight films blind, keep the costs.
 
-### Step 1. Make what exists work ([plan](superpowers/plans/2026-10-29-taste-and-finish-step1-make-what-exists-work.md))
+### Step 1. Make what exists work
 
 - [x] The device frame takes an interface built in layers (`device-screen`, `ui.device` parts), no engine change.
 - [x] The index shows each pack's entries by need, generated from the modules' notes, in the cached part of the prompt.
@@ -31,39 +31,39 @@ Every step is measured on the bench: the grid of [bench/README.md](../bench/READ
 
 On the bilal project as the run of 2026-10-28 left it (the check the assistant read during that run returned 496 warnings and 29 notes), `tramme check` now reads in six lines (65 warnings, 33 notes of the final document), no contrast warning remains on the interface texts, and the coverage check finds the stretches where the speaker is alone (44.5 s to 77.25 s, 92 s to 114.75 s, 172 s to 193.5 s, and one at the start).
 
-### Step 2. Typefaces ([plan](superpowers/plans/2026-10-29-taste-and-finish-step2-typefaces.md))
+### Step 2. Typefaces
 
 - [x] A catalogue of open typefaces searched by character, a specimen sheet drawn by the engine, the chosen files copied into the project at a pinned version, type pairing in the guide.
 
-### Step 3. Direction: kinds of picture, then style frames ([plan](superpowers/plans/2026-10-29-taste-and-finish-step3-direction.md))
+### Step 3. Direction: kinds of picture, then style frames
 
 - [x] The direction picks the few kinds of picture a film alternates, so no form repeats scene after scene.
 - [x] Two or three style frames drawn by an image model, one kept as the target: palette to tokens, type matched to the catalogue, plates and objects made again as assets, the scene rebuilt in layers.
 - [ ] One dev run on the trial server (the dressing brief of bilal and one launch brief, twice each): the kinds each plan chose, the frame kept, whether two runs of one brief keep different frames, the cost. Spends the user's quota, waits for their go.
 
-### Step 4. Material ([plan](superpowers/plans/2026-10-29-taste-and-finish-step4-material.md))
+### Step 4. Material
 
 - [x] Objects and illustrations made as assets, textures and light drawn by the engine, free libraries (CC0 textures and models, licensed photos and clips) with credits, real logos only with the user's yes.
 - [ ] One dev run on the trial server (the dressing brief of bilal and one launch brief): objects, surfaces and stock files each film used, whether any scene stayed a flat plate, the real logos listed, the cost against step 3. Spends the user's quota, waits for their go.
 
-### Step 5. The missing vocabulary ([plan](superpowers/plans/2026-10-29-taste-and-finish-step5-missing-vocabulary.md))
+### Step 5. The missing vocabulary
 
 - [x] Interface pieces, layers in perspective, a camera onto a detail, simple 3D solids, finance charts, the comparison of a render with a picture.
   - [x] Layers in perspective and a picture pinned on four corners (`rotationX`, `rotationY`, `fx.pin`, `pin`), a camera onto a detail (`push-in`).
   - [x] Interface pieces (pack and `screen`), 3D solids with materials (`solid.3d`), candlesticks and price lines, `compare`, and the guide's lines on them.
 - [ ] One dev run on the trial server (the dressing brief of bilal and one launch brief): whether the interface scenes used `screen`, whether layers were tilted, whether `push-in` and `compare` ran, the operations per scene against step 4's run, the cost. Spends the user's quota, waits for their go.
 
-### Step 6. The critic ([plan](superpowers/plans/2026-10-29-taste-and-finish-step6-critic.md))
+### Step 6. The critic
 
 - [x] A separate review in a fresh context, on motion rather than stills, with a definition of done and variants instead of endless fixes; the number of rounds is a setting.
 - [ ] Two dev briefs at `criticRounds` 0, 1 and 2, compared on cost and blind scores (`node bench/usage.ts --compare`); the default is the user's to set from them. Spends quota, waits for the user's go.
 
-### Step 7. Scene by scene ([plan](superpowers/plans/2026-10-29-taste-and-finish-step7-scene-by-scene.md))
+### Step 7. Scene by scene
 
 - [x] The direction, the kept style frame and the scene list written to the project; each scene built in a fresh context that inherits only them.
 - [ ] One 60 s dev film (8 scenes or more) with *Scenes built apart* on and off: finished scenes, cost per scene and its spread, total, time. Spends quota, waits for the user's go.
 
-### Step 8. A library of references ([plan](superpowers/plans/2026-10-29-taste-and-finish-step8-references.md))
+### Step 8. A library of references
 
 - [x] Annotated in words, never as copied media: what makes a frame or a cut work, and the faults to avoid.
 - [ ] Two dev briefs on the trial server: which references were read, whether the direction cites a principle, whether the critic's fixes name a fault of the list, the cost the tool calls add. Spends quota, waits for the user's go.

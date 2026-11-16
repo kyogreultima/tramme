@@ -152,7 +152,7 @@ describe('the message queue', () => {
 
   it('a command is not queued', async () => {
     await begin();
-    await send('/x', { command: { cmd: { kind: 'prompt', name: 'x', title: 'x', description: '', from: 'tramme', prompt: '' } } });
+    await send('/x', { commands: [{ cmd: { kind: 'prompt', name: 'x', title: 'x', description: '', from: 'tramme', prompt: '' } }] });
     expect(queue.value).toEqual([]);
     await endTurn();
   });

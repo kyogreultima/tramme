@@ -142,3 +142,35 @@ export function anchorPoint(p: Pin): Pt {
   const xs = p.points.map((q) => q[0]), ys = p.points.map((q) => q[1]);
   return [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2];
 }
+
+// ── a pin moved ──────────────────────────────────────────────
+
+/** the layer on top under a point of the frame (a fraction of it), from the layers placed now; null over none */
+export function layerUnder(placed: Placed[], at: Pt, frame: { w: number; h: number }): Under | null {
+  const x = at[0] * frame.w, y = at[1] * frame.h;
+  // placed in drawing order: the last one holding the point is on top
+  const top = [...placed].reverse().find((p) => p.box && p.opacity > 0 && x >= p.box.x && x <= p.box.x + p.box.w && y >= p.box.y && y <= p.box.y + p.box.h);
+  return top ? { id: top.id, name: top.name, type: top.type } : null;
+}
+
+/**
+ * A pin dragged by `by` (fractions of the frame), whole: a point, every point
+ * of a path or of an area, kept inside the frame. What it is on follows it: the
+ * layer under the point or the path's start, the layers a selection now takes in.
+ */
+export function movedPin(p: Pin, by: Pt, placed: Placed[], frame: { w: number; h: number }): Pin {
+  const pts = p.kind === 'point' ? [p.at] : p.points;
+  // the shift kept so that the whole pin stays in the frame
+  const lo = [Math.min(...pts.map((q) => q[0])), Math.min(...pts.map((q) => q[1]))], hi = [Math.max(...pts.map((q) => q[0])), Math.max(...pts.map((q) => q[1]))];
+  const d = [0, 1].map((k) => Math.min(1 - hi[k], Math.max(-lo[k], by[k])));
+  const shift = (q: Pt): Pt => [+(q[0] + d[0]).toFixed(4), +(q[1] + d[1]).toFixed(4)];
+  const { under: _old, ...rest } = p as Pin & { under?: Under };
+  if (p.kind === 'area') {
+    // an area kept as a hint stays one; a selection takes in the layers under it now
+    const points = p.points.map(shift);
+    return { ...p, points, layers: p.layers.length ? areaCandidates(placed, points.map((q): Pt => [q[0] * frame.w, q[1] * frame.h]), frame).layers : [] };
+  }
+  const moved = p.kind === 'point' ? { ...rest, at: shift(p.at) } as Pin : { ...rest, points: p.points.map(shift) } as Pin;
+  const under = layerUnder(placed, moved.kind === 'point' ? moved.at : (moved as Extract<Pin, { kind: 'path' }>).points[0], frame);
+  return under ? { ...moved, under } as Pin : moved;
+}

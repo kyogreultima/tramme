@@ -11,8 +11,9 @@
 
 import { LIMITS, PROJECT_FORMAT } from '@tramme/project';
 import { BROWSER_DIRECT, failure, HttpError, json } from '@tramme/api';
-import type { Env } from './http.ts';
+import { pageAsset, rewrittenHeaders, type Env } from './http.ts';
 import { relay } from './relay.ts';
+import { CLOUD_ROUTES, cloudConfig, cloudOn } from './cloud.ts';
 
 /** the vault's page: its own scripts, the providers it calls, framed by the editor only */
 function vaultPolicy(app: string) {
@@ -50,12 +51,14 @@ export async function personal(req: Request, env: Env): Promise<Response> {
     if (url.origin !== app) return Response.redirect(new URL(url.pathname + url.search, app).href, 301);
     if (url.pathname.startsWith('/api/')) {
       if (url.pathname === '/api/config' && req.method === 'GET') {
-        return json({ mode: 'personal', vault, format: PROJECT_FORMAT, limits: LIMITS, claude: { server: false }, transcribe: false });
+        return json({ mode: 'personal', vault, format: PROJECT_FORMAT, limits: LIMITS, claude: { server: false }, transcribe: false, ...cloudConfig(env) });
       }
+      // a page of the cloud (cloud.ts) whose session ended: its saves wait for a sign-in, never a 404 they would take for a loss
+      if (cloudOn(env) && (CLOUD_ROUTES.includes(url.pathname.split('/')[2]) || url.pathname.startsWith('/api/gallery/mine') || url.pathname === '/api/market/publish')) throw new HttpError(401, 'signed_out');
       throw new HttpError(404, 'this server keeps nothing: projects and keys stay in the browser (personal mode)');
     }
     if (url.pathname === '/vault.html') throw new HttpError(404, 'not found');
-    return editorPage(await env.ASSETS.fetch(req), vault, app);
+    return editorPage(await pageAsset(env, req), vault, app);
   } catch (e) { return failure(e); }
 }
 
@@ -71,7 +74,5 @@ async function editorPage(res: Response, vault: string, app: string): Promise<Re
   const home = attr(`${app}/`), preview = attr(`${app}/og.jpg`);
   const html = (await res.text()).replace('<head>', `<head><meta name="tramme-vault" content="${attr(vault)}">`
     + `<link rel="canonical" href="${home}"><meta property="og:url" content="${home}"><meta property="og:image" content="${preview}"><meta name="twitter:image" content="${preview}">`);
-  const headers = new Headers(res.headers);
-  headers.delete('content-length');
-  return new Response(html, { status: res.status, headers });
+  return new Response(html, { status: res.status, headers: rewrittenHeaders(res.headers) });
 }

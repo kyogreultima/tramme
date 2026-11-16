@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PLANS } from '../src/lib/plans';
+import { PLANS, PRICING_SHOWN } from '../src/lib/plans';
 import { landingData } from '../src/lib/site';
 import { read } from './sources';
 
@@ -7,8 +7,9 @@ type Node = { '@type': string; inLanguage?: string; offers?: { price: string; pr
 const graph = (locale: 'en' | 'fr') => landingData(new URL('https://tramme.dev'), '/og.jpg', ['Windows'], locale)['@graph'] as Node[];
 
 describe('what the search engines read', () => {
-  it('offers the three plans at the prices of the plans data, in euros', () => {
+  it('offers the three plans at the prices of the plans data, in euros, while the prices are shown', () => {
     const app = graph('en').find((n) => n['@type'] === 'SoftwareApplication')!;
+    if (!PRICING_SHOWN) { expect(app.offers).toBeUndefined(); return; }
     expect(app.offers!.map((o) => o.price)).toEqual(PLANS.map((p) => String(p.price.month)));
     expect(app.offers!.every((o) => o.priceCurrency === 'EUR')).toBe(true);
   });

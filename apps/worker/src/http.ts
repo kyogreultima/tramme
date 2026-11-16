@@ -1,15 +1,46 @@
 // What the Worker is given, and small helpers of its own (the shared ones
 // come from @tramme/api).
 
-export { HttpError, json, readJson } from '@tramme/api';
+export { cookieOf as cookie, HttpError, json, readJson } from '@tramme/api';
+
+/**
+ * A file of the editor's build, for a page the Worker rewrites (the editor's page in each mode): asked without the
+ * browser's conditions, so a copy it kept of the page in another mode is never confirmed by a 304, and answered
+ * without the build's ETag, which named the file before it was rewritten.
+ */
+export async function pageAsset(env: Env, req: Request): Promise<Response> {
+  // the other files (scripts, pictures) keep their conditions: they are the same in every mode
+  const page = req.headers.get('sec-fetch-dest') === 'document' || (req.headers.get('accept') ?? '').includes('text/html');
+  if (!page) return env.ASSETS.fetch(req);
+  const headers = new Headers(req.headers);
+  headers.delete('if-none-match');
+  headers.delete('if-modified-since');
+  return env.ASSETS.fetch(new Request(req, { headers }));
+}
+
+/** the headers of a page the Worker rewrote: no length, no validator, never kept by a cache */
+export function rewrittenHeaders(from: Headers): Headers {
+  const headers = new Headers(from);
+  for (const h of ['content-length', 'etag', 'last-modified']) headers.delete(h);
+  headers.set('cache-control', 'no-store');
+  return headers;
+}
 
 export interface Env {
   /** the editor's static build (and the key vault's page) */
   ASSETS: Fetcher;
   /** 'personal': no storage, no keys on the server, everything in the visitor's browser; otherwise private (see docs/deploy.md) */
   MODE?: string;
-  /** private mode: projects, libraries and the keys of the settings, under projects/<id>/<path>, library/, config/ */
+  /** private mode: projects, libraries and the keys of the settings, under projects/<id>/<path>, library/, config/;
+   * with accounts, the files of every signed-in person, each workspace under w/<workspace>/ (cloud.ts) */
   FILES?: R2Bucket;
+  /** export in the cloud: the renderer container (container.ts) and the queue of the jobs (renders.ts) */
+  RENDERER?: DurableObjectNamespace;
+  RENDER_QUEUE?: DurableObjectNamespace;
+  /** accounts: "on" holds signed-in people to their plan's limits (limits.ts); off until the payment exists */
+  PLAN_LIMITS?: string;
+  /** accounts: the secret the keys kept in a workspace are sealed with (`openssl rand -hex 32`); without it, no cloud */
+  KEYS_SECRET?: string;
   /** private mode, secrets: keys of the providers (optional; a key from the settings comes first, see @tramme/api keys.ts) */
   ANTHROPIC_API_KEY?: string;
   OPENAI_API_KEY?: string;
@@ -32,6 +63,8 @@ export interface Env {
   DEV_OPEN?: string;
   /** accounts: the backend (the private platform repository) as a container behind this Worker, with no address of its own (container.ts) */
   ACCOUNTS?: DurableObjectNamespace;
+  /** the export queue's renderer when no container renders (a server of one): the address of `pnpm renderer` on this machine */
+  RENDERER_URL?: string;
   /** accounts, in development: the address of a backend started on this machine; neither this nor ACCOUNTS: no accounts */
   ACCOUNTS_URL?: string;
   /** accounts: what the backend container is started with (backend-env.ts); the secrets by `wrangler secret put` */
@@ -59,12 +92,4 @@ export interface Env {
   VAULT_ORIGIN?: string;
   /** personal mode: how many requests a visitor may send through the relay (rate limiting binding) */
   RELAY_LIMIT?: RateLimit;
-}
-
-export function cookie(req: Request, name: string): string | null {
-  for (const part of (req.headers.get('cookie') ?? '').split(';')) {
-    const [k, ...v] = part.trim().split('=');
-    if (k === name) return v.join('=');
-  }
-  return null;
 }

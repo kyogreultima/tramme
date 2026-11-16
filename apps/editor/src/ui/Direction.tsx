@@ -12,6 +12,7 @@ import { BRIEF_PATH, briefOf, briefOp, parseBrief, type Brief, type BriefInput }
 import { FILM_PLAN_PATH, KIND_LABEL, parsePlan, type FilmPlan } from '../filmplan.ts';
 import { commit, S, toast } from '../state.ts';
 import { sourcesOf, type Source } from '../sources.ts';
+import { saveStyle, styleOf } from '../style.ts';
 import { studio } from '../studio.ts';
 import { ATTACHABLE } from './composer.tsx';
 import { resolveColor } from './controls.tsx';
@@ -74,6 +75,8 @@ export function Direction() {
     } catch (e) { toast(t('studio.direction.notSaved', { error: (e as Error).message }), 'error'); }
   };
 
+  // the direction kept as a style, offered to the next projects (style.ts)
+  const keepStyle = () => { const s = styleOf(S.project.peek().name, S.doc.peek(), brief); saveStyle(s).then(() => toast(t('style.kept', { name: s.name }))).catch((e) => toast((e as Error).message, 'error')); };
   const colors = Object.entries(doc.tokens ?? {}).filter(([, tk]) => tk.type === 'color').map(([name, tk]) => [name, resolveColor(String(tk.value), doc.tokens)] as const);
   const fonts = [...new Set(Object.values(doc.assets).filter((a) => a.type === 'font').map((a) => String((a as { family?: string }).family ?? a.name ?? '')).filter(Boolean))];
   const safeImageUrl = (path: string) => { try { projectAssetUrl(path, docUrl); return api.fileUrl(project, path); } catch { return ''; } };
@@ -103,7 +106,7 @@ export function Direction() {
 
       {(colors.length > 0 || fonts.length > 0) && (
         <section class="dir-section">
-          <div class="dir-head"><h4>{t('studio.direction.look')}</h4></div>
+          <div class="dir-head"><h4>{t('studio.direction.look')}</h4><button class="btn sm ghost" title={t('style.keepHint')} onClick={keepStyle}><Icon name="check" />{t('style.keep')}</button></div>
           {colors.length > 0 && <div class="dir-swatches">{colors.map(([name, value]) => <span key={name} class="dir-swatch" title={`${name} · ${value}`}><i style={{ background: value }} /><span>{name}</span></span>)}</div>}
           {fonts.length > 0 && <div class="dir-fonts">{fonts.map((f) => <span key={f} style={{ fontFamily: `"${f}"` }}>{f}</span>)}</div>}
         </section>

@@ -30,7 +30,7 @@ import { prefs } from '../settings.ts';
 import { runCall, uid } from './calls.ts';
 import { clip } from '../model.ts';
 import { FILM_PLAN_PATH, parsePlan, planText } from '../filmplan.ts';
-import type { Command } from './commands.ts';
+import type { Called, Command } from './commands.ts';
 import { describe, imageBlocks, type Attachment } from '../attachments.ts';
 import { locale, t } from '../i18n/index.ts';
 import { personal } from '../mode.ts';
@@ -485,7 +485,9 @@ export async function saveChat(items: ChatItem[] = chat.peek()) {
 }
 
 export interface AskPayload {
-  text: string; context: TurnContext; doc: TrammeDoc; decisions: { id: string; status: string }[]; attachments?: Attachment[]; command?: Command; commandInput?: Record<string, unknown>;
+  text: string; context: TurnContext; doc: TrammeDoc; decisions: { id: string; status: string }[]; attachments?: Attachment[];
+  /** the tools and workflows the message names (/name), in the order written; a tool's form filled in rides with it */
+  commands?: Called[];
   /** messages written during the previous turn, answered together, each with its own context (text and context are the last one's) */
   queued?: { text: string; context: TurnContext }[];
 }
@@ -557,7 +559,7 @@ export async function* ask(p: AskPayload, signal: AbortSignal): AsyncGenerator<A
     ...(dropped ? [`Your previous proposal "${dropped.label}" got no answer; it is dropped.`] : []),
   ];
   notes.push(...ranAlone.splice(0));
-  if (p.command) notes.push(commandNote(p.command, p.commandInput));
+  for (const c of p.commands ?? []) notes.push(commandNote(c.cmd, c.input));
   notes.push(...describe(p.attachments ?? [], p.doc));
   // the interface's language is the user's: the answers, proposal titles and new layer names follow it
   notes.push(`The user's interface is in ${locale === 'fr' ? 'French' : 'English'}: reply in that language, including the titles of your proposals and the names of the layers you create.`);

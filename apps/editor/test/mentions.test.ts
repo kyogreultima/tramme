@@ -1,5 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { applyMention, assetMentions, expandMentions, mentionQuery, matchMentions } from '../src/mentions.ts';
+import { applyMention, assetMentions, expandMentions, mentionQuery, matchMentions, tagOfName } from '../src/mentions.ts';
+import { piecesOf } from '../src/ai/commands.ts';
+
+describe('a file of any name, tagged', () => {
+  it('makes a tag of it that the box reads whole: commas, quotes and emoji made _, accents kept, composed', () => {
+    const hamza = tagOfName('Hi, I’m Hamza Fareed. 👋 Creative Director. AI Creator. I design brands, websites and content that.mp4');
+    expect(hamza).toBe('Hi_I_m_Hamza_Fareed._Creative_Director._AI_Creator._I_design_brands_websites_and_content_that.mp4');
+    // a name whose accents are written apart (e and its grave): one letter again
+    const secret = tagOfName('Le secret derrière ces apps.mp4');
+    expect(secret).toBe('Le_secret_derrière_ces_apps.mp4');
+    const tags = new Set([hamza, secret, 'tramme.mp4']);
+    const marked = piecesOf(`/captions et @${hamza} et @tramme.mp4 et @${secret}`, (n) => n === 'captions', (t) => tags.has(t)).filter((p) => p.kind).map((p) => p.text);
+    expect(marked).toEqual(['/captions', `@${hamza}`, '@tramme.mp4', `@${secret}`]);
+  });
+});
 
 describe('the @ of a message', () => {
   it('finds the word being tagged at the caret, only after a space or at the start', () => {
@@ -26,5 +40,13 @@ describe('the @ of a message', () => {
   it('says in the message what each tag stands for, and leaves what is not one', () => {
     const say = (token: string) => (token === 'logo' ? 'the image asset "logo": Brand Logo' : null);
     expect(expandMentions('put @logo top left, mail me@x.fr and @nobody', say)).toBe('put @logo (the image asset "logo": Brand Logo) top left, mail me@x.fr and @nobody');
+  });
+});
+
+describe('a tag of a file named in another language', () => {
+  it('is read whole at the caret and explained at send, accents included', () => {
+    const name = 'Le_secret_derrière_ces_apps.mp4';
+    expect(mentionQuery(`voir @Le_secret_derri`, 21)).toEqual({ from: 5, query: 'Le_secret_derri' });
+    expect(expandMentions(`voir @${name} ici`, (tk) => (tk === name ? 'the attached file' : null))).toBe(`voir @${name} (the attached file) ici`);
   });
 });

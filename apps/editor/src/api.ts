@@ -11,6 +11,7 @@ import type { KeyedProvider, KeyStatus, Voice } from '@tramme/api';
 import type { Usage } from '@tramme/assistant';
 export type { Voice };
 import { vaultOrigin } from './mode.ts';
+import { t } from './i18n/index.ts';
 import { desktopFetch, tauri } from './tauri.ts';
 import { vaultFetch } from './vault/link.ts';
 import type { FileKind } from './sources.ts';
@@ -74,8 +75,10 @@ export type AiEvent =
 export type { KeyedProvider, KeyStatus };
 
 export interface ServerConfig {
-  /** personal: projects and keys stay in the browser (mode.ts) */
-  mode?: 'private' | 'personal';
+  /** personal: projects and keys stay in the browser; cloud: in the signed-in person's account (mode.ts) */
+  mode?: 'private' | 'personal' | 'cloud';
+  /** personal mode: signing in keeps the projects in the account (the deployment has the cloud) */
+  cloud?: boolean;
   format: string;
   limits: { file: number; archive: number; files: number };
   claude: { server: boolean };
@@ -118,8 +121,10 @@ export const reach = (path: string, init?: RequestInit): Promise<Response> => (a
 /** the answer when it is a success; what the server said wrong otherwise, as an ApiError */
 async function answered(r: Response): Promise<Response> {
   if (r.ok) return r;
-  let body: { error?: string; issues?: { path: string; message: string }[] } = {};
+  let body: { error?: string; issues?: { path: string; message: string }[]; limit?: string; max?: number } = {};
   try { body = await r.json(); } catch { /* not JSON */ }
+  // a plan's limit, said in the person's language
+  if (body.error === 'plan_limit') throw new ApiError(r.status, body.limit === 'privateProjects' ? t('plans.limit.privateProjects') : t('plans.limit.cloudProjects', { max: body.max ?? 0 }));
   throw new ApiError(r.status, body.error ?? `HTTP ${r.status}`, body.issues);
 }
 
@@ -156,7 +161,9 @@ export const api = {
 
   // ── projects ───────────────────────────────────────────────
   list: () => call<Manifest[]>('/api/projects'),
-  create: (opts: { name: string; width?: number; height?: number; fps?: number; duration?: number; created?: string; empty?: boolean }) => call<Manifest>('/api/projects', jsonInit('POST', opts)),
+  /** `place: 'cloud'`: in the account, from the desktop app, whose own projects are in a folder (its cloud.rs) */
+  create: (opts: { name: string; width?: number; height?: number; fps?: number; duration?: number; created?: string; empty?: boolean }, place?: 'cloud') =>
+    call<Manifest>(place ? `/api/projects?place=${place}` : '/api/projects', jsonInit('POST', opts)),
   info: (id: string) => call<{ manifest: Manifest; files: ProjectFile[] }>(P(id)),
   update: (id: string, patch: { name?: string; thumbnail?: string | null }) => call<Manifest>(P(id), jsonInit('PATCH', patch)),
 

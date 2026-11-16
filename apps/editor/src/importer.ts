@@ -145,11 +145,14 @@ async function fill(project: Manifest, files: Map<string, Uint8Array | string>, 
   }
 }
 
-/** a .tramme archive as a new project (always a new id: nothing is overwritten); ask null skips the code question */
-export async function importArchive(file: Blob, progress?: Progress, opts?: { ask?: CodeAsk | null }): Promise<Manifest> {
+/**
+ * a .tramme archive as a new project (always a new id: nothing is overwritten); ask null skips the code question;
+ * place 'cloud': in the account, from the desktop app (bring.ts)
+ */
+export async function importArchive(file: Blob, progress?: Progress, opts?: { ask?: CodeAsk | null; place?: 'cloud' }): Promise<Manifest> {
   const { files, manifest, doc } = await readArchive(new Uint8Array(await file.arrayBuffer()), opts?.ask);
   const root = doc.compositions[doc.root];
-  const project = await api.create({ name: manifest.name, created: manifest.created, width: root?.width, height: root?.height, fps: root?.fps, duration: root?.duration, empty: true });
+  const project = await api.create({ name: manifest.name, created: manifest.created, width: root?.width, height: root?.height, fps: root?.fps, duration: root?.duration, empty: true }, opts?.place);
   return fill(project, files, progress);
 }
 

@@ -1,24 +1,30 @@
-// The deployed app, in one of two modes (MODE in wrangler.jsonc):
+// The app, in one of two modes (MODE in wrangler.jsonc):
 //
-// - private (default): one user behind Cloudflare Access. The editor's static
+// - private (default, `pnpm dev`): one user, locally; deployed, behind Cloudflare Access. The editor's static
 //   build, and under /api the projects (R2), the keys of the settings (R2) and
 //   the providers reached with them, speech to text (Workers AI).
 // - personal: anyone, without an account; the server keeps nothing. See
-//   personal.ts.
+//   personal.ts. With accounts, a signed-in person's projects and keys are
+//   kept in the cloud, under their workspace: cloud.ts.
 //
 // Private routes, besides those of @tramme/api (storage.ts, providers.ts, keys.ts):
 //   GET    /api/config                          what this server offers, the providers connected
 //   PUT    /api/keys/:provider, /custom/:id     connect a provider from the settings (DELETE: disconnect)
 //   /api/auth, /api/account, /api/billing      the accounts backend's (accounts.ts), when ACCOUNTS_URL is set
 //   POST   /api/transcribe                      {audio: WAV base64, language?} -> words with their timing (Whisper on Workers AI, else the OpenAI key)
+//   POST   /api/projects/:id/renders, GET /api/renders[/:job]   the export on the server (renders.ts), when it renders
 
 import { failure, HttpError, json, keysRoute, PROVIDER_ROUTES, providerRoute, providersConfig, storageRoute } from '@tramme/api';
 import { LIMITS, PROJECT_FORMAT } from '@tramme/project';
 import { accountRoute } from './accounts.ts';
+import { cloud, cloudOn, signedIn } from './cloud.ts';
+import { galleryRoute } from './gallery.ts';
+import { marketRoute } from './market.ts';
 import { guard } from './access.ts';
 import type { Env } from './http.ts';
 import { bucket, keyStore, workerKeys } from './keys.ts';
 import { personal } from './personal.ts';
+import { enqueue, renderRoute, renders, SERVER } from './renders.ts';
 import { transcribe } from './speech.ts';
 
 // HTML returned through ASSETS.fetch does not always inherit _headers (notably
@@ -42,7 +48,7 @@ async function route(req: Request, env: Env, url: URL): Promise<Response> {
   const m = req.method;
   if (parts[0] === 'config' && m === 'GET') {
     const providers = providersConfig(await workerKeys(env));
-    return json({ mode: 'private', format: PROJECT_FORMAT, limits: LIMITS, ...providers, transcribe: !!env.AI || providers.transcribe });
+    return json({ mode: 'private', format: PROJECT_FORMAT, limits: LIMITS, ...providers, transcribe: !!env.AI || providers.transcribe, serverRender: renders(env) });
   }
   if (parts[0] === 'keys') return keysRoute(req, keyStore(env), parts.slice(1).map(decodeURIComponent));
   // Whisper on Workers AI first; the OpenAI key (a provider route) when the server has none
@@ -51,29 +57,50 @@ async function route(req: Request, env: Env, url: URL): Promise<Response> {
     const res = await providerRoute(req, { keys: await workerKeys(env), fetch: (input, init) => fetch(input, init) }, parts);
     if (res) return res;
   }
+  // the export on the server: this server's own projects, nothing counted against a plan
+  if (renders(env) && (parts[0] === 'renders' || (parts[0] === 'projects' && parts[2] === 'renders'))) {
+    const done = await renderRoute(req, env, { workspaceId: SERVER, plan: 'pro' }, bucket(env), enqueue(env));
+    if (done) return done;
+  }
   const res = await storageRoute(req, bucket(env), url);
   if (res) return res;
   throw new HttpError(404, `unknown route: ${m} ${url.pathname}`);
 }
 
 // the accounts backend, as a container behind this Worker (wrangler.jsonc, the `cloud` environment)
-export { AccountsContainer } from './container.ts';
+export { AccountsContainer, RendererContainer } from './container.ts';
+export { RenderQueue } from './renders.ts';
 
 export default {
-  async fetch(req, env) {
+  async fetch(req: Request, env: Env, ctx?: ExecutionContext) {
     const url = new URL(req.url);
     if ((url.pathname === '/project-sandbox.html' || url.pathname === '/project-sandbox') && (env.MODE !== 'personal' || url.origin === env.APP_ORIGIN)) {
       return projectSandbox(req, env);
     }
     // the routes of accounts come first, in every mode: a visitor has no session yet, and the personal
     // deployment can have accounts (without ACCOUNTS or ACCOUNTS_URL they do not exist)
-    if (url.pathname.startsWith('/api/')) {
+    // (deleting an account in the cloud is the Worker's: its files go with it, cloud.ts)
+    // and closing one from the back-office
+    const deletion = req.method === 'DELETE' && (url.pathname === '/api/account' || /^\/api\/admin\/users\/[^/]+$/.test(url.pathname)) && cloudOn(env);
+    if (url.pathname.startsWith('/api/') && !deletion) {
       try {
         const account = await accountRoute(req, env);
         if (account) return account;
       } catch (e) { return failure(e); }
     }
-    if (env.MODE === 'personal') return personal(req, env);
+    if (env.MODE === 'personal') {
+      // the gallery is everyone's, signed in or not (gallery.ts)
+      if (cloudOn(env) && url.origin === env.APP_ORIGIN && url.pathname.startsWith('/api/gallery') && !url.pathname.startsWith('/api/gallery/mine')) {
+        try { const res = await galleryRoute(req, env.FILES!); if (res) return res; } catch (e) { return failure(e); }
+      }
+      // and so is the plugins' marketplace (market.ts), but publishing in it
+      if (cloudOn(env) && url.origin === env.APP_ORIGIN && url.pathname.startsWith('/api/market') && url.pathname !== '/api/market/publish') {
+        try { const res = await marketRoute(req, env.FILES!); if (res) return res; } catch (e) { return failure(e); }
+      }
+      let signed = null;
+      try { signed = url.origin === env.APP_ORIGIN ? await signedIn(req, env) : null; } catch (e) { return failure(e); }
+      return signed ? cloud(req, env, signed, ctx) : personal(req, env);
+    }
     if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(req);
     try {
       return (await guard(req, env)) ?? (await route(req, env, url));

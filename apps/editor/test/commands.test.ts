@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { applyOps, validate, type ToolContext, type TrammeDoc } from '@tramme/core';
 import { newProject } from '@tramme/project';
-import { fieldsOf, inputOf, listCommands, matchCommands, parseCommand, ranked, ready, type Command } from '../src/ai/commands.ts';
+import { applyCommand, commandQuery, commandsIn, fieldsOf, inputOf, listCommands, matchCommands, parseCommand, piecesOf, ranked, ready, type Command } from '../src/ai/commands.ts';
 import { editorRegistry } from '../src/vocabulary.ts';
 
 const sky = {
@@ -28,8 +28,8 @@ describe('the / menu', () => {
   const list = listCommands(reg);
 
   it('lists the editor\'s tools and workflows with the plugins\' ones', () => {
-    expect(list.filter((c) => c.kind === 'tool').map((c) => c.name)).toEqual(['captions', 'title', 'keyword', 'lower-third', 'svg-paths', 'kinetic-title', 'bar-chart', 'stat', 'transition', 'quote', 'logo-reveal', 'list', 'timeline', 'split-screen', 'map-journey', 'kit', 'typefaces', 'typeface-use', 'pointer', 'terrain', 'keys', 'riffle', 'events', 'event-counter', 'event-tags', 'event-receipt', 'beats', 'shots', 'subjects', 'palette', 'space', 'still', 'track', 'callout', 'stabilize', 'proxy', 'define_component', 'instantiate', 'detach', 'component-keep', 'component-use', 'denoise', 'skin', 'upscale', 'interpolate', 'cutout', 'depth', 'photo-2.5d', 'model', 'remove-bg', 'lipsync', 'silences', 'ripple_delete', 'insert_clip', 'overwrite_clip', 'ripple_trim', 'roll', 'slip', 'slide', 'detach_audio', 'link', 'sync_clips', 'add_adjustment', 'match_look', 'publish', 'fillers', 'charter', 'moments', 'check', 'motion', 'compare', 'critique', 'scene-takes', 'references', 'reference-keep', 'cues', 'sfx', 'sound-find', 'synth', 'generate-sound', 'music-plan', 'voices', 'duck', 'sound-keep', 'credits', 'mix', 'meters', 'chain', 'generate-image', 'generate-video', 'shorts', 'sources', 'block-add', 'block-use', 'brief', 'write_scene', 'edit_scene', 'check_scene', 'film-plan', 'scene-done', 'read-reference', 'style-frames', 'surface', 'stock', 'pin', 'push-in', 'library-add', 'library-use', 'demo.stars']);
-    expect(list.filter((c) => c.kind === 'prompt').map((c) => `${c.name}:${c.from}`)).toEqual(['analyze:tramme', 'dress:tramme', 'review:tramme', 'polish:tramme', 'sound-design:tramme', 'shorts:tramme', 'transcript:tramme', 'cut-silences:tramme', 'beats:tramme', 'remake:tramme', 'still:tramme', 'night:sky']);
+    expect(list.filter((c) => c.kind === 'tool').map((c) => c.name)).toEqual(['captions', 'title', 'keyword', 'lower-third', 'svg-paths', 'kinetic-title', 'bar-chart', 'stat', 'transition', 'quote', 'logo-reveal', 'list', 'timeline', 'split-screen', 'map-journey', 'kit', 'typefaces', 'typeface-use', 'pointer', 'terrain', 'keys', 'riffle', 'events', 'event-counter', 'event-tags', 'event-receipt', 'beats', 'shots', 'subjects', 'palette', 'space', 'still', 'track', 'callout', 'stabilize', 'proxy', 'define_component', 'instantiate', 'detach', 'component-keep', 'component-use', 'denoise', 'skin', 'upscale', 'interpolate', 'cutout', 'depth', 'photo-2.5d', 'model', 'remove-bg', 'lipsync', 'silences', 'takes', 'ripple_delete', 'insert_clip', 'overwrite_clip', 'ripple_trim', 'roll', 'slip', 'slide', 'detach_audio', 'link', 'sync_clips', 'add_adjustment', 'match_look', 'publish', 'fillers', 'charter', 'moments', 'check', 'motion', 'compare', 'critique', 'scene-takes', 'references', 'reference-keep', 'cues', 'sfx', 'sound-find', 'synth', 'generate-sound', 'music-plan', 'voices', 'duck', 'sound-keep', 'credits', 'mix', 'meters', 'chain', 'generate-image', 'generate-video', 'shorts', 'sources', 'block-add', 'block-use', 'brief', 'write_scene', 'edit_scene', 'check_scene', 'film-plan', 'scene-done', 'read-reference', 'style-frames', 'surface', 'stock', 'pin', 'push-in', 'library-add', 'library-use', 'demo.stars']);
+    expect(list.filter((c) => c.kind === 'prompt').map((c) => `${c.name}:${c.from}`)).toEqual(['analyze:tramme', 'dress:tramme', 'review:tramme', 'polish:tramme', 'sound-design:tramme', 'shorts:tramme', 'transcript:tramme', 'cut-silences:tramme', 'beats:tramme', 'remake:tramme', 'still:tramme', 'blocks:tramme', 'from-voice:tramme', 'night:sky']);
   });
 
   it('finds commands by name first, then by title or description', () => {
@@ -97,5 +97,42 @@ describe('the dressings as tools', () => {
     expect(l.props?.source).toBe('beetle');
     expect(c.order).toContain(id);
     expect(l.in).toBe(1);
+  });
+});
+
+describe('several commands in one message', () => {
+  const reg = editorRegistry().clone().use(sky, 'sky');
+  const list = listCommands(reg);
+
+  it('opens the menu on a / at the caret, at the start or after a space, never inside a word', () => {
+    expect(commandQuery('/st', 3)).toEqual({ from: 0, query: 'st' });
+    expect(commandQuery('make it /ni', 11)).toEqual({ from: 8, query: 'ni' });
+    expect(commandQuery('1/2 of it', 3)).toBeNull();
+    expect(commandQuery('https://x', 9)).toBeNull();
+  });
+
+  it('puts the chosen name in place of what was typed, the caret after it', () => {
+    expect(applyCommand('make it /ni please', { from: 8, query: 'ni' }, 'night')).toEqual({ text: 'make it /night  please', caret: 15 });
+  });
+
+  it('finds every command a message names, once each, in order, the unknown ones left out', () => {
+    expect(commandsIn('/night with /demo.stars and /nothing, /night again', list).map((c) => c.name)).toEqual(['night', 'demo.stars']);
+    expect(commandsIn('a path a/night is no command', list)).toEqual([]);
+  });
+
+  it('marks the known commands and tags apart from the words', () => {
+    const isCommand = (n: string) => n === 'night', isTag = (t: string) => t === 'logo';
+    expect(piecesOf('/night over @logo, @nobody and /nope', isCommand, isTag)).toEqual([
+      { text: '/night', kind: 'command' },
+      { text: ' over ' },
+      { text: '@logo', kind: 'tag' },
+      { text: ', @nobody and /nope' },
+    ]);
+    expect(piecesOf('plain words', isCommand, isTag)).toEqual([{ text: 'plain words' }]);
+    // a file named in another language: its whole name is the tag, accents included
+    const long = '@Le_secret_derrière_ces_apps_étrangement_addictives_mp4.mp4';
+    expect(piecesOf(`/night et aussi ${long} ici`, isCommand, (tk) => tk === long.slice(1))).toEqual([
+      { text: '/night', kind: 'command' }, { text: ' et aussi ' }, { text: long, kind: 'tag' }, { text: ' ici' },
+    ]);
   });
 });

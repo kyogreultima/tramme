@@ -66,7 +66,7 @@ describe('the site\'s links', () => {
     expect(signUp({ lang: 'fr' })).toBe('https://app.tramme.dev/signup?lang=fr');
     expect(logIn()).toBe('https://app.tramme.dev/login');
     expect(space()).toBe('https://app.tramme.dev/space');
-    expect(appProject('a b')).toBe('https://app.tramme.dev/p/a%20b');
+    expect(appProject('a b')).toBe('https://app.tramme.dev/?remix=a%20b');
   });
 
   it('lead to the local app on this machine', async () => {

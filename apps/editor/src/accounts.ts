@@ -10,6 +10,7 @@
 import { signal } from '@preact/signals';
 import { locale, m, t } from './i18n/index.ts';
 import { platform } from './tauri.ts';
+import { cloud, personal } from './mode.ts';
 
 export interface UserJson {
   id: string;
@@ -19,6 +20,10 @@ export interface UserJson {
   hasPassword: boolean;
   providers: Provider[];
   locale: string;
+  /** the name public films are signed with; null until the first is published or one is chosen */
+  handle?: string | null;
+  /** one of the people who run the platform: the back-office (/admin) is theirs */
+  isAdmin?: boolean;
   workspace: { id: string; name: string };
 }
 
@@ -58,6 +63,8 @@ const SAYINGS: Record<string, string> = {
   network: m('account.err.network'),
   generic: m('account.err.generic'),
   cancelled: m('account.err.cancelled'),
+  handle_taken: m('account.err.handle_taken'),
+  handle_invalid: m('account.err.handle_invalid'),
   failed: m('account.err.failed'),
   disabled: m('account.err.disabled'),
   no_email: m('account.err.no_email'),
@@ -80,7 +87,7 @@ export function errorCode(status: number, data: unknown): ErrorCode {
 /** the sentence for a code, in the interface's language */
 export const messageFor = (code: ErrorCode | undefined): string => t((code && SAYINGS[code]) || SAYINGS.generic);
 
-async function call<T = Record<string, unknown>>(method: string, path: string, body?: unknown): Promise<Reply<T>> {
+export async function call<T = Record<string, unknown>>(method: string, path: string, body?: unknown): Promise<Reply<T>> {
   let res: Response;
   try {
     res = await fetch(path, { method, headers: body === undefined ? undefined : { 'content-type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
@@ -119,6 +126,22 @@ export async function signOut() {
   return r;
 }
 
+/** whether signing in here keeps the projects in the account: the personal mode of a deployment that has the cloud */
+async function cloudOffered(): Promise<boolean> {
+  if (!personal) return false;
+  try { return !!((await (await fetch('/api/config')).json()) as { cloud?: boolean }).cloud; } catch { return false; }
+}
+
+/**
+ * Where to go once signed in or out. When that changes where the projects are (this browser, the account),
+ * the page loads again, so the server gives it the right mode; otherwise the router changes the page.
+ */
+export async function landAt(to: string) {
+  const changes = account.value.status === 'in' ? await cloudOffered() : cloud;
+  // the router is the page's (it reads the window), loaded once it is needed
+  if (changes) location.assign(to); else (await import('./nav.ts')).go(to);
+}
+
 // ── the links of the mails ───────────────────────────────────
 
 export const forgotPassword = (email: string) => call('POST', '/api/auth/password/forgot', { email });
@@ -128,7 +151,7 @@ export const resendVerification = () => call('POST', '/api/auth/verify/resend');
 
 // ── the space ────────────────────────────────────────────────
 
-export const updateProfile = async (changes: { name?: string; locale?: string }) => take(await call<{ user?: UserJson }>('PATCH', '/api/account', changes));
+export const updateProfile = async (changes: { name?: string; locale?: string; handle?: string }) => take(await call<{ user?: UserJson }>('PATCH', '/api/account', changes));
 export const changePassword = (next: string, current?: string) => call('PUT', '/api/account/password', { next, ...(current ? { current } : {}) });
 export const revokeOtherSessions = () => call('POST', '/api/account/sessions/revoke');
 export async function unlinkProvider(provider: Provider) {
@@ -170,6 +193,12 @@ export interface Billing {
 export const sellsHere = (): boolean => platform !== 'android';
 
 export const billing = () => call<Billing>('GET', '/api/billing');
+
+/** an API token of the account (the command line's `tramme cloud-export`, a script): its value only when it is made */
+export interface ApiToken { id: string; name: string; createdAt: string; lastUsedAt: string | null; token?: string }
+export const apiTokens = () => call<ApiToken[]>('GET', '/api/account/tokens');
+export const makeApiToken = (name: string) => call<ApiToken>('POST', '/api/account/tokens', { name });
+export const revokeApiToken = (id: string) => call('DELETE', `/api/account/tokens/${encodeURIComponent(id)}`);
 export const plans = () => call<PlanTerms[]>('GET', '/api/billing/plans');
 export const checkout = (plan: 'plus' | 'pro', interval: 'month' | 'year') => call<{ url?: string }>('POST', '/api/billing/checkout', { plan, interval, locale });
 export const manageSubscription = () => call<{ url?: string }>('POST', '/api/billing/portal');

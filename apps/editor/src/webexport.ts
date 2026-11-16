@@ -128,6 +128,7 @@ async function exportOnce(doc: TrammeDoc, base: string, format: WebFormat, opts:
     const sandboxFrame = async (f: number) => {
       aborted(opts.signal);
       const time = f / fps;
+      await r.bringImages(time);
       ensureSandboxDoc(sandboxHost(), { doc, docUrl: base, loaded: (id) => { try { return r.assets.get(id); } catch { return null; } } });
       const videos = await sandboxVideoFrames(r, doc, time);
       const c = doc.compositions[r.compId];

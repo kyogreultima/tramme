@@ -1,11 +1,15 @@
 // Where this editor keeps its projects and reaches the providers.
 //
-// - private (the Worker behind Cloudflare Access, or `wrangler dev`): the
+// - private (`pnpm dev`, the Worker's server mode): the
 //   server keeps the projects and the keys.
 // - personal (anyone, no account): the projects stay in this browser, served
 //   by the service worker (sw.ts) from IndexedDB; the keys stay in the key
 //   vault, a page of another origin the editor and its plugins cannot read
 //   (vault/). The Worker says so with <meta name="tramme-vault">.
+// - cloud (a deployment with accounts, someone signed in): the server keeps
+//   their projects and keys, under their account, as a private server does.
+//   The Worker says so with <meta name="tramme-account">; signing in or out
+//   loads the page again (accounts.ts, landAt).
 
 import { t } from './i18n/index.ts';
 
@@ -15,6 +19,9 @@ export const vaultOrigin: string | undefined = typeof document !== 'undefined'
   : undefined;
 
 export const personal = !!vaultOrigin;
+
+/** a signed-in person's page of a deployment with accounts: the projects are in the account */
+export const cloud: boolean = typeof document !== 'undefined' && !!document.querySelector('meta[name="tramme-account"]');
 
 /** the service worker serving the projects from this browser, in control of this page */
 async function startLocalStore() {

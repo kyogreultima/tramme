@@ -11,8 +11,10 @@ import Faq from '../../components/Faq.astro';
 import Closing from '../../components/Closing.astro';
 import { PRICING_TOPICS } from '../../lib/faq';
 import { localeOf, localePaths, t } from '../../lib/i18n';
+import { PRICING_SHOWN } from '../../lib/plans';
 
-export const getStaticPaths = localePaths;
+// not built while the prices are hidden
+export const getStaticPaths = () => (PRICING_SHOWN ? localePaths() : []);
 
 const locale = localeOf(Astro.url.pathname);
 ---

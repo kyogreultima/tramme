@@ -1,8 +1,8 @@
 ---
 // One public project: its video large, its title, its author, its words, the
 // author's other projects, and the way to open it in the app when it can be
-// reused. (With the gallery API, set `prerender = false` and read the id from
-// Astro.params.)
+// reused. Rendered when asked (lib/gallery.ts reads the app's gallery), so a
+// film published a minute ago has its page.
 import Page from '../../../components/Page.astro';
 import Media from '../../../components/Media.astro';
 import ProjectCard from '../../../components/ProjectCard.astro';
@@ -10,15 +10,14 @@ import Head from '../../../components/Head.astro';
 import Closing from '../../../components/Closing.astro';
 import { getProject, listProjects } from '../../../lib/gallery';
 import { appProject } from '../../../lib/links';
-import { LOCALES, DEFAULT_LOCALE, localeOf, pathIn, t } from '../../../lib/i18n';
+import { localeOf, pathIn, t } from '../../../lib/i18n';
 
-export async function getStaticPaths() {
-  const projects = await listProjects();
-  return projects.flatMap(({ id }) => LOCALES.map((l) => ({ params: { lang: l === DEFAULT_LOCALE ? undefined : l, id } })));
-}
+export const prerender = false;
 
 const locale = localeOf(Astro.url.pathname);
-const project = (await getProject(Astro.params.id!))!;
+const found = await getProject(Astro.params.id ?? '');
+if (!found) return Astro.rewrite(pathIn(locale, '/404/'));
+const project = found;
 const others = (await listProjects()).filter((p) => p.author.handle === project.author.handle && p.id !== project.id);
 const published = new Intl.DateTimeFormat(locale === 'fr' ? 'fr-FR' : 'en-GB', { dateStyle: 'long' }).format(new Date(project.publishedAt));
 ---

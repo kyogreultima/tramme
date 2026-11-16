@@ -94,7 +94,7 @@ function Said({ text }: { text: string }) {
 
 const Step = ({ it }: { it: ChatItem }) => (it.tool ? <ToolLine tool={it.tool} /> : <Thinking th={it.thinking!} />);
 
-/** the turn under way: what it does now and for how long, the model, how far through the stages, its last steps, and the way to pause or stop it */
+/** the turn under way, at the bottom of its message: what it does now and for how long, the model, how far through the stages, its last steps, and the way to pause or stop it */
 function Run({ work, steps, open, onToggle }: { work: ChatItem[]; steps: ChatItem[]; open: boolean; onToggle: () => void }) {
   const secs = useElapsed(turnStart.value, true), hold = paused.value;
   const now = liveStage(work), seen = stagesOf(work), scene = liveScene(work);
@@ -158,12 +158,10 @@ function Plain({ work, live }: { work: ChatItem[]; live: boolean }) {
   const usage = work.find((it) => it.usage)?.usage;
   return (
     <div class={`work${live ? ' live' : ''}`}>
-      {live ? <Run work={work} steps={steps} open={open} onToggle={() => setOpen(!open)} /> : (
-        <div class="work-head">
-          <span class="mark"><LogoMark /></span>
-          <b>Tramme</b>
-        </div>
-      )}
+      <div class="work-head">
+        <span class="mark"><LogoMark /></span>
+        <b>Tramme</b>
+      </div>
       {shots.length > 0 && (
         <div class="work-shots">
           {shots.slice(-6).map((it) => <button key={it.id} class="work-shot" title={it.image!.caption} onClick={() => { lightbox.value = it.image!.url; }}><img src={it.image!.url} alt={it.image!.caption} loading="lazy" /></button>)}
@@ -172,7 +170,8 @@ function Plain({ work, live }: { work: ChatItem[]; live: boolean }) {
       {work.map((it) => (it.text !== undefined && !it.tool && !it.thinking && it.text.trim() ? <Said key={it.id} text={it.text} /> : null))}
       {work.map((it) => (it.proposal ? <TakeCard key={it.id} p={it.proposal} /> : null))}
       {usage && <UsageLine u={usage} />}
-      {!live && <Summary steps={steps} stages={stagesOf(work)} />}
+      {/* the turn under way at the very bottom, held there while the thread scrolls: what is happening stays in sight under the takes */}
+      {live ? <Run work={work} steps={steps} open={open} onToggle={() => setOpen(!open)} /> : <Summary steps={steps} stages={stagesOf(work)} />}
     </div>
   );
 }
