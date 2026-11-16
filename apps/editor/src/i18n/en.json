@@ -252,7 +252,8 @@
     "downloadPremiere": "Download for Premiere Pro (zip)",
     "download": "Download the film",
     "failed": "The export in the cloud did not finish: {error}",
-    "limit": "Exporting above 1080p in the cloud is not part of your plan."
+    "limit": "Exporting above 1080p in the cloud is not part of your plan.",
+    "accountOnly": "In the cloud: the projects of your account. This one is kept on this device; bring it into your account from your space to export it there."
   },
   "market": {
     "title": "Discover",
@@ -2304,7 +2305,9 @@
       "none": "No project is kept here apart from your account's.",
       "row": "Projects kept here",
       "rowHint": "The projects made in this browser or on this computer, copied into your account.",
-      "button": "Bring them"
+      "button": "Bring them",
+      "busy": "A copy into your account is under way; these can go once it is over.",
+      "retry": "Try again"
     },
     "signedInAs": "Signed in as {email}",
     "projects": "Projects",

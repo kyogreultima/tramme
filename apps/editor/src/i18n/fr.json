@@ -252,7 +252,8 @@
     "downloadPremiere": "Télécharger pour Premiere Pro (zip)",
     "download": "Télécharger le film",
     "failed": "L'export dans le cloud n'a pas abouti : {error}",
-    "limit": "L'export au-delà du 1080p dans le cloud ne fait pas partie de votre offre."
+    "limit": "L'export au-delà du 1080p dans le cloud ne fait pas partie de votre offre.",
+    "accountOnly": "Dans le cloud : les projets de votre compte. Celui-ci est gardé sur cet appareil ; ajoutez-le à votre compte depuis votre espace pour l'y exporter."
   },
   "market": {
     "title": "Découvrir",
@@ -3676,7 +3677,9 @@
       "none": "Aucun projet n'est gardé ici en dehors de ceux de votre compte.",
       "row": "Projets gardés ici",
       "rowHint": "Les projets faits dans ce navigateur ou sur cet ordinateur, copiés dans votre compte.",
-      "button": "Les ajouter"
+      "button": "Les ajouter",
+      "busy": "Un ajout à votre compte est en cours ; ceux-ci pourront suivre une fois terminé.",
+      "retry": "Réessayer"
     },
     "signedInAs": "Connecté en tant que {email}",
     "projects": "Projets",

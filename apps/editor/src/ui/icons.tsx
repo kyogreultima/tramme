@@ -26,6 +26,7 @@ const P: Record<string, string> = {
   magnet: 'M3.5 3v5a4.5 4.5 0 0 0 9 0V3h-3v5a1.5 1.5 0 0 1-3 0V3zM3.5 5.5h3M9.5 5.5h3',
   key: 'M5.5 13a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM7.3 8.7 13 3M11 5l1.5 1.5M9.5 6.5l1 1',
   unlock: 'M4.5 7.5h7v5.5h-7zM6 7.5V5.5a2 2 0 0 1 3.9-.6',
+  user: 'M8 8a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM3 13.5a5 5 0 0 1 10 0',
   chevron: 'M6 4l4 4-4 4',
   chevronDown: 'M4 6l4 4 4-4',
   foldAll: 'M5 2.5l3 3 3-3M5 13.5l3-3 3 3M3 8h10',

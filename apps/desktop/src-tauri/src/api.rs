@@ -105,6 +105,16 @@ fn route_inner(parts: &[String], req: Request<Vec<u8>>) -> Result<Body, store::H
         ("keys", _) => Ok(ok_json(KeyStore::system()?.route(method, &decode_segments(&parts[1..]), req.body())?)),
         // the account: sent to the backend of this build's environment (account.rs)
         ("auth" | "account" | "billing", _) => Ok(crate::account::route(&req)),
+        // the exports in the cloud of the account's projects (asked by /api/projects/cloud--<id>/renders): the app of this
+        // build's environment renders them and says where each one is (apps/worker/src/renders.ts)
+        ("renders", "GET") => {
+            // only what is under /api/renders goes: no segment climbs out of it
+            if parts.iter().any(|p| p == "." || p == ".." || p.contains('%')) {
+                return Ok(json_response(400, &json!({ "error": "unreadable address" })));
+            }
+            let q = req.uri().query().map(|q| format!("?{q}")).unwrap_or_default();
+            to_cloud(&req, &format!("{}{q}", req.uri().path()))
+        }
         // the provider routes are the page's (api.reach), never asked here
         ("claude" | "llm" | "models" | "generate" | "generate-image" | "generate-video" | "transcribe", _) => Ok(json_response(
             404,

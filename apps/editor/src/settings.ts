@@ -6,7 +6,7 @@
 import { effect, signal } from '@preact/signals';
 import { MODEL_TASKS, resolveModel, type ModelEntry, type ModelTask } from './models.ts';
 import type { DictationSource } from './speech.ts';
-import { FORMER_PREFERENCES_KEY, GLASS_THEMES, PREFERENCES_KEY, savedTheme, showTheme, VIEWS, type ThemeId, type View } from './theme/pref.ts';
+import { DEFAULT_THEME, FORMER_PREFERENCES_KEY, GLASS_THEMES, PREFERENCES_KEY, savedTheme, showTheme, VIEWS, type ThemeId, type View } from './theme/pref.ts';
 import { installGlassLight } from './theme/liquid-glass.ts';
 import { installRefraction } from './theme/refraction.ts';
 
@@ -90,7 +90,7 @@ export interface Preferences {
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
-  language: 'auto', theme: 'studio', view: 'studio', motion: 'auto', still: 'display', blur: 'document', exactFrames: true, scrubAudio: true, sandboxPreview: false,
+  language: 'auto', theme: DEFAULT_THEME, view: 'studio', motion: 'auto', still: 'display', blur: 'document', exactFrames: true, scrubAudio: true, sandboxPreview: false,
   effectsDb: -8, musicDb: -14, duckDb: -12, varySounds: true, confirmPaid: true, paidPerTurn: 10, voiceProvider: 'auto', voiceShortlist: {}, voice: '', voiceModel: '', previewVolume: 1, previewMuted: false, proxies: true, models: {}, pluginsOff: [], areaConfirm: 'always', assistantTranscribes: false, assistantFetchesReal: false, acceptReadings: false, checkUpdates: true, lastUpdateCheck: 0, updateNotified: '', recentCommands: [], quickLauncher: false,
   pictureProvider: 'auto', pictureQuality: 'auto', pictureSize: 'large', styleFrames: 2,
   videoProvider: 'auto', videoSeconds: 8, dictation: 'local', watermark: true, watermarkTold: false,
@@ -126,9 +126,13 @@ try {
 } catch { /* no storage */ }
 
 function load(): Preferences {
+  // the preferences kept under the tool's former name are taken over
+  try { return checked(JSON.parse(localStorage.getItem(PREFERENCES_KEY) ?? localStorage.getItem(FORMER_PREFERENCES_KEY) ?? '{}')); } catch { return { ...DEFAULT_PREFERENCES }; }
+}
+
+/** saved preferences (this browser's, the account's) made whole: each value checked, the defaults where one is missing */
+export function checked(saved: Partial<Preferences>): Preferences {
   try {
-    // the preferences kept under the tool's former name are taken over
-    const saved = JSON.parse(localStorage.getItem(PREFERENCES_KEY) ?? localStorage.getItem(FORMER_PREFERENCES_KEY) ?? '{}') as Partial<Preferences>;
     const p = { ...DEFAULT_PREFERENCES, ...saved };
     if (!['auto', 'full', 'half', 'quarter'].includes(p.motion)) p.motion = DEFAULT_PREFERENCES.motion;
     if (!['display', 'full'].includes(p.still)) p.still = DEFAULT_PREFERENCES.still;

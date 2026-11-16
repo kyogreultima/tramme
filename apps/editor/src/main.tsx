@@ -46,6 +46,7 @@ import './theme/frost.css';
 import './theme/liquid-glass.css';
 import { offerTours } from './tours/index.ts';
 import { resumeRenders } from './ui/CloudRender.tsx';
+import { startPrefsSync } from './prefs-sync.ts';
 import { startProject } from './start.ts';
 import { t } from './i18n/index.ts';
 import { boot } from './mode.ts';
@@ -162,6 +163,8 @@ boot().then(() => {
   watchUpdates();
   // the exports on the server asked from this browser, followed until they are told over (CloudRender.tsx)
   resumeRenders();
+  // signed in, the preferences are the account's, the same on every device (prefs-sync.ts)
+  startPrefsSync();
   if (m) {
     trackPage(location.pathname);
     openProject(m[1]).catch((e) => {

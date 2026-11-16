@@ -223,6 +223,9 @@ importers:
       '@tramme/core':
         specifier: workspace:*
         version: link:packages/core
+      '@tramme/interop':
+        specifier: workspace:*
+        version: link:packages/interop
       '@tramme/nodes':
         specifier: workspace:*
         version: link:packages/nodes

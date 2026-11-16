@@ -39,6 +39,7 @@
     "@tramme/api": "workspace:*",
     "@tramme/assistant": "workspace:*",
     "@tramme/core": "workspace:*",
+    "@tramme/interop": "workspace:*",
     "@tramme/nodes": "workspace:*",
     "@tramme/project": "workspace:*",
     "@tramme/render": "workspace:*",

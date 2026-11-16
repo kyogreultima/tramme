@@ -24,7 +24,8 @@ export const PREFERENCES_KEY = 'tramme.preferences';
 /** and where they were kept under the tool's earlier name */
 export const FORMER_PREFERENCES_KEY = 'emotion.preferences';
 
-export const DEFAULT_THEME: ThemeId = 'studio';
+/** Liquid Glass: the frosted surfaces that bend the picture behind them (refraction.ts) */
+export const DEFAULT_THEME: ThemeId = 'liquid-glass';
 export const DEFAULT_VIEW: View = 'studio';
 
 /** the theme in saved preferences: the one chosen, or what the former mode and per-mode themes mean, else the default */
