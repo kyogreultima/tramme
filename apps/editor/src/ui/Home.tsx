@@ -20,9 +20,10 @@ import { S, toast } from '../state.ts';
 import { listCommands, type Command } from '../ai/commands.ts';
 import { packCommands, shippedPacks } from '../packs.ts';
 import { MarkedField, useCommandMenu, useMentionMenu } from './composer.tsx';
+import { listStyles, readStyle, styleWords } from '../style.ts';
 import { expandMentions } from '../mentions.ts';
 import { MicButton, writeInto } from './MicButton.tsx';
-import { handheld, Modal, longPress, openMenu, Seg } from './controls.tsx';
+import { handheld, Modal, longPress, openMenu, Seg, Select } from './controls.tsx';
 import { Icon } from './icons.tsx';
 import { Brand } from './Logo.tsx';
 import { ModelPicker } from './ModelPicker.tsx';
@@ -210,7 +211,17 @@ export function DirectionBox({ busy, onStart }: { busy: boolean; onStart: (words
   useEffect(() => { const el = area.current; if (el) { el.style.height = 'auto'; el.style.height = `${Math.min(260, Math.max(92, el.scrollHeight))}px`; } }, [words]);
   const add = (list: Picked[]) => setMaterial((had) => [...had, ...list.filter((p) => !had.some((h) => h.path === p.path))]);
   const ready = !busy && (words.trim().length > 0 || material.length > 0);
-  const start = () => { if (!ready) return; const f = FILM_FORMATS.find(([id]) => id === format)!; onStart(expandMentions(words.trim(), (tok) => { const p = material.find((x) => tagOf(x) === tok); return p ? `the attached file "${p.file.name}"` : null; }), material, [f[2], f[3]]); };
+  // the styles kept from earlier projects (style.ts): one chosen is told to the assistant with the words
+  const [styles, setStyles] = useState<string[]>([]);
+  const [style, setStyle] = useState('');
+  useEffect(() => { void listStyles().then(setStyles); }, []);
+  const start = async () => {
+    if (!ready) return;
+    const f = FILM_FORMATS.find(([id]) => id === format)!;
+    const chosen = style ? await readStyle(style) : null;
+    const said = expandMentions(words.trim(), (tok) => { const p = material.find((x) => tagOf(x) === tok); return p ? `the attached file "${p.file.name}"` : null; });
+    onStart(chosen ? `${said}\n\n${styleWords(chosen)}` : said, material, [f[2], f[3]]);
+  };
   // the / menu, as in the message box: a workflow starts the project with it, a tool waits in the editor's box with its form.
   // The shipped packs' commands come from the index, so the menu offers them before a project holds any pack.
   const [packCmds, setPackCmds] = useState<Command[]>([]);
@@ -258,6 +269,7 @@ export function DirectionBox({ busy, onStart }: { busy: boolean; onStart: (words
           <input ref={files} type="file" multiple hidden accept="image/*,video/*,audio/*,.pdf,application/pdf,.md,.markdown,.json,.ttf,.otf,.woff,.woff2,.glb,.gltf" onChange={chosen} />
           <input ref={folder} type="file" multiple hidden {...{ webkitdirectory: true }} onChange={chosen} />
           <span class="grow" />
+          {styles.length > 0 && <Select value={style} options={[['', t('style.none')], ...styles.map((s) => [s, s.replace(/\.json$/, '')] as [string, string])]} onChange={setStyle} />}
           <ModelPicker />
           <Seg value={format} role="radiogroup" ariaLabel={t('common.format')}
             options={FILM_FORMATS.map(([id, , w, h]) => ({ value: id, label: <><i class="fmt" style={{ aspectRatio: `${w} / ${h}`, [w >= h ? 'width' : 'height']: '13px' }} />{id.replace('x', ':')}</> }))}

@@ -3434,6 +3434,12 @@
     "keepScript": "Script",
     "askTakes": "Transcris mon dernier enregistrement et garde les prises du script."
   },
+  "style": {
+    "keep": "Garder comme mon style",
+    "keepHint": "Garde cette palette, ces typos, le ton et les règles : l'accueil les propose aux prochains projets.",
+    "kept": "Style « {name} » gardé : l'accueil le propose aux prochains projets.",
+    "none": "Sans style"
+  },
   "device": {
     "ready": "Votre fichier est prêt",
     "saveToGallery": "Enregistrer dans la galerie",

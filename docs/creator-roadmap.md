@@ -23,7 +23,7 @@ What a creator who talks to the camera every week needs, taken from what works e
 ## D. Smaller things
 
 - [x] Several `/commands` in one message, and the commands and `@tags` marked in the boxes.
-- [ ] A style kept with the account (the direction: colours, type, pace, sound), offered to each new project.
+- [x] A style kept with the account (the direction's palette, typefaces, tone and rules: "Keep as my style", the library's styles), offered to each new project on the home screen (apps/editor/src/style.ts).
 - [ ] "From a voice": a recording dropped alone, and the cleaning, the storyboard, the edit and the sound follow one another.
 
 ## E. Export for editors

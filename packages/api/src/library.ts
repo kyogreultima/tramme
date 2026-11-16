@@ -25,6 +25,8 @@ const ENTRY_MAX = 1800;
 
 export const SHELVES = {
   plugins: { prefix: 'library/plugins/', name: /^[a-z0-9][a-z0-9_-]{0,62}\.(js|mjs)$/, what: 'plugin', type: () => 'text/javascript; charset=utf-8' },
+  // a style kept to start the next projects with (apps/editor/src/style.ts): palette, type, tone, rules
+  styles: { prefix: 'library/styles/', name: /^[a-z0-9][a-z0-9_-]{0,62}\.json$/, what: 'style', type: () => 'application/json; charset=utf-8' },
   sounds: { prefix: 'library/sounds/', name: /^[a-z0-9][a-z0-9_-]{0,62}\.(wav|mp3|ogg|m4a|flac|webm|opus)$/, what: 'sound', type: (n: string) => AUDIO[n.split('.').pop()!] ?? 'application/octet-stream', described: true },
 } satisfies Record<string, Shelf>;
 

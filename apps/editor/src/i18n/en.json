@@ -2033,6 +2033,12 @@
     "keepScript": "Script",
     "askTakes": "Transcribe my last recording and keep the takes of the script."
   },
+  "style": {
+    "keep": "Keep as my style",
+    "keepHint": "Keeps this palette, these typefaces, the tone and the rules: the next projects are offered them on the home screen.",
+    "kept": "Style “{name}” kept: the home screen offers it to the next projects.",
+    "none": "No style"
+  },
   "device": {
     "ready": "Your file is ready",
     "saveToGallery": "Save to the gallery",

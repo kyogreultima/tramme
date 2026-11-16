@@ -100,6 +100,7 @@ fn route_inner(parts: &[String], req: Request<Vec<u8>>) -> Result<Body, store::H
         ("projects", _) => projects(&store, parts, req),
         ("library", _) => shelf(&store, "plugins", parts, req),
         ("sounds", _) => shelf(&store, "sounds", parts, req),
+        ("styles", _) => shelf(&store, "styles", parts, req),
         ("device", _) => device(parts, req),
         ("keys", _) => Ok(ok_json(KeyStore::system()?.route(method, &decode_segments(&parts[1..]), req.body())?)),
         // the account: sent to the backend of this build's environment (account.rs)
@@ -367,7 +368,7 @@ fn shelf(store: &Store, shelf: &str, parts: &[String], req: Request<Vec<u8>>) ->
 /// a name of the shelf: lower case letters, digits, - and _, then its extension
 fn decode_name(shelf: &str, raw: &str) -> Result<String, store::HttpError> {
     let name = percent_encoding::percent_decode_str(raw).decode_utf8_lossy().into_owned();
-    let exts = if shelf == "sounds" { "wav|mp3|ogg|m4a|flac|webm|opus" } else { "js|mjs" };
+    let exts = match shelf { "sounds" => "wav|mp3|ogg|m4a|flac|webm|opus", "styles" => "json", _ => "js|mjs" };
     let ok = {
         let mut chars = name.chars();
         let valid_start = matches!(chars.next(), Some(c) if c.is_ascii_lowercase() || c.is_ascii_digit());
@@ -389,6 +390,9 @@ fn decode_name(shelf: &str, raw: &str) -> Result<String, store::HttpError> {
 fn shelf_type(shelf: &str, name: &str) -> &'static str {
     if shelf == "plugins" {
         return "text/javascript; charset=utf-8";
+    }
+    if shelf == "styles" {
+        return "application/json; charset=utf-8";
     }
     match crate::format::mime_of(name) {
         "audio/wav" | "audio/mpeg" | "audio/ogg" | "audio/mp4" | "audio/flac" => crate::format::mime_of(name),
@@ -510,6 +514,8 @@ mod tests {
         assert!(decode_name("plugins", "Tool.js").is_err());
         assert!(decode_name("plugins", "a.exe").is_err());
         assert!(decode_name("sounds", "a.wav.exe").is_err());
+        assert_eq!(decode_name("styles", "my-style.json").unwrap(), "my-style.json");
+        assert!(decode_name("styles", "a.js").is_err());
     }
 
     #[test]
