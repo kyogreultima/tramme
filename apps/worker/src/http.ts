@@ -63,6 +63,8 @@ export interface Env {
   DEV_OPEN?: string;
   /** accounts: the backend (the private platform repository) as a container behind this Worker, with no address of its own (container.ts) */
   ACCOUNTS?: DurableObjectNamespace;
+  /** the export queue's renderer when no container renders (a server of one): the address of `pnpm renderer` on this machine */
+  RENDERER_URL?: string;
   /** accounts, in development: the address of a backend started on this machine; neither this nor ACCOUNTS: no accounts */
   ACCOUNTS_URL?: string;
   /** accounts: what the backend container is started with (backend-env.ts); the secrets by `wrangler secret put` */

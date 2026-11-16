@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { memoryRecords, prefixedBucket, recordBucket, signEdge, storageRoute } from '@tramme/api';
 import worker from '../src/index.ts';
 import type { Env } from '../src/http.ts';
-import { nextJob, runJob, type Job } from '../src/renders.ts';
+import { nextJob, rendererOf, runJob, SERVER, tellOwner, type Job } from '../src/renders.ts';
 
 const APP = 'https://app.example';
 const SECRET = 'edge-secret';
@@ -78,5 +78,52 @@ describe('export in the cloud', () => {
     const a = { workspaceId: 'a', job: '1', priority: false, at: '1' }, b = { workspaceId: 'b', job: '2', priority: true, at: '2' };
     expect(nextJob([a, b])).toBe(b);
     expect(nextJob([a, { ...b, priority: false }])).toBe(a);
+  });
+});
+
+describe('export on a server of one', () => {
+  function server(over: Record<string, unknown> = {}) {
+    const files = recordBucket(memoryRecords());
+    const queued: { workspaceId: string; job: string }[] = [];
+    const env = {
+      FILES: files, DEV_OPEN: '1', RENDERER_URL: 'http://127.0.0.1:8080',
+      ASSETS: { fetch: async () => new Response('') },
+      RENDER_QUEUE: { idFromName: () => 'q', get: () => ({ fetch: async (r: Request) => { queued.push(await r.json()); return new Response(null, { status: 202 }); } }) },
+      ...over,
+    } as unknown as Env;
+    return { env, files, queued };
+  }
+  const local = (env: Env, path: string, init: RequestInit = {}) => worker.fetch(new Request(`http://localhost:8787${path}`, init), env);
+
+  it('says it renders, queues a job of its own projects, and renders it with the renderer of the machine', async () => {
+    const { env, files, queued } = server();
+    expect(((await (await local(env, '/api/config')).json()) as { serverRender: boolean }).serverRender).toBe(true);
+    const id = ((await (await local(env, '/api/projects', { method: 'POST', body: JSON.stringify({ name: 'Film' }) })).json()) as { id: string }).id;
+    const job = await (await local(env, `/api/projects/${id}/renders`, { method: 'POST', body: '{}' })).json() as Job;
+    expect(queued).toEqual([expect.objectContaining({ workspaceId: SERVER, job: job.id })]);
+    const asked: string[] = [];
+    const real = globalThis.fetch;
+    globalThis.fetch = (async (r: Request) => { asked.push(r.url); return new Response(new Uint8Array([7])); }) as typeof fetch;
+    try { expect(await runJob(files, SERVER, job.id, rendererOf(env))).toMatchObject({ status: 'done', file: `renders/cloud-${job.id}.mp4` }); } finally { globalThis.fetch = real; }
+    expect(asked[0]).toMatch(/^http:\/\/127\.0\.0\.1:8080\/render\?quality=1080p/);
+    expect(((await (await local(env, `/api/renders/${job.id}`)).json()) as Job).status).toBe('done');
+  });
+
+  it('says nothing of it without a renderer', async () => {
+    const { env } = server({ RENDERER_URL: undefined });
+    expect(((await (await local(env, '/api/config')).json()) as { serverRender: boolean }).serverRender).toBe(false);
+  });
+
+  it('tells the owner of an account\'s job once it is over, and no one on a server of one', async () => {
+    const told: unknown[] = [];
+    const real = globalThis.fetch;
+    globalThis.fetch = (async (r: Request) => { told.push({ url: r.url, body: await r.json() }); return new Response('{}'); }) as typeof fetch;
+    try {
+      const env = { ACCOUNTS_URL: 'http://backend.test', INTERNAL_SECRET: 'i' } as unknown as Env;
+      await tellOwner(env, { id: 'j', project: 'p', status: 'done', userId: 'u' } as Job);
+      await tellOwner(env, { id: 'k', project: 'p', status: 'done' } as Job);
+      await tellOwner(env, { id: 'l', project: 'p', status: 'rendering', userId: 'u' } as Job);
+    } finally { globalThis.fetch = real; }
+    expect(told).toEqual([{ url: 'http://backend.test/internal/notify/render', body: { userId: 'u', project: 'p', job: 'j', status: 'done' } }]);
   });
 });

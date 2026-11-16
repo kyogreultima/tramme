@@ -14,7 +14,7 @@ import { shortsOf } from '../shorts.ts';
 import { openMenu, Popover, Select, Toggle, type MenuItem } from './controls.tsx';
 import { PublishPanel } from './PublishPanel.tsx';
 import { GalleryDialog } from './GalleryDialog.tsx';
-import { CloudRender } from './CloudRender.tsx';
+import { CloudRender, serverRender } from './CloudRender.tsx';
 import { cloud } from '../mode.ts';
 import { hdrCapability } from '../hdr.ts';
 import { ExportQueueList } from './ExportQueueList.tsx';
@@ -297,7 +297,7 @@ function ExportPop({ anchor, onClose }: { anchor: HTMLElement; onClose: () => vo
         </div>
       </div>}
       {state && 'error' in state && <div class="prop-note err">{state.error}</div>}
-      {cloud && <CloudRender disabled={running()} />}
+      {serverRender.value && <CloudRender disabled={running()} />}
       <ExportQueueList />
       </div>
       {running()

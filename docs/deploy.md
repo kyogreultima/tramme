@@ -105,6 +105,10 @@ The assistant's `generate-sound` tool makes sound effects, music beds and voice-
 
 The Worker transcribes the speech of sounds and videos with Workers AI (`@cf/openai/whisper-large-v3-turbo`, the `AI` binding declared in `wrangler.jsonc`, about $0.0005 per minute of sound). Workers AI runs at Cloudflare even from `wrangler dev`, which requires you to be logged in, and its use is billed. Without this binding, an OpenAI key connected in the settings transcribes (Whisper); without either, the editor goes through the local companion, which transcribes on the machine.
 
+### Export on the server
+
+`pnpm renderer` starts the renderer of the exports (`apps/renderer`: the command line's render with Chrome and ffmpeg) on port 8080. While it runs, the export panel offers "Export on the server": the project is rendered as the desktop app renders it, one job at a time, and the film lands in its `renders/`. The app tells when it is over (a notification of the system when it is in the background, a message otherwise), after a reload too. With accounts, the same queue renders in a container, and the account's owner is also told by mail.
+
 ### Limits of the server mode
 
 - Files of 95 MB at most (the request size Workers accepts); heavier sounds and videos are uploaded in parts (R2 multipart, 32 MiB per part, 4 GiB per file); 2000 files per project.

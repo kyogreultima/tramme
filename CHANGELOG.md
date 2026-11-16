@@ -10,6 +10,8 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Added
 
+- **Export on the server, in local**: `pnpm renderer` starts the renderer on this machine, and the export panel of `pnpm dev` offers "Export on the server", rendered as the desktop app renders it.
+- **Told when an export on the server is over**: a notification of the system (browser, desktop, phone) when the app is in the background, a message in it otherwise, followed from any page and after a reload; with an account, a mail too, with the way back to the project.
 - **Several commands in one message**: a `/command` can be written anywhere in a message (at its start or after a space), as many as needed; the assistant gets each of them, in the order written. One tool alone at the start keeps its form and runs at once, as before.
 
 ### Changed

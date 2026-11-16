@@ -10,6 +10,7 @@
     "build": "node apps/editor/build.ts",
     "dev": "node apps/editor/build.ts --dev",
     "dev:personal": "node apps/editor/build.ts --dev --personal",
+    "renderer": "node apps/renderer/server.ts",
     "deploy:personal": "node apps/editor/build.ts && wrangler deploy -c apps/worker/wrangler.jsonc --env personal",
     "site": "pnpm --filter ./apps/site dev",
     "site:build": "pnpm --filter ./apps/site build",

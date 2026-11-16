@@ -20,8 +20,13 @@
   // are connected in the settings or go in apps/worker/.dev.vars
   "vars": {
     "ACCESS_TEAM_DOMAIN": "",
-    "ACCESS_AUD": ""
+    "ACCESS_AUD": "",
+    // the export on the server: the renderer started on this machine by `pnpm renderer` (apps/renderer)
+    "RENDERER_URL": "http://127.0.0.1:8080"
   },
+  // the queue of the exports on the server (renders.ts), one at a time
+  "durable_objects": { "bindings": [{ "name": "RENDER_QUEUE", "class_name": "RenderQueue" }] },
+  "migrations": [{ "tag": "render-queue", "new_sqlite_classes": ["RenderQueue"] }],
   // speech to text for the assistant (Whisper); used from `wrangler dev` too, through your Cloudflare account
   "ai": { "binding": "AI" },
   "observability": { "enabled": true },

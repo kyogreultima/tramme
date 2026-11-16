@@ -12,6 +12,7 @@
 //   PUT    /api/keys/:provider, /custom/:id     connect a provider from the settings (DELETE: disconnect)
 //   /api/auth, /api/account, /api/billing      the accounts backend's (accounts.ts), when ACCOUNTS_URL is set
 //   POST   /api/transcribe                      {audio: WAV base64, language?} -> words with their timing (Whisper on Workers AI, else the OpenAI key)
+//   POST   /api/projects/:id/renders, GET /api/renders[/:job]   the export on the server (renders.ts), when it renders
 
 import { failure, HttpError, json, keysRoute, PROVIDER_ROUTES, providerRoute, providersConfig, storageRoute } from '@tramme/api';
 import { LIMITS, PROJECT_FORMAT } from '@tramme/project';
@@ -23,6 +24,7 @@ import { guard } from './access.ts';
 import type { Env } from './http.ts';
 import { bucket, keyStore, workerKeys } from './keys.ts';
 import { personal } from './personal.ts';
+import { enqueue, renderRoute, renders, SERVER } from './renders.ts';
 import { transcribe } from './speech.ts';
 
 // HTML returned through ASSETS.fetch does not always inherit _headers (notably
@@ -46,7 +48,7 @@ async function route(req: Request, env: Env, url: URL): Promise<Response> {
   const m = req.method;
   if (parts[0] === 'config' && m === 'GET') {
     const providers = providersConfig(await workerKeys(env));
-    return json({ mode: 'private', format: PROJECT_FORMAT, limits: LIMITS, ...providers, transcribe: !!env.AI || providers.transcribe });
+    return json({ mode: 'private', format: PROJECT_FORMAT, limits: LIMITS, ...providers, transcribe: !!env.AI || providers.transcribe, serverRender: renders(env) });
   }
   if (parts[0] === 'keys') return keysRoute(req, keyStore(env), parts.slice(1).map(decodeURIComponent));
   // Whisper on Workers AI first; the OpenAI key (a provider route) when the server has none
@@ -54,6 +56,11 @@ async function route(req: Request, env: Env, url: URL): Promise<Response> {
   if (PROVIDER_ROUTES.includes(parts[0])) {
     const res = await providerRoute(req, { keys: await workerKeys(env), fetch: (input, init) => fetch(input, init) }, parts);
     if (res) return res;
+  }
+  // the export on the server: this server's own projects, nothing counted against a plan
+  if (renders(env) && (parts[0] === 'renders' || (parts[0] === 'projects' && parts[2] === 'renders'))) {
+    const done = await renderRoute(req, env, { workspaceId: SERVER, plan: 'pro' }, bucket(env), enqueue(env));
+    if (done) return done;
   }
   const res = await storageRoute(req, bucket(env), url);
   if (res) return res;

@@ -243,7 +243,10 @@
     "hint": "Rendu sur un serveur comme l'app de bureau le fait : vous pouvez fermer cette page, le film arrive dans les rendus du projet.",
     "queued": "En attente de son tour sur le serveur…",
     "rendering": "Rendu sur le serveur…",
-    "done": "Le film rendu dans le cloud est prêt.",
+    "startServer": "Exporter sur le serveur",
+    "hintServer": "Rendu par le moteur lancé sur cette machine (pnpm renderer), comme l'app de bureau le fait : le film arrive dans les rendus du projet.",
+    "doneTitle": "Export terminé",
+    "doneBody": "Le film de « {name} » est prêt dans ses rendus.",
     "download": "Télécharger le film",
     "failed": "L'export dans le cloud n'a pas abouti : {error}",
     "limit": "L'export au-delà du 1080p dans le cloud ne fait pas partie de votre offre."

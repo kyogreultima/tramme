@@ -45,6 +45,7 @@ import './screens/quick.css';
 import './theme/frost.css';
 import './theme/liquid-glass.css';
 import { offerTours } from './tours/index.ts';
+import { resumeRenders } from './ui/CloudRender.tsx';
 import { startProject } from './start.ts';
 import { t } from './i18n/index.ts';
 import { boot } from './mode.ts';
@@ -159,6 +160,8 @@ boot().then(() => {
   watchCompanion();
   // a newer version of the app, looked for on its own every twelve hours
   watchUpdates();
+  // the exports on the server asked from this browser, followed until they are told over (CloudRender.tsx)
+  resumeRenders();
   if (m) {
     trackPage(location.pathname);
     openProject(m[1]).catch((e) => {

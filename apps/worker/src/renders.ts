@@ -8,7 +8,11 @@
 //   GET  /api/renders                                                  this person's jobs, the newest first
 //   GET  /api/renders/<job>                                            one, and where it is
 //
-// In the workspace: renders/<job>.json, the job's record.
+// In the workspace: renders/<job>.json, the job's record. A server of one (`pnpm dev`, the private mode) has the
+// same routes on its own projects, rendered by the renderer started on this machine (RENDERER_URL). Once a
+// job of an account is over, the backend mails its owner (the page may be closed).
+
+import { internal } from './accounts.ts';
 
 import { DurableObject } from 'cloudflare:workers';
 import { HttpError, json, prefixedBucket, readJson, storageRoute, workspacePrefix, type Bucket, type Edge } from '@tramme/api';
@@ -30,6 +34,8 @@ export interface Job {
   error?: string;
   /** a plan whose jobs go first (Pro) */
   priority: boolean;
+  /** the account that asked for it (none on a server of one): told by mail when it is over */
+  userId?: string;
 }
 
 const JOB = (id: string) => `renders/${id}.json`;
@@ -43,7 +49,7 @@ export async function readJob(files: Bucket, id: string): Promise<Job | null> {
 const writeJob = (files: Bucket, job: Job) => files.put(JOB(job.id), JSON.stringify(job), { httpMetadata: { contentType: 'application/json' } });
 
 /** the export routes of a signed-in person: undefined when the request is not one of them */
-export async function renderRoute(req: Request, env: Env, edge: Edge, files: Bucket, queue: (ws: string, job: Job) => Promise<void>): Promise<Response | undefined> {
+export async function renderRoute(req: Request, env: Env, edge: Pick<Edge, 'workspaceId' | 'plan'> & { userId?: string }, files: Bucket, queue: (ws: string, job: Job) => Promise<void>): Promise<Response | undefined> {
   const url = new URL(req.url);
   const parts = url.pathname.split('/').slice(2);
   const m = req.method;
@@ -61,7 +67,7 @@ export async function renderRoute(req: Request, env: Env, edge: Edge, files: Buc
     const now = new Date().toISOString();
     const job: Job = {
       id: newJob(), project, quality, ...(typeof body.comp === 'string' && /^[\w-]{1,64}$/.test(body.comp) ? { comp: body.comp } : {}),
-      status: 'queued', createdAt: now, updatedAt: now, priority: terms.priorityQueue,
+      status: 'queued', createdAt: now, updatedAt: now, priority: terms.priorityQueue, ...(edge.userId ? { userId: edge.userId } : {}),
     };
     await writeJob(files, job);
     await queue(edge.workspaceId, job);
@@ -84,9 +90,15 @@ export async function renderRoute(req: Request, env: Env, edge: Edge, files: Buc
 /** what renders a project: its archive in, its film out (the renderer container, or a stand-in in the tests) */
 export type Renderer = (archive: ArrayBuffer, job: Job) => Promise<ArrayBuffer>;
 
+/** a server of one keeps its projects at the bucket's root: its jobs have no workspace */
+export const SERVER = '';
+
+/** the files of a workspace, or the server's own */
+const filesOf = (bucket: Bucket, workspaceId: string) => (workspaceId === SERVER ? bucket : prefixedBucket(bucket, workspacePrefix(workspaceId)));
+
 /** one job done: the project's archive rendered, the film kept with the project, the record saying so */
 export async function runJob(bucket: Bucket, workspaceId: string, jobId: string, render: Renderer): Promise<Job | null> {
-  const files = prefixedBucket(bucket, workspacePrefix(workspaceId));
+  const files = filesOf(bucket, workspaceId);
   const job = await readJob(files, jobId);
   if (!job || job.status === 'done') return job;
   const step = async (change: Partial<Job>) => { Object.assign(job, change, { updatedAt: new Date().toISOString() }); await writeJob(files, job); };
@@ -125,23 +137,37 @@ export class RenderQueue extends DurableObject<Env> {
     if (!list.length || !this.env.FILES) return;
     const next = nextJob(list);
     await this.ctx.storage.put('waiting', list.filter((w) => w !== next));
-    await runJob(this.env.FILES, next.workspaceId, next.job, containerRenderer(this.env));
+    const job = await runJob(this.env.FILES, next.workspaceId, next.job, rendererOf(this.env));
     if (list.length > 1) await this.ctx.storage.setAlarm(Date.now());
+    if (job) await tellOwner(this.env, job);
   }
 }
 
 /** the next job: the oldest of the plans with a priority, else the oldest */
 export const nextJob = (list: Waiting[]): Waiting => list.find((w) => w.priority) ?? list[0];
 
-/** the renderer container behind the Worker (container.ts, RendererContainer) */
-export function containerRenderer(env: Env): Renderer {
+/** whether this deployment renders: a queue, and a renderer (the container, or one started on this machine) */
+export const renders = (env: Env) => !!env.RENDER_QUEUE && (!!env.RENDERER || !!env.RENDERER_URL);
+
+/** what renders here: the container behind the Worker (container.ts, RendererContainer), else the renderer at RENDERER_URL (`pnpm renderer`) */
+export function rendererOf(env: Env): Renderer {
   return async (archive, job) => {
-    if (!env.RENDERER) throw new Error('no renderer in this deployment');
     const q = new URLSearchParams({ quality: job.quality, ...(job.comp ? { comp: job.comp } : {}) });
-    const res = await env.RENDERER.get(env.RENDERER.idFromName('renderer')).fetch(new Request(`http://renderer/render?${q}`, { method: 'POST', body: archive }));
+    const req = (base: string) => new Request(`${base}/render?${q}`, { method: 'POST', body: archive });
+    let res: Response;
+    if (env.RENDERER) res = await env.RENDERER.get(env.RENDERER.idFromName('renderer')).fetch(req('http://renderer'));
+    else if (env.RENDERER_URL) {
+      try { res = await fetch(req(env.RENDERER_URL.replace(/\/+$/, ''))); } catch { throw new Error('the renderer is not running on this machine: start it with pnpm renderer'); }
+    } else throw new Error('no renderer in this deployment');
     if (!res.ok) throw new Error(`the renderer said ${res.status}: ${(await res.text()).slice(0, 300)}`);
     return res.arrayBuffer();
   };
+}
+
+/** the owner of a job of an account told it is over, by mail (the backend's); a mail that cannot leave changes nothing */
+export async function tellOwner(env: Env, job: Job): Promise<void> {
+  if (!job.userId || (job.status !== 'done' && job.status !== 'failed') || !(env.ACCOUNTS || env.ACCOUNTS_URL)) return;
+  await internal(env, '/internal/notify/render', { body: { userId: job.userId, project: job.project, job: job.id, status: job.status } }).catch(() => {});
 }
 
 /** a job handed to the queue of this deployment */
