@@ -8,6 +8,22 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+## [0.30.0] - 2026-11-17
+
+### Added
+
+- A project brought into an account keeps its original ID, so a second import or another window can recognize the same project.
+- A transcription can be stopped while it is running; its progress shows which service is working and when a local model is downloading.
+
+### Changed
+
+- On desktop, a signed-in transcription can use the account's cloud service. The companion runs its local Whisper model in a separate worker thread so transcription does not block its other work.
+- Projects already brought into an account are hidden from the device's local list and skipped on later imports; an incomplete copy remains visible for retry.
+
+### Fixed
+
+- Simultaneous imports with the same project ID no longer overwrite each other in folder-backed storage.
+
 ## [0.29.0] - 2026-11-16
 
 ### Added
@@ -979,7 +995,8 @@ First public release.
 
 - Cloudflare Worker serving the editor and the API, projects stored in R2, access protected by Cloudflare Access.
 
-[Unreleased]: ../../compare/v0.29.0...HEAD
+[Unreleased]: ../../compare/v0.30.0...HEAD
+[0.30.0]: ../../compare/v0.29.0...v0.30.0
 [0.29.0]: ../../compare/v0.28.0...v0.29.0
 [0.28.0]: ../../compare/v0.27.0...v0.28.0
 [0.27.0]: ../../compare/v0.26.1...v0.27.0
