@@ -215,13 +215,15 @@
 .command-name { flex: none; font-family: var(--mono); font-size: 10.5px; color: var(--text-3); }
 .command-row.on .command-name { color: var(--accent-text); }
 .command-name.tag, .command-row.on .command-name.tag { color: var(--expr); }
-/* a box's words drawn behind it (MarkedField): its known /commands in the accent, its @tags in another colour */
+/* a box's words drawn again under it (MarkedField): while something is marked they are the ones read, the field's own text clear over them */
 .marked-field { position: relative; }
 .marked-field > textarea { position: relative; z-index: 1; }
-.marked { position: absolute; top: 0; left: 0; z-index: 0; box-sizing: border-box; overflow: hidden; border: 0 solid transparent; color: transparent; white-space: pre-wrap; overflow-wrap: break-word; pointer-events: none; }
-.marked mark { color: transparent; border-radius: 4px; }
-.marked mark.command { --tint: var(--accent-soft); background: var(--tint); box-shadow: 0 0 0 2px var(--tint); }
-.marked mark.tag { --tint: color-mix(in srgb, var(--expr) 18%, transparent); background: var(--tint); box-shadow: 0 0 0 2px var(--tint); }
+.marked-field.on > textarea { color: transparent; caret-color: var(--text); }
+.marked { position: absolute; top: 0; left: 0; z-index: 0; box-sizing: border-box; overflow: hidden; border: 0 solid transparent; color: var(--text); white-space: pre-wrap; overflow-wrap: break-word; pointer-events: none; }
+/* a /command in the accent, an @tag in the colour of links to things; a pill that takes no room (a shadow, not a padding) */
+.marked mark { all: unset; border-radius: 4px; }
+.marked mark.tok-command { color: var(--accent-text); background: var(--accent-soft); box-shadow: 0 0 0 2px var(--accent-soft); }
+.marked mark.tok-tag { --tint: color-mix(in srgb, var(--expr) 14%, transparent); color: var(--expr); background: var(--tint); box-shadow: 0 0 0 2px var(--tint); }
 .command-desc { font-size: var(--fs-sm); color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .command-from { flex: none; max-width: 90px; height: 20px; display: inline-flex; align-items: center; padding: 0 7px; border-radius: 6px; background: var(--field); color: var(--text-2); font: 500 var(--fs-xs)/1 var(--ui); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .command-keys { flex: none; display: flex; gap: 14px; padding: 6px 12px; border-top: 1px solid var(--line); color: var(--text-3); font-size: var(--fs-xs); }

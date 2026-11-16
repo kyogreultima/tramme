@@ -112,11 +112,15 @@ export function useMentionMenu(area: RefObject<HTMLTextAreaElement | null>, text
   return { open, view, keyDown, sync };
 }
 
+/** what places a glyph: the layer takes every one of them from the field, so its words fall exactly under the caret */
+const TYPE = ['fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'fontStretch', 'fontVariant', 'fontFeatureSettings', 'fontVariationSettings', 'fontKerning', 'fontOpticalSizing', 'textRendering', 'letterSpacing', 'wordSpacing', 'textTransform', 'textIndent', 'lineHeight', 'tabSize', 'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'borderTopWidth', 'borderLeftWidth'] as const;
+
 /**
- * A box's words drawn again behind it, the /commands and @tags it knows
- * marked (a command in the accent, a tag in another colour): the textarea's
- * own text stays over them, clear, so typing and the caret are the field's.
- * The layer takes the field's font, padding and width, and follows its scroll.
+ * A box's words drawn again under it, the /commands and @tags it knows in
+ * their colours (a command in the accent, a tag in another): while something
+ * is marked, the field's own text is clear and the layer's words are the ones
+ * read, the caret and the selection staying the field's. The layer takes the
+ * field's typography, padding and width, and follows its scroll.
  */
 export function MarkedField({ area, text, isCommand, isTag, children }: { area: RefObject<HTMLTextAreaElement | null>; text: string; isCommand: (name: string) => boolean; isTag: (token: string) => boolean; children: ComponentChildren }) {
   const back = useRef<HTMLDivElement>(null);
@@ -125,7 +129,7 @@ export function MarkedField({ area, text, isCommand, isTag, children }: { area: 
     const el = area.current, b = back.current;
     if (!el || !b) return;
     const cs = getComputedStyle(el);
-    for (const k of ['font', 'letterSpacing', 'lineHeight', 'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'borderTopWidth', 'borderLeftWidth', 'tabSize'] as const) (b.style as unknown as Record<string, string>)[k] = cs[k];
+    for (const k of TYPE) (b.style as unknown as Record<string, string>)[k] = (cs as unknown as Record<string, string>)[k];
     b.style.width = `${el.clientWidth + parseFloat(cs.borderLeftWidth)}px`;
     b.style.height = `${el.offsetHeight}px`;
     b.scrollTop = el.scrollTop;
@@ -138,8 +142,8 @@ export function MarkedField({ area, text, isCommand, isTag, children }: { area: 
     return () => el.removeEventListener('scroll', follow);
   }, []);
   return (
-    <div class="marked-field">
-      {marked && <div class="marked" ref={back} aria-hidden="true">{pieces.map((p, i) => (p.kind ? <mark key={i} class={p.kind}>{p.text}</mark> : p.text))}{'\n'}</div>}
+    <div class={`marked-field${marked ? ' on' : ''}`}>
+      {marked && <div class="marked" ref={back} aria-hidden="true">{pieces.map((p, i) => (p.kind ? <mark key={i} class={`tok-${p.kind}`}>{p.text}</mark> : p.text))}{'\n'}</div>}
       {children}
     </div>
   );
