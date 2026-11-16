@@ -28,3 +28,11 @@ describe('the @ of a message', () => {
     expect(expandMentions('put @logo top left, mail me@x.fr and @nobody', say)).toBe('put @logo (the image asset "logo": Brand Logo) top left, mail me@x.fr and @nobody');
   });
 });
+
+describe('a tag of a file named in another language', () => {
+  it('is read whole at the caret and explained at send, accents included', () => {
+    const name = 'Le_secret_derrière_ces_apps.mp4';
+    expect(mentionQuery(`voir @Le_secret_derri`, 21)).toEqual({ from: 5, query: 'Le_secret_derri' });
+    expect(expandMentions(`voir @${name} ici`, (tk) => (tk === name ? 'the attached file' : null))).toBe(`voir @${name} (the attached file) ici`);
+  });
+});

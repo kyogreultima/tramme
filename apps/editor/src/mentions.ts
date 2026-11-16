@@ -7,9 +7,13 @@ import type { TrammeDoc } from '@tramme/core';
 
 export interface Mentionable { token: string; label: string; kind: string }
 
+/** what a tag is made of: letters of any language (a file named "Le secret derrière…"), digits, _ . and -; it ends on a letter, a digit or _ */
+export const TAG_CHARS = String.raw`[\p{L}\p{N}_.-]`;
+export const TAG = String.raw`${TAG_CHARS}*[\p{L}\p{N}_]`;
+
 /** the word being tagged at the caret: an @ at the start or after a space, and what follows it up to the caret */
 export function mentionQuery(text: string, caret: number): { from: number; query: string } | null {
-  const m = /(^|\s)@([\w.-]*)$/.exec(text.slice(0, caret));
+  const m = new RegExp(String.raw`(^|\s)@(${TAG_CHARS}*)$`, 'u').exec(text.slice(0, caret));
   return m ? { from: caret - m[2].length - 1, query: m[2] } : null;
 }
 
@@ -32,7 +36,7 @@ export function matchMentions(list: Mentionable[], query: string): Mentionable[]
 
 /** each tag `describe` knows gets its meaning in brackets after it; an e-mail address or an unknown tag is left as it is */
 export function expandMentions(text: string, describe: (token: string) => string | null): string {
-  return text.replace(/(^|\s)@([\w.-]*\w)/g, (all, space: string, token: string) => {
+  return text.replace(new RegExp(String.raw`(^|\s)@(${TAG})`, 'gu'), (all, space: string, token: string) => {
     const d = describe(token);
     return d ? `${space}@${token} (${d})` : all;
   });

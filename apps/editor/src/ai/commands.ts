@@ -5,6 +5,7 @@
 
 import type { JsonSchema, Registry, TrammeDoc } from '@tramme/core';
 import { libraryList } from '../library.ts';
+import { TAG } from '../mentions.ts';
 
 export interface Command {
   kind: 'tool' | 'prompt';
@@ -80,9 +81,10 @@ export interface Piece { text: string; kind?: 'command' | 'tag' }
 export function piecesOf(text: string, isCommand: (name: string) => boolean, isTag: (token: string) => boolean): Piece[] {
   const out: Piece[] = [];
   let at = 0;
-  for (const m of text.matchAll(/(^|\s)([/@])([\w.-]*\w)/g)) {
+  // a tag takes letters of any language; a command's name stays plain letters, digits, _ . and -
+  for (const m of text.matchAll(new RegExp(String.raw`(^|\s)([/@])(${TAG})`, 'gu'))) {
     const [, space, sign, word] = m, start = m.index! + space.length;
-    if (!(sign === '/' ? /^[A-Za-z]/.test(word) && isCommand(word) : isTag(word))) continue;
+    if (!(sign === '/' ? /^[A-Za-z][\w.-]*$/.test(word) && isCommand(word) : isTag(word))) continue;
     if (start > at) out.push({ text: text.slice(at, start) });
     out.push({ text: sign + word, kind: sign === '/' ? 'command' : 'tag' });
     at = start + 1 + word.length;

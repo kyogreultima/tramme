@@ -129,5 +129,10 @@ describe('several commands in one message', () => {
       { text: ', @nobody and /nope' },
     ]);
     expect(piecesOf('plain words', isCommand, isTag)).toEqual([{ text: 'plain words' }]);
+    // a file named in another language: its whole name is the tag, accents included
+    const long = '@Le_secret_derrière_ces_apps_étrangement_addictives_mp4.mp4';
+    expect(piecesOf(`/night et aussi ${long} ici`, isCommand, (tk) => tk === long.slice(1))).toEqual([
+      { text: '/night', kind: 'command' }, { text: ' et aussi ' }, { text: long, kind: 'tag' }, { text: ' ici' },
+    ]);
   });
 });
