@@ -11,8 +11,8 @@ What a creator who talks to the camera every week needs, taken from what works e
 
 ## B. The script as a prompter
 
-- [ ] Record in the app (camera and microphone, or the voice alone) with the script scrolling, in the browser, the desktop app and on the phone.
-- [ ] The recording joins the project and goes to A.
+- [x] Record in the app (camera and microphone) with the script scrolling at the pace chosen (the prompter: in the studio's bar and the atelier's timeline, apps/editor/src/ui/Prompter.tsx).
+- [x] The recording joins the project, and the assistant's box is ready to keep its takes (A).
 
 ## C. A storyboard by block
 

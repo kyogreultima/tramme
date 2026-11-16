@@ -3421,6 +3421,19 @@
   "takes": {
     "done": "{kept} phrases du script sur {total} gardées, leur dernière bonne prise"
   },
+  "prompter": {
+    "open": "Prompteur : dire le script à la caméra",
+    "title": "Prompteur",
+    "placeholder": "Écrivez ou collez le script : chaque phrase dite à la caméra, autant de fois qu'il faut. L'assistant garde la dernière bonne prise de chacune.",
+    "speed": "Vitesse de défilement",
+    "record": "Enregistrer",
+    "stop": "Arrêter",
+    "saving": "Ajout de l'enregistrement au projet…",
+    "noScript": "Écrivez d'abord le script.",
+    "noCamera": "La caméra ou le micro n'est pas disponible : autorisez-les dans le navigateur.",
+    "keepScript": "Script",
+    "askTakes": "Transcris mon dernier enregistrement et garde les prises du script."
+  },
   "device": {
     "ready": "Votre fichier est prêt",
     "saveToGallery": "Enregistrer dans la galerie",

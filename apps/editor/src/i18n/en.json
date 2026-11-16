@@ -2020,6 +2020,19 @@
   "takes": {
     "done": "{kept} of {total} sentences of the script kept, their last good take"
   },
+  "prompter": {
+    "open": "Prompter: say the script to the camera",
+    "title": "Prompter",
+    "placeholder": "Write or paste the script: each sentence said to the camera, as many times as needed. The assistant keeps the last good take of each.",
+    "speed": "Scrolling speed",
+    "record": "Record",
+    "stop": "Stop",
+    "saving": "Adding the recording to the project…",
+    "noScript": "Write the script first.",
+    "noCamera": "The camera or the microphone is not available: allow them in the browser.",
+    "keepScript": "Script",
+    "askTakes": "Transcribe my last recording and keep the takes of the script."
+  },
   "device": {
     "ready": "Your file is ready",
     "saveToGallery": "Save to the gallery",

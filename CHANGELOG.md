@@ -10,6 +10,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Added
 
+- **The prompter**: in the studio's bar and the atelier's timeline, the script written or pasted (kept with the project), then said to the camera while it scrolls at the pace chosen, after a count-in; the recording joins the project and the assistant's box is ready to keep its takes.
 - **The takes chosen against the script**: the `takes` tool (and the assistant, asked to) reads a talking video against its script, sentence by sentence: the last good take of each one is kept in the order of the script, the false starts, repeats and words off the script are cut, and the sentences never said are named. The script is kept with the project.
 - **Export for Premiere Pro**: "For Premiere Pro" in the export panel (on the server, and in the cloud with an account), or `tramme premiere <project>`: a zip with the timeline (Final Cut 7 XML, File > Import in Premiere), the footage and sounds with their cuts, offsets and levels (voices, music and effects on their own tracks), what is drawn under and over the footage as clips with alpha per scene (ProRes 4444), the captions as subtitles (SRT). After Effects imports the same clips.
 - **Export on the server, in local**: `pnpm renderer` starts the renderer on this machine, and the export panel of `pnpm dev` offers "Export on the server", rendered as the desktop app renders it.

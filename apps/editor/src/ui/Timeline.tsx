@@ -16,6 +16,7 @@ import { assetData, fileLength, preview } from '../preview.ts';
 import { Tabs } from './timeline/Tabs.tsx';
 import { Mixer } from './Mixer.tsx';
 import { recording, toggleVoiceover } from '../voiceover-run.ts';
+import { PrompterButton } from './Prompter.tsx';
 import { clearRangeOps, setRangeOps } from '../exportspan.ts';
 import { syncClips } from '../sync.ts';
 import { makeMulticam } from './Multicam.tsx';
@@ -72,6 +73,7 @@ export function Transport() {
         <button class={`icon-btn${S.loop.value ? ' on' : ''}`} title={t('timeline.loop')} onClick={() => { S.loop.value = !S.loop.value; }}><Icon name="loop" /></button>
         <button class={`icon-btn rec${recording.value ? ' on' : ''}`} data-tour="record" title={t('timeline.recordHint')} aria-label={t('timeline.recordVoiceover')} onClick={() => { void toggleVoiceover(); }}><Icon name="mic" /></button>
         <button class={`icon-btn${voiceover ? ' on' : ''}`} title={t('voiceover.open')} aria-label={t('voiceover.open')} onClick={(e) => setVoiceover(voiceover ? null : (e.currentTarget as HTMLElement))}><Icon name="chat" /></button>
+        <PrompterButton />
         {voiceover && <Popover anchor={voiceover} onClose={() => setVoiceover(null)} class="voiceover-pop"><VoiceoverPanel onDone={() => setVoiceover(null)} /></Popover>}
         {recording.value && <span class="rec-state mono">{recording.value.stage === 'count' ? t('timeline.countIn', { n: recording.value.n }) : recording.value.stage === 'record' ? t('timeline.recordingNow') : t('timeline.savingTake')}</span>}
       </div>

@@ -700,3 +700,16 @@ svg.i.flip { transform: rotate(180deg); }
 .library-tile svg.i { width: 22px; height: 22px; color: var(--accent-text); }
 .library-tile:hover, .library-tile:active { background: var(--hover); }
 .library-detail { color: var(--text-3); font-size: var(--fs-xs); }
+
+/* the prompter: the script written, then said to the camera while it scrolls */
+.prompter { display: flex; flex-direction: column; gap: 12px; padding: 0 16px 16px; }
+.prompter-script { min-height: 320px; padding: 14px; border: 0; border-radius: var(--r-md); background: var(--field); color: var(--text); font: 400 var(--fs-md)/1.6 var(--ui); resize: vertical; outline: none; }
+.prompter-stage { position: relative; height: min(60vh, 520px); border-radius: var(--r-md); overflow: hidden; background: var(--bg); }
+.prompter-camera { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); opacity: 0.35; }
+.prompter-roll { position: absolute; inset: 0; overflow: hidden; padding: 30% 10% 0; color: var(--text); font: 600 32px/1.45 var(--ui); text-align: center; }
+.prompter-roll p { margin: 0 0 0.6em; }
+.prompter-tail { height: 100%; }
+.prompter-count { position: absolute; inset: 0; display: grid; place-items: center; font-size: 96px; color: var(--text); }
+.prompter-bar { display: flex; align-items: center; gap: 10px; }
+.prompter-bar .grow { flex: 1; }
+.prompter-speed { display: flex; align-items: center; gap: 8px; }
