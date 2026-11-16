@@ -2,7 +2,9 @@
 // then said to the camera while it scrolls at the pace chosen. The recording
 // (camera and microphone) joins the project's files, and the assistant's box
 // is given the words that ask it to keep the takes of the script (takes.ts).
-// Escape or closing during a take drops it: nothing is written.
+// Escape or closing during a take drops it: nothing is written. Its other
+// tab writes the blocks: for each sentence of the script, what to show over it
+// (meta.blocks; empty: the camera), which the assistant builds (/blocks).
 
 import { pointer } from '@tramme/core';
 import { useEffect, useRef, useState } from 'preact/hooks';
@@ -13,6 +15,7 @@ import { commit, S, toast } from '../state.ts';
 import { Modal } from './controls.tsx';
 import { Icon } from './icons.tsx';
 import { importFiles } from './LeftPanel.tsx';
+import { sentencesOf } from '../takes.ts';
 
 type Stage = 'write' | 'count' | 'record' | 'save';
 
@@ -25,6 +28,13 @@ function keepScript(script: string) {
   const doc = S.doc.peek(), had = doc.meta.script;
   if ((had ?? '') === script) return;
   commit(t('prompter.keepScript'), [{ op: had === undefined ? 'add' : 'replace', path: pointer('meta', 'script'), value: script }]);
+}
+
+/** the blocks kept with the project when they changed: one line per sentence, what to show over it */
+function keepBlocks(blocks: string[]) {
+  const doc = S.doc.peek(), had = doc.meta.blocks;
+  if (JSON.stringify(had ?? []) === JSON.stringify(blocks)) return;
+  commit(t('prompter.keepBlocks'), [{ op: had === undefined ? 'add' : 'replace', path: pointer('meta', 'blocks'), value: blocks }]);
 }
 
 /** the button that opens the prompter: in the studio's bar and in the atelier's timeline */
@@ -41,6 +51,9 @@ export function PrompterButton({ size = '' }: { size?: '' | 'sm' }) {
 export function Prompter({ onClose }: { onClose: () => void }) {
   const [script, setScript] = useState(String(S.doc.peek().meta.script ?? ''));
   const [stage, setStage] = useState<Stage>('write');
+  const [tab, setTab] = useState<'script' | 'blocks'>('script');
+  const [blocks, setBlocks] = useState<string[]>(Array.isArray(S.doc.peek().meta.blocks) ? (S.doc.peek().meta.blocks as unknown[]).map(String) : []);
+  const sentences = sentencesOf(script);
   const [count, setCount] = useState(3);
   const [speed, setSpeed] = useState(40);
   const camera = useRef<HTMLVideoElement>(null), roll = useRef<HTMLDivElement>(null);
@@ -57,7 +70,10 @@ export function Prompter({ onClose }: { onClose: () => void }) {
   };
   useEffect(() => () => { if (live.current) { live.current.dropped = true; live.current.rec?.state === 'recording' && live.current.rec.stop(); } release(); }, []);
 
-  const close = () => { if (live.current) live.current.dropped = true; live.current?.rec?.state === 'recording' && live.current.rec.stop(); release(); keepScript(script); onClose(); };
+  const kept = () => { keepScript(script); keepBlocks(sentences.map((_, i) => (blocks[i] ?? '').trim())); };
+  const close = () => { if (live.current) live.current.dropped = true; live.current?.rec?.state === 'recording' && live.current.rec.stop(); release(); kept(); onClose(); };
+  // the blocks to the assistant: its box given the workflow that builds them
+  const build = () => { kept(); draft.value = '/blocks '; onClose(); };
 
   const start = async () => {
     if (!script.trim()) { toast(t('prompter.noScript'), 'error'); return; }
@@ -108,7 +124,22 @@ export function Prompter({ onClose }: { onClose: () => void }) {
   return (
     <Modal title={t('prompter.title')} onClose={close} wide>
       <div class={`prompter ${stage}`}>
-        {stage === 'write' ? (
+        {stage === 'write' && (
+          <div class="prompter-tabs">
+            <button class={`btn sm${tab === 'script' ? ' on' : ' ghost'}`} onClick={() => setTab('script')}>{t('prompter.tabScript')}</button>
+            <button class={`btn sm${tab === 'blocks' ? ' on' : ' ghost'}`} disabled={!sentences.length} onClick={() => setTab('blocks')}>{t('prompter.tabBlocks', { n: sentences.length })}</button>
+          </div>
+        )}
+        {stage === 'write' && tab === 'blocks' ? (
+          <div class="prompter-blocks">
+            {sentences.map((s, i) => (
+              <label key={i} class="prompter-block">
+                <span class="prompter-sentence"><span class="mono faint">{i + 1}</span>{s}</span>
+                <input value={blocks[i] ?? ''} placeholder={t('prompter.blockCamera')} onInput={(e) => { const next = [...blocks]; next[i] = (e.target as HTMLInputElement).value; setBlocks(next); }} />
+              </label>
+            ))}
+          </div>
+        ) : stage === 'write' ? (
           <textarea class="prompter-script" value={script} placeholder={t('prompter.placeholder')} onInput={(e) => setScript((e.target as HTMLTextAreaElement).value)} />
         ) : (
           <div class="prompter-stage">
@@ -120,7 +151,8 @@ export function Prompter({ onClose }: { onClose: () => void }) {
         <div class="prompter-bar">
           <label class="prompter-speed"><span class="faint">{t('prompter.speed')}</span><input type="range" min={10} max={120} value={speed} onInput={(e) => setSpeed(Number((e.target as HTMLInputElement).value))} /></label>
           <span class="grow" />
-          {stage === 'write' && <button class="btn primary" onClick={() => { void start(); }}><Icon name="mic" />{t('prompter.record')}</button>}
+          {stage === 'write' && tab === 'blocks' && <button class="btn primary" onClick={build}><Icon name="wand" />{t('prompter.build')}</button>}
+          {stage === 'write' && tab === 'script' && <button class="btn primary" onClick={() => { void start(); }}><Icon name="mic" />{t('prompter.record')}</button>}
           {stage === 'record' && <button class="btn primary" onClick={stop}><Icon name="stop" />{t('prompter.stop')}</button>}
           {stage === 'save' && <span class="faint"><Icon name="spinner" /> {t('prompter.saving')}</span>}
         </div>

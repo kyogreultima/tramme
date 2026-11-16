@@ -2031,7 +2031,12 @@
     "noScript": "Write the script first.",
     "noCamera": "The camera or the microphone is not available: allow them in the browser.",
     "keepScript": "Script",
-    "askTakes": "Transcribe my last recording and keep the takes of the script."
+    "askTakes": "Transcribe my last recording and keep the takes of the script.",
+    "tabScript": "Script",
+    "tabBlocks": "Blocks ({n})",
+    "blockCamera": "The camera (or say what to show over this sentence)",
+    "build": "Build the blocks",
+    "keepBlocks": "Blocks"
   },
   "style": {
     "keep": "Keep as my style",

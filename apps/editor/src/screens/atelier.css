@@ -713,3 +713,8 @@ svg.i.flip { transform: rotate(180deg); }
 .prompter-bar { display: flex; align-items: center; gap: 10px; }
 .prompter-bar .grow { flex: 1; }
 .prompter-speed { display: flex; align-items: center; gap: 8px; }
+.prompter-tabs { display: flex; gap: 4px; }
+.prompter-blocks { display: flex; flex-direction: column; gap: 10px; max-height: min(60vh, 520px); overflow-y: auto; }
+.prompter-block { display: flex; flex-direction: column; gap: 6px; }
+.prompter-sentence { display: flex; gap: 10px; color: var(--text); font-size: var(--fs-md); }
+.prompter-block input { padding: 8px 10px; border: 0; border-radius: var(--r-sm); background: var(--field); color: var(--text); font: inherit; outline: none; }

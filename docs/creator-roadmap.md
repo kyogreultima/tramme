@@ -16,15 +16,15 @@ What a creator who talks to the camera every week needs, taken from what works e
 
 ## C. A storyboard by block
 
-- [ ] A view of the film by sentence of the script: for each block, keep the camera or say in one sentence what to show.
-- [ ] Ideas offered for a block left empty.
-- [ ] The blocks built apart (the scenes already are), shown building side by side.
+- [x] A view of the film by sentence of the script: for each block, keep the camera or say in one sentence what to show (the prompter's Blocks tab, meta.blocks; built by the `/blocks` workflow).
+- [x] Ideas offered for a block left empty (the `/blocks` workflow proposes one per empty block before building).
+- [ ] The blocks built apart (the scenes already are), shown building side by side. Left: the thread shows them one under the other.
 
 ## D. Smaller things
 
 - [x] Several `/commands` in one message, and the commands and `@tags` marked in the boxes.
 - [x] A style kept with the account (the direction's palette, typefaces, tone and rules: "Keep as my style", the library's styles), offered to each new project on the home screen (apps/editor/src/style.ts).
-- [ ] "From a voice": a recording dropped alone, and the cleaning, the storyboard, the edit and the sound follow one another.
+- [x] "From a voice": a recording dropped alone, and the cleaning, the storyboard, the edit and the sound follow one another (the `/from-voice` workflow).
 
 ## E. Export for editors
 

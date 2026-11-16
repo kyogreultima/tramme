@@ -10,6 +10,8 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Added
 
+- **Blocks of the script**: the prompter's Blocks tab gives each sentence of the script what to show over it (empty: the camera); `/blocks` builds them where each sentence is said, and proposes an idea for the empty ones first.
+- **A film from a voice**: `/from-voice` makes a film from a voice recording alone: transcribed, cleaned, cut, planned on its words, built, given its music and effects.
 - **My style**: "Keep as my style" in the direction keeps the project's palette, typefaces, tone and rules (in the account when signed in, on the device otherwise); the home screen then offers it, and the assistant follows it from the first turn.
 - **The prompter**: in the studio's bar and the atelier's timeline, the script written or pasted (kept with the project), then said to the camera while it scrolls at the pace chosen, after a count-in; the recording joins the project and the assistant's box is ready to keep its takes.
 - **The takes chosen against the script**: the `takes` tool (and the assistant, asked to) reads a talking video against its script, sentence by sentence: the last good take of each one is kept in the order of the script, the false starts, repeats and words off the script are cut, and the sentences never said are named. The script is kept with the project.

@@ -121,6 +121,14 @@ export const EDITOR_PROMPTS: PromptType[] = [
     name: 'still', title: 'Save a still', description: 'a picture of the composition at a moment, saved as an image asset (cover, thumbnail)',
     prompt: 'Save a still of this composition (use_tool "still") at the moment I name — or, if I have not said one, look at a few candidates first and save the one that reads best: one clear subject, room for a title. Tell me where it was saved and what it shows. Place it as a layer only if I asked for a cover on the timeline.',
   },
+  {
+    name: 'blocks', title: 'Build the blocks of the script', description: 'the film built sentence by sentence: for each block of the script, the camera or what it says to show',
+    prompt: 'Build this film block by block from its script (meta.script of the project) and the blocks written for it (meta.blocks: what to show for each sentence, in order; an empty one keeps the camera). Find where each sentence is said in the edit (the transcript of the talking video, after its takes were kept), and for each block with words build what they ask over that span, as a scene of its own, the blocks built apart; keep the camera on the empty ones. Before building, propose in one line an idea for each empty block where a picture would help the sentence, and build the ideas I keep. Then check with frames and sum up block by block.',
+  },
+  {
+    name: 'from-voice', title: 'A film from a voice', description: 'a voice recording alone becomes a film: cleaned, cut, storyboarded, built and given its sound',
+    prompt: 'Make a film from the voice recording of this project, the rest following from it: transcribe it, clean it (denoise) and cut its silences and hesitations (silences, fillers), then plan the film on its words (film-plan): the scenes on what is said, each with what to show. Tell me the plan in a few lines and build it, the scenes built apart, with captions written with the voice; then give it its sound (music under the voice, ducked; effects on the moments that matter) and check with frames. Ask about the format and the tone first if I have not said them.',
+  },
 ];
 
 /** the base vocabulary of the editor, before a document's plugins */
