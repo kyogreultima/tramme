@@ -28,5 +28,5 @@ What a creator who talks to the camera every week needs, taken from what works e
 
 ## E. Export for editors
 
-- [ ] A Final Cut 7 XML for Premiere Pro: the cuts, the footage with its in and out points, the sound on its tracks; each block's animation as a ProRes 4444 clip with alpha above the footage; the subtitles as SRT. From the desktop app, the command line and the export in the cloud.
+- [x] A Final Cut 7 XML for Premiere Pro (`tramme premiere`, "For Premiere Pro" in the export panel): the cuts, the footage with its in and out points, the sound on its tracks; each block's animation as a ProRes 4444 clip with alpha above the footage; the subtitles as SRT. From the desktop app, the command line and the export in the cloud.
 - After Effects takes the same clips. Rebuilding the animations layer by layer in After Effects (a script) is left out: too much for what it gives.

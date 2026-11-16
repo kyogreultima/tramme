@@ -44,7 +44,8 @@ export interface Bucket {
   /** with onlyIf: the object without its body when the condition fails */
   get(key: string, options: { range?: Headers; onlyIf: Headers }): Promise<StoredBody | StoredObject | null>;
   get(key: string, options?: { range?: Headers }): Promise<StoredBody | null>;
-  put(key: string, value: ArrayBuffer | Uint8Array | string, options?: PutOptions): Promise<StoredObject | null>;
+  /** a stream only where the store takes one of a known length (R2: a FixedLengthStream), for what is too large to hold */
+  put(key: string, value: ArrayBuffer | Uint8Array | string | ReadableStream, options?: PutOptions): Promise<StoredObject | null>;
   delete(keys: string | string[]): Promise<void>;
   list(options: { prefix?: string; delimiter?: string; cursor?: string; include?: ('httpMetadata' | 'customMetadata')[] }): Promise<Listing>;
   createMultipartUpload(key: string, options?: { httpMetadata?: { contentType?: string } }): Promise<{ uploadId: string }>;

@@ -10,6 +10,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Added
 
+- **Export for Premiere Pro**: "For Premiere Pro" in the export panel (on the server, and in the cloud with an account), or `tramme premiere <project>`: a zip with the timeline (Final Cut 7 XML, File > Import in Premiere), the footage and sounds with their cuts, offsets and levels (voices, music and effects on their own tracks), what is drawn under and over the footage as clips with alpha per scene (ProRes 4444), the captions as subtitles (SRT). After Effects imports the same clips.
 - **Export on the server, in local**: `pnpm renderer` starts the renderer on this machine, and the export panel of `pnpm dev` offers "Export on the server", rendered as the desktop app renders it.
 - **Told when an export on the server is over**: a notification of the system (browser, desktop, phone) when the app is in the background, a message in it otherwise, followed from any page and after a reload; with an account, a mail too, with the way back to the project.
 - **Several commands in one message**: a `/command` can be written anywhere in a message (at its start or after a space), as many as needed; the assistant gets each of them, in the order written. One tool alone at the start keeps its form and runs at once, as before.

@@ -247,6 +247,9 @@
     "hintServer": "Rendered by the renderer started on this machine (pnpm renderer), as the desktop app renders it: the film lands in the project's renders.",
     "doneTitle": "Export finished",
     "doneBody": "The film of “{name}” is ready in its renders.",
+    "premiere": "For Premiere Pro",
+    "premiereHint": "A Premiere Pro timeline, rendered on the server: the footage and sounds keep their cuts, what is drawn comes as clips with alpha per scene, the captions as subtitles. After Effects takes the same clips.",
+    "downloadPremiere": "Download for Premiere Pro (zip)",
     "download": "Download the film",
     "failed": "The export in the cloud did not finish: {error}",
     "limit": "Exporting above 1080p in the cloud is not part of your plan."

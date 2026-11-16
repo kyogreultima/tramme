@@ -127,3 +127,17 @@ describe('export on a server of one', () => {
     expect(told).toEqual([{ url: 'http://backend.test/internal/notify/render', body: { userId: 'u', project: 'p', job: 'j', status: 'done' } }]);
   });
 });
+
+describe('the export for Premiere Pro on the server', () => {
+  it('asks the renderer for it and keeps the zip with the project', async () => {
+    const { env, files } = setup();
+    const cookie = await as();
+    const id = await project(env, cookie);
+    const job = await (await call(env, `/api/projects/${id}/renders`, cookie, { method: 'POST', body: JSON.stringify({ format: 'premiere' }) })).json() as Job;
+    expect(job.format).toBe('premiere');
+    let asked = '';
+    const done = await runJob(files, WS, job.id, async (_a, j) => { asked = j.format ?? 'mp4'; return new Response(new Uint8Array([0x50, 0x4b])); });
+    expect(asked).toBe('premiere');
+    expect(done).toMatchObject({ status: 'done', file: `renders/premiere-${job.id}.zip` });
+  });
+});

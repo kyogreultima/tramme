@@ -55,7 +55,9 @@ export function recordBucket(store: RecordStore): Bucket {
       return withBody(r, rangeOf(options?.range, r.data.size));
     }) as Bucket['get'],
     async put(key, value, options) {
-      const r = record(key, new Blob([typeof value === 'string' || value instanceof ArrayBuffer ? value : value.slice()]), options?.httpMetadata?.contentType, options?.customMetadata);
+      // a stream (an export too large to hold elsewhere) is read whole here: this store keeps blobs
+      const blob = value instanceof ReadableStream ? await new Response(value).blob() : new Blob([typeof value === 'string' || value instanceof ArrayBuffer ? value : value.slice()]);
+      const r = record(key, blob, options?.httpMetadata?.contentType, options?.customMetadata);
       const onlyIf = options?.onlyIf;
       const ok = await store.put(r, onlyIf ? (current) => conditionsHold(onlyIf, current ? `"${current.etag}"` : null) : undefined);
       return ok ? meta(r) : null;

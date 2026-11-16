@@ -21,10 +21,14 @@ import type { Env } from './http.ts';
 import { limitsOn } from './limits.ts';
 
 export type Quality = '1080p' | '4k';
+/** what a job makes: the film, or the Premiere Pro timeline with its clips (a zip) */
+export type Format = 'mp4' | 'premiere';
 export interface Job {
   id: string;
   project: string;
   quality: Quality;
+  /** none: the film */
+  format?: Format;
   comp?: string;
   status: 'queued' | 'rendering' | 'done' | 'failed';
   createdAt: string;
@@ -58,7 +62,7 @@ export async function renderRoute(req: Request, env: Env, edge: Pick<Edge, 'work
     // the project must be there (its manifest), read through the storage routes
     const info = await storageRoute(new Request(new URL(`/api/projects/${project}`, url)), files, new URL(`/api/projects/${project}`, url)).catch(() => null);
     if (!info?.ok) throw new HttpError(404, 'project not found');
-    const body = await readJson<{ comp?: unknown }>(req);
+    const body = await readJson<{ comp?: unknown; format?: unknown }>(req);
     // the film is rendered at the project's size: above 1080p, it is a 4K export
     const { manifest } = (await info.json()) as { manifest: { width?: number; height?: number } };
     const quality: Quality = (manifest.width ?? 0) * (manifest.height ?? 0) > 1920 * 1080 ? '4k' : '1080p';
@@ -66,7 +70,7 @@ export async function renderRoute(req: Request, env: Env, edge: Pick<Edge, 'work
     if (quality === '4k' && limitsOn(env) && !terms.export4k) return json({ error: 'plan_limit', limit: 'export4k', max: false }, 403);
     const now = new Date().toISOString();
     const job: Job = {
-      id: newJob(), project, quality, ...(typeof body.comp === 'string' && /^[\w-]{1,64}$/.test(body.comp) ? { comp: body.comp } : {}),
+      id: newJob(), project, quality, ...(body.format === 'premiere' ? { format: 'premiere' as const } : {}), ...(typeof body.comp === 'string' && /^[\w-]{1,64}$/.test(body.comp) ? { comp: body.comp } : {}),
       status: 'queued', createdAt: now, updatedAt: now, priority: terms.priorityQueue, ...(edge.userId ? { userId: edge.userId } : {}),
     };
     await writeJob(files, job);
@@ -87,8 +91,18 @@ export async function renderRoute(req: Request, env: Env, edge: Pick<Edge, 'work
   throw new HttpError(404, 'unknown route');
 }
 
-/** what renders a project: its archive in, its film out (the renderer container, or a stand-in in the tests) */
-export type Renderer = (archive: ArrayBuffer, job: Job) => Promise<ArrayBuffer>;
+/** what renders a project: its archive in, its film out (the renderer container, or a stand-in in the tests); a response is kept as it arrives */
+export type Renderer = (archive: ArrayBuffer, job: Job) => Promise<ArrayBuffer | Response>;
+
+/** a response kept without holding it whole (a Premiere export weighs gigabytes): streamed at its announced length */
+function streamed(res: Response): ArrayBuffer | ReadableStream | Promise<ArrayBuffer> {
+  const length = Number(res.headers.get('content-length'));
+  const Fixed = (globalThis as { FixedLengthStream?: new (n: number) => TransformStream }).FixedLengthStream;
+  if (!res.body || !Fixed || !(length > 0)) return res.arrayBuffer();
+  const { readable, writable } = new Fixed(length);
+  void res.body.pipeTo(writable);
+  return readable;
+}
 
 /** a server of one keeps its projects at the bucket's root: its jobs have no workspace */
 export const SERVER = '';
@@ -107,9 +121,10 @@ export async function runJob(bucket: Bucket, workspaceId: string, jobId: string,
     const at = new URL(`https://render/api/projects/${job.project}/export`);
     const archive = await storageRoute(new Request(at), files, at);
     if (!archive?.ok) throw new Error('the project cannot be read');
-    const film = await render(await archive.arrayBuffer(), job);
-    const file = `renders/cloud-${job.id}.mp4`;
-    await files.put(`projects/${job.project}/${file}`, film, { httpMetadata: { contentType: 'video/mp4' } });
+    const made = await render(await archive.arrayBuffer(), job);
+    const premiere = job.format === 'premiere';
+    const file = premiere ? `renders/premiere-${job.id}.zip` : `renders/cloud-${job.id}.mp4`;
+    await files.put(`projects/${job.project}/${file}`, made instanceof Response ? await streamed(made) : made, { httpMetadata: { contentType: premiere ? 'application/zip' : 'video/mp4' } });
     await step({ status: 'done', file });
   } catch (e) {
     await step({ status: 'failed', error: (e as Error).message.slice(0, 500) });
@@ -152,7 +167,7 @@ export const renders = (env: Env) => !!env.RENDER_QUEUE && (!!env.RENDERER || !!
 /** what renders here: the container behind the Worker (container.ts, RendererContainer), else the renderer at RENDERER_URL (`pnpm renderer`) */
 export function rendererOf(env: Env): Renderer {
   return async (archive, job) => {
-    const q = new URLSearchParams({ quality: job.quality, ...(job.comp ? { comp: job.comp } : {}) });
+    const q = new URLSearchParams({ quality: job.quality, ...(job.format ? { format: job.format } : {}), ...(job.comp ? { comp: job.comp } : {}) });
     const req = (base: string) => new Request(`${base}/render?${q}`, { method: 'POST', body: archive });
     let res: Response;
     if (env.RENDERER) res = await env.RENDERER.get(env.RENDERER.idFromName('renderer')).fetch(req('http://renderer'));
@@ -160,7 +175,7 @@ export function rendererOf(env: Env): Renderer {
       try { res = await fetch(req(env.RENDERER_URL.replace(/\/+$/, ''))); } catch { throw new Error('the renderer is not running on this machine: start it with pnpm renderer'); }
     } else throw new Error('no renderer in this deployment');
     if (!res.ok) throw new Error(`the renderer said ${res.status}: ${(await res.text()).slice(0, 300)}`);
-    return res.arrayBuffer();
+    return res;
   };
 }
 

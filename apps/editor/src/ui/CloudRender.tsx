@@ -18,7 +18,7 @@ import { allowNotifications, notify } from '../notify.ts';
 import { S, toast } from '../state.ts';
 import { Icon } from './icons.tsx';
 
-interface Job { id: string; project: string; status: 'queued' | 'rendering' | 'done' | 'failed'; file?: string; error?: string }
+interface Job { id: string; project: string; status: 'queued' | 'rendering' | 'done' | 'failed'; file?: string; error?: string; format?: 'mp4' | 'premiere' }
 /** a job followed from this browser, with the name of its project for the notification */
 interface Followed { job: Job; name: string }
 
@@ -69,13 +69,14 @@ function follow() {
   }, EVERY);
 }
 
-async function start() {
+/** a job asked for: the film, or the Premiere Pro timeline with its clips (a zip: the XML, the media, the drawings as ProRes with alpha, the subtitles) */
+async function start(format: 'mp4' | 'premiere' = 'mp4') {
   // asked from the click: the browser shows its question only then
   void allowNotifications();
   const project = S.project.peek();
   try {
     const job = await answered(await fetch(`/api/projects/${encodeURIComponent(project.id)}/renders`, {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ comp: S.compId.peek() }),
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ comp: S.compId.peek(), ...(format === 'premiere' ? { format } : {}) }),
     }));
     keep([...followed.peek().filter((f) => f.job.project !== project.id || under(f.job)), { job, name: project.name }]);
     follow();
@@ -94,12 +95,17 @@ export function resumeRenders() {
 /** the export's panel: the button, then where the job is, then the film */
 export function CloudRender({ disabled }: { disabled?: boolean }) {
   const project = S.project.value, mine = [...followed.value].reverse().find((f) => f.job.project === project.id)?.job;
-  const button = <button class="btn outline" disabled={disabled} title={cloud ? t('cloudRender.hint') : t('cloudRender.hintServer')} onClick={start}><Icon name="upload" />{cloud ? t('cloudRender.start') : t('cloudRender.startServer')}</button>;
+  const button = (
+    <div class="export-saves">
+      <button class="btn outline" disabled={disabled} title={cloud ? t('cloudRender.hint') : t('cloudRender.hintServer')} onClick={() => start()}><Icon name="upload" />{cloud ? t('cloudRender.start') : t('cloudRender.startServer')}</button>
+      <button class="btn outline" disabled={disabled} title={t('cloudRender.premiereHint')} onClick={() => start('premiere')}><Icon name="film" />{t('cloudRender.premiere')}</button>
+    </div>
+  );
   if (!mine) return button;
   if (mine.status === 'done' && mine.file) {
     return (
       <div class="export-saves">
-        <a class="btn sm" href={api.fileUrl(project.id, mine.file)} download><Icon name="download" />{t('cloudRender.download')}</a>
+        <a class="btn sm" href={api.fileUrl(project.id, mine.file)} download><Icon name="download" />{mine.format === 'premiere' ? t('cloudRender.downloadPremiere') : t('cloudRender.download')}</a>
         <span class="faint" style={{ fontSize: 11 }}>{t('topbar.keptInPath', { path: mine.file })}</span>
         {button}
       </div>

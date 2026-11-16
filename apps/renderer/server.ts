@@ -4,7 +4,7 @@
 // a project's .tramme archive; it answers the film (MP4). One render at a time:
 // the queue never sends two.
 //
-//   POST /render?comp=<id>     body: the .tramme archive    -> the MP4
+//   POST /render?comp=<id>&format=mp4|premiere   body: the .tramme archive    -> the MP4, or the Premiere Pro timeline (a zip)
 //   GET  /health
 //
 //   node apps/renderer/server.ts            (PORT, 8080 by default; CHROME_PATH for Chrome)
@@ -33,14 +33,19 @@ function cli(args: string[]): Promise<void> {
   });
 }
 
-/** a project's archive rendered: unpacked (and checked) by the CLI, then rendered as the desktop export does */
-export async function render(archive: Buffer, comp?: string): Promise<Buffer> {
+/** what a render hands back: the film, or the Premiere Pro timeline with its clips (a zip) */
+export type Format = 'mp4' | 'premiere';
+
+/** a project's archive rendered: unpacked (and checked) by the CLI, then rendered as the desktop export does, or as a Premiere Pro timeline */
+export async function render(archive: Buffer, comp?: string, format: Format = 'mp4'): Promise<Buffer> {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tramme-render-'));
   try {
-    const file = path.join(dir, 'project.tramme'), folder = path.join(dir, 'project'), out = path.join(dir, 'film.mp4');
+    const file = path.join(dir, 'project.tramme'), folder = path.join(dir, 'project'), out = path.join(dir, format === 'premiere' ? 'premiere.zip' : 'film.mp4');
     fs.writeFileSync(file, archive);
     await cli(['unpack', file, '--out', folder]);
-    await cli(['render', folder, '--format', 'mp4', '--out', out, ...(comp ? ['--comp', comp] : [])]);
+    const on = comp ? ['--comp', comp] : [];
+    if (format === 'premiere') await cli(['premiere', folder, '--out', path.join(dir, 'premiere'), '--zip', out, ...on]);
+    else await cli(['render', folder, '--format', 'mp4', '--out', out, ...on]);
     return fs.readFileSync(out);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
@@ -68,8 +73,9 @@ export const server = http.createServer(async (req, res) => {
   try {
     const comp = url.searchParams.get('comp') ?? undefined;
     if (comp && !/^[\w-]{1,64}$/.test(comp)) throw new Error('invalid composition');
-    const film = await render(await body(req), comp);
-    res.writeHead(200, { 'content-type': 'video/mp4', 'content-length': film.length }).end(film);
+    const format: Format = url.searchParams.get('format') === 'premiere' ? 'premiere' : 'mp4';
+    const film = await render(await body(req), comp, format);
+    res.writeHead(200, { 'content-type': format === 'premiere' ? 'application/zip' : 'video/mp4', 'content-length': film.length }).end(film);
   } catch (e) {
     res.writeHead(500, { 'content-type': 'text/plain; charset=utf-8' }).end((e as Error).message);
   } finally {

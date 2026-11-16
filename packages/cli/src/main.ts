@@ -5,6 +5,7 @@
 //   tramme cloud-export <doc|project.tramme> [--app url] [--token tr_…] [--out film.mp4] [--comp id]   rendered in the cloud of an account (cloud-export.ts)
 //   tramme render   <doc> [--format mp4|mov|webm|gif|png] [--out file] [--samples n] [--from s] [--to s] [--crf 16] [--mute] [--comp id] [--pages n] [--depth 8|10]
 //   tramme export   <doc> --format lottie|svg|wav [--t s] [--comp id] [--out file]
+//   tramme premiere <doc> [--out folder] [--comp id] [--zip file]       a Premiere Pro timeline: XML, the footage and sounds, the drawings as ProRes clips with alpha, SRT (premiere.ts)
 //   tramme import   <animation.json> [--out folder]                     Lottie to a Tramme project folder
 //   tramme pack     <folder> [--out project.tramme]                    a project folder as a .tramme archive (checked)
 //   tramme unpack   <project.tramme> [--out folder]                    a .tramme archive as a project folder (checked)
@@ -310,6 +311,17 @@ const COMMANDS: Record<string, () => Promise<void> | void> = {
   check: () => cmdCheck(pos[0]),
   still: () => cmdStill(pos[0]),
   render: () => cmdRender(pos[0]),
+  premiere: async () => {
+    const { premiereExport } = await import('./premiere.ts');
+    const doc = pos[0];
+    if (!doc || !fs.existsSync(doc)) throw new Error(`document not found: ${doc ?? '(none)'}`);
+    const out = path.resolve(str('out') ?? path.join('out', `${stem(doc)}_premiere`));
+    const r = await premiereExport(doc, { out, comp: str('comp'), verbose: !!flags.verbose });
+    for (const w of r.warnings) console.log(`  note: ${w}`);
+    console.log(`-> ${path.relative(process.cwd(), r.xml)} (File > Import in Premiere Pro)`);
+    const zip = str('zip');
+    if (zip) { const { zipFolder } = await import('./premiere.ts'); zipFolder(out, path.resolve(zip)); console.log(`-> ${zip}`); }
+  },
   compare: () => cmdCompare(pos[0], pos[1]),
   schema: cmdSchema,
   export: () => cmdExport(pos[0]),
