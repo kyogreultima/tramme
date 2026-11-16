@@ -11,7 +11,7 @@ import { account, call } from './accounts.ts';
 import { checked, prefs, setPrefs, type Preferences } from './settings.ts';
 
 /** what belongs to this device and stays on it: when it last looked for an update, its launcher, its dictation's source */
-const OWN: (keyof Preferences)[] = ['lastUpdateCheck', 'updateNotified', 'checkUpdates', 'quickLauncher', 'dictation'];
+const OWN: (keyof Preferences)[] = ['lastUpdateCheck', 'updateNotified', 'checkUpdates', 'quickLauncher', 'dictation', 'dictationPicked'];
 /** how long a change waits before it is sent: the sliders send one change, not fifty */
 const WAIT = 1500;
 

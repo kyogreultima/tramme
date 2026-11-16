@@ -34,7 +34,7 @@ export function bringInBackground(projects: Manifest[], onDone?: () => void) {
     const failed = projects.filter((p) => r.failed.some((f) => f.id === p.id));
     bringing.value = { at: null, failed };
     if (r.failed.length) notify(t('account.bring.title'), t('account.bring.failed', { names: r.failed.map((f) => f.name).join(', ') }), 'error');
-    else notify(t('account.bring.title'), t('account.bring.done', { count: r.brought.length }));
+    else notify(t('account.bring.title'), r.brought.length ? t('account.bring.done', { count: r.brought.length }) : t('account.bring.already'));
     refresh?.();
   });
 }

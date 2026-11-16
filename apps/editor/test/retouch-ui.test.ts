@@ -130,8 +130,9 @@ describe('the setting of the confirmation', () => {
     const { SettingsDialog } = await import('../src/ui/Settings.tsx');
     openSettings('behavior');
     await mount(h(SettingsDialog, {}));
-    expect(host.textContent).toContain('Selecting layers by drawing');
-    const row = () => [...host.querySelectorAll('.set-row')].find((r) => r.textContent?.includes('Selecting layers by drawing'))!;
+    const dialog = document.querySelector('.modal-back')!;
+    expect(dialog.textContent).toContain('Selecting layers by drawing');
+    const row = () => [...dialog.querySelectorAll('.set-row')].find((r) => r.textContent?.includes('Selecting layers by drawing'))!;
     await click([...row().querySelectorAll('button')].find((b) => b.textContent === 'Above three'));
     expect(prefs.peek().areaConfirm).toBe('many');
     await click([...row().querySelectorAll('button')].find((b) => b.textContent === 'Never'));

@@ -125,13 +125,14 @@ describe('the about pane of the settings', () => {
     document.body.appendChild(host);
     openSettings('about');
     await act(() => { render(h(SettingsDialog, {}), host); });
-    expect(host.textContent).toContain(APP_VERSION);
-    const check = [...host.querySelectorAll('button')].find((b) => b.textContent === 'Check now')!;
+    const dialog = document.querySelector('.modal-back')!;
+    expect(dialog.textContent).toContain(APP_VERSION);
+    const check = [...dialog.querySelectorAll('button')].find((b) => b.textContent === 'Check now')!;
     await act(async () => { check.click(); await new Promise((r) => setTimeout(r, 10)); });
     expect(update.value?.version).toBe('99.0.0');
-    expect(host.textContent).toContain('Version 99.0.0 is available');
+    expect(dialog.textContent).toContain('Version 99.0.0 is available');
     // the release has no installers here: the link goes to its page
-    expect(host.querySelector('a[href^="https://example.test/releases/v99.0.0"]')).toBeTruthy();
+    expect(dialog.querySelector('a[href^="https://example.test/releases/v99.0.0"]')).toBeTruthy();
     render(null, host);
   });
 });

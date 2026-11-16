@@ -28,6 +28,8 @@ rand = "0.10"
 dirs = "7"
 unicode-normalization = "0.1"
 ureq = { version = "2", default-features = false, features = ["tls", "gzip"] }
+# the live dictation's WebSocket to the app of this environment (listen.rs)
+tungstenite = { version = "0.26", default-features = false, features = ["handshake", "rustls-tls-webpki-roots"] }
 regex = "1"
 base64 = "0.23"
 url = "2"

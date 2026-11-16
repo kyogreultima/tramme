@@ -6,6 +6,10 @@
 // TRAMME_WHISPER_MODEL names another for this machine.
 
 //
+// Whisper runs in a thread of its own (the same module, started again as a worker): loading a model of a
+// gigabyte and hearing a chunk keep the processor for minutes on some machines, and the companion goes on
+// answering meanwhile (the assistant's turns, the editor asking whether it is there).
+//
 // The published companion leaves transformers.js out (onnxruntime weighs ~150 MB):
 // the first transcription installs it once, with npm, into ~/.tramme/whisper.
 
@@ -13,6 +17,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { isMainThread, parentPort, Worker, workerData } from 'node:worker_threads';
 import spawn from 'cross-spawn';
 import { asrWords, spokenLanguage, type WhisperParts } from '@tramme/core';
 
@@ -102,7 +107,45 @@ function pcm(wav: Buffer): { samples: Float32Array; rate: number } {
   throw new Error('WAV without data');
 }
 
-export async function transcribeLocal(audioBase64: string, language?: string, asked?: string) {
+/** what a chunk heard comes back as */
+export interface Heard { words: ReturnType<typeof asrWords>; text: string; language: string; duration: number; model: string }
+
+/** what marks the thread that hears (bin.ts starts this module there when it is the bundle) */
+export const WHISPER_THREAD = 'tramme-whisper';
+
+let thread: Worker | null = null, asked = 0;
+const waiting = new Map<number, { resolve: (h: Heard) => void; reject: (e: Error) => void }>();
+
+/** the thread, started on the first chunk and kept: its model stays loaded between chunks */
+function whisperThread(): Worker {
+  if (thread) return thread;
+  const worker = new Worker(new URL(import.meta.url), { workerData: { role: WHISPER_THREAD } });
+  const fail = (e: Error) => { for (const w of waiting.values()) w.reject(e); waiting.clear(); thread = null; };
+  worker.on('message', (m: { id: number; heard?: Heard; error?: string }) => {
+    const w = waiting.get(m.id);
+    if (!w) return;
+    waiting.delete(m.id);
+    if (m.heard) w.resolve(m.heard); else w.reject(new Error(m.error ?? 'transcription failed'));
+  });
+  worker.on('error', fail);
+  worker.on('exit', (code) => fail(new Error(`the transcription stopped (code ${code})`)));
+  // the companion's server keeps the process alive, not this thread
+  worker.unref();
+  thread = worker;
+  return worker;
+}
+
+/** a WAV chunk (16 kHz mono, base64) to words, heard in Whisper's thread */
+export function transcribeLocal(audioBase64: string, language?: string, model?: string): Promise<Heard> {
+  return new Promise((resolve, reject) => {
+    const id = ++asked;
+    waiting.set(id, { resolve, reject });
+    whisperThread().postMessage({ id, audio: audioBase64, language, model });
+  });
+}
+
+/** the chunk heard, in Whisper's thread */
+async function hear(audioBase64: string, language?: string, asked?: string): Promise<Heard> {
   const { samples, rate } = pcm(Buffer.from(audioBase64, 'base64'));
   if (rate !== 16000) throw new Error(`16 kHz expected (got ${rate} Hz)`);
   const id = whisperModel(asked);
@@ -113,4 +156,14 @@ export async function transcribeLocal(audioBase64: string, language?: string, as
   const out = await run(samples, { return_timestamps: 'word', chunk_length_s: 30, language: spoken, task: 'transcribe' });
   const words = asrWords(out);
   return { words, text: out.text.trim(), language: spoken, duration: samples.length / rate, model: id };
+}
+
+// started again as Whisper's thread: each chunk asked is heard here, one after the other
+if (!isMainThread && (workerData as { role?: string } | null)?.role === WHISPER_THREAD) {
+  parentPort!.on('message', (m: { id: number; audio: string; language?: string; model?: string }) => {
+    hear(m.audio, m.language, m.model).then(
+      (heard) => parentPort!.postMessage({ id: m.id, heard }),
+      (e: Error) => parentPort!.postMessage({ id: m.id, error: e.message }),
+    );
+  });
 }

@@ -40,6 +40,21 @@ export function storageContract(name: string, makeBucket: () => Bucket) {
       expect((await call('/api/projects/nope-1234')).status).toBe(404);
     });
 
+    it('keeps a requested import id and refuses a second project with that id', async () => {
+      const { call } = setup();
+      const body = { id: 'local-film-123', name: 'Original', empty: true };
+      const first = await call('/api/projects', { method: 'POST', body: JSON.stringify(body) });
+      expect(first.status).toBe(201);
+      expect(((await first.json()) as Manifest).id).toBe(body.id);
+      const repeated = await call('/api/projects', { method: 'POST', body: JSON.stringify(body) });
+      expect(repeated.status).toBe(409);
+      expect((await (await call('/api/projects')).json()) as Manifest[]).toHaveLength(1);
+      const simultaneous = await Promise.all([1, 2].map(() => call('/api/projects', {
+        method: 'POST', body: JSON.stringify({ ...body, id: 'local-film-456' }),
+      })));
+      expect(simultaneous.map((r) => r.status).sort()).toEqual([201, 409]);
+    });
+
     it('refuses to overwrite a file changed elsewhere (If-Match), and says when nothing changed (If-None-Match)', async () => {
       const { call, create } = setup();
       const m = await create();

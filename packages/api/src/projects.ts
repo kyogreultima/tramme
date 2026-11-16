@@ -83,7 +83,7 @@ export async function listProjects(bucket: Bucket) {
   return all.filter((m): m is Manifest => !!m).sort((a, b) => b.modified.localeCompare(a.modified));
 }
 
-interface CreateBody { name?: string; width?: number; height?: number; fps?: number; duration?: number; created?: string; empty?: boolean }
+interface CreateBody { id?: string; name?: string; width?: number; height?: number; fps?: number; duration?: number; created?: string; empty?: boolean }
 
 /**
  * A new project. With `empty`, only the manifest is written: the editor then
@@ -96,8 +96,19 @@ export async function createProject(bucket: Bucket, req: Request) {
   const int = (v: unknown, d: number, max: number) => (Number.isInteger(v) && (v as number) > 0 && (v as number) <= max ? (v as number) : d);
   const width = int(b.width, 1920, 8192), height = int(b.height, 1080, 8192), fps = int(b.fps, 30, 240);
   const duration = typeof b.duration === 'number' && b.duration > 0 && b.duration <= 3600 ? b.duration : 5;
-  const { manifest, doc } = newProject({ name, width, height, fps, duration, id: await freeId(bucket, name), app: 'tramme' });
+  if (b.id !== undefined) {
+    checkId(b.id);
+    if (!b.empty) throw new HttpError(400, 'a requested project id is only for an empty import');
+  }
+  const { manifest, doc } = newProject({ name, width, height, fps, duration, id: b.id ?? await freeId(bucket, name), app: 'tramme' });
   if (b.created && !Number.isNaN(Date.parse(b.created))) manifest.created = b.created;
+  if (b.id !== undefined) {
+    const claimed = await bucket.put(key(manifest.id, MANIFEST), JSON.stringify(manifest, null, 2) + '\n', {
+      httpMetadata: { contentType: mimeOf(MANIFEST) }, onlyIf: new Headers({ 'if-none-match': '*' }),
+    });
+    if (!claimed) throw new HttpError(409, 'project already exists');
+    return json(manifest, 201);
+  }
   if (!b.empty) await bucket.put(key(manifest.id, DOCUMENT), JSON.stringify(doc, null, 2) + '\n', { httpMetadata: { contentType: mimeOf(DOCUMENT) } });
   await writeManifest(bucket, manifest);
   return json(manifest, 201);

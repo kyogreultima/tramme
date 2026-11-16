@@ -163,3 +163,32 @@ describe('worker: projects in the cloud', () => {
     expect(((await (await call(env, '/api/config', { cookie: await as(A) })).json()) as { mode: string }).mode).toBe('personal');
   });
 });
+
+describe('worker: speech to text for an account', () => {
+  const chunk = () => JSON.stringify({ audio: btoa('RIFF....WAVEfmt '), language: 'fr' });
+
+  it('hears a signed-in person on Workers AI, within a rate per account, and says so in its config', async () => {
+    const { env } = setup();
+    const run = vi.fn(async () => ({ text: 'bonjour', transcription_info: { language: 'fr' }, segments: [{ words: [{ word: 'bonjour', start: 0.1, end: 0.5 }] }] }));
+    const limited: string[] = [];
+    Object.assign(env, { AI: { run }, RELAY_LIMIT: { limit: async ({ key }: { key: string }) => { limited.push(key); return { success: limited.length < 3 }; } } });
+    expect(await (await call(env, '/api/config', { cookie: await as(A) })).json()).toMatchObject({ transcribe: true });
+    const heard = await call(env, '/api/transcribe', { method: 'POST', body: chunk(), headers: { 'content-type': 'application/json' }, cookie: await as(A) });
+    expect(heard.status).toBe(200);
+    expect(await heard.json()).toMatchObject({ words: [{ w: 'bonjour', s: 0.1, e: 0.5 }], language: 'fr' });
+    expect(limited).toEqual([`transcribe:${A.workspaceId}`]);
+    await call(env, '/api/transcribe', { method: 'POST', body: chunk(), headers: { 'content-type': 'application/json' }, cookie: await as(A) });
+    // past the rate: told to wait, Workers AI not asked
+    const over = await call(env, '/api/transcribe', { method: 'POST', body: chunk(), headers: { 'content-type': 'application/json' }, cookie: await as(A) });
+    expect(over.status).toBe(429);
+    expect(run).toHaveBeenCalledTimes(2);
+  });
+
+  it('is not heard for a visitor who is not signed in', async () => {
+    const { env } = setup();
+    Object.assign(env, { AI: { run: vi.fn() } });
+    const res = await call(env, '/api/transcribe', { method: 'POST', body: chunk(), headers: { 'content-type': 'application/json' } });
+    expect(res.status).not.toBe(200);
+    expect((env as unknown as { AI: { run: ReturnType<typeof vi.fn> } }).AI.run).not.toHaveBeenCalled();
+  });
+});

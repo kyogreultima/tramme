@@ -358,9 +358,9 @@ export function Timeline() {
         { label: t('timeline.syncBySound'), icon: 'audio', disabled: S.selection.peek().length < 2 || !S.selection.peek().includes(id), onClick: () => { void syncClips(S.selection.peek()); } },
         { label: t('timeline.makeMulticam'), icon: 'film', disabled: S.selection.peek().filter((x) => c.layers[x]?.type === 'video').length < 2 || !S.selection.peek().includes(id), onClick: () => { void makeMulticam(S.selection.peek()); } },
         { label: t('timeline.matchLook'), icon: 'palette', disabled: S.selection.peek().filter((x) => c.layers[x]?.type === 'video' || c.layers[x]?.type === 'image').length < 2 || !S.selection.peek().includes(id), onClick: () => { void matchLooks(S.selection.peek()); } },
-        { label: t('timeline.crossfade'), icon: 'compare', hint: t('timeline.crossfadeHint'), disabled: !fade, onClick: () => fade && commit(t('timeline.crossfade'), fade.ops) },
+        { label: t('timeline.crossfade'), icon: 'compare', detail: t('timeline.crossfadeHint'), disabled: !fade, onClick: () => fade && commit(t('timeline.crossfade'), fade.ops) },
         {
-          label: transitionOf(l) ? t('timeline.changeTransition') : t('timeline.addTransition'), icon: 'effects', hint: t('timeline.transitionHint'),
+          label: transitionOf(l) ? t('timeline.changeTransition') : t('timeline.addTransition'), icon: 'effects', detail: t('timeline.transitionHint'),
           disabled: !outgoingOf(d0, compId, id),
           onClick: () => {
             const had = Number(staticValue(transitionOf(l)?.props?.duration)) || 0.5;

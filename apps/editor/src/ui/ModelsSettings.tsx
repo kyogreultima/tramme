@@ -160,8 +160,8 @@ export function LocalModels() {
       <Section title={t('localModels.sound')} hint={t('localModels.soundHint')}>
         {SOUND.map((task) => <ModelRow key={task} task={task} files={files} changed={changed} />)}
         <Row label={t('localModels.dictation')} hint={t('localModels.dictationHint')}>
-          <Select value={prefs.value.dictation} options={[['local', t('localModels.dictationLocal')], ['companion', t('localModels.dictationCompanion')], ['server', t('localModels.dictationServer')]]}
-            onChange={(v) => setPrefs({ dictation: v as DictationSource })} />
+          <Select value={prefs.value.dictation} options={[['auto', t('localModels.dictationAuto')], ['local', t('localModels.dictationLocal')], ['companion', t('localModels.dictationCompanion')], ['server', t('localModels.dictationServer')]]}
+            onChange={(v) => setPrefs({ dictation: v as DictationSource, dictationPicked: true })} />
         </Row>
       </Section>
       <Section title={t('localModels.advanced')} hint={t('localModels.advancedHint')}>

@@ -537,12 +537,14 @@ export function Modal({ title, onClose, children, wide, above }: { title: string
     addEventListener('keydown', key);
     return () => removeEventListener('keydown', key);
   }, [onClose]);
-  return (
+  // on the page's body: opened from a bar of glass (backdrop-filter makes it the box of its fixed children), it would stay inside the bar
+  return createPortal(
     <div class={`modal-back${above ? ' above' : ''}`} onPointerDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div class={`modal${wide ? ' wide' : ''}`} role="dialog" aria-label={title}>
         <div class="modal-head"><span>{title}</span><button class="icon-btn sm" title={t('common.close')} onClick={onClose}><Icon name="x" /></button></div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

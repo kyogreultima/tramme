@@ -81,8 +81,10 @@ export interface Preferences {
   /** clips made by a provider: the one by default (auto: the first connected), and their length in seconds */
   videoProvider: 'auto' | 'hydracept';
   videoSeconds: 4 | 6 | 8;
-  /** where a dictation is transcribed: the downloaded model (this browser, the default), the companion, or the server */
+  /** where a dictation is transcribed: auto (the server live when it hears, else the downloaded model), the downloaded model (this browser), the companion, or the server */
   dictation: DictationSource;
+  /** the dictation's source was picked in the settings (a 'local' saved before 'auto' existed was the default, not a choice) */
+  dictationPicked: boolean;
   /** the Tramme logo in a corner of the exported films; only Plus and Pro can turn it off (watermark.ts) */
   watermark: boolean;
   /** the first export carrying the watermark has said why */
@@ -93,7 +95,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   language: 'auto', theme: DEFAULT_THEME, view: 'studio', motion: 'auto', still: 'display', blur: 'document', exactFrames: true, scrubAudio: true, sandboxPreview: false,
   effectsDb: -8, musicDb: -14, duckDb: -12, varySounds: true, confirmPaid: true, paidPerTurn: 10, voiceProvider: 'auto', voiceShortlist: {}, voice: '', voiceModel: '', previewVolume: 1, previewMuted: false, proxies: true, models: {}, pluginsOff: [], areaConfirm: 'always', assistantTranscribes: false, assistantFetchesReal: false, acceptReadings: false, checkUpdates: true, lastUpdateCheck: 0, updateNotified: '', recentCommands: [], quickLauncher: false,
   pictureProvider: 'auto', pictureQuality: 'auto', pictureSize: 'large', styleFrames: 2,
-  videoProvider: 'auto', videoSeconds: 8, dictation: 'local', watermark: true, watermarkTold: false,
+  videoProvider: 'auto', videoSeconds: 8, dictation: 'auto', dictationPicked: false, watermark: true, watermarkTold: false,
 };
 
 // ── themes and views ─────────────────────────────────────────
@@ -184,7 +186,8 @@ export function checked(saved: Partial<Preferences>): Preferences {
     p.videoSeconds = ([4, 6, 8] as number[]).includes(seconds)
       ? seconds as Preferences['videoSeconds']
       : DEFAULT_PREFERENCES.videoSeconds;
-    if (!['local', 'companion', 'server'].includes(p.dictation)) p.dictation = DEFAULT_PREFERENCES.dictation;
+    p.dictationPicked = p.dictationPicked === true;
+    if (!['auto', 'local', 'companion', 'server'].includes(p.dictation) || (p.dictation === 'local' && !p.dictationPicked)) p.dictation = DEFAULT_PREFERENCES.dictation;
     return p;
   } catch { return { ...DEFAULT_PREFERENCES }; }
 }

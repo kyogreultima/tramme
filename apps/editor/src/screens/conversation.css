@@ -336,3 +336,5 @@ code.cmd { display: block; margin-top: 4px; padding: 6px 8px; border-radius: var
 .mic svg.i { position: relative; }
 .mic-level { position: absolute; inset: 0; background: var(--accent-soft); transform-origin: bottom; transition: transform 80ms linear; }
 .mic-time { color: var(--accent-text); font-size: var(--fs-sm); }
+/* a live dictation's words as they come (MicButton): one line, its end in sight */
+.mic-live { min-width: 0; max-width: 46ch; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--text-2); font-size: var(--fs-sm); }

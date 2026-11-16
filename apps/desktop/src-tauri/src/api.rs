@@ -115,6 +115,8 @@ fn route_inner(parts: &[String], req: Request<Vec<u8>>) -> Result<Body, store::H
             let q = req.uri().query().map(|q| format!("?{q}")).unwrap_or_default();
             to_cloud(&req, &format!("{}{q}", req.uri().path()))
         }
+        // signed in, speech to text is the cloud's (Whisper on Workers AI, apps/worker/src/cloud.ts): seconds, where this machine takes minutes
+        ("transcribe", "POST") if crate::account::signed_in() => to_cloud(&req, "/api/transcribe"),
         // the provider routes are the page's (api.reach), never asked here
         ("claude" | "llm" | "models" | "generate" | "generate-image" | "generate-video" | "transcribe", _) => Ok(json_response(
             404,

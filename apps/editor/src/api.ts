@@ -91,6 +91,10 @@ export interface ServerConfig {
   images?: string[];
   /** providers that make video clips */
   videos?: string[];
+  /** the server transcribes speech (Whisper on Workers AI, or an OpenAI key) */
+  transcribe?: boolean;
+  /** the server hears a dictation as it is said (Deepgram on Workers AI, /api/listen) */
+  listen?: boolean;
 }
 
 /** a sound made by a provider: the file and what made it */
@@ -162,7 +166,7 @@ export const api = {
   // ── projects ───────────────────────────────────────────────
   list: () => call<Manifest[]>('/api/projects'),
   /** `place: 'cloud'`: in the account, from the desktop app, whose own projects are in a folder (its cloud.rs) */
-  create: (opts: { name: string; width?: number; height?: number; fps?: number; duration?: number; created?: string; empty?: boolean }, place?: 'cloud') =>
+  create: (opts: { id?: string; name: string; width?: number; height?: number; fps?: number; duration?: number; created?: string; empty?: boolean }, place?: 'cloud') =>
     call<Manifest>(place ? `/api/projects?place=${place}` : '/api/projects', jsonInit('POST', opts)),
   info: (id: string) => call<{ manifest: Manifest; files: ProjectFile[] }>(P(id)),
   update: (id: string, patch: { name?: string; thumbnail?: string | null }) => call<Manifest>(P(id), jsonInit('PATCH', patch)),

@@ -9,6 +9,7 @@ const speech = await import('../src/speech.ts');
 const cache = await import('../src/model-cache.ts');
 const confirm = await import('../src/confirm.ts');
 const state = await import('../src/state.ts');
+const listen = await import('../src/listen.ts');
 const { prefs, setPrefs, DEFAULT_PREFERENCES } = await import('../src/settings.ts');
 const { insertAtCursor, recording } = dictation;
 
@@ -31,8 +32,11 @@ beforeEach(() => {
   host = document.body.appendChild(document.createElement('div'));
   setPrefs({ ...DEFAULT_PREFERENCES });
   vi.spyOn(state, 'toast').mockImplementation(() => {});
+  // no server in the tests: Automatic is the downloaded model unless a test says otherwise
+  vi.spyOn(speech, 'serverHears').mockResolvedValue(false);
+  vi.spyOn(listen, 'canListen').mockResolvedValue(false);
 });
-afterEach(() => { render(null, host); host.remove(); vi.restoreAllMocks(); vi.unstubAllGlobals(); recording.value = null; });
+afterEach(async () => { await act(async () => { render(null, host); }); host.remove(); vi.restoreAllMocks(); vi.unstubAllGlobals(); recording.value = null; });
 
 /** a microphone and a recorder that record nothing, enough for start and stop */
 function fakeMicrophone() {
@@ -160,5 +164,108 @@ describe('dictation', () => {
     expect(transcribe).toHaveBeenLastCalledWith(samples, 'companion');
     // no download offered when the model is not the source
     expect(ask).not.toHaveBeenCalled();
+  });
+});
+
+describe('a live dictation (on the server)', () => {
+  /** a microphone whose processor is fed by the test: feed(seconds, loud) pushes that much sound */
+  function liveMicrophone() {
+    fakeMicrophone();
+    let processor: { onaudioprocess: ((e: { inputBuffer: { getChannelData: () => Float32Array } }) => void) | null } | null = null;
+    vi.stubGlobal('AudioContext', class {
+      createMediaStreamSource() { return { connect() {} }; }
+      createAnalyser() { return { fftSize: 0, getByteTimeDomainData() {} }; }
+      createScriptProcessor() { processor = { onaudioprocess: null, connect() {}, disconnect() {} } as never; return processor; }
+      get destination() { return {}; }
+      close() { return Promise.resolve(); }
+    });
+    return (seconds: number, loud = true) => {
+      for (let i = 0; i < Math.round((seconds * 16000) / 4000); i++) processor!.onaudioprocess!({ inputBuffer: { getChannelData: () => new Float32Array(4000).fill(loud ? 0.2 : 0) } });
+    };
+  }
+
+  it('shows words while the live connection is still opening', async () => {
+    vi.useFakeTimers();
+    setPrefs({ dictation: 'server' });
+    vi.spyOn(listen, 'canListen').mockResolvedValue(true);
+    let opened!: (stream: Awaited<ReturnType<typeof listen.openListening>>) => void;
+    vi.spyOn(listen, 'openListening').mockImplementation(() => new Promise((resolve) => { opened = resolve; }));
+    vi.spyOn(speech, 'transcribeSamples').mockResolvedValue('early words');
+    const feed = liveMicrophone();
+    await dictation.startDictation();
+    feed(2);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(dictation.liveText.value).toBe('early words');
+    opened({ send: vi.fn(), finish: async () => {}, drop: vi.fn() });
+    await vi.advanceTimersByTimeAsync(0);
+    dictation.cancelDictation();
+    vi.useRealTimers();
+  });
+
+  it('without a stream, shows the words of the passage every second, keeps a long one that ends on a pause, and sends only the rest at the end', async () => {
+    vi.useFakeTimers();
+    setPrefs({ dictation: 'server' });
+    vi.spyOn(listen, 'canListen').mockResolvedValue(false);
+    const sent: number[] = [];
+    vi.spyOn(speech, 'transcribeSamples').mockImplementation(async (s) => { sent.push(s.length / 16000); return `w${sent.length}`; });
+    const feed = liveMicrophone();
+    await dictation.startDictation();
+    await vi.advanceTimersByTimeAsync(0);
+    feed(2);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(sent).toEqual([2]);
+    expect(dictation.liveText.value).toBe('w1');
+    // 21 s said, ending on a pause: kept as said
+    feed(18.6); feed(0.4, false);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(sent.at(-1)).toBe(21);
+    expect(dictation.liveText.value).toBe('w2');
+    // a few more words, then the user stops: only those go
+    feed(3);
+    await vi.advanceTimersByTimeAsync(600);
+    vi.useRealTimers();
+    expect(await dictation.stopDictation()).toBe('w2 w3');
+    expect(sent.at(-1)).toBe(3);
+    expect(dictation.liveText.value).toBe('');
+  });
+
+  it('streams to the server where it listens: what was said while it opened goes first, the words show as they come, the last ones at the end', async () => {
+    setPrefs({ dictation: 'server' });
+    vi.spyOn(listen, 'canListen').mockResolvedValue(true);
+    const sent: number[] = [];
+    let say!: (h: { text: string; final: boolean; end: number }) => void;
+    let open!: () => void;
+    const finish = vi.fn(async () => { say({ text: 'the end.', final: true, end: 3 }); });
+    vi.spyOn(listen, 'openListening').mockImplementation((onHeard) => new Promise((resolve) => {
+      say = onHeard;
+      open = () => resolve({ send: (pcm) => { sent.push(pcm.length); }, finish, drop: vi.fn() });
+    }));
+    const whisper = vi.spyOn(speech, 'transcribeSamples').mockResolvedValue('whisper');
+    const feed = liveMicrophone();
+    await dictation.startDictation();
+    // the user speaks before the stream is open: kept, then sent first
+    feed(1);
+    open();
+    await vi.waitFor(() => expect(sent).toEqual([16000]));
+    feed(0.25);
+    expect(sent.at(-1)).toBe(4000);
+    say({ text: 'Hello', final: false, end: 1 });
+    expect(dictation.liveText.value).toBe('Hello');
+    say({ text: 'Hello everyone.', final: true, end: 1.2 });
+    say({ text: 'Today', final: false, end: 2 });
+    expect(dictation.liveText.value).toBe('Hello everyone. Today');
+    expect(await dictation.stopDictation()).toBe('Hello everyone. the end.');
+    expect(finish).toHaveBeenCalledOnce();
+    expect(whisper).not.toHaveBeenCalled();
+  });
+
+  it('Automatic hears live when the server transcribes, else on the downloaded model', async () => {
+    const hears = vi.spyOn(speech, 'serverHears').mockResolvedValue(true);
+    setPrefs({ dictation: 'auto' });
+    expect(await dictation.dictationSource()).toBe('server');
+    hears.mockResolvedValue(false);
+    expect(await dictation.dictationSource()).toBe('local');
+    setPrefs({ dictation: 'companion' });
+    expect(await dictation.dictationSource()).toBe('companion');
   });
 });

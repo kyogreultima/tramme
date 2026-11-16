@@ -25,6 +25,7 @@ import type { Env } from './http.ts';
 import { bucket, keyStore, workerKeys } from './keys.ts';
 import { personal } from './personal.ts';
 import { enqueue, renderRoute, renders, SERVER } from './renders.ts';
+import { listen } from './listen.ts';
 import { transcribe } from './speech.ts';
 
 // HTML returned through ASSETS.fetch does not always inherit _headers (notably
@@ -48,11 +49,12 @@ async function route(req: Request, env: Env, url: URL): Promise<Response> {
   const m = req.method;
   if (parts[0] === 'config' && m === 'GET') {
     const providers = providersConfig(await workerKeys(env));
-    return json({ mode: 'private', format: PROJECT_FORMAT, limits: LIMITS, ...providers, transcribe: !!env.AI || providers.transcribe, serverRender: renders(env) });
+    return json({ mode: 'private', format: PROJECT_FORMAT, limits: LIMITS, ...providers, transcribe: !!env.AI || providers.transcribe, listen: !!env.AI, serverRender: renders(env) });
   }
   if (parts[0] === 'keys') return keysRoute(req, keyStore(env), parts.slice(1).map(decodeURIComponent));
   // Whisper on Workers AI first; the OpenAI key (a provider route) when the server has none
   if (parts[0] === 'transcribe' && m === 'POST' && env.AI) return transcribe(req, env);
+  if (parts[0] === 'listen' && m === 'GET' && env.AI) return listen(req, env);
   if (PROVIDER_ROUTES.includes(parts[0])) {
     const res = await providerRoute(req, { keys: await workerKeys(env), fetch: (input, init) => fetch(input, init) }, parts);
     if (res) return res;

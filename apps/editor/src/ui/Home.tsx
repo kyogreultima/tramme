@@ -30,12 +30,12 @@ import { ModelPicker } from './ModelPicker.tsx';
 import { Overlays } from './shell.tsx';
 import { HelpButton } from './Help.tsx';
 import { WindowControls, windowBar } from './WindowControls.tsx';
-import { personal } from '../mode.ts';
+import { cloud, personal } from '../mode.ts';
 import { install, installable } from '../install.ts';
 import { offerTours } from '../tours/index.ts';
 import { prefs, settingsOpen } from '../settings.ts';
 import { GLASS_THEMES } from '../theme/pref.ts';
-import { APP_VERSION, downloadOf, update } from '../version.ts';
+import { downloadOf, update } from '../version.ts';
 import { tauri } from '../tauri.ts';
 import { inAccount } from '../bring.ts';
 import { IDEAS } from '../ideas.ts';
@@ -176,6 +176,7 @@ function Failure({ error, onClose }: { error: ImportError | Error; onClose: () =
 
 function Card({ m, onMenu }: { m: Manifest; onMenu: (e: MouseEvent | { clientX: number; clientY: number }) => void }) {
   const [broken, setBroken] = useState(false);
+  const inCloud = cloud || (tauri && inAccount(m));
   // every thumb sits in the same 16/10 box, whatever the film's format: the grid keeps
   // one row height (a vertical film fills it, cropped); the placeholder keeps the shape
   const vertical = (m.height ?? 9) > (m.width ?? 16);
@@ -187,9 +188,10 @@ function Card({ m, onMenu }: { m: Manifest; onMenu: (e: MouseEvent | { clientX: 
           ? <img src={`${api.fileUrl(m.id, m.thumbnail)}?v=${encodeURIComponent(m.modified)}`} alt="" loading="lazy" onError={() => setBroken(true)} />
           : <span class="frame" style={{ aspectRatio: `${m.width ?? 16} / ${m.height ?? 9}`, ...(vertical ? { width: 'auto', height: '62%' } : {}) }}><Icon name="film" /></span>}
       </div>
+      {inCloud && <span class="card-cloud" title={t('home.inYourAccount')}>Cloud</span>}
       <div class="card-meta">
         <div class="card-name" title={m.name}>{m.name}</div>
-        <div class="card-sub">{[dims(m), ago(m.modified), tauri && inAccount(m) ? t('home.inYourAccount') : ''].filter(Boolean).join(' · ')}</div>
+        <div class="card-sub">{[dims(m), ago(m.modified)].filter(Boolean).join(' · ')}</div>
       </div>
       <button class="icon-btn sm card-more" title={t('home.actions')} onClick={(e) => { e.stopPropagation(); onMenu(e); }}><Icon name="more" /></button>
     </div>
@@ -451,10 +453,6 @@ export function Home() {
             </div>
           </section>
         )}
-        <footer class="home-version faint mono">
-          {t('home.version', { version: APP_VERSION })}
-          {update.value && <> · <a href={downloadOf(update.value).href} target="_blank" rel="noopener">{t('home.newVersion', { version: update.value.version })}</a></>}
-        </footer>
       </main>
       {drag && <div class="drop-hint"><Icon name="upload" /><span>{t('home.dropATrammeProject')}</span></div>}
       {busy && (

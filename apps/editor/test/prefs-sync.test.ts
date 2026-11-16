@@ -56,3 +56,13 @@ describe('the preferences of the account', () => {
     expect((sent[1] as { view: string; theme: string })).toMatchObject({ view: 'atelier', theme: 'dusk' });
   });
 });
+
+describe('the dictation setting', () => {
+  it('is Automatic by default, and a Downloaded model saved before Automatic existed (never picked) becomes Automatic', async () => {
+    const { checked } = await import('../src/settings.ts');
+    expect(DEFAULT_PREFERENCES.dictation).toBe('auto');
+    expect(checked({ dictation: 'local' }).dictation).toBe('auto');
+    expect(checked({ dictation: 'local', dictationPicked: true }).dictation).toBe('local');
+    expect(checked({ dictation: 'companion' }).dictation).toBe('companion');
+  });
+});

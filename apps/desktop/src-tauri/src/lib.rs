@@ -18,6 +18,7 @@ mod exports;
 mod fetch;
 pub mod format;
 mod keys;
+mod listen;
 pub mod store;
 
 use std::borrow::Cow;
@@ -86,14 +87,16 @@ pub fn run() {
         desktop_state, desktop::desktop_pick_home, desktop::desktop_set_home, desktop::desktop_pending_name, desktop::desktop_pending_bytes,
         desktop_fetch, desktop_fetch_abort, desktop::desktop_open_plugins, desktop_open_url,
         desktop::desktop_quick_enable, desktop::desktop_quick_open, desktop::desktop_quick_do,
-        desktop::desktop_quick_drop_names, desktop::desktop_quick_drop_file
+        desktop::desktop_quick_drop_names, desktop::desktop_quick_drop_file,
+        listen::listen_open, listen::listen_send, listen::listen_finish
     ]);
     #[cfg(mobile)]
     let builder = builder.invoke_handler(tauri::generate_handler![
         analytics::analytics_state, analytics::analytics_set, analytics::analytics_event,
         desktop_state, desktop_fetch, desktop_fetch_abort, desktop_open_url,
         exports::device_save, exports::device_share, exports::device_keep_awake, exports::device_exit,
-        exports::device_bars, bodies::device_body
+        exports::device_bars, bodies::device_body,
+        listen::listen_open, listen::listen_send, listen::listen_finish
     ]);
     builder
         .plugin(tauri_plugin_dialog::init())

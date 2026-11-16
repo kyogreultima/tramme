@@ -12,7 +12,7 @@ import { deleteKeys, pps } from './Timeline.tsx';
 import { rippleOnMagnetic, runEditKey } from './timeline/edit-keys.ts';
 import { markerJump } from './timeline/shortcuts.ts';
 import { uploads } from '../files.ts';
-import { transcriptions } from '../speech.ts';
+import { cancelTranscription, transcriptions } from '../speech.ts';
 import { SettingsDialog } from './Settings.tsx';
 import { settingsOpen } from '../settings.ts';
 import { DeviceSaveSheet } from './DeviceSaveSheet.tsx';
@@ -85,8 +85,11 @@ export function Toasts() {
     <div class="toasts">
       {transcriptions.value.map((j) => (
         <div key={`t${j.id}`} class="toast upload">
-          <span>{t('common.transcriptOfName', { name: j.name })} · {t(j.stage)}{j.total > 1 ? ` · ${j.done} / ${j.total}` : ''}</span>
-          <div class="progress"><i style={{ width: `${(100 * j.done) / Math.max(1, j.total)}%` }} /></div>
+          <span class="toast-line">
+            <span>{t('common.transcriptOfName', { name: j.name })} · {j.loading ? t('speech.loadingModel', { percent: Math.round((100 * j.loading.loaded) / Math.max(1, j.loading.total)), mb: Math.round(j.loading.total / 1e6) }) : t(j.stage)}{j.total > 1 ? ` · ${j.done} / ${j.total}` : ''}</span>
+            <button class="btn ghost sm" type="button" onClick={() => cancelTranscription(j.id)}>{t('common.cancel')}</button>
+          </span>
+          <div class="progress"><i style={{ width: `${j.loading ? (100 * j.loading.loaded) / Math.max(1, j.loading.total) : (100 * j.done) / Math.max(1, j.total)}%` }} /></div>
         </div>
       ))}
       {uploads.value.map((u) => (
