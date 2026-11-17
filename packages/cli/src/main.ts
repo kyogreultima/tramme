@@ -3,7 +3,8 @@
 //   tramme check    <doc> [--comp id]                                  the picture checks, issues folded by cause
 //   tramme still    <doc> --t 0.5,1.2 [--out dir] [--samples n] [--comp id]
 //   tramme cloud-export <doc|project.tramme> [--app url] [--token tr_…] [--out film.mp4] [--comp id]   rendered in the cloud of an account (cloud-export.ts)
-//   tramme render   <doc> [--format mp4|mov|webm|gif|png] [--out file] [--samples n] [--from s] [--to s] [--crf 16] [--mute] [--comp id] [--pages n] [--depth 8|10] [--isolate]
+//   tramme render   <doc> [--format mp4|mov|webm|gif|png] [--out file] [--samples n] [--from s] [--to s] [--crf n] [--mute] [--comp id] [--pages n] [--depth 8|10] [--master] [--isolate]
+//                   --master: the encoder's slow settings, the best picture for its size (default: fast, for the web)
 //                   --isolate: a project with code drawn in its sandbox, not on the render page (slower)
 //   tramme export   <doc> --format lottie|svg|wav [--t s] [--comp id] [--out file]
 //   tramme premiere <doc> [--out folder] [--comp id] [--zip file]       a Premiere Pro timeline: XML, the footage and sounds, the drawings as ProRes clips with alpha, SRT (premiere.ts)
@@ -135,7 +136,7 @@ async function cmdRender(file: string) {
     const pages = num('pages') ?? defaultPages(s.info.width, s.info.height);
     console.log(`rendering ${stem(file)} (${format}): ${s.info.width}x${s.info.height} at ${s.info.fps} fps${pages > 1 ? `, up to ${pages} pages at once` : ''}`);
     const r = await renderVideo(s.server, s.page, {
-      docUrl: s.docUrl, doc, compId: str('comp'), format, samples: num('samples'), from: num('from'), to: num('to'), crf: num('crf'), mute: !!flags.mute, out, pages, depth: num('depth') === 10 ? 10 : 8,
+      docUrl: s.docUrl, doc, compId: str('comp'), format, samples: num('samples'), from: num('from'), to: num('to'), crf: num('crf'), quality: flags.master ? 'master' : 'fast', mute: !!flags.mute, out, pages, depth: num('depth') === 10 ? 10 : 8,
     });
     console.log(`${r.frames} frames in ${r.seconds.toFixed(1)} s (${r.msPerFrame.toFixed(0)} ms/frame${'pages' in r ? `, ${r.pages} pages` : ''})${r.audio ? ', with sound' : ''} -> ${path.relative(process.cwd(), out)}`);
     console.log(`  per frame: ${formatParts(r.parts)}`);

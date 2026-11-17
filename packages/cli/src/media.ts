@@ -1,5 +1,8 @@
 // ffmpeg side: encoders for raw frames streamed from the render page, with
 // the document's sound, already mixed by the page (the mixer of the editor).
+// Two qualities: fast (the default, for the web and social networks: the
+// encoder's quick preset) and master (the slow preset, the smallest file for
+// the best picture, for a film that is edited or archived further).
 //   mp4   H.264 High, BT.709, MP3 320 kb/s (frames in YUV 4:2:0)
 //   mov   ProRes 4444 with alpha, PCM audio (frames in straight RGBA)
 //   webm  VP9 with alpha, Opus audio
@@ -24,9 +27,19 @@ export const DEEP_FORMATS: VideoFormat[] = ['mp4', 'mov', 'webm', 'png'];
 
 const COLOR = ['-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-color_range', 'tv'];
 
+/** fast: the quick encoder settings (the default); master: the slow ones, the best picture for its size */
+export type ExportQuality = 'fast' | 'master';
+
+/** H.264 at each quality: the preset and the CRF (lower is better and bigger) unless one is given */
+const H264: Record<ExportQuality, { preset: string; crf: number }> = { fast: { preset: 'veryfast', crf: 18 }, master: { preset: 'slow', crf: 16 } };
+/** VP9's speed at each quality (higher is faster) */
+const VP9_CPU: Record<ExportQuality, string> = { fast: '4', master: '2' };
+
 /** audio: the mixed sound of the rendered span, a WAV starting at its first frame */
 export interface EncoderJob {
   format: VideoFormat; W: number; H: number; fps: number; frames: number; out: string; audio?: string; crf?: number;
+  /** fast (default) or master */
+  quality?: ExportQuality;
   /** png: the number of the first image (a segment of a parallel export writes its own) */
   startNumber?: number;
   /** bits a channel: 10 writes H.265 Main 10, ProRes from 16-bit frames, VP9 profile 2, 16-bit PNG */
@@ -41,11 +54,10 @@ const AUDIO_CODEC: Partial<Record<VideoFormat, string[]>> = {
   webm: ['-c:a', 'libopus', '-b:a', '192k', '-ar', '48000'],
 };
 
-/** ffmpeg reading raw frames on stdin; out is the target file (a folder for png) */
-export function encoder({ format, W, H, fps, frames, out, audio, crf = 16, startNumber = 0, depth = 8 }: EncoderJob) {
+/** ffmpeg's arguments to encode raw frames read on stdin */
+export function encoderArgs({ format, W, H, fps, frames, out, audio, crf, startNumber = 0, depth = 8, quality = 'fast' }: EncoderJob): string[] {
   if (depth === 10 && !DEEP_FORMATS.includes(format)) throw new Error(`${format} has no 10-bit form (${DEEP_FORMATS.join(', ')})`);
   const deep = depth === 10;
-  fs.mkdirSync(format === 'png' ? out : path.dirname(out), { recursive: true });
   const dur = (frames / fps).toFixed(6);
   const pix = deep ? ['-pix_fmt', 'rgba64le'] : format === 'mp4' ? ['-pix_fmt', 'yuv420p', ...COLOR] : ['-pix_fmt', 'rgba'];
   const args = ['-y', '-hide_banner', '-loglevel', 'error', '-f', 'rawvideo', ...pix, '-s', `${W}x${H}`, '-r', String(fps), '-i', '-'];
@@ -56,8 +68,8 @@ export function encoder({ format, W, H, fps, frames, out, audio, crf = 16, start
   switch (format) {
     case 'mp4':
       // 10 bits: H.265 Main 10, tagged hvc1 (QuickTime, Safari)
-      if (deep) { args.push(...toTv, '-c:v', 'libx265', '-preset', 'slow', '-crf', String(crf), '-profile:v', 'main10', '-pix_fmt', 'yuv420p10le', ...COLOR, '-tag:v', 'hvc1', '-x265-params', 'log-level=error', ...(withAudio ? AUDIO_CODEC.mp4! : []), '-t', dur, '-movflags', '+faststart', out); break; }
-      args.push('-c:v', 'libx264', '-preset', 'slow', '-crf', String(crf), '-profile:v', 'high', '-pix_fmt', 'yuv420p', ...COLOR, '-g', String(fps * 2), '-bf', '2',
+      if (deep) { args.push(...toTv, '-c:v', 'libx265', '-preset', quality === 'master' ? 'slow' : 'fast', '-crf', String(crf ?? 16), '-profile:v', 'main10', '-pix_fmt', 'yuv420p10le', ...COLOR, '-tag:v', 'hvc1', '-x265-params', 'log-level=error', ...(withAudio ? AUDIO_CODEC.mp4! : []), '-t', dur, '-movflags', '+faststart', out); break; }
+      args.push('-c:v', 'libx264', '-preset', H264[quality].preset, '-crf', String(crf ?? H264[quality].crf), '-profile:v', 'high', '-pix_fmt', 'yuv420p', ...COLOR, '-g', String(fps * 2), '-bf', '2',
         ...(withAudio ? AUDIO_CODEC.mp4! : []), '-t', dur, '-movflags', '+faststart', out);
       break;
     case 'mov':
@@ -66,7 +78,7 @@ export function encoder({ format, W, H, fps, frames, out, audio, crf = 16, start
       break;
     case 'webm':
       // 10 bits: VP9 profile 2, without its alpha (VP9 carries no 10-bit alpha)
-      args.push(...toTv, '-c:v', 'libvpx-vp9', ...(deep ? ['-profile:v', '2', '-pix_fmt', 'yuv420p10le'] : ['-pix_fmt', 'yuva420p']), '-b:v', '0', '-crf', '22', '-deadline', 'good', '-cpu-used', '2', '-row-mt', '1', ...COLOR,
+      args.push(...toTv, '-c:v', 'libvpx-vp9', ...(deep ? ['-profile:v', '2', '-pix_fmt', 'yuv420p10le'] : ['-pix_fmt', 'yuva420p']), '-b:v', '0', '-crf', '22', '-deadline', 'good', '-cpu-used', VP9_CPU[quality], '-row-mt', '1', ...COLOR,
         ...(withAudio ? AUDIO_CODEC.webm! : []), '-t', dur, out);
       break;
     case 'gif':
@@ -76,6 +88,13 @@ export function encoder({ format, W, H, fps, frames, out, audio, crf = 16, start
       args.push('-f', 'image2', '-start_number', String(startNumber), '-c:v', 'png', '-pix_fmt', deep ? 'rgba64be' : 'rgba', path.join(out, '%05d.png'));
       break;
   }
+  return args;
+}
+
+/** ffmpeg reading raw frames on stdin; out is the target file (a folder for png) */
+export function encoder(job: EncoderJob) {
+  const args = encoderArgs(job);
+  fs.mkdirSync(job.format === 'png' ? job.out : path.dirname(job.out), { recursive: true });
   const ff = spawn(FFMPEG, args, { stdio: ['pipe', 'inherit', 'inherit'] });
   ff.on('error', () => {});
   ff.stdin.on('error', (e) => console.error('ffmpeg stdin', e.message));

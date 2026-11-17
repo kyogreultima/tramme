@@ -7,7 +7,7 @@ import type { Page } from 'puppeteer-core';
 import { chaptersOf, type TrammeDoc } from '@tramme/core';
 import type { FrameParts } from '@tramme/render/src/timing.ts';
 import { openDoc, type DocInfo } from './browser.ts';
-import { addChapters, encoder, frameKind, joinSegments, type VideoFormat } from './media.ts';
+import { addChapters, encoder, frameKind, joinSegments, type ExportQuality, type VideoFormat } from './media.ts';
 import type { Server } from './server.ts';
 import { mediaReport, verifyMedia } from './verify-media.ts';
 
@@ -21,6 +21,8 @@ export interface VideoJob {
   from?: number;
   to?: number;
   crf?: number;
+  /** fast (default) or master (media.ts) */
+  quality?: ExportQuality;
   mute?: boolean;
   /** target file (a folder for png) */
   out: string;
@@ -88,7 +90,7 @@ async function renderFilm(server: Server, page: Page, job: VideoJob, onProgress?
     try { return await renderSegments(server, page, job, info, format, f0, f1, n, audio, onProgress); }
     finally { if (audio) fs.rmSync(mix, { force: true }); }
   }
-  const enc = encoder({ format, W: info.width, H: info.height, fps: info.fps, frames: f1 - f0, out: job.out, audio, crf: job.crf, depth: job.depth });
+  const enc = encoder({ format, W: info.width, H: info.height, fps: info.fps, frames: f1 - f0, out: job.out, audio, crf: job.crf, depth: job.depth, quality: job.quality });
   server.sink = enc.write;
   if (onProgress) await page.exposeFunction('__trammeProgress', onProgress).catch(() => {});
   const t0 = Date.now();
@@ -125,7 +127,7 @@ async function renderSegments(server: Server, first: Page, job: VideoJob, info: 
     const results = await Promise.all(spans.map(async ([a, b], i) => {
       const p = pages[i], name = `segment-${process.pid}-${i}`;
       const out = format === 'png' ? job.out : path.join(tmp, `${String(i).padStart(3, '0')}.${format}`);
-      const enc = encoder({ format, W: info.width, H: info.height, fps: info.fps, frames: b - a, out, crf: job.crf, startNumber: a - f0, depth: job.depth });
+      const enc = encoder({ format, W: info.width, H: info.height, fps: info.fps, frames: b - a, out, crf: job.crf, startNumber: a - f0, depth: job.depth, quality: job.quality });
       server.sinks.set(name, enc.write);
       if (onProgress) await p.exposeFunction('__trammeProgress', (d: number) => { done[i] = d; onProgress(done.reduce((x, y) => x + y, 0), f1 - f0); }).catch(() => {});
       try {
