@@ -117,6 +117,16 @@ export interface EvaluatorOptions {
   allowExpressions?: boolean;
 }
 
+/** whether an evaluator built here runs expressions when its options do not say */
+let expressionsHere = true;
+/**
+ * A trusted page that hosts a project sandbox calls this once: from then on,
+ * an evaluator built without an explicit `allowExpressions` refuses every
+ * expression, so a page-side reading the sandbox does not cover fails closed
+ * instead of running project code with the page's rights.
+ */
+export function isolateExpressions(): void { expressionsHere = false; }
+
 export class Evaluator {
   readonly doc: TrammeDoc;
   readonly registry: Registry;
@@ -131,7 +141,7 @@ export class Evaluator {
     this.doc = doc;
     this.registry = registry;
     this.data = opts.data;
-    this.allowExpressions = opts.allowExpressions ?? true;
+    this.allowExpressions = opts.allowExpressions ?? expressionsHere;
   }
 
   /**

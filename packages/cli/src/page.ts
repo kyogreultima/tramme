@@ -5,12 +5,12 @@
 // plugin sandbox's worker (docs/evaluator-sandbox.md): the page ships the
 // document and each video asset's decoded frame, and one picture comes back.
 
-import type { TrammeDoc } from '@tramme/core';
+import { isolateExpressions, type TrammeDoc } from '@tramme/core';
 import { builtinRegistry } from '@tramme/nodes';
 import { addParts, encodeWav, FIRST_SETTLE_LIMIT, formatParts, mixComposition, noParts, perFrame, Renderer, type FrameParts, type RenderOptions } from '@tramme/render';
-import { blitSandboxFrame, declarationsModule, ensureDeclared, ensureSandboxDoc, renderSandboxFrame, sandboxDeclaration } from '../../../apps/editor/src/plugins/sandbox-draw.ts';
+import { blitSandboxFrame, declarationsModule, ensureDeclared, ensureSandboxDoc, moduleItemsOf, renderSandboxFrame, sandboxDeclaration, sandboxVector } from '../../../apps/editor/src/plugins/sandbox-draw.ts';
 import { browserHost, type PluginHost } from '../../../apps/editor/src/plugins/host.ts';
-import { containsExpression } from '@tramme/project';
+import { needsIsolation } from '@tramme/project';
 import { watermarkStamp } from '../../../apps/editor/src/watermark-draw.ts';
 
 const q = new URLSearchParams(location.search);
@@ -18,8 +18,8 @@ const docUrl = new URL(q.get('doc') || '', location.href).href;
 let renderer: Renderer;
 let currentDoc: TrammeDoc | null = null;
 let sandbox: PluginHost | null = null;
-const needsIsolation = (doc: TrammeDoc) => Object.values(doc.assets).some((asset) => asset.type === 'module') || containsExpression(doc);
-const moduleItemsOf = (doc: TrammeDoc) => Object.entries(doc.assets).filter(([, asset]) => asset.type === 'module').map(([id, asset]) => ({ id, url: new URL(asset.src, docUrl).href }));
+// this trusted page never runs a project's expression: an isolated document's run in its sandbox
+isolateExpressions();
 
 async function init() {
   const r = await fetch(docUrl);
@@ -28,7 +28,7 @@ async function init() {
   const isolated = needsIsolation(currentDoc);
   if (isolated) {
     sandbox = browserHost(docUrl);
-    await ensureDeclared(sandbox, moduleItemsOf(currentDoc));
+    await ensureDeclared(sandbox, moduleItemsOf(currentDoc, docUrl));
   }
   renderer = await Renderer.open(currentDoc, builtinRegistry(), docUrl, document.getElementById('out') as HTMLCanvasElement, {
     compId: q.get('comp') || currentDoc.root,
@@ -49,7 +49,7 @@ async function sandboxReady(): Promise<PluginHost | null> {
   if (!doc || !needsIsolation(doc)) return null;
   sandbox ??= browserHost(docUrl);
   // the document's plugins loaded in the worker first (a url it knows is not loaded again), as the editor does
-  await ensureDeclared(sandbox, moduleItemsOf(doc));
+  await ensureDeclared(sandbox, moduleItemsOf(doc, docUrl));
   ensureSandboxDoc(sandbox, {
     doc, docUrl,
     loaded: (id) => { try { return renderer.assets.get(id); } catch { return null; } },
@@ -98,7 +98,7 @@ const api = {
     if (isolated !== renderer.sandboxModules) throw new Error('document isolation mode changed; open a new render page');
     if (isolated) {
       sandbox ??= browserHost(docUrl);
-      await ensureDeclared(sandbox, moduleItemsOf(doc));
+      await ensureDeclared(sandbox, moduleItemsOf(doc, docUrl));
     }
     await renderer.setDoc(doc, { compId: compId || doc.root });
     currentDoc = doc;
@@ -126,6 +126,11 @@ const api = {
     ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(out, 0, 0, small.width, small.height);
     return dataUrl(small);
+  },
+  /** an isolated document's SVG still or Lottie file, converted in its sandbox */
+  async vector(format: 'svg' | 'lottie', t: number, compId?: string): Promise<{ text: string; warnings: string[] }> {
+    if (!currentDoc || !sandbox) throw new Error('vector conversion in the sandbox needs an isolated document');
+    return sandboxVector(sandbox, currentDoc, docUrl, format, t, compId || currentDoc.root);
   },
   /** the sound over [from, to] through the mixer of the editor, as a WAV in base64; null when there is none */
   async mix(from: number, to: number): Promise<string | null> {

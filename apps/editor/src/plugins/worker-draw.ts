@@ -19,6 +19,7 @@ import { quadAt } from '../quad.ts';
 import { builtinRegistry, setWebScenePlaceholder } from '@tramme/nodes';
 import { CanvasPool, Compositor, drawComposed, drawFrame, drawLayers, finishOf, subTimes } from '@tramme/render/src/index.ts';
 import { nodeContext, resizeNode } from '@tramme/render/src/gpu.ts';
+import { toLottie, toSvg } from '@tramme/interop';
 import { RecordingPath2D } from './recording-path.ts';
 import { videoKey, type DrawPayload, type DrawResult, type FramePayload, type LayerSample, type SandboxDoc, type VideoNeed } from './protocol.ts';
 import type { SandboxDrawSide } from './worker-side.ts';
@@ -347,6 +348,19 @@ export function makeSandboxDraw(modules: Map<string, PluginModule>): SandboxDraw
       const values = await runChecks(doc, reg, compId, { data: (id) => side.json.get(id) });
       if (values.length > 4096) throw new Error('too many sandbox quality issues');
       return values;
+    },
+    async vector(format, doc, t, compId, files) {
+      if (!doc.compositions?.[compId]) throw new Error('unknown sandbox composition');
+      await fontsReady;
+      const reg = builtinRegistry().clone();
+      for (const [id, mod] of modules) reg.use(mod, id);
+      const readAsset = (id: string) => (Object.hasOwn(files, id) ? files[id] : null);
+      if (format === 'lottie') {
+        const { lottie, warnings } = toLottie(doc, reg, { compId, readAsset });
+        return { text: JSON.stringify(lottie), warnings };
+      }
+      const { svg, warnings } = toSvg(doc, reg, t, { compId, readAsset });
+      return { text: svg, warnings };
     },
     async samplePlaced(t, compId) {
       const doc = theDoc();

@@ -5,6 +5,7 @@ export * from './registry.ts';
 export * from './props.ts';
 export * from './expr.ts';
 export * from './evaluate.ts';
+export * from './bounded.ts';
 export * from './ops.ts';
 export * from './edit.ts';
 export * from './path.ts';

@@ -11,7 +11,7 @@
 import { signal } from '@preact/signals';
 import { PROVIDER_ROUTES, recordBucket } from '@tramme/api';
 import { applyOps, type Op, type ToolContext, type TrammeDoc } from '@tramme/core';
-import { compareVersions, LIMITS, manifestOf, packInstalled, permissionsAdded, readPluginPackage, unpackInstalled, type PluginManifest } from '@tramme/project';
+import { compareVersions, LIMITS, manifestOf, needsIsolation, packInstalled, permissionsAdded, readPluginPackage, unpackInstalled, type PluginManifest } from '@tramme/project';
 import { api, reach } from './api.ts';
 import { folderRecords, type DirHandle } from './local/folder.ts';
 import { personal } from './mode.ts';
@@ -282,6 +282,8 @@ export function permitted(ctx: ToolContext, p: Installed): ToolContext {
       const u = new URL(url, location.href);
       if (u.origin === location.origin && u.pathname.startsWith('/api/')) {
         const route = u.pathname.split('/')[2] ?? '';
+        // an encoded separator or dot could name another route once the server decodes it
+        if (/%(2f|5c|2e)|\\/i.test(u.pathname)) throw new Error(`${name}: invalid provider path`);
         if (PROVIDER_ROUTES.includes(route) && providers.includes(route)) return reach(u.pathname + u.search, init as RequestInit);
         throw new Error(`${name} did not declare the provider route "${route}" (meta.permissions.providers)`);
       }
@@ -356,12 +358,12 @@ export const copiesIn = (doc: TrammeDoc): Record<string, string> => {
 };
 
 /**
- * The project's plugins drawn by the sandbox, their modules never loaded on
- * the page (step 5): under the experimental flag, and always for a project
- * that carries a copy of an installed plugin (code from outside the project
- * the user did not write).
+ * The project evaluated and drawn by its sandbox, its code never run on the
+ * page: every project that carries code (plugins, Free code, expressions,
+ * copies of installed plugins), and every project at all under the setting.
+ * A saved preference can only add isolation, never take it away.
  */
-export const sandboxedDoc = (doc: TrammeDoc): boolean => prefs.peek().sandboxPreview || ((doc.plugins ?? []).length > 0 && Object.keys(copiesIn(doc)).length > 0);
+export const sandboxedDoc = (doc: TrammeDoc): boolean => prefs.peek().sandboxPreview || needsIsolation(doc);
 
 /** the operations that copy a plugin into a project (beside the ones that made it needed), and the files to write first */
 export function copyOps(doc: TrammeDoc, p: Installed): { ops: Op[]; files: [string, Blob][] } {

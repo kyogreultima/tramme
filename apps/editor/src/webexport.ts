@@ -11,14 +11,13 @@ import { zipSync } from 'fflate';
 import type { TrammeDoc, Registry } from '@tramme/core';
 import { fetchAssetReader, toLottie, toSvg } from '@tramme/interop';
 import { deepCodec, encodeWav, i420p10, mixComposition, Renderer, SETTLE_LIMIT } from '@tramme/render';
-import { containsExpression } from '@tramme/project';
 
 import { AVC_FROM_STREAM } from './avc.ts';
 import { deviceTarget, keepAwake } from './device.ts';
 import { platform, tauri } from './tauri.ts';
 import type { WebFormat } from './formats.ts';
 import { filterModule, pluginHost } from './plugins/index.ts';
-import { blitSandboxFrame, declarationsModule, ensureDeclared, ensureSandboxDoc, moduleItemsOf, primeSandboxExports, renderSandboxFrame, sandboxDeclaration } from './plugins/sandbox-draw.ts';
+import { blitSandboxFrame, declarationsModule, ensureDeclared, ensureSandboxDoc, moduleItemsOf, primeSandboxExports, renderSandboxFrame, sandboxDeclaration, sandboxVector } from './plugins/sandbox-draw.ts';
 import { prefs } from './settings.ts';
 import { sandboxedDoc } from './installed.ts';
 import { t } from './i18n/index.ts';
@@ -74,12 +73,21 @@ export async function exportInBrowser(doc: TrammeDoc, base: string, format: WebF
   try { return await exportOnce(doc, base, format, opts); } finally { keepAwake(false); }
 }
 
+/** an isolated project's SVG still or Lottie file, converted in its sandbox */
+async function vectorInSandbox(doc: TrammeDoc, base: string, format: 'svg' | 'lottie', opts: WebExportOptions): Promise<WebExportResult> {
+  const { text, warnings } = await sandboxVector(pluginHost(base), doc, base, format, opts.t ?? 0, opts.compId);
+  aborted(opts.signal);
+  return format === 'lottie'
+    ? { blob: new Blob([text], { type: 'application/json' }), ext: 'lottie.json', warnings }
+    : { blob: new Blob([text], { type: 'image/svg+xml' }), ext: 'svg', warnings };
+}
+
 async function exportOnce(doc: TrammeDoc, base: string, format: WebFormat, opts: WebExportOptions): Promise<WebExportResult> {
   if (format !== 'wav' && Object.values(doc.compositions).some((comp) => Object.values(comp.layers).some((layer) => layer.type === 'webscene'))) {
     throw new Error(tauri ? t('export.websceneDesktopApp') : t('export.websceneDesktopOnly'));
   }
   if (format === 'lottie' || format === 'svg') {
-    if (sandboxedDoc(doc) && containsExpression(doc)) throw new Error(t('export.isolatedVectorExpressions'));
+    if (sandboxedDoc(doc)) return vectorInSandbox(doc, base, format, opts);
     const readAsset = await fetchAssetReader(doc, base);
     // the sandboxed nodes' vector exports are computed in the sandbox first: the conversion reads them synchronously
     await primeSandboxExports(doc, opts.registry, opts.t ?? 0);

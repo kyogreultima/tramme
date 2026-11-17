@@ -149,6 +149,9 @@ describe('installed plugins in a project', () => {
     expect(wrote).toEqual(['assets/a.json', 'data/b.json']);
     await expect(c.fetch!('https://elsewhere.test/x')).rejects.toThrow(/did not declare https:\/\/elsewhere.test/);
     await expect(c.fetch!('/api/claude/messages')).rejects.toThrow(/provider route "claude"/);
+    // a declared route cannot name another one through an encoded separator
+    await expect(c.fetch!('/api/generate/%2F..%2Fconfig')).rejects.toThrow(/invalid provider path/);
+    await expect(c.fetch!('/api/generate/%5cconfig')).rejects.toThrow(/invalid provider path/);
     await expect(permitted(ctx, plugin()).fetch!('https://api.example.com/')).rejects.toThrow(/meta.permissions.network/);
     const network = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('ok'));
     try {

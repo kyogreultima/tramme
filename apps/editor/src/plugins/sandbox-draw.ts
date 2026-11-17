@@ -12,8 +12,9 @@ import type { EffectType, Handle, Host, ModifierType, NodeType, PluginModule, Re
 import { Evaluator } from '@tramme/core';
 import { sandboxedDoc } from '../installed.ts';
 import type { Renderer } from '@tramme/render';
-import type { PluginHost } from './host.ts';
-import { videoKey, type FrameAnswer, type FramePayload, type PluginDecl, type SandboxDoc, type SchemaModifier, type SchemaNode, type VideoNeed } from './protocol.ts';
+import { fetchAssetFiles } from '@tramme/interop';
+import { approvedProjectResource, type PluginHost } from './host.ts';
+import { videoKey, type VectorAnswer, type VectorFormat, type FrameAnswer, type FramePayload, type PluginDecl, type SandboxDoc, type SchemaModifier, type SchemaNode, type VideoNeed } from './protocol.ts';
 
 /** what the wrapper needs from the editor: the document and its loaded assets */
 export interface SandboxContext {
@@ -315,4 +316,19 @@ export async function primeSandboxExports(doc: TrammeDoc, registry: Registry, t:
     }
   }
   await Promise.all(jobs);
+}
+
+/** the bytes an isolated conversion may embed per file, as the isolated renderer reads images */
+const VECTOR_FILE_LIMIT = 32 * 1024 * 1024;
+
+/**
+ * An isolated document's SVG still or Lottie file, converted in its sandbox
+ * (its expressions, modifiers and plugin nodes run there): the page reads only
+ * the images, fonts and data of the project's own folder, and receives the text.
+ */
+export async function sandboxVector(host: PluginHost, doc: TrammeDoc, docUrl: string, format: VectorFormat, t: number, compId: string): Promise<VectorAnswer> {
+  await ensureDeclared(host, moduleItemsOf(doc, docUrl));
+  const root = new URL('./', new URL(docUrl, location.href));
+  const files = await fetchAssetFiles(doc, docUrl, { approve: (url) => approvedProjectResource(url, root.pathname, location.origin, location.protocol), limit: VECTOR_FILE_LIMIT });
+  return host.vector(format, doc, t, compId, Object.fromEntries(files));
 }

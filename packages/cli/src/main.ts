@@ -21,21 +21,24 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { upgradeDoc, documentJsonSchema, stringifyDoc, validate, type TrammeDoc } from '@tramme/core';
+import { isolateExpressions, upgradeDoc, documentJsonSchema, stringifyDoc, validate, type TrammeDoc } from '@tramme/core';
 import { builtinRegistry } from '@tramme/nodes';
 import { fromLottie, toLottie, toSvg } from '@tramme/interop';
 import { fileAssetReader } from '@tramme/interop/node';
 import { launch, openDoc } from './browser.ts';
 import { compareFiles } from './compare.ts';
 import { formatParts } from '@tramme/render/src/timing.ts';
-import { defaultPages, renderAudio, renderVideo } from './jobs.ts';
+import { defaultPages, renderAudio, renderVideo, vectorInSandbox } from './jobs.ts';
 import { VIDEO_FORMATS, type VideoFormat } from './media.ts';
 import { docRegistry, filesRegistry } from './plugins.ts';
 import { plainError } from './plain-error.ts';
 import { readConfig, resolveMountedPath, Server } from './server.ts';
-import { checkProject, containsExpression, DOCUMENT, isChatPath, MANIFEST, newProject, packProject, unpackProject, LEGACIES, migrateProject } from '@tramme/project';
+import { checkProject, containsExpression, DOCUMENT, needsIsolation, isChatPath, MANIFEST, newProject, packProject, unpackProject, LEGACIES, migrateProject } from '@tramme/project';
 import { lintSceneFiles, MAX_SCENE_SOURCE } from '@tramme/project/src/scene-lint.ts';
 import { engineCapture, prepareWebScenes } from './webscene.ts';
+
+// This native process never runs a project's expression: it converts, checks and renders through the browser sandbox.
+isolateExpressions();
 
 const [cmd, ...rest] = process.argv.slice(2);
 const pos: string[] = [];
@@ -166,24 +169,35 @@ function cmdCompare(ref: string, test: string) {
 async function cmdExport(file: string) {
   const doc = readDoc(file);
   const format = str('format');
-  if ((format === 'lottie' || format === 'svg') && containsExpression(doc)) throw new Error('vector export with expressions requires an isolated renderer; use raster export');
-  const { registry, resolve, dir } = registryOf(file, doc);
   const compId = str('comp') ?? doc.root;
-  const readAsset = fileAssetReader(doc, dir, resolve);
   const report = (w: string[]) => { for (const x of w) console.log(`  attention : ${x}`); };
+  const write = (out: string, text: string) => { fs.mkdirSync(path.dirname(out), { recursive: true }); fs.writeFileSync(out, text); };
+  const t = num('t') ?? 0;
+  const outOf = () => path.resolve(str('out') ?? path.join('out', format === 'lottie' ? `${stem(file)}.lottie.json` : `${stem(file)}_${t.toFixed(3)}.svg`));
+  // a project with code converts in the render page's sandbox: its expressions and plugins never run in this process
+  if ((format === 'lottie' || format === 'svg') && needsIsolation(doc)) {
+    const s = await session(file);
+    try {
+      const { text, warnings } = await vectorInSandbox(s.page, format, t, compId);
+      const out = outOf();
+      write(out, text);
+      console.log(`wrote ${path.relative(process.cwd(), out)}${format === 'lottie' ? ` (${(fs.statSync(out).size / 1024).toFixed(0)} KB)` : ''}`);
+      report(warnings);
+    } finally { await s.close(); }
+    return;
+  }
+  const { registry, resolve, dir } = registryOf(file, doc);
+  const readAsset = fileAssetReader(doc, dir, resolve);
   if (format === 'lottie') {
     const { lottie, warnings } = toLottie(doc, await registry, { compId, readAsset });
-    const out = path.resolve(str('out') ?? path.join('out', `${stem(file)}.lottie.json`));
-    fs.mkdirSync(path.dirname(out), { recursive: true });
-    fs.writeFileSync(out, JSON.stringify(lottie));
+    const out = outOf();
+    write(out, JSON.stringify(lottie));
     console.log(`wrote ${path.relative(process.cwd(), out)} (${(fs.statSync(out).size / 1024).toFixed(0)} KB)`);
     report(warnings);
   } else if (format === 'svg') {
-    const t = num('t') ?? 0;
     const { svg, warnings } = toSvg(doc, await registry, t, { compId, readAsset });
-    const out = path.resolve(str('out') ?? path.join('out', `${stem(file)}_${t.toFixed(3)}.svg`));
-    fs.mkdirSync(path.dirname(out), { recursive: true });
-    fs.writeFileSync(out, svg);
+    const out = outOf();
+    write(out, svg);
     console.log(`wrote ${path.relative(process.cwd(), out)}`);
     report(warnings);
   } else if (format === 'wav') {

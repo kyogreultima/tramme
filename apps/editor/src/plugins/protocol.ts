@@ -160,6 +160,13 @@ export interface VideoNeed { id: string; t: number }
 /** what a sandbox frame gives back: its picture and the video frames it drew, or the video frames it still lacks */
 export interface FrameAnswer { bitmap?: unknown; err?: string; need?: VideoNeed[]; drew?: VideoNeed[] }
 
+/** a whole SVG still or Lottie file converted in the sandbox, where the document's expressions may run */
+export type VectorFormat = 'svg' | 'lottie';
+/** an approved asset's bytes for a vector conversion (the sandbox reads no file itself) */
+export interface VectorFile { data: Uint8Array; mime: string; width: number; height: number }
+/** the converted text (SVG markup or Lottie JSON) and what the conversion could not carry */
+export interface VectorAnswer { text: string; warnings: string[] }
+
 /** the key a decoded video frame crosses under: the asset and its time in the file, to the microsecond */
 export const videoKey = (id: string, t: number) => `${id}@${Math.round(t * 1e6)}`;
 
@@ -199,6 +206,7 @@ export type ToWorker =
   | { kind: 'qualityChecks'; call: number; compId: string }
   | { kind: 'samplePlaced'; call: number; t: number; compId: string }
   | { kind: 'export'; call: number; type: string; props: unknown }
+  | { kind: 'vector'; call: number; format: VectorFormat; doc: unknown; t: number; compId: string; files: Record<string, VectorFile> }
   | { kind: 'abort'; call: number }
   | { kind: 'answer'; id: number; ok?: unknown; err?: string };
 
@@ -221,6 +229,7 @@ export type FromWorker =
   | { kind: 'qualityChecked'; call: number; values?: QualityIssue[]; err?: string }
   | { kind: 'sampledPlaced'; call: number; values?: PlacedSample[]; err?: string }
   | { kind: 'exported'; call: number; svg?: string; lottie?: unknown; err?: string }
+  | { kind: 'vectored'; call: number; text?: string; warnings?: string[]; err?: string }
   | { kind: 'ask'; id: number; call: number; q: Ask }
   | { kind: 'progress'; call: number; done: number; total: number; step?: string };
 

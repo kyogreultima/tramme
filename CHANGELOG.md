@@ -15,6 +15,16 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 - Sound-specific cue timing, music-key tuning for pitched effects, mono cancellation warnings and rhythm checks against saved reference films.
 - Path deformers (wave, noise, twist and bend).
 - Lottie import of positions animated with X and Y apart (After Effects' Separate Dimensions), and of zero-length layers that serve as parents.
+- SVG and Lottie export of projects with expressions, plugins or Free code, in the editor, the desktop app and the command line: the conversion runs in the project's sandbox.
+
+### Changed
+
+- Every project that carries code (plugins, Free code, expressions) now plays, exports and converts in its own sandbox, in the editor, the desktop app and the command line; the setting draws projects without code there too. The editor's page and the command line's process run no project expression themselves.
+- A plugin's tool saves files under `assets/` only; the document, plugin code, web scenes, versions and conversations stay out of its reach.
+
+### Fixed
+
+- The preview says plainly when the project's sandbox stopped, and recognizes a memory limit again.
 
 ## [0.30.1] - 2026-11-17
 

@@ -2,7 +2,7 @@
 // never waits and never depends on timing. Paths resolve against the
 // document's URL. sync() follows edits: only new or changed assets load.
 
-import { parseCube, type Asset, type TrammeDoc } from '@tramme/core';
+import { parseCube, readBounded, type Asset, type TrammeDoc } from '@tramme/core';
 import { VideoFrames } from './video.ts';
 
 /** the longest side, in pixels, of an SVG drawn without a size of its own */
@@ -22,21 +22,7 @@ const MAX_IMAGE_SIDE = 8192;
 const MAX_PROJECT_ASSETS = 4096;
 
 async function boundedBytes(response: Response, limit: number, label: string): Promise<ArrayBuffer> {
-  const declared = Number(response.headers.get('content-length'));
-  if (declared > limit) { void response.body?.cancel(); throw new Error(`${label} exceeds ${limit / 1048576} MB`); }
-  const reader = response.body?.getReader();
-  if (!reader) throw new Error(`${label} requires a streamed response`);
-  const chunks: Uint8Array[] = []; let size = 0;
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    size += value.byteLength;
-    if (size > limit) { void reader.cancel(); throw new Error(`${label} exceeds ${limit / 1048576} MB`); }
-    chunks.push(value);
-  }
-  const bytes = new Uint8Array(size); let at = 0;
-  for (const chunk of chunks) { bytes.set(chunk, at); at += chunk.byteLength; }
-  return bytes.buffer as ArrayBuffer;
+  return (await readBounded(response, limit, label)).buffer as ArrayBuffer;
 }
 
 /** the proportions of an SVG from its viewBox (1:1 when it has none) */

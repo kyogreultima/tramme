@@ -147,6 +147,11 @@ async function renderSegments(server: Server, first: Page, job: VideoJob, info: 
   }
 }
 
+/** an isolated document's SVG still or Lottie file, converted in the sandbox of a render page that opened it */
+export async function vectorInSandbox(page: Page, format: 'svg' | 'lottie', t: number, compId: string | undefined): Promise<{ text: string; warnings: string[] }> {
+  return page.evaluate((x) => (window as any).TRAMME.vector(x.format, x.t, x.compId), { format, t, compId });
+}
+
 /** the composition's sound alone, as a WAV */
 export async function renderAudio(server: Server, page: Page, docUrl: string, compId: string | undefined, out: string) {
   const info = await openDoc(page, server.port, docUrl, compId);

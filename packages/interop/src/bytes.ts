@@ -1,7 +1,7 @@
 // Asset bytes for the exporters, in browsers and Node: media type, pixel
 // size read from the image header (PNG, JPEG, GIF, WebP), base64.
 
-import type { TrammeDoc } from '@tramme/core';
+import { readBounded, type TrammeDoc } from '@tramme/core';
 
 export interface AssetFile { data: Uint8Array; mime: string; width: number; height: number }
 /** the bytes of an asset by id, or null when it cannot be read */
@@ -48,15 +48,35 @@ export function assetFile(type: string, name: string, data: Uint8Array): AssetFi
   return { data, mime: mimeOfName(name), width: size?.width ?? 0, height: size?.height ?? 0 };
 }
 
+/** which asset urls a conversion may read, and how many bytes each */
+export interface AssetFetchOptions {
+  /** false: the url is not read (an isolated project reads its own folder only) */
+  approve?(url: URL): boolean;
+  /** bytes per file; a larger one is not read */
+  limit?: number;
+}
+
 /**
- * readAsset for the exporters in a browser: images, fonts and JSON data of the document
- * fetched first (relative srcs resolve against base), then read at once.
+ * The images, fonts and JSON data of the document, by asset id, fetched for a
+ * conversion (relative srcs resolve against base). A file refused by `approve`,
+ * missing or over `limit` is left out: the exporter warns about it.
  */
-export async function fetchAssetReader(doc: TrammeDoc, base: string): Promise<AssetReader> {
+export async function fetchAssetFiles(doc: TrammeDoc, base: string, opts: AssetFetchOptions = {}): Promise<Map<string, AssetFile>> {
   const files = new Map<string, AssetFile>();
   await Promise.all(Object.entries(doc.assets).filter(([, a]) => a.type === 'image' || a.type === 'font' || a.type === 'json').map(async ([id, a]) => {
-    const r = await fetch(new URL(a.src, base));
-    if (r.ok) files.set(id, assetFile(a.type, a.src, new Uint8Array(await r.arrayBuffer())));
+    let url: URL;
+    try { url = new URL(a.src, base); } catch { return; }
+    if (opts.approve && !opts.approve(url)) return;
+    const r = await fetch(url);
+    if (!r.ok) return;
+    const data = opts.limit ? await readBounded(r, opts.limit, a.src).catch(() => null) : new Uint8Array(await r.arrayBuffer());
+    if (data) files.set(id, assetFile(a.type, a.src, data));
   }));
+  return files;
+}
+
+/** readAsset for the exporters in a browser: the document's files fetched first, then read at once */
+export async function fetchAssetReader(doc: TrammeDoc, base: string, opts: AssetFetchOptions = {}): Promise<AssetReader> {
+  const files = await fetchAssetFiles(doc, base, opts);
   return (id) => files.get(id) ?? null;
 }

@@ -4,7 +4,8 @@
 // runs their tools and checks against a context whose every reach into the
 // project is a message answered by the page. Nothing here touches the DOM.
 
-import { Registry, type CheckContext, type CheckType, type EffectType, type ModifierType, type MotionReport, type NodeType, type PluginModule, type Quad, type QualityIssue, type SoundCue, type ToolContext, type ToolOutput } from '@tramme/core';
+import { Registry, type TrammeDoc, type CheckContext, type CheckType, type EffectType, type ModifierType, type MotionReport, type NodeType, type PluginModule, type Quad, type QualityIssue, type SoundCue, type ToolContext, type ToolOutput } from '@tramme/core';
+import type { VectorAnswer, VectorFile, VectorFormat } from './protocol.ts';
 import type { Ask, CheckCtxData, ClockSample, DrawPayload, DrawResult, FrameAnswer, FramePayload, FromWorker, LayerSample, MotionSample, PlacedSample, PluginDecl, SandboxDoc, SchemaEffect, SchemaModifier, SchemaNode, ToWorker, ToolCtxData } from './protocol.ts';
 
 /** the sandbox id of an installed plugin (installed:<file>): the project's own plugins have the document's asset ids */
@@ -36,6 +37,8 @@ export interface SandboxDrawSide {
   sampleQuads(layerId: string, compId: string, times: number[]): Promise<Quad[]>;
   qualityChecks(compId: string): Promise<QualityIssue[]>;
   samplePlaced(t: number, compId: string): Promise<PlacedSample[]>;
+  /** a whole SVG still or Lottie file of the document, converted here with the project's modules */
+  vector(format: VectorFormat, doc: TrammeDoc, t: number, compId: string, files: Record<string, VectorFile>): Promise<VectorAnswer>;
 }
 
 export interface WorkerSideOptions {
@@ -285,6 +288,17 @@ export function startWorkerSide({ post, importModule, sandbox: makeSandbox }: Wo
           const r = await sandbox.exportOf(m.type, m.props).catch((e: Error) => ({ err: e.message }));
           post({ kind: 'exported', call: m.call, ...r });
         })();
+        return;
+      }
+      if (m.kind === 'vector') {
+        if (!sandbox) { post({ kind: 'vectored', call: m.call, err: 'the sandbox cannot convert here' }); return; }
+        if ((m.format !== 'svg' && m.format !== 'lottie') || !Number.isFinite(m.t) || typeof m.compId !== 'string' || m.compId.length > 256 ||
+            !m.doc || typeof m.doc !== 'object' || !m.files || typeof m.files !== 'object') {
+          post({ kind: 'vectored', call: m.call, err: 'invalid sandbox vector request' }); return;
+        }
+        void sandbox.vector(m.format, m.doc as TrammeDoc, m.t, m.compId, m.files)
+          .then((r) => post({ kind: 'vectored', call: m.call, text: r.text, warnings: r.warnings }))
+          .catch((e: Error) => post({ kind: 'vectored', call: m.call, err: e.message }));
         return;
       }
       if (m.kind === 'abort') {

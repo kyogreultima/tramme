@@ -26,6 +26,23 @@ export function filterModule(mod: PluginModule): PluginModule {
   };
 }
 
+/**
+ * Every sandboxed tool writes media and data only: under assets/ (or renders/).
+ * The document, the manifest, conversations, versions, web scenes and plugin
+ * modules are refused whatever the context it was given (a grant of declared
+ * files included), so a tool can neither bypass the proposal's validation nor
+ * replace code that runs with another plugin's grants.
+ */
+const SANDBOX_WRITABLE = /^(assets|renders)\//;
+export function sandboxedContext(ctx: ToolContext): ToolContext {
+  return {
+    ...ctx,
+    writeFile: (path, data) => (typeof path === 'string' && SANDBOX_WRITABLE.test(path)
+      ? ctx.writeFile(path, data)
+      : Promise.reject(new Error(`a plugin's tool writes under assets/ only, not ${String(path)}`))),
+  };
+}
+
 /** the plugins (id and url) a registry already carries from a sandbox */
 const attached = new WeakMap<Registry, { host: PluginHost; done: Set<string> }>();
 
@@ -57,7 +74,7 @@ export async function attachIsolated(registry: Registry, host: PluginHost, doc: 
           return target;
         };
         registry.use({
-          tools: d.tools.map((t) => ({ ...t, run: async (input, ctx) => (await executionHost()).runTool(t.name, input, context ? context(p.id, ctx) : ctx) })),
+          tools: d.tools.map((t) => ({ ...t, run: async (input, ctx) => (await executionHost()).runTool(t.name, input, sandboxedContext(context ? context(p.id, ctx) : ctx)) })),
           checks: d.checks.map((c) => ({ ...c, run: async (ctx) => (await executionHost()).runCheck(c.name, ctx) })),
         }, p.id);
       }
@@ -115,7 +132,7 @@ export async function attachInstalled(registry: Registry, host: PluginHost, list
         tools: d.tools.filter((t) => !registry.hasTool(t.name)).map((t) => ({ ...t, run: (input, ctx) => around(p.id, async () => {
           const target = hooks.hostFor?.(p.id, p.url) ?? host;
           if (target !== host) await target.ensure([{ id: p.id, url: p.url }]);
-          return target.runTool(t.name, input, hooks.context ? hooks.context(p.id, ctx) : ctx);
+          return target.runTool(t.name, input, sandboxedContext(hooks.context ? hooks.context(p.id, ctx) : ctx));
         }) })),
         checks: free(d.checks, registry.listChecks().map((c) => c.check)).map((c) => ({ ...c, run: (ctx) => around(p.id, async () => {
           const target = hooks.hostFor?.(p.id, p.url) ?? host;

@@ -4,7 +4,8 @@
 // validated and proposed like any tool's (ai/tools.ts calls the wrappers the
 // registry carries — plugins/vocabulary.ts puts them there).
 
-import { toolOutput, type CheckContext, type MotionReport, type NodeType, type PlacedLayer, type Quad, type QualityIssue, type SoundCue, type ToolContext, type ToolOutput } from '@tramme/core';
+import { readBounded, toolOutput, type CheckContext, type MotionReport, type NodeType, type PlacedLayer, type Quad, type QualityIssue, type SoundCue, type ToolContext, type ToolOutput } from '@tramme/core';
+import type { VectorAnswer, VectorFile, VectorFormat } from './protocol.ts';
 import type { Ask, ClockSample, DrawPayload, DrawResult, FrameAnswer, FramePayload, FromWorker, LayerSample, MotionSample, PlacedSample, PluginDecl, SandboxDoc, ToWorker } from './protocol.ts';
 
 /** the schema of a node without its code: what a check's samples may cross */
@@ -36,6 +37,8 @@ const OUTBOUND_LIMIT = 64 * 1024 * 1024;
 /** the values an outbound message may hold: room for a long film's document, bounded so a walk of it stays short */
 const OUTBOUND_COUNT = 4_000_000;
 const GRAPHICS_LIMIT = 256 * 1024 * 1024;
+/** a converted SVG or Lottie file, embedded pictures and fonts included */
+const VECTOR_LIMIT = 64 * 1024 * 1024;
 /** how long an export waits for one frame of the sandbox before taking it as stuck (the preview: 30 s) */
 const EXPORT_FRAME_SECONDS = 300;
 /** the video frames one sandbox frame may ask for (each video layer, at each motion-blur sample) */
@@ -103,30 +106,7 @@ function graphicsTooLarge(value: unknown): boolean {
 }
 
 /** Read only approved bytes; cancel a slow or oversized response before it fills memory. */
-export async function readLimitedBody(response: Response, max: number, label: string): Promise<Uint8Array> {
-  const tooLarge = () => new Error(`${label} exceeds ${max / (1024 * 1024)} MB`);
-  const length = response.headers.get('content-length');
-  if (length && Number(length) > max) { await response.body?.cancel(); throw tooLarge(); }
-  if (!response.body) return new Uint8Array();
-  const reader = response.body.getReader(), chunks: Uint8Array[] = [];
-  let total = 0;
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      total += value.byteLength;
-      if (total > max) throw tooLarge();
-      chunks.push(value);
-    }
-  } catch (error) {
-    await reader.cancel().catch(() => {});
-    throw error;
-  } finally { reader.releaseLock(); }
-  const out = new Uint8Array(total);
-  let offset = 0;
-  for (const chunk of chunks) { out.set(chunk, offset); offset += chunk.byteLength; }
-  return out;
-}
+export const readLimitedBody = readBounded;
 
 export interface PluginHost {
   /**
@@ -164,6 +144,8 @@ export interface PluginHost {
   sampleQuads(layerId: string, compId: string, times: number[]): Promise<Quad[]>;
   samplePlaced(t: number, compId: string): Promise<PlacedSample[]>;
   qualityChecks(compId: string): Promise<QualityIssue[]>;
+  /** a whole SVG still or Lottie file converted in the sandbox, from approved asset bytes */
+  vector(format: VectorFormat, doc: unknown, t: number, compId: string, files: Record<string, VectorFile>): Promise<VectorAnswer>;
   /** stop: every call waiting is refused, with `reason` when there is one */
   dispose(reason?: string): void;
   /** disposed (its worker stopped): the next project's or call's sandbox is a new one */
@@ -433,6 +415,18 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
       else w.resolve(m.values);
       return;
     }
+    if (m.kind === 'vectored') {
+      if ((m.err !== undefined && (typeof m.err !== 'string' || m.err.length > 4096)) || (m.text !== undefined && typeof m.text !== 'string') ||
+          (m.warnings !== undefined && (!Array.isArray(m.warnings) || m.warnings.length > 1000 || m.warnings.some((w) => typeof w !== 'string' || w.length > 4096)))) { invalid(); return; }
+      if (responseTooLarge(m.text, VECTOR_LIMIT, 1)) { timeout(`sandbox response exceeds ${VECTOR_LIMIT / (1024 * 1024)} MB`); return; }
+      const w = waits.get(m.call);
+      if (!w) return;
+      waits.delete(m.call);
+      if (m.err) w.reject(new Error(m.err));
+      else if (typeof m.text !== 'string') w.reject(new Error('invalid sandbox vector response'));
+      else w.resolve({ text: m.text, warnings: m.warnings ?? [] });
+      return;
+    }
     if (m.kind === 'progress') {
       if (!Number.isFinite(m.done) || !Number.isFinite(m.total) || (m.step !== undefined && (typeof m.step !== 'string' || m.step.length > 4096))) { invalid(); return; }
       const ctx = bridges.get(m.call);
@@ -627,6 +621,10 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
           (v.layers !== undefined && (!Array.isArray(v.layers) || v.layers.length > 256 || v.layers.some((id) => typeof id !== 'string' || id.length > 256))) ||
           !validSay(v.say))) throw new Error('invalid sandbox quality response');
       return values;
+    },
+    async vector(format, doc, t, compId, files) {
+      if ((format !== 'svg' && format !== 'lottie') || !Number.isFinite(t) || typeof compId !== 'string' || compId.length > 256) throw new Error('invalid sandbox vector request');
+      return await run({ kind: 'vector', call: ++call, format, doc, t, compId, files }, undefined, undefined, EXPORT_FRAME_SECONDS) as VectorAnswer;
     },
     dispose(reason) {
       const wasOpen = !closed;
