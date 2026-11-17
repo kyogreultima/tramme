@@ -34,7 +34,8 @@ const KEEP_MS = 60 * 60_000;
 /** a command of the CLI; when it fails, the reason it printed last (its errors, stacks left out) */
 function cli(args: string[]): Promise<void> {
   return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [CLI, ...args], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] });
+    // offline: the project's code runs on the render page at full speed, its Chrome cut off from all but the local render server (browser.ts)
+    const child = spawn(process.execPath, [CLI, ...args], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, TRAMME_OFFLINE: '1' } });
     let out = '', err = '';
     child.stdout.on('data', (d) => { out = (out + d).slice(-8000); });
     child.stderr.on('data', (d) => { err = (err + d).slice(-8000); });

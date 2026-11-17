@@ -3,7 +3,8 @@
 //   tramme check    <doc> [--comp id]                                  the picture checks, issues folded by cause
 //   tramme still    <doc> --t 0.5,1.2 [--out dir] [--samples n] [--comp id]
 //   tramme cloud-export <doc|project.tramme> [--app url] [--token tr_…] [--out film.mp4] [--comp id]   rendered in the cloud of an account (cloud-export.ts)
-//   tramme render   <doc> [--format mp4|mov|webm|gif|png] [--out file] [--samples n] [--from s] [--to s] [--crf 16] [--mute] [--comp id] [--pages n] [--depth 8|10]
+//   tramme render   <doc> [--format mp4|mov|webm|gif|png] [--out file] [--samples n] [--from s] [--to s] [--crf 16] [--mute] [--comp id] [--pages n] [--depth 8|10] [--isolate]
+//                   --isolate: a project with code drawn in its sandbox, not on the render page (slower)
 //   tramme export   <doc> --format lottie|svg|wav [--t s] [--comp id] [--out file]
 //   tramme premiere <doc> [--out folder] [--comp id] [--zip file]       a Premiere Pro timeline: XML, the footage and sounds, the drawings as ProRes clips with alpha, SRT (premiere.ts)
 //   tramme import   <animation.json> [--out folder]                     Lottie to a Tramme project folder
@@ -25,7 +26,7 @@ import { isolateExpressions, upgradeDoc, documentJsonSchema, stringifyDoc, valid
 import { builtinRegistry } from '@tramme/nodes';
 import { fromLottie, toLottie, toSvg } from '@tramme/interop';
 import { fileAssetReader } from '@tramme/interop/node';
-import { launch, openDoc } from './browser.ts';
+import { isolateProjects, launch, openDoc } from './browser.ts';
 import { compareFiles } from './compare.ts';
 import { formatParts } from '@tramme/render/src/timing.ts';
 import { defaultPages, renderAudio, renderVideo, vectorInSandbox } from './jobs.ts';
@@ -58,6 +59,8 @@ const asDoc = (p?: string) => {
 if (!['compare', 'import', 'pack', 'unpack', 'bench', 'load', 'agent', 'check-media'].includes(cmd)) pos[0] = asDoc(pos[0])!;
 const num = (k: string) => (flags[k] === undefined ? undefined : Number(flags[k]));
 const str = (k: string) => (typeof flags[k] === 'string' ? (flags[k] as string) : undefined);
+// a project's code runs on the render page unless asked otherwise (browser.ts)
+isolateProjects(!!flags.isolate);
 
 function readDoc(file: string): TrammeDoc {
   if (!file || !fs.existsSync(file)) throw new Error(`document not found: ${file ?? '(none)'}`);

@@ -188,7 +188,7 @@ function Card({ m, onMenu }: { m: Manifest; onMenu: (e: MouseEvent | { clientX: 
           ? <img src={`${api.fileUrl(m.id, m.thumbnail)}?v=${encodeURIComponent(m.modified)}`} alt="" loading="lazy" onError={() => setBroken(true)} />
           : <span class="frame" style={{ aspectRatio: `${m.width ?? 16} / ${m.height ?? 9}`, ...(vertical ? { width: 'auto', height: '62%' } : {}) }}><Icon name="film" /></span>}
       </div>
-      {inCloud && <span class="card-cloud" title={t('home.inYourAccount')}>Cloud</span>}
+      {inCloud && <span class="card-cloud" title={t('home.inYourAccount')} role="img" aria-label={t('home.inYourAccount')}><Icon name="cloud" /></span>}
       <div class="card-meta">
         <div class="card-name" title={m.name}>{m.name}</div>
         <div class="card-sub">{[dims(m), ago(m.modified)].filter(Boolean).join(' · ')}</div>

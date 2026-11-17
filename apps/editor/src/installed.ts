@@ -11,7 +11,7 @@
 import { signal } from '@preact/signals';
 import { PROVIDER_ROUTES, recordBucket } from '@tramme/api';
 import { applyOps, type Op, type ToolContext, type TrammeDoc } from '@tramme/core';
-import { compareVersions, LIMITS, manifestOf, needsIsolation, packInstalled, permissionsAdded, readPluginPackage, unpackInstalled, type PluginManifest } from '@tramme/project';
+import { compareVersions, LIMITS, manifestOf, packInstalled, permissionsAdded, readPluginPackage, unpackInstalled, type PluginManifest } from '@tramme/project';
 import { api, reach } from './api.ts';
 import { folderRecords, type DirHandle } from './local/folder.ts';
 import { personal } from './mode.ts';
@@ -358,12 +358,14 @@ export const copiesIn = (doc: TrammeDoc): Record<string, string> => {
 };
 
 /**
- * The project evaluated and drawn by its sandbox, its code never run on the
- * page: every project that carries code (plugins, Free code, expressions,
- * copies of installed plugins), and every project at all under the setting.
- * A saved preference can only add isolation, never take it away.
+ * The project evaluated and drawn by its sandbox. Trust is given once, at the
+ * door, as a host application does with its plugins: the user's own projects,
+ * the assistant's code and a project whose code the user accepted at import
+ * (importer.ts) run on the page at full speed. The sandbox draws a project
+ * that carries a copy of an installed plugin (code from outside the project
+ * the user did not write), and every project under the setting.
  */
-export const sandboxedDoc = (doc: TrammeDoc): boolean => prefs.peek().sandboxPreview || needsIsolation(doc);
+export const sandboxedDoc = (doc: TrammeDoc): boolean => prefs.peek().sandboxPreview || ((doc.plugins ?? []).length > 0 && Object.keys(copiesIn(doc)).length > 0);
 
 /** the operations that copy a plugin into a project (beside the ones that made it needed), and the files to write first */
 export function copyOps(doc: TrammeDoc, p: Installed): { ops: Op[]; files: [string, Blob][] } {

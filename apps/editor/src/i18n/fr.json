@@ -1213,7 +1213,7 @@
     "scrubAudioHint": "Déplacer la tête de lecture joue une courte fenêtre du son à chaque pas, assez pour entendre le moment d’une coupe ou d’un effet. Le son des vidéos n’est pas scrubbé.",
     "likeTheExport24": "Comme l'export : 24 images par seconde pour une composition à 24 i/s, plutôt qu'une à chaque rafraîchissement de l'écran. Plus léger, sans perte.",
     "sandboxPreview": "Dessiner chaque projet dans son bac à sable",
-    "sandboxPreviewHint": "Un projet qui contient du code (plugins, Code libre, expressions) est toujours évalué et dessiné dans son propre bac à sable, où son code n'atteint que ce que l'éditeur lui transmet. Ce réglage y dessine aussi les projets sans code. Les images vidéo sont décodées ici ; un scrub peut montrer l'image précédente un instant.",
+    "sandboxPreviewHint": "La confiance se donne une fois : vos projets, le code de l'assistant et un projet dont vous avez accepté le code à l'import tournent dans l'éditeur à pleine vitesse. Activé, chaque projet est évalué et dessiné dans son propre bac à sable, où son code n'atteint que ce que l'éditeur lui transmet ; la lecture et les exports sont plus lents.",
     "previewRenderStillWhen": "Rendu de l'aperçu : {still} à l'arrêt, {motion} en mouvement (ajusté pendant la lecture).",
     "previewRenderStillWhenStill": "Rendu de l'aperçu : {still} à l'arrêt, {motion} en mouvement.",
     "offerToursOnOpening": "Proposer les visites à l'ouverture",

@@ -11,6 +11,7 @@ vi.mock('../src/plugins/index.ts', async (load) => ({
 import { newProject } from '@tramme/project';
 import { builtinRegistry } from '@tramme/nodes';
 import { exportInBrowser } from '../src/webexport.ts';
+import { prefs } from '../src/settings.ts';
 
 describe('browser web scene export', () => {
   it('refuses visual export before opening a renderer', async () => {
@@ -23,6 +24,9 @@ describe('browser web scene export', () => {
   });
 
   it('converts an isolated vector export in the sandbox, never on the page', async () => {
+    // isolation is the user's choice: their own projects are trusted, as a host application trusts its plugins
+    const was = prefs.peek();
+    prefs.value = { ...was, sandboxPreview: true };
     const doc = newProject({ name: 'Expression', width: 64, height: 64, fps: 1, duration: 1 }).doc;
     // run on the page, this expression would write a global
     doc.compositions.main.layers.title = { type: 'text', props: { text: { $expr: '(globalThis.__pageRan = true, "hello")' } }, transform: {} } as never;
@@ -35,5 +39,6 @@ describe('browser web scene export', () => {
     expect(sandbox.calls).toEqual([['svg', doc, 0.5, 'main', {}]]);
     expect((globalThis as { __pageRan?: boolean }).__pageRan).toBeUndefined();
     vi.unstubAllGlobals();
+    prefs.value = was;
   });
 });

@@ -202,10 +202,31 @@ function shellOf(meta: esbuild.Metafile): { shell: string[]; build: string } {
 }
 
 /** the plugin sandbox: a module worker at a fixed address (src/plugins/worker.ts), its own bundle */
+/**
+ * The project sandbox starts its worker from a data: URL of this bundle
+ * (project-sandbox.html), and Chrome refuses a URL over 2 MiB without a word:
+ * the worker fails with "unknown error" and every project with code stops. The
+ * bundle is minified in development too (its source map keeps it readable), and
+ * the build fails while there is still room (SANDBOX_URL_BUDGET).
+ */
+const SANDBOX_URL_LIMIT = 2 * 1024 * 1024;
+const SANDBOX_URL_BUDGET = Math.floor(SANDBOX_URL_LIMIT * 0.85);
+const sandboxUrlLength = (code: string) => `data:text/javascript;charset=utf-8,${encodeURIComponent(code)}`.length;
+const sandboxSize: esbuild.Plugin = {
+  name: 'sandbox-size',
+  setup: (b) => b.onEnd((r) => {
+    if (r.errors.length) return;
+    const n = sandboxUrlLength(fs.readFileSync(path.join(DIST, 'plugin-worker.js'), 'utf8'));
+    if (n <= SANDBOX_URL_BUDGET) return;
+    const why = `the sandbox worker is ${(n / 1048576).toFixed(2)} MiB as the data: URL the sandbox starts it from: over its budget of ${(SANDBOX_URL_BUDGET / 1048576).toFixed(2)} MiB (Chrome refuses ${(SANDBOX_URL_LIMIT / 1048576).toFixed(0)} MiB). Keep what the worker imports smaller.`;
+    if (dev) console.error(`[build] ${why}`);
+    else throw new Error(why);
+  }),
+};
 const sandboxOptions: esbuild.BuildOptions = {
   entryPoints: [path.join(HERE, 'src/plugins/worker.ts')], outfile: path.join(DIST, 'plugin-worker.js'),
   bundle: true, format: 'esm', platform: 'browser', target: 'chrome120',
-  minify: !dev && !process.env.TRAMME_NOMINIFY, sourcemap: 'linked', logLevel: 'warning', legalComments: 'none',
+  minify: true, sourcemap: 'linked', logLevel: 'warning', legalComments: 'none', plugins: [sandboxSize],
 };
 
 /** the seek runtime web scenes import, a file of its own: the live preview puts it in each scene's document */

@@ -12,7 +12,7 @@ import './install.ts';
 import '@fontsource-variable/geist';
 import '@fontsource-variable/geist-mono';
 import { DOCUMENT } from '@tramme/project';
-import { isolateExpressions, upgradeDoc, type TrammeDoc } from '@tramme/core';
+import { upgradeDoc, type TrammeDoc } from '@tramme/core';
 import { api } from './api.ts';
 import { preview } from './preview.ts';
 import { comp, commit, hooks, load, S, select, setTime, undo } from './state.ts';
@@ -55,10 +55,6 @@ import { carryBodies, followBars, startBackButton } from './device.ts';
 import { watchUpdates } from './version.ts';
 import { copiesFor, startInstalled } from './installed.ts';
 import { lift } from './nav.ts';
-
-// The editor's page never runs a project's expression: an evaluator built here
-// without saying otherwise refuses one (it runs in the project's sandbox).
-isolateExpressions();
 
 const root = document.getElementById('app')!;
 

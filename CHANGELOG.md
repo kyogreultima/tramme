@@ -19,7 +19,9 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ### Changed
 
-- Every project that carries code (plugins, Free code, expressions) now plays, exports and converts in its own sandbox, in the editor, the desktop app and the command line; the setting draws projects without code there too. The editor's page and the command line's process run no project expression themselves.
+- Projects are trusted once, as a host application trusts its plugins: your own projects, the assistant's code and a project whose code you accepted on import play and export at full speed. The sandbox draws projects that carry a copy of an installed plugin, and every project when the setting asks for it; `tramme render --isolate` does the same on the command line.
+- Exports in the cloud run a project's code at full speed, in a Chrome cut off from the network.
+- A project saved in your account shows a cloud icon on its card, in place of the word.
 - A plugin's tool saves files under `assets/` only; the document, plugin code, web scenes, versions and conversations stay out of its reach.
 
 ### Fixed

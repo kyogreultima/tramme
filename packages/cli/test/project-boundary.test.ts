@@ -306,7 +306,7 @@ describe.skipIf(!CHROME)('the served project sandbox', () => {
     unsafeDoc = JSON.stringify(doc);
     unsafeModuleReads = 0;
     try {
-      await page.goto(`http://127.0.0.1:${port}/__tramme/?doc=/project/unsafe-code.tramme.json`);
+      await page.goto(`http://127.0.0.1:${port}/__tramme/?doc=/project/unsafe-code.tramme.json&isolate=1`);
       const urls = await page.evaluate(async () => { await (window as any).TRAMME.ready; const first = await (window as any).TRAMME.still(0); const second = await (window as any).TRAMME.still(0); return [first, second]; }) as string[];
       for (const url of urls) {
         const png = PNG.sync.read(Buffer.from(url.split(',')[1], 'base64'));
@@ -325,7 +325,7 @@ describe.skipIf(!CHROME)('the served project sandbox', () => {
     unsafeDoc = JSON.stringify(clean);
     unsafeModuleReads = 0;
     try {
-      await page.goto(`http://127.0.0.1:${port}/__tramme/?doc=/project/unsafe-code.tramme.json`);
+      await page.goto(`http://127.0.0.1:${port}/__tramme/?doc=/project/unsafe-code.tramme.json&isolate=1`);
       const reason = await page.evaluate(async (doc) => {
         await (window as any).TRAMME.ready;
         try { await (window as any).TRAMME.load(doc); return 'loaded'; }
@@ -348,7 +348,7 @@ describe.skipIf(!CHROME)('the served project sandbox', () => {
     doc.compositions.main.order = ['model'];
     unsafeDoc = JSON.stringify(doc);
     try {
-      await page.goto(`http://127.0.0.1:${port}/__tramme/?doc=/project/unsafe-code.tramme.json`);
+      await page.goto(`http://127.0.0.1:${port}/__tramme/?doc=/project/unsafe-code.tramme.json&isolate=1`);
       const touched = await page.evaluate(async () => {
         await (window as any).TRAMME.ready;
         return document.body.dataset.executed ?? null;

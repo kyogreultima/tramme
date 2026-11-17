@@ -1213,7 +1213,7 @@
     "scrubAudioHint": "Dragging the playhead plays a short window of the sound at each step, enough to hear the moment a cut or a hit lands. The videos' own sound is not scrubbed.",
     "likeTheExport24": "Like the export: 24 frames per second for a 24 fps composition, rather than one at every screen refresh. Lighter, with no loss.",
     "sandboxPreview": "Draw every project in its sandbox",
-    "sandboxPreviewHint": "A project that carries code (plugins, Free code, expressions) is always evaluated and drawn in its own sandbox, where its code reaches only what the editor hands it. This draws projects without code there too. Video frames are decoded here; scrubbing may show the previous picture for a moment.",
+    "sandboxPreviewHint": "Projects are trusted once: your own, the assistant's code, and a project whose code you accepted on import run in the editor at full speed. Turned on, every project is evaluated and drawn in its own sandbox instead, where its code reaches only what the editor hands it; playback and exports are slower.",
     "previewRenderStillWhen": "Preview render: {still} when still, {motion} in motion (adjusted during playback).",
     "previewRenderStillWhenStill": "Preview render: {still} when still, {motion} in motion.",
     "offerToursOnOpening": "Offer tours on opening",

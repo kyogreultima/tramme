@@ -435,13 +435,8 @@ describe.skipIf(!CHROME)('effects, rendered', () => {
   }, 120_000);
 
   it('draws a distribution: each instance at its place, its colour from the palette', async () => {
-    let sandboxRequests = 0;
-    const onRequest = (request: import('puppeteer-core').HTTPRequest) => { if (new URL(request.url()).pathname === '/project-sandbox.html') sandboxRequests++; };
-    page.on('request', onRequest);
-    let f: Awaited<ReturnType<typeof still>>;
-    try { f = await still('badges-row', 0.5); }
-    finally { page.off('request', onRequest); }
-    expect(sandboxRequests).toBeGreaterThan(0);
+    // its expression (spin) runs on the render page: the command line renders the user's own project
+    const f = await still('badges-row', 0.5);
     expect(near(f(60, 90), RED)).toBe(true);
     expect(near(f(160, 90), [0, 255, 0])).toBe(true);
     expect(near(f(260, 90), BLUE)).toBe(true);

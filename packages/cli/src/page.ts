@@ -1,9 +1,13 @@
 // Runtime page driven by the CLI through Puppeteer: loads one document,
 // validates it, loads its assets and exposes window.TRAMME.
 //   /__tramme/?doc=/project/film.tramme.json[&comp=main]
-// With plugins in the project, the whole frame is evaluated and drawn in the
-// plugin sandbox's worker (docs/evaluator-sandbox.md): the page ships the
-// document and each video asset's decoded frame, and one picture comes back.
+// The project's code (plugins, expressions) runs on this page, as a host
+// application runs the plugins it was given: the command line renders the
+// user's own files, and the renderer of the exports in the cloud cuts this
+// Chrome off the network (browser.ts, offline). With &isolate=1 (tramme render
+// --isolate), a project with code is evaluated and drawn in the plugin
+// sandbox's worker instead (docs/evaluator-sandbox.md): the page ships the
+// document and the video frames it asks for, and one picture comes back.
 
 import { isolateExpressions, type TrammeDoc } from '@tramme/core';
 import { builtinRegistry } from '@tramme/nodes';
@@ -18,14 +22,17 @@ const docUrl = new URL(q.get('doc') || '', location.href).href;
 let renderer: Renderer;
 let currentDoc: TrammeDoc | null = null;
 let sandbox: PluginHost | null = null;
-// this trusted page never runs a project's expression: an isolated document's run in its sandbox
-isolateExpressions();
+const isolate = q.get('isolate') === '1';
+/** whether this document is drawn by the sandbox: asked for, and code in it */
+const isolatedDoc = (doc: TrammeDoc) => isolate && needsIsolation(doc);
+// isolated, this page never runs a project's expression: they run in the sandbox
+if (isolate) isolateExpressions();
 
 async function init() {
   const r = await fetch(docUrl);
   if (!r.ok) throw new Error(`document not found: ${docUrl}`);
   currentDoc = (await r.json()) as TrammeDoc;
-  const isolated = needsIsolation(currentDoc);
+  const isolated = isolatedDoc(currentDoc);
   if (isolated) {
     sandbox = browserHost(docUrl);
     await ensureDeclared(sandbox, moduleItemsOf(currentDoc, docUrl));
@@ -46,7 +53,7 @@ async function init() {
 /** the sandbox host whenever project code (plugins or expressions) can run */
 async function sandboxReady(): Promise<PluginHost | null> {
   const doc = currentDoc;
-  if (!doc || !needsIsolation(doc)) return null;
+  if (!doc || !isolatedDoc(doc)) return null;
   sandbox ??= browserHost(docUrl);
   // the document's plugins loaded in the worker first (a url it knows is not loaded again), as the editor does
   await ensureDeclared(sandbox, moduleItemsOf(doc, docUrl));
@@ -94,7 +101,7 @@ const api = {
   },
   /** switch to another version of the document (validated, new assets loaded) */
   async load(doc: TrammeDoc, compId?: string) {
-    const isolated = needsIsolation(doc);
+    const isolated = isolatedDoc(doc);
     if (isolated !== renderer.sandboxModules) throw new Error('document isolation mode changed; open a new render page');
     if (isolated) {
       sandbox ??= browserHost(docUrl);
@@ -127,9 +134,11 @@ const api = {
     ctx.drawImage(out, 0, 0, small.width, small.height);
     return dataUrl(small);
   },
-  /** an isolated document's SVG still or Lottie file, converted in its sandbox */
+  /** a document with code as an SVG still or a Lottie file, converted in its sandbox (the command line's Node process runs no project code) */
   async vector(format: 'svg' | 'lottie', t: number, compId?: string): Promise<{ text: string; warnings: string[] }> {
-    if (!currentDoc || !sandbox) throw new Error('vector conversion in the sandbox needs an isolated document');
+    if (!currentDoc) throw new Error('no document');
+    sandbox ??= browserHost(docUrl);
+    await ensureDeclared(sandbox, moduleItemsOf(currentDoc, docUrl));
     return sandboxVector(sandbox, currentDoc, docUrl, format, t, compId || currentDoc.root);
   },
   /** the sound over [from, to] through the mixer of the editor, as a WAV in base64; null when there is none */
