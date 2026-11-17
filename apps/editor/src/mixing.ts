@@ -11,7 +11,7 @@
 // each effect, and five moments are given to check by ear: a human does the
 // final listen.
 
-import { audioClips, bandPowers, noiseFigures, NOISY_SNR, curveAt, integratedLoudness, loudnessSeries, pictureMotion, pointer, powerDb, soundFigures, soundMix, truePeak, type AudioClip, type Op, type QualityIssue, type SoundFigures, type ToolContext, type ToolType } from '@tramme/core';
+import { audioClips, bandPowers, noiseFigures, NOISY_SNR, curveAt, integratedLoudness, loudnessSeries, monoLoss, outOfProfile, pictureMotion, pointer, powerDb, profileOf, rhythmOf, soundFigures, soundMix, truePeak, type AudioClip, type Op, type QualityIssue, type RhythmFigures, type RhythmProfile, type SoundFigures, type ToolContext, type ToolType } from '@tramme/core';
 import { editorEvaluator } from './evaluator.ts';
 import { sandboxedDoc } from './installed.ts';
 import { mixComposition } from '@tramme/render';
@@ -21,6 +21,7 @@ import { prefs } from './settings.ts';
 import { t } from './i18n/index.ts';
 import { metersTool } from './audio-meters.ts';
 import { chainTool } from './effect-chain.ts';
+import { decodeMono, RATE } from './perception.ts';
 
 // ── the stems ────────────────────────────────────────────────
 interface Stems {
@@ -190,7 +191,28 @@ const mix: ToolType<Record<string, never>> = {
   },
 };
 
-export const MIXING_TOOLS: ToolType[] = [mix, metersTool, chainTool];
+const PROFILE_PATH = 'assets/sounds/profile.json';
+
+const soundProfile: ToolType<{ assets: string[] }> = {
+  name: 'sound-profile', title: 'Sound rhythm of reference films', description: 'measures reference films or audio assets and saves the ranges used by the sound check',
+  input: { type: 'object', properties: { assets: { type: 'array', items: { type: 'string', format: 'asset', assetType: ['audio', 'video'] } } }, required: ['assets'] },
+  ai: { when: 'the user gives films whose sound they like', avoid: "making a profile from one's own film" },
+  async run({ assets }, ctx) {
+    const ids = [...new Set(assets)];
+    if (!ids.length) throw new Error('Give at least one reference film or audio asset.');
+    const refs: RhythmFigures[] = [];
+    for (const id of ids) {
+      const a = ctx.doc.assets[id];
+      if (!a || (a.type !== 'audio' && a.type !== 'video')) throw new Error(`Unknown audio or video reference: ${id}`);
+      const samples = await decodeMono(ctx.assetUrl(id), ctx.signal);
+      refs.push(rhythmOf([samples], RATE));
+    }
+    await ctx.writeFile(PROFILE_PATH, JSON.stringify({ assets: ids, figures: refs, profile: profileOf(refs) }, null, 2));
+    return { text: t('sound.profileText', { n: ids.length }), notice: t('sound.profileSaved', { n: ids.length }) };
+  },
+};
+
+export const MIXING_TOOLS: ToolType[] = [mix, soundProfile, metersTool, chainTool];
 
 // ── the mix, checked ─────────────────────────────────────────
 /** what the sound checks say, English templates translated where shown (and listed for the catalogs) */
@@ -198,6 +220,8 @@ export const SOUND_TEXTS = {
   clips: 'The sound clips (peak {db} dBFS around {t} s): lower the loudest layers',
   loudness: 'The master is at {lufs} LUFS, {target} asked: check the levels',
   peak: 'The master peaks at {db} dBTP, over -1: lower the loudest layers',
+  mono: 'The mix loses {db} dB in mono around {t} s (a phone speaker): a stereo sound cancels itself, use one channel',
+  rhythm: "The sound's {figure} is {value}, your references go from {from} to {to}",
   quiet: 'The mix is very quiet ({db} dBFS over its loudest 400 ms)',
   together: 'Two sounds start together at {t} s: keep one, or move one',
   offCue: '"{name}" lands {frames} frame(s) off its {visual} ({t} s): move it onto the picture',
@@ -211,6 +235,21 @@ export const SOUND_TEXTS = {
 };
 
 const say = (text: string, params: Record<string, string | number>) => ({ message: Object.entries(params).reduce((s, [k, v]) => s.replace(`{${k}}`, String(v)), text), say: { text, params } });
+export function monoIssue(m: { lossDb: number; at?: number } | null): QualityIssue | null {
+  if (!m || m.lossDb < 6) return null;
+  return { check: 'sound', severity: 'warning', ...(m.at === undefined ? {} : { t: m.at }), ...say(SOUND_TEXTS.mono, { db: m.lossDb.toFixed(1), t: m.at?.toFixed(2) ?? '?' }) };
+}
+export function rhythmIssues(figures: RhythmFigures, profile: RhythmProfile | null): QualityIssue[] {
+  if (!profile) return [];
+  const labels = { perTen: t('sound.figure.perTen'), gapMedian: t('sound.figure.gapMedian'), gapMax: t('sound.figure.gapMax'), spreadDb: t('sound.figure.spreadDb'), lowShare: t('sound.figure.lowShare'), floorDb: t('sound.figure.floorDb'), digitalSilence: t('sound.figure.digitalSilence') };
+  return outOfProfile(figures, profile).map((key) => ({
+    check: 'sound' as const, severity: 'info' as const,
+    ...say(SOUND_TEXTS.rhythm, { figure: labels[key], value: +figures[key].toFixed(2), from: +profile[key][0].toFixed(2), to: +profile[key][1].toFixed(2) }),
+  }));
+}
+export function offCueFrames(o: { hit: number; cue: number; cueShift: number; fps: number }): number {
+  return Math.round(Math.abs(o.hit - o.cue - o.cueShift) * o.fps);
+}
 const median = (v: number[]) => { const s = [...v].sort((a, b) => a - b); return s.length ? s[Math.floor(s.length / 2)] : NaN; };
 
 export interface SoundReport {
@@ -235,6 +274,15 @@ export async function soundReport(ctx: ToolContext, opts: { image?: boolean } = 
   // the master
   if (target !== null && Number.isFinite(lufs) && Math.abs(lufs - target) > 1) issues.push({ check: 'sound', severity: 'warning', ...say(SOUND_TEXTS.loudness, { lufs: lufs.toFixed(1), target }) });
   if (tp > -1) issues.push({ check: 'sound', severity: 'warning', ...say(target === null ? SOUND_TEXTS.clips : SOUND_TEXTS.peak, { db: tp.toFixed(1), t: soundFigures(final, rate).peakAt.toFixed(2) }) });
+  const mono = monoIssue(monoLoss(final, rate));
+  if (mono) issues.push(mono);
+  const savedProfile = await ctx.readText(PROFILE_PATH).catch(() => null);
+  if (savedProfile) {
+    try {
+      const profile = (JSON.parse(savedProfile) as { profile: RhythmProfile }).profile;
+      if (profile) issues.push(...rhythmIssues(rhythmOf(final, rate), profile));
+    } catch { /* an invalid optional profile cannot stop the other checks */ }
+  }
   const f = soundFigures(final, rate);
   if (f.loudDb < -30) issues.push({ check: 'sound', severity: 'info', ...say(SOUND_TEXTS.quiet, { db: f.loudDb }) });
   // the voice over its own noise: a floor high between the words is a voice to clean
@@ -249,14 +297,18 @@ export async function soundReport(ctx: ToolContext, opts: { image?: boolean } = 
   }
   // each effect: on its cue, heard over the bed
   const effects = await effectsOf(ctx, s), cues = await cuesOf(ctx);
+  if (mono?.t !== undefined) {
+    const layers = effects.filter((e) => e.hit !== null && Math.abs(e.hit - mono.t!) <= 0.4).map((e) => e.clip.layerId);
+    if (layers.length) mono.layers = [...new Set(layers)];
+  }
   for (const e of effects) {
     if (e.hit === null) continue;
     const at = +e.hit.toFixed(2);
     if (e.clip.visual) {
       const tol = (e.clip.weight === 'hero' ? 1 : 2) / fps;
-      const near = cues.filter((q) => q.kind === e.clip.visual && Math.abs(q.t - e.hit!) <= 0.25).sort((a, b) => Math.abs(a.t - e.hit!) - Math.abs(b.t - e.hit!))[0];
+      const near = cues.filter((q) => q.kind === e.clip.visual && Math.abs(q.t + e.clip.cueShift - e.hit!) <= 0.25).sort((a, b) => Math.abs(a.t + e.clip.cueShift - e.hit!) - Math.abs(b.t + e.clip.cueShift - e.hit!))[0];
       if (!near) issues.push({ check: 'sound', severity: e.clip.weight === 'hero' ? 'warning' : 'info', t: at, layers: [e.clip.layerId], ...say(SOUND_TEXTS.noCue, { name: e.name, visual: e.clip.visual, t: at }) });
-      else if (Math.abs(near.t - e.hit) > tol + 1e-6) issues.push({ check: 'sound', severity: 'warning', t: at, layers: [e.clip.layerId], ...say(SOUND_TEXTS.offCue, { name: e.name, frames: Math.round(Math.abs(near.t - e.hit) * fps), visual: e.clip.visual, t: near.t.toFixed(2) }) });
+      else if (Math.abs(near.t + e.clip.cueShift - e.hit) > tol + 1e-6) issues.push({ check: 'sound', severity: 'warning', t: at, layers: [e.clip.layerId], ...say(SOUND_TEXTS.offCue, { name: e.name, frames: offCueFrames({ hit: e.hit, cue: near.t, cueShift: e.clip.cueShift, fps }), visual: e.clip.visual, t: near.t.toFixed(2) }) });
     }
     if (!e.bed) continue;
     const lift = liftOf(e);

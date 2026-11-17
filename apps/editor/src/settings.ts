@@ -35,6 +35,8 @@ export interface Preferences {
   duckDb: number;
   /** a sound placed on several moments alternates its variants */
   varySounds: boolean;
+  /** family ids the user does not want to hear or see again in searches */
+  bannedSounds: string[];
   /** a sound made by a provider (it costs money) waits for the user's yes */
   confirmPaid: boolean;
   /** paid generations a turn of the assistant may make when its changes apply without the user (nothing is asked then) */
@@ -93,7 +95,7 @@ export interface Preferences {
 
 export const DEFAULT_PREFERENCES: Preferences = {
   language: 'auto', theme: DEFAULT_THEME, view: 'studio', motion: 'auto', still: 'display', blur: 'document', exactFrames: true, scrubAudio: true, sandboxPreview: false,
-  effectsDb: -8, musicDb: -14, duckDb: -12, varySounds: true, confirmPaid: true, paidPerTurn: 10, voiceProvider: 'auto', voiceShortlist: {}, voice: '', voiceModel: '', previewVolume: 1, previewMuted: false, proxies: true, models: {}, pluginsOff: [], areaConfirm: 'always', assistantTranscribes: false, assistantFetchesReal: false, acceptReadings: false, checkUpdates: true, lastUpdateCheck: 0, updateNotified: '', recentCommands: [], quickLauncher: false,
+  effectsDb: -8, musicDb: -14, duckDb: -12, varySounds: true, bannedSounds: [], confirmPaid: true, paidPerTurn: 10, voiceProvider: 'auto', voiceShortlist: {}, voice: '', voiceModel: '', previewVolume: 1, previewMuted: false, proxies: true, models: {}, pluginsOff: [], areaConfirm: 'always', assistantTranscribes: false, assistantFetchesReal: false, acceptReadings: false, checkUpdates: true, lastUpdateCheck: 0, updateNotified: '', recentCommands: [], quickLauncher: false,
   pictureProvider: 'auto', pictureQuality: 'auto', pictureSize: 'large', styleFrames: 2,
   videoProvider: 'auto', videoSeconds: 8, dictation: 'auto', dictationPicked: false, watermark: true, watermarkTold: false,
 };
@@ -154,6 +156,7 @@ export function checked(saved: Partial<Preferences>): Preferences {
     p.duckDb = within(p.duckDb, d.duckDb, -40, -1);
     p.previewVolume = within(p.previewVolume, d.previewVolume, 0, 1);
     p.varySounds = p.varySounds !== false;
+    p.bannedSounds = Array.isArray(p.bannedSounds) ? [...new Set(p.bannedSounds.filter((x) => typeof x === 'string'))] : [];
     p.confirmPaid = p.confirmPaid !== false;
     p.paidPerTurn = Math.round(within(p.paidPerTurn, d.paidPerTurn, 0, 100));
     p.previewMuted = p.previewMuted === true;

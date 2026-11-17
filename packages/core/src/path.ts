@@ -189,3 +189,15 @@ export function insertPathVertex(p: PathValue, seg: number, u: number): PathValu
   }
   return { ...p, v, i, o };
 }
+
+/** Split every original segment equally with de Casteljau, preserving its cubic outline. */
+export function subdividePath(path: PathValue, n: number): PathValue {
+  const parts = Math.max(1, Math.min(17, Math.floor(n)));
+  if (parts === 1 || path.v.length < 2) return path;
+  let out = path;
+  const count = path.closed ? path.v.length : path.v.length - 1;
+  for (let s = 0; s < count; s++) {
+    for (let k = 1; k < parts; k++) out = insertPathVertex(out, s * parts + k - 1, 1 / (parts - k + 1));
+  }
+  return out;
+}

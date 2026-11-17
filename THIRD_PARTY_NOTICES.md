@@ -68,6 +68,7 @@ No model is packed with the editor, the desktop app or the command line: each is
 
 | Model | License | Use |
 |---|---|---|
+| [CLAP HTSAT unfused](https://huggingface.co/Xenova/clap-htsat-unfused) (`Xenova/clap-htsat-unfused`) | Apache-2.0 | Local sound and text embeddings for semantic search; weights load on demand, while vectors for the 421 CC0 catalog sounds ship in `sounds/clap.bin` |
 | [U²-Net](https://github.com/xuebinqin/U-2-Net) human segmentation and U²-Netp, rembg's weights in ONNX (`jellybox/u2net-human-seg`, `BritishWerewolf/U-2-Netp`) | Apache-2.0 | Cut-out of a person, of any subject |
 | [YOLOS](https://github.com/hustvl/YOLOS) tiny (`Xenova/yolos-tiny`) | Apache-2.0 | Detection (people and things, for the cut-out and the tracking) |
 | [Depth Anything v2](https://github.com/DepthAnything/Depth-Anything-V2) small (`onnx-community/depth-anything-v2-small`) | Apache-2.0 | Depth (parallax, depth blur). The base and large sizes are CC-BY-NC-4.0: offered in the settings, marked not for commercial work |
@@ -81,6 +82,7 @@ No model is packed with the editor, the desktop app or the command line: each is
 The editor bundles Geist and Geist Mono ([@fontsource-variable](https://fontsource.org), SIL Open Font License 1.1); it works offline. The example projects in `examples/` (drawings, thumbnails) are part of Tramme and under the same Apache 2.0 license.
 
 The sound library in `sounds/` (copied into the editor's build) holds recordings by [Kenney](https://www.kenney.nl) from the packs Impact Sounds, Interface Sounds, Digital Audio, UI Audio, Music Jingles and Sci-fi Sounds, released under [Creative Commons Zero (CC0 1.0)](http://creativecommons.org/publicdomain/zero/1.0/): public domain, free for any use, crediting welcome but not required (`sounds/LICENSE.txt`). The sounds written as code (`apps/editor/src/sound-presets.ts`) are part of Tramme.
+
 
 ## Services
 

@@ -19,6 +19,8 @@ export * from './space.ts';
 export * from './audio.ts';
 export * from './loudness.ts';
 export * from './spectrum.ts';
+export * from './tonality.ts';
+export * from './rhythm.ts';
 export * from './sounds.ts';
 export * from './transcript.ts';
 export * from './tools.ts';

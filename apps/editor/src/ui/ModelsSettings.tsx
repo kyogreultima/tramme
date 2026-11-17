@@ -28,6 +28,7 @@ const TASK: Record<ModelTask, string> = {
   face: m('localModels.face'),
   upscale: m('localModels.upscale'),
   interpolate: m('localModels.interpolate'),
+  'sound-meaning': m('localModels.soundMeaning'),
 };
 
 /** what to know before choosing a model, by its id */
@@ -46,7 +47,7 @@ const NOTE: Record<string, string> = {
 
 /** the tasks on the picture, then those on the sound */
 const PICTURE: ModelTask[] = ['cutout-person', 'cutout-any', 'detection', 'depth', 'face', 'upscale'];
-const SOUND: ModelTask[] = ['transcription', 'vad'];
+const SOUND: ModelTask[] = ['transcription', 'vad', 'sound-meaning'];
 
 const bytes = (n: number) => size(n / 1e6);
 const size = (mb: number) => (mb >= 1000 ? `${(mb / 1000).toFixed(1)} GB` : `${mb < 10 ? mb.toFixed(1) : Math.round(mb)} MB`);

@@ -5,7 +5,7 @@
 // links to the parent's. Masks, mattes other than a single alpha shape,
 // trim paths, repeaters and expressions are reported, not converted.
 
-import type { Asset, Composition, TrammeDoc, Keyframe, Layer, Prop, Vec2 } from '@tramme/core';
+import { sampleKeyframes, type Asset, type Composition, type TrammeDoc, type Keyframe, type Layer, type Prop, type Vec2 } from '@tramme/core';
 import { fromBase64 } from './bytes.ts';
 
 type L = Record<string, any>;
@@ -89,7 +89,18 @@ class Importer {
     if (ks.p?.s) {
       const x = this.prop(ks.p.x, (v) => r4(Number(v))), y = this.prop(ks.p.y, (v) => r4(Number(v)));
       if (typeof x === 'number' && typeof y === 'number') position = [x, y];
-      else { this.warn('position with separate dimensions: approximated'); position = [typeof x === 'number' ? x : 0, typeof y === 'number' ? y : 0]; }
+      else {
+        const keysOf = (axis: Prop | undefined): Keyframe[] => axis && typeof axis === 'object' && '$k' in axis ? axis.$k as Keyframe[] : [];
+        const xKeys = keysOf(x), yKeys = keysOf(y);
+        const compatible = !xKeys.length || !yKeys.length || (xKeys.length === yKeys.length && xKeys.every((key, i) => key.t === yKeys[i].t && JSON.stringify(key.ease) === JSON.stringify(yKeys[i].ease)));
+        const boundaries = [...new Set([...xKeys.map((k) => k.t), ...yKeys.map((k) => k.t)])].sort((a, b) => a - b);
+        const times = compatible ? boundaries : Array.from({ length: Math.round((boundaries.at(-1)! - boundaries[0]) * this.fps) + 1 }, (_, i) => r4(boundaries[0] + i / this.fps));
+        const valueAt = (axis: Prop | undefined, t: number) => typeof axis === 'number' ? axis : keysOf(axis).length ? Number(sampleKeyframes('number', keysOf(axis), t, {})) : 0;
+        position = { $k: times.map((t, i) => {
+          const a = xKeys.find((k) => k.t === t), b = yKeys.find((k) => k.t === t);
+          return { t, v: [r4(valueAt(x, t)), r4(valueAt(y, t))], ...(i < times.length - 1 && (!compatible || a?.ease || b?.ease) ? { ease: compatible ? a?.ease ?? b?.ease : 'hold' } : {}) };
+        }) } as Prop<Vec2>;
+      }
     }
     if (ks.rx || ks.ry) this.warn('3D layers: X and Y rotations ignored');
     const tr: NonNullable<Layer['transform']> = {
@@ -168,7 +179,10 @@ class Importer {
     const layers: Record<string, Layer> = {};
     const byInd = new Map<number, { id: string; lottie: L; shift: Vec2 }>();
     const made: { id: string; lottie: L }[] = [];
+    const parents = new Set(src.map((ly) => ly.parent).filter((id) => id !== undefined));
     for (const ly of src) {
+      // a zero-length layer no other layer hangs from draws nothing: an exporter's placeholder beside the visible copy
+      if ((ly.op ?? 0) <= (ly.ip ?? 0) && !parents.has(ly.ind)) continue;
       const lid = this.id(ly.nm || `layer-${ly.ind}`);
       const res = this.layer(ly, lid, layers);
       if (!res) continue;
@@ -212,7 +226,7 @@ class Importer {
 
   /** one Lottie layer; returns the anchor shift used to centre its content */
   layer(ly: L, id: string, layers: Record<string, Layer>): { shift: Vec2 } | null {
-    const base: Partial<Layer> = { name: ly.nm, in: this.t(ly.ip ?? 0), out: this.t(ly.op ?? 0) };
+    const base: Partial<Layer> = { name: ly.nm, ...((ly.op ?? 0) > (ly.ip ?? 0) ? { in: this.t(ly.ip), out: this.t(ly.op) } : {}) };
     if (ly.hd) base.visible = false;
     if (ly.td) base.visible = false;
     if (ly.bm) base.blend = ({ 1: 'multiply', 2: 'screen', 3: 'overlay', 4: 'darken', 5: 'lighten', 16: 'add' } as Record<number, Layer['blend']>)[ly.bm] ?? 'normal';
@@ -283,6 +297,10 @@ class Importer {
         return { shift: [0, 0] };
       }
       default:
+        if (ly.ty === undefined) {
+          layers[id] = { ...base, type: 'group', visible: false, transform: this.transform(ly.ks), children: [] } as Layer;
+          return { shift: [0, 0] };
+        }
         this.warn(`Lottie layer of type ${ly.ty} ("${ly.nm ?? id}") not converted`);
         return null;
     }

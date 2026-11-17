@@ -4,7 +4,7 @@
 // vocabulary, run by the assistant (use_tool) or from the / menu.
 
 import { ALL_FORMATS, AudioBufferSink, CanvasSink, Input, UrlSource } from 'mediabunny';
-import { analyseAudio, busyGrid, clearMargins, dominant, freeSides, largestFree, pointer, type Op, type ToolContext, type ToolType } from '@tramme/core';
+import { analyseAudio, busyGrid, clearMargins, dominant, freeSides, keyOf, largestFree, pointer, type Op, type ToolContext, type ToolType } from '@tramme/core';
 import { t } from './i18n/index.ts';
 import { freshId } from './model.ts';
 import { progressCallback, type DownloadProgress } from './model-cache.ts';
@@ -118,7 +118,9 @@ const beats: ToolType<{ asset?: string }> = {
   ai: { when: 'before cutting to the beat or making things move with the music: then place cuts and entrances on the beats or bars it lists, and use the react modifier or audio() in expressions' },
   async run({ asset: wanted }, ctx) {
     const asset = mediaOf(ctx, wanted, ['audio', 'video']), a = ctx.doc.assets[asset];
-    const analysis = analyseAudio(await decodeMono(ctx.assetUrl(asset), ctx.signal), RATE);
+    const samples = await decodeMono(ctx.assetUrl(asset), ctx.signal);
+    const analysis = analyseAudio(samples, RATE);
+    analysis.key = keyOf(samples, RATE);
     analysis.source = asset;
     const { id, ops, reload } = await save(ctx, asset, 'analysis', analysis, `Analysis · ${a.name ?? asset}`);
     const layers = Object.entries(ctx.doc.compositions[ctx.compId].layers).filter(([, l]) => (l.type === 'audio' || l.type === 'video') && l.props?.[l.type] === asset).map(([lid]) => lid);

@@ -8,6 +8,14 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+### Added
+
+- Local CLAP sound search and candidate judgment, with precomputed vectors for the shipped catalog; sound family bans and user-library preference.
+- Credited CC BY recordings and Jamendo music through anonymous Openverse, with beat analysis saved for music beds.
+- Sound-specific cue timing, music-key tuning for pitched effects, mono cancellation warnings and rhythm checks against saved reference films.
+- Path deformers (wave, noise, twist and bend).
+- Lottie import of positions animated with X and Y apart (After Effects' Separate Dimensions), and of zero-length layers that serve as parents.
+
 ## [0.30.1] - 2026-11-17
 
 ### Fixed

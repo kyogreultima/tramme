@@ -4,9 +4,9 @@
 
 **Goal:** Bring into Tramme what the study of Openverse, Real SFX, earshot and Cavalry found missing: search and judging by meaning, finer sync, mono and rhythm checks, key matching, more free sources, path deformers and a Cavalry import proof.
 
-**Architecture:** Every measure is a pure function in `@tramme/core` (testable without a browser). The editor's sound tools (`apps/editor/src/sound.ts`) and checks (`apps/editor/src/mixing.ts`) call them. The CLAP model runs in the browser through transformers.js, which the editor already uses for the cut-out and the depth map. Openverse goes through the Worker only when a key is configured there.
+**Architecture:** Every measure is a pure function in `@tramme/core` (testable without a browser). The editor's sound tools (`apps/editor/src/sound.ts`) and checks (`apps/editor/src/mixing.ts`) call them. The CLAP model runs in the browser through transformers.js, which the editor already uses for the cut-out and the depth map. Openverse keeps the existing anonymous browser request; no account or credentials are required.
 
-**Tech Stack:** TypeScript, vitest, Web Audio, `@huggingface/transformers` 4.3.2 (already a dependency), Cloudflare Worker (`packages/api`).
+**Tech Stack:** TypeScript, vitest, Web Audio, `@huggingface/transformers` 4.3.2 (already a dependency).
 
 **Spec:** [docs/superpowers/specs/2026-11-16-sound-and-motion-research.md](../specs/2026-11-16-sound-and-motion-research.md) (the research report, in French). Tasks 1 to 13 implement pistes 1 to 12 of its table.
 
@@ -14,10 +14,11 @@
 
 - Work on `develop`. No new branch. No push.
 - One commit at the end of all the work (no per-task commit, no plan-edit commit), with no Claude attribution line.
+- Do not create an account with an external service or require the user to create one. If a source cannot be used anonymously, leave that source out.
 - Sounds are files. Nothing is synthesised at render time. The one mixer (`packages/render/src/audio.ts`) is not forked.
 - Recordings stay first for hits, clicks and whooshes (`RECORDED_FIRST` in `sound.ts`).
 - Licences accepted from outside: CC0, PDM, CC BY. NC, ND and SA are always refused. Tramme is commercial (FSL).
-- No technical error shown raw to the user. A missing model, key or network falls back to what works today, and the tool's text says so plainly.
+- No technical error shown raw to the user. A missing model or network falls back to what works today, and the tool's text says so plainly.
 - Every user-facing string goes through `t()` with keys added in both `apps/editor/src/i18n/en.json` and `fr.json`.
 - Colours only from the theme tokens. No new UI beyond a settings row and tool inputs.
 - Tests: `pnpm vitest run <file>` from a `C:\` cwd with an uppercase drive letter.
@@ -197,22 +198,17 @@ Run: same command. Expected: PASS.
 
 ---
 
-### Task 4: Openverse through the Worker, and CC BY recordings
+### Task 4: CC BY recordings from anonymous Openverse
 
 **Files:**
-- Modify: `packages/api/src/keyed-providers.json` (add `openverse`)
-- Modify: `packages/api/src/stock.ts` (route `openverse`), `packages/api/src/providers.ts` (route comment)
-- Modify: `apps/editor/src/api.ts` (`stockOpenverse`), `apps/editor/src/openverse.ts`
+- Modify: `apps/editor/src/openverse.ts` (licence parsing)
 - Modify: `apps/editor/src/sound.ts` (`sound-find`: licences)
-- Modify: `apps/worker/.dev.vars.example`, `docs/deploy.md`
-- Test: `apps/worker/test/worker.test.ts`, `apps/editor/test/openverse.test.ts` (create), `apps/editor/test/sound.test.ts`
+- Test: `apps/editor/test/openverse.test.ts` (create), `apps/editor/test/sound.test.ts`
 
 **Interfaces:**
 - Produces:
-  - The route `GET /api/stock/openverse/<audio|images>?<Openverse params>`. It answers Openverse's JSON as is, and 503 `no openverse key` when none is set.
-  - The keyed provider `"openverse": { "origin": "https://api.openverse.org", "fields": [{ "name": "client_id", "required": true }] }`. The key itself is the client secret.
   - `licenceOf(r: { license?: string; license_version?: string }): string | null`, exported from `apps/editor/src/openverse.ts`. It answers `'CC0'`, `'PDM'` or `'CC BY <version>'`, and `null` for anything else (NC, ND, SA, unknown).
-  - `openverse(kind, params, signal)` keeps its signature. It tries the Worker route first and falls back to the direct anonymous call on 503, 404 or a network error.
+  - `openverse(kind, params, signal)` keeps its signature and its existing direct anonymous request. No Openverse application, Worker route, client credentials or OAuth token is added.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -220,33 +216,17 @@ Run: same command. Expected: PASS.
 // openverse.test.ts
 it.each([['cc0', '1.0', 'CC0'], ['by', '4.0', 'CC BY 4.0'], ['BY', '3.0', 'CC BY 3.0'], ['pdm', '1.0', 'PDM']])('credits %s %s as %s', (license, v, out) => expect(licenceOf({ license, license_version: v })).toBe(out));
 it.each(['by-nc', 'BY-ND', 'by-sa', 'sampling+', ''])('refuses %s', (license) => expect(licenceOf({ license })).toBeNull());
-it('falls back to the anonymous search when the Worker has no key', async () => { /* stub api.stockOpenverse → 503, fetch direct → results; expect results */ });
-```
-
-```ts
-// worker.test.ts
-it('exchanges the openverse client credentials once and reuses the token', async () => {
-  /* stub fetch: POST /v1/auth_tokens/token/ → { access_token: 'tok', expires_in: 36000 }; two searches → one token call, both searches carry Authorization: Bearer tok */
-});
-it('answers 503 without an openverse key', async () => { /* no key → 503 */ });
+it('searches anonymously without an authorization header', async () => { /* stub fetch; expect the existing direct Openverse URL and results */ });
 ```
 
 - [ ] **Step 2: Run them to see them fail**
 
-Run: `pnpm vitest run apps/editor/test/openverse.test.ts apps/worker/test/worker.test.ts`. Expected: FAIL.
+Run: `pnpm vitest run apps/editor/test/openverse.test.ts apps/editor/test/sound.test.ts`. Expected: FAIL for the new licence cases.
 
 - [ ] **Step 3: Implement**
 
-**The Worker.** `openverseSearch(req, reach, kind)` in `stock.ts`:
-- `kind` is `audio` or `images`, otherwise 404;
-- the token comes from `POST https://api.openverse.org/v1/auth_tokens/token/`, form `grant_type=client_credentials&client_id=…&client_secret=…`;
-- it is kept in module memory until 60 s before `expires_in`, and read like the `project` field of `hydracept.ts`;
-- the query string is passed through with `page_size` capped at 50;
-- a 429 becomes an `HttpError(429, 'openverse: too many requests, try again in a while')`.
-
 **`sound-find`.** It asks for `license: 'cc0,by'` and keeps a result only when `licenceOf(x)` is not null. The licence passes through to `keepInLibrary`. The text's first line drops "CC0" and says "credited".
-
-**Deploy.** `.dev.vars.example` and `docs/deploy.md` say how to register an Openverse application: `POST /v1/auth_tokens/register/`, then confirm the e-mail. The user does that, with their own address.
+Keep the existing anonymous Openverse call for both sound and image search. Do not add account setup or deployment secrets. If anonymous access to a source is unavailable, leave that source out and report it.
 
 - [ ] **Step 4: Run the tests to see them pass**
 
@@ -285,6 +265,8 @@ Run: `pnpm vitest run apps/editor/test/sound.test.ts -t "Jamendo"`. Expected: FA
 - [ ] **Step 3: Implement**
 
 The tool searches with `source: 'jamendo'`, `license: 'cc0,by'` and `page_size: '20'`. It keeps tracks whose duration (ms) is within `[min, max]` and whose `licenceOf` is not null. `soundFlaws` is not applied, since it is tuned for effects.
+
+Use Jamendo only through Openverse's anonymous search. If that source is unavailable without an account, leave `music-find` out and record why; do not add Jamendo credentials.
 
 Its `ai.when`: "a music bed the user does not want generated, or before a paid generation". The tool runs `beats` on what it keeps so `music-plan` can read the grid.
 
@@ -444,7 +426,7 @@ This closes the box of step 7 of `docs/sound-roadmap.md`: "Pitch matched to the 
 - [ ] **Step 1: Write the failing tests**
 
 ```ts
-it('moves a C# chime to D in D major', () => expect(tuneTo(61, scaleOf({ tonic: 2, mode: 'major', confidence: 1 }))).toBe(1));
+it('moves a C natural chime to C# in D major', () => expect(tuneTo(60, scaleOf({ tonic: 2, mode: 'major', confidence: 1 }))).toBe(1));
 it('leaves a note of the scale alone', () => expect(tuneTo(62, scaleOf({ tonic: 2, mode: 'major', confidence: 1 }))).toBe(0));
 it('does not nudge the rate of a tuned sound on repeated moments', () => {
   const { ops } = place(ctx, [[chime]], [{ t: 1 }, { t: 2 }, { t: 3 }], { gain: -8, vary: true, tuned: 1 });
@@ -590,7 +572,7 @@ This follows the feature-proofs rule: real, untouched work found online, its lic
 
 - [ ] **Step 1: Find the source**
 
-Look for 2 Lottie files exported from Cavalry: on LottieFiles, by searching "Cavalry", and from creators who say they made it in Cavalry. Their licence must allow reuse: the Lottie Simple License, or CC0/CC BY. Record the URL, the author and the licence in `out/cavalry-lottie/SOURCE.md`.
+Look for 2 publicly downloadable Lottie files exported from Cavalry: on LottieFiles, by searching "Cavalry", and from creators who say they made it in Cavalry. Do not create an account or use a source that requires one. Their licence must allow reuse: the Lottie Simple License, or CC0/CC BY. Record the URL, the author and the licence in `out/cavalry-lottie/SOURCE.md`.
 
 - [ ] **Step 2: Import and render**
 
@@ -643,7 +625,7 @@ Use the trial server, port 8790, repo-local state. On a film with music and cues
 
 ```bash
 git add -A
-git commit -m "feat(sound): sounds found and judged by meaning (CLAP), tuned to the music, shifted per kind on their cue; mono and rhythm checks; bans; Openverse through the Worker with CC BY, music beds from Jamendo; path deformers; a Cavalry animation imported as proof"
+git commit -m "feat(sound): sounds found and judged by meaning (CLAP), tuned to the music, shifted per kind on their cue; mono and rhythm checks; bans; CC BY recordings and music beds from anonymous Openverse; path deformers; a Cavalry animation imported as proof"
 ```
 
 ## Left out, on purpose

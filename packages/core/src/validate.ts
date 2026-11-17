@@ -354,7 +354,7 @@ class Checker {
 
   mods(path: string, def: PropDef, mods: unknown) {
     if (!Array.isArray(mods)) return this.err(path, 'list of modifiers expected');
-    if (def.type !== 'number' && def.type !== 'vec2') return this.err(path, `modifiers apply to numbers and vectors, not to ${def.type}`);
+    if (def.type !== 'number' && def.type !== 'vec2' && !(def.type === 'path' && mods.every((m) => isObj(m) && m.type === 'deform'))) return this.err(path, `modifiers apply to numbers and vectors, not to ${def.type}`);
     mods.forEach((m, i) => {
       const p = `${path}/${i}`;
       if (!isObj(m) || typeof m.type !== 'string') return this.err(p, 'modifier { type, ...params } expected');

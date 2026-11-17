@@ -36,6 +36,8 @@ What exists goes partway. `stagger` and `noise` vary a value by the layer's rank
 
 ### Step 3. The time field
 
+- [x] The `deform` modifier works on vector paths with wave, noise, twist and bend modes; subdivisions preserve the source cubic before deformation.
+
 - [x] `timeField` in `packages/core/src/modifiers.ts`: the property read at `base(t − amount · d)`, with `d` from the rank, a position along an angle, the distance to a point or a layer, or noise (`fbm`, scale 0 for a fixed random offset per element, `speed` for a field that drifts).
 - [x] Bounds: a local time outside the span holds the first or last pose; a `loop` before it repeats.
 - [x] Continuity: `d` continuous in space and time (gradient noise), an animated seed or amount interpolated, never switched.

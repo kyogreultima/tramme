@@ -14,6 +14,8 @@ A model cannot hear. Designing a sound blind (synthesis) has a low ceiling for a
 
 ## Principles
 
+CLAP compares sounds to text locally when its browser model is available; the catalog's 421 vectors are precomputed. Word search continues without the model or a connection.
+
 - **Authoring time and render time are separate**, as for the plugins ([plugins-roadmap.md](plugins-roadmap.md#principles)). A sound is made once, saved as an asset with what made it (`assets/sounds/<name>.sound.json`: its code and seed, or its prompt and provider), and played by an `audio` layer.
 - **One mixer.** The preview, the browser exports and the command line mix with the same code (`packages/render/src/audio.ts`): filters, gain curves, fades, reverb, speed sound the same everywhere. The command line mixes in its page and hands ffmpeg the finished track.
 - **One mechanism for the assistant and the editor.** The sound tools are editor tools: the assistant calls them with `use_tool`, the user from the `/` menu. Their layers come as a proposal.
@@ -32,6 +34,10 @@ A model cannot hear. Designing a sound blind (synthesis) has a low ceiling for a
 
 ### Step 2. The sound library
 
+- [x] Whole sound families can be banned from search; at equal scores, the user's library comes first.
+- [x] CLAP ranks sounds by meaning and judges candidate recordings when available. Word search remains the fallback. `scripts/sound-clap.ts` rebuilds the shipped vectors in `sounds/clap.bin` without redownloading the sound library.
+- [x] Anonymous Openverse accepts credited CC BY recordings as well as CC0; `music-find` keeps eligible Jamendo music and saves its beat analysis.
+
 - [x] 421 recordings from Kenney's packs (CC0, public domain): impacts, interface sounds, digital sounds, jingles, sci-fi, UI (`sounds/`, 5.2 MB), measured in Chrome by `scripts/sound-library.ts` into `sounds/catalog.json`, shipped with the editor.
 - [x] Sounds written as code where the recordings lack (`apps/editor/src/sound-presets.ts`): whoosh, swoosh, riser, reverse swell, sub boom, cinematic impact, thump, pop, tick, glitch, sparkle, power down, room tone.
 - [x] One format for every source (`SoundEntry`, `packages/core/src/sounds.ts`) and a search by words with the kinds' synonyms, one sound per family (`searchSounds`).
@@ -44,6 +50,8 @@ A model cannot hear. Designing a sound blind (synthesis) has a low ceiling for a
 Done when: asked for "a whoosh on each transition", the assistant finds one and proposes it at every transition, and the export plays it. Checked in Chrome: hits placed on the frame, MP4 with its AAC track, WAV loud at the right instants.
 
 ### Step 3. Sound in sync
+
+- [x] A tap leads its cue by 60 ms, a click by 11 ms, and a whoosh follows by 37 ms; the sync check follows these shifts.
 
 - [x] Moments named by the document (`momentsOf`): `now`, `entrances`, `exits` (of the layers given, or every visible one), `markers`, `cuts` (between video layers and from the `shots` analysis), `beats` and `bars` (from the `beats` analysis, where the music's layer plays it), on the composition's frames.
 - [x] Aligned on the landing moment (`peak`) or the start (`start`, by default for music, voices, jingles, ambiences).
@@ -60,12 +68,16 @@ Done when: asked for "a whoosh on each transition", the assistant finds one and 
 
 ### Step 6. Checks
 
+- [x] Mono summing warns when cancellation loses at least 6 dB. A saved rhythm profile from reference films adds informational range checks; without one, this check is silent.
+
 - [x] The `check` tool reads the mix: clipping, a mix far too loud or too quiet, two short sounds starting together.
 - [x] Sounds against picture: an effect off its cue (1 frame for a hero, 2 for the others) or underlining a motion the picture does not make.
 - [x] The mix measured as an engineer does (`apps/editor/src/mixing.ts`): the master's loudness (±1 LU) and true peak (≤ -1 dBTP), each effect heard over the bed in one of its bands (1.5 dB), a hero's body (3 dB), the music 8 LU under the voice, dips and silences nobody planned (a marker of kind `silence` plans one).
 - [x] The picture of the mix for the assistant (waveform, spectrogram, the motion of the picture, a line at each effect, heroes red) and five moments for the user to check by ear.
 
 ### Step 7. Mixing
+
+- [x] Pitched effects follow the detected music key within two semitones; tuned repeats keep a stable playback rate.
 
 Shared with the plugins roadmap (step 10, audio processing).
 
@@ -75,7 +87,7 @@ Shared with the plugins roadmap (step 10, audio processing).
 - [x] The master brought to the composition's loudness (`sound.loudness`, -14 LUFS by default, BS.1770) with a look-ahead true-peak limiter at -1 dBTP, in every export; the preview applies the same gain, measured ahead, and a limiter.
 - [x] `mix` tool: each effect's gain set against the bed band by band (a support sound 3.5 dB over it in its easiest band, a hero 5 dB in its main one), capped in the bright band and under the bed's peaks, a sound crowding the one before brought down, one sound kept within 2 dB of itself.
 - [x] A hero stacked (`sfx` with `sound: "a+b"`, peaks aligned, each 4 dB under), the bed stopping before it (`stop`) and thinning out into it (`build`, an animated `lowCut`).
-- [x] Equaliser bands beyond the two cuts: `eqLow` (shelf at 120 Hz), `eqMid` (bell at `eqMidFreq`, 200–8000 Hz, Q 0.9) and `eqHigh` (shelf at 8 kHz), in dB on every sound layer and the sound of videos, one biquad per band set in the one mixer. Pitch matched to the music's key: still open.
+- [x] Equaliser bands beyond the two cuts: `eqLow` (shelf at 120 Hz), `eqMid` (bell at `eqMidFreq`, 200–8000 Hz, Q 0.9) and `eqHigh` (shelf at 8 kHz), in dB on every sound layer and the sound of videos, one biquad per band set in the one mixer.
 - [x] A compressor per sound (compress, 0 to 1): one DynamicsCompressor between the equaliser and the gain in the one mixer - the loud moments brought down (a voice kept level), harder as the amount grows, preview and exports alike.
 
 ### Step 8. Made by providers

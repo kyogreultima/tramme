@@ -9,6 +9,8 @@ import type { PropSchema } from './registry.ts';
 import type { AudioReader } from './analysis.ts';
 import type { AiNotes } from './tools.ts';
 import type { Keyframe, Vec2 } from './types.ts';
+import type { PathValue } from './registry.ts';
+import { subdividePath } from './path.ts';
 
 export interface Modifier { type: string; [param: string]: unknown }
 
@@ -88,6 +90,49 @@ export const wiggle: ModifierType = {
     seed: { type: 'number', default: 0, step: 1, label: 'Seed' },
   },
   apply: (v, p, c) => each(v, (x, i) => x + p.amp * fbm(c.t * p.freq, i * 7.31 + p.seed * 3.17, c.seed, p.octaves)),
+};
+
+const isPath = (v: unknown): v is PathValue => !!v && typeof v === 'object' && Array.isArray((v as PathValue).v);
+
+export const deform: ModifierType = {
+  type: 'deform', title: 'Path deformer', description: 'waves, roughens, twists or bends a vector path',
+  params: {
+    mode: { type: 'enum', default: 'wave', options: ['wave', 'noise', 'twist', 'bend'], label: 'Mode' },
+    amount: { type: 'number', default: 20, step: 1, label: 'Amount' },
+    freq: { type: 'number', default: 2, min: 0, step: 0.1, label: 'Frequency' },
+    speed: { type: 'number', default: 0, step: 0.1, label: 'Speed' },
+    detail: { type: 'number', default: 4, min: 0, max: 16, step: 1, label: 'Detail' },
+    seed: { type: 'number', default: 0, step: 1, label: 'Seed' },
+  },
+  apply(value, p, ctx) {
+    if (!isPath(value) || value.v.length < 2) return value;
+    const path = subdividePath(value, Math.max(1, Math.min(16, Math.floor(p.detail))));
+    const n = path.v.length;
+    const distances = [0];
+    for (let k = 1; k < n; k++) distances.push(distances[k - 1] + Math.hypot(path.v[k][0] - path.v[k - 1][0], path.v[k][1] - path.v[k - 1][1]));
+    const total = distances[n - 1] + (path.closed ? Math.hypot(path.v[0][0] - path.v[n - 1][0], path.v[0][1] - path.v[n - 1][1]) : 0);
+    const center: Vec2 = [path.v.reduce((s, v) => s + v[0], 0) / n, path.v.reduce((s, v) => s + v[1], 0) / n];
+    const origin = p.mode === 'bend' ? path.v[0] : center;
+    const rotate = (v: Vec2, angle: number): Vec2 => [v[0] * Math.cos(angle) - v[1] * Math.sin(angle), v[0] * Math.sin(angle) + v[1] * Math.cos(angle)];
+    const angles: number[] = [];
+    const v = path.v.map((point, k): Vec2 => {
+      const u = total ? distances[k] / total : 0;
+      if (p.mode === 'twist' || p.mode === 'bend') {
+        const angle = p.amount * Math.PI / 180 * (p.mode === 'twist' ? u - 0.5 : u);
+        angles.push(angle);
+        const r = rotate([point[0] - origin[0], point[1] - origin[1]], angle);
+        return [origin[0] + r[0], origin[1] + r[1]];
+      }
+      angles.push(0);
+      const before = path.v[k === 0 ? (path.closed ? n - 1 : 0) : k - 1];
+      const after = path.v[k === n - 1 ? (path.closed ? 0 : n - 1) : k + 1];
+      const dx = after[0] - before[0], dy = after[1] - before[1], length = Math.hypot(dx, dy) || 1;
+      const displacement = p.mode === 'noise' ? p.amount * fbm(u * p.freq + p.seed, ctx.t * p.speed, ctx.seed, 3) : p.amount * Math.sin(2 * Math.PI * (p.freq * u + p.speed * ctx.t));
+      return [point[0] - dy / length * displacement, point[1] + dx / length * displacement];
+    });
+    const tangents = (list: Vec2[] | undefined) => list?.map((q, k) => rotate(q, angles[k]));
+    return { ...path, v, i: tangents(path.i), o: tangents(path.o) };
+  },
 };
 
 export const loop: ModifierType = {
@@ -335,10 +380,11 @@ const MODIFIER_NOTES: Record<string, AiNotes> = {
   smooth: { when: 'softening jittery keyframes or tracked data' },
   react: { when: 'making things move with the music once it has an analysis (the beats tool): scale +0.06 on beat for a pulse, opacity on hit for flashes, position on low for a bounce', example: { type: 'react', source: 'music', signal: 'beat', amount: 0.06, decay: 0.18 } },
   timeField: { when: 'one animation played at different moments across elements: a wave (angle), a ripple from a point or a layer (distance), a liquid time (noise with drift), a random desynchronisation (noise, scale 0); amount 0.3 to 1.2 s across the field; put it on every animated property of the element, the same settings', avoid: 'amounts longer than the animation itself, which leave elements still while others finish (the reading breaks); loop only for animations made to repeat', example: { type: 'timeField', mode: 'distance', amount: 0.8 } },
+  deform: { when: 'a vector path should wave, roughen, twist or bend', example: { type: 'deform', mode: 'wave', amount: 20, freq: 2 } },
   near: { when: 'figures that answer a pointer: keyframe a small layer as the pointer, then let the shapes around it rise, sink or lean (freq 2 to 3, damping 0.45 to 0.6); the layer and its pointer must be siblings', avoid: 'amounts that break the drawing (a scale past 2, an offset past a cell): the rest pose is the picture, the pointer is a bonus', example: { type: 'near', source: 'pointer', radius: 240, amount: 1.4, axis: 'y', freq: 2.4, damping: 0.55 } },
 };
 
-export const BUILTIN_MODIFIERS = [wiggle, loop, spring, stagger, noise, smooth, react, near, timeField];
+export const BUILTIN_MODIFIERS = [wiggle, loop, spring, stagger, noise, smooth, react, near, timeField, deform];
 for (const mod of BUILTIN_MODIFIERS) mod.ai = MODIFIER_NOTES[mod.type];
 
 /** default params filled in */

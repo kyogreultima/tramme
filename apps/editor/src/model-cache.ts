@@ -32,7 +32,7 @@ export function groupCache(files: CachedFile[], models: ModelEntry[] = MODELS): 
     out.set(id, g);
   };
   for (const f of files) {
-    const known = models.find((m) => (m.adapter.kind !== 'pipeline' ? filesOf(m).includes(f.url) : f.url.startsWith(cachePrefix(m))));
+    const known = models.find((m) => (m.adapter.kind !== 'pipeline' && m.adapter.kind !== 'clap' ? filesOf(m).includes(f.url) : f.url.startsWith(cachePrefix(m))));
     if (known) { add(known.id, known.name, f); continue; }
     const repo = repoOf(f.url);
     add(repo ? `hub:${repo}` : 'other', repo ?? 'other', f);
@@ -42,7 +42,7 @@ export function groupCache(files: CachedFile[], models: ModelEntry[] = MODELS): 
 
 /** the files of a model in the cache and their weight (a file two rows share, the small U²-Net, counts for both) */
 export function cachedOf(m: ModelEntry, files: CachedFile[]): { bytes: number; urls: string[] } {
-  const mine = files.filter((f) => (m.adapter.kind !== 'pipeline' ? filesOf(m).includes(f.url) : f.url.startsWith(cachePrefix(m))));
+  const mine = files.filter((f) => (m.adapter.kind !== 'pipeline' && m.adapter.kind !== 'clap' ? filesOf(m).includes(f.url) : f.url.startsWith(cachePrefix(m))));
   return { bytes: mine.reduce((n, f) => n + f.bytes, 0), urls: mine.map((f) => f.url) };
 }
 
@@ -72,6 +72,13 @@ export type DownloadProgress = (loaded: number, total: number) => void;
 
 /** a model's files fetched into the cache ahead of its tool, with their progress (bytes of all its files) */
 export async function downloadModel(m: ModelEntry, progress?: DownloadProgress): Promise<void> {
+  if (m.adapter.kind === 'clap') {
+    const { AutoTokenizer, AutoProcessor, ClapTextModelWithProjection, ClapAudioModelWithProjection } = await import('@huggingface/transformers');
+    const options = { revision: m.revision, dtype: 'q8', ...(progress ? { progress_callback: progressCallback(progress) } : {}) } as const;
+    const loaded = await Promise.all([AutoTokenizer.from_pretrained(m.source, options), AutoProcessor.from_pretrained(m.source, options), ClapTextModelWithProjection.from_pretrained(m.source, options), ClapAudioModelWithProjection.from_pretrained(m.source, options)]);
+    await Promise.all(loaded.map((x) => (x as { dispose?: () => Promise<void> }).dispose?.()));
+    return;
+  }
   // files read with onnxruntime (a matte, a voice detector, a super-resolution network and its weights): each fetched into the cache as it is
   if (m.adapter.kind !== 'pipeline') {
     const files = filesOf(m);

@@ -24,6 +24,8 @@ export interface AudioClip {
   weight: 'hero' | 'support';
   /** what it underlines in the picture, when it says so */
   visual?: SoundVisual;
+  /** seconds by which the audible hit intentionally precedes or follows its visual cue */
+  cueShift: number;
   /** asset id of the file */
   asset: string;
   /** composition time (s) where the clip starts */
@@ -222,6 +224,7 @@ export function audioClips(doc: TrammeDoc, compId: string, seen: ReadonlySet<str
       role: SOUND_ROLES.includes(role as SoundRole) ? role as SoundRole : layer.type === 'video' ? 'voice' : NAMED.find(([re]) => re.test(`${layerId} ${layer.name ?? ''} ${asset} ${doc.assets[asset].name ?? ''}`))?.[1] ?? 'effect',
       weight: staticValue(props.weight) === 'hero' ? 'hero' : 'support',
       ...(SOUND_VISUALS.includes(visual as SoundVisual) ? { visual: visual as SoundVisual } : {}),
+      cueShift: num(staticValue(props.cueShift), 0),
       // a group starting after the layer skips the beginning of its file
       offset,
       ...(loops ? { loopStart: start, loopEnd } : {}),
@@ -416,6 +419,29 @@ export interface SoundFigures {
 }
 
 const db = (x: number) => (x > 0 ? +(20 * Math.log10(x)).toFixed(1) : -120);
+
+/** Largest level loss when a stereo mix is heard through one mono speaker. */
+export function monoLoss(channels: Float32Array[], sampleRate: number, window = 0.4): { lossDb: number; at: number } | null {
+  if (channels.length < 2 || !Number.isFinite(sampleRate) || sampleRate <= 0) return null;
+  const [left, right] = channels, length = Math.min(left.length, right.length);
+  const size = Math.max(1, Math.round(sampleRate * window));
+  let worst: { lossDb: number; at: number } | null = null;
+  for (let from = 0; from < length; from += size) {
+    const to = Math.min(length, from + size);
+    let stereo = 0, mono = 0;
+    for (let i = from; i < to; i++) {
+      const l = left[i], r = right[i], m = (l + r) / 2;
+      stereo += (l * l + r * r) / 2;
+      mono += m * m;
+    }
+    const stereoRms = Math.sqrt(stereo / (to - from));
+    if (stereoRms < 0.001) continue;
+    const monoRms = Math.sqrt(mono / (to - from));
+    const lossDb = 20 * Math.log10(stereoRms / Math.max(monoRms, 1e-9));
+    if (!worst || lossDb > worst.lossDb) worst = { lossDb, at: (from + to) / (2 * sampleRate) };
+  }
+  return worst;
+}
 
 /** peak, levels, the moment it lands on, where it starts and ends: what the assistant reads of a sound it cannot hear */
 export function soundFigures(channels: Float32Array[], sampleRate: number): SoundFigures {

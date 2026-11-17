@@ -9,8 +9,8 @@
 // their model cards (licence, size, input) and stay marked "not tried" in the
 // settings until they are.
 
-export type ModelTask = 'cutout-person' | 'cutout-any' | 'detection' | 'depth' | 'transcription' | 'vad' | 'face' | 'upscale' | 'interpolate';
-export const MODEL_TASKS: ModelTask[] = ['cutout-person', 'cutout-any', 'detection', 'depth', 'transcription', 'vad', 'face', 'upscale', 'interpolate'];
+export type ModelTask = 'cutout-person' | 'cutout-any' | 'detection' | 'depth' | 'transcription' | 'vad' | 'face' | 'upscale' | 'interpolate' | 'sound-meaning';
+export const MODEL_TASKS: ModelTask[] = ['cutout-person', 'cutout-any', 'detection', 'depth', 'transcription', 'vad', 'face', 'upscale', 'interpolate', 'sound-meaning'];
 
 /** a matte network read with onnxruntime: a square picture in, a matte out */
 export interface MatteAdapter {
@@ -53,6 +53,7 @@ export interface EngineAdapter { kind: 'engine' }
 export interface EsrganAdapter { kind: 'esrgan'; tile: number; pad: number; more: string[] }
 /** a frame interpolation network read with onnxruntime: the two frames stacked (six planes) and a time between them in, the frame at that time out, any size */
 export interface RifeAdapter { kind: 'rife' }
+export interface ClapAdapter { kind: 'clap' }
 
 export interface ModelEntry {
   id: string;
@@ -70,11 +71,11 @@ export interface ModelEntry {
   commercial: boolean | null;
   /** tried with the tool in this version (what to know before choosing the others: the settings' notes) */
   checked: boolean;
-  adapter: MatteAdapter | PipelineAdapter | VadAdapter | MediaPipeAdapter | EngineAdapter | EsrganAdapter | RifeAdapter;
+  adapter: MatteAdapter | PipelineAdapter | VadAdapter | MediaPipeAdapter | EngineAdapter | EsrganAdapter | RifeAdapter | ClapAdapter;
 }
 
 /** the files a model keeps in the cache: its source, and the others of a model in several files; none for the built-in engine */
-export const filesOf = (m: ModelEntry): string[] => (m.adapter.kind === 'engine' ? [] : [m.source, ...(m.adapter.kind === 'esrgan' ? m.adapter.more : [])]);
+export const filesOf = (m: ModelEntry): string[] => (m.adapter.kind === 'engine' || m.adapter.kind === 'clap' ? [] : [m.source, ...(m.adapter.kind === 'esrgan' ? m.adapter.more : [])]);
 
 const U2NET: MatteAdapter = { kind: 'matte', side: 320, mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225], byMax: true, output: 'prob' };
 const ISNET: MatteAdapter = { kind: 'matte', side: 1024, mean: [0.5, 0.5, 0.5], std: [1, 1, 1], byMax: false, output: 'range' };
@@ -148,6 +149,7 @@ export const MODELS: ModelEntry[] = [
   },
   // the frames between two frames: the core's block-matching motion by default (nothing to download), RIFE for hard motion
   { id: 'block-motion', task: 'interpolate', name: 'Block matching (built in)', source: '', revision: 'builtin', mb: 0, licence: '', commercial: true, checked: true, adapter: { kind: 'engine' } },
+  { id: 'clap-htsat-unfused', task: 'sound-meaning', name: 'CLAP sound meaning', source: 'Xenova/clap-htsat-unfused', revision: 'c28f2883575e590e04d3146ff0713c2448d691ba', mb: 200, licence: 'Apache-2.0', commercial: true, checked: false, adapter: { kind: 'clap' } },
   {
     // RIFE (hzwer's Practical-RIFE weights, MIT, its README says) in FuryTMP's ONNX export, its time between the frames made an input; MIT.
     // Another export (t9749/rife-4.25-lite-onnx) returned a frame given twice moved 2 px: measure a new one the same way before offering it
@@ -188,5 +190,5 @@ export const madeBy = (m: ModelEntry) => `${m.id}@${m.revision}`;
 
 /** the cache key a model's files are kept under (the URL of a matte; the hub path of a pipeline model) */
 export function cachePrefix(m: ModelEntry): string {
-  return m.adapter.kind !== 'pipeline' ? m.source : `https://huggingface.co/${m.source}/resolve/`;
+  return m.adapter.kind !== 'pipeline' && m.adapter.kind !== 'clap' ? m.source : `https://huggingface.co/${m.source}/resolve/`;
 }

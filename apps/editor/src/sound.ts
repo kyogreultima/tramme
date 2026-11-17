@@ -7,8 +7,9 @@
 // layer; the mixer of @tramme/render plays it the same in the preview and
 // the exports.
 
-import { openverse } from './openverse.ts';
-import { analyseAudio, audioClips, isAudioAnalysis, pointer, searchSounds, soundCues, soundFigures, soundFlaws, staticValue, variantsOf, volumeBlockKeys, type Layer, type Op, type SoundCue, type SoundEntry, type SoundFigures, type SoundRole, type SoundVisual, type ToolContext, type ToolType } from '@tramme/core';
+import { licenceOf, openverse } from './openverse.ts';
+import { audioVector, catalogVectors, cosine, packVector, textVector, unpackVector } from './clap.ts';
+import { analyseAudio, audioClips, banKey, isAudioAnalysis, keyOf, pitchOf, pointer, scaleOf, searchSounds, soundCues, soundFigures, soundFlaws, staticValue, variantsOf, volumeBlockKeys, type Layer, type MusicKey, type Op, type SoundCue, type SoundEntry, type SoundFigures, type SoundRole, type SoundVisual, type ToolContext, type ToolType } from '@tramme/core';
 import { editorEvaluator } from './evaluator.ts';
 import { sampleLayerClock } from './isolated-clock.ts';
 import { sandboxedDoc } from './installed.ts';
@@ -19,7 +20,7 @@ import { encodeWav, renderSynth, SYNTH_MAX } from '@tramme/render';
 import { api } from './api.ts';
 import { payFor } from './confirm.ts';
 import { clip, freshId, SOUND_GROUP, soundGroupOf, transcriptOfDoc } from './model.ts';
-import { prefs } from './settings.ts';
+import { prefs, setPrefs } from './settings.ts';
 import { analyses } from './perception.ts';
 import { SOUND_PRESETS } from './sound-presets.ts';
 import { canvas, caption, drawSpectrogram, drawWave, INK, mark } from './sound-pictures.ts';
@@ -162,15 +163,17 @@ export const channelsOf = (b: AudioBuffer) => Array.from({ length: b.numberOfCha
 const wavBlob = (b: AudioBuffer) => new Blob([encodeWav(b) as BlobPart], { type: 'audio/wav' });
 
 /** Match the existing beats tool's mono 16 kHz input using the browser's resampler. */
-async function generatedBeats(buffer: AudioBuffer): Promise<number[]> {
+async function generatedAnalysis(buffer: AudioBuffer) {
   const rate = 16000;
   const ctx = new OfflineAudioContext(1, Math.max(1, Math.ceil(buffer.duration * rate)), rate);
   const source = ctx.createBufferSource();
   source.buffer = buffer;
   source.connect(ctx.destination);
   source.start();
-  return analyseAudio((await ctx.startRendering()).getChannelData(0), rate).beats;
+  const mono = (await ctx.startRendering()).getChannelData(0);
+  return { ...analyseAudio(mono, rate), key: keyOf(mono, rate) };
 }
+const generatedBeats = async (buffer: AudioBuffer) => (await generatedAnalysis(buffer)).beats;
 
 /** a sound of the library brought into the project: its file copied (with where it comes from and its license), or its code rendered */
 async function bring(ctx: ToolContext, e: SoundEntry): Promise<ProjectSound> {
@@ -225,20 +228,33 @@ function soundGroup(ctx: ToolContext, taken: Record<string, unknown>, ops: Op[])
  * gives the layer what it underlines and its weight. The layers go in the
  * Sound group.
  */
-function place(ctx: ToolContext, sounds: Placement[][], moments: Moment[], o: { gain: number; rate?: number; keepPitch?: boolean; align?: 'peak' | 'start'; vary: boolean; weight?: 'hero' | 'support' }): { ops: Op[]; layers: string[] } {
+export const CUE_SHIFT: Record<string, number> = { tap: -0.06, click: -0.011, tick: -0.011, key: -0.011, ui: -0.011, whoosh: 0.037, swish: 0.037, transition: 0.037 };
+
+export function tuneTo(midi: number, scale: number[]): number {
+  const note = ((Math.round(midi) % 12) + 12) % 12;
+  for (let distance = 0; distance <= 2; distance++) {
+    if (scale.includes((note + distance) % 12)) return distance;
+    if (scale.includes((note - distance + 12) % 12)) return -distance;
+  }
+  return 0;
+}
+
+export function place(ctx: ToolContext, sounds: Placement[][], moments: Moment[], o: { gain: number; rate?: number; keepPitch?: boolean; align?: 'peak' | 'start'; vary: boolean; weight?: 'hero' | 'support'; tuned?: number | ((moment: Moment, sound: Placement) => number | undefined) }): { ops: Op[]; layers: string[] } {
   const c = ctx.doc.compositions[ctx.compId], taken: Record<string, unknown> = { ...c.layers };
   const ops: Op[] = [], layers: string[] = [];
   if (!moments.length) return { ops, layers };
   const group = soundGroup(ctx, taken, ops);
   moments.forEach((m, i) => {
     const stack = sounds[i % sounds.length];
-    const nudge = o.vary && sounds.length === 1 && moments.length > 1 ? 1 + ((((i * 0.618034) % 1) - 0.5) * 0.08) : 1;
-    const rate = +((o.rate ?? 1) * nudge).toFixed(o.keepPitch ? 4 : 3);
     const weight = o.weight ?? m.weight;
     stack.forEach((s, k) => {
+      const tuned = typeof o.tuned === 'function' ? o.tuned(m, s) : o.tuned;
+      const nudge = tuned === undefined && o.vary && sounds.length === 1 && moments.length > 1 ? 1 + ((((i * 0.618034) % 1) - 0.5) * 0.08) : 1;
+      const rate = +((o.rate ?? 1) * nudge * (tuned === undefined ? 1 : 2 ** (tuned / 12))).toFixed(o.keepPitch || tuned !== undefined ? 4 : 3);
       const align = o.align ?? (FROM_START.has(s.kind) ? 'start' : 'peak');
+      const cueShift = align === 'peak' ? CUE_SHIFT[s.kind] ?? 0 : 0;
       const lead = (align === 'peak' ? s.figures.peakAt : 0) / rate;
-      let at = m.t - lead, start = 0;
+      let at = m.t + cueShift - lead, start = 0;
       if (at < 0) { start = -at * rate; at = 0; }
       const out = Math.min(c.duration, at + (s.figures.duration - start) / rate);
       if (out <= at) return;
@@ -247,10 +263,11 @@ function place(ctx: ToolContext, sounds: Placement[][], moments: Moment[], o: { 
       layers.push(id);
       const props: Record<string, unknown> = { audio: s.asset, start: +start.toFixed(4), gain: +(o.gain - STACK_DB * k).toFixed(1) };
       if (rate !== 1) props.rate = rate;
-      if (o.keepPitch && rate !== 1) props.keepPitch = true;
+      if (o.keepPitch && tuned === undefined && rate !== 1) props.keepPitch = true;
       if (ROLE[s.kind]) props.role = ROLE[s.kind];
       if (weight === 'hero') props.weight = 'hero';
       if (m.visual) props.visual = m.visual;
+      if (cueShift !== 0) props.cueShift = cueShift;
       ops.push({ op: 'add', path: pointer('compositions', ctx.compId, 'layers', id), value: { type: 'audio', name: `${s.title} · ${m.t.toFixed(2)} s`, in: +at.toFixed(4), out: +out.toFixed(4), props } });
       ops.push({ op: 'add', path: pointer('compositions', ctx.compId, 'layers', group, 'children', '-'), value: id });
     });
@@ -384,7 +401,16 @@ const figuresText = (f: SoundFigures) => `${f.duration.toFixed(2)} s, lands at $
 /** kinds a recording always beats code for: a hit, a click, a whoosh written as code sounds cheap */
 const RECORDED_FIRST = new Set(['impact', 'hit', 'boom', 'thump', 'tap', 'click', 'tick', 'pop', 'whoosh', 'swish', 'transition', 'ui', 'key']);
 
-const sfx: ToolType<{ query?: string; sound?: string; at?: unknown; on?: string; layers?: unknown; gain?: number; rate?: number; vary?: boolean; align?: 'peak' | 'start'; weight?: 'hero' | 'support'; stop?: boolean; build?: boolean }> = {
+export function musicKeyAt(ctx: ToolContext, time: number, read: (id: string) => unknown): MusicKey | null {
+  for (const clip of audioClips(ctx.doc, ctx.compId)) {
+    if (clip.role !== 'music' || time < clip.at || time >= clip.at + clip.duration) continue;
+    const analysis = read(`analysis-${clip.asset}`);
+    if (isAudioAnalysis(analysis) && analysis.key) return analysis.key;
+  }
+  return null;
+}
+
+const sfx: ToolType<{ query?: string; sound?: string; at?: unknown; on?: string; layers?: unknown; gain?: number; rate?: number; vary?: boolean; tune?: boolean; align?: 'peak' | 'start'; weight?: 'hero' | 'support'; stop?: boolean; build?: boolean }> = {
   name: 'sfx', title: 'Sound effects', description: 'searches the sound library (recorded sounds, sounds written as code, your own) and places a sound on moments of the video, its hit on the frame; a hero stacks sounds and makes the bed stop before it',
   input: {
     type: 'object',
@@ -394,6 +420,7 @@ const sfx: ToolType<{ query?: string; sound?: string; at?: unknown; on?: string;
       ...PLACING,
       rate: { type: 'number', minimum: 0.25, maximum: 4, title: 'Speed', description: 'under 1 lower and longer, over 1 higher and shorter' },
       vary: { type: 'boolean', title: 'Vary', description: 'alternate its variants on repeated moments (as the Sound settings say by default)' },
+      tune: { type: 'boolean', title: 'Tune', description: 'match a pitched effect to the analysed music key when one plays under it (yes by default)' },
       weight: { enum: ['hero', 'support'], title: 'Weight', description: 'hero: one of the few moments the film is built around; the cues say it by default' },
       stop: { type: 'boolean', title: 'Stop before', description: 'the music and ambience fall 24 dB over the 0.4 s before each moment, so a hero lands in silence' },
       build: { type: 'boolean', title: 'Build', description: 'the music thins out (its low end cut) over the 2 s before each moment, into a hero' },
@@ -403,16 +430,22 @@ const sfx: ToolType<{ query?: string; sound?: string; at?: unknown; on?: string;
     when: 'to give the video its sound. Read the cues first (cues tool), then sound the cuts with a whoosh or transition, the lands with a thump or tap, the appears with a pop or click, the moves with a swish; the heroes with a stack (sound "a+b") and stop. Search (query): the list says when each lands and how loud, the sheet shows each waveform and spectrogram: reject a clip with two events in it, a steady noise, clicks inside a whoosh, clean sine lines on a physical sound. Then place one (sound, with at or on)',
     avoid: 'a hit, a click or a whoosh written as code when a recording exists; meme sounds; a sound on every element; two hits at the same instant; sounds louder than the voice. After placing, balance them (mix) and check',
   },
-  async run({ query, sound, at, on, layers, gain = prefs.peek().effectsDb, rate, vary = prefs.peek().varySounds, align, weight, stop, build }, ctx) {
+  async run({ query, sound, at, on, layers, gain = prefs.peek().effectsDb, rate, vary = prefs.peek().varySounds, tune = true, align, weight, stop, build }, ctx) {
     const all = await soundLibrary();
     if (!sound) {
-      const hits = searchSounds(all, query ?? '', { limit: 15 });
+      const words = query ?? '', text = words ? await textVector(words) : null;
+      const catalog = text ? await catalogVectors() : new Map<string, Float32Array>();
+      const hits = searchSounds(all, words, { limit: 15, banned: new Set(prefs.peek().bannedSounds),
+        ...(text ? { meaning: (e: SoundEntry) => {
+          try { const vector = e.clap ? unpackVector(e.clap) : catalog.get(e.id); return vector ? cosine(text, vector) : null; } catch { return null; }
+        } } : {}),
+      });
       // recordings first for what code makes cheap, unless code is asked for
       const found = /synth|code/i.test(query ?? '') ? hits : [...hits.filter((e) => !(e.code && RECORDED_FIRST.has(e.kind))), ...hits.filter((e) => e.code && RECORDED_FIRST.has(e.kind))];
       if (!found.length) return { text: `No sound for "${query}". Kinds in the library: ${[...new Set(all.map((e) => e.kind))].join(', ')}. Or find recordings (sound-find), write one with the synth tool, or have one made with generate-sound.`, notice: t('sound.nothingFound') };
       const sheet = await soundSheet(ctx, found.slice(0, 6)).catch(() => null);
       return {
-        text: [`Sounds for "${query ?? ''}" (${all.length} in the library):`, ...found.map((e) => line(e, all)), 'Place one: sfx with sound (its id, or ids joined with + for a stack) and at (times) or on (cues, heroes, cuts, moves, lands, appears, entrances, exits, markers, beats, bars, now). Its variants alternate on repeated moments.'].join('\n'),
+        text: [`Sounds for "${query ?? ''}" (${all.length} in the library):`, ...found.map((e) => line(e, all)), 'Place one: sfx with sound (its id, or ids joined with + for a stack) and at (times) or on (cues, heroes, cuts, moves, lands, appears, entrances, exits, markers, beats, bars, now). Its variants alternate on repeated moments.', ...(query && found.length < 3 ? ['Few sounds here: find recordings (sound-find) before writing one.'] : [])].join('\n'),
         ...(sheet ? { images: [{ url: sheet, caption: t('sound.sheet') }] } : {}),
         notice: t('sound.foundN', { n: found.length }),
       };
@@ -422,21 +455,49 @@ const sfx: ToolType<{ query?: string; sound?: string; at?: unknown; on?: string;
     const missing = ids.filter((_, i) => !entries[i]);
     if (missing.length) throw new Error(`no sound ${missing.map((m) => `"${m}"`).join(', ')} in the library: search first (query)`);
     const moments = await timesOf(ctx, { at, on, layers });
+    const read = tune && moments.length ? await analyses(ctx) : () => undefined;
+    const keys = moments.map((m) => musicKeyAt(ctx, m.t, read));
     // one stack per variant: a single sound alternates its variants, a stack stays as asked
     const picks: SoundEntry[][] = ids.length === 1 && vary && moments.length > 1 ? variantsOf(all, entries[0]!).slice(0, Math.max(1, moments.length)).map((e) => [e]) : [entries as SoundEntry[]];
     const brought = new Map<string, ProjectSound>();
     for (const e of picks.flat()) if (!brought.has(e.id)) brought.set(e.id, await bring(ctx, e));
+    const pitches = new Map<string, number>();
+    if (tune && ids.length === 1 && entries[0]!.kind !== 'music' && keys.some(Boolean)) {
+      for (const e of picks.flat()) {
+        if (pitches.has(brought.get(e.id)!.asset)) continue;
+        const pitch = await samplesOf(e, ctx.signal).then((b) => pitchOf(channelsOf(b)[0], b.sampleRate)).catch(() => null);
+        if (pitch) pitches.set(brought.get(e.id)!.asset, pitch.midi);
+      }
+    }
+    const tuned = pitches.size ? (moment: Moment, sound: Placement) => { const key = musicKeyAt(ctx, moment.t, read), midi = pitches.get(sound.asset); return key && midi !== undefined ? tuneTo(midi, scaleOf(key)) : undefined; } : undefined;
     const stacks = picks.map((stack) => stack.map((e) => ({ asset: brought.get(e.id)!.asset, title: e.title, figures: brought.get(e.id)!.figures, kind: e.kind })));
-    const placed = place(ctx, stacks, moments, { gain, rate, align, vary, weight });
+    const placed = place(ctx, stacks, moments, { gain, rate, align, vary, weight, tuned });
     // the bed makes room: on every moment asked for, or on the heroes among them
     const room = moments.filter((m) => (weight ?? m.weight) === 'hero' || (weight === undefined && !m.weight)).map((m) => m.t);
     const bed = [...(stop ? await stopOps(ctx, room) : []), ...(build ? await buildOps(ctx, room) : [])];
     const title = entries.map((e) => e!.title).join(' + ');
     return {
       ops: [...[...brought.values()].flatMap((b) => b.ops), ...placed.ops, ...bed], reload: [...brought.values()].flatMap((b) => b.reload), label: title,
-      text: `${title}${picks.length > 1 ? ` (${picks.length} variants)` : ''}: ${placedText(placed, moments)} Gain ${gain} dB.${bed.length ? ` The bed ${[stop && 'stops', build && 'builds'].filter(Boolean).join(' and ')} before ${room.length} moment(s).` : stop || build ? ' No music or ambience layer to stop or build.' : ''} Balance it against the bed with the mix tool.`,
+      text: `${title}${picks.length > 1 ? ` (${picks.length} variants)` : ''}: ${placedText(placed, moments)} Gain ${gain} dB.${tuned && keys[0] ? ` Tuned each pitched variant within 2 st to ${['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'][keys[0].tonic]} ${keys[0].mode}.` : ''}${bed.length ? ` The bed ${[stop && 'stops', build && 'builds'].filter(Boolean).join(' and ')} before ${room.length} moment(s).` : stop || build ? ' No music or ambience layer to stop or build.' : ''} Balance it against the bed with the mix tool.`,
       notice: t('sound.placed', { name: title, n: placed.layers.length }),
     };
+  },
+};
+
+const soundBan: ToolType<{ sound: string; undo?: boolean }> = {
+  name: 'sound-ban', title: 'Ban a sound', description: 'removes a sound and all variants of its family from future library searches; undo brings them back',
+  input: { type: 'object', properties: {
+    sound: { type: 'string', title: 'Sound', description: 'id of the rejected sound' },
+    undo: { type: 'boolean', title: 'Undo', description: 'allow this family in searches again' },
+  }, required: ['sound'] },
+  ai: { when: 'the user rejects a sound, or a sound keeps coming back wrong', avoid: 'banning a whole kind' },
+  async run({ sound, undo = false }) {
+    const all = await soundLibrary(), entry = all.find((e) => e.id === sound);
+    if (!entry) throw new Error(`no sound "${sound}" in the library`);
+    const key = banKey(entry), banned = new Set(prefs.peek().bannedSounds);
+    if (undo) banned.delete(key); else banned.add(key);
+    setPrefs({ bannedSounds: [...banned] });
+    return { text: undo ? t('sound.unbanText', { name: entry.title, key }) : t('sound.banText', { name: entry.title, key }), notice: undo ? t('sound.unbanned', { name: entry.title }) : t('sound.banned', { name: entry.title }) };
   },
 };
 
@@ -555,11 +616,13 @@ const generateSound: ToolType<{ kind: 'sfx' | 'music' | 'voice'; prompt: string;
 async function keepInLibrary(title: string, data: Blob, d: { kind: string; title: string; tags: string[]; figures: SoundFigures; prompt?: string; provider?: string } & Pick<SoundEntry, 'license' | 'author' | 'url'>): Promise<SoundEntry> {
   const id = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 56) || 'sound';
   const file = `${id}.${extOf(data.type)}`;
+  const vector = typeof caches === 'undefined' ? null : await measure(data).then(({ buffer }) => audioVector(buffer)).catch(() => null);
   const entry: SoundEntry = {
     id: `mine-${id}`, title: d.title, kind: d.kind, tags: d.tags, source: 'library', file,
     duration: d.figures.duration, peakAt: d.figures.peakAt, peakDb: d.figures.peakDb, loudDb: d.figures.loudDb,
     ...(d.prompt ? { prompt: d.prompt.slice(0, 400) } : {}), ...(d.provider ? { provider: d.provider } : {}),
     ...(d.license ? { license: d.license } : {}), ...(d.author ? { author: d.author } : {}), ...(d.url ? { url: d.url } : {}),
+    ...(vector ? { clap: packVector(vector) } : {}),
   };
   await api.soundPut(file, data, entry);
   return entry;
@@ -735,9 +798,11 @@ const cues: ToolType<{ layers?: unknown }> = {
   },
 };
 
-/** the free recordings of Openverse (Freesound, CC0 only): found, judged, the good ones kept with their credit. Without a key it answers 20 results a page at most */
+/** the free recordings of Openverse (Freesound, CC0 or CC BY): found, judged, the good ones kept with their credit. */
+export const MATCH_MIN = 0.2;
+export const soundMatch = (query: Float32Array | null, audio: Float32Array | null): boolean => !query || !audio || cosine(query, audio) >= MATCH_MIN;
 const soundFind: ToolType<{ query: string; kind?: string; count?: number }> = {
-  name: 'sound-find', title: 'Find recordings', description: 'searches free recordings (CC0 from Freesound, through Openverse) for what the library lacks, judges each one (two events in one clip, a steady noise, clicks, a clipped take) and keeps the good ones in your library with their credit',
+  name: 'sound-find', title: 'Find recordings', description: 'searches free recordings (CC0 or CC BY from Freesound, through Openverse) for what the library lacks, judges each one (two events in one clip, a steady noise, clicks, a clipped take) and keeps the good ones in your library with their credit',
   input: {
     type: 'object',
     properties: {
@@ -752,13 +817,17 @@ const soundFind: ToolType<{ query: string; kind?: string; count?: number }> = {
     avoid: 'writing a hit or a whoosh as code instead; meme sounds',
   },
   async run({ query, kind = 'sfx', count = 4 }, ctx) {
-    const found = await openverse('audio', { q: query, license: 'cc0', source: 'freesound', page_size: '20' }, ctx.signal) as { id: string; title: string; url: string; duration?: number; creator?: string; foreign_landing_url?: string; tags?: { name: string }[] }[];
+    const found = await openverse('audio', { q: query, license: 'cc0,by', source: 'freesound', page_size: '20' }, ctx.signal) as { id: string; title: string; url: string; license?: string; license_version?: string; duration?: number; creator?: string; foreign_landing_url?: string; tags?: { name: string }[] }[];
     // short sounds only: a motion effect, not a recording session
     const short = found.filter((x) => x.url && (x.duration ?? 0) > 0 && (x.duration ?? 0) <= 12000);
     const kept: SoundEntry[] = [], refused: string[] = [];
+    const text = await textVector(query);
+    const candidates: { title: string; blob: Blob; figures: SoundFigures; license: string; author?: string; url?: string; tags: string[]; similarity: number }[] = [];
     for (const x of short) {
-      if (kept.length >= count) break;
-      ctx.progress?.(kept.length, count, x.title);
+      if (!text && candidates.length >= count) break;
+      const license = licenceOf(x);
+      if (!license) { refused.push(`${x.title} (licence)`); continue; }
+      ctx.progress?.(candidates.length, count, x.title);
       const res = await fetch(x.url, { signal: ctx.signal }).catch(() => null);
       if (!res?.ok) continue;
       const blob = await res.blob();
@@ -766,18 +835,73 @@ const soundFind: ToolType<{ query: string; kind?: string; count?: number }> = {
       if (!sound) continue;
       const flaws = soundFlaws(channelsOf(sound.buffer), sound.buffer.sampleRate, kind);
       if (flaws.length) { refused.push(`${x.title} (${flaws.join(', ')})`); continue; }
+      const vector = text ? await audioVector(sound.buffer) : null;
+      if (!soundMatch(text, vector)) { refused.push(`${x.title} (does not sound like "${query}")`); continue; }
       const title = x.title.replace(/\.(wav|mp3|ogg|flac|m4a|aiff?)$/i, '').slice(0, 60);
       const tags = [...new Set([...query.toLowerCase().split(/\s+/), ...(x.tags ?? []).map((g) => g.name.toLowerCase())])].slice(0, 12);
-      kept.push(await keepInLibrary(title, blob, { kind, title, tags, figures: sound.figures, license: 'CC0', author: x.creator, url: x.foreign_landing_url }));
+      candidates.push({ title, blob, figures: sound.figures, license, author: x.creator, url: x.foreign_landing_url, tags, similarity: text && vector ? cosine(text, vector) : 0 });
     }
+    candidates.sort((a, b) => b.similarity - a.similarity);
+    for (const x of candidates.slice(0, count)) kept.push(await keepInLibrary(x.title, x.blob, { kind, title: x.title, tags: x.tags, figures: x.figures, license: x.license, author: x.author, url: x.url }));
     if (!kept.length) return { text: `No clean recording for "${query}"${refused.length ? ` (refused: ${refused.slice(0, 6).join('; ')})` : ''}. Try other words, or have one made (generate-sound).`, notice: t('sound.nothingFound') };
     const sheet = await soundSheet(ctx, kept).catch(() => null);
     const all = await soundLibrary();
     return {
-      text: [`Kept in your library (CC0, credited):`, ...kept.map((e) => line(e, all)), ...(refused.length ? [`Refused: ${refused.slice(0, 6).join('; ')}.`] : []), 'Place one with sfx (sound: its id).'].join('\n'),
+      text: [`Kept in your library (credited):`, ...kept.map((e) => line(e, all)), ...(refused.length ? [`Refused: ${refused.slice(0, 6).join('; ')}.`] : []), 'Place one with sfx (sound: its id).'].join('\n'),
       ...(sheet ? { images: [{ url: sheet, caption: t('sound.sheet') }] } : {}),
       notice: t('sound.keptN', { n: kept.length }),
     };
+  },
+};
+
+export function musicCandidate(r: { license?: string; license_version?: string; duration?: number }, min: number, max: number): string | null {
+  const seconds = (r.duration ?? 0) / 1000;
+  return seconds >= min && seconds <= max ? licenceOf(r) : null;
+}
+
+const musicFind: ToolType<{ query: string; count?: number; min?: number; max?: number }> = {
+  name: 'music-find', title: 'Find music beds', description: 'finds credited music from Jamendo through the anonymous Openverse search and keeps suitable tracks in your sound library',
+  input: { type: 'object', properties: {
+    query: { type: 'string', title: 'Search', description: 'the mood, instruments and pace of the music' },
+    count: { type: 'integer', minimum: 1, maximum: 6, title: 'How many' },
+    min: { type: 'number', minimum: 0, title: 'Shortest (s)' },
+    max: { type: 'number', minimum: 0, title: 'Longest (s)' },
+  }, required: ['query'] },
+  ai: { when: 'a music bed the user does not want generated, or before a paid generation', avoid: 'keeping music with a noncommercial licence' },
+  async run({ query, count = 3, min = 20, max = 300 }, ctx) {
+    if (min > max) return { text: t('sound.musicRange'), notice: t('sound.nothingFound') };
+    let results: Awaited<ReturnType<typeof openverse>>;
+    try { results = await openverse('audio', { q: query, license: 'cc0,by', source: 'jamendo', page_size: '20' }, ctx.signal); }
+    catch (error) {
+      if (ctx.signal.aborted) throw error;
+      return { text: t('sound.musicUnavailableText'), notice: t('sound.musicUnavailable') };
+    }
+    const found = results as { title: string; url?: string; duration?: number; license?: string; license_version?: string; creator?: string; foreign_landing_url?: string; tags?: { name: string }[] }[];
+    const kept: SoundEntry[] = [], refused: string[] = [], ops: Op[] = [], reload: string[] = [];
+    for (const x of found) {
+      if (kept.length >= Math.min(count, 6)) break;
+      const license = musicCandidate(x, min, max);
+      if (!license) { refused.push(t('sound.musicRejected', { name: x.title })); continue; }
+      if (!x.url) continue;
+      const response = await fetch(x.url, { signal: ctx.signal }).catch(() => null);
+      if (!response?.ok) continue;
+      const blob = await response.blob(), measured = await measure(blob).catch(() => null);
+      if (!measured) continue;
+      const title = x.title.replace(/\.(wav|mp3|ogg|flac|m4a|aiff?)$/i, '').slice(0, 60);
+      const tags = [...new Set([...query.toLowerCase().split(/\s+/), ...(x.tags ?? []).map((g) => g.name.toLowerCase())])].slice(0, 12);
+      kept.push(await keepInLibrary(title, blob, { kind: 'music', title, tags, figures: measured.figures, license, author: x.creator, url: x.foreign_landing_url }));
+      const project = await keepFile(ctx, title, blob, title, measured.figures, { title, license, author: x.creator, url: x.foreign_landing_url });
+      ops.push(...project.ops);
+      reload.push(...project.reload);
+      const analysis = { ...await generatedAnalysis(measured.buffer), source: project.asset };
+      const analysisId = `analysis-${project.asset}`.slice(0, 64);
+      const path = await ctx.writeFile(`assets/analysis/${project.asset}-analysis.json`, JSON.stringify(analysis));
+      const old = ctx.doc.assets[analysisId];
+      ops.push({ op: old ? 'replace' : 'add', path: pointer('assets', analysisId), value: { type: 'json', src: path, name: `Analysis · ${title}` } });
+      if (old) reload.push(analysisId);
+    }
+    if (!kept.length) return { text: [t('sound.musicNone', { query }), ...(refused.length ? [t('sound.musicRefused', { list: refused.slice(0, 6).join('; ') })] : [])].join(' '), notice: t('sound.nothingFound') };
+    return { ops, reload, text: [t('sound.musicKept', { n: kept.length }), ...kept.map((e) => `- ${e.id}: ${e.title} (${e.license})`), ...(refused.length ? [t('sound.musicRefused', { list: refused.slice(0, 6).join('; ') })] : [])].join('\n'), notice: t('sound.keptN', { n: kept.length }) };
   },
 };
 
@@ -832,4 +956,4 @@ const credits: ToolType<Record<string, never>> = {
   },
 };
 
-export const SOUND_TOOLS: ToolType[] = [cues, sfx, soundFind, synth, generateSound, musicPlanTool, voices, duck, soundKeep, credits];
+export const SOUND_TOOLS: ToolType[] = [cues, sfx, soundBan, soundFind, musicFind, synth, generateSound, musicPlanTool, voices, duck, soundKeep, credits];

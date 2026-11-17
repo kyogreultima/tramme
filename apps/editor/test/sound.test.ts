@@ -1,10 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { applyOps, searchSounds, variantsOf, type SoundEntry, type ToolContext, type Transcript, type TrammeDoc } from '@tramme/core';
+import { applyOps, scaleOf, searchSounds, variantsOf, type SoundEntry, type ToolContext, type Transcript, type TrammeDoc } from '@tramme/core';
 import { builtinRegistry } from '@tramme/nodes';
 import { newProject } from '@tramme/project';
-import { momentsOf, SOUND_TOOLS } from '../src/sound.ts';
+import { momentsOf, musicCandidate, musicKeyAt, place, soundMatch, SOUND_TOOLS, tuneTo } from '../src/sound.ts';
 import { addVolumeBlockOps } from '../src/ui/timeline/mixer.ts';
 import { SOUND_PRESETS } from '../src/sound-presets.ts';
 // the preferences the tools read (imported here, before any module reset)
@@ -77,6 +77,42 @@ describe('the credits', () => {
 });
 
 describe('the sound library', () => {
+  it('drops every variant of a banned family', () => {
+    const entries = [
+      { id: 'hit-a-1', family: 'hit-a', kind: 'impact', title: 'Impact A1', tags: [], source: 'built-in', duration: 1, peakAt: 0.2 },
+      { id: 'hit-a-2', family: 'hit-a', kind: 'impact', title: 'Impact A2', tags: [], source: 'built-in', duration: 1, peakAt: 0.2 },
+      { id: 'hit-b', kind: 'impact', title: 'Impact B', tags: [], source: 'built-in', duration: 1, peakAt: 0.2 },
+    ] as SoundEntry[];
+    expect(searchSounds(entries, 'impact', { banned: new Set(['hit-a']) }).map((e) => e.id)).toEqual(['hit-b']);
+  });
+
+  it('prefers a library recording when word scores tie', () => {
+    const entries = [
+      { id: 'a-thud', kind: 'impact', title: 'Impact', tags: [], source: 'built-in', duration: 1, peakAt: 0.2 },
+      { id: 'mine-thud', kind: 'impact', title: 'Impact', tags: [], source: 'library', duration: 1, peakAt: 0.2 },
+    ] as SoundEntry[];
+    expect(searchSounds(entries, 'impact')[0].id).toBe('mine-thud');
+    expect(searchSounds(entries, '')[0].id).toBe('mine-thud');
+  });
+
+  it('can tune alternating sound variants by their own pitches', () => {
+    const d = newProject({ name: 'Tune', width: 100, height: 100, fps: 30, duration: 5 }).doc;
+    const ctx = { doc: d, compId: d.root } as ToolContext;
+    const f = { duration: 1, peakAt: 0.1, peakDb: -1, loudDb: -12, rmsDb: -20, start: 0, end: 1 };
+    const { ops } = place(ctx, [[{ asset: 'a', title: 'A', figures: f, kind: 'chime' }], [{ asset: 'b', title: 'B', figures: f, kind: 'chime' }]], [{ t: 1 }, { t: 2 }], { gain: -8, vary: true, tuned: (_m, sound) => sound.asset === 'a' ? 1 : -1 });
+    const rates = (ops as any[]).filter((o) => o.value?.type === 'audio').map((o) => o.value.props.rate);
+    expect(rates).toEqual([+(2 ** (1 / 12)).toFixed(4), +(2 ** (-1 / 12)).toFixed(4)]);
+  });
+  it('finds a semantic match without shared words and falls back to words alone', () => {
+    const entries = [
+      { id: 'door-slam', kind: 'impact', title: 'Door slam', tags: ['door'], source: 'built-in', duration: 1, peakAt: 0.2 },
+      { id: 'glass', kind: 'chime', title: 'Glass ding', tags: ['glass'], source: 'built-in', duration: 1, peakAt: 0.2 },
+    ] as SoundEntry[];
+    const similarity = new Map([['door-slam', 0.6], ['glass', 0.1]]);
+    expect(searchSounds(entries, 'heavy wooden noise', { meaning: (e) => similarity.get(e.id) ?? null }).map((e) => e.id)).toEqual(['door-slam']);
+    expect(searchSounds(entries, 'camera shutter', { meaning: () => 0.4 })).toEqual([]);
+    expect(searchSounds(entries, 'door', { meaning: () => null })).toEqual(searchSounds(entries, 'door'));
+  });
   it('holds every file it lists, once, measured and described', () => {
     expect(catalog.length).toBeGreaterThan(300);
     expect(new Set(library.map((e) => e.id)).size).toBe(library.length);
@@ -137,6 +173,71 @@ function context(doc = project(), extra: Partial<ToolContext> = {}) {
   } as unknown as ToolContext;
   return { ctx, written };
 }
+
+describe('cue shift for the sound kind', () => {
+  const tap = { asset: 'sound-tap', title: 'Tap', figures: { duration: 1, peakAt: 0.05, peakDb: -1, rmsDb: -12, loudDb: -6, start: 0, end: 1 }, kind: 'tap' };
+  it('lands a tap 60 ms before the cut', () => {
+    const { ctx } = context();
+    const layer = audioLayers(place(ctx, [[tap]], [{ t: 2, visual: 'cut' }], { gain: -8, vary: false }).ops)[0];
+    expect(layer.in).toBeCloseTo(1.89, 4);
+    expect(layer.props.cueShift).toBe(-0.06);
+  });
+  it('starts at zero with a file offset when the shifted peak precedes the film', () => {
+    const { ctx } = context();
+    const layer = audioLayers(place(ctx, [[tap]], [{ t: 0.03, visual: 'cut' }], { gain: -8, vary: false }).ops)[0];
+    expect(layer.in).toBe(0);
+    expect(layer.props.start).toBeCloseTo(0.08, 4);
+  });
+  it('leaves start-aligned sounds unshifted', () => {
+    const { ctx } = context();
+    const layer = audioLayers(place(ctx, [[tap]], [{ t: 2, visual: 'cut' }], { gain: -8, vary: false, align: 'start' }).ops)[0];
+    expect(layer.in).toBe(2);
+    expect(layer.props.cueShift).toBeUndefined();
+  });
+});
+
+describe('pitch matching', () => {
+  it('moves C natural to C sharp in D major', () => {
+    expect(tuneTo(60, scaleOf({ tonic: 2, mode: 'major', confidence: 1 }))).toBe(1);
+    expect(tuneTo(62, scaleOf({ tonic: 2, mode: 'major', confidence: 1 }))).toBe(0);
+  });
+  it('does not vary the speed of a tuned sound on repeated moments', () => {
+    const { ctx } = context();
+    const chime = { asset: 'sound-chime', title: 'Chime', kind: 'chime', figures: { duration: 1, peakAt: 0, peakDb: -1, rmsDb: -12, loudDb: -6, start: 0, end: 1 } };
+    const layers = audioLayers(place(ctx, [[chime]], [{ t: 1 }, { t: 2 }, { t: 3 }], { gain: -8, vary: true, tuned: 1 }).ops);
+    expect(new Set(layers.map((l) => l.props.rate))).toEqual(new Set([+(2 ** (1 / 12)).toFixed(4)]));
+    expect(layers.every((l) => l.props.keepPitch === undefined)).toBe(true);
+  });
+  it('uses only the key of music playing at the moment', () => {
+    const { ctx } = context();
+    const key = { tonic: 2, mode: 'major' as const, confidence: 0.2 };
+    const read = (id: string) => id === 'analysis-music' ? { kind: 'audio-analysis', beats: [], key } : undefined;
+    expect(musicKeyAt(ctx, 2, read)).toEqual(key);
+    expect(musicKeyAt(ctx, 11, read)).toBeNull();
+  });
+});
+
+it('bans a chosen variant with its whole family and can undo the ban', async () => {
+  const { ctx } = context();
+  try {
+    await tool('sound-ban').run({ sound: 'impact-impact-metal-heavy-002' }, ctx);
+    expect(prefs.peek().bannedSounds).toContain('impact-impact-metal-heavy');
+    await tool('sound-ban').run({ sound: 'impact-impact-metal-heavy-002', undo: true }, ctx);
+    expect(prefs.peek().bannedSounds).not.toContain('impact-impact-metal-heavy');
+  } finally { setPrefs({ bannedSounds: [] }); }
+});
+
+it('keeps only credited Jamendo tracks within the requested length', () => {
+  expect(musicCandidate({ license: 'by', license_version: '3.0', duration: 95000 }, 20, 300)).toBe('CC BY 3.0');
+  expect(musicCandidate({ license: 'by-nc', duration: 95000 }, 20, 300)).toBeNull();
+  expect(musicCandidate({ license: 'by', duration: 10000 }, 20, 300)).toBeNull();
+});
+
+it('refuses a recording whose sound does not match the search, when vectors exist', () => {
+  const query = Float32Array.from([1, 0]), wrong = Float32Array.from([0, 1]);
+  expect(soundMatch(query, wrong)).toBe(false);
+  expect(soundMatch(null, wrong)).toBe(true);
+});
 
 beforeEach(() => {
   vi.stubGlobal('location', { href: 'http://x/' });
