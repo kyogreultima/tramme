@@ -8,6 +8,12 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+## [0.30.1] - 2026-11-17
+
+### Fixed
+
+- Cloud exports can start Chromium in the renderer container when it runs as root; projects with plugins no longer fail during archive validation for that reason.
+
 ## [0.30.0] - 2026-11-17
 
 ### Added
@@ -995,7 +1001,8 @@ First public release.
 
 - Cloudflare Worker serving the editor and the API, projects stored in R2, access protected by Cloudflare Access.
 
-[Unreleased]: ../../compare/v0.30.0...HEAD
+[Unreleased]: ../../compare/v0.30.1...HEAD
+[0.30.1]: ../../compare/v0.30.0...v0.30.1
 [0.30.0]: ../../compare/v0.29.0...v0.30.0
 [0.29.0]: ../../compare/v0.28.0...v0.29.0
 [0.28.0]: ../../compare/v0.27.0...v0.28.0

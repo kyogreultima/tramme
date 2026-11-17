@@ -13,18 +13,24 @@ export const CHROME = [
   '/usr/bin/google-chrome',
 ].find((p) => p && fs.existsSync(p));
 
+/** The renderer image runs as root; Chromium refuses to start there with its sandbox enabled. */
+export function chromeArgs(root = process.getuid?.() === 0): string[] {
+  return [
+    ...(root ? ['--no-sandbox'] : []),
+    '--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist', '--enable-unsafe-swiftshader',
+    '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows',
+    '--autoplay-policy=no-user-gesture-required', '--force-color-profile=srgb', '--disable-lcd-text',
+    '--window-size=1920,1080',
+  ];
+}
+
 export async function launch({ quiet = true } = {}): Promise<{ browser: Browser; page: Page }> {
   if (!CHROME) throw new Error('Chrome not found (set CHROME_PATH to point to it)');
   const browser = await puppeteer.launch({
     executablePath: CHROME,
     headless: true,
     protocolTimeout: 0,
-    args: [
-      '--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist', '--enable-unsafe-swiftshader',
-      '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows',
-      '--autoplay-policy=no-user-gesture-required', '--force-color-profile=srgb', '--disable-lcd-text',
-      '--window-size=1920,1080',
-    ],
+    args: chromeArgs(),
     defaultViewport: { width: 1920, height: 1080, deviceScaleFactor: 1 },
   });
   const page = await browser.newPage();
