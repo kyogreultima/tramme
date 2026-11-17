@@ -107,7 +107,9 @@ The Worker transcribes the speech of sounds and videos with Workers AI (`@cf/ope
 
 ### Export on the server
 
-`pnpm renderer` starts the renderer of the exports (`apps/renderer`: the command line's render with Chrome and ffmpeg) on port 8080. While it runs, the export panel offers "Export on the server": the project is rendered as the desktop app renders it, one job at a time, and the film lands in its `renders/`. The app tells when it is over (a notification of the system when it is in the background, a message otherwise), after a reload too. With accounts, the same queue renders in a container, and the account's owner is also told by mail.
+`pnpm renderer` starts the renderer of the exports (`apps/renderer`: the command line's render with Chrome and ffmpeg) on port 8080. While it runs, the export panel offers "Export on the server": the project is rendered as the desktop app renders it, one job at a time, and the film lands in its `renders/`. The app tells when it is over (a notification of the system when it is in the background, a message otherwise), after a reload too. With accounts, the same queue renders in a container, and the account's owner is also told by mail. The queue hands the project to the renderer and asks every 15 seconds where it is (the page asks the queue every 4 seconds at first, then less often up to every 30, and once a minute in the background): no request waits for a whole render, so a film of any length outlasts neither the queue's alarm nor the container's sleep. A failed export says its reason (an asset that cannot be read, an issue of the project), never a call stack.
+
+Before deploying anything that touches the exports, `pnpm test:cloud` checks them from end to end on this machine: the Worker's routes, the queue, the real renderer, Chrome and ffmpeg, on the examples, the plugin fixture and a film made as the assistant makes one (voice, sounds, font, PNG and SVG, footage), plain and isolated in the sandbox; each film is checked for its size, frames, duration and sound. `CLOUD_CASES=showreel,assistant pnpm test:cloud` runs some of them.
 
 ### Limits of the server mode
 

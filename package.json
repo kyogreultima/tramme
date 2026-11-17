@@ -22,6 +22,7 @@
     "android:dev": "node apps/editor/build.ts && cd apps/desktop && tauri android dev",
     "android:build": "node apps/editor/build.ts && cd apps/desktop && tauri android build",
     "test": "vitest run",
+    "test:cloud": "vitest run -c vitest.e2e.config.ts",
     "typecheck": "tsc --noEmit -p . && tsc --noEmit -p apps/worker",
     "tramme": "node packages/cli/src/main.ts",
     "edit": "node packages/cli/src/main.ts edit",

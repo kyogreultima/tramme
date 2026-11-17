@@ -23,6 +23,7 @@ import { inAccount } from '../bring.ts';
 import { t } from '../i18n/index.ts';
 import { cloud } from '../mode.ts';
 import { allowNotifications, notify } from '../notify.ts';
+import { nextWait } from '../render-pace.ts';
 import { S, toast } from '../state.ts';
 import { tauri } from '../tauri.ts';
 import { Icon } from './icons.tsx';
@@ -33,8 +34,9 @@ interface Followed { job: Job; name: string; project?: string }
 const projectOf = (f: Followed) => f.project ?? f.job.project;
 
 const KEY = 'tramme.renders';
-/** how often the jobs under way are asked about */
-const EVERY = 4000;
+/** the questions asked since a job was last asked for (their pace: render-pace.ts) */
+let asked = 0;
+const hidden = () => typeof document !== 'undefined' && document.visibilityState === 'hidden';
 
 const read = (): Followed[] => { try { return JSON.parse(localStorage.getItem(KEY) ?? '[]') as Followed[]; } catch { return []; } };
 const write = (list: Followed[]) => { try { localStorage.setItem(KEY, JSON.stringify(list.slice(-20))); } catch { /* private window: followed in this page only */ } };
@@ -58,11 +60,13 @@ async function answered(r: Response): Promise<Job> {
 
 function keep(list: Followed[]) { followed.value = list; write(list); }
 
-/** every job under way asked about now and then; one that ends is told */
-function follow() {
+/** every job under way asked about now and then (nextWait); one that ends is told */
+function follow(wait = nextWait(asked, hidden())) {
   if (timer) clearTimeout(timer);
+  timer = null;
   if (!followed.peek().some((f) => under(f.job))) return;
   timer = setTimeout(async () => {
+    asked++;
     const list = [...followed.peek()];
     for (const [i, f] of list.entries()) {
       if (!under(f.job)) continue;
@@ -78,8 +82,11 @@ function follow() {
     }
     keep(list);
     follow();
-  }, EVERY);
+  }, wait);
 }
+
+// the page back in front: the jobs under way asked about at once, then at the pace they had reached
+if (typeof document !== 'undefined') document.addEventListener('visibilitychange', () => { if (!hidden() && timer) follow(0); });
 
 /** a job asked for: the film, or the Premiere Pro timeline with its clips (a zip: the XML, the media, the drawings as ProRes with alpha, the subtitles) */
 async function start(format: 'mp4' | 'premiere' = 'mp4') {
@@ -91,6 +98,8 @@ async function start(format: 'mp4' | 'premiere' = 'mp4') {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ comp: S.compId.peek(), ...(format === 'premiere' ? { format } : {}) }),
     }));
     keep([...followed.peek().filter((f) => projectOf(f) !== project.id || under(f.job)), { job, name: project.name, project: project.id }]);
+    // a new job: asked about soon again
+    asked = 0;
     follow();
   } catch (e) {
     toast(e instanceof ApiError && e.message === 'plan_limit' ? t('cloudRender.limit') : t('cloudRender.failed', { error: (e as Error).message }), 'error');

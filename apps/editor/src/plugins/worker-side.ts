@@ -5,7 +5,7 @@
 // project is a message answered by the page. Nothing here touches the DOM.
 
 import { Registry, type CheckContext, type CheckType, type EffectType, type ModifierType, type MotionReport, type NodeType, type PluginModule, type Quad, type QualityIssue, type SoundCue, type ToolContext, type ToolOutput } from '@tramme/core';
-import type { Ask, CheckCtxData, ClockSample, DrawPayload, DrawResult, FramePayload, FromWorker, LayerSample, MotionSample, PlacedSample, PluginDecl, SandboxDoc, SchemaEffect, SchemaModifier, SchemaNode, ToWorker, ToolCtxData } from './protocol.ts';
+import type { Ask, CheckCtxData, ClockSample, DrawPayload, DrawResult, FrameAnswer, FramePayload, FromWorker, LayerSample, MotionSample, PlacedSample, PluginDecl, SandboxDoc, SchemaEffect, SchemaModifier, SchemaNode, ToWorker, ToolCtxData } from './protocol.ts';
 
 /** the sandbox id of an installed plugin (installed:<file>): the project's own plugins have the document's asset ids */
 export const INSTALLED = 'installed:';
@@ -24,7 +24,7 @@ export interface SandboxDrawSide {
   /** a node's vector export, computed from its declarations' code */
   exportOf(type: string, props: unknown): Promise<{ svg?: string; lottie?: unknown; err?: string }>;
   /** a whole composition evaluated and drawn here (the evaluator's move); the picture may be transferred */
-  renderFrame(p: FramePayload): Promise<{ bitmap?: unknown; transfer?: Transferable[]; err?: string }>;
+  renderFrame(p: FramePayload): Promise<FrameAnswer & { transfer?: Transferable[] }>;
   /** evaluate one property without running its expression on the page */
   evaluateValue(address: string, t: number, compId: string): Promise<unknown>;
   evaluateSeries(addresses: string[], times: number[], compId: string): Promise<unknown[][]>;
@@ -183,7 +183,7 @@ export function startWorkerSide({ post, importModule, sandbox: makeSandbox }: Wo
       if (m.kind === 'render') {
         if (!sandbox) { post({ kind: 'rendered', call: m.call, err: 'the sandbox cannot render here' }); return; }
         void (async () => {
-          const r: { bitmap?: unknown; transfer?: Transferable[]; err?: string } = await sandbox.renderFrame(m.payload).catch((e: Error) => ({ err: e.message }));
+          const r: FrameAnswer & { transfer?: Transferable[] } = await sandbox.renderFrame(m.payload).catch((e: Error) => ({ err: e.message }));
           post({ kind: 'rendered', call: m.call, ...r }, r.transfer);
         })();
         return;

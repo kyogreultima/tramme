@@ -357,6 +357,21 @@ describe('the plugin sandbox', () => {
       }
     } finally { vi.useRealTimers(); }
   });
+  it('lets an export wait for a heavy frame past the preview\'s limit, and still stops a stuck one', async () => {
+    vi.useFakeTimers();
+    try {
+      const { host } = connectHost(() => {}, () => DOC_URL);
+      let settled = false;
+      const frame = host.renderFrame({ compId: 'root', t: 0, scale: 1, width: 10, height: 10 }, { export: true }).catch((e: Error) => { settled = true; throw e; });
+      const rejected = expect(frame).rejects.toThrow('render call timed out after 300 seconds');
+      await vi.advanceTimersByTimeAsync(30_001);
+      expect(settled).toBe(false);
+      expect(host.closed()).toBe(false);
+      await vi.advanceTimersByTimeAsync(270_000);
+      await rejected;
+      expect(host.closed()).toBe(true);
+    } finally { vi.useRealTimers(); }
+  });
   it('tells the page what a plugin declares, without its code', async () => {
     const { host } = pair(new Map([['blob:stars', plugin()]]));
     const decls = await host.ensure([{ id: 'stars', url: 'blob:stars' }]);

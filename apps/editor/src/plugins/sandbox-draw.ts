@@ -13,7 +13,7 @@ import { Evaluator } from '@tramme/core';
 import { sandboxedDoc } from '../installed.ts';
 import type { Renderer } from '@tramme/render';
 import type { PluginHost } from './host.ts';
-import type { PluginDecl, SandboxDoc, SchemaModifier, SchemaNode } from './protocol.ts';
+import { videoKey, type FrameAnswer, type FramePayload, type PluginDecl, type SandboxDoc, type SchemaModifier, type SchemaNode, type VideoNeed } from './protocol.ts';
 
 /** what the wrapper needs from the editor: the document and its loaded assets */
 export interface SandboxContext {
@@ -219,33 +219,63 @@ export function moduleItemsOf(doc: TrammeDoc, docUrl: string): { id: string; url
 }
 
 /**
- * Every video asset's exact frame at t, decoded on the page (the sandbox
- * does not decode): shipped with the sandbox's render request. A frame is a
- * canvas as often as a bitmap, and a canvas element does not cross
- * postMessage: each one travels as an ImageBitmap (closed by the host once
- * the request is answered).
+ * A video frame decoded on the page (the sandbox does not decode), ready to
+ * cross: a frame is a canvas as often as a bitmap, and a canvas element does
+ * not cross postMessage, so it travels as an ImageBitmap (closed by the host
+ * once the request is answered). One that cannot be decoded crosses blank: its
+ * layer draws nothing rather than ask for it again.
  */
-export async function sandboxVideoFrames(r: Renderer, doc: TrammeDoc, t: number): Promise<Record<string, unknown>> {
-  const videos: Record<string, unknown> = {};
-  const decoded = new Map<string, { image: CanvasImageSource | null } | null>();
-  for (const [id, a] of Object.entries(doc.assets)) {
-    if (a.type !== 'video') continue;
-    try {
-      const source = r.assets.useProxies && a.proxy && doc.assets[a.proxy]?.type === 'video' ? a.proxy : id;
-      const key = r.assets.url?.(source) ?? source;
-      // Keep every asset id available to plugins, while decoding a shared
-      // proxy/file once. Each id still owns a separate transferable bitmap.
-      if (!decoded.has(key)) {
-        const va = r.assets.get<{ request?(x: number): Promise<void>; frameAt(x: number): { image: CanvasImageSource | null } | null } | null>(id);
-        if (!va) continue;
-        await va.request?.(t);
-        decoded.set(key, va.frameAt(t));
-      }
-      const fr = decoded.get(key);
-      if (fr?.image) videos[id] = await createImageBitmap(fr.image);
-    } catch { /* not decodable: the node's draw says so */ }
+async function decodeVideoFrame(r: Renderer, id: string, t: number): Promise<ImageBitmap> {
+  try {
+    const va = r.assets.get<{ request?(x: number): Promise<void>; frameAt(x: number): { image: CanvasImageSource | null } | null } | null>(id);
+    if (va) {
+      await va.request?.(t);
+      const fr = va.frameAt(t);
+      if (fr?.image) return await createImageBitmap(fr.image);
+    }
+  } catch { /* drawn blank */ }
+  return createImageBitmap(new OffscreenCanvas(1, 1));
+}
+
+/** the rounds of video frames one sandbox frame may ask for before it is taken as stuck */
+const VIDEO_ROUNDS = 4;
+/** the video frames each host's last two frames asked for (comp time, needs): the next frame's are decoded ahead */
+const lastNeeds = new WeakMap<PluginHost, { t: number; need: VideoNeed[] }[]>();
+
+/** the frames the next frame will likely ask for: each one of the last frame moved on at the pace it moved since the frame before */
+function predictNeeds(host: PluginHost, t: number): VideoNeed[] {
+  const [prev, last] = lastNeeds.get(host) ?? [];
+  if (!last) return [];
+  const paired = prev && prev.need.length === last.need.length && prev.need.every((n, i) => n.id === last.need[i].id) && last.t !== prev.t;
+  return last.need.map((n, i) => {
+    const rate = paired ? (n.t - prev.need[i].t) / (last.t - prev.t) : 1;
+    return { id: n.id, t: n.t + rate * (t - last.t) };
+  });
+}
+
+/**
+ * One frame drawn by the sandbox, its videos decoded here: only the frames the
+ * sandbox draws (each video layer at its own time in the file, at each
+ * motion-blur sample), not every video of the project at the composition's
+ * time. The frames the last two frames asked for, moved on, go with the first
+ * request; the sandbox names any it still lacks, decoded and sent again.
+ */
+export async function renderSandboxFrame(host: PluginHost, r: Renderer, payload: Omit<FramePayload, 'videos'>, opts?: { export?: boolean }): Promise<FrameAnswer> {
+  // the frames sent, by key: each round decodes them again (the decoder keeps its frames) since the host closes what it sent
+  const wanted = new Map<string, VideoNeed>(predictNeeds(host, payload.t).map((n) => [videoKey(n.id, n.t), n]));
+  for (let round = 0; round < VIDEO_ROUNDS; round++) {
+    const videos: Record<string, ImageBitmap> = {};
+    for (const [key, n] of wanted) videos[key] = await decodeVideoFrame(r, n.id, n.t);
+    const answer = await host.renderFrame({ ...payload, videos }, opts);
+    if (!answer.need?.length) {
+      lastNeeds.set(host, [...(lastNeeds.get(host) ?? []).slice(-1), { t: payload.t, need: answer.drew ?? [] }]);
+      return answer;
+    }
+    const fresh = answer.need.filter((n) => !wanted.has(videoKey(n.id, n.t)));
+    if (!fresh.length) break;
+    for (const n of fresh) wanted.set(videoKey(n.id, n.t), n);
   }
-  return videos;
+  return { err: 'the video frames of this frame did not come' };
 }
 
 /** the sandbox's finished picture, shown through the renderer's own compositor (its canvas is WebGL) */

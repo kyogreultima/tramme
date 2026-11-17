@@ -23,7 +23,7 @@ import { clipChain, liveMaster, loadPitch, masterGainDb, mixTracks, playClip, Re
 import { comp, compIdOf, S, setRegistry, setTime, toast, viewDoc } from './state.ts';
 import { attachInstalled, attachIsolated, filterModule, onSandboxStopped, pluginHost, pluginToolHost } from './plugins/index.ts';
 import { copiesIn, copyId, counted, installed, installedFor, installedTypes, offIn, permitted, sandboxedDoc, stopped, STRIKES } from './installed.ts';
-import { bindSandbox, blitSandboxFrame, declarationsModule, ensureDeclared, ensureSandboxDoc, moduleItemsOf, resetSandbox, sandboxDeclaration, sandboxVideoFrames, type SandboxContext } from './plugins/sandbox-draw.ts';
+import { bindSandbox, blitSandboxFrame, declarationsModule, ensureDeclared, ensureSandboxDoc, moduleItemsOf, renderSandboxFrame, resetSandbox, sandboxDeclaration, type SandboxContext } from './plugins/sandbox-draw.ts';
 import { setWebScenePlaceholder } from '@tramme/nodes';
 import { liveScenes } from './webscene-preview.ts';
 import { t } from './i18n/index.ts';
@@ -343,8 +343,7 @@ class Preview {
       await r.bringImages(t);
       ensureSandboxDoc(host, { doc, docUrl: base, loaded: (id) => { try { return r.assets.get(id); } catch { return null; } } });
       const scale = Math.min(1, width / r.comp.width);
-      const videos = await sandboxVideoFrames(r, doc, t);
-      const picture = await host.renderFrame({ compId: r.compId, t, scale, width: r.comp.width, height: r.comp.height, videos });
+      const picture = await renderSandboxFrame(host, r, { compId: r.compId, t, scale, width: r.comp.width, height: r.comp.height });
       if (picture.err || !picture.bitmap) throw new Error(picture.err ?? 'no picture from the sandbox');
       const small = document.createElement('canvas');
       small.width = Math.round(r.comp.width * scale); small.height = Math.round(r.comp.height * scale);
@@ -488,8 +487,7 @@ class Preview {
     // the pictures this frame shows, brought in first: the sandbox only has those kept
     await r.bringImages(t);
     ensureSandboxDoc(pluginHost(docUrl), ctx);
-    const videos = await sandboxVideoFrames(r, doc, t);
-    const pic = await pluginHost(docUrl).renderFrame({ compId: r.compId, t, scale, samples, width: c.width, height: c.height, videos });
+    const pic = await renderSandboxFrame(pluginHost(docUrl), r, { compId: r.compId, t, scale, samples, width: c.width, height: c.height });
     if (pic.err) { S.renderError.value = `sandbox: ${pic.err}`; return; }
     if (!pic.bitmap) return;
     this.setScale(r, scale, this.stillScale());

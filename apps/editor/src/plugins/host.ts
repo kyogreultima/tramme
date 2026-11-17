@@ -5,7 +5,7 @@
 // registry carries — plugins/vocabulary.ts puts them there).
 
 import { toolOutput, type CheckContext, type MotionReport, type NodeType, type PlacedLayer, type Quad, type QualityIssue, type SoundCue, type ToolContext, type ToolOutput } from '@tramme/core';
-import type { Ask, ClockSample, DrawPayload, DrawResult, FramePayload, FromWorker, LayerSample, MotionSample, PlacedSample, PluginDecl, SandboxDoc, ToWorker } from './protocol.ts';
+import type { Ask, ClockSample, DrawPayload, DrawResult, FrameAnswer, FramePayload, FromWorker, LayerSample, MotionSample, PlacedSample, PluginDecl, SandboxDoc, ToWorker } from './protocol.ts';
 
 /** the schema of a node without its code: what a check's samples may cross */
 const schemaOf = (n: NodeType) => ({ type: n.type, title: n.title, category: n.category, description: n.description, ai: n.ai, props: n.props, ...(n.container ? { container: true } : {}) });
@@ -36,6 +36,10 @@ const OUTBOUND_LIMIT = 64 * 1024 * 1024;
 /** the values an outbound message may hold: room for a long film's document, bounded so a walk of it stays short */
 const OUTBOUND_COUNT = 4_000_000;
 const GRAPHICS_LIMIT = 256 * 1024 * 1024;
+/** how long an export waits for one frame of the sandbox before taking it as stuck (the preview: 30 s) */
+const EXPORT_FRAME_SECONDS = 300;
+/** the video frames one sandbox frame may ask for (each video layer, at each motion-blur sample) */
+const MAX_VIDEO_NEEDS = 512;
 const canvasSize = (width: number, height: number, scale = 1) => {
   if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 || !Number.isFinite(scale) || scale <= 0) throw new Error('invalid sandbox canvas');
   if (width > 8192 || height > 8192 || width * scale > 8192 || height * scale > 8192) throw new Error('sandbox canvas exceeds 8192 pixels');
@@ -141,8 +145,13 @@ export interface PluginHost {
   draw(payload: DrawPayload): Promise<DrawResult[]>;
   /** a node's vector export, computed in the sandbox */
   exportOf(type: string, props: unknown): Promise<{ svg?: string; lottie?: unknown; err?: string }>;
-  /** a whole composition evaluated and drawn in the sandbox; one picture comes back */
-  renderFrame(payload: FramePayload): Promise<{ bitmap?: unknown; err?: string }>;
+  /**
+   * A whole composition evaluated and drawn in the sandbox; one picture comes
+   * back, or the video frames it lacks (`need`: drawn again once the page has
+   * decoded them, sandboxFrame). An export waits for a heavy frame (all its
+   * motion-blur samples, pages rendering at once) longer than the preview does.
+   */
+  renderFrame(payload: FramePayload, opts?: { export?: boolean }): Promise<FrameAnswer>;
   /** an evaluated property, computed in the worker */
   evaluateValue(address: string, t: number, compId: string): Promise<unknown>;
   /** values[address][time], sampled together in one isolated evaluator */
@@ -308,12 +317,17 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
     }
     if (m.kind === 'rendered') {
       if (m.err !== undefined && typeof m.err !== 'string') { invalid(); return; }
+      const needs = (list: unknown) => list === undefined || (Array.isArray(list) && list.length <= MAX_VIDEO_NEEDS && list.every((n) => n && typeof n.id === 'string' && n.id.length <= 256 && Number.isFinite(n.t)));
+      if (!needs(m.need) || !needs(m.drew)) { invalid(); return; }
       if (responseTooLarge(m.bitmap) || responseTooLarge(m.err) || graphicsTooLarge(m.bitmap)) { timeout('sandbox response exceeds its data or graphics budget'); return; }
       const w = waits.get(m.call);
       if (!w) return;
       waits.delete(m.call);
       if (m.err) w.reject(new Error(m.err));
-      else w.resolve({ bitmap: m.bitmap });
+      else {
+        const plain = (list: { id: string; t: number }[]) => list.map((n) => ({ id: n.id, t: n.t }));
+        w.resolve(m.need?.length ? { need: plain(m.need) } : { bitmap: m.bitmap, drew: plain(m.drew ?? []) });
+      }
       return;
     }
     if (m.kind === 'evaluated') {
@@ -447,7 +461,7 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
     else invalid();
   };
 
-  const run = (msg: ToWorker & { call: number }, ctx?: ToolContext | CheckContext, signal?: AbortSignal): Promise<unknown> => {
+  const run = (msg: ToWorker & { call: number }, ctx?: ToolContext | CheckContext, signal?: AbortSignal, patience?: number): Promise<unknown> => {
     if (responseTooLarge(msg, OUTBOUND_LIMIT, OUTBOUND_COUNT)) return Promise.reject(new Error('sandbox message exceeds 64 MB'));
     if (graphicsTooLarge(msg)) return Promise.reject(new Error('sandbox graphics exceed 256 MB'));
     if (waits.size >= 64) return Promise.reject(new Error('too many pending sandbox calls'));
@@ -456,7 +470,7 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
     const stop = () => send({ kind: 'abort', call: c });
     signal?.addEventListener('abort', stop, { once: true });
     return new Promise((resolve, reject) => {
-      const seconds = msg.kind === 'tool' ? 120 : msg.kind === 'check' ? 30 : 30;
+      const seconds = patience ?? (msg.kind === 'tool' ? 120 : 30);
       const timer = setTimeout(() => timeout(`${msg.kind} call timed out after ${seconds} seconds`), seconds * 1000);
       waits.set(c, {
         resolve: (v) => { clearTimeout(timer); signal?.removeEventListener('abort', stop); resolve(v); },
@@ -514,11 +528,11 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
       const r = await run({ kind: 'export', call: ++call, type, props });
       return (r ?? {}) as { svg?: string; lottie?: unknown; err?: string };
     },
-    async renderFrame(payload) {
+    async renderFrame(payload, opts) {
       try {
         canvasSize(payload.width, payload.height, payload.scale);
-        const r = await run({ kind: 'render', call: ++call, payload });
-        return (r ?? {}) as { bitmap?: unknown; err?: string };
+        const r = await run({ kind: 'render', call: ++call, payload }, undefined, undefined, opts?.export ? EXPORT_FRAME_SECONDS : undefined);
+        return (r ?? {}) as FrameAnswer;
       } finally {
         // the frames shipped were copied by the message: the page's bitmaps are done with
         for (const v of Object.values(payload.videos ?? {})) (v as { close?(): void }).close?.();

@@ -3,7 +3,7 @@
 // the server (dates, size of the main composition); the editor writes the
 // document and the other files.
 
-import { Zip, ZipDeflate, ZipPassThrough } from 'fflate';
+import { deflateSync, Zip, ZipPassThrough } from 'fflate';
 import { isMedia, upgradeFile, currentPath, LEGACIES, DOCUMENT, isChatPath, LIMITS, MANIFEST, ManifestSchema, mimeOf, newId, newProject, parseDocument, pathIssue, type Manifest } from '@tramme/project';
 import type { Bucket, StoredBody, StoredObject } from './bucket.ts';
 import { HttpError, json, readJson } from './http.ts';
@@ -159,6 +159,24 @@ export async function duplicateProject(bucket: Bucket, id: string, req: Request)
   return json(await writeManifest(bucket, m), 201);
 }
 
+/**
+ * A file of the archive compressed in one piece (deflateSync), the archive still
+ * streaming file by file. fflate's streaming deflate (ZipDeflate, 0.8.3) writes
+ * matches further back than its window on some files (a TrueType font, level 6
+ * and 9): the archive could not be opened again ("invalid distance"), the export
+ * in the cloud failed. Each file is pushed whole, in one final chunk.
+ */
+export class ZipWholeDeflate extends ZipPassThrough {
+  constructor(filename: string) {
+    super(filename);
+    this.compression = 8;
+  }
+  override process(chunk: Uint8Array, final: boolean): void {
+    if (!final) throw new Error('ZipWholeDeflate takes a file in one chunk');
+    this.ondata(null, deflateSync(chunk, { level: 6 }), true);
+  }
+}
+
 /** the project as a .tramme archive, zipped while it streams out */
 export async function exportProject(bucket: Bucket, id: string) {
   const m = await readManifest(bucket, id);
@@ -176,7 +194,7 @@ export async function exportProject(bucket: Bucket, id: string) {
         const obj = await bucket.get(o.key);
         if (!obj) continue;
         // media are already compressed: store them as they are
-        const file = /\.(png|jpe?g|webp|gif|avif|mp3|ogg|m4a|mp4|webm|mov|woff2?)$/i.test(path) ? new ZipPassThrough(path) : new ZipDeflate(path, { level: 6 });
+        const file = /\.(png|jpe?g|webp|gif|avif|mp3|ogg|m4a|mp4|webm|mov|woff2?)$/i.test(path) ? new ZipPassThrough(path) : new ZipWholeDeflate(path);
         zip.add(file);
         file.push(new Uint8Array(await obj.arrayBuffer()), true);
         if (failed) throw failed;

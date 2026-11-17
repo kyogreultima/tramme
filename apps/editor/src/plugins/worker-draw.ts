@@ -20,7 +20,7 @@ import { builtinRegistry, setWebScenePlaceholder } from '@tramme/nodes';
 import { CanvasPool, Compositor, drawComposed, drawFrame, drawLayers, finishOf, subTimes } from '@tramme/render/src/index.ts';
 import { nodeContext, resizeNode } from '@tramme/render/src/gpu.ts';
 import { RecordingPath2D } from './recording-path.ts';
-import type { DrawPayload, DrawResult, FramePayload, LayerSample, SandboxDoc } from './protocol.ts';
+import { videoKey, type DrawPayload, type DrawResult, type FramePayload, type LayerSample, type SandboxDoc, type VideoNeed } from './protocol.ts';
 import type { SandboxDrawSide } from './worker-side.ts';
 
 // A web scene not captured yet (its pictures are made by `tramme render`) draws nothing here instead of
@@ -109,16 +109,26 @@ export function makeSandboxDraw(modules: Map<string, PluginModule>): SandboxDraw
 
   const theDoc = () => side.doc as unknown as TrammeDoc | null;
 
-  const sandboxAsset = (id: string, videos: Map<string, unknown>) => {
+  const sandboxAsset = (id: string, videos: Map<string, unknown>, need: Map<string, VideoNeed>, drew: Map<string, VideoNeed>) => {
     if (side.images.has(id)) return side.images.get(id);
     if (side.json.has(id)) return side.json.get(id);
     if (side.models.has(id)) return side.models.get(id);
     const a = assetInfo(id);
     if (a.type === 'font') return a.family ?? id;
     if (a.type === 'video') {
-      // the page decodes the frame this render asks for and ships it with the request
-      const frame = videos.get(id) as ImageBitmap | undefined;
-      return { width: frame?.width ?? 0, height: frame?.height ?? 0, duration: Number(a.duration ?? 0), frameAt: () => ({ image: frame ?? null, exact: true }), request: () => {} };
+      // the page decodes the frames a render draws (the layer's own time in the file, at each motion-blur
+      // sample) and ships them with the request; one it lacks is asked for, and the frame drawn again
+      const at = (t: number) => videos.get(videoKey(id, t)) as ImageBitmap | undefined;
+      const size = [...videos.entries()].find(([k]) => k.startsWith(`${id}@`))?.[1] as ImageBitmap | undefined;
+      return {
+        width: size?.width ?? Number(a.width ?? 0), height: size?.height ?? Number(a.height ?? 0), duration: Number(a.duration ?? 0),
+        frameAt: (t: number) => {
+          const frame = at(t);
+          (frame ? drew : need).set(videoKey(id, t), { id, t });
+          return { image: frame ?? null, exact: !!frame };
+        },
+        request: () => Promise.resolve(),
+      };
     }
     if (a.type === 'module') {
       const mod = modules.get(id);
@@ -128,16 +138,27 @@ export function makeSandboxDraw(modules: Map<string, PluginModule>): SandboxDraw
     throw new Error(`host.asset: the asset "${id}" (${String(a.type)}) is not in the sandbox`);
   };
 
+  // One evaluator and one set of simulations for a document snapshot and its
+  // plugins, kept from frame to frame: rebuilt for each frame, an export paid
+  // the registry and the evaluator's caches again at every frame, and stepped
+  // every simulation from its layer's start again (a cost growing with the film).
+  let kept: { doc: TrammeDoc; plugins: number; reg: ReturnType<typeof builtinRegistry>; evaluator: Evaluator; sims: Map<string, { frame: number; state: unknown }> } | null = null;
+  const frameTools = (doc: TrammeDoc) => {
+    if (kept?.doc === doc && kept.plugins === modules.size) return kept;
+    const reg = builtinRegistry().clone();
+    for (const [id, mod] of modules) reg.use(mod, id);
+    kept = { doc, plugins: modules.size, reg, evaluator: new Evaluator(doc, reg, { data: (id) => side.json.get(id) }), sims: new Map() };
+    return kept;
+  };
+
   const renderFrame = async (p: FramePayload) => {
     const doc = theDoc();
     if (!doc) return { err: 'no document in the sandbox' };
     const comp = doc.compositions[p.compId];
     if (!comp) return { err: `unknown composition: ${p.compId}` };
     const videos = new Map(Object.entries(p.videos ?? {}));
-    const reg = builtinRegistry().clone();
-    for (const [id, mod] of modules) reg.use(mod, id);
-    const evaluator = new Evaluator(doc, reg, { data: (id) => side.json.get(id) });
-    const sims = new Map<string, { frame: number; state: unknown }>();
+    const need = new Map<string, VideoNeed>(), drew = new Map<string, VideoNeed>();
+    const { reg, evaluator, sims } = frameTools(doc);
     const layerOf = (id: string, t: number, cid: string) => {
       try { return doc.compositions[cid]?.layers[id] ? evaluator.layerAt(id, t, cid) : null; } catch { return null; }
     };
@@ -150,7 +171,7 @@ export function makeSandboxDraw(modules: Map<string, PluginModule>): SandboxDraw
       width: comp.width,
       height: comp.height,
       duration: comp.duration,
-      asset: ((id: string) => sandboxAsset(id, videos)) as Host['asset'],
+      asset: ((id: string) => sandboxAsset(id, videos, need, drew)) as Host['asset'],
       assetInfo: (id) => assetInfo(id) as never,
       assetUrl: (id) => new URL(String(assetInfo(id).src), side.docUrl).href,
       compositionSize: (cid2: string) => { const c = doc.compositions[cid2]; return c ? { width: c.width, height: c.height, duration: c.duration } : null; },
@@ -227,9 +248,11 @@ export function makeSandboxDraw(modules: Map<string, PluginModule>): SandboxDraw
         const type = reg.hasEffect(e.type) ? reg.effect(e.type) : null;
         return type?.stage === 'finish' && type.gl ? [{ code: type.gl.code, schema: type.props, props: e.props }] : [];
       });
+      // video frames missing: the page decodes them and asks for this frame again
+      if (need.size) return { need: [...need.values()].slice(0, 512) };
       compositor.finish(fx, { bg: bg ? [toLin(bg[0] / 255), toLin(bg[1] / 255), toLin(bg[2] / 255)] : null, checker: false }, seed, { passes, t: frame.t, scale: (scaleX + scaleY) / 2, onError: (e: Error) => { throw e; } });
       const bitmap = await createImageBitmap(output);
-      return { bitmap, transfer: [bitmap as unknown as Transferable] };
+      return { bitmap, drew: [...drew.values()].slice(0, 512), transfer: [bitmap as unknown as Transferable] };
     } catch (e) {
       return { err: (e as Error).message };
     }

@@ -8,7 +8,7 @@
 import type { TrammeDoc } from '@tramme/core';
 import { builtinRegistry } from '@tramme/nodes';
 import { addParts, encodeWav, FIRST_SETTLE_LIMIT, formatParts, mixComposition, noParts, perFrame, Renderer, type FrameParts, type RenderOptions } from '@tramme/render';
-import { blitSandboxFrame, declarationsModule, ensureDeclared, ensureSandboxDoc, sandboxDeclaration, sandboxVideoFrames } from '../../../apps/editor/src/plugins/sandbox-draw.ts';
+import { blitSandboxFrame, declarationsModule, ensureDeclared, ensureSandboxDoc, renderSandboxFrame, sandboxDeclaration } from '../../../apps/editor/src/plugins/sandbox-draw.ts';
 import { browserHost, type PluginHost } from '../../../apps/editor/src/plugins/host.ts';
 import { containsExpression } from '@tramme/project';
 import { watermarkStamp } from '../../../apps/editor/src/watermark-draw.ts';
@@ -59,12 +59,13 @@ async function sandboxReady(): Promise<PluginHost | null> {
 
 /** the sandbox's finished picture for frame f, its videos decoded on the page */
 async function sandboxFrame(f: number): Promise<OffscreenCanvas> {
+  const time = f / renderer.comp.fps;
+  // the pictures this frame shows, brought in first (a project heavier than the room keeps some aside): the sandbox only has those kept
+  await renderer.bringImages(time);
   const sb = await sandboxReady();
   if (!sb) throw new Error('the sandbox is off');
-  const time = f / renderer.comp.fps;
-  const videos = await sandboxVideoFrames(renderer, currentDoc!, time);
   const c = currentDoc!.compositions[renderer.compId];
-  const pic = await sb.renderFrame({ compId: renderer.compId, t: time, scale: 1, width: c.width, height: c.height, videos });
+  const pic = await renderSandboxFrame(sb, renderer, { compId: renderer.compId, t: time, scale: 1, width: c.width, height: c.height }, { export: true });
   if (pic.err) throw new Error(pic.err);
   if (!pic.bitmap) throw new Error(`frame ${f} drew nothing in the sandbox`);
   return pic.bitmap as OffscreenCanvas;

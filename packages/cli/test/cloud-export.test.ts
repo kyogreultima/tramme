@@ -9,7 +9,9 @@ import { cloudExport } from '../src/cloud-export.ts';
 // the Worker itself answers (its types are the Workers runtime's, checked with apps/worker's own configuration)
 const WORKER = '../../../apps/worker/src/';
 const worker: { fetch(req: Request, env: unknown): Promise<Response> } = (await import(`${WORKER}index.ts`)).default;
-const { runJob } = await import(`${WORKER}renders.ts`) as { runJob(files: unknown, ws: string, job: string, render: () => Promise<ArrayBuffer>): Promise<unknown> };
+const { runJob } = await import(`${WORKER}renders.ts`) as { runJob(files: unknown, ws: string, job: string, render: unknown, every?: number): Promise<unknown> };
+/** a renderer whose render is over as soon as it starts */
+const instant = { start: async () => 'r', state: async () => ({ status: 'done' }), film: async () => new Uint8Array([7, 7, 7]).buffer, drop: async () => {} };
 type Env = unknown;
 
 const APP = 'https://app.example';
@@ -24,7 +26,7 @@ describe('tramme cloud-export', () => {
       MODE: 'personal', APP_ORIGIN: APP, VAULT_ORIGIN: 'https://vault.example', ASSETS: { fetch: async () => new Response('') },
       ACCOUNTS_URL: 'http://backend.test', FILES: files, EDGE_SECRET: 's', INTERNAL_SECRET: 'i', KEYS_SECRET: 'k',
       // the queue renders at once, with a stand-in renderer
-      RENDER_QUEUE: { idFromName: () => 'q', get: () => ({ fetch: async (r: Request) => { const w = await r.json() as { workspaceId: string; job: string }; await runJob(files, w.workspaceId, w.job, async () => new Uint8Array([7, 7, 7]).buffer); return new Response(null, { status: 202 }); } }) },
+      RENDER_QUEUE: { idFromName: () => 'q', get: () => ({ fetch: async (r: Request) => { const w = await r.json() as { workspaceId: string; job: string }; await runJob(files, w.workspaceId, w.job, instant, 1); return new Response(null, { status: 202 }); } }) },
     } as unknown as Env;
     const real = globalThis.fetch;
     vi.stubGlobal('fetch', async (input: string | Request, init?: RequestInit) => {

@@ -8,7 +8,7 @@ import type { TrammeDoc } from '@tramme/core';
 import { Renderer } from '@tramme/render';
 import { editorRegistry } from './vocabulary.ts';
 import { attachIsolated, filterModule, pluginHost, pluginToolHost } from './plugins/index.ts';
-import { declarationsModule, ensureDeclared, ensureSandboxDoc, moduleItemsOf, sandboxDeclaration, sandboxVideoFrames } from './plugins/sandbox-draw.ts';
+import { declarationsModule, ensureDeclared, ensureSandboxDoc, moduleItemsOf, renderSandboxFrame, sandboxDeclaration } from './plugins/sandbox-draw.ts';
 import { prefs } from './settings.ts';
 import { sandboxedDoc } from './installed.ts';
 import { S } from './state.ts';
@@ -53,8 +53,7 @@ export class Stills {
       const docUrl = new URL(S.docUrl.peek(), location.href).href;
       await r.bringImages(t, compId);
       ensureSandboxDoc(pluginHost(docUrl), { doc, docUrl, loaded: (id) => { try { return r.assets.get(id); } catch { return null; } } });
-      const videos = await sandboxVideoFrames(r, doc, t);
-      const pic = await pluginHost(docUrl).renderFrame({ compId, t, scale: k, width: c.width, height: c.height, videos });
+      const pic = await renderSandboxFrame(pluginHost(docUrl), r, { compId, t, scale: k, width: c.width, height: c.height });
       if (pic.err || !pic.bitmap) throw new Error(pic.err ?? 'no picture from the sandbox');
       const small = document.createElement('canvas');
       small.width = Math.round(c.width * k); small.height = Math.round(c.height * k);

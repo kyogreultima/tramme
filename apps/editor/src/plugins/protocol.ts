@@ -150,9 +150,18 @@ export interface FramePayload {
   samples?: number;
   width: number;
   height: number;
-  /** the current picture of each video asset, decoded on the page (copied, not transferred) */
+  /** the video frames the page decoded for this frame, under videoKey(id, t) (copied, not transferred) */
   videos?: Record<string, unknown>;
 }
+
+/** a frame of a video asset a sandbox frame draws: its asset, and its time in the file */
+export interface VideoNeed { id: string; t: number }
+
+/** what a sandbox frame gives back: its picture and the video frames it drew, or the video frames it still lacks */
+export interface FrameAnswer { bitmap?: unknown; err?: string; need?: VideoNeed[]; drew?: VideoNeed[] }
+
+/** the key a decoded video frame crosses under: the asset and its time in the file, to the microsecond */
+export const videoKey = (id: string, t: number) => `${id}@${Math.round(t * 1e6)}`;
 
 /** what one item drew: its picture (over its bounds), or why it failed */
 export interface DrawResult {
@@ -200,7 +209,7 @@ export type FromWorker =
   | { kind: 'loadFailed'; id: string; url: string; message: string }
   | { kind: 'result'; call: number; ok?: unknown; err?: string }
   | { kind: 'drawn'; call: number; frame: number; results: DrawResult[] }
-  | { kind: 'rendered'; call: number; bitmap?: unknown; err?: string }
+  | { kind: 'rendered'; call: number; bitmap?: unknown; err?: string; need?: VideoNeed[]; drew?: VideoNeed[] }
   | { kind: 'evaluated'; call: number; value?: unknown; err?: string }
   | { kind: 'evaluatedSeries'; call: number; values?: unknown[][]; err?: string }
   | { kind: 'evaluatedLayers'; call: number; values?: LayerSample[]; err?: string }

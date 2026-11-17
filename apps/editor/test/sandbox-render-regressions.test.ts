@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { newProject } from '@tramme/project';
 import type { PluginModule } from '@tramme/core';
-import { blitSandboxFrame, ensureSandboxDoc, moduleItemsOf, resetSandbox, sandboxVideoFrames } from '../src/plugins/sandbox-draw.ts';
+import { blitSandboxFrame, ensureSandboxDoc, moduleItemsOf, renderSandboxFrame, resetSandbox } from '../src/plugins/sandbox-draw.ts';
+import { videoKey } from '../src/plugins/protocol.ts';
 import type { Renderer } from '@tramme/render';
 import { makeSandboxDraw } from '../src/plugins/worker-draw.ts';
 import type { PluginHost } from '../src/plugins/host.ts';
@@ -174,24 +175,67 @@ describe('sandbox video rendering', () => {
     expect(paint.slice(hero + 1, label).filter((p) => p.canvas === paint[hero].canvas && (p.op === 'clear' || p.op === 'transform'))).toEqual([]);
   });
 
-  it('keeps video frames available to plugin nodes that compute an asset id', async () => {
+  /** the page's side over the worker's: renderFrame answered by makeSandboxDraw, video frames decoded by a stand-in renderer that records them */
+  const videoRig = (doc: ReturnType<typeof project>, mod?: PluginModule) => {
+    const side = makeSandboxDraw(new Map(mod ? [['plugin', mod]] : []));
+    side.setDoc({ doc, docUrl: 'https://tramme.test/doc.json', images: {}, json: {}, fonts: [] });
+    const calls: number[] = [], decoded: [string, number][] = [];
+    const host = { renderFrame: async (p: Parameters<typeof side.renderFrame>[0]) => { calls.push(p.t); const { transfer: _, ...answer } = await side.renderFrame(p); return answer; } } as unknown as PluginHost;
+    const renderer = { assets: { get: (id: string) => ({ request: async (t: number) => { decoded.push([id, +t.toFixed(4)]); }, frameAt: () => ({ image: { width: 960, height: 540 } }) }) } } as unknown as Renderer;
+    return { host, renderer, calls, decoded };
+  };
+  const frameOf = (doc: ReturnType<typeof project>, t: number) => ({ compId: doc.root, t, scale: 0.25, width: 1920, height: 1080 });
+
+  it('decodes only the video frames a frame draws, at the layer\'s own time in the file', async () => {
     const doc = project();
-    doc.assets.clip = { type: 'video', src: 'clip.mp4' };
-    doc.compositions[doc.root].layers.custom = { type: 'plugin.video', props: { data: 'lookup' } };
-    const renderer = { assets: { get: () => ({ request: async () => {}, frameAt: () => ({ image: { width: 960, height: 540 } }) }) } } as unknown as Renderer;
-    expect(Object.keys(await sandboxVideoFrames(renderer, doc, 1))).toEqual(['clip']);
+    doc.compositions[doc.root].motionBlur = { samples: 1, shutter: 0 };
+    doc.assets.footage = { type: 'video', src: 'assets/footage.mp4' };
+    doc.assets.unused = { type: 'video', src: 'assets/unused.mp4' };
+    doc.compositions[doc.root].layers.video = { type: 'video', in: 1, props: { video: 'footage', start: 0.5 } };
+    doc.compositions[doc.root].order = ['video'];
+    const { host, renderer, decoded } = videoRig(doc);
+    const answer = await renderSandboxFrame(host, renderer, frameOf(doc, 2));
+    expect(answer.err).toBeUndefined();
+    expect(answer.bitmap).toBeTruthy();
+    // the layer starts at 1 s and plays the file from 0.5 s: at 2 s it shows the file's 1.5 s, and the unused video is never decoded
+    expect(decoded).toEqual([['footage', 1.5]]);
   });
 
-  it('decodes a shared proxy once and supplies frames under both asset ids', async () => {
+  it('decodes the next frame\'s video ahead, so a played film asks the sandbox once a frame', async () => {
     const doc = project();
-    doc.assets.clip = { type: 'video', src: 'clip.mp4', proxy: 'proxy' };
-    doc.assets.proxy = { type: 'video', src: 'proxy.mp4' };
-    doc.compositions[doc.root].layers.video = { type: 'video', props: { video: 'clip' } };
-    const decoded: string[] = [];
-    const renderer = { assets: { useProxies: true, url: (id: string) => doc.assets[id].src, get: (id: string) => ({ request: async () => { decoded.push(id); }, frameAt: () => ({ image: { width: 960, height: 540 } }) }) } } as unknown as Renderer;
-    const pictures = await sandboxVideoFrames(renderer, doc, 1);
-    expect(decoded).toEqual(['clip']);
-    expect(Object.keys(pictures)).toEqual(['clip', 'proxy']);
+    doc.compositions[doc.root].motionBlur = { samples: 1, shutter: 0 };
+    doc.assets.footage = { type: 'video', src: 'assets/footage.mp4' };
+    doc.compositions[doc.root].layers.video = { type: 'video', props: { video: 'footage', rate: 2 } };
+    doc.compositions[doc.root].order = ['video'];
+    const { host, renderer, calls } = videoRig(doc);
+    for (let f = 0; f < 6; f++) expect((await renderSandboxFrame(host, renderer, frameOf(doc, f / 24))).err).toBeUndefined();
+    // the first two frames learn the pace (twice the composition's: rate 2), each one after is asked once
+    expect(calls.length).toBe(2 + 2 + 4);
+  });
+
+  it('gives a plugin node that computes an asset id the video frame it asks for', async () => {
+    const doc = project();
+    doc.assets.clip = { type: 'video', src: 'clip.mp4' };
+    doc.compositions[doc.root].layers.custom = { type: 'test.lookup', props: {} };
+    doc.compositions[doc.root].order = ['custom'];
+    const seen: unknown[] = [];
+    const mod: PluginModule = { nodes: [{ type: 'test.lookup', title: 'Lookup', category: 'Test', props: {}, render: { canvas2d: (_ctx, _p, h) => { seen.push(h.asset<{ frameAt(t: number): { image: unknown } }>(['cl', 'ip'].join('')).frameAt(0.25).image); } } }] };
+    const { host, renderer, decoded } = videoRig(doc, mod);
+    expect((await renderSandboxFrame(host, renderer, frameOf(doc, 1))).err).toBeUndefined();
+    expect(decoded).toEqual([['clip', 0.25]]);
+    expect(seen.at(-1)).toBeTruthy();
+  });
+
+  it('draws a frame whose video cannot be decoded without it, rather than failing', async () => {
+    const doc = project();
+    doc.assets.footage = { type: 'video', src: 'assets/footage.mp4' };
+    doc.compositions[doc.root].layers.video = { type: 'video', props: { video: 'footage' } };
+    doc.compositions[doc.root].order = ['video'];
+    const { host } = videoRig(doc);
+    const broken = { assets: { get: () => null } } as unknown as Renderer;
+    const answer = await renderSandboxFrame(host, broken, frameOf(doc, 1));
+    expect(answer.err).toBeUndefined();
+    expect(answer.bitmap).toBeTruthy();
   });
 
   it('uses one subframe for playback even when the document requests motion blur', async () => {
@@ -237,10 +281,11 @@ describe('sandbox video rendering', () => {
     doc.assets.footage = { type: 'video', src: 'assets/footage.mp4' };
     doc.compositions[doc.root].layers.video = { type: 'video', props: { video: 'footage', size: [1920, 1080], fit: 'cover' } };
     doc.compositions[doc.root].order = ['video'];
+    doc.compositions[doc.root].motionBlur = { samples: 1, shutter: 0 };
     const side = makeSandboxDraw(new Map());
     side.setDoc({ doc, docUrl: 'https://tramme.test/doc.json', images: {}, json: {}, fonts: [] });
     const frame = { width: 1920, height: 1080 };
-    const result = await side.renderFrame({ compId: doc.root, t: 2, scale: 0.25, width: 1920, height: 1080, videos: { footage: frame } });
+    const result = await side.renderFrame({ compId: doc.root, t: 2, scale: 0.25, width: 1920, height: 1080, videos: { [videoKey('footage', 2)]: frame } });
     expect(result.err).toBeUndefined();
     expect(draws.find(([image]) => image === frame)).toEqual([frame, -960, -540, 1920, 1080]);
   });

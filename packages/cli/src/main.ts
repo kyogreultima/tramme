@@ -31,6 +31,7 @@ import { formatParts } from '@tramme/render/src/timing.ts';
 import { defaultPages, renderAudio, renderVideo } from './jobs.ts';
 import { VIDEO_FORMATS, type VideoFormat } from './media.ts';
 import { docRegistry, filesRegistry } from './plugins.ts';
+import { plainError } from './plain-error.ts';
 import { readConfig, resolveMountedPath, Server } from './server.ts';
 import { checkProject, containsExpression, DOCUMENT, isChatPath, MANIFEST, newProject, packProject, unpackProject, LEGACIES, migrateProject } from '@tramme/project';
 import { lintSceneFiles, MAX_SCENE_SOURCE } from '@tramme/project/src/scene-lint.ts';
@@ -256,10 +257,8 @@ async function reportProject(files: Map<string, Uint8Array>, label: string) {
     try { all.push(...validate(doc, await filesRegistry(doc, files)).map((i) => ({ path: `${DOCUMENT}${i.path}`, message: i.message }))); }
     catch (e) { all.push({ path: `${DOCUMENT}/plugins`, message: (e as Error).message }); }
   }
-  if (all.length) {
-    for (const i of all.slice(0, 40)) console.log(`  ${i.path} : ${i.message}`);
-    throw new Error(`${label}: ${all.length} issue(s)`);
-  }
+  // the issues are the error itself: a caller that keeps only the error (the renderer of the exports in the cloud) says what is wrong
+  if (all.length) throw new Error([`${label}: ${all.length} issue(s)`, ...all.slice(0, 8).map((i) => `  ${i.path} : ${i.message}`), ...(all.length > 8 ? [`  … ${all.length - 8} more`] : [])].join('\n'));
 }
 
 async function cmdPack(dir: string) {
@@ -368,6 +367,7 @@ if (!run) {
 try {
   await run();
 } catch (e) {
-  console.error((e as Error).message);
+  // the reason, not the page's call stack Puppeteer appends to it (TRAMME_DEBUG keeps it)
+  console.error(process.env.TRAMME_DEBUG ? (e as Error).stack ?? (e as Error).message : plainError((e as Error).message));
   process.exit(1);
 }
