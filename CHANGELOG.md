@@ -8,6 +8,8 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+## [0.31.0] - 2026-11-18
+
 ### Added
 
 - Local CLAP sound search and candidate judgment, with precomputed vectors for the shipped catalog; sound family bans and user-library preference.
@@ -1023,7 +1025,8 @@ First public release.
 
 - Cloudflare Worker serving the editor and the API, projects stored in R2, access protected by Cloudflare Access.
 
-[Unreleased]: ../../compare/v0.30.1...HEAD
+[Unreleased]: ../../compare/v0.31.0...HEAD
+[0.31.0]: ../../compare/v0.30.1...v0.31.0
 [0.30.1]: ../../compare/v0.30.0...v0.30.1
 [0.30.0]: ../../compare/v0.29.0...v0.30.0
 [0.29.0]: ../../compare/v0.28.0...v0.29.0
