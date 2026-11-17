@@ -4,7 +4,7 @@
 // for it; the job waits in the queue (RenderQueue, one at a time, the plans with
 // a priority first) and says where it is until the film is there.
 //
-//   POST /api/projects/<id>/renders {comp?}     a job (above 1080p, a 4K export: the plans that have it)
+//   POST /api/projects/<id>/renders {comp?, profile?}     a job (above 1080p, a 4K export: the plans that have it)
 //   GET  /api/renders                                                  this person's jobs, the newest first
 //   GET  /api/renders/<job>                                            one, and where it is
 //
@@ -29,6 +29,7 @@ export interface Job {
   quality: Quality;
   /** none: the film */
   format?: Format;
+  profile?: 'master';
   comp?: string;
   status: 'queued' | 'rendering' | 'done' | 'failed';
   createdAt: string;
@@ -65,7 +66,7 @@ export async function renderRoute(req: Request, env: Env, edge: Pick<Edge, 'work
     // the project must be there (its manifest), read through the storage routes
     const info = await storageRoute(new Request(new URL(`/api/projects/${project}`, url)), files, new URL(`/api/projects/${project}`, url)).catch(() => null);
     if (!info?.ok) throw new HttpError(404, 'project not found');
-    const body = await readJson<{ comp?: unknown; format?: unknown }>(req);
+    const body = await readJson<{ comp?: unknown; format?: unknown; profile?: unknown }>(req);
     // the film is rendered at the project's size: above 1080p, it is a 4K export
     const { manifest } = (await info.json()) as { manifest: { width?: number; height?: number } };
     const quality: Quality = (manifest.width ?? 0) * (manifest.height ?? 0) > 1920 * 1080 ? '4k' : '1080p';
@@ -74,6 +75,7 @@ export async function renderRoute(req: Request, env: Env, edge: Pick<Edge, 'work
     const now = new Date().toISOString();
     const job: Job = {
       id: newJob(), project, quality, ...(body.format === 'premiere' ? { format: 'premiere' as const } : {}), ...(typeof body.comp === 'string' && /^[\w-]{1,64}$/.test(body.comp) ? { comp: body.comp } : {}),
+      ...(body.profile === 'master' && body.format !== 'premiere' ? { profile: 'master' as const } : {}),
       status: 'queued', createdAt: now, updatedAt: now, priority: terms.priorityQueue, ...(edge.userId ? { userId: edge.userId } : {}),
     };
     await writeJob(files, job);
@@ -247,7 +249,7 @@ export function rendererOf(env: Env): Renderer {
   const refused = async (res: Response) => new Error((await res.text()).trim().slice(0, 480) || `the renderer answered ${res.status}`);
   return {
     async start(archive, job) {
-      const q = new URLSearchParams({ quality: job.quality, ...(job.format ? { format: job.format } : {}), ...(job.comp ? { comp: job.comp } : {}) });
+      const q = new URLSearchParams({ quality: job.quality, ...(job.format ? { format: job.format } : {}), ...(job.profile ? { profile: job.profile } : {}), ...(job.comp ? { comp: job.comp } : {}) });
       const res = await call(`/render?${q}`, { method: 'POST', body: archive });
       if (!res.ok) throw await refused(res);
       return ((await res.json()) as { id: string }).id;

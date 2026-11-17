@@ -23,6 +23,7 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 - Exports in the cloud run a project's code at full speed, in a Chrome cut off from the network.
 - A project saved in your account shows a cloud icon on its card, in place of the word.
 - Exports from the command line and in the cloud encode with the quick settings by default, about three times faster for the web and social networks; `tramme render --master` keeps the slow settings for a film edited or archived further.
+- A fast export encodes with the computer's video chip when it has one (NVIDIA, Intel, AMD, Apple), and in software when the chip fails; its motion blur follows each layer's movement in one pass instead of drawing every frame several times. A 15-second showreel exports in 47 s instead of 117 s for the master. Rotations and changes of size stay sharp in a fast export; the master blurs them.
 - A plugin's tool saves files under `assets/` only; the document, plugin code, web scenes, versions and conversations stay out of its reach.
 
 ### Fixed

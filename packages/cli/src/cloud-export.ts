@@ -4,14 +4,14 @@
 // is), rendered by the app's renderer (apps/worker/src/renders.ts), and its film
 // brought back.
 //
-//   tramme cloud-export <folder | project.tramme> [--app https://app.tramme.dev] [--token tr_…] [--out film.mp4]
+//   tramme cloud-export <folder | project.tramme> [--app https://app.tramme.dev] [--token tr_…] [--out film.mp4] [--master]
 //   (the token can also come from TRAMME_TOKEN, the address from TRAMME_APP_URL)
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { DOCUMENT, MANIFEST, checkProject, type Manifest } from '@tramme/project';
 
-export interface CloudExportOptions { app: string; token: string; out: string; comp?: string; wait?: (ms: number) => Promise<void>; log?: (line: string) => void }
+export interface CloudExportOptions { app: string; token: string; out: string; comp?: string; profile?: 'master'; wait?: (ms: number) => Promise<void>; log?: (line: string) => void }
 
 interface Job { id: string; status: 'queued' | 'rendering' | 'done' | 'failed'; file?: string; error?: string }
 
@@ -47,7 +47,7 @@ export async function cloudExport(files: Map<string, Uint8Array>, opts: CloudExp
   await ask(at(DOCUMENT), { method: 'PUT', headers: { 'content-type': 'application/json' }, body: files.get(DOCUMENT) as BodyInit });
 
   let job = (await (await ask(`/api/projects/${encodeURIComponent(made.id)}/renders`, {
-    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(opts.comp ? { comp: opts.comp } : {}),
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ comp: opts.comp, profile: opts.profile }),
   })).json()) as Job;
   log(`export ${job.id}: ${job.status}`);
   for (let said = job.status; job.status === 'queued' || job.status === 'rendering';) {

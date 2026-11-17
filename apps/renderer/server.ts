@@ -7,7 +7,7 @@
 // Durable Object's alarm, a sleeping container or a fetch waits for. One render
 // at a time: the queue never sends two.
 //
-//   POST   /render?comp=<id>&format=mp4|premiere   body: the .tramme archive   -> 202 {id}
+//   POST   /render?comp=<id>&format=mp4|premiere&profile=master   body: the .tramme archive   -> 202 {id}
 //   GET    /render/<id>                            -> {status: rendering|done|failed, error?}
 //   GET    /render/<id>/film                       -> the MP4, or the Premiere Pro timeline (a zip)
 //   DELETE /render/<id>                            the film taken: its folder removed
@@ -48,14 +48,14 @@ function cli(args: string[]): Promise<void> {
 export type Format = 'mp4' | 'premiere';
 
 /** a project's archive rendered into `dir`: unpacked (and checked) by the CLI, then rendered as the desktop export does, or as a Premiere Pro timeline; the file made */
-export async function render(dir: string, archive: Buffer, comp?: string, format: Format = 'mp4'): Promise<string> {
+export async function render(dir: string, archive: Buffer, comp?: string, format: Format = 'mp4', profile?: 'master'): Promise<string> {
   const file = path.join(dir, 'project.tramme'), folder = path.join(dir, 'project'), out = path.join(dir, format === 'premiere' ? 'premiere.zip' : 'film.mp4');
   fs.writeFileSync(file, archive);
   // the archive's issues are named by its project, not by the folder it was unpacked into here
   await cli(['unpack', file, '--out', folder]).catch((e: Error) => { throw new Error(e.message.replaceAll(file, 'the project')); });
   const on = comp ? ['--comp', comp] : [];
   if (format === 'premiere') await cli(['premiere', folder, '--out', path.join(dir, 'premiere'), '--zip', out, ...on]);
-  else await cli(['render', folder, '--format', 'mp4', '--out', out, ...on]);
+  else await cli(['render', folder, '--format', 'mp4', '--out', out, ...on, ...(profile === 'master' ? ['--master'] : [])]);
   return out;
 }
 
@@ -96,10 +96,11 @@ export const server = http.createServer(async (req, res) => {
       const comp = url.searchParams.get('comp') ?? undefined;
       if (comp && !/^[\w-]{1,64}$/.test(comp)) { res.writeHead(400).end('invalid composition'); return; }
       const format: Format = url.searchParams.get('format') === 'premiere' ? 'premiere' : 'mp4';
+      const profile = url.searchParams.get('profile') === 'master' ? 'master' : undefined;
       const archive = await body(req);
       const r: Render = { id: randomUUID(), status: 'rendering', dir: fs.mkdtempSync(path.join(os.tmpdir(), 'tramme-render-')), format };
       renders.set(r.id, r);
-      render(r.dir, archive, comp, format)
+      render(r.dir, archive, comp, format, profile)
         .then((file) => Object.assign(r, { status: 'done', file }))
         .catch((e: Error) => Object.assign(r, { status: 'failed', error: e.message || 'the render failed' }))
         .finally(() => { r.over = Date.now(); });

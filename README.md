@@ -49,14 +49,14 @@ On Cloudflare, in personal mode (`pnpm deploy:personal`): a public deployment an
 tramme validate <doc>                                 structure, references, types, plugins included
 tramme check    <doc> [--comp id]                     the picture checks, issues folded by cause
 tramme still    <doc> --t 0.5,1.2 [--samples n]       PNG stills
-tramme render   <doc> [--format mp4|mov|webm|gif|png] [--from s --to s] [--samples n] [--mute] [--pages n] [--depth 8|10]
+tramme render   <doc> [--format mp4|mov|webm|gif|png] [--from s --to s] [--samples n] [--mute] [--pages n] [--depth 8|10] [--master]
 tramme export   <doc> --format lottie|svg|wav [--t s] vector export, or sound only
 tramme import   <animation.json> [--out folder]       Lottie to a Tramme project
 tramme pack     <folder> [--out project.tramme]        a project folder as a .tramme archive (checked)
 tramme unpack   <project.tramme> [--out folder]        a .tramme archive as a project folder (checked)
 tramme nodes    [<doc>]                               the available vocabulary
 tramme agent    [--origin https://…] [--port 4317]    the assistant's local companion
-tramme cloud-export <doc> [--app url] [--token tr_…] [--out film.mp4]   rendered in the cloud of an account (API token from your space)
+tramme cloud-export <doc> [--app url] [--token tr_…] [--out film.mp4] [--master]   rendered in the cloud of an account (API token from your space)
 tramme compare  <ref> <test> [--diff folder]          PSNR and an image of the differences
 tramme check-export <doc> --format lottie|svg --t …   export read back (lottie-web, Chrome) against Tramme
 tramme check-media <file> [--width n --height n --fps n --frames n --duration s] [--json]   decode and verify MP4, MOV or WebM delivery
@@ -66,6 +66,10 @@ tramme schema                                         regenerates the JSON schem
 ```
 
 (`tramme` = `node packages/cli/src/main.ts`, or `pnpm tramme <command>`. `<doc>` is a project folder or a document file.)
+
+The CLI and cloud export use the fast profile by default. For 8-bit MP4, the CLI probes the machine's H.264 hardware encoders and retries with `libx264 veryfast` if the hardware fails. The cloud container uses software encoding. Set `TRAMME_HW_ENCODER=off` to use software locally.
+
+The fast profile draws each frame once and adds directional blur based on layer translation when the composition enables motion blur. `--master` keeps the composition's multisample blur and uses `libx264 slow` for 8-bit MP4. With `tramme render`, `--samples n` selects multisample blur explicitly and `--samples 1` renders a sharp frame. ProRes and 10-bit exports use software encoding and multisample blur by default.
 
 ## Layout
 

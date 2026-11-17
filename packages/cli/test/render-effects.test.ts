@@ -10,7 +10,7 @@ import { PNG } from 'pngjs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { applyOps, detachPlan, validate, type TrammeDoc } from '@tramme/core';
 import { builtinRegistry } from '@tramme/nodes';
-import { CHROME, launch, openDoc } from '../src/browser.ts';
+import { CHROME, isolateProjects, launch, openDoc } from '../src/browser.ts';
 import { readConfig, Server } from '../src/server.ts';
 
 type Pixel = [number, number, number];
@@ -217,6 +217,7 @@ function smoothed(props: Record<string, unknown>) {
 let dir = '', server: Server, close: () => Promise<void>, page: import('puppeteer-core').Page, still: (kind: string, t: number) => Promise<(x: number, y: number) => Pixel>, mix: (kind: string) => Promise<string>;
 
 describe.skipIf(!CHROME)('effects, rendered', () => {
+  let port: number;
   beforeAll(async () => {
     dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tramme-transitions-'));
     for (const k of KINDS) fs.writeFileSync(path.join(dir, `${k}.tramme.json`), JSON.stringify(doc(k)));
@@ -251,8 +252,17 @@ describe.skipIf(!CHROME)('effects, rendered', () => {
     // apart, so no frame covers another
     row.compositions.main.layers.row.distribute = { ...row.compositions.main.layers.row.distribute!, layout: { type: 'list', spacing: 130 }, time: { mode: 'rank', amount: 1 } };
     fs.writeFileSync(path.join(dir, 'badges-wave.tramme.json'), JSON.stringify(row));
+    const moving = doc('crossfade');
+    const c = moving.compositions.main;
+    c.motionBlur = { samples: 8, shutter: 1 };
+    c.order = ['a'];
+    Reflect.deleteProperty(c.layers, 'b');
+    Reflect.deleteProperty(c.layers, 'm');
+    c.layers.a.props = { size: [20, 20], fill: '#FF0000' };
+    c.layers.a.transform = { position: { $expr: '[160 + (t - 1) * 1200, 90]' } } as never;
+    fs.writeFileSync(path.join(dir, 'velocity.tramme.json'), JSON.stringify(moving));
     server = new Server(readConfig(path.join(dir, 'crossfade.tramme.json')));
-    const port = await server.start();
+    port = await server.start();
     const launched = await launch();
     const { browser } = launched;
     page = launched.page;
@@ -273,6 +283,21 @@ describe.skipIf(!CHROME)('effects, rendered', () => {
   afterAll(async () => { await close?.(); if (dir) fs.rmSync(dir, { recursive: true, force: true }); }, 60_000);
 
   const near = (a: Pixel, b: Pixel) => a.every((v, i) => Math.abs(v - b[i]) <= 3);
+  it.each([false, true])('blurs moving layers independently of the sample count (isolation: %s)', async (isolated) => {
+    isolateProjects(isolated);
+    try { await openDoc(page, port, '/project/velocity.tramme.json'); }
+    finally { isolateProjects(false); }
+    await page.evaluate(() => (window as any).TRAMME.watermark(false));
+    const url = await page.evaluate(() => (window as any).TRAMME.still(1, { motionBlur: 'velocity' }));
+    const two = await page.evaluate(() => (window as any).TRAMME.still(1, { motionBlur: 'velocity', samples: 2 }));
+    expect(two).toBe(url);
+    const { width, data } = PNG.sync.read(Buffer.from(url.split(',')[1], 'base64'));
+    const red = (x: number, y: number) => data[(y * width + x) * 4];
+    expect(red(140, 90)).toBeGreaterThan(10);
+    expect(red(140, 90)).toBeLessThan(200);
+    expect(red(160, 70)).toBe(0);
+  });
+
   const RED: Pixel = [255, 0, 0], BLUE: Pixel = [0, 0, 255];
 
   it('crossfades linearly and dips through a colour', async () => {

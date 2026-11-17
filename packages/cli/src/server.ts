@@ -108,7 +108,18 @@ export class Server {
       let chain = Promise.resolve();
       const name = new URL(req.url ?? '', 'http://x').searchParams.get('sink');
       sock.on('message', (data: Buffer) => {
-        chain = chain.then(() => (name ? this.sinks.get(name) : this.sink)?.(data)).then(() => sock.send('ok')).catch((e) => console.error(e));
+        chain = chain.then(async () => {
+          if (sock.readyState !== sock.OPEN) return;
+          const write = name ? this.sinks.get(name) : this.sink;
+          try {
+            if (!write) throw new Error('no encoder for this frame stream');
+            await write(data);
+            sock.send('ok');
+          } catch (e) {
+            sock.send((e as Error).message);
+            sock.close(1011);
+          }
+        });
       });
     });
   }

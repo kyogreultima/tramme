@@ -12,6 +12,7 @@ import { noParts, type FrameParts } from './timing.ts';
 export interface RenderOptions {
   /** sub-frames: overrides the composition's motion blur (1 for a fast preview) */
   samples?: number;
+  motionBlur?: 'velocity';
   shutter?: number;
   /** render into the float target for readYUV / readRGBA instead of the visible canvas */
   toFbo?: boolean;
@@ -26,19 +27,61 @@ export const SETTLE_LIMIT = 20_000;
 /** the first frame of a render opens its files and decoders (a 4K source of 150 MB, several pages at once): it waits longer */
 export const FIRST_SETTLE_LIMIT = 120_000;
 
-/** sample times inside the shutter, never straddling a cut marker or the ends */
-export function subTimes(t: number, n: number, shutter: number, comp: Composition): number[] {
-  if (n <= 1 || shutter <= 0) return [t];
-  const span = shutter / comp.fps;
+function shutterLimits(t: number, comp: Composition): [number, number] {
   let lo = 0, hi = comp.duration;
   const cuts = (comp.markers || []).filter((m) => m.kind === 'cut').map((m) => m.t).sort((a, b) => a - b);
   for (const c of cuts) {
     if (c <= t + 1e-9) lo = Math.max(lo, c);
     else { hi = Math.min(hi, c); break; }
   }
+  return [lo, hi - 1e-5];
+}
+
+/** sample times inside the shutter, never straddling a cut marker or the ends */
+export function subTimes(t: number, n: number, shutter: number, comp: Composition): number[] {
+  if (n <= 1 || shutter <= 0) return [t];
+  const span = shutter / comp.fps;
+  const [lo, hi] = shutterLimits(t, comp);
   const ts: number[] = [];
-  for (let i = 0; i < n; i++) ts.push(Math.min(hi - 1e-5, Math.max(lo, t + ((i + 0.5) / n - 0.5) * span)));
+  for (let i = 0; i < n; i++) ts.push(Math.min(hi, Math.max(lo, t + ((i + 0.5) / n - 0.5) * span)));
   return ts;
+}
+
+/** Evaluate the edges of the shutter for motion vectors without drawing them. */
+export function velocityOf(evaluator: Evaluator, frame: EvaluatedFrame, shutter: number): DrawEnv['motion'] {
+  const { comp, t, compId } = frame;
+  const [lo, hi] = shutterLimits(t, comp);
+  const half = shutter / comp.fps / 2;
+  const at = (ts: number) => {
+    const f = ts === t ? frame : evaluator.frame(ts, compId, frame.instance);
+    const positions = new Map<string, [number, number]>();
+    const visit = (layers: EvaluatedFrame['layers'], root: boolean) => {
+      for (const layer of layers) {
+        let [x, y] = layer.transform.position;
+        if (root && f.camera) {
+          const { pan, zoom, perspective } = f.camera;
+          const distance = perspective + layer.transform.depth;
+          if (distance <= 1) continue;
+          const k = zoom * perspective / distance;
+          x = comp.width / 2 + (x - comp.width / 2 - pan[0]) * k;
+          y = comp.height / 2 + (y - comp.height / 2 - pan[1]) * k;
+        }
+        positions.set(layer.id, [x, y]);
+        visit(layer.children, false);
+      }
+    };
+    visit(f.layers, true);
+    return positions;
+  };
+  const before = at(Math.max(lo, t - half));
+  const after = at(Math.max(t, Math.min(hi, t + half)));
+  return (layer) => {
+    const a = before.get(layer.id), b = after.get(layer.id);
+    if (!a || !b) return;
+    const [x, y] = layer.transform.position;
+    if (a[0] === x && a[1] === y && b[0] === x && b[1] === y) return;
+    return [[a[0] - x, a[1] - y], [b[0] - x, b[1] - y]];
+  };
 }
 
 /** compositor settings from the composition's finishing effects */
@@ -313,8 +356,8 @@ export class Renderer {
   }
 
   /** draw the layers of one instant on the scene canvas (no motion blur, no finish) */
-  drawScene(frame: EvaluatedFrame) {
-    drawFrame(this.sctx, frame, this.env(frame));
+  drawScene(frame: EvaluatedFrame, motion?: DrawEnv['motion']) {
+    drawFrame(this.sctx, frame, { ...this.env(frame), motion });
   }
 
   /** the images the layers show between `from` and `to` (a nested composition: all of its own), by id */
@@ -432,9 +475,11 @@ export class Renderer {
   renderSteps(t: number, opts: RenderOptions = {}): () => EvaluatedFrame | null {
     const e0 = performance.now();
     const frame = this.evaluator.frame(t, this.compId);
-    this.times.evaluate += performance.now() - e0;
     const n = opts.samples ?? frame.motionBlur.samples;
-    const times = subTimes(t, n, opts.shutter ?? frame.motionBlur.shutter, this.comp);
+    const shutter = opts.shutter ?? frame.motionBlur.shutter;
+    const motion = opts.motionBlur === 'velocity' && n > 1 && shutter > 0 ? velocityOf(this.evaluator, frame, shutter) : undefined;
+    this.times.evaluate += performance.now() - e0;
+    const times = motion ? [t] : subTimes(t, n, shutter, this.comp);
     let i = 0;
     return () => {
       if (i === 0) { this.compositor.begin(); this.pending = []; this.errors.clear(); this.assets.beginFrame(); }
@@ -446,7 +491,7 @@ export class Renderer {
         this.times.evaluate += d0 - e1;
         // footage holds the frame's own picture across the shutter (Host.shutter)
         this.shutterOffset = ts - t;
-        try { this.drawScene(sub); } finally { this.shutterOffset = 0; }
+        try { this.drawScene(sub, motion); } finally { this.shutterOffset = 0; }
         this.compositor.add(this.scene, 1 / times.length);
         this.times.draw += performance.now() - d0;
         if (i < times.length) return null;

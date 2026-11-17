@@ -146,8 +146,10 @@ export interface FramePayload {
   t: number;
   /** canvas pixels per composition pixel (the preview draws smaller) */
   scale: number;
-  /** preview may use fewer motion-blur samples; exports leave this unset */
+  /** overrides the composition's motion blur sample count */
   samples?: number;
+  shutter?: number;
+  motionBlur?: 'velocity';
   width: number;
   height: number;
   /** the video frames the page decoded for this frame, under videoKey(id, t) (copied, not transferred) */

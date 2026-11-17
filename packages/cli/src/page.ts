@@ -65,14 +65,14 @@ async function sandboxReady(): Promise<PluginHost | null> {
 }
 
 /** the sandbox's finished picture for frame f, its videos decoded on the page */
-async function sandboxFrame(f: number): Promise<OffscreenCanvas> {
+async function sandboxFrame(f: number, { samples, shutter, motionBlur }: RenderOptions = {}): Promise<OffscreenCanvas> {
   const time = f / renderer.comp.fps;
   // the pictures this frame shows, brought in first (a project heavier than the room keeps some aside): the sandbox only has those kept
   await renderer.bringImages(time);
   const sb = await sandboxReady();
   if (!sb) throw new Error('the sandbox is off');
   const c = currentDoc!.compositions[renderer.compId];
-  const pic = await renderSandboxFrame(sb, renderer, { compId: renderer.compId, t: time, scale: 1, width: c.width, height: c.height }, { export: true });
+  const pic = await renderSandboxFrame(sb, renderer, { compId: renderer.compId, t: time, scale: 1, width: c.width, height: c.height, samples, shutter, motionBlur }, { export: true });
   if (pic.err) throw new Error(pic.err);
   if (!pic.bitmap) throw new Error(`frame ${f} drew nothing in the sandbox`);
   return pic.bitmap as OffscreenCanvas;
@@ -114,7 +114,7 @@ const api = {
   /** PNG of one frame as a data URL; maxWidth scales it down (previews for the assistant) */
   async still(t: number, opts: RenderOptions = {}, maxWidth?: number): Promise<string> {
     if (await sandboxReady()) {
-      blitSandboxFrame(renderer, await sandboxFrame(Math.round(t * renderer.comp.fps)), t, false);
+      blitSandboxFrame(renderer, await sandboxFrame(Math.round(t * renderer.comp.fps), opts), t, false);
       const out = canvas();
       if (!maxWidth || out.width <= maxWidth) return dataUrl(out);
       const k = maxWidth / out.width, small = document.createElement('canvas');
@@ -155,9 +155,21 @@ const api = {
     const { width: W, height: H, fps } = renderer.comp;
     const ws = new WebSocket(`ws://${location.host}/__tramme/ws${sink ? `?sink=${encodeURIComponent(sink)}` : ''}`);
     ws.binaryType = 'arraybuffer';
-    await new Promise((res, rej) => { ws.onopen = res; ws.onerror = rej; });
-    let waiting: (() => void) | null = null;
-    ws.onmessage = () => { const r = waiting; waiting = null; r?.(); };
+    let waiting: ((error?: string) => void) | null = null;
+    let streamError: string | undefined;
+    const received = (error?: string) => {
+      streamError ??= error;
+      const ack = waiting;
+      waiting = null;
+      ack?.(streamError);
+    };
+    await new Promise<void>((resolve, reject) => {
+      ws.onopen = () => resolve();
+      ws.onerror = () => reject(new Error('could not open the encoder stream'));
+      ws.onclose = () => reject(new Error('encoder stream closed before opening'));
+    });
+    ws.onerror = ws.onclose = () => received('encoder stream closed');
+    ws.onmessage = (e) => received(e.data === 'ok' ? undefined : String(e.data));
     const size = kind === 'rgba64' ? W * H * 8 : kind === 'rgba' ? W * H * 4 : (W * H * 3) / 2;
     const bufs = [new Uint8Array(size), new Uint8Array(size)];
     // 16 bits a channel, little-endian as the page's typed arrays are (ffmpeg rgba64le)
@@ -167,39 +179,44 @@ const api = {
     const parts = noParts();
     renderer.times = noParts();
     const progress = (window as any).__trammeProgress as ((done: number, total: number) => void) | undefined;
-    let inflight: Promise<void> | null = null;
-    for (let f = f0; f < f1; f++) {
-      if (await sandboxReady()) {
-        blitSandboxFrame(renderer, await sandboxFrame(f), f / fps, false, true);
-      } else {
-        await renderer.renderComplete(f / fps, { ...opts, toFbo: true, ...(f === f0 ? { settleLimit: FIRST_SETTLE_LIMIT } : {}) });
-        // a frame whose pictures never came (see SETTLE_LIMIT): the export stops rather than carry a wrong picture
-        if (renderer.late) { ws.close(); throw new Error(`frame ${f} (${(f / fps).toFixed(2)} s) never finished: a video frame or a plugin picture did not come`); }
+    let inflight: Promise<string | undefined> | null = null;
+    const waitForEncoder = async () => {
+      const error = await inflight ?? streamError;
+      if (error) throw new Error(error);
+    };
+    try {
+      for (let f = f0; f < f1; f++) {
+        if (await sandboxReady()) {
+          blitSandboxFrame(renderer, await sandboxFrame(f, opts), f / fps, false, true);
+        } else {
+          await renderer.renderComplete(f / fps, { ...opts, toFbo: true, ...(f === f0 ? { settleLimit: FIRST_SETTLE_LIMIT } : {}) });
+          // a frame whose pictures never came (see SETTLE_LIMIT): the export stops rather than carry a wrong picture
+          if (renderer.late) throw new Error(`frame ${f} (${(f / fps).toFixed(2)} s) never finished: a video frame or a plugin picture did not come`);
+        }
+        const buf = bufs[f & 1];
+        const r0 = performance.now();
+        if (wide) renderer.compositor.readRGBA16(wide[f & 1]);
+        else if (kind === 'rgba') renderer.compositor.readRGBA(buf, renderer.lastSeed);
+        else renderer.compositor.readYUV(buf, renderer.lastSeed);
+        const s0 = performance.now();
+        parts.readback += s0 - r0;
+        await waitForEncoder(); // one frame in flight while the next renders
+        parts.send += performance.now() - s0;
+        inflight = new Promise((r) => { waiting = r; });
+        ws.send(buf);
+        progress?.(f - f0 + 1, f1 - f0);
+        if ((f - f0) % 30 === 29 || f === f1 - 1) {
+          const n = f - f0 + 1;
+          const sofar = addParts({ ...parts }, renderer.times);
+          console.log(`image ${f + 1}/${f1}  ${((performance.now() - t0) / n).toFixed(0)} ms/image  (${formatParts(sofar, n)})`);
+        }
       }
-      const buf = bufs[f & 1];
-      const r0 = performance.now();
-      if (wide) renderer.compositor.readRGBA16(wide[f & 1]);
-      else if (kind === 'rgba') renderer.compositor.readRGBA(buf, renderer.lastSeed);
-      else renderer.compositor.readYUV(buf, renderer.lastSeed);
-      const s0 = performance.now();
-      parts.readback += s0 - r0;
-      if (inflight) await inflight; // one frame in flight while the next renders
-      parts.send += performance.now() - s0;
-      inflight = new Promise((r) => { waiting = r; });
-      ws.send(buf);
-      progress?.(f - f0 + 1, f1 - f0);
-      if ((f - f0) % 30 === 29 || f === f1 - 1) {
-        const n = f - f0 + 1;
-        const sofar = addParts({ ...parts }, renderer.times);
-        console.log(`image ${f + 1}/${f1}  ${((performance.now() - t0) / n).toFixed(0)} ms/image  (${formatParts(sofar, n)})`);
-      }
-    }
-    const s1 = performance.now();
-    if (inflight) await inflight;
-    parts.send += performance.now() - s1;
-    ws.close();
-    const n = Math.max(1, f1 - f0);
-    return { ms: (performance.now() - t0) / n, parts: perFrame(addParts(parts, renderer.times), n) };
+      const s1 = performance.now();
+      await waitForEncoder();
+      parts.send += performance.now() - s1;
+      const n = Math.max(1, f1 - f0);
+      return { ms: (performance.now() - t0) / n, parts: perFrame(addParts(parts, renderer.times), n) };
+    } finally { ws.close(); }
   },
 };
 

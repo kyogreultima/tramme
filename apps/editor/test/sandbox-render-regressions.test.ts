@@ -248,6 +248,17 @@ describe('sandbox video rendering', () => {
     expect(gpu.samples).toBe(1);
   });
 
+  it('keeps a film without motion blur sharp when the preview asks for a few samples', async () => {
+    const doc = project();
+    doc.compositions[doc.root].motionBlur = { samples: 1, shutter: 0.5 };
+    const side = makeSandboxDraw(new Map());
+    side.setDoc({ doc, docUrl: 'https://tramme.test/doc.json', images: {}, json: {}, fonts: [] });
+    // the "limited" blur preference asks for 4: the composition's 1 wins
+    const result = await side.renderFrame({ compId: doc.root, t: 1, scale: 0.25, width: 1920, height: 1080, samples: 4 });
+    expect(result.err).toBeUndefined();
+    expect(gpu.samples).toBe(1);
+  });
+
   it('releases decoded frames after the worker has used them', async () => {
     const doc = project();
     const side = makeSandboxDraw(new Map());

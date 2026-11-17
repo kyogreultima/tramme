@@ -17,7 +17,7 @@
 import { Evaluator, layerClock, motionReport as coreMotionReport, parseColor, pictureMotion as corePictureMotion, runChecks, sampleAt, soundCues, type Host, type Instance, type NodeType, type PluginModule, type TrammeDoc } from '@tramme/core';
 import { quadAt } from '../quad.ts';
 import { builtinRegistry, setWebScenePlaceholder } from '@tramme/nodes';
-import { CanvasPool, Compositor, drawComposed, drawFrame, drawLayers, finishOf, subTimes } from '@tramme/render/src/index.ts';
+import { CanvasPool, Compositor, drawComposed, drawFrame, drawLayers, finishOf, subTimes, velocityOf } from '@tramme/render/src/index.ts';
 import { nodeContext, resizeNode } from '@tramme/render/src/gpu.ts';
 import { toLottie, toSvg } from '@tramme/interop';
 import { RecordingPath2D } from './recording-path.ts';
@@ -232,17 +232,20 @@ export function makeSandboxDraw(modules: Map<string, PluginModule>): SandboxDraw
         compositor.resize(w, h);
       }
       const frame0 = evaluator.frame(p.t, p.compId);
+      // a request lowers the composition's samples (a fast preview), never raises them: a film without motion blur stays sharp
       const samples = Math.max(1, Math.min(frame0.motionBlur.samples, p.samples ?? frame0.motionBlur.samples));
-      const times = subTimes(p.t, samples, frame0.motionBlur.shutter, comp);
+      const shutter = p.shutter ?? frame0.motionBlur.shutter;
+      const motion = p.motionBlur === 'velocity' && samples > 1 && shutter > 0 ? velocityOf(evaluator, frame0, shutter) : undefined;
+      const times = motion ? [p.t] : subTimes(p.t, samples, shutter, comp);
       compositor.begin();
       for (const ts of times) {
-        const frame = evaluator.frame(ts, p.compId);
+        const frame = ts === p.t ? frame0 : evaluator.frame(ts, p.compId);
         const scratch = pool.get(w, h);
-        drawFrame(scratch, frame, envOf({ t: ts }, p.compId));
+        drawFrame(scratch, frame, { ...envOf({ t: ts }, p.compId), motion });
         compositor.add(scratch.canvas as unknown as OffscreenCanvas, 1 / times.length);
         pool.release(scratch);
       }
-      const frame = evaluator.frame(p.t, p.compId);
+      const frame = frame0;
       const { fx, seed } = finishOf(frame.effects, frame.frame);
       const bg = frame.background ? parseColor(frame.background) : null;
       const passes = frame.effects.flatMap((e) => {

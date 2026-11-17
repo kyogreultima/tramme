@@ -14,6 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import ffmpegPath from 'ffmpeg-static';
 import { ffmetadata, type Chapter } from '@tramme/core';
+import type { HardwareEncoder } from './hardware.ts';
 
 export const FFMPEG = ffmpegPath as unknown as string;
 export type VideoFormat = 'mp4' | 'mov' | 'webm' | 'gif' | 'png';
@@ -40,6 +41,8 @@ export interface EncoderJob {
   format: VideoFormat; W: number; H: number; fps: number; frames: number; out: string; audio?: string; crf?: number;
   /** fast (default) or master */
   quality?: ExportQuality;
+  /** a fast 8-bit H.264 encoded by the machine's video chip (hardware.ts) */
+  hardware?: HardwareEncoder | null;
   /** png: the number of the first image (a segment of a parallel export writes its own) */
   startNumber?: number;
   /** bits a channel: 10 writes H.265 Main 10, ProRes from 16-bit frames, VP9 profile 2, 16-bit PNG */
@@ -55,12 +58,13 @@ const AUDIO_CODEC: Partial<Record<VideoFormat, string[]>> = {
 };
 
 /** ffmpeg's arguments to encode raw frames read on stdin */
-export function encoderArgs({ format, W, H, fps, frames, out, audio, crf, startNumber = 0, depth = 8, quality = 'fast' }: EncoderJob): string[] {
+export function encoderArgs({ format, W, H, fps, frames, out, audio, crf, startNumber = 0, depth = 8, quality = 'fast', hardware }: EncoderJob): string[] {
   if (depth === 10 && !DEEP_FORMATS.includes(format)) throw new Error(`${format} has no 10-bit form (${DEEP_FORMATS.join(', ')})`);
   const deep = depth === 10;
   const dur = (frames / fps).toFixed(6);
   const pix = deep ? ['-pix_fmt', 'rgba64le'] : format === 'mp4' ? ['-pix_fmt', 'yuv420p', ...COLOR] : ['-pix_fmt', 'rgba'];
-  const args = ['-y', '-hide_banner', '-loglevel', 'error', '-f', 'rawvideo', ...pix, '-s', `${W}x${H}`, '-r', String(fps), '-i', '-'];
+  const accelerated = format === 'mp4' && !deep && quality === 'fast' && crf === undefined ? hardware : null;
+  const args = ['-y', '-hide_banner', '-loglevel', 'error', ...(accelerated?.inputArgs ?? []), '-f', 'rawvideo', ...pix, '-s', `${W}x${H}`, '-r', String(fps), '-i', '-'];
   const withAudio = !!audio && (format === 'mp4' || format === 'mov' || format === 'webm');
   if (withAudio) args.push('-i', audio, '-map', '0:v', '-map', '1:a');
   else if (format !== 'gif') args.push('-map', '0:v');
@@ -69,6 +73,11 @@ export function encoderArgs({ format, W, H, fps, frames, out, audio, crf, startN
     case 'mp4':
       // 10 bits: H.265 Main 10, tagged hvc1 (QuickTime, Safari)
       if (deep) { args.push(...toTv, '-c:v', 'libx265', '-preset', quality === 'master' ? 'slow' : 'fast', '-crf', String(crf ?? 16), '-profile:v', 'main10', '-pix_fmt', 'yuv420p10le', ...COLOR, '-tag:v', 'hvc1', '-x265-params', 'log-level=error', ...(withAudio ? AUDIO_CODEC.mp4! : []), '-t', dur, '-movflags', '+faststart', out); break; }
+      if (accelerated) {
+        args.push('-c:v', accelerated.name, ...accelerated.args, '-pix_fmt', accelerated.pixFmt, ...COLOR, '-g', String(fps * 2),
+          ...(withAudio ? AUDIO_CODEC.mp4! : []), '-t', dur, '-movflags', '+faststart', out);
+        break;
+      }
       args.push('-c:v', 'libx264', '-preset', H264[quality].preset, '-crf', String(crf ?? H264[quality].crf), '-profile:v', 'high', '-pix_fmt', 'yuv420p', ...COLOR, '-g', String(fps * 2), '-bf', '2',
         ...(withAudio ? AUDIO_CODEC.mp4! : []), '-t', dur, '-movflags', '+faststart', out);
       break;
@@ -91,17 +100,39 @@ export function encoderArgs({ format, W, H, fps, frames, out, audio, crf, startN
   return args;
 }
 
+export class EncoderError extends Error {}
+
 /** ffmpeg reading raw frames on stdin; out is the target file (a folder for png) */
 export function encoder(job: EncoderJob) {
   const args = encoderArgs(job);
   fs.mkdirSync(job.format === 'png' ? job.out : path.dirname(job.out), { recursive: true });
   const ff = spawn(FFMPEG, args, { stdio: ['pipe', 'inherit', 'inherit'] });
-  ff.on('error', () => {});
-  ff.stdin.on('error', (e) => console.error('ffmpeg stdin', e.message));
-  const done = new Promise<void>((res, rej) => ff.on('close', (c) => (c === 0 ? res() : rej(new Error('ffmpeg failed (code ' + c + ')')))));
+  let failure: EncoderError | undefined;
+  let closed = false;
+  const remember = (message: string) => failure ??= new EncoderError(`ffmpeg failed (${message})`);
+  ff.on('error', (e) => remember(e.message));
+  ff.stdin.on('error', (e) => remember(e.message));
+  const done = new Promise<void>((resolve) => ff.once('close', (code) => {
+    closed = true;
+    if (code !== 0) remember(`code ${code}`);
+    resolve();
+  }));
   return {
-    write: (buf: Buffer) => new Promise<void>((res) => { if (!ff.stdin.write(buf)) ff.stdin.once('drain', () => res()); else res(); }),
-    end: async () => { ff.stdin.end(); await done; },
+    get error() { return failure; },
+    write: (buf: Buffer) => new Promise<void>((resolve, reject) => {
+      if (failure) { reject(failure); return; }
+      if (closed) { reject(remember('closed before all frames arrived')); return; }
+      ff.stdin.write(buf, (e) => { if (e) reject(remember(e.message)); else resolve(); });
+    }),
+    async end() {
+      ff.stdin.end();
+      await done;
+      if (failure) throw failure;
+    },
+    async abort() {
+      if (!closed) ff.kill();
+      await done;
+    },
   };
 }
 

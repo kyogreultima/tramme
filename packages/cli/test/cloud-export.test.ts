@@ -11,7 +11,7 @@ const WORKER = '../../../apps/worker/src/';
 const worker: { fetch(req: Request, env: unknown): Promise<Response> } = (await import(`${WORKER}index.ts`)).default;
 const { runJob } = await import(`${WORKER}renders.ts`) as { runJob(files: unknown, ws: string, job: string, render: unknown, every?: number): Promise<unknown> };
 /** a renderer whose render is over as soon as it starts */
-const instant = { start: async () => 'r', state: async () => ({ status: 'done' }), film: async () => new Uint8Array([7, 7, 7]).buffer, drop: async () => {} };
+const instant = { start: vi.fn(async (_archive: ArrayBuffer, _job: { profile?: string }) => 'r'), state: async () => ({ status: 'done' }), film: async () => new Uint8Array([7, 7, 7]).buffer, drop: async () => {} };
 type Env = unknown;
 
 const APP = 'https://app.example';
@@ -41,7 +41,8 @@ describe('tramme cloud-export', () => {
     const project = { files: new Map([[MANIFEST, text(made.manifest)], [DOCUMENT, text(made.doc)]]) };
     const out = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'cloud-export-')), 'film.mp4');
     const lines: string[] = [];
-    await cloudExport(project.files, { app: APP, token: TOKEN, out, wait: async () => {}, log: (l) => lines.push(l) });
+    await cloudExport(project.files, { app: APP, token: TOKEN, out, profile: 'master', wait: async () => {}, log: (l) => lines.push(l) });
+    expect(instant.start.mock.calls[0][1].profile).toBe('master');
     expect([...fs.readFileSync(out)]).toEqual([7, 7, 7]);
     expect(lines.some((l) => l.includes(': done'))).toBe(true);
   });

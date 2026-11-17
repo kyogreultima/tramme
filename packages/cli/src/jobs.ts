@@ -5,9 +5,11 @@ import os from 'node:os';
 import path from 'node:path';
 import type { Page } from 'puppeteer-core';
 import { chaptersOf, type TrammeDoc } from '@tramme/core';
+import type { RenderOptions } from '@tramme/render';
 import type { FrameParts } from '@tramme/render/src/timing.ts';
 import { openDoc, type DocInfo } from './browser.ts';
-import { addChapters, encoder, frameKind, joinSegments, type ExportQuality, type VideoFormat } from './media.ts';
+import { forgetHardware, hardwareH264, type HardwareEncoder } from './hardware.ts';
+import { addChapters, encoder, EncoderError, frameKind, joinSegments, type ExportQuality, type VideoFormat } from './media.ts';
 import type { Server } from './server.ts';
 import { mediaReport, verifyMedia } from './verify-media.ts';
 
@@ -66,8 +68,26 @@ async function mixTo(page: Page, from: number, to: number, out: string): Promise
   return true;
 }
 
+/** the machine's video chip for a fast 8-bit H.264 whose CRF was not given by hand (hardware.ts), else the software encoder */
+async function hardwareFor(job: VideoJob): Promise<HardwareEncoder | null> {
+  return (job.format ?? 'mp4') === 'mp4' && (job.quality ?? 'fast') === 'fast' && (job.depth ?? 8) === 8 && job.crf === undefined ? hardwareH264() : null;
+}
+
+function captureOptions(job: VideoJob): RenderOptions {
+  const velocity = job.samples === undefined && job.quality !== 'master' && job.depth !== 10 && job.format !== 'mov';
+  return velocity ? { motionBlur: 'velocity' } : { samples: job.samples };
+}
+
 export async function renderVideo(server: Server, page: Page, job: VideoJob, onProgress?: (done: number, total: number) => void) {
-  const r = await renderFilm(server, page, job, onProgress);
+  const hardware = await hardwareFor(job);
+  let r: Awaited<ReturnType<typeof renderFilm>>;
+  try { r = await renderFilm(server, page, job, hardware, onProgress); }
+  catch (e) {
+    if (!hardware || !(e instanceof EncoderError)) throw e;
+    console.error(`the hardware encoder (${hardware.name}) failed: ${(e as Error).message}; the film is encoded again in software`);
+    forgetHardware(hardware);
+    r = await renderFilm(server, page, job, null, onProgress);
+  }
   // the chapters of the span rendered, written into the file
   const from = (job.from ?? 0), seconds = r.frames / r.info.fps;
   await addChapters(job.format ?? 'mp4', job.out, chaptersOf(r.info.markers, from, from + seconds), seconds);
@@ -77,7 +97,7 @@ export async function renderVideo(server: Server, page: Page, job: VideoJob, onP
   return { ...r, verification };
 }
 
-async function renderFilm(server: Server, page: Page, job: VideoJob, onProgress?: (done: number, total: number) => void) {
+async function renderFilm(server: Server, page: Page, job: VideoJob, hardware: HardwareEncoder | null, onProgress?: (done: number, total: number) => void) {
   const format = job.format ?? 'mp4';
   const info: DocInfo = await openDoc(page, server.port, job.docUrl, job.compId);
   const f0 = Math.round((job.from ?? 0) * info.fps);
@@ -87,19 +107,23 @@ async function renderFilm(server: Server, page: Page, job: VideoJob, onProgress?
   // a parallel export: segments of at least a second each, a GIF's palette is made over the whole film
   const n = format === 'gif' ? 1 : Math.min(job.pages ?? 1, Math.floor((f1 - f0) / Math.max(1, info.fps)));
   if (n > 1) {
-    try { return await renderSegments(server, page, job, info, format, f0, f1, n, audio, onProgress); }
+    try { return await renderSegments(server, page, job, info, format, f0, f1, n, audio, hardware, onProgress); }
     finally { if (audio) fs.rmSync(mix, { force: true }); }
   }
-  const enc = encoder({ format, W: info.width, H: info.height, fps: info.fps, frames: f1 - f0, out: job.out, audio, crf: job.crf, depth: job.depth, quality: job.quality });
+  const enc = encoder({ format, W: info.width, H: info.height, fps: info.fps, frames: f1 - f0, out: job.out, audio, crf: job.crf, depth: job.depth, quality: job.quality, hardware });
   server.sink = enc.write;
-  if (onProgress) await page.exposeFunction('__trammeProgress', onProgress).catch(() => {});
+  const progress = onProgress && await page.exposeFunction('__trammeProgress', onProgress).then(() => true, () => false);
   const t0 = Date.now();
   try {
-    const { ms, parts }: { ms: number; parts: FrameParts } = await page.evaluate((a) => (window as any).TRAMME.capture(a.f0, a.f1, a.opts, a.kind), { f0, f1, opts: { samples: job.samples }, kind: frameKind(format, job.depth) });
+    const { ms, parts }: { ms: number; parts: FrameParts } = await page.evaluate((a) => (window as any).TRAMME.capture(a.f0, a.f1, a.opts, a.kind), { f0, f1, opts: captureOptions(job), kind: frameKind(format, job.depth) });
     await enc.end();
     return { info, frames: f1 - f0, audio: !!audio, msPerFrame: ms, parts, seconds: (Date.now() - t0) / 1000 };
+  } catch (e) {
+    throw enc.error ?? e;
   } finally {
     server.sink = null;
+    await enc.abort();
+    if (progress) await page.removeExposedFunction('__trammeProgress').catch(() => {});
     if (audio) fs.rmSync(mix, { force: true });
   }
 }
@@ -111,7 +135,7 @@ async function renderFilm(server: Server, page: Page, job: VideoJob, onProgress?
  * middle steps from its start (the renderer's checkpoints), so each frame is
  * the one a single page would draw.
  */
-async function renderSegments(server: Server, first: Page, job: VideoJob, info: DocInfo, format: VideoFormat, f0: number, f1: number, n: number, audio: string | undefined, onProgress?: (done: number, total: number) => void) {
+async function renderSegments(server: Server, first: Page, job: VideoJob, info: DocInfo, format: VideoFormat, f0: number, f1: number, n: number, audio: string | undefined, hardware: HardwareEncoder | null, onProgress?: (done: number, total: number) => void) {
   const spans = segmentsOf(f0, f1, n);
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'tramme-segments-'));
   const browser = first.browser();
@@ -122,20 +146,38 @@ async function renderSegments(server: Server, first: Page, job: VideoJob, info: 
   }
   const done = spans.map(() => 0);
   const t0 = Date.now();
+  const active = new Set<ReturnType<typeof encoder>>();
+  let failure: { error: unknown } | undefined;
   try {
     await Promise.all(pages.slice(1).map((p) => openDoc(p, server.port, job.docUrl, job.compId)));
-    const results = await Promise.all(spans.map(async ([a, b], i) => {
+    const settled = await Promise.allSettled(spans.map(async ([a, b], i) => {
       const p = pages[i], name = `segment-${process.pid}-${i}`;
       const out = format === 'png' ? job.out : path.join(tmp, `${String(i).padStart(3, '0')}.${format}`);
-      const enc = encoder({ format, W: info.width, H: info.height, fps: info.fps, frames: b - a, out, crf: job.crf, startNumber: a - f0, depth: job.depth, quality: job.quality });
+      const enc = encoder({ format, W: info.width, H: info.height, fps: info.fps, frames: b - a, out, crf: job.crf, startNumber: a - f0, depth: job.depth, quality: job.quality, hardware });
+      active.add(enc);
       server.sinks.set(name, enc.write);
-      if (onProgress) await p.exposeFunction('__trammeProgress', (d: number) => { done[i] = d; onProgress(done.reduce((x, y) => x + y, 0), f1 - f0); }).catch(() => {});
+      const progress = onProgress && await p.exposeFunction('__trammeProgress', (d: number) => { done[i] = d; onProgress(done.reduce((x, y) => x + y, 0), f1 - f0); }).then(() => true, () => false);
       try {
-        const r: { ms: number; parts: FrameParts } = await p.evaluate((x) => (window as any).TRAMME.capture(x.a, x.b, x.opts, x.kind, x.name), { a, b, opts: { samples: job.samples }, kind: frameKind(format, job.depth), name });
+        const r: { ms: number; parts: FrameParts } = await p.evaluate((x) => (window as any).TRAMME.capture(x.a, x.b, x.opts, x.kind, x.name), { a, b, opts: captureOptions(job), kind: frameKind(format, job.depth), name });
         await enc.end();
         return { ...r, frames: b - a, out };
-      } finally { server.sinks.delete(name); }
+      } catch (e) {
+        if (!failure) {
+          failure = { error: enc.error ?? e };
+          await Promise.all([...active].map((running) => running.abort()));
+        }
+        throw failure.error;
+      } finally {
+        server.sinks.delete(name);
+        active.delete(enc);
+        await enc.abort();
+        if (progress) await p.removeExposedFunction('__trammeProgress').catch(() => {});
+      }
     }));
+    const results = settled.map((result) => {
+      if (result.status === 'rejected') throw result.reason;
+      return result.value;
+    });
     if (format !== 'png') await joinSegments(format, results.map((r) => r.out), job.out, (f1 - f0) / info.fps, audio);
     // per frame over the whole film: each segment's figures weighed by its frames
     const total = f1 - f0, parts = {} as FrameParts;

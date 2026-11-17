@@ -2,7 +2,7 @@
 //   tramme validate <doc>
 //   tramme check    <doc> [--comp id]                                  the picture checks, issues folded by cause
 //   tramme still    <doc> --t 0.5,1.2 [--out dir] [--samples n] [--comp id]
-//   tramme cloud-export <doc|project.tramme> [--app url] [--token tr_…] [--out film.mp4] [--comp id]   rendered in the cloud of an account (cloud-export.ts)
+//   tramme cloud-export <doc|project.tramme> [--app url] [--token tr_…] [--out film.mp4] [--comp id] [--master]   rendered in the cloud of an account (cloud-export.ts)
 //   tramme render   <doc> [--format mp4|mov|webm|gif|png] [--out file] [--samples n] [--from s] [--to s] [--crf n] [--mute] [--comp id] [--pages n] [--depth 8|10] [--master] [--isolate]
 //                   --master: the encoder's slow settings, the best picture for its size (default: fast, for the web)
 //                   --isolate: a project with code drawn in its sandbox, not on the render page (slower)
@@ -352,7 +352,7 @@ const COMMANDS: Record<string, () => Promise<void> | void> = {
     const files = fs.statSync(src).isDirectory() ? readFolder(src) : unpackProject(new Uint8Array(fs.readFileSync(src)));
     const token = str('token') ?? process.env.TRAMME_TOKEN;
     if (!token) throw new Error('an API token is needed: --token tr_… or TRAMME_TOKEN (made in the app, Your space, API tokens)');
-    await cloudExport(files, { app: str('app') ?? process.env.TRAMME_APP_URL ?? 'https://app.tramme.dev', token, out: str('out') ?? `${path.basename(src).replace(/\.(tramme|trame|emotion)$/, '')}.mp4`, comp: str('comp') });
+    await cloudExport(files, { app: str('app') ?? process.env.TRAMME_APP_URL ?? 'https://app.tramme.dev', token, out: str('out') ?? `${path.basename(src).replace(/\.(tramme|trame|emotion)$/, '')}.mp4`, comp: str('comp'), ...(flags.master ? { profile: 'master' } : {}) });
   },
   nodes: () => cmdNodes(pos[0]),
   bench: async () => { const { bench } = await import('./bench.ts'); await bench(pos[0], { layer: str('layer'), t: num('t'), width: num('width'), height: num('height'), dpr: num('dpr') }); },
