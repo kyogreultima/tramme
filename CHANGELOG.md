@@ -8,6 +8,21 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+## [0.33.0] - 2026-11-20
+
+### Added
+
+- The assistant can read the waveform and vectorscope of a rendered frame, measure near-black and near-white pixels, check RGB clipping and sample a white or grey patch. It can also apply any of the eight built-in colour looks at an adjustable strength, as editable effects.
+
+### Changed
+
+- When grading footage, the assistant checks the source profile, corrects colour balance and exposure, then measures the result again. When refining an existing grade, it starts with the current effects and preserves the intended look.
+
+### Fixed
+
+- The CLI writes AAC-LC audio in MP4 exports and checks that the expected audio track decodes in the finished file.
+- Video exports report an unreadable sound source by name. The editor checks that the finished soundtrack can be decoded and exports WebM with Opus if the browser cannot encode AAC for MP4.
+
 ## [0.32.1] - 2026-11-19
 
 ### Fixed
@@ -1052,7 +1067,8 @@ First public release.
 
 - Cloudflare Worker serving the editor and the API, projects stored in R2, access protected by Cloudflare Access.
 
-[Unreleased]: ../../compare/v0.32.1...HEAD
+[Unreleased]: ../../compare/v0.33.0...HEAD
+[0.33.0]: ../../compare/v0.32.1...v0.33.0
 [0.32.1]: ../../compare/v0.32.0...v0.32.1
 [0.32.0]: ../../compare/v0.31.0...v0.32.0
 [0.31.0]: ../../compare/v0.30.1...v0.31.0
