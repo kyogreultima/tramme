@@ -219,37 +219,6 @@ export function moduleItemsOf(doc: TrammeDoc, docUrl: string): { id: string; url
     .map(([id, asset]) => ({ id, url: new URL(asset.src, docUrl).href }));
 }
 
-/**
- * A video frame decoded on the page (the sandbox does not decode), ready to
- * cross: a frame is a canvas as often as a bitmap, and a canvas element does
- * not cross postMessage, so it travels as an ImageBitmap (closed by the host
- * once the request is answered). One that cannot be decoded crosses blank: its
- * layer draws nothing rather than ask for it again. Times that fall in one
- * picture of the file (the motion-blur samples of a frame) share its one
- * bitmap: a 4K picture copied for each sample passed the sandbox's limit.
- * While the preview moves (`shrink` below 1), the picture is first made
- * smaller on the graphics card (VideoFrames.quickPicture, as Host.quick does
- * on the page): a 4K copy per frame was most of a played frame's time.
- */
-async function decodeVideoFrame(va: SandboxVideo | null, t: number, made: Map<CanvasImageSource, Promise<ImageBitmap>>, shrink = 1): Promise<ImageBitmap> {
-  try {
-    if (va) {
-      await va.request?.(t);
-      const image = va.frameAt(t)?.image;
-      if (image) {
-        let bitmap = made.get(image);
-        if (!bitmap) {
-          const small = shrink < 1 && va.width && va.height ? va.quickPicture?.(image, Math.ceil(va.width * shrink), Math.ceil(va.height * shrink)) : null;
-          // the small picture is a canvas drawn over by the next one: createImageBitmap copies it at once
-          made.set(image, bitmap = createImageBitmap(small ?? image));
-        }
-        return await bitmap;
-      }
-    }
-  } catch { /* drawn blank */ }
-  return createImageBitmap(new OffscreenCanvas(1, 1));
-}
-
 /** a video as the page's renderer holds it (render/video.ts VideoFrames) */
 interface SandboxVideo {
   width?: number;
@@ -261,31 +230,105 @@ interface SandboxVideo {
 const videoOf = (r: Renderer, id: string): SandboxVideo | null => { try { return r.assets.get<SandboxVideo | null>(id); } catch { return null; } };
 
 /**
- * How much smaller a moving preview's video frames may cross: the preview's
- * own scale, with room for a layer pushed in a little, applied only when the
- * frame lands at half its size or less (as Host.quick on the page).
+ * The bytes of video pictures one sandbox frame carries at most, under the
+ * sandbox's own limit (host.ts GRAPHICS_LIMIT, 256 MB) with room to spare:
+ * past it, every picture of the frame crosses smaller rather than the frame
+ * failing (many 4K layers at once, a fast clip whose blur samples each fall
+ * in another picture, 8K footage).
  */
-function shrinkOf(va: SandboxVideo | null, payload: Omit<FramePayload, 'videos'>): number {
-  if (!va?.width || !va.height) return 1;
-  const k = 1.25 * payload.scale * Math.max(payload.width / va.width, payload.height / va.height);
-  return k <= 0.5 ? k : 1;
+export const VIDEO_FRAME_BUDGET = 192 * 1024 * 1024;
+/** room over the size a frame landed on last time, for a layer pushed in from one frame to the next */
+const LANDING_MARGIN = 1.1;
+
+/** one picture of a file a frame sends: the times that show it, and the size it crosses at */
+interface Planned { va: SandboxVideo; image: CanvasImageSource; pinned?: VideoFrame; keys: string[]; w: number; h: number }
+
+/**
+ * The video frames one sandbox frame sends, decoded here (the sandbox does not
+ * decode) and turned into ImageBitmaps (a canvas does not cross postMessage;
+ * the host closes them once answered). Times that fall in one picture of the
+ * file (the motion-blur samples of a frame) share its one bitmap. Each picture
+ * crosses no bigger than the largest size its layers land on (VideoAsset.drawnAt,
+ * told by the sandbox), the file's own size when none says, and all of them
+ * smaller together when they would pass VIDEO_FRAME_BUDGET. A frame that cannot
+ * be decoded crosses blank: its layer draws nothing rather than ask for it again.
+ */
+async function videoFrames(r: Renderer, wanted: Map<string, VideoNeed>, margin: number): Promise<{ videos: Record<string, ImageBitmap>; videoSizes: Record<string, [number, number]> }> {
+  const videos: Record<string, ImageBitmap> = {}, videoSizes: Record<string, [number, number]> = {};
+  const planned = new Map<CanvasImageSource, Planned>(), blank: string[] = [];
+  // every open video's own size, even one this frame has not asked for yet: its layer tells the size it lands on from the first time
+  for (const [id, a] of Object.entries(r.doc?.assets ?? {})) {
+    if (a.type !== 'video' || !r.assets.has?.(id)) continue;
+    const va = videoOf(r, id);
+    if (va?.width && va.height) videoSizes[id] = [va.width, va.height];
+  }
+  // the videos decode side by side, as the page's own frames do
+  await Promise.all([...wanted].map(async ([key, n]) => {
+    const va = videoOf(r, n.id);
+    try {
+      if (!va) throw new Error('no video');
+      await va.request?.(n.t);
+      const image = va.frameAt(n.t)?.image;
+      if (!image) throw new Error('no frame');
+      // a video that does not say its size crosses as it is
+      const W = va.width || 0, H = va.height || 0;
+      if (W && H) videoSizes[n.id] = [W, H];
+      // Each axis can shrink independently when a layer stretches the picture.
+      const w = Math.max(1, Math.min(W, n.w ? Math.ceil(n.w * margin) : W));
+      const h = Math.max(1, Math.min(H, n.h ? Math.ceil(n.h * margin) : H));
+      const p = planned.get(image);
+      if (p) { p.keys.push(key); p.w = Math.max(p.w, w); p.h = Math.max(p.h, h); }
+      else {
+        // The decoder can evict this picture while the other samples are decoding.
+        const pinned = typeof VideoFrame !== 'undefined' && image instanceof VideoFrame ? image.clone() : undefined;
+        planned.set(image, { va, image: pinned ?? image, pinned, keys: [key], w, h });
+      }
+    } catch { blank.push(key); }
+  }));
+  const bytes = [...planned.values()].reduce((sum, p) => sum + (p.va.width && p.va.height ? p.w * p.h * 4 : 0), 0);
+  const fit = bytes > VIDEO_FRAME_BUDGET ? Math.sqrt(VIDEO_FRAME_BUDGET / bytes) * 0.99 : 1;
+  for (const p of planned.values()) {
+    const W = p.va.width || 0, H = p.va.height || 0;
+    const w = Math.max(1, Math.floor(p.w * fit)), h = Math.max(1, Math.floor(p.h * fit));
+    let bitmap: ImageBitmap;
+    try {
+      if (!W || !H || (w >= W && h >= H)) bitmap = await createImageBitmap(p.image);
+      else {
+        // made small on the graphics card (a canvas drawn over by the next one: createImageBitmap copies it at once)
+        const small = p.va.quickPicture?.(p.image, w, h);
+        const resize = () => createImageBitmap(p.image, { resizeWidth: w, resizeHeight: h, resizeQuality: 'high' });
+        bitmap = await (small ? createImageBitmap(small).catch(resize) : resize());
+      }
+    } catch { blank.push(...p.keys); continue; }
+    finally { p.pinned?.close(); }
+    for (const key of p.keys) videos[key] = bitmap;
+  }
+  if (blank.length) {
+    const transparent = new OffscreenCanvas(1, 1);
+    transparent.getContext('2d');
+    const none = await createImageBitmap(transparent);
+    for (const key of blank) videos[key] = none;
+  }
+  return { videos, videoSizes };
 }
+
 /** the frames decoded ahead of a played sandbox frame, so the next ones find theirs ready */
 const AHEAD_FRAMES = 2;
 
 /** the rounds of video frames one sandbox frame may ask for before it is taken as stuck */
 const VIDEO_ROUNDS = 4;
 /** the video frames each host's last two frames asked for (comp time, needs): the next frame's are decoded ahead */
-const lastNeeds = new WeakMap<PluginHost, { t: number; need: VideoNeed[] }[]>();
+type VideoHistory = { t: number; need: VideoNeed[] }[];
+const lastNeeds = new WeakMap<Renderer, { host: PluginHost; compId: string; scale: number; exporting: boolean; frames: VideoHistory }>();
 
 /** the frames the next frame will likely ask for: each one of the last frame moved on at the pace it moved since the frame before */
-function predictNeeds(host: PluginHost, t: number): VideoNeed[] {
-  const [prev, last] = lastNeeds.get(host) ?? [];
+function predictNeeds(history: VideoHistory, t: number): VideoNeed[] {
+  const [prev, last] = history;
   if (!last) return [];
   const paired = prev && prev.need.length === last.need.length && prev.need.every((n, i) => n.id === last.need[i].id) && last.t !== prev.t;
   return last.need.map((n, i) => {
     const rate = paired ? (n.t - prev.need[i].t) / (last.t - prev.t) : 1;
-    return { id: n.id, t: n.t + rate * (t - last.t) };
+    return { id: n.id, t: n.t + rate * (t - last.t), w: n.w, h: n.h };
   });
 }
 
@@ -295,26 +338,36 @@ function predictNeeds(host: PluginHost, t: number): VideoNeed[] {
  * motion-blur sample), not every video of the project at the composition's
  * time. The frames the last two frames asked for, moved on, go with the first
  * request; the sandbox names any it still lacks, decoded and sent again.
- * Played (`playing`), the frames go smaller while the preview moves, and the
- * next frames' videos start decoding as soon as this one is answered.
+ * Played (`playing`), the next frames' videos start decoding as soon as this
+ * one is answered.
  */
 export async function renderSandboxFrame(host: PluginHost, r: Renderer, payload: Omit<FramePayload, 'videos'>, opts?: { export?: boolean; playing?: boolean }): Promise<FrameAnswer> {
+  const exporting = opts?.export === true;
+  const { compId, scale } = payload;
+  const previous = lastNeeds.get(r);
+  const history = previous?.host === host && previous.compId === compId && previous.scale === scale && previous.exporting === exporting ? previous.frames : [];
   // the frames sent, by key: each round decodes them again (the decoder keeps its frames) since the host closes what it sent
-  const wanted = new Map<string, VideoNeed>(predictNeeds(host, payload.t).map((n) => [videoKey(n.id, n.t), n]));
+  let wanted = new Map<string, VideoNeed>(predictNeeds(history, payload.t).map((n) => [videoKey(n.id, n.t), n]));
   for (let round = 0; round < VIDEO_ROUNDS; round++) {
-    const videos: Record<string, ImageBitmap> = {}, videoSizes: Record<string, [number, number]> = {}, made = new Map<CanvasImageSource, Promise<ImageBitmap>>();
-    // the videos decode side by side, as the page's own frames do
-    await Promise.all([...wanted].map(async ([key, n]) => {
-      const va = videoOf(r, n.id);
-      if (va?.width && va.height) videoSizes[n.id] = [va.width, va.height];
-      videos[key] = await decodeVideoFrame(va, n.t, made, opts?.playing ? shrinkOf(va, payload) : 1);
-    }));
+    const { videos, videoSizes } = await videoFrames(r, wanted, exporting ? 1 : LANDING_MARGIN);
     const answer = await host.renderFrame({ ...payload, videos, videoSizes }, opts);
     if (!answer.need?.length) {
-      lastNeeds.set(host, [...(lastNeeds.get(host) ?? []).slice(-1), { t: payload.t, need: answer.drew ?? [] }]);
+      if (answer.err) return answer;
+      const drawn = answer.drew ?? [];
+      // Predicted source times can be right while animated transforms changed the landing size.
+      if (exporting && answer.bitmap && round + 1 < VIDEO_ROUNDS && drawn.some((n) => {
+        const sent = wanted.get(videoKey(n.id, n.t));
+        return sent?.w !== n.w || sent?.h !== n.h;
+      })) {
+        (answer.bitmap as ImageBitmap).close();
+        wanted = new Map(drawn.map((n) => [videoKey(n.id, n.t), n]));
+        continue;
+      }
+      const frames = [...history.slice(-1), { t: payload.t, need: drawn }];
+      lastNeeds.set(r, { host, compId, scale, exporting, frames });
       const fps = r.comp?.fps;
       if (opts?.playing && fps) {
-        for (let k = 1; k <= AHEAD_FRAMES; k++) for (const n of predictNeeds(host, payload.t + k / fps)) {
+        for (let k = 1; k <= AHEAD_FRAMES; k++) for (const n of predictNeeds(frames, payload.t + k / fps)) {
           const va = videoOf(r, n.id);
           if (va && !va.frameAt(n.t)?.exact) void va.request?.(n.t, 'ahead');
         }

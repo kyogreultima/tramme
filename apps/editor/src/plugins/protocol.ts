@@ -158,8 +158,8 @@ export interface FramePayload {
   videoSizes?: Record<string, [number, number]>;
 }
 
-/** a frame of a video asset a sandbox frame draws: its asset, and its time in the file */
-export interface VideoNeed { id: string; t: number }
+/** a frame of a video asset a sandbox frame draws: its asset, its time in the file, and the canvas pixels it lands on when its layer says */
+export interface VideoNeed { id: string; t: number; w?: number; h?: number }
 
 /** what a sandbox frame gives back: its picture and the video frames it drew, or the video frames it still lacks */
 export interface FrameAnswer { bitmap?: unknown; err?: string; need?: VideoNeed[]; drew?: VideoNeed[] }

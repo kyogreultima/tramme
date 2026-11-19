@@ -77,7 +77,7 @@ export const video: NodeType<VideoProps> = {
       const { src, t } = source({ ...p, video: p.video }, host);
       const { image, exact } = src.frameAt(t);
       if (!exact) host.defer?.(src.request(t));
-      if (!image || !src.width || !src.height) return;
+      if (!src.width || !src.height || (!image && !src.drawnAt)) return;
       // the frame is centred on the layer origin; cropped, the point named by focus stays at its centre (pictureRect, shared with the tracking and the checks)
       const r = pictureRect(p.fit, w, h, src.width, src.height, p.focus);
       if (p.fit === 'cover') { ctx.beginPath(); ctx.rect(-w / 2, -h / 2, w, h); ctx.clip(); }
@@ -91,6 +91,11 @@ export const video: NodeType<VideoProps> = {
         ctx.scale(c.s, c.s);
         ctx.translate(-cx, -cy);
       }
+      if (src.drawnAt) {
+        const m = ctx.getTransform();
+        src.drawnAt(t, Math.ceil(r.w * Math.hypot(m.a, m.b)), Math.ceil(r.h * Math.hypot(m.c, m.d)));
+      }
+      if (!image) return;
       ctx.drawImage((host.quick ? quick(ctx, src, image, r.w, r.h) : null) ?? image, r.x, r.y, r.w, r.h);
     },
   },

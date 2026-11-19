@@ -125,9 +125,16 @@ export function makeSandboxDraw(modules: Map<string, PluginModule>): SandboxDraw
       return {
         width: own?.[0] ?? size?.width ?? Number(a.width ?? 0), height: own?.[1] ?? size?.height ?? Number(a.height ?? 0), duration: Number(a.duration ?? 0),
         frameAt: (t: number) => {
-          const frame = at(t);
-          (frame ? drew : need).set(videoKey(id, t), { id, t });
+          const frame = at(t), key = videoKey(id, t);
+          if (!need.has(key) && !drew.has(key)) (frame ? drew : need).set(key, { id, t });
           return { image: frame ?? null, exact: !!frame };
+        },
+        // the size it lands on, the largest when several draws show it: the page sends it no bigger
+        drawnAt: (t: number, w: number, h: number) => {
+          const n = need.get(videoKey(id, t)) ?? drew.get(videoKey(id, t));
+          if (!n || !(w > 0) || !(h > 0)) return;
+          n.w = Math.max(n.w ?? 0, Math.ceil(w));
+          n.h = Math.max(n.h ?? 0, Math.ceil(h));
         },
         request: () => Promise.resolve(),
       };

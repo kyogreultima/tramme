@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { newProject } from '@tramme/project';
 import type { PluginModule } from '@tramme/core';
-import { blitSandboxFrame, ensureSandboxDoc, moduleItemsOf, renderSandboxFrame, resetSandbox } from '../src/plugins/sandbox-draw.ts';
+import { blitSandboxFrame, ensureSandboxDoc, moduleItemsOf, renderSandboxFrame, resetSandbox, VIDEO_FRAME_BUDGET } from '../src/plugins/sandbox-draw.ts';
 import { videoKey } from '../src/plugins/protocol.ts';
 import type { Renderer } from '@tramme/render';
 import { makeSandboxDraw } from '../src/plugins/worker-draw.ts';
@@ -24,9 +24,11 @@ class Surface {
   height: number;
   constructor(width: number, height: number) { this.width = width; this.height = height; }
   getContext() {
+    let m = [1, 0, 0, 1, 0, 0];
     return {
       canvas: this, globalAlpha: 1,
-      setTransform: (...args: number[]) => paint.push({ canvas: this, op: 'transform', args }),
+      setTransform: (...args: number[]) => { m = args.length === 6 ? args : [1, 0, 0, 1, 0, 0]; paint.push({ canvas: this, op: 'transform', args }); },
+      getTransform: () => ({ a: m[0], b: m[1], c: m[2], d: m[3], e: m[4], f: m[5] }),
       clearRect: (...args: number[]) => paint.push({ canvas: this, op: 'clear', args }),
       save() {}, restore() {}, transform() {},
       translate() {}, beginPath() {}, rect() {}, clip() {},
@@ -213,68 +215,160 @@ describe('sandbox video rendering', () => {
     expect(calls.length).toBe(2 + 2 + 4);
   });
 
+  /**
+   * Videos as the page holds them (VideoFrames): every time inside one picture of a `fps` file gives that
+   * picture's one object, quickPicture makes a smaller one; the payloads sent to the sandbox are kept
+   */
+  const filesRig = (doc: ReturnType<typeof project>, size: [number, number], fps = 30) => {
+    const side = makeSandboxDraw(new Map());
+    side.setDoc({ doc, docUrl: 'https://tramme.test/doc.json', images: {}, json: {}, fonts: [] });
+    const pictures = new Map<string, { width: number; height: number }>(), shrunk: [number, number][] = [], asked: [number, string][] = [];
+    const file = (id: string) => ({
+      width: size[0], height: size[1],
+      request: async (t: number, kind = 'shown') => { asked.push([+t.toFixed(4), kind]); },
+      frameAt: (t: number) => {
+        const key = `${id}#${Math.floor(t * fps + 1e-6)}`;
+        if (!pictures.has(key)) pictures.set(key, { width: size[0], height: size[1] });
+        return { image: pictures.get(key)!, exact: false };
+      },
+      quickPicture: (_: unknown, w: number, h: number) => { shrunk.push([w, h]); return { width: w, height: h }; },
+    });
+    const files = new Map<string, ReturnType<typeof file>>();
+    const renderer = { doc, comp: doc.compositions[doc.root], assets: { has: () => true, get: (id: string) => { if (!files.has(id)) files.set(id, file(id)); return files.get(id); } } } as unknown as Renderer;
+    const sent: Record<string, { source: { width: number; height: number } }>[] = [];
+    const host = { renderFrame: async (p: Parameters<typeof side.renderFrame>[0]) => { sent.push((p.videos ?? {}) as never); const { transfer: _, ...answer } = await side.renderFrame(p); return answer; } } as unknown as PluginHost;
+    /** the distinct bitmaps of the largest payload, and their bytes */
+    const largest = () => {
+      const most = sent.reduce((a, v) => (Object.keys(v).length > Object.keys(a).length ? v : a), {} as (typeof sent)[number]);
+      const bitmaps = new Set(Object.values(most));
+      return { keys: Object.keys(most).length, bitmaps, bytes: [...bitmaps].reduce((n, b) => n + b.source.width * b.source.height * 4, 0) };
+    };
+    return { host, renderer, sent, shrunk, asked, largest };
+  };
+  const videoLayers = (doc: ReturnType<typeof project>, count: number, props: Record<string, unknown> = {}) => {
+    const main = doc.compositions[doc.root];
+    main.order = [];
+    for (let i = 0; i < count; i++) {
+      doc.assets[`footage${i}`] = { type: 'video', src: `assets/footage${i}.mp4` };
+      main.layers[`video${i}`] = { type: 'video', props: { video: `footage${i}`, ...props } };
+      main.order.push(`video${i}`);
+    }
+  };
+
   it('sends one copy of a video frame that several motion-blur samples share', async () => {
     const doc = project();
     doc.compositions[doc.root].motionBlur = { samples: 8, shutter: 0.5 };
-    doc.assets.footage = { type: 'video', src: 'assets/footage.mp4' };
-    doc.compositions[doc.root].layers.video = { type: 'video', props: { video: 'footage' } };
-    doc.compositions[doc.root].order = ['video'];
-    const side = makeSandboxDraw(new Map());
-    side.setDoc({ doc, docUrl: 'https://tramme.test/doc.json', images: {}, json: {}, fonts: [] });
-    // a 30 fps file: every time inside one of its frames gives that frame's one picture, as the decoder's pool does
-    const pictures = new Map<number, { width: number; height: number }>();
-    const picture = (t: number) => { const i = Math.floor(t * 30 + 1e-6); if (!pictures.has(i)) pictures.set(i, { width: 3840, height: 2160 }); return pictures.get(i)!; };
-    const renderer = { assets: { get: () => ({ request: async () => {}, frameAt: (t: number) => ({ image: picture(t) }) }) } } as unknown as Renderer;
-    const sent: Record<string, unknown>[] = [];
-    const host = { renderFrame: async (p: Parameters<typeof side.renderFrame>[0]) => { sent.push(p.videos ?? {}); const { transfer: _, ...answer } = await side.renderFrame(p); return answer; } } as unknown as PluginHost;
+    videoLayers(doc, 1);
+    const { host, renderer, largest } = filesRig(doc, [3840, 2160]);
     for (let f = 0; f < 4; f++) expect((await renderSandboxFrame(host, renderer, frameOf(doc, 10 + f / 24), { export: true })).err).toBeUndefined();
     // the eight samples name eight times, but they fall in one or two pictures of the file: one bitmap per picture crosses
-    const most = sent.reduce((a, v) => (Object.keys(v).length > Object.keys(a).length ? v : a), {});
-    expect(Object.keys(most).length).toBeGreaterThan(4);
-    const pictured = new Set(Object.values(most).map((b) => (b as { source: unknown }).source));
-    expect(new Set(Object.values(most)).size).toBe(pictured.size);
+    const { keys, bitmaps } = largest();
+    expect(keys).toBeGreaterThan(4);
+    expect(bitmaps.size).toBeLessThanOrEqual(2);
+  });
+
+  it('keeps decoded pictures alive until the sandbox bitmaps are made', async () => {
+    class DecodedFrame {
+      displayWidth = 3840;
+      displayHeight = 2160;
+      closed = false;
+      clone() { return new DecodedFrame(); }
+      close() { this.closed = true; }
+    }
+    vi.stubGlobal('VideoFrame', DecodedFrame);
+    vi.stubGlobal('createImageBitmap', async (source: DecodedFrame) => {
+      if (source.closed) throw new Error('decoder already closed this frame');
+      return { width: source.displayWidth, height: source.displayHeight };
+    });
+    const doc = project();
+    const first = new DecodedFrame(), second = new DecodedFrame();
+    const renderer = { assets: { get: () => ({
+      width: 3840, height: 2160,
+      request: async (t: number) => {
+        if (t === 2) {
+          await new Promise((resolve) => setTimeout(resolve, 0));
+          first.close();
+        }
+      },
+      frameAt: (t: number) => ({ image: t === 1 ? first : second }),
+    }) } } as unknown as Renderer;
+    let sent: Record<string, ImageBitmap> = {};
+    const host = { renderFrame: async (payload: { videos: typeof sent }) => {
+      sent = payload.videos;
+      return Object.keys(sent).length ? {} : { need: [{ id: 'clip', t: 1 }, { id: 'clip', t: 2 }] };
+    } } as unknown as PluginHost;
+    await renderSandboxFrame(host, renderer, frameOf(doc, 1), { export: true });
+    expect(sent[videoKey('clip', 1)]?.width).toBe(3840);
+    expect(sent[videoKey('clip', 2)]?.width).toBe(3840);
+  });
+
+  it('sends an export\'s video frames at the size they land on, not the file\'s', async () => {
+    const doc = project();
+    doc.compositions[doc.root].motionBlur = { samples: 1, shutter: 0 };
+    videoLayers(doc, 1);
+    const { host, renderer, shrunk, largest } = filesRig(doc, [3840, 2160]);
+    for (let f = 0; f < 3; f++) expect((await renderSandboxFrame(host, renderer, { ...frameOf(doc, 1 + f / 24), scale: 1 }, { export: true })).err).toBeUndefined();
+    expect(shrunk.at(-1)).toEqual([1920, 1080]);
+    expect(largest().bytes).toBe(1920 * 1080 * 4);
+  });
+
+  it('recalculates the landing size when a moving preview switches to export', async () => {
+    const doc = project();
+    doc.compositions[doc.root].motionBlur = { samples: 1, shutter: 0 };
+    videoLayers(doc, 1);
+    const { host, renderer, shrunk } = filesRig(doc, [3840, 2160]);
+    for (let f = 0; f < 2; f++) {
+      expect((await renderSandboxFrame(host, renderer, frameOf(doc, 1 + f / 24), { playing: true })).err).toBeUndefined();
+    }
+    expect(shrunk.at(-1)).toEqual([528, 297]);
+    const frame = { ...frameOf(doc, 1 + 2 / 24), scale: 1 };
+    expect((await renderSandboxFrame(host, renderer, frame, { export: true })).err).toBeUndefined();
+    expect(shrunk.at(-1)).toEqual([1920, 1080]);
+  });
+
+  it('sends a stretched picture at its rendered width and height', async () => {
+    const doc = project();
+    doc.compositions[doc.root].motionBlur = { samples: 1, shutter: 0 };
+    videoLayers(doc, 1, { fit: 'fill', size: [640, 640] });
+    const { host, renderer, shrunk } = filesRig(doc, [3840, 2160]);
+    const frame = { ...frameOf(doc, 1), scale: 1 };
+    expect((await renderSandboxFrame(host, renderer, frame, { export: true })).err).toBeUndefined();
+    expect(shrunk).toEqual([[640, 640]]);
   });
 
   it('plays a 4K video through the sandbox as a small picture drawn over the file\'s own rectangle, the next frames decoding ahead', async () => {
     const doc = project();
     doc.compositions[doc.root].motionBlur = { samples: 1, shutter: 0 };
-    doc.assets.footage = { type: 'video', src: 'assets/footage.mp4' };
-    doc.compositions[doc.root].layers.video = { type: 'video', props: { video: 'footage', fit: 'contain' } };
-    doc.compositions[doc.root].order = ['video'];
-    const side = makeSandboxDraw(new Map());
-    side.setDoc({ doc, docUrl: 'https://tramme.test/doc.json', images: {}, json: {}, fonts: [] });
-    const shrunk: [number, number][] = [], asked: [number, string][] = [];
-    const video = {
-      width: 3840, height: 2160,
-      request: async (t: number, kind = 'shown') => { asked.push([+t.toFixed(4), kind]); },
-      frameAt: () => ({ image: { width: 3840, height: 2160 }, exact: false }),
-      quickPicture: (_: unknown, w: number, h: number) => { shrunk.push([w, h]); return { width: w, height: h }; },
-    };
-    const renderer = { comp: { fps: 24 }, assets: { get: () => video } } as unknown as Renderer;
-    const host = { renderFrame: async (p: Parameters<typeof side.renderFrame>[0]) => { const { transfer: _, ...answer } = await side.renderFrame(p); return answer; } } as unknown as PluginHost;
+    videoLayers(doc, 1, { fit: 'contain' });
+    const { host, renderer, shrunk, asked } = filesRig(doc, [3840, 2160]);
     for (let f = 0; f < 3; f++) expect((await renderSandboxFrame(host, renderer, { ...frameOf(doc, 1 + f / 24), scale: 0.25 }, { playing: true })).err).toBeUndefined();
-    // shown at a quarter of 1920: the 4K frame crosses at 1.25 × 0.25 × ½ of its size
-    expect(shrunk.at(-1)).toEqual([600, 338]);
+    // shown at a quarter of 1920 (480 px), with a tenth to spare
+    expect(shrunk.at(-1)).toEqual([528, 297]);
     // the video layer still draws over the file's whole frame (1920 × 1080 in the composition), not the small picture's
-    const drawn = draws.at(-1)!;
-    expect(drawn.slice(3, 5)).toEqual([1920, 1080]);
+    expect(draws.at(-1)!.slice(3, 5)).toEqual([1920, 1080]);
     expect(asked.some(([t, kind]) => kind === 'ahead' && t > 1 + 2 / 24)).toBe(true);
   });
 
-  it('sends the frames whole when not playing', async () => {
-    const doc = project();
-    doc.compositions[doc.root].motionBlur = { samples: 1, shutter: 0 };
-    doc.assets.footage = { type: 'video', src: 'assets/footage.mp4' };
-    doc.compositions[doc.root].layers.video = { type: 'video', props: { video: 'footage' } };
-    doc.compositions[doc.root].order = ['video'];
-    const side = makeSandboxDraw(new Map());
-    side.setDoc({ doc, docUrl: 'https://tramme.test/doc.json', images: {}, json: {}, fonts: [] });
-    const quickPicture = vi.fn();
-    const renderer = { comp: { fps: 24 }, assets: { get: () => ({ width: 3840, height: 2160, request: async () => {}, frameAt: () => ({ image: { width: 3840, height: 2160 } }), quickPicture }) } } as unknown as Renderer;
-    const host = { renderFrame: async (p: Parameters<typeof side.renderFrame>[0]) => { const { transfer: _, ...answer } = await side.renderFrame(p); return answer; } } as unknown as PluginHost;
-    expect((await renderSandboxFrame(host, renderer, { ...frameOf(doc, 1), scale: 0.25 })).err).toBeUndefined();
-    expect(quickPicture).not.toHaveBeenCalled();
-  });
+  // the cases that reach the sandbox's limit: they all cross within the budget, every layer drawn
+  for (const [what, files, size, comp, props, blur] of [
+    ['a fast clip whose blur samples each fall in another picture', 1, [3840, 2160], [3840, 2160], { rate: 8 }, { samples: 16, shutter: 1 }],
+    ['ten 4K layers at once in a 4K film', 10, [3840, 2160], [3840, 2160], {}, { samples: 1, shutter: 0 }],
+    ['8K footage, three layers with blur', 3, [7680, 4320], [3840, 2160], {}, { samples: 8, shutter: 0.5 }],
+  ] as const) {
+    it(`exports ${what} without passing the sandbox's limit`, async () => {
+      const doc = newProject({ name: 'Heavy', width: comp[0], height: comp[1], fps: 24, duration: 30 }).doc;
+      doc.compositions[doc.root].motionBlur = { ...blur };
+      videoLayers(doc, files, { ...props, size: [comp[0], comp[1]] });
+      const { host, renderer, largest } = filesRig(doc, [size[0], size[1]]);
+      for (let f = 0; f < 3; f++) {
+        draws.length = 0;
+        const answer = await renderSandboxFrame(host, renderer, { compId: doc.root, t: 1 + f / 24, scale: 1, width: comp[0], height: comp[1] }, { export: true });
+        expect(answer.err).toBeUndefined();
+        expect(draws.length).toBeGreaterThanOrEqual(files);
+      }
+      expect(largest().bytes).toBeLessThanOrEqual(VIDEO_FRAME_BUDGET);
+    });
+  }
 
   it('gives a plugin node that computes an asset id the video frame it asks for', async () => {
     const doc = project();
@@ -290,6 +384,15 @@ describe('sandbox video rendering', () => {
   });
 
   it('draws a frame whose video cannot be decoded without it, rather than failing', async () => {
+    class BitmapSurface extends Surface {
+      initialized = false;
+      override getContext() { this.initialized = true; return super.getContext(); }
+    }
+    vi.stubGlobal('OffscreenCanvas', BitmapSurface);
+    vi.stubGlobal('createImageBitmap', async (source: unknown) => {
+      if (source instanceof BitmapSurface && source.width === 1 && !source.initialized) throw new Error('missing canvas context');
+      return { source };
+    });
     const doc = project();
     doc.assets.footage = { type: 'video', src: 'assets/footage.mp4' };
     doc.compositions[doc.root].layers.video = { type: 'video', props: { video: 'footage' } };

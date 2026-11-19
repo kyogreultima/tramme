@@ -8,6 +8,12 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+## [0.32.1] - 2026-11-19
+
+### Fixed
+
+- Sandboxed video exports send each decoded picture at its rendered size. When overlapping layers or motion-blur samples exceed the transfer budget, Tramme reduces the resolution of those pictures for that frame so the export can continue.
+
 ## [0.32.0] - 2026-11-19
 
 ### Added
@@ -1046,7 +1052,8 @@ First public release.
 
 - Cloudflare Worker serving the editor and the API, projects stored in R2, access protected by Cloudflare Access.
 
-[Unreleased]: ../../compare/v0.32.0...HEAD
+[Unreleased]: ../../compare/v0.32.1...HEAD
+[0.32.1]: ../../compare/v0.32.0...v0.32.1
 [0.32.0]: ../../compare/v0.31.0...v0.32.0
 [0.31.0]: ../../compare/v0.30.1...v0.31.0
 [0.30.1]: ../../compare/v0.30.0...v0.30.1

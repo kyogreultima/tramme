@@ -94,6 +94,12 @@ export interface VideoAsset {
   request(t: number, kind?: 'shown' | 'ahead' | 'side'): Promise<void>;
   /** a picture of `image` (one frameAt gave) at width x height, made quickly on the graphics card; null when it cannot: draw `image` itself */
   quickPicture?(image: CanvasImageSource, width: number, height: number): CanvasImageSource | null;
+  /**
+   * The size, in canvas pixels, the frame at t lands on: told before it is
+   * drawn (even while it is still missing). A host that carries the frames
+   * elsewhere (the plugins' sandbox) sends them no bigger than that.
+   */
+  drawnAt?(t: number, width: number, height: number): void;
 }
 
 /** what a node sees while it loads or draws */
