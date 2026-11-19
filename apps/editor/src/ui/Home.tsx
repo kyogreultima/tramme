@@ -37,7 +37,7 @@ import { prefs, settingsOpen } from '../settings.ts';
 import { GLASS_THEMES } from '../theme/pref.ts';
 import { downloadOf, update } from '../version.ts';
 import { tauri } from '../tauri.ts';
-import { inAccount } from '../bring.ts';
+import { bring, inAccount, moveHere } from '../bring.ts';
 import { IDEAS } from '../ideas.ts';
 import { t } from '../i18n/index.ts';
 import { go } from '../nav.ts';
@@ -177,6 +177,9 @@ function Failure({ error, onClose }: { error: ImportError | Error; onClose: () =
 function Card({ m, onMenu }: { m: Manifest; onMenu: (e: MouseEvent | { clientX: number; clientY: number }) => void }) {
   const [broken, setBroken] = useState(false);
   const inCloud = cloud || (tauri && inAccount(m));
+  // the desktop app, signed in: projects of two places side by side, each says where it lives
+  const twoPlaces = tauri && account.value.status === 'in';
+  const place = inCloud ? t('home.placeAccount') : t('home.placeHere');
   // every thumb sits in the same 16/10 box, whatever the film's format: the grid keeps
   // one row height (a vertical film fills it, cropped); the placeholder keeps the shape
   const vertical = (m.height ?? 9) > (m.width ?? 16);
@@ -188,10 +191,12 @@ function Card({ m, onMenu }: { m: Manifest; onMenu: (e: MouseEvent | { clientX: 
           ? <img src={`${api.fileUrl(m.id, m.thumbnail)}?v=${encodeURIComponent(m.modified)}`} alt="" loading="lazy" onError={() => setBroken(true)} />
           : <span class="frame" style={{ aspectRatio: `${m.width ?? 16} / ${m.height ?? 9}`, ...(vertical ? { width: 'auto', height: '62%' } : {}) }}><Icon name="film" /></span>}
       </div>
-      {inCloud && <span class="card-cloud" title={t('home.inYourAccount')} role="img" aria-label={t('home.inYourAccount')}><Icon name="cloud" /></span>}
+      {twoPlaces
+        ? <span class="card-cloud" title={place} role="img" aria-label={place}><Icon name={inCloud ? 'cloud' : 'folder'} /></span>
+        : inCloud && <span class="card-cloud" title={t('home.inYourAccount')} role="img" aria-label={t('home.inYourAccount')}><Icon name="cloud" /></span>}
       <div class="card-meta">
         <div class="card-name" title={m.name}>{m.name}</div>
-        <div class="card-sub">{[dims(m), ago(m.modified)].filter(Boolean).join(' · ')}</div>
+        <div class="card-sub">{[twoPlaces ? place : '', dims(m), ago(m.modified)].filter(Boolean).join(' · ')}</div>
       </div>
       <button class="icon-btn sm card-more" title={t('home.actions')} onClick={(e) => { e.stopPropagation(); onMenu(e); }}><Icon name="more" /></button>
     </div>
@@ -381,9 +386,29 @@ export function Home() {
         await saveBlob(await r.blob(), `${safeName(m.name)}.tramme`);
       } catch (x) { toast(t('home.couldNotExportError', { error: (x as Error).message }), 'error'); }
     } },
+    // the desktop app, signed in: a project moves between this computer and the account (bring.ts), it is never in both
+    ...(tauri && account.value.status === 'in' ? [{
+      label: inAccount(m) ? t('home.moveHere') : t('home.moveToAccount'), icon: inAccount(m) ? 'folder' : 'cloud',
+      onClick: () => void move(m),
+    }] : []),
     'sep',
     { label: t('common.delete'), icon: 'trash', danger: true, onClick: () => setDialog({ kind: 'remove', m }) },
   ]);
+  const move = async (m: Manifest) => {
+    setBusy({ label: t('home.moving', { name: m.name }), done: 0, total: 1 });
+    try {
+      if (inAccount(m)) {
+        await moveHere(m);
+        toast(t('home.movedHere', { name: m.name }));
+      } else {
+        const r = await bring([m], () => {});
+        if (r.failed.length) throw new Error(r.failed[0].error);
+        toast(t('home.moved', { name: m.name }));
+      }
+    } catch (x) { toast(t('home.couldNotMove', { name: m.name, error: (x as Error).message }), 'error', 9000); }
+    setBusy(null);
+    refresh();
+  };
 
   return (
     <div class={`home${drag ? ' dragging' : ''}`}

@@ -97,6 +97,12 @@ async function openProject(id: string) {
   lift();
   loadChats(info.files).catch((e) => console.warn('[tramme] conversations :', (e as Error).message)).finally(startProject);
   await preview.start();
+  // a video too heavy for this machine's preview: a proxy offered, once (proxy-offer.ts)
+  const opened = fileProject();
+  setTimeout(() => {
+    const base = new URL(S.docUrl.peek(), location.href);
+    void import('./proxy-offer.ts').then(({ offerProxies }) => offerProxies(opened, (asset) => new URL(S.doc.peek().assets[asset].src, base).href)).catch(() => {});
+  }, 2500);
   // the editor's tour, the first time a project opens
   setTimeout(() => offerTours('editor'), 700);
   hooks.afterSave = () => { thumbnail(); };

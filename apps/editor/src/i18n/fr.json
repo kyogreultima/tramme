@@ -267,7 +267,7 @@
     "download": "Télécharger le film",
     "failed": "L'export dans le cloud n'a pas abouti : {error}",
     "limit": "L'export au-delà du 1080p dans le cloud ne fait pas partie de votre offre.",
-    "accountOnly": "Dans le cloud : les projets de votre compte. Celui-ci est gardé sur cet appareil ; ajoutez-le à votre compte depuis votre espace pour l'y exporter."
+    "accountOnly": "Dans le cloud : les projets de votre compte. Celui-ci est sur cet ordinateur : déplacez-le dans votre compte depuis son menu sur l'accueil pour l'y exporter."
   },
   "market": {
     "title": "Découvrir",
@@ -333,6 +333,8 @@
     "revoked": "La version est révoquée : les copies installées se désactivent à leur prochaine vérification."
   },
   "gallery": {
+    "filmTooLarge": "Le film fait {size} Mo et la galerie en accepte {limit} au plus : exportez-le de nouveau en qualité rapide, ou plus court.",
+    "archiveTooLarge": "Le projet fait {size} Mo avec ses rushes, plus que les {limit} Mo que garde la galerie : le film est publié seul, et le projet reste le vôtre.",
     "title": "Publier dans la galerie",
     "publishButton": "Publier dans la galerie",
     "lead": "Ce film part dans la galerie avec une image prise en son milieu. Votre projet reste tel quel dans votre compte.",
@@ -809,6 +811,14 @@
     "replayEverythingAsThe": "Tout revoir comme la première fois"
   },
   "home": {
+    "placeHere": "Sur cet ordinateur",
+    "placeAccount": "Dans votre compte",
+    "moveToAccount": "Déplacer dans votre compte",
+    "moveHere": "Déplacer sur cet ordinateur",
+    "moving": "Déplacement de {name}…",
+    "moved": "{name} est maintenant dans votre compte.",
+    "movedHere": "{name} est maintenant sur cet ordinateur.",
+    "couldNotMove": "{name} reste où il était : {error}",
     "installApp": "Installer l'app",
     "installAppHint": "Tramme dans sa propre fenêtre, depuis l'écran d'accueil ou les applications de l'ordinateur",
     "landscape": "Paysage",
@@ -1028,6 +1038,7 @@
     "component": "composant",
     "proxyTitle": "Créer un proxy ?",
     "proxyText": "{name} se décode à {fps} images par seconde sur cet ordinateur et se lit à {need} : l'aperçu saccaderait. Une copie allégée (540 lignes) se lit à sa place pendant le montage ; les exports gardent l'original.",
+    "proxyOversized": "{name} fait {lines} lignes pour un film de {film} : chaque image est décodée à quatre fois ce que l'aperçu affiche, et l'aperçu saccade là où les plans se superposent. Une copie à {film} lignes se lit à sa place pendant le montage ; les exports gardent l'original.",
     "makeProxy": "Créer un proxy",
     "luts": "LUT",
     "text": "Texte",
@@ -3704,20 +3715,23 @@
     },
     "bring": {
       "title": "Projets gardés ici",
-      "lead": "Projets faits ici avant votre connexion : {count}. Ajoutez-les à votre compte pour les retrouver partout où vous vous connectez.",
-      "kept": "La copie locale reste ici. Ses changements ne sont pas synchronisés automatiquement avec celle du compte.",
+      "lead": "Projets faits ici avant votre connexion : {count}. Déplacez-les dans votre compte pour les retrouver partout où vous vous connectez.",
+      "kept": "Chaque projet est déplacé : une fois sa copie dans votre compte vérifiée fichier par fichier, il quitte cet endroit. Ses exports le suivent.",
       "later": "Plus tard",
-      "submit": "Ajouter {count}",
+      "submit": "Déplacer {count}",
       "at": "{done} sur {total} : {name}",
-      "done": "Projets ajoutés à votre compte : {count}.",
-      "already": "Ces projets sont déjà dans votre compte ; aucune nouvelle copie n'a été créée.",
-      "failed": "Ces projets n'ont pas pu être ajoutés : {names}",
+      "done": "Projets déplacés dans votre compte : {count}.",
+      "already": "Ces projets étaient déjà dans votre compte : les copies d'ici sont retirées.",
+      "failed": "Ces projets restent ici : {names}",
       "none": "Aucun projet n'est gardé ici en dehors de ceux de votre compte.",
       "row": "Projets gardés ici",
-      "rowHint": "Les projets faits dans ce navigateur ou sur cet ordinateur, copiés dans votre compte.",
-      "button": "Les ajouter",
-      "busy": "Un ajout à votre compte est en cours ; ceux-ci pourront suivre une fois terminé.",
-      "retry": "Réessayer"
+      "rowHint": "Les projets créés dans ce navigateur ou sur cet ordinateur, à déplacer dans votre compte.",
+      "button": "Les déplacer",
+      "busy": "Un déplacement vers votre compte est en cours ; ceux-ci pourront suivre une fois terminé.",
+      "retry": "Réessayer",
+      "differs": "Votre compte garde une copie plus ancienne de ce projet, et les deux diffèrent : ouvrez les deux, gardez la bonne, puis supprimez l'autre.",
+      "notWhole": "La copie dans votre compte est incomplète, le projet reste donc ici. Relancez le déplacement.",
+      "incomplete": "Une copie précédente dans votre compte s'est arrêtée en route : supprimez-la de votre compte, puis déplacez ce projet de nouveau."
     },
     "signedInAs": "Connecté en tant que {email}",
     "projects": "Projets",

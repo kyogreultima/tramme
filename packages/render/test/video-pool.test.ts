@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ReaderPool, type PoolFrame } from '../src/video-pool.ts';
+import { KEEP, MAX_READERS, ReaderPool, type PoolFrame } from '../src/video-pool.ts';
 
 const FPS = 30, LENGTH = 20;
 
@@ -9,7 +9,7 @@ function fakeFile() {
   const newReader = () => async function* (t: number): AsyncGenerator<PoolFrame<string>, void, unknown> {
     for (let i = Math.floor(t * FPS + 1e-9); i < LENGTH * FPS; i++) {
       stats.decoded++;
-      yield { timestamp: i / FPS, duration: 1 / FPS, canvas: `frame ${i}` };
+      yield { timestamp: i / FPS, duration: 1 / FPS, picture: `frame ${i}` };
     }
   };
   return { newReader, stats };
@@ -18,7 +18,7 @@ function fakeFile() {
 /** the picture a layer gets at t, decoded if it has to be */
 async function show(pool: ReaderPool<PoolFrame<string>>, t: number) {
   await pool.read(t);
-  return pool.find(t)?.canvas;
+  return pool.find(t)?.picture;
 }
 
 describe('the readers of one video file', () => {
@@ -62,8 +62,8 @@ describe('the readers of one video file', () => {
     expect(await show(pool, 14)).toBe('frame 420'); // a fourth moment: the reader at 1 s goes
     expect(pool.size).toBe(3);
     expect(pool.find(1)).toBeUndefined();
-    expect(pool.find(5 + 1 / FPS)?.canvas).toBe('frame 151');
-    expect(pool.find(9 + 1 / FPS)?.canvas).toBe('frame 271');
+    expect(pool.find(5 + 1 / FPS)?.picture).toBe('frame 151');
+    expect(pool.find(9 + 1 / FPS)?.picture).toBe('frame 271');
   });
 
   it('keep a reader’s frames when another reads elsewhere (a step back on one layer)', async () => {
@@ -88,13 +88,33 @@ describe('the readers of one video file', () => {
     const pool = new ReaderPool(newReader);
     await show(pool, 3);
     await show(pool, 10);
-    expect(pool.nearest(3.5)?.canvas).toBe('frame 90');
-    expect(pool.nearest(9)?.canvas).toBe('frame 300');
+    expect(pool.nearest(3.5)?.picture).toBe('frame 90');
+    expect(pool.nearest(9)?.picture).toBe('frame 300');
   });
 
   it('stop at the end of the file without a frame past it', async () => {
     const { newReader } = fakeFile();
     const pool = new ReaderPool(newReader);
     expect(await show(pool, LENGTH + 1)).toBeUndefined();
+  });
+
+  it('hands each frame it lets go to drop once, and keeps the ones it holds open', async () => {
+    const { newReader } = fakeFile();
+    const dropped: string[] = [];
+    const pool = new ReaderPool(newReader, MAX_READERS, (f) => dropped.push(f.picture));
+    // playing forward: past KEEP frames, the oldest go
+    for (let k = 0; k < KEEP + 4; k++) await show(pool, 1 + k / FPS);
+    expect(dropped).toEqual(['frame 30', 'frame 31', 'frame 32', 'frame 33']);
+    // one decoder for it all: a time on the end of the last frame (1 + k/30 in floating point) continues it
+    expect(pool.opened).toBe(1);
+    // what is kept is never dropped
+    for (let k = 4; k < KEEP + 4; k++) expect(pool.find(1 + k / FPS)?.picture).toBe(`frame ${30 + k}`);
+    // more places than readers: the least used starts over and its frames go
+    await show(pool, 5); await show(pool, 10); await show(pool, 15);
+    expect(dropped).toContain(`frame ${30 + KEEP + 3}`);
+    // closing: everything still held goes, each frame once
+    pool.dispose();
+    expect(new Set(dropped).size).toBe(dropped.length);
+    expect(dropped).toContain('frame 450');
   });
 });

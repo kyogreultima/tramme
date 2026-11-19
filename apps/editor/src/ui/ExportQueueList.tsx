@@ -4,6 +4,7 @@
 import { exportQueue, queueVersion } from '../export-queue.ts';
 import { saveBlob, saveLabel } from '../download.ts';
 import { t } from '../i18n/index.ts';
+import { plainRenderMessage } from '../render-message.ts';
 import { Icon } from './icons.tsx';
 
 export function ExportQueueList() {
@@ -20,9 +21,11 @@ export function ExportQueueList() {
           {j.status === 'running' && <div class="progress"><i style={{ width: `${Math.round((j.progress ?? 0) * 100)}%` }} /></div>}
           {j.status === 'waiting' && <span class="faint">{t('topbar.queueWaiting')}</span>}
           {j.status === 'cancelled' && <span class="faint">{t('topbar.queueCancelled')}</span>}
-          {j.status === 'error' && <span class="err" title={j.error}>{t('topbar.queueFailed')}</span>}
+          {j.status === 'error' && <span class="err">{t('topbar.queueFailed')}</span>}
           {j.status === 'done' && j.result && <button class="btn sm" onClick={() => void saveBlob(j.result!.blob, j.result!.name)}><Icon name="download" />{saveLabel()}</button>}
           {(j.status === 'waiting' || j.status === 'running') && <button class="icon-btn xs" title={t('topbar.cancelExport')} onClick={() => exportQueue.cancel(j.id)}><Icon name="x" /></button>}
+          {/* why it failed, in a sentence under its name; the engine's own words stay in the tooltip */}
+          {j.status === 'error' && j.error && <div class="why" title={j.error}>{plainRenderMessage(j.error)}</div>}
         </div>
       ))}
     </div>

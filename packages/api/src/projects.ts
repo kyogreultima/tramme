@@ -193,10 +193,25 @@ export async function exportProject(bucket: Bucket, id: string) {
         const path = o.key.slice(key(id).length);
         const obj = await bucket.get(o.key);
         if (!obj) continue;
-        // media are already compressed: store them as they are
-        const file = /\.(png|jpe?g|webp|gif|avif|mp3|ogg|m4a|mp4|webm|mov|woff2?)$/i.test(path) ? new ZipPassThrough(path) : new ZipWholeDeflate(path);
-        zip.add(file);
-        file.push(new Uint8Array(await obj.arrayBuffer()), true);
+        // media are already compressed: stored as they are, and streamed piece by piece, so a
+        // video larger than the Worker's memory (128 MB) never has to be held whole
+        if (/\.(png|jpe?g|webp|gif|avif|mp3|ogg|m4a|mp4|webm|mov|woff2?)$/i.test(path)) {
+          const file = new ZipPassThrough(path);
+          zip.add(file);
+          const reader = (obj.body as ReadableStream<Uint8Array>).getReader();
+          for (;;) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            file.push(value, false);
+            if (failed) throw failed;
+            await flush();
+          }
+          file.push(new Uint8Array(0), true);
+        } else {
+          const file = new ZipWholeDeflate(path);
+          zip.add(file);
+          file.push(new Uint8Array(await obj.arrayBuffer()), true);
+        }
         if (failed) throw failed;
         await flush();
       }

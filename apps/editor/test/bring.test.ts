@@ -13,7 +13,7 @@ vi.mock('../src/importer.ts', () => ({
   }),
 }));
 
-const { bring, localProjects, markOffered, wasOffered } = await import('../src/bring.ts');
+const { bring, localProjects, markOffered, missingFiles, wasOffered } = await import('../src/bring.ts');
 const { api, ApiError } = await import('../src/api.ts');
 const { importArchive } = await import('../src/importer.ts');
 
@@ -26,6 +26,15 @@ async function made(name: string) {
 
 afterEach(() => { imported.length = 0; });
 
+/** what a whole copy in the account holds: a project made here has its manifest and its document */
+const whole = [{ path: 'tramme.json', size: 1, etag: '', modified: '' }, { path: DOCUMENT, size: 1, etag: '', modified: '' }];
+/** whether this browser still stores a project (localProjects hides one the account holds whole) */
+const kept = async (id: string) => {
+  const url = new URL('http://local/api/projects');
+  const list = (await (await storageRoute(new Request(url), recordBucket(idbRecords()), url))!.json()) as { id: string }[];
+  return list.some((p) => p.id === id);
+};
+
 describe('bringing this browser\'s projects into the account', () => {
   it('lists the projects kept in this browser', async () => {
     await made('First');
@@ -33,18 +42,54 @@ describe('bringing this browser\'s projects into the account', () => {
     expect((await localProjects()).map((p) => p.name).sort()).toEqual(['First', 'Second']);
   });
 
-  it('brings each chosen one through its archive, goes on after a failure, and keeps the local copies', async () => {
+  it('moves each chosen one through its archive, goes on after a failure, and removes here only what is in the account', async () => {
     const remote = vi.spyOn(api, 'list').mockResolvedValue([]);
+    const info = vi.spyOn(api, 'info').mockImplementation(async (id) => ({ manifest: { id } as never, files: whole }));
     const list = await localProjects();
     const steps: number[] = [];
-    const r = await bring(list, (done) => steps.push(done));
-    expect(imported).toHaveLength(2);
-    expect(imported.every((b) => b.size > 0)).toBe(true);
-    expect(r.brought).toHaveLength(1);
-    expect(r.failed.map((f) => f.error)).toEqual(['quota']);
-    expect(steps).toEqual([0, 1, 2]);
-    expect(await localProjects()).toHaveLength(2);
-    remote.mockRestore();
+    try {
+      const r = await bring(list, (done) => steps.push(done));
+      expect(imported).toHaveLength(2);
+      expect(imported.every((b) => b.size > 0)).toBe(true);
+      expect(r.brought).toHaveLength(1);
+      expect(r.failed.map((f) => f.error)).toEqual(['quota']);
+      expect(steps).toEqual([0, 1, 2]);
+      // the one in the account left here; the one that failed stays
+      expect(await localProjects()).toHaveLength(1);
+      expect((await localProjects())[0].id).toBe(r.failed[0].id);
+    } finally { remote.mockRestore(); info.mockRestore(); }
+  });
+
+  it('keeps a project here when its copy in the account lacks a file', async () => {
+    const source = await made('Half copied');
+    const local = (await localProjects()).find((p) => p.id === source.id)!;
+    const remote = vi.spyOn(api, 'list').mockResolvedValue([]);
+    const info = vi.spyOn(api, 'info').mockResolvedValue({ manifest: local, files: [whole[1]] });
+    try {
+      const r = await bring([local], () => {});
+      expect(r.failed.map((f) => f.id)).toEqual([local.id]);
+      expect(await kept(local.id)).toBe(true);
+    } finally { remote.mockRestore(); info.mockRestore(); }
+  });
+
+  it('keeps a project here when the account holds an older copy whose document differs', async () => {
+    const source = await made('Edited since');
+    const local = (await localProjects()).find((p) => p.id === source.id)!;
+    const remote = vi.spyOn(api, 'list').mockResolvedValue([{ ...local }]);
+    const info = vi.spyOn(api, 'info').mockResolvedValue({ manifest: local, files: whole });
+    const read = vi.spyOn(api, 'readText').mockResolvedValue({ text: '{"older":true}', etag: '' });
+    try {
+      const r = await bring([local], () => {});
+      expect(imported).toHaveLength(0);
+      expect(r.failed.map((f) => f.id)).toEqual([local.id]);
+      expect(await kept(local.id)).toBe(true);
+    } finally { remote.mockRestore(); info.mockRestore(); read.mockRestore(); }
+  });
+
+  it('finds what a copy lacks: a file, or one of another size; the manifest and the document only by presence', () => {
+    const from = [{ path: 'tramme.json', size: 10 }, { path: DOCUMENT, size: 50 }, { path: 'assets/a.mp4', size: 100 }, { path: 'renders/f.mp4', size: 7 }];
+    expect(missingFiles(from, [{ path: 'tramme.json', size: 11 }, { path: DOCUMENT, size: 52 }, { path: 'assets/a.mp4', size: 100 }, { path: 'renders/f.mp4', size: 7 }])).toEqual([]);
+    expect(missingFiles(from, [{ path: 'tramme.json', size: 10 }, { path: DOCUMENT, size: 50 }, { path: 'assets/a.mp4', size: 99 }])).toEqual(['assets/a.mp4', 'renders/f.mp4']);
   });
 
   it('is offered once per person in this browser', () => {
@@ -56,22 +101,21 @@ describe('bringing this browser\'s projects into the account', () => {
     expect(wasOffered('u2')).toBe(false);
   });
 
-  it('does not copy a project again when its cloud copy already has the same origin', async () => {
+  it('does not copy a project again when its cloud copy already has the same origin, and removes it here', async () => {
     const source = await made('One local film');
     const local = (await localProjects()).find((p) => p.id === source.id)!;
-    const list = vi.spyOn(api, 'list').mockResolvedValueOnce([]).mockResolvedValueOnce([
-      { ...local, id: 'older-cloud-copy' },
-    ]);
+    const list = vi.spyOn(api, 'list').mockResolvedValue([{ ...local, id: 'older-cloud-copy' }]);
+    const info = vi.spyOn(api, 'info').mockResolvedValue({ manifest: local, files: whole });
     const url = new URL(`http://local/api/projects/${local.id}/files/${DOCUMENT}`);
     const original = await storageRoute(new Request(url), recordBucket(idbRecords()), url);
     const document = await original!.text();
     const read = vi.spyOn(api, 'readText').mockResolvedValue({ text: document, etag: '' });
     try {
-      await bring([local], () => {});
       const repeated = await bring([local], () => {});
-      expect(imported).toHaveLength(1);
+      expect(imported).toHaveLength(0);
       expect(repeated.skipped.map((p) => p.id)).toEqual([local.id]);
-    } finally { list.mockRestore(); read.mockRestore(); }
+      expect(await kept(local.id)).toBe(false);
+    } finally { list.mockRestore(); read.mockRestore(); info.mockRestore(); }
   });
 
   it('does not confuse two projects sharing a name and creation date when their documents differ', async () => {
@@ -79,11 +123,12 @@ describe('bringing this browser\'s projects into the account', () => {
     const local = (await localProjects()).find((p) => p.id === source.id)!;
     const list = vi.spyOn(api, 'list').mockResolvedValue([{ ...local, id: 'another-film' }]);
     const read = vi.spyOn(api, 'readText').mockResolvedValue({ text: '{"different":true}', etag: '' });
+    const info = vi.spyOn(api, 'info').mockResolvedValue({ manifest: local, files: whole });
     try {
       const result = await bring([local], () => {});
       expect(result.skipped).toHaveLength(0);
       expect(result.brought).toHaveLength(1);
-    } finally { list.mockRestore(); read.mockRestore(); }
+    } finally { list.mockRestore(); read.mockRestore(); info.mockRestore(); }
   });
 
   it('hides a local copy only after the matching account project has its document', async () => {
@@ -105,12 +150,15 @@ describe('bringing this browser\'s projects into the account', () => {
     const source = await made('Two windows');
     const local = (await localProjects()).find((p) => p.id === source.id)!;
     const list = vi.spyOn(api, 'list').mockResolvedValueOnce([]).mockResolvedValueOnce([{ ...local }]);
-    const info = vi.spyOn(api, 'info').mockResolvedValue({ manifest: local, files: [{ path: DOCUMENT, size: 1, etag: '', modified: '' }] });
+    const info = vi.spyOn(api, 'info').mockResolvedValue({ manifest: local, files: whole });
     vi.mocked(importArchive).mockRejectedValueOnce(new ApiError(409, 'project already exists'));
+    const url = new URL(`http://local/api/projects/${local.id}/files/${DOCUMENT}`);
+    const document = await (await storageRoute(new Request(url), recordBucket(idbRecords()), url))!.text();
+    const read = vi.spyOn(api, 'readText').mockResolvedValue({ text: document, etag: '' });
     try {
       const result = await bring([local], () => {});
       expect(result.skipped.map((p) => p.id)).toEqual([local.id]);
       expect(result.failed).toHaveLength(0);
-    } finally { list.mockRestore(); info.mockRestore(); }
+    } finally { list.mockRestore(); info.mockRestore(); read.mockRestore(); }
   });
 });

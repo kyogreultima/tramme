@@ -1,6 +1,6 @@
 export { AssetStore } from './assets.ts';
 export { audioEffectChain, clipChain, encodeWav, liveMaster, MIX_RATE, masterGainDb, mixBus, mixComposition, mixTracks, playClip, renderSynth, seeded, SYNTH_MAX, VOICE_EFFECTS, type MixOptions, type SynthKit } from './audio.ts';
-export { probeVideo, VideoFrames } from './video.ts';
+export { fetchVideoRange, probeVideo, VideoFrames } from './video.ts';
 export { CanvasPool, drawComposed, drawFrame, drawLayers, localMatrix, type DrawEnv, type HostFactory } from './canvas2d.ts';
 export { Compositor, type Finish, type Look } from './compositor.ts';
 export { addParts, bottleneck, CAUSE, formatParts, noParts, PARTS, perFrame, type FrameParts } from './timing.ts';

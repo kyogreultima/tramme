@@ -24,7 +24,6 @@ import { api } from '../api.ts';
 import { fromLottie } from '@tramme/interop';
 import { mediaOf, TranscribeButton, transcribeItem } from './Transcribe.tsx';
 import { fileProject, requireFileProject, sameFileProject, safeName, takenPaths, upload, type FileProject } from '../files.ts';
-import { askUser } from '../confirm.ts';
 import { assetWithHash, contentHash } from '../hash.ts';
 import { m, t, tr } from '../i18n/index.ts';
 import { listCommands } from '../ai/commands.ts';
@@ -567,21 +566,8 @@ export async function importFiles(files: FileList | File[]) {
   // a video this machine decodes slower than it plays: a proxy offered (measured on a second of it)
   for (const o of ops) {
     const a = o.value as Asset, f = Array.from(files).find((x) => x.name.replace(/\.[^.]+$/, '') === a.name);
-    if (a.type === 'video' && f) void offerProxy(o.path.split('/').pop()!, f, project);
+    if (a.type === 'video' && f) void import('../proxy-offer.ts').then(({ offerProxy }) => offerProxy(project, o.path.split('/').pop()!, f, f.name));
   }
-}
-
-async function offerProxy(id: string, file: File, project: FileProject) {
-  const { decodeRate, playsPoorly, proxySize } = await import('../proxy.ts');
-  const rate = await decodeRate(file).catch(() => null);
-  if (!sameFileProject(project)) return;
-  if (!rate || !proxySize(rate.width, rate.height) || !playsPoorly(rate.fps, rate.fileFps)) return;
-  if (!(await askUser(t('panel.proxyTitle'), t('panel.proxyText', { name: file.name, fps: Math.round(rate.fps), need: Math.round(rate.fileFps) }), t('panel.makeProxy')))) return;
-  if (!sameFileProject(project)) return;
-  const { listCommands } = await import('../ai/commands.ts'), { runCommand } = await import('../ai/conversation.ts');
-  if (!sameFileProject(project)) return;
-  const cmd = listCommands(S.registry.peek()).find((c) => c.name === 'proxy');
-  if (cmd) await runCommand(cmd, { video: id });
 }
 
 function Compositions() {

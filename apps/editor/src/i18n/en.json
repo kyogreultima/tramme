@@ -267,7 +267,7 @@
     "download": "Download the film",
     "failed": "The export in the cloud did not finish: {error}",
     "limit": "Exporting above 1080p in the cloud is not part of your plan.",
-    "accountOnly": "In the cloud: the projects of your account. This one is kept on this device; bring it into your account from your space to export it there."
+    "accountOnly": "In the cloud: the projects of your account. This one is on this computer: move it into your account from its menu on the home page to export it there."
   },
   "market": {
     "title": "Discover",
@@ -333,6 +333,8 @@
     "revoked": "The version is revoked: the installed copies turn off at their next check."
   },
   "gallery": {
+    "filmTooLarge": "The film is {size} MB and the gallery takes {limit} MB at most: export it again in the fast quality, or shorter.",
+    "archiveTooLarge": "The project is {size} MB with its footage, more than the {limit} MB the gallery keeps: the film is published alone, and the project stays yours to open.",
     "title": "Publish in the gallery",
     "publishButton": "Publish in the gallery",
     "lead": "This film goes to the gallery with a still taken in its middle. Your project in your account stays as it is.",
@@ -809,6 +811,14 @@
     "replayEverythingAsThe": "Replay everything as the first time"
   },
   "home": {
+    "placeHere": "On this computer",
+    "placeAccount": "In your account",
+    "moveToAccount": "Move to your account",
+    "moveHere": "Move to this computer",
+    "moving": "Moving {name}…",
+    "moved": "{name} is now in your account.",
+    "movedHere": "{name} is now on this computer.",
+    "couldNotMove": "{name} stays where it was: {error}",
     "installApp": "Install the app",
     "installAppHint": "Tramme in its own window, from your home screen or your computer's apps",
     "landscape": "Landscape",
@@ -1028,6 +1038,7 @@
     "component": "component",
     "proxyTitle": "Make a proxy?",
     "proxyText": "{name} decodes at {fps} frames a second on this computer and plays at {need}: the preview would stutter. A lighter copy (540 lines) plays instead while you edit; the exports keep the original.",
+    "proxyOversized": "{name} has {lines} lines for a film of {film}: each frame is decoded at four times what the preview shows, and the preview stutters where shots overlap. A copy at {film} lines plays instead while you edit; the exports keep the original.",
     "makeProxy": "Make a proxy",
     "luts": "LUTs",
     "text": "Text",
@@ -2312,20 +2323,23 @@
     },
     "bring": {
       "title": "Projects kept here",
-      "lead": "Projects made here before you signed in: {count}. Bring them into your account to find them everywhere you sign in.",
-      "kept": "The local copy stays here. Changes to it are not synced automatically with the account copy.",
+      "lead": "Projects made here before you signed in: {count}. Move them into your account to find them everywhere you sign in.",
+      "kept": "Each project moves: once its copy in your account is checked file by file, it leaves here. Its exports go with it.",
       "later": "Not now",
-      "submit": "Bring {count}",
+      "submit": "Move {count}",
       "at": "{done} of {total}: {name}",
-      "done": "Projects brought into your account: {count}.",
-      "already": "These projects are already in your account; no new copies were made.",
-      "failed": "These projects could not be brought: {names}",
+      "done": "Projects moved into your account: {count}.",
+      "already": "These projects were already in your account: the copies here are removed.",
+      "failed": "These projects stay here: {names}",
       "none": "No project is kept here apart from your account's.",
       "row": "Projects kept here",
-      "rowHint": "The projects made in this browser or on this computer, copied into your account.",
-      "button": "Bring them",
-      "busy": "A copy into your account is under way; these can go once it is over.",
-      "retry": "Try again"
+      "rowHint": "The projects made in this browser or on this computer, to move into your account.",
+      "button": "Move them",
+      "busy": "A move into your account is under way; these can go once it is over.",
+      "retry": "Try again",
+      "differs": "Your account holds an older copy of this project, and the two differ: open both, keep the right one, then delete the other.",
+      "notWhole": "The copy in your account came out incomplete, so the project stays here. Try the move again.",
+      "incomplete": "An earlier copy in your account stopped halfway: delete it from your account, then move this project again."
     },
     "signedInAs": "Signed in as {email}",
     "projects": "Projects",

@@ -4,10 +4,11 @@
 // read forward instead of making one decoder seek back and forth every frame.
 // Bounded: past MAX_READERS, the least recently used reader starts over where
 // it is asked. A frame decoded by one reader serves every layer asking for
-// that moment.
+// that moment. A frame no reader keeps any more is handed to `drop` (a
+// decoder's frame is closed there, or the decoder runs out of them).
 
 /** a decoded frame: its time span in the file and its picture */
-export interface PoolFrame<P = unknown> { timestamp: number; duration: number; canvas: P }
+export interface PoolFrame<P = unknown> { timestamp: number; duration: number; picture: P }
 
 /** a reader's decoder, opened at t and yielding frames in order from there */
 export type OpenAt<F extends PoolFrame> = (t: number) => AsyncGenerator<F, void, unknown>;
@@ -37,11 +38,13 @@ export class ReaderPool<F extends PoolFrame> {
 
   private newReader: () => OpenAt<F>;
   private max: number;
+  private drop: (f: F) => void;
 
   /** newReader makes a reader's decoder: its own, so its kept frames are never overwritten by another's */
-  constructor(newReader: () => OpenAt<F>, max = MAX_READERS) {
+  constructor(newReader: () => OpenAt<F>, max = MAX_READERS, drop: (f: F) => void = () => {}) {
     this.newReader = newReader;
     this.max = max;
+    this.drop = drop;
   }
 
   /** the frame shown at t, if a reader has it */
@@ -61,9 +64,15 @@ export class ReaderPool<F extends PoolFrame> {
   }
 
   private keep(r: Reader<F>, f: F) {
+    for (const x of r.frames) if (x.timestamp === f.timestamp) this.drop(x);
     r.frames = [...r.frames.filter((x) => x.timestamp !== f.timestamp), f];
-    if (r.frames.length > KEEP) r.frames.shift();
+    if (r.frames.length > KEEP) this.drop(r.frames.shift()!);
     r.at = f.timestamp + f.duration;
+  }
+
+  private forget(r: Reader<F>) {
+    for (const f of r.frames) this.drop(f);
+    r.frames = [];
   }
 
   /** decodes up to the frame shown at t: forward on the reader just behind it, else a new read there */
@@ -71,7 +80,8 @@ export class ReaderPool<F extends PoolFrame> {
     if (this.find(t)) return;
     // the reader that continues best: just behind t
     let best: Reader<F> | undefined;
-    for (const r of this.readers) if (r.it && t >= r.at && t - r.at < AHEAD && (!best || r.at > best.at)) best = r;
+    // with find's tolerance: a time that lands on the end of the last frame (1/30 added in floating point) continues that reader rather than opening another there
+    for (const r of this.readers) if (r.it && t + 1e-6 >= r.at && t - r.at < AHEAD && (!best || r.at > best.at)) best = r;
     if (best) {
       best.used = ++this.clock;
       for (;;) {
@@ -90,7 +100,7 @@ export class ReaderPool<F extends PoolFrame> {
     } else {
       r = this.readers.reduce((a, b) => (b.used < a.used ? b : a));
       await r.it?.return(undefined);
-      r.frames = [];
+      this.forget(r);
     }
     r.used = ++this.clock;
     r.it = r.openAt(t);
@@ -104,7 +114,7 @@ export class ReaderPool<F extends PoolFrame> {
   get size() { return this.readers.length; }
 
   dispose() {
-    for (const r of this.readers) r.it?.return(undefined);
+    for (const r of this.readers) { r.it?.return(undefined); this.forget(r); }
     this.readers = [];
   }
 }

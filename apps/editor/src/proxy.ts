@@ -5,7 +5,8 @@
 // import when the machine decodes the file too slowly to play it (measured).
 
 import { ALL_FORMATS, BlobSource, BufferTarget, CanvasSink, CanvasSource, getFirstEncodableVideoCodec, Input, Mp4OutputFormat, Output, Quality, UrlSource } from 'mediabunny';
-import { pointer, type ToolType } from '@tramme/core';
+import { pointer, type ToolType, type TrammeDoc } from '@tramme/core';
+import { fetchVideoRange } from '@tramme/render';
 import { AVC_FROM_STREAM } from './avc.ts';
 import { canvas } from './perception.ts';
 import { t } from './i18n/index.ts';
@@ -60,10 +61,11 @@ export async function encodeProxy(url: string, height: number, signal: AbortSign
 /**
  * How fast this machine decodes a file, in frames a second, from a second of
  * it at its own size: a file that decodes slower than it plays stutters, and
- * a proxy is worth offering.
+ * a proxy is worth offering. The file itself (an import) or its address (a
+ * project's video, read in ranges).
  */
-export async function decodeRate(file: Blob, seconds = 1): Promise<{ fps: number; decoded: number; width: number; height: number; fileFps: number } | null> {
-  const input = new Input({ source: new BlobSource(file), formats: ALL_FORMATS });
+export async function decodeRate(file: Blob | string, seconds = 1): Promise<{ fps: number; decoded: number; width: number; height: number; fileFps: number } | null> {
+  const input = new Input({ source: typeof file === 'string' ? new UrlSource(file, { fetchFn: fetchVideoRange }) : new BlobSource(file), formats: ALL_FORMATS });
   try {
     const track = await input.getPrimaryVideoTrack();
     if (!track || !(await track.canDecode())) return null;
@@ -78,6 +80,25 @@ export async function decodeRate(file: Blob, seconds = 1): Promise<{ fps: number
 
 /** whether a file plays poorly here: it decodes slower than 1.2 times its own frame rate */
 export const playsPoorly = (decodeFps: number, fileFps: number) => decodeFps < fileFps * 1.2;
+
+/** how `asset` is shown: the most layers showing it at the same moment, and the height of the tallest composition showing it (0: none) */
+export function readsOf(doc: TrammeDoc, asset: string): { reads: number; filmHeight: number } {
+  let reads = 0, filmHeight = 0;
+  for (const c of Object.values(doc.compositions)) {
+    const spans = Object.values(c.layers)
+      .filter((l) => l.type === 'video' && l.visible !== false && l.props?.video === asset)
+      .map((l) => [l.in ?? 0, l.out ?? c.duration] as const)
+      .filter(([a, b]) => b > a);
+    if (!spans.length) continue;
+    filmHeight = Math.max(filmHeight, c.height);
+    // the moments where a span starts: the count there is the count of every span that holds it
+    for (const [at] of spans) reads = Math.max(reads, spans.filter(([a, b]) => a <= at && at < b).length);
+  }
+  return { reads, filmHeight };
+}
+
+/** a video this tall is oversized for a film this tall: twice its lines or more */
+export const oversized = (videoHeight: number, filmHeight: number) => filmHeight > 0 && videoHeight >= filmHeight * 2;
 
 interface ProxyArgs { video?: string; height?: number }
 

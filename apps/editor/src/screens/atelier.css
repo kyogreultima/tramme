@@ -391,7 +391,8 @@
 .export-saves { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .export-queue { display: flex; flex-direction: column; gap: 4px; padding-top: 6px; border-top: 1px solid var(--line-soft); font-size: var(--fs-xs); }
 .export-queue-head { display: flex; align-items: center; justify-content: space-between; color: var(--text-3); }
-.export-job { display: flex; align-items: center; gap: 8px; color: var(--text-2); }
+.export-job { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: var(--text-2); }
+.export-job .why { flex-basis: 100%; font-size: 11px; color: var(--danger); overflow-wrap: anywhere; user-select: text; }
 .export-job .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .export-job .progress { width: 80px; }
 .export-job .err { color: var(--danger); }

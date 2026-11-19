@@ -1,5 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { fetchVideoRange } from '../src/video.ts';
+import { RANGE_PIECE } from '../src/video-cache.ts';
 
 afterEach(() => vi.unstubAllGlobals());
 const read = fetchVideoRange;
@@ -15,7 +16,7 @@ it('finishes a bounded video transfer before exposing its body to a paused decod
     return new Response(body, { status: 206, headers: { 'content-range': 'bytes 1024-1026/373179626' } });
   });
   const response = await read('https://tramme.test/video.mp4', { headers: { range: 'bytes=1024-' }, signal });
-  expect(range).toBe('bytes=1024-263167');
+  expect(range).toBe(`bytes=1024-${1024 + RANGE_PIECE - 1}`);
   expect(receivedSignal).toBe(signal);
   expect(finished).toBe(true);
   expect(response.headers.get('content-range')).toBe('bytes 1024-1026/373179626');
@@ -37,6 +38,6 @@ it('falls back to the original request when the server hides the total range siz
     return ranges.length === 1 ? new Response('part', { status: 206 }) : new Response('whole file', { status: 200 });
   });
   const response = await read('https://tramme.test/video.mp4', { headers: { range: 'bytes=0-' } });
-  expect(ranges).toEqual(['bytes=0-262143', 'bytes=0-']);
+  expect(ranges).toEqual([`bytes=0-${RANGE_PIECE - 1}`, 'bytes=0-']);
   expect(await response.text()).toBe('whole file');
 });
