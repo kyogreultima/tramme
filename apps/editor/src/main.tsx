@@ -101,7 +101,7 @@ async function openProject(id: string) {
   const opened = fileProject();
   setTimeout(() => {
     const base = new URL(S.docUrl.peek(), location.href);
-    void import('./proxy-offer.ts').then(({ offerProxies }) => offerProxies(opened, (asset) => new URL(S.doc.peek().assets[asset].src, base).href)).catch(() => {});
+    void import('./proxy-auto.ts').then(({ proxiesIfSlow }) => proxiesIfSlow(opened, (asset) => new URL(S.doc.peek().assets[asset].src, base).href)).catch(() => {});
   }, 2500);
   // the editor's tour, the first time a project opens
   setTimeout(() => offerTours('editor'), 700);

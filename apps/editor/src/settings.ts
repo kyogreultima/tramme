@@ -53,6 +53,8 @@ export interface Preferences {
   previewMuted: boolean;
   /** the preview plays a video's proxy when it has one (the exports always read the original) */
   proxies: boolean;
+  /** while nothing moves, the preview draws ahead the passages too heavy to play live, then plays them back as pictures (prepared.ts) */
+  prepare: boolean;
   /** the model each local tool downloads and runs, per task: a model's id, or 'hub:owner/name'; missing, the default (models.ts) */
   models: Partial<Record<ModelTask, string>>;
   /** installed plugins turned off on this device (their file names) */
@@ -95,7 +97,7 @@ export interface Preferences {
 
 export const DEFAULT_PREFERENCES: Preferences = {
   language: 'auto', theme: DEFAULT_THEME, view: 'studio', motion: 'auto', still: 'display', blur: 'document', exactFrames: true, scrubAudio: true, sandboxPreview: false,
-  effectsDb: -8, musicDb: -14, duckDb: -12, varySounds: true, bannedSounds: [], confirmPaid: true, paidPerTurn: 10, voiceProvider: 'auto', voiceShortlist: {}, voice: '', voiceModel: '', previewVolume: 1, previewMuted: false, proxies: true, models: {}, pluginsOff: [], areaConfirm: 'always', assistantTranscribes: false, assistantFetchesReal: false, acceptReadings: false, checkUpdates: true, lastUpdateCheck: 0, updateNotified: '', recentCommands: [], quickLauncher: false,
+  effectsDb: -8, musicDb: -14, duckDb: -12, varySounds: true, bannedSounds: [], confirmPaid: true, paidPerTurn: 10, voiceProvider: 'auto', voiceShortlist: {}, voice: '', voiceModel: '', previewVolume: 1, previewMuted: false, proxies: true, prepare: true, models: {}, pluginsOff: [], areaConfirm: 'always', assistantTranscribes: false, assistantFetchesReal: false, acceptReadings: false, checkUpdates: true, lastUpdateCheck: 0, updateNotified: '', recentCommands: [], quickLauncher: false,
   pictureProvider: 'auto', pictureQuality: 'auto', pictureSize: 'large', styleFrames: 2,
   videoProvider: 'auto', videoSeconds: 8, dictation: 'auto', dictationPicked: false, watermark: true, watermarkTold: false,
 };
@@ -167,6 +169,7 @@ export function checked(saved: Partial<Preferences>): Preferences {
       : {};
     if (typeof p.voiceModel !== 'string') p.voiceModel = d.voiceModel;
     p.proxies = p.proxies !== false;
+    p.prepare = p.prepare !== false;
     const models = p.models && typeof p.models === 'object' ? p.models : {};
     p.models = Object.fromEntries(MODEL_TASKS.filter((k) => typeof models[k] === 'string').map((k) => [k, models[k]]));
     p.pluginsOff = Array.isArray(p.pluginsOff) ? p.pluginsOff.filter((x) => typeof x === 'string') : [];

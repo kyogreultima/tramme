@@ -566,7 +566,7 @@ export async function importFiles(files: FileList | File[]) {
   // a video this machine decodes slower than it plays: a proxy offered (measured on a second of it)
   for (const o of ops) {
     const a = o.value as Asset, f = Array.from(files).find((x) => x.name.replace(/\.[^.]+$/, '') === a.name);
-    if (a.type === 'video' && f) void import('../proxy-offer.ts').then(({ offerProxy }) => offerProxy(project, o.path.split('/').pop()!, f, f.name));
+    if (a.type === 'video' && f) void import('../proxy-auto.ts').then(({ proxyIfSlow }) => proxyIfSlow(project, o.path.split('/').pop()!, f, f.name));
   }
 }
 

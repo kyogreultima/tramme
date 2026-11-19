@@ -1,6 +1,6 @@
 // The thumbnails of a video along its clip: one small canvas per slot, decoded
-// from the preview's own video decoder (a second decoder would double the
-// memory), one at a time, a quarter of a second quantised so the clips of one
+// from the preview's video file on the reader set apart for requests from the
+// side (video-pool.ts: it never carries off the one the preview shows), one at a time, a quarter of a second quantised so the clips of one
 // file share their thumbs. Nothing runs while the film plays (the preview has
 // the decoder), nothing runs for a hidden timeline, and a small LRU (a few MB
 // at most) keeps the recent ones: scrolling back is instant, the decoder is
@@ -73,10 +73,10 @@ async function drain() {
     queue.delete(k);
     try {
       const vf = assetData(job.asset) as
-        | { request(t: number): Promise<void>; frameAt(t: number): { image: CanvasImageSource | null }; width: number; height: number }
+        | { request(t: number, kind?: 'side'): Promise<void>; frameAt(t: number): { image: CanvasImageSource | null }; width: number; height: number }
         | undefined;
       if (vf) {
-        await vf.request(job.t);
+        await vf.request(job.t, 'side');
         const f = vf.frameAt(job.t);
         if (f.image) {
           const c = document.createElement('canvas');

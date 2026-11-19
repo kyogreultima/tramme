@@ -9,8 +9,9 @@
 
 import { ALL_FORMATS, BlobSource, CanvasSink, Input, UrlSource, VideoSampleSink, type InputVideoTrack } from 'mediabunny';
 import type { VideoAsset } from '@tramme/core';
-import { KEEP, ReaderPool, type PoolFrame } from './video-pool.ts';
+import { KEEP, ReaderPool, type PoolFrame, type ReadKind } from './video-pool.ts';
 import { previewVideoBlob, RANGE_PIECE } from './video-cache.ts';
+import { shrinkFrame } from './frame-shrink.ts';
 
 /** Finish range responses of bounded size so paused decoders do not hold HTTP connections. */
 export const fetchVideoRange: typeof fetch = async (input, init) => {
@@ -45,7 +46,8 @@ export class VideoFrames implements VideoAsset {
   hasAudio = false;
   private input: Input;
   private pool!: ReaderPool<PoolFrame<CanvasImageSource>>;
-  private busy: Promise<void> = Promise.resolve();
+  /** requests on their way, by time (ms): asked again, the same wait */
+  private inflight = new Map<number, Promise<void>>();
   /** times asked for and not found (past the end, a gap): not asked again */
   private missed = new Set<number>();
 
@@ -82,15 +84,24 @@ export class VideoFrames implements VideoAsset {
     return { image: near?.picture ?? null, exact: missed };
   }
 
-  /** decodes the frame shown at t (one request at a time, in order) */
-  request(t: number): Promise<void> {
-    const time = Math.min(Math.max(0, t), Math.max(0, this.duration - 1e-3));
-    this.busy = this.busy.then(() => this.decode(time)).catch((e) => { console.warn('[tramme] video:', (e as Error).message); });
-    return this.busy;
+  quickPicture(image: CanvasImageSource, width: number, height: number): CanvasImageSource | null {
+    return typeof VideoFrame !== 'undefined' && image instanceof VideoFrame ? shrinkFrame(image, width, height) : null;
   }
 
-  private async decode(t: number) {
-    await this.pool.read(t);
+  /** decodes the frame shown at t (each reader in order, the readers side by side: video-pool.ts) */
+  request(t: number, kind: ReadKind = 'shown'): Promise<void> {
+    const time = Math.min(Math.max(0, t), Math.max(0, this.duration - 1e-3));
+    const key = Math.round(time * 1000);
+    let p = this.inflight.get(key);
+    if (!p) {
+      p = this.decode(time, kind).catch((e) => { console.warn('[tramme] video:', (e as Error).message); }).finally(() => this.inflight.delete(key));
+      this.inflight.set(key, p);
+    }
+    return p;
+  }
+
+  private async decode(t: number, kind: ReadKind) {
+    await this.pool.read(t, kind);
     if (!this.pool.find(t)) {
       if (this.missed.size > 200) this.missed.clear();
       this.missed.add(Math.round(t * 1000));

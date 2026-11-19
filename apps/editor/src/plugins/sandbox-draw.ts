@@ -281,11 +281,15 @@ export async function renderSandboxFrame(host: PluginHost, r: Renderer, payload:
 
 /** the sandbox's finished picture, shown through the renderer's own compositor (its canvas is WebGL) */
 export function blitSandboxFrame(r: Renderer, bitmap: unknown, t: number, checker: boolean, toFbo = false) {
-  try {
-    r.compositor.begin();
-    r.compositor.add(bitmap as OffscreenCanvas, 1);
-    r.compositor.finish({ bloom: 0, bloomThreshold: 0.85, vignette: 0, grain: 0, exposure: 1 }, { bg: null, checker }, 1, { hud: r.stamp?.(t) ?? null, t, toFbo, scale: r.scale, onError: (e: Error) => { throw e; } });
-  } finally { (bitmap as { close?(): void }).close?.(); }
+  try { blitPicture(r, bitmap as OffscreenCanvas, t, checker, toFbo); }
+  finally { (bitmap as { close?(): void }).close?.(); }
+}
+
+/** a finished picture at the render's size shown as the frame through the renderer's compositor (no effect added; the picture is kept) */
+export function blitPicture(r: Renderer, picture: TexImageSource, t: number, checker: boolean, toFbo = false) {
+  r.compositor.begin();
+  r.compositor.add(picture, 1);
+  r.compositor.finish({ bloom: 0, bloomThreshold: 0.85, vignette: 0, grain: 0, exposure: 1 }, { bg: null, checker }, 1, { hud: r.stamp?.(t) ?? null, t, toFbo, scale: r.scale, onError: (e: Error) => { throw e; } });
 }
 
 /**

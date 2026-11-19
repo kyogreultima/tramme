@@ -8,6 +8,27 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+## [0.32.0] - 2026-11-19
+
+### Added
+
+- A project lives in one place, this computer or your account: on desktop, each card shows where, and its menu moves it either way. A move copies the project with its exports, checks the copy file by file, and only then removes the original; an older, different copy in the account is never taken for it.
+- Prepared passages: while nothing plays, the preview draws ahead the moments too heavy to play live (overlapping videos, frames that came late) and plays them back smoothly. An edit elsewhere keeps them; an edit there prepares them again. A setting turns it off.
+
+### Changed
+
+- Playback decodes the next frames while the current one shows, and starts the next shot 0.6 s before its cut: on a 4K edit cut end to end, 3 frames out of 118 come late instead of all of them.
+- While playing, a video shown at half its size or less is made small on the graphics card: a 4K take plays at 93 frames per second instead of 56, two overlapping shots at 45 instead of 35. Still frames and exports keep the full picture.
+- A video too slow to decode on this computer gets its light copy automatically, without a question; the setting is now called "Light copies for the preview".
+- The timeline's thumbnails decode apart from the preview, so they no longer hold up the frame it waits for.
+- Cloud projects read videos in pieces of 8 MB, and the preview keeps decoded frames as they are, instead of copying each into a canvas.
+- The gallery refuses a film over 60 MB before uploading anything, and publishes a film alone when its project is too large to share.
+
+### Fixed
+
+- Downloading a large project from the cloud streams its videos instead of reading them whole, which cut long archives short.
+- A failed export shows why in the export queue, in plain words.
+
 ## [0.31.0] - 2026-11-18
 
 ### Added
@@ -1025,7 +1046,8 @@ First public release.
 
 - Cloudflare Worker serving the editor and the API, projects stored in R2, access protected by Cloudflare Access.
 
-[Unreleased]: ../../compare/v0.31.0...HEAD
+[Unreleased]: ../../compare/v0.32.0...HEAD
+[0.32.0]: ../../compare/v0.31.0...v0.32.0
 [0.31.0]: ../../compare/v0.30.1...v0.31.0
 [0.30.1]: ../../compare/v0.30.0...v0.30.1
 [0.30.0]: ../../compare/v0.29.0...v0.30.0

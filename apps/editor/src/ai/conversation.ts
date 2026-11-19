@@ -127,10 +127,11 @@ export async function startTurn(messages: Queued[], commands?: Called[]) {
 }
 
 /** a tool of the / menu run at once, without the assistant */
-export async function runCommand(cmd: Command, input: Record<string, unknown>) {
+export async function runCommand(cmd: Command, input: Record<string, unknown>, said?: string) {
   if (running.peek()) return;
   const line = inputLine(input);
-  chat.value = [...chat.value, { id: uid(), role: 'user', text: `/${cmd.name}${line ? ` · ${line}` : ''}`, context: contextLine().text, at: S.time.peek() }];
+  // `said`: what the editor does on its own, in a plain sentence, instead of the command line the user would type
+  chat.value = [...chat.value, { id: uid(), role: 'user', text: said ?? `/${cmd.name}${line ? ` · ${line}` : ''}`, context: contextLine().text, at: S.time.peek() }];
   await consume((signal) => runTool(cmd.name, input, signal), false);
 }
 

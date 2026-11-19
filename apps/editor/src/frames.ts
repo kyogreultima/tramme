@@ -71,6 +71,20 @@ export class Stills {
     return copy.toDataURL('image/jpeg', quality);
   }
 
+  /**
+   * The frame at t as the preview draws it while playing (its size, one
+   * sub-frame, the checker behind transparency), as a picture: the prepared
+   * passages (prepared.ts). Null when a video frame never came.
+   */
+  async picture(doc: TrammeDoc, t: number, compId: string, scale: number): Promise<ImageBitmap | null> {
+    const r = await this.rendererFor(doc, compId);
+    r.setScale(scale);
+    await r.renderComplete(t, { samples: 1, checker: true });
+    if (r.late) return null;
+    r.render(t, { samples: 1, checker: true });
+    return createImageBitmap(this.canvas);
+  }
+
   dispose() { this.renderer?.dispose(); this.renderer = null; this.doc = null; }
 }
 

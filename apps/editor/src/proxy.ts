@@ -97,8 +97,6 @@ export function readsOf(doc: TrammeDoc, asset: string): { reads: number; filmHei
   return { reads, filmHeight };
 }
 
-/** a video this tall is oversized for a film this tall: twice its lines or more */
-export const oversized = (videoHeight: number, filmHeight: number) => filmHeight > 0 && videoHeight >= filmHeight * 2;
 
 interface ProxyArgs { video?: string; height?: number }
 

@@ -100,6 +100,16 @@ export function finishOf(effects: EvaluatedEffect[], frame: number): { fx: Finis
 
 const toLin = (c: number) => (c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
 
+/** the size a composition renders at for a scale: width a multiple of 8, even height (the encoders' and compositor's rule) */
+export function renderSize(width: number, height: number, scale: number): { width: number; height: number } {
+  return { width: Math.max(8, Math.round((width * scale) / 8) * 8), height: Math.max(2, Math.round((height * scale) / 2) * 2) };
+}
+
+/** how long before its in point a layer gets ready (s): a seek to a keyframe a second back decodes in well under that */
+export const LEAD = 0.6;
+/** frames brought in ahead of the one playing */
+export const AHEAD_FRAMES = 2;
+
 export interface RendererOptions {
   compId?: string;
   /** 'cpu' (default): exact analytic anti-aliasing; 'gpu': faster, less precise on paths */
@@ -149,6 +159,8 @@ export class Renderer {
   scale = 1;
   private sx = 1;
   private sy = 1;
+  /** frames drawn quickly, a little less finely (Host.quick): the preview sets it while it moves; exports keep false */
+  quick = false;
   /** seed of the last finished frame (for the YUV / RGBA dither) */
   lastSeed = 0;
   /** the picture laid over every frame this renderer finishes, by the frame's time, at the render's size, straight alpha: the watermark of an export (null: none) */
@@ -245,7 +257,7 @@ export class Renderer {
   /** canvases and compositor at the render size (width multiple of 8, even height) */
   private resize() {
     const { width: W, height: H } = this.comp;
-    const w = Math.max(8, Math.round((W * this.scale) / 8) * 8), h = Math.max(2, Math.round((H * this.scale) / 2) * 2);
+    const { width: w, height: h } = renderSize(W, H, this.scale);
     this.sx = w / W; this.sy = h / H;
     if (this.scene.width === w && this.scene.height === h && this.compositor) return;
     this.scene.width = w; this.scene.height = h;
@@ -277,7 +289,7 @@ export class Renderer {
     const comp = this.evaluator.comp(compId);
     return (layerId: string): Host => ({
       layerId, layerIn: comp.layers[layerId]?.in ?? 0,
-      t: f.t, frame: f.frame, shutter: this.shutterOffset, fps: comp.fps, width: comp.width, height: comp.height, duration: comp.duration,
+      t: f.t, frame: f.frame, shutter: this.shutterOffset, quick: this.quick, fps: comp.fps, width: comp.width, height: comp.height, duration: comp.duration,
       asset: <T>(id: string) => assets.use<T>(id, (p) => { this.pending.push(p); }),
       assetInfo: (id: string) => assets.info(id),
       assetUrl: (id: string) => assets.url(id),
@@ -378,11 +390,30 @@ export class Renderer {
   }
 
   /**
-   * A project heavier than the room keeps some pictures away: those the next
-   * seconds will show are brought in now, so a cut does not wait for them.
-   * Nothing to do (and nothing scanned) while every picture is kept.
+   * While playing, what the next moments need is brought in before it is
+   * shown (Node.ahead): the next AHEAD_FRAMES frames of the layers showing
+   * now (a video decodes them while the current one is on screen, instead of
+   * when its turn comes and the frame before stands in), and the first frame
+   * of the layers starting within LEAD seconds (a video's decoder starts
+   * where the shot begins). In a project heavier than the room, the pictures
+   * of the next `ahead` seconds come back too.
    */
   prefetch(t: number, ahead = 1.5): void {
+    const comp = this.doc.compositions[this.compId];
+    if (comp && !this.sandboxModules) for (const [id, layer] of Object.entries(comp.layers)) {
+      if (layer.visible === false || !this.registry.hasNode(layer.type)) continue;
+      const node = this.registry.node(layer.type);
+      if (!node.ahead) continue;
+      const at = layer.in ?? 0, out = layer.out ?? comp.duration;
+      const times = at > t ? (at <= t + LEAD ? [at] : []) : Array.from({ length: AHEAD_FRAMES }, (_, k) => t + (k + 1) / comp.fps).filter((x) => x < out);
+      for (const x of times) {
+        try {
+          const L = this.evaluator.layerAt(id, x, this.compId);
+          // nothing it brings counts as missing from the frame drawn now
+          node.ahead(L.props, { ...this.hostFactory({ t: x, frame: Math.round(x * comp.fps) })(id), asset: <T>(a: string) => this.assets.use<T>(a, () => {}), defer: () => {} });
+        } catch { /* a layer that cannot be read yet: drawn as it comes */ }
+      }
+    }
     if (!this.assets.hasCold) return;
     for (const id of this.imagesBetween(this.compId, t, t + ahead)) if (this.assets.isCold(id)) void this.assets.request(id);
   }
