@@ -12,7 +12,7 @@ import { readConfig, serveFile, Server } from '../../../packages/cli/src/server.
 
 const ffmpeg = createRequire(new URL('../../../packages/cli/package.json', import.meta.url))('ffmpeg-static') as string | null;
 
-it.skipIf(!CHROME || !ffmpeg)('exports overlapping 4K video with blur and keeps the sped-up clip in sync', async () => {
+it.skipIf(!CHROME || !ffmpeg)('keeps overlapping 4K video and sound in sync when MP4 needs a WebM audio fallback', async () => {
   const { doc } = newProject({ name: 'Sandbox sync', width: 1920, height: 1080, fps: 24, duration: 0.5 });
   doc.assets.clip = { type: 'video', src: 'clip.webm' };
   doc.assets.fixture = { type: 'module', src: 'fixture.js' };
@@ -49,9 +49,16 @@ it.skipIf(!CHROME || !ffmpeg)('exports overlapping 4K video with blur and keeps 
         globalThis.runExport = async (doc) => {
           prefs.value = { ...prefs.peek(), sandboxPreview: true };
           let frames = 0;
-          const { blob } = await exportInBrowser(doc, location.href, 'webm', {
-            compId: doc.root, registry: builtinRegistry(), watermark: false, onProgress: (done) => { frames = done; },
-          });
+          const isSupported = AudioEncoder.isConfigSupported;
+          AudioEncoder.isConfigSupported = (config) => config.codec.startsWith('mp4a')
+            ? Promise.resolve({ supported: false, config }) : isSupported.call(AudioEncoder, config);
+          let result;
+          try {
+            result = await exportInBrowser(doc, location.href, 'mp4', {
+              compId: doc.root, registry: builtinRegistry(), watermark: false, onProgress: (done) => { frames = done; },
+            });
+          } finally { AudioEncoder.isConfigSupported = isSupported; }
+          const { blob, ext, warnings } = result;
           const input = new Input({ source: new BlobSource(blob), formats: ALL_FORMATS });
           try {
             const video = await input.getPrimaryVideoTrack(), audio = await input.getPrimaryAudioTrack();
@@ -71,7 +78,7 @@ it.skipIf(!CHROME || !ffmpeg)('exports overlapping 4K video with blur and keeps 
               const i = buffer.getChannelData(0).findIndex(x => Math.abs(x) > 0.1);
               if (i >= 0) { tone = timestamp + i / buffer.sampleRate; break; }
             }
-            return { frames, decodedFrames, width: video.displayWidth, height: video.displayHeight, flash, tone, plugin, overlay, beforeFlash };
+            return { frames, decodedFrames, ext, warnings, audioCodec: audio.codec, width: video.displayWidth, height: video.displayHeight, flash, tone, plugin, overlay, beforeFlash };
           } finally { input.dispose(); }
         };
       ` },
@@ -116,12 +123,13 @@ it.skipIf(!CHROME || !ffmpeg)('exports overlapping 4K video with blur and keeps 
     await page.goto(`http://127.0.0.1:${port}/project/document.tramme.json`);
     const result = await page.evaluate((project) => {
       const run = (globalThis as unknown as { runExport: (d: typeof project) => Promise<{
-        frames: number; decodedFrames: number; width: number; height: number; flash: number | null; tone: number | null;
+        frames: number; decodedFrames: number; ext: string; warnings: string[]; audioCodec: string; width: number; height: number; flash: number | null; tone: number | null;
         plugin: boolean; overlay: boolean; beforeFlash: boolean;
       }> }).runExport;
       return run(project);
     }, doc);
-    expect(result).toMatchObject({ frames: 12, decodedFrames: 12, width: 1920, height: 1080, plugin: true, overlay: true, beforeFlash: true });
+    expect(result).toMatchObject({ frames: 12, decodedFrames: 12, ext: 'webm', audioCodec: 'opus', width: 1920, height: 1080, plugin: true, overlay: true, beforeFlash: true });
+    expect(result.warnings.some((warning) => /aac/i.test(warning) && /webm/i.test(warning))).toBe(true);
     expect(result.flash).not.toBeNull();
     expect(result.tone).not.toBeNull();
     expect(Math.abs(result.flash! - 0.25)).toBeLessThanOrEqual(1 / comp.fps);

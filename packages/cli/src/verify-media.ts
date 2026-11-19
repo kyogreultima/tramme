@@ -4,13 +4,14 @@ import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { FFMPEG } from './media.ts';
 
-export interface MediaExpected { width?: number; height?: number; fps?: number; frames?: number; duration?: number }
-export interface MediaActual { width: number; height: number; fps: number; frames: number; duration: number }
+export interface MediaExpected { width?: number; height?: number; fps?: number; frames?: number; duration?: number; audioCodec?: 'aac' | 'opus' | 'pcm_s24le' }
+export interface MediaActual { width: number; height: number; fps: number; frames: number; duration: number; audio?: { codec: string; samples: number } }
 export interface MediaVerification { ok: boolean; file: string; expected: MediaExpected; actual: MediaActual | null; issues: string[] }
 
 /** Exact dimensions/count, rational cadence and up to one frame of mux timing tolerance. */
 export async function verifyMedia(file: string, expected: MediaExpected = {}, timeoutMs = 120_000): Promise<MediaVerification> {
-  for (const [key, value] of Object.entries(expected)) {
+  const { audioCodec, ...videoExpected } = expected;
+  for (const [key, value] of Object.entries(videoExpected)) {
     if (!Number.isFinite(value) || value <= 0 || (['width', 'height', 'frames'].includes(key) && !Number.isInteger(value))) throw new Error(`check-media: ${key} must be a positive ${['width', 'height', 'frames'].includes(key) ? 'integer' : 'number'}`);
   }
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) throw new Error('check-media: timeout must be positive milliseconds');
@@ -20,13 +21,15 @@ export async function verifyMedia(file: string, expected: MediaExpected = {}, ti
     return result;
   }
   let width = 0, height = 0, fps = 0, frames = 0, duration = 0, tail = '', carry = '', infoCarry = '';
+  let decodedAudioCodec = '', audioSamples = 0;
   let firstTime = Infinity, lastTime = -Infinity, lastDuration = 0;
   const error = await new Promise<string | null>((resolve) => {
     let settled = false;
     const finish = (failure: string | null) => { if (!settled) { settled = true; clearTimeout(timer); resolve(failure); } };
     const ff = spawn(FFMPEG, [
       '-hide_banner', '-nostdin', '-nostats', '-xerror', '-err_detect', 'explode', '-i', result.file,
-      '-map', '0:v:0', '-an', '-vf', 'showinfo=checksum=0', '-fps_mode', 'passthrough',
+      '-map', '0:v:0', ...(audioCodec ? ['-map', '0:a:0?', '-af', 'volumedetect'] : ['-an']),
+      '-vf', 'showinfo=checksum=0', '-fps_mode', 'passthrough',
       '-progress', 'pipe:1', '-f', 'null', '-',
     ], { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
     const timer = setTimeout(() => { ff.kill(); finish(`Video verification timed out after ${timeoutMs} ms.`); }, timeoutMs);
@@ -45,6 +48,11 @@ export async function verifyMedia(file: string, expected: MediaExpected = {}, ti
       infoCarry += chunk.toString();
       const lines = infoCarry.split(/\r?\n/); infoCarry = lines.pop() ?? '';
       for (const line of lines) {
+        if (audioCodec) {
+          decodedAudioCodec ||= /Stream #0:\d+.*: Audio: ([\w]+)/.exec(line)?.[1] ?? '';
+          const samples = /\bn_samples: (\d+)/.exec(line);
+          if (samples) audioSamples = Math.max(audioSamples, Number(samples[1]));
+        }
         const size = /\bs:(\d+)x(\d+)\b/.exec(line);
         if (size) { width = Number(size[1]); height = Number(size[2]); }
         const rate = /config in time_base:.*?frame_rate:\s*(\d+)\/(\d+)/.exec(line);
@@ -59,7 +67,7 @@ export async function verifyMedia(file: string, expected: MediaExpected = {}, ti
         }
       }
     });
-    ff.on('close', (code) => finish(code === 0 ? null : `FFmpeg could not decode the complete video (exit ${code}): ${tail.split(/\r?\n/).filter(Boolean).slice(-3).join(' ').slice(-800)}`));
+    ff.on('close', (code) => finish(code === 0 ? null : `FFmpeg could not decode the complete ${audioCodec ? 'video and audio' : 'video'} (exit ${code}): ${tail.split(/\r?\n/).filter(Boolean).slice(-3).join(' ').slice(-800)}`));
   });
   if (error) { result.issues.push(error); return result; }
   // Progress reports the last frame's timestamp, not its trailing duration.
@@ -69,7 +77,14 @@ export async function verifyMedia(file: string, expected: MediaExpected = {}, ti
     return result;
   }
   result.actual = { width, height, fps, frames, duration };
-  for (const [key, wanted] of Object.entries(expected) as [keyof MediaActual, number][]) {
+  if (audioCodec) {
+    if (!decodedAudioCodec || audioSamples === 0) result.issues.push('Expected audio, but no audio samples could be decoded.');
+    else {
+      result.actual.audio = { codec: decodedAudioCodec, samples: audioSamples };
+      if (decodedAudioCodec !== audioCodec) result.issues.push(`Audio codec: expected ${audioCodec}, decoded ${decodedAudioCodec}.`);
+    }
+  }
+  for (const [key, wanted] of Object.entries(videoExpected) as [keyof typeof videoExpected, number][]) {
     const actual = result.actual[key];
     const tolerance = key === 'duration' ? 1 / (expected.fps ?? fps) + 0.001 : key === 'fps' ? 0.001 : 0;
     if (Math.abs(actual - wanted) > tolerance) result.issues.push(`${key}: expected ${wanted}, decoded ${actual}.`);
@@ -80,5 +95,5 @@ export async function verifyMedia(file: string, expected: MediaExpected = {}, ti
 
 export function mediaReport(result: MediaVerification): string {
   const a = result.actual;
-  return `${result.ok ? 'PASS' : 'FAIL'} ${result.file}${a ? `: ${a.width}×${a.height}, ${a.fps} fps, ${a.frames} frames, ${a.duration.toFixed(3)} s` : ''}${result.issues.length ? `\n${result.issues.join('\n')}` : ''}`;
+  return `${result.ok ? 'PASS' : 'FAIL'} ${result.file}${a ? `: ${a.width}×${a.height}, ${a.fps} fps, ${a.frames} frames, ${a.duration.toFixed(3)} s` : ''}${a?.audio ? `, audio ${a.audio.codec}` : ''}${result.issues.length ? `\n${result.issues.join('\n')}` : ''}`;
 }

@@ -1,10 +1,10 @@
 // The equaliser's place in the mix: the clips carry it, the chain builds one
 // biquad per band set — and none at 0 dB, so an uneq'd mix is unchanged.
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { audioClips, type AudioClip, type TrammeDoc } from '@tramme/core';
 import { newProject } from '@tramme/project';
-import { audioEffectChain, clipChain } from '../src/audio.ts';
+import { audioEffectChain, clipChain, mixExportAudio } from '../src/audio.ts';
 
 const withSound = (sound: Record<string, unknown>): TrammeDoc => {
   const { doc } = newProject({ name: 'T', width: 100, height: 100, fps: 30, duration: 2 });
@@ -13,6 +13,30 @@ const withSound = (sound: Record<string, unknown>): TrammeDoc => {
   doc.compositions[doc.root].order = ['a'];
   return doc;
 };
+
+it('surfaces the asset name when an export cannot decode a sound clip', async () => {
+  const doc = withSound({});
+  const context = mockCtx().ctx;
+  Object.assign(context, {
+    sampleRate: 48000,
+    createBuffer: (_channels: number, length: number) => ({ getChannelData: () => new Float32Array(length) }),
+    decodeAudioData: vi.fn().mockRejectedValue(new Error('bad audio')),
+  });
+  vi.stubGlobal('OfflineAudioContext', function () { return context; });
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(new Uint8Array([1]))));
+  try {
+    const renderer = { doc, compId: doc.root, assets: { url: () => 'https://tramme.test/snd.wav' } } as unknown as Parameters<typeof mixExportAudio>[0];
+    await expect(mixExportAudio(renderer)).rejects.toThrow('snd');
+  } finally { vi.unstubAllGlobals(); }
+});
+
+it('does not treat video footage with no audio track as an export failure', async () => {
+  const doc = withSound({});
+  doc.assets.snd.type = 'video';
+  doc.compositions[doc.root].layers.a = { type: 'video', props: { video: 'snd' } };
+  const renderer = { doc, compId: doc.root, assets: { has: () => true, get: () => ({ hasAudio: false }) } } as unknown as Parameters<typeof mixExportAudio>[0];
+  await expect(mixExportAudio(renderer)).resolves.toBeNull();
+});
 
 describe('audioClips', () => {
   it('reads the equaliser, clamped, 0 as recorded', () => {

@@ -43,8 +43,8 @@ export class Stills {
     return this.renderer;
   }
 
-  /** the frame at t, at most `width` pixels wide, as a JPEG data URL (fitLongest gives the width for a longest side) */
-  async still(doc: TrammeDoc, t: number, compId: string, width: number, quality = 0.86): Promise<string> {
+  /** the frame at t, at most `width` pixels wide, as a data URL (fitLongest gives the width for a longest side) */
+  async still(doc: TrammeDoc, t: number, compId: string, width: number, quality = 0.86, format: 'image/jpeg' | 'image/png' = 'image/jpeg'): Promise<string> {
     const r = await this.rendererFor(doc, compId);
     const c = doc.compositions[compId];
     const k = Math.min(1, width / c.width);
@@ -59,7 +59,7 @@ export class Stills {
       small.width = Math.round(c.width * k); small.height = Math.round(c.height * k);
       try { small.getContext('2d')!.drawImage(pic.bitmap as OffscreenCanvas, 0, 0, small.width, small.height); }
       finally { (pic.bitmap as ImageBitmap).close(); }
-      return small.toDataURL('image/jpeg', quality);
+      return small.toDataURL(format, quality);
     }
     r.setScale(k);
     await r.renderComplete(t);
@@ -68,7 +68,7 @@ export class Stills {
     const copy = document.createElement('canvas');
     copy.width = this.canvas.width; copy.height = this.canvas.height;
     copy.getContext('2d')!.drawImage(this.canvas, 0, 0);
-    return copy.toDataURL('image/jpeg', quality);
+    return copy.toDataURL(format, quality);
   }
 
   /**

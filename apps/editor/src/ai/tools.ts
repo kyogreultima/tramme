@@ -365,11 +365,11 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
     }
   }
 
-  /** a still of the live document, as a JPEG data URL */
-  private stillUrl(t: number, compId?: string): Promise<string> {
+  /** a still of the live document, as a JPEG data URL by default */
+  private stillUrl(t: number, compId?: string, format?: 'image/jpeg' | 'image/png'): Promise<string> {
     const doc = this.liveDoc();
     const id = compId && doc.compositions[compId] ? compId : this.scoped ? this.compOf(doc) : doc.root, c = doc.compositions[id];
-    return this.stills.still(doc, t, id, c ? fitLongest(c.width, c.height, STILL_SIDE)[0] : STILL_SIDE);
+    return this.stills.still(doc, t, id, c ? fitLongest(c.width, c.height, STILL_SIDE)[0] : STILL_SIDE, undefined, format);
   }
 
   private async still(t: number, compId: string | undefined, caption?: string): Promise<ToolResult> {
@@ -437,7 +437,7 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
         if (isSceneTextPath(path)) bumpScene();
         return path;
       },
-      renderStill: (t, id) => { current(); return this.stillUrl(t, id).then((value) => { current(); return value; }); },
+      renderStill: (t, id, format) => { current(); return this.stillUrl(t, id, format).then((value) => { current(); return value; }); },
       transcript: async (id, opts) => { current(); const value = (await this.readTranscript(id, opts?.ask ?? true)).t; current(); return value; },
       signal: this.signal,
       // a plugin's figures are not trusted: what is not a number is shown as a step without a share

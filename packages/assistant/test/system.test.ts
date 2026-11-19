@@ -25,11 +25,11 @@ describe('the system prompt in cache order', () => {
     expect(systemParts(REF).variable).toBe('');
   });
 
-  it('says the same words as before with its guides, the reference first', () => {
+  it('keeps the original instructions with its guides, the reference first', () => {
     const p = systemPrompt(REF, 'BRIEF', ['plug: x']);
     // the guides left the prompt for read_guide, and an index of them came in
     const whole = [p, ...guidesOf(REF).map((g) => g.text)].join('\n\n');
-    expect(paragraphs(whole).filter((x) => !x.startsWith('Guides:'))).toEqual(paragraphs(BEFORE));
+    expect(paragraphs(whole).filter((x) => !x.startsWith('Guides:') && !x.startsWith('When grading footage,'))).toEqual(paragraphs(BEFORE));
     expect(p).not.toBe(BEFORE);
     expect(p.indexOf(REF)).toBeLessThan(p.indexOf('BRIEF'));
     expect(p.indexOf(REF)).toBeLessThan(p.indexOf('plug: x'));
@@ -43,6 +43,13 @@ describe('the system prompt in cache order', () => {
     expect(systemPrompt(REF)).toBe(systemParts(REF).fixed);
     expect(systemPrompt(REF, 'BRIEF')).toBe(joinSystem(parts));
   });
+});
+
+it('has the assistant measure and correct footage before applying a look', () => {
+  const { fixed } = systemParts(REF);
+  const grading = fixed.slice(fixed.indexOf('When grading footage,'), fixed.indexOf('Material:'));
+  expect(grading).toMatch(/"grade-scopes"[\s\S]+Correct temperature and tint before adjusting exposure[\s\S]+"grade-look"[\s\S]+after/);
+  expect(grading).toContain('When refining an existing grade, start with its active effects');
 });
 
 describe('the film plan in the prompt', () => {

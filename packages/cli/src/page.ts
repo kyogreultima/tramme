@@ -11,7 +11,7 @@
 
 import { isolateExpressions, type TrammeDoc } from '@tramme/core';
 import { builtinRegistry } from '@tramme/nodes';
-import { addParts, encodeWav, FIRST_SETTLE_LIMIT, formatParts, mixComposition, noParts, perFrame, Renderer, type FrameParts, type RenderOptions } from '@tramme/render';
+import { addParts, encodeWav, FIRST_SETTLE_LIMIT, formatParts, mixExportAudio, noParts, perFrame, Renderer, type FrameParts, type RenderOptions } from '@tramme/render';
 import { blitSandboxFrame, declarationsModule, ensureDeclared, ensureSandboxDoc, moduleItemsOf, renderSandboxFrame, sandboxDeclaration, sandboxVector } from '../../../apps/editor/src/plugins/sandbox-draw.ts';
 import { browserHost, type PluginHost } from '../../../apps/editor/src/plugins/host.ts';
 import { needsIsolation } from '@tramme/project';
@@ -143,7 +143,7 @@ const api = {
   },
   /** the sound over [from, to] through the mixer of the editor, as a WAV in base64; null when there is none */
   async mix(from: number, to: number): Promise<string | null> {
-    const buf = await mixComposition(renderer.doc, renderer.compId, (id) => renderer.assets.url(id), { from, to });
+    const buf = await mixExportAudio(renderer, { from, to });
     if (!buf) return null;
     const bytes = encodeWav(buf);
     let s = '';

@@ -79,6 +79,46 @@ export function histogram(rgba: ArrayLike<number>, w: number, h: number): { r: U
   return { r, g, b, luma };
 }
 
+export type ScopeRegion = [x: number, y: number, width: number, height: number];
+
+/** Display-referred readings in 8-bit levels, with fully transparent samples omitted. */
+export function gradeReadings(rgba: ArrayLike<number>, w: number, h: number, region?: ScopeRegion) {
+  const hist = histogram(rgba, w, h);
+  const pixels = hist.luma.reduce((n, count) => n + count, 0);
+  const round = (n: number) => Math.round(n * 100) / 100;
+  const pct = (n: number) => round(100 * n / pixels);
+  const edge = (channel: Uint32Array) => ({ atZeroPct: pct(channel[0]), atMaxPct: pct(channel[255]) });
+  const percentile = (q: number) => {
+    let n = 0;
+    return hist.luma.findIndex((count) => (n += count) >= Math.ceil(q * pixels));
+  };
+  let neutral = null;
+  if (region) {
+    const [x, y, width, height] = region;
+    const left = Math.floor(x * w / 100), top = Math.floor(y * h / 100);
+    const right = Math.min(w, Math.ceil((x + width) * w / 100)), bottom = Math.min(h, Math.ceil((y + height) * h / 100));
+    let n = 0, red = 0, green = 0, blue = 0;
+    for (let py = top; py < bottom; py++) for (let px = left; px < right; px++) {
+      const i = (py * w + px) * 4;
+      if (rgba[i + 3] === 0) continue;
+      n++;
+      red += rgba[i]; green += rgba[i + 1]; blue += rgba[i + 2];
+    }
+    if (n) neutral = { pixels: n, rgb: [round(red / n), round(green / n), round(blue / n)],
+      redMinusBlue: round((red - blue) / n), magentaMinusGreen: round(((red + blue) / 2 - green) / n) };
+  }
+  return {
+    pixels,
+    luma: pixels ? {
+      p01: percentile(0.01), p50: percentile(0.5), p99: percentile(0.99),
+      nearBlackPct: pct(hist.luma[0] + hist.luma[1] + hist.luma[2]),
+      nearWhitePct: pct(hist.luma[253] + hist.luma[254] + hist.luma[255]),
+    } : null,
+    channels: pixels ? { red: edge(hist.r), green: edge(hist.g), blue: edge(hist.b) } : null,
+    ...(region ? { neutral } : {}),
+  };
+}
+
 /** a parade's counts as an image: each third in its colour */
 export function paradeToImage(counts: Uint32Array, w: number, rows: number): Uint8ClampedArray<ArrayBuffer> {
   const out = new Uint8ClampedArray(new ArrayBuffer(3 * w * rows * 4));

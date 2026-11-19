@@ -3,7 +3,7 @@
 // Two qualities: fast (the default, for the web and social networks: the
 // encoder's quick preset) and master (the slow preset, the smallest file for
 // the best picture, for a film that is edited or archived further).
-//   mp4   H.264 High, BT.709, MP3 320 kb/s (frames in YUV 4:2:0)
+//   mp4   H.264 High, BT.709, AAC-LC 320 kb/s (frames in YUV 4:2:0)
 //   mov   ProRes 4444 with alpha, PCM audio (frames in straight RGBA)
 //   webm  VP9 with alpha, Opus audio
 //   gif   two-pass palette, no audio
@@ -51,8 +51,7 @@ export interface EncoderJob {
 
 /** the sound's codec in each container */
 const AUDIO_CODEC: Partial<Record<VideoFormat, string[]>> = {
-  // MP3 rather than AAC: VS Code's player cannot decode AAC
-  mp4: ['-c:a', 'libmp3lame', '-b:a', '320k', '-ar', '48000'],
+  mp4: ['-c:a', 'aac', '-profile:a', 'aac_low', '-b:a', '320k', '-ar', '48000'],
   mov: ['-c:a', 'pcm_s24le', '-ar', '48000'],
   webm: ['-c:a', 'libopus', '-b:a', '192k', '-ar', '48000'],
 };

@@ -51,6 +51,7 @@ import { MOMENT_TOOLS } from './moments.ts';
 import { SKIN_TOOLS } from './faces.ts';
 import { LONG_TOOLS } from './longtools.ts';
 import { PROXY_TOOLS } from './proxy.ts';
+import { GRADE_TOOLS } from './grade-tools.ts';
 import { placeTemplate, TEMPLATES, type TemplateArgs } from './templates.ts';
 
 const at = { type: 'number', minimum: 0, title: 'Start (s)', description: 'composition time; the current time by default' };
@@ -70,6 +71,7 @@ function templateTool(name: string, properties: Record<string, unknown>, require
 }
 
 export const EDITOR_TOOLS: ToolType[] = [
+  ...GRADE_TOOLS,
   templateTool('captions', { transcript: { type: 'string', format: 'asset', assetType: 'json', title: 'Transcript' }, at, duration, place }),
   templateTool('title', { text: { type: 'string', title: 'Text' }, subtitle: { type: 'string', title: 'Subtitle' }, at, duration, place }, ['text']),
   templateTool('keyword', { text: { type: 'string', title: 'Text' }, at, duration, place }, ['text']),

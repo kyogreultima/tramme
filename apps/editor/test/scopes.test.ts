@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { countsToImage, histogram, histogramToImage, parade, vectorscope, waveform } from '../src/scopes.ts';
+import { countsToImage, gradeReadings, histogram, histogramToImage, parade, vectorscope, waveform } from '../src/scopes.ts';
 
 /** a 2 × 2 frame: black, white, pure red, transparent */
 const FRAME = [0, 0, 0, 255, 255, 255, 255, 255, 255, 0, 0, 255, 9, 9, 9, 0];
@@ -39,6 +39,19 @@ describe('the scopes', () => {
     expect(h.luma[255]).toBe(1);
     expect(h.luma[54]).toBe(1);
     expect(histogramToImage(h, 64, 16).length).toBe(64 * 16 * 4);
+  });
+
+  it('measures clipped tones separately from clipped channels and reads a neutral patch', () => {
+    const pixels = [0, 0, 0, 255, 255, 255, 255, 255, 255, 0, 0, 255, 210, 190, 202, 255, 0, 0, 0, 0];
+    const result = gradeReadings(pixels, 5, 1, [60, 0, 20, 100]);
+    expect(result.pixels).toBe(4);
+    expect(result.luma).toMatchObject({ nearBlackPct: 25, nearWhitePct: 25 });
+    expect(result.channels?.red).toEqual({ atZeroPct: 25, atMaxPct: 50 });
+    expect(result.neutral).toEqual({ pixels: 1, rgb: [210, 190, 202], redMinusBlue: 8, magentaMinusGreen: 16 });
+  });
+
+  it('reports missing samples when the frame is transparent', () => {
+    expect(gradeReadings([0, 0, 0, 0], 1, 1)).toMatchObject({ pixels: 0, luma: null, channels: null });
   });
 
   it('draw counts on a log scale, empty cells clear', () => {

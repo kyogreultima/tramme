@@ -90,9 +90,14 @@ export async function renderVideo(server: Server, page: Page, job: VideoJob, onP
   }
   // the chapters of the span rendered, written into the file
   const from = (job.from ?? 0), seconds = r.frames / r.info.fps;
-  await addChapters(job.format ?? 'mp4', job.out, chaptersOf(r.info.markers, from, from + seconds), seconds);
-  const verification = ['mp4', 'mov', 'webm'].includes(job.format ?? 'mp4')
-    ? await verifyMedia(job.out, { width: r.info.width, height: r.info.height, fps: r.info.fps, frames: r.frames, duration: seconds }) : undefined;
+  const format = job.format ?? 'mp4';
+  await addChapters(format, job.out, chaptersOf(r.info.markers, from, from + seconds), seconds);
+  const audioCodec = format === 'mp4' ? 'aac' : format === 'webm' ? 'opus' : format === 'mov' ? 'pcm_s24le' : undefined;
+  const verification = ['mp4', 'mov', 'webm'].includes(format)
+    ? await verifyMedia(job.out, {
+      width: r.info.width, height: r.info.height, fps: r.info.fps, frames: r.frames, duration: seconds,
+      ...(r.audio && audioCodec ? { audioCodec } : {}),
+    }) : undefined;
   if (verification && !verification.ok) throw new Error(`Export verification failed:\n${mediaReport(verification)}`);
   return { ...r, verification };
 }
