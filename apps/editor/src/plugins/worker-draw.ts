@@ -110,7 +110,7 @@ export function makeSandboxDraw(modules: Map<string, PluginModule>): SandboxDraw
 
   const theDoc = () => side.doc as unknown as TrammeDoc | null;
 
-  const sandboxAsset = (id: string, videos: Map<string, unknown>, need: Map<string, VideoNeed>, drew: Map<string, VideoNeed>) => {
+  const sandboxAsset = (id: string, videos: Map<string, unknown>, need: Map<string, VideoNeed>, drew: Map<string, VideoNeed>, sizes: Record<string, [number, number]>) => {
     if (side.images.has(id)) return side.images.get(id);
     if (side.json.has(id)) return side.json.get(id);
     if (side.models.has(id)) return side.models.get(id);
@@ -120,9 +120,10 @@ export function makeSandboxDraw(modules: Map<string, PluginModule>): SandboxDraw
       // the page decodes the frames a render draws (the layer's own time in the file, at each motion-blur
       // sample) and ships them with the request; one it lacks is asked for, and the frame drawn again
       const at = (t: number) => videos.get(videoKey(id, t)) as ImageBitmap | undefined;
-      const size = [...videos.entries()].find(([k]) => k.startsWith(`${id}@`))?.[1] as ImageBitmap | undefined;
+      // the file's own size: a frame sent smaller (the preview moving) is drawn over the same rectangle
+      const own = sizes[id], size = own ? null : [...videos.entries()].find(([k]) => k.startsWith(`${id}@`))?.[1] as ImageBitmap | undefined;
       return {
-        width: size?.width ?? Number(a.width ?? 0), height: size?.height ?? Number(a.height ?? 0), duration: Number(a.duration ?? 0),
+        width: own?.[0] ?? size?.width ?? Number(a.width ?? 0), height: own?.[1] ?? size?.height ?? Number(a.height ?? 0), duration: Number(a.duration ?? 0),
         frameAt: (t: number) => {
           const frame = at(t);
           (frame ? drew : need).set(videoKey(id, t), { id, t });
@@ -158,6 +159,8 @@ export function makeSandboxDraw(modules: Map<string, PluginModule>): SandboxDraw
     const comp = doc.compositions[p.compId];
     if (!comp) return { err: `unknown composition: ${p.compId}` };
     const videos = new Map(Object.entries(p.videos ?? {}));
+    const sizes: Record<string, [number, number]> = {};
+    for (const [id, s] of Object.entries(p.videoSizes ?? {})) if (Array.isArray(s) && s.every((v) => Number.isSafeInteger(v) && v > 0 && v <= 16384)) sizes[id] = [s[0], s[1]];
     const need = new Map<string, VideoNeed>(), drew = new Map<string, VideoNeed>();
     const { reg, evaluator, sims } = frameTools(doc);
     const layerOf = (id: string, t: number, cid: string) => {
@@ -172,7 +175,7 @@ export function makeSandboxDraw(modules: Map<string, PluginModule>): SandboxDraw
       width: comp.width,
       height: comp.height,
       duration: comp.duration,
-      asset: ((id: string) => sandboxAsset(id, videos, need, drew)) as Host['asset'],
+      asset: ((id: string) => sandboxAsset(id, videos, need, drew, sizes)) as Host['asset'],
       assetInfo: (id) => assetInfo(id) as never,
       assetUrl: (id) => new URL(String(assetInfo(id).src), side.docUrl).href,
       compositionSize: (cid2: string) => { const c = doc.compositions[cid2]; return c ? { width: c.width, height: c.height, duration: c.duration } : null; },

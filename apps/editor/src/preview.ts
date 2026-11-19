@@ -40,6 +40,8 @@ setWebScenePlaceholder((folder) => (liveScenes.has(folder) ? null : t('viewport.
 
 /** the slowest pace a media element takes (browsers refuse less): slower, it waits */
 const MIN_ELEMENT_RATE = 0.0625;
+/** the furthest ahead a played sandbox frame is asked for (seconds): past it, the preview is too slow to keep time anyway */
+const SANDBOX_LEAD_MAX = 0.5;
 
 class Preview {
   readonly meters = previewMeters;
@@ -85,6 +87,8 @@ class Preview {
   /** one sandbox frame in flight (the flag's draw path) */
   private sandboxBusy = false;
   private sandboxAgain = false;
+  /** while playing, how long a sandbox frame takes to land (seconds, averaged): the frame asked for is that far ahead */
+  private sandboxLead = 0;
   /** the sharp frame being drawn in steps, cancelled by any change */
   private job: (() => EvaluatedFrame | null) | null = null;
   /** frame of the composition last drawn during playback (exact frames) */
@@ -441,7 +445,14 @@ class Preview {
           this.sandboxAgain = false;
           const blur = prefs.peek().blur;
           const samples = moving || scrubbing || blur === 'off' ? 1 : blur === 'limited' ? 4 : undefined;
-          void this.drawSandboxFrame(t, samples, scale).catch((e) => { S.renderError.value = `sandbox: ${(e as Error).message}`; }).finally(() => {
+          // played, the frame lands a round trip after it is asked for while the sound runs on: the frame asked
+          // is the one due when it lands, so the picture keeps time with the voice
+          const fps = comp.peek().fps, end = comp.peek().duration;
+          const at = playing && this.sandboxLead > 0 ? Math.min(end, prefs.peek().exactFrames ? Math.floor((t + this.sandboxLead) * fps + 1e-6) / fps : t + this.sandboxLead) : t;
+          const asked = performance.now();
+          void this.drawSandboxFrame(at, samples, scale, playing).then(() => {
+            if (playing) this.sandboxLead = Math.min(SANDBOX_LEAD_MAX, this.sandboxLead * 0.8 + 0.2 * (performance.now() - asked) / 1000);
+          }).catch((e) => { S.renderError.value = `sandbox: ${(e as Error).message}`; }).finally(() => {
             this.sandboxBusy = false;
             // Only another invalidation needs another frame. An unconditional
             // redraw here keeps decoding and drawing forever while paused.
@@ -491,7 +502,7 @@ class Preview {
    * transparency as anywhere. Video frames are still decoded here and travel
    * with the request.
    */
-  private async drawSandboxFrame(t: number, samples?: number, scale = this.renderer!.scale) {
+  private async drawSandboxFrame(t: number, samples?: number, scale = this.renderer!.scale, playing = false) {
     const r = this.renderer!;
     const doc = this.applied ?? S.doc.peek();
     const c = doc.compositions[r.compId];
@@ -504,7 +515,7 @@ class Preview {
     // the pictures this frame shows, brought in first: the sandbox only has those kept
     await r.bringImages(t);
     ensureSandboxDoc(pluginHost(docUrl), ctx);
-    const pic = await renderSandboxFrame(pluginHost(docUrl), r, { compId: r.compId, t, scale, samples, width: c.width, height: c.height });
+    const pic = await renderSandboxFrame(pluginHost(docUrl), r, { compId: r.compId, t, scale, samples, width: c.width, height: c.height }, { playing });
     if (pic.err) { S.renderError.value = `sandbox: ${pic.err}`; return; }
     if (!pic.bitmap) return;
     this.setScale(r, scale, this.stillScale());

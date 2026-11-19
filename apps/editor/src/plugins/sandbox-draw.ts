@@ -224,19 +224,54 @@ export function moduleItemsOf(doc: TrammeDoc, docUrl: string): { id: string; url
  * cross: a frame is a canvas as often as a bitmap, and a canvas element does
  * not cross postMessage, so it travels as an ImageBitmap (closed by the host
  * once the request is answered). One that cannot be decoded crosses blank: its
- * layer draws nothing rather than ask for it again.
+ * layer draws nothing rather than ask for it again. Times that fall in one
+ * picture of the file (the motion-blur samples of a frame) share its one
+ * bitmap: a 4K picture copied for each sample passed the sandbox's limit.
+ * While the preview moves (`shrink` below 1), the picture is first made
+ * smaller on the graphics card (VideoFrames.quickPicture, as Host.quick does
+ * on the page): a 4K copy per frame was most of a played frame's time.
  */
-async function decodeVideoFrame(r: Renderer, id: string, t: number): Promise<ImageBitmap> {
+async function decodeVideoFrame(va: SandboxVideo | null, t: number, made: Map<CanvasImageSource, Promise<ImageBitmap>>, shrink = 1): Promise<ImageBitmap> {
   try {
-    const va = r.assets.get<{ request?(x: number): Promise<void>; frameAt(x: number): { image: CanvasImageSource | null } | null } | null>(id);
     if (va) {
       await va.request?.(t);
-      const fr = va.frameAt(t);
-      if (fr?.image) return await createImageBitmap(fr.image);
+      const image = va.frameAt(t)?.image;
+      if (image) {
+        let bitmap = made.get(image);
+        if (!bitmap) {
+          const small = shrink < 1 && va.width && va.height ? va.quickPicture?.(image, Math.ceil(va.width * shrink), Math.ceil(va.height * shrink)) : null;
+          // the small picture is a canvas drawn over by the next one: createImageBitmap copies it at once
+          made.set(image, bitmap = createImageBitmap(small ?? image));
+        }
+        return await bitmap;
+      }
     }
   } catch { /* drawn blank */ }
   return createImageBitmap(new OffscreenCanvas(1, 1));
 }
+
+/** a video as the page's renderer holds it (render/video.ts VideoFrames) */
+interface SandboxVideo {
+  width?: number;
+  height?: number;
+  request?(x: number, kind?: 'shown' | 'ahead'): Promise<void>;
+  frameAt(x: number): { image: CanvasImageSource | null; exact?: boolean } | null;
+  quickPicture?(image: CanvasImageSource, width: number, height: number): CanvasImageSource | null;
+}
+const videoOf = (r: Renderer, id: string): SandboxVideo | null => { try { return r.assets.get<SandboxVideo | null>(id); } catch { return null; } };
+
+/**
+ * How much smaller a moving preview's video frames may cross: the preview's
+ * own scale, with room for a layer pushed in a little, applied only when the
+ * frame lands at half its size or less (as Host.quick on the page).
+ */
+function shrinkOf(va: SandboxVideo | null, payload: Omit<FramePayload, 'videos'>): number {
+  if (!va?.width || !va.height) return 1;
+  const k = 1.25 * payload.scale * Math.max(payload.width / va.width, payload.height / va.height);
+  return k <= 0.5 ? k : 1;
+}
+/** the frames decoded ahead of a played sandbox frame, so the next ones find theirs ready */
+const AHEAD_FRAMES = 2;
 
 /** the rounds of video frames one sandbox frame may ask for before it is taken as stuck */
 const VIDEO_ROUNDS = 4;
@@ -260,16 +295,30 @@ function predictNeeds(host: PluginHost, t: number): VideoNeed[] {
  * motion-blur sample), not every video of the project at the composition's
  * time. The frames the last two frames asked for, moved on, go with the first
  * request; the sandbox names any it still lacks, decoded and sent again.
+ * Played (`playing`), the frames go smaller while the preview moves, and the
+ * next frames' videos start decoding as soon as this one is answered.
  */
-export async function renderSandboxFrame(host: PluginHost, r: Renderer, payload: Omit<FramePayload, 'videos'>, opts?: { export?: boolean }): Promise<FrameAnswer> {
+export async function renderSandboxFrame(host: PluginHost, r: Renderer, payload: Omit<FramePayload, 'videos'>, opts?: { export?: boolean; playing?: boolean }): Promise<FrameAnswer> {
   // the frames sent, by key: each round decodes them again (the decoder keeps its frames) since the host closes what it sent
   const wanted = new Map<string, VideoNeed>(predictNeeds(host, payload.t).map((n) => [videoKey(n.id, n.t), n]));
   for (let round = 0; round < VIDEO_ROUNDS; round++) {
-    const videos: Record<string, ImageBitmap> = {};
-    for (const [key, n] of wanted) videos[key] = await decodeVideoFrame(r, n.id, n.t);
-    const answer = await host.renderFrame({ ...payload, videos }, opts);
+    const videos: Record<string, ImageBitmap> = {}, videoSizes: Record<string, [number, number]> = {}, made = new Map<CanvasImageSource, Promise<ImageBitmap>>();
+    // the videos decode side by side, as the page's own frames do
+    await Promise.all([...wanted].map(async ([key, n]) => {
+      const va = videoOf(r, n.id);
+      if (va?.width && va.height) videoSizes[n.id] = [va.width, va.height];
+      videos[key] = await decodeVideoFrame(va, n.t, made, opts?.playing ? shrinkOf(va, payload) : 1);
+    }));
+    const answer = await host.renderFrame({ ...payload, videos, videoSizes }, opts);
     if (!answer.need?.length) {
       lastNeeds.set(host, [...(lastNeeds.get(host) ?? []).slice(-1), { t: payload.t, need: answer.drew ?? [] }]);
+      const fps = r.comp?.fps;
+      if (opts?.playing && fps) {
+        for (let k = 1; k <= AHEAD_FRAMES; k++) for (const n of predictNeeds(host, payload.t + k / fps)) {
+          const va = videoOf(r, n.id);
+          if (va && !va.frameAt(n.t)?.exact) void va.request?.(n.t, 'ahead');
+        }
+      }
       return answer;
     }
     const fresh = answer.need.filter((n) => !wanted.has(videoKey(n.id, n.t)));

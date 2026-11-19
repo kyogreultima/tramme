@@ -154,6 +154,8 @@ export interface FramePayload {
   height: number;
   /** the video frames the page decoded for this frame, under videoKey(id, t) (copied, not transferred) */
   videos?: Record<string, unknown>;
+  /** each video's own size, by asset id: the frames sent while the preview moves are made smaller, the layout keeps the file's */
+  videoSizes?: Record<string, [number, number]>;
 }
 
 /** a frame of a video asset a sandbox frame draws: its asset, and its time in the file */

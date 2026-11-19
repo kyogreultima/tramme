@@ -213,6 +213,69 @@ describe('sandbox video rendering', () => {
     expect(calls.length).toBe(2 + 2 + 4);
   });
 
+  it('sends one copy of a video frame that several motion-blur samples share', async () => {
+    const doc = project();
+    doc.compositions[doc.root].motionBlur = { samples: 8, shutter: 0.5 };
+    doc.assets.footage = { type: 'video', src: 'assets/footage.mp4' };
+    doc.compositions[doc.root].layers.video = { type: 'video', props: { video: 'footage' } };
+    doc.compositions[doc.root].order = ['video'];
+    const side = makeSandboxDraw(new Map());
+    side.setDoc({ doc, docUrl: 'https://tramme.test/doc.json', images: {}, json: {}, fonts: [] });
+    // a 30 fps file: every time inside one of its frames gives that frame's one picture, as the decoder's pool does
+    const pictures = new Map<number, { width: number; height: number }>();
+    const picture = (t: number) => { const i = Math.floor(t * 30 + 1e-6); if (!pictures.has(i)) pictures.set(i, { width: 3840, height: 2160 }); return pictures.get(i)!; };
+    const renderer = { assets: { get: () => ({ request: async () => {}, frameAt: (t: number) => ({ image: picture(t) }) }) } } as unknown as Renderer;
+    const sent: Record<string, unknown>[] = [];
+    const host = { renderFrame: async (p: Parameters<typeof side.renderFrame>[0]) => { sent.push(p.videos ?? {}); const { transfer: _, ...answer } = await side.renderFrame(p); return answer; } } as unknown as PluginHost;
+    for (let f = 0; f < 4; f++) expect((await renderSandboxFrame(host, renderer, frameOf(doc, 10 + f / 24), { export: true })).err).toBeUndefined();
+    // the eight samples name eight times, but they fall in one or two pictures of the file: one bitmap per picture crosses
+    const most = sent.reduce((a, v) => (Object.keys(v).length > Object.keys(a).length ? v : a), {});
+    expect(Object.keys(most).length).toBeGreaterThan(4);
+    const pictured = new Set(Object.values(most).map((b) => (b as { source: unknown }).source));
+    expect(new Set(Object.values(most)).size).toBe(pictured.size);
+  });
+
+  it('plays a 4K video through the sandbox as a small picture drawn over the file\'s own rectangle, the next frames decoding ahead', async () => {
+    const doc = project();
+    doc.compositions[doc.root].motionBlur = { samples: 1, shutter: 0 };
+    doc.assets.footage = { type: 'video', src: 'assets/footage.mp4' };
+    doc.compositions[doc.root].layers.video = { type: 'video', props: { video: 'footage', fit: 'contain' } };
+    doc.compositions[doc.root].order = ['video'];
+    const side = makeSandboxDraw(new Map());
+    side.setDoc({ doc, docUrl: 'https://tramme.test/doc.json', images: {}, json: {}, fonts: [] });
+    const shrunk: [number, number][] = [], asked: [number, string][] = [];
+    const video = {
+      width: 3840, height: 2160,
+      request: async (t: number, kind = 'shown') => { asked.push([+t.toFixed(4), kind]); },
+      frameAt: () => ({ image: { width: 3840, height: 2160 }, exact: false }),
+      quickPicture: (_: unknown, w: number, h: number) => { shrunk.push([w, h]); return { width: w, height: h }; },
+    };
+    const renderer = { comp: { fps: 24 }, assets: { get: () => video } } as unknown as Renderer;
+    const host = { renderFrame: async (p: Parameters<typeof side.renderFrame>[0]) => { const { transfer: _, ...answer } = await side.renderFrame(p); return answer; } } as unknown as PluginHost;
+    for (let f = 0; f < 3; f++) expect((await renderSandboxFrame(host, renderer, { ...frameOf(doc, 1 + f / 24), scale: 0.25 }, { playing: true })).err).toBeUndefined();
+    // shown at a quarter of 1920: the 4K frame crosses at 1.25 × 0.25 × ½ of its size
+    expect(shrunk.at(-1)).toEqual([600, 338]);
+    // the video layer still draws over the file's whole frame (1920 × 1080 in the composition), not the small picture's
+    const drawn = draws.at(-1)!;
+    expect(drawn.slice(3, 5)).toEqual([1920, 1080]);
+    expect(asked.some(([t, kind]) => kind === 'ahead' && t > 1 + 2 / 24)).toBe(true);
+  });
+
+  it('sends the frames whole when not playing', async () => {
+    const doc = project();
+    doc.compositions[doc.root].motionBlur = { samples: 1, shutter: 0 };
+    doc.assets.footage = { type: 'video', src: 'assets/footage.mp4' };
+    doc.compositions[doc.root].layers.video = { type: 'video', props: { video: 'footage' } };
+    doc.compositions[doc.root].order = ['video'];
+    const side = makeSandboxDraw(new Map());
+    side.setDoc({ doc, docUrl: 'https://tramme.test/doc.json', images: {}, json: {}, fonts: [] });
+    const quickPicture = vi.fn();
+    const renderer = { comp: { fps: 24 }, assets: { get: () => ({ width: 3840, height: 2160, request: async () => {}, frameAt: () => ({ image: { width: 3840, height: 2160 } }), quickPicture }) } } as unknown as Renderer;
+    const host = { renderFrame: async (p: Parameters<typeof side.renderFrame>[0]) => { const { transfer: _, ...answer } = await side.renderFrame(p); return answer; } } as unknown as PluginHost;
+    expect((await renderSandboxFrame(host, renderer, { ...frameOf(doc, 1), scale: 0.25 })).err).toBeUndefined();
+    expect(quickPicture).not.toHaveBeenCalled();
+  });
+
   it('gives a plugin node that computes an asset id the video frame it asks for', async () => {
     const doc = project();
     doc.assets.clip = { type: 'video', src: 'clip.mp4' };
