@@ -8,6 +8,20 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+## [0.35.0] - 2026-11-20
+
+### Added
+
+- The editor and the desktop app export web scenes as MP4, WebM, GIF and PNG sequences. Each scene draws its own picture for every frame, and Tramme composites that picture with the rest of the film.
+- The assistant sees web scenes. `check_scene` returns stills of the scene at its start, middle and end, or the error its page raises. Stills, contact sheets, the critic and the storyboard show the scene in the film instead of a placeholder.
+- A web scene can use the files of another scene in the project, such as the fonts of an interface kit, through `../<scene>/...` or `/scenes/<scene>/...`. Those files are read-only. When one of them changes, the scene is captured again.
+
+### Fixed
+
+- `tramme still` captures web scenes, as `tramme render` does.
+- When a picture is changed from a reference without naming a provider, Tramme picks OpenAI or Gemini instead of a provider that only draws from words. If neither key is set, the error says which key to add.
+- The web scene preview loads pictures named in a `style` attribute whose quotes are written as `&quot;`.
+
 ## [0.34.0] - 2026-11-20
 
 ### Added
@@ -1078,7 +1092,8 @@ First public release.
 
 - Cloudflare Worker serving the editor and the API, projects stored in R2, access protected by Cloudflare Access.
 
-[Unreleased]: ../../compare/v0.34.0...HEAD
+[Unreleased]: ../../compare/v0.35.0...HEAD
+[0.35.0]: ../../compare/v0.34.0...v0.35.0
 [0.34.0]: ../../compare/v0.33.0...v0.34.0
 [0.33.0]: ../../compare/v0.32.1...v0.33.0
 [0.32.1]: ../../compare/v0.32.0...v0.32.1
