@@ -1081,6 +1081,7 @@
     "couldNotImportName": "Could not import {name}: {error}",
     "nameIsAsset": "{name} is the asset {asset}",
     "alreadyInProject": "Already in the project, not imported again: {list}",
+    "documentsAsMaterial": "Added to the project material (Direction tab), read by the assistant: {list}",
     "importNFiles": "Import {n} files",
     "nDrawingsInFolder": "{n} drawings in {folder}/: right-click one of them, \"Animate the folder\", to make a sequence.",
     "newComposition": "New composition",

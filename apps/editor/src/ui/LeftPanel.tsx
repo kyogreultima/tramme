@@ -25,6 +25,7 @@ import { fromLottie } from '@tramme/interop';
 import { mediaOf, TranscribeButton, transcribeItem } from './Transcribe.tsx';
 import { fileProject, requireFileProject, sameFileProject, safeName, takenPaths, upload, type FileProject } from '../files.ts';
 import { assetWithHash, contentHash } from '../hash.ts';
+import { kindOf, SOURCES_DIR } from '../sources.ts';
 import { m, t, tr } from '../i18n/index.ts';
 import { listCommands } from '../ai/commands.ts';
 import { projectAssetUrl } from '../project-asset-url.ts';
@@ -532,9 +533,20 @@ export async function importFiles(files: FileList | File[]) {
   const stem = images.length > 1 ? commonStem(images.map((f) => f.name)) : null;
   const folder = stem ? `assets/${safeName(stem)}` : 'assets';
   // a file already in the project (or twice in this import) is answered with its asset, nothing written
-  const added = new Map<string, string>(), already: string[] = [];
+  const added = new Map<string, string>(), already: string[] = [], documents: string[] = [];
   for (const f of Array.from(files)) {
     if (!sameFileProject(project)) return;
+    // a PDF or markdown document is material for the assistant, not an asset a layer shows:
+    // it joins the project's sources, where the Direction tab lists it and the sources tool reads it
+    if (kindOf(f) === 'document') {
+      try {
+        paths ??= await takenPaths();
+        await upload(paths, `${SOURCES_DIR}${safeName(f.name)}`, f);
+        requireFileProject(project);
+        documents.push(f.name);
+      } catch (e) { toast(t('panel.couldNotImportName', { name: f.name, error: (e as Error).message }), 'error'); if (!sameFileProject(project)) return; }
+      continue;
+    }
     if (/\.json$/i.test(f.name)) {
       try { await importLottie(f, project); } catch (e) { toast(t('panel.couldNotImportLottie', { error: (e as Error).message }), 'error'); }
       continue;
@@ -563,6 +575,7 @@ export async function importFiles(files: FileList | File[]) {
     toast(t('panel.nDrawingsInFolder', { n: images.length, folder }), 'info', 9000);
   }
   if (already.length) toast(t('panel.alreadyInProject', { list: already.join(', ') }), 'info', 8000);
+  if (documents.length) toast(t('panel.documentsAsMaterial', { list: documents.join(', ') }), 'info', 8000);
   // a video this machine decodes slower than it plays: a proxy offered (measured on a second of it)
   for (const o of ops) {
     const a = o.value as Asset, f = Array.from(files).find((x) => x.name.replace(/\.[^.]+$/, '') === a.name);

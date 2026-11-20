@@ -1081,6 +1081,7 @@
     "couldNotImportName": "Import de {name} impossible : {error}",
     "nameIsAsset": "{name} est l'asset {asset}",
     "alreadyInProject": "Déjà dans le projet, pas importé une seconde fois : {list}",
+    "documentsAsMaterial": "Ajouté à la matière du projet (onglet Direction), lu par l’assistant : {list}",
     "importNFiles": "Importer {n} fichiers",
     "nDrawingsInFolder": "{n} dessins dans {folder}/ : clic droit sur l'un d'eux, « Animer le dossier », pour en faire une séquence.",
     "newComposition": "Nouvelle composition",
