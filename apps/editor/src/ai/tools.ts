@@ -546,7 +546,8 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
     if (path === DOCUMENT) return text('read the document with get_document', true);
     const bad = pathIssue(path) ?? (/%|#/.test(path) ? 'invalid project path' : null);
     if (bad) return text(`${path}: ${bad}`, true);
-    if (!TEXT_FILE.test(path) || path === MANIFEST || isChatPath(path)) return text('only .js, .mjs, .json, .svg and .md text files can be read', true);
+    // a web scene's own text files (its HTML and CSS too): the assistant reads one before it edits it with edit_scene
+    if (!(TEXT_FILE.test(path) || isSceneTextPath(path)) || path === MANIFEST || isChatPath(path)) return text('only .js, .mjs, .json, .svg and .md text files, and the text files of a web scene (scenes/<id>/: .html, .css, .txt too), can be read', true);
     const body = await readProjectText(project.id, path);
     requireFileProject(project);
     if (body === null) return text(`file not found: ${path}`, true);

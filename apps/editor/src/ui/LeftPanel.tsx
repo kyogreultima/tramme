@@ -26,6 +26,8 @@ import { mediaOf, TranscribeButton, transcribeItem } from './Transcribe.tsx';
 import { fileProject, requireFileProject, sameFileProject, safeName, takenPaths, upload, type FileProject } from '../files.ts';
 import { assetWithHash, contentHash } from '../hash.ts';
 import { kindOf, SOURCES_DIR } from '../sources.ts';
+import { droppedOf, pickedOf, sceneFoldersOf, writeSceneFolders, type Picked } from '../importer.ts';
+import { bumpScene } from '../webscene-preview.ts';
 import { m, t, tr } from '../i18n/index.ts';
 import { listCommands } from '../ai/commands.ts';
 import { projectAssetUrl } from '../project-asset-url.ts';
@@ -522,12 +524,29 @@ async function importLottie(f: File, project: FileProject) {
   }
 }
 
-export async function importFiles(files: FileList | File[]) {
+/** files or whole folders (a folder chosen or dropped keeps its paths) into the project */
+export async function importFiles(picked: FileList | File[] | Picked[]) {
   const project = fileProject();
   const doc = S.doc.peek();
   const ops = [];
   const taken: Record<string, unknown> = { ...doc.assets };
   let paths: Set<string> | null = null;
+  const items = Array.from(picked as ArrayLike<File | Picked>, (x) => (x instanceof File ? pickedOf([x])[0] : x))
+    .filter((it) => !it.path.split('/').some((part) => part.startsWith('.')));
+  // a folder holding a scene.json is a web scene: it comes in whole under scenes/<id>/
+  const { scenes, rest } = sceneFoldersOf(items);
+  if (scenes.length) {
+    try {
+      paths ??= await takenPaths();
+      const target = paths;
+      const { written, refused, skipped } = await writeSceneFolders(scenes, target, (path, f) => upload(target, path, f).then(() => requireFileProject(project)));
+      if (written.length) { bumpScene(); toast(t('panel.scenesImported', { list: written.join(', ') }), 'info', 9000); }
+      if (refused.length) toast(t('panel.scenesRefused', { list: refused.join(', ') }), 'error', 9000);
+      if (skipped.length) toast(t('panel.sceneFilesSkipped', { list: skipped.slice(0, 5).join(', ') }), 'info', 9000);
+    } catch (e) { toast(t('panel.couldNotImportName', { name: scenes.map((s) => s.name).join(', '), error: (e as Error).message }), 'error'); }
+    if (!sameFileProject(project)) return;
+  }
+  const files = rest.map((it) => it.file);
   // numbered drawings (oeil_01.png, oeil_02.png…) go together in a folder of their own
   const images = Array.from(files).filter((f) => typeOfFile(f.name) === 'image');
   const stem = images.length > 1 ? commonStem(images.map((f) => f.name)) : null;
@@ -643,6 +662,7 @@ function Assets() {
   const [filter, setFilter] = useState<AssetFilter>({});
   const spoken = useSpoken(doc, !!filter.text);
   const input = useRef<HTMLInputElement>(null);
+  const folderInput = useRef<HTMLInputElement>(null);
   const relink = useRef<HTMLInputElement>(null);
   const offline = S.offline.value;
   // a copy of a shipped pack older than the editor's: offered its update, the way an installed plugin's copy is
@@ -697,14 +717,15 @@ function Assets() {
   return (
     <div class={`panel-body${over ? ' drop' : ''}`} style={over ? { boxShadow: 'inset 0 0 0 2px var(--accent-line)' } : undefined}
       onDragOver={(e) => { e.preventDefault(); setOver(true); }} onDragLeave={() => setOver(false)}
-      onDrop={(e) => { e.preventDefault(); setOver(false); if (e.dataTransfer?.files.length) importFiles(e.dataTransfer.files); }}>
+      onDrop={(e) => { e.preventDefault(); setOver(false); if (e.dataTransfer?.files.length) void droppedOf(e.dataTransfer).then(importFiles); }}>
       <Compositions />
       <input ref={relink} type="file" multiple hidden onChange={(e) => { const f = (e.target as HTMLInputElement).files; if (f) void relinkFiles([...f]); (e.target as HTMLInputElement).value = ''; }} />
       {offline.length > 0 && <div class="missing-note"><Icon name="alert" size={13} /><span>{t('panel.mediaMissing', { n: offline.length })}</span><button class="btn sm" onClick={() => relink.current?.click()}>{t('panel.relinkMissing')}</button></div>}
       {Object.keys(doc.assets).length > 0 && <MediaBar doc={doc} filter={filter} onChange={setFilter} />}
       {Object.keys(doc.assets).length > 0 && shown.length === 0 && <div class="faint tree-none">{t('panel.noMediaMatches')}</div>}
       <input ref={input} type="file" multiple hidden onChange={(e) => { const f = (e.target as HTMLInputElement).files; if (f) importFiles(f); (e.target as HTMLInputElement).value = ''; }} />
-      {byType.size === 0 && <div class="empty"><Icon name="folder" />{t('panel.noAssetsDropFiles')}<button class="btn sm" onClick={() => input.current?.click()}><Icon name="plus" />{t('panel.import')}</button></div>}
+      <input ref={folderInput} type="file" multiple hidden {...{ webkitdirectory: true }} onChange={(e) => { const f = (e.target as HTMLInputElement).files; if (f) importFiles(pickedOf(f)); (e.target as HTMLInputElement).value = ''; }} />
+      {byType.size === 0 && <div class="empty"><Icon name="folder" />{t('panel.noAssetsDropFiles')}<button class="btn sm" onClick={() => input.current?.click()}><Icon name="plus" />{t('panel.import')}</button><button class="btn sm ghost" onClick={() => folderInput.current?.click()}><Icon name="folder" />{t('panel.importFolder')}</button></div>}
       {[...byType].map(([type, list]) => (
         <div key={type}>
           <div class="section-label" style={type === 'module' ? { display: 'flex', alignItems: 'center' } : undefined}>
@@ -731,7 +752,7 @@ function Assets() {
           ))}
         </div>
       ))}
-      {byType.size > 0 && <div style={{ padding: 10 }}><button class="btn sm ghost" onClick={() => input.current?.click()}><Icon name="plus" />{t('panel.importFiles')}</button></div>}
+      {byType.size > 0 && <div style={{ padding: 10 }}><button class="btn sm ghost" onClick={() => input.current?.click()}><Icon name="plus" />{t('panel.importFiles')}</button><button class="btn sm ghost" onClick={() => folderInput.current?.click()}><Icon name="folder" />{t('panel.importFolder')}</button></div>}
       {byType.size === 0 && <div style={{ padding: 10 }}><button class="btn sm ghost" onClick={(e) => packMenu(e, addPack)}><Icon name="plus" />{t('panel.addPack')}</button></div>}
     </div>
   );

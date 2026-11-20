@@ -237,7 +237,7 @@ export const TOOLS: ToolDef[] = [
   },
   {
     name: 'read_file',
-    description: 'The text content of a project file (.js/.mjs plugin, .json data, .svg). A long file comes in parts: the answer says the offset to read the next one from.',
+    description: 'The text content of a project file (.js/.mjs plugin, .json data, .svg, .md, and a web scene\'s text files under scenes/<id>/: .html, .css, .txt). A long file comes in parts: the answer says the offset to read the next one from.',
     schema: z.object({
       path: z.string().describe('path in the project, e.g. plugins/star.js'),
       offset: z.number().int().min(0).optional().describe('character to start from (0 by default)'),
