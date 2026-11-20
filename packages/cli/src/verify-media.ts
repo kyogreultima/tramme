@@ -28,7 +28,7 @@ export async function verifyMedia(file: string, expected: MediaExpected = {}, ti
     const finish = (failure: string | null) => { if (!settled) { settled = true; clearTimeout(timer); resolve(failure); } };
     const ff = spawn(FFMPEG, [
       '-hide_banner', '-nostdin', '-nostats', '-xerror', '-err_detect', 'explode', '-i', result.file,
-      '-map', '0:v:0', ...(audioCodec ? ['-map', '0:a:0?', '-af', 'volumedetect'] : ['-an']),
+      '-map', '0:v:0', ...(audioCodec ? ['-map', '0:a:0?', '-af', 'ashowinfo'] : ['-an']),
       '-vf', 'showinfo=checksum=0', '-fps_mode', 'passthrough',
       '-progress', 'pipe:1', '-f', 'null', '-',
     ], { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -50,9 +50,11 @@ export async function verifyMedia(file: string, expected: MediaExpected = {}, ti
       for (const line of lines) {
         if (audioCodec) {
           decodedAudioCodec ||= /Stream #0:\d+.*: Audio: ([\w]+)/.exec(line)?.[1] ?? '';
-          const samples = /\bn_samples: (\d+)/.exec(line);
-          if (samples) audioSamples = Math.max(audioSamples, Number(samples[1]));
+          // counted frame by frame as they are decoded: a summary printed when the filter closes can be missing
+          if (line.includes('Parsed_ashowinfo')) { audioSamples += Number(/\bnb_samples:(\d+)/.exec(line)?.[1] ?? 0); continue; }
         }
+        // the video's measures come from its own filter's lines only (the audio's carry a pts_time too)
+        if (!line.includes('Parsed_showinfo')) continue;
         const size = /\bs:(\d+)x(\d+)\b/.exec(line);
         if (size) { width = Number(size[1]); height = Number(size[2]); }
         const rate = /config in time_base:.*?frame_rate:\s*(\d+)\/(\d+)/.exec(line);
@@ -78,11 +80,10 @@ export async function verifyMedia(file: string, expected: MediaExpected = {}, ti
   }
   result.actual = { width, height, fps, frames, duration };
   if (audioCodec) {
+    // the wrong codec is said whatever was counted: it is the first thing to fix
+    if (decodedAudioCodec && decodedAudioCodec !== audioCodec) result.issues.push(`Audio codec: expected ${audioCodec}, decoded ${decodedAudioCodec}.`);
     if (!decodedAudioCodec || audioSamples === 0) result.issues.push('Expected audio, but no audio samples could be decoded.');
-    else {
-      result.actual.audio = { codec: decodedAudioCodec, samples: audioSamples };
-      if (decodedAudioCodec !== audioCodec) result.issues.push(`Audio codec: expected ${audioCodec}, decoded ${decodedAudioCodec}.`);
-    }
+    else result.actual.audio = { codec: decodedAudioCodec, samples: audioSamples };
   }
   for (const [key, wanted] of Object.entries(videoExpected) as [keyof typeof videoExpected, number][]) {
     const actual = result.actual[key];

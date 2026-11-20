@@ -8,6 +8,10 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+### Fixed
+
+- The delivery check of a video counts the audio samples as each frame is decoded, instead of reading a summary at the end that could be missing. When the codec is wrong, it now says so.
+
 ## [0.35.0] - 2026-11-20
 
 ### Added
