@@ -12,6 +12,7 @@ import { declarationsModule, ensureDeclared, ensureSandboxDoc, moduleItemsOf, re
 import { prefs } from './settings.ts';
 import { sandboxedDoc } from './installed.ts';
 import { S } from './state.ts';
+import { withSceneCapture } from './webscene-snapshot.ts';
 
 /** a renderer of its own (never the preview's) and the stills it draws */
 export class Stills {
@@ -45,6 +46,11 @@ export class Stills {
 
   /** the frame at t, at most `width` pixels wide, as a data URL (fitLongest gives the width for a longest side) */
   async still(doc: TrammeDoc, t: number, compId: string, width: number, quality = 0.86, format: 'image/jpeg' | 'image/png' = 'image/jpeg'): Promise<string> {
+    // web scenes drawn from their own frames, not the live view's stand-in
+    return withSceneCapture(S.project.peek().id, doc, () => this.drawStill(doc, t, compId, width, quality, format));
+  }
+
+  private async drawStill(doc: TrammeDoc, t: number, compId: string, width: number, quality: number, format: 'image/jpeg' | 'image/png'): Promise<string> {
     const r = await this.rendererFor(doc, compId);
     const c = doc.compositions[compId];
     const k = Math.min(1, width / c.width);

@@ -214,7 +214,7 @@ ${lint.map((l) => `- ${l}`).join('\n')}` : ''}` };
 
 const checkScene: ToolType<{ id: string }> = {
   name: 'check_scene', title: 'Check a web scene',
-  description: 'checks a web scene: scene.json matches the format, its entry is an HTML file of the scene, and its scripts hold nothing that breaks determinism (free Date.now, Math.random, fetch, requestAnimationFrame). Stills of a scene come from the export (tramme render)',
+  description: 'checks a web scene: scene.json matches the format, its entry is an HTML file of the scene, its scripts hold nothing that breaks determinism (free Date.now, Math.random, fetch, requestAnimationFrame), and its page runs: stills of the scene alone at its start, middle and end, drawn by the scene itself (an error of the page is reported). render_still shows it in the film too',
   input: { type: 'object', required: ['id'], properties: { id: { type: 'string', title: 'Scene' } } },
   ai: { when: 'after writing or editing a scene, before adding or changing its layer' },
   async run(input, ctx) {
@@ -224,8 +224,18 @@ const checkScene: ToolType<{ id: string }> = {
     problems.push(...lint);
     if (problems.length) return { text: `scenes/${input.id} has problems:\n${problems.map((p) => `- ${p}`).join('\n')}` };
     const path = scenePath(input.id, 'scene.json');
-    const ops = sceneSyncOps(ctx.doc, `scenes/${input.id}`, manifestOf(await ctx.readText(path), path));
-    return { ops, label: `Scene ${input.id}`, text: `scenes/${input.id} is well formed.${ops.length ? ' The parameters of the layers showing it are brought up to date.' : ''} The seek lint found nothing; stills of a scene come from the export (tramme render).` };
+    const manifest = manifestOf(await ctx.readText(path), path);
+    const ops = sceneSyncOps(ctx.doc, `scenes/${input.id}`, manifest);
+    const done = `scenes/${input.id} is well formed.${ops.length ? ' The parameters of the layers showing it are brought up to date.' : ''} The seek lint found nothing.`;
+    // the page run for real, where a browser can draw it (not in tests without one)
+    if (typeof createImageBitmap !== 'function') return { ops, label: `Scene ${input.id}`, text: done };
+    const [{ sceneStills }, { S }] = await Promise.all([import('./webscene-snapshot.ts'), import('./state.ts')]);
+    try {
+      const images = await sceneStills(S.project.peek().id, ctx.doc, `scenes/${input.id}`, manifest);
+      return { ops, label: `Scene ${input.id}`, images, text: `${done} Stills of the scene alone at its start, middle and end follow: judge them as the picture the film will show.` };
+    } catch (error) {
+      return { ops, label: `Scene ${input.id}`, text: `${done} But its page fails when it runs: ${(error as Error).message}` };
+    }
   },
 };
 

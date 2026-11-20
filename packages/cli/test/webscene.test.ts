@@ -4,7 +4,7 @@ import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { newProject } from '@tramme/project';
 import { fontFaceCss, injectCss, tokenCss } from '@tramme/project';
-import { assetsUsedBy, prepareWebScenes, sceneKey, type SceneCapturer } from '../src/webscene.ts';
+import { assetsUsedBy, otherSceneFile, prepareWebScenes, sceneKey, type SceneCapturer } from '../src/webscene.ts';
 
 const dirs: string[] = [];
 afterEach(() => { for (const dir of dirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true }); });
@@ -159,6 +159,32 @@ describe('project fonts and pictures in a scene', () => {
     expect(capture.mock.calls.length).toBe(1);
     expect(capture.mock.calls[0][0].projectDir).toBe(dir);
     fs.writeFileSync(path.join(dir, 'assets', 'logo.png'), 'two');
+    (await prepareWebScenes(file, doc, capture)).cleanup();
+    expect(capture.mock.calls.length).toBe(2);
+  });
+});
+
+describe("a scene that reads another scene's files (a kit's fonts)", () => {
+  it('serves them by ../<id>/ or /scenes/<id>/, never outside the scenes, and captures again when one changes', async () => {
+    const { dir, doc, file } = project();
+    const kit = path.join(dir, 'scenes', 'kit');
+    fs.mkdirSync(kit, { recursive: true });
+    fs.writeFileSync(path.join(kit, 'scene.json'), '{}');
+    fs.writeFileSync(path.join(kit, 'font.woff2'), 'one');
+    const scene = path.join(dir, 'scenes', 'title');
+    fs.writeFileSync(path.join(scene, 'index.html'), "<style>@font-face{font-family:K;src:url('../kit/font.woff2')}</style><p>one</p>");
+    expect(otherSceneFile(scene, dir, '/kit/font.woff2')).toBe(path.join(kit, 'font.woff2'));
+    expect(otherSceneFile(scene, dir, '/scenes/kit/font.woff2')).toBe(path.join(kit, 'font.woff2'));
+    // a folder of the scene's own, or a folder that is no scene, is not another scene
+    fs.mkdirSync(path.join(scene, 'parts'));
+    expect(otherSceneFile(scene, dir, '/parts/a.png')).toBeNull();
+    expect(otherSceneFile(scene, dir, '/assets/a.png')).toBeNull();
+    expect(assetsUsedBy(scene)).toEqual(['scenes/kit/font.woff2']);
+    const capture = fake();
+    (await prepareWebScenes(file, doc, capture)).cleanup();
+    (await prepareWebScenes(file, doc, capture)).cleanup();
+    expect(capture.mock.calls.length).toBe(1);
+    fs.writeFileSync(path.join(kit, 'font.woff2'), 'two');
     (await prepareWebScenes(file, doc, capture)).cleanup();
     expect(capture.mock.calls.length).toBe(2);
   });

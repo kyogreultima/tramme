@@ -55,7 +55,7 @@ describe('the document of a web scene preview', () => {
     expect(reads).toContain('scenes/title/fonts/t.woff2');
   });
 
-  it('leaves references to the network and to other places alone, and reads nothing outside the scene and assets/', async () => {
+  it('leaves references to the network and to other places alone, and reads nothing outside the scenes and assets/', async () => {
     const { frame, reads } = project({
       'scenes/title/index.html': `<head></head><img src="https://example.com/x.png"><img src="//cdn.test/y.png"><img src="../other/z.png"><img src="../../plugins/p.js"><img src="/document.tramme.json">
         <script type="module" src="https://example.com/a.js"></script><script type="module">import 'https://example.com/b.js'; import('../../plugins/evil.js');</script>`,
@@ -64,11 +64,17 @@ describe('the document of a web scene preview', () => {
     const html = await frame();
     expect(html).toContain('src="https://example.com/x.png"');
     expect(html).toContain('src="//cdn.test/y.png"');
-    expect(html).toContain('src="../other/z.png"');
+    // another scene's file (a kit's font or picture) is read, as data
+    expect(html).toContain(`src="data:image/png;base64,${btoa('z')}"`);
     expect(html).toContain('src="/document.tramme.json"');
     expect(html).toContain("import 'https://example.com/b.js'");
     expect(importMap(html)).toEqual({ 'scene:runtime': expect.any(String) });
-    expect(reads).toEqual(['scenes/title/index.html']);
+    expect(reads).toEqual(['scenes/title/index.html', 'scenes/other/z.png']);
+  });
+
+  it('reads a style attribute whose quotes are written as entities, as a serialised page writes them', async () => {
+    const html = await project({ 'scenes/title/index.html': '<head></head><div style="background-image: url(&quot;./bg.png&quot;); width: 2px"></div>', 'scenes/title/bg.png': 'b' }).frame();
+    expect(html).toContain(`style="background-image: url(&quot;data:image/png;base64,${btoa('b')}&quot;); width: 2px"`);
   });
 
   it('refuses a missing entry, an entry outside the scene, and files over the budget', async () => {

@@ -233,7 +233,11 @@ const generateImage: ToolType<Input> = {
     if (a.again && !ctx.doc.assets[a.again]) throw new Error(`${a.again}: no such picture in the project`);
     const words = a.prompt?.trim() || (before?.prompt ? String(before.prompt) : '');
     if (!words) throw new Error('say what to draw (prompt), or name a picture made before to make again (again)');
-    const provider = a.provider ?? (before?.provider ? String(before.provider) : undefined) ?? (p.pictureProvider !== 'auto' ? p.pictureProvider : undefined);
+    const inherited = (before?.provider ? String(before.provider) : undefined) ?? (p.pictureProvider !== 'auto' ? p.pictureProvider : undefined);
+    const changing = !!(a.reference ?? (a.again && (a.change || a.extend)));
+    // a picture to change goes to a provider that changes pictures: the one that drew it before or the preference
+    // only when it can, otherwise the server picks one (a provider named in the call is kept, and refused below)
+    const provider = a.provider ?? (changing && inherited && !CHANGERS.includes(inherited) ? undefined : inherited);
     // an object is drawn in the style of the film's target, when the plan has one and the provider can work from a picture
     const styled = a.object && !a.reference && !a.again && (!provider || CHANGERS.includes(provider)) ? parsePlan(await ctx.readText(FILM_PLAN_PATH).catch(() => null))?.target : undefined;
     const source = a.reference ?? (a.again && (a.change || a.extend) ? a.again : undefined) ?? styled;

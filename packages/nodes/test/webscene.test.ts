@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { setWebScenePlaceholder, webscene } from '../src/webscene.ts';
+import { setWebScenePlaceholder, setWebSceneSource, webscene } from '../src/webscene.ts';
 
 describe('web scene layer', () => {
   it('reports missing capture instead of drawing a blank layer', () => {
@@ -24,5 +24,30 @@ describe('web scene stand-in', () => {
     setWebScenePlaceholder(() => null);
     try { draw(ctx, props, { t: 0 } as never); } finally { setWebScenePlaceholder(null); }
     expect(calls).toEqual([]);
+  });
+});
+
+describe('web scene drawn from its own frame', () => {
+  const props = { folder: 'scenes/title', frames: [], fps: 30, size: [320, 180] as [number, number], $params: { tone: 'warm' } };
+  it("draws the picture the source gives, defers while it comes, fails with the scene's error, and falls back without a source", () => {
+    const calls: unknown[][] = [];
+    const ctx = { drawImage: (...args: unknown[]) => calls.push(args) } as unknown as CanvasRenderingContext2D;
+    const draw = webscene.render!.canvas2d!;
+    const picture = { width: 320 } as unknown as CanvasImageSource, wait = Promise.resolve(), deferred: unknown[] = [];
+    const asked: unknown[] = [];
+    let give: unknown = picture;
+    setWebSceneSource((ask) => { asked.push(ask); return give as never; });
+    try {
+      draw(ctx, props, { t: 1.5 } as never);
+      expect(asked).toEqual([{ folder: 'scenes/title', t: 1.5, size: [320, 180], params: { tone: 'warm' } }]);
+      expect(calls).toEqual([[picture, -160, -90, 320, 180]]);
+      give = wait;
+      draw(ctx, props, { t: 1.5, defer: (p: unknown) => deferred.push(p) } as never);
+      expect(deferred).toEqual([wait]);
+      give = new Error('the page threw');
+      expect(() => draw(ctx, props, { t: 1.5 } as never)).toThrow('web scene scenes/title: the page threw');
+      give = null;
+      expect(() => draw(ctx, props, { t: 1.5 } as never)).toThrow('has no captured frames');
+    } finally { setWebSceneSource(null); }
   });
 });

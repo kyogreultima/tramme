@@ -110,7 +110,10 @@ async function cmdStill(file: string) {
   const times = String(flags.t ?? '0').split(',').map(Number);
   const outDir = path.resolve(str('out') ?? path.join('out', stem(file)));
   fs.mkdirSync(outDir, { recursive: true });
-  const s = await session(file);
+  // web scenes are captured to pictures first, as for a render (and reused by the next one)
+  const scenes = await prepareWebScenes(file, readDoc(file), engineCapture, await registryOf(file, readDoc(file)).registry);
+  if (scenes.captured || scenes.reused) console.log(`  web scenes: ${scenes.captured} captured, ${scenes.reused} reused from renders/webscene`);
+  const s = await session(scenes.file).catch((error) => { scenes.cleanup(); throw error; });
   try {
     for (const t0 of times) {
       const t = Math.min(t0, s.info.duration - 1 / s.info.fps);
@@ -119,7 +122,7 @@ async function cmdStill(file: string) {
       fs.writeFileSync(f, Buffer.from(url.split(',')[1], 'base64'));
       console.log('wrote', path.relative(process.cwd(), f));
     }
-  } finally { await s.close(); }
+  } finally { await s.close(); scenes.cleanup(); }
 }
 
 async function cmdRender(file: string) {

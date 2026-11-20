@@ -77,6 +77,9 @@ async function geminiImageModel(key: string, fetch: Reach['fetch']): Promise<str
 /** OpenAI's size for a ratio: its three sizes, the square when a small picture is asked (it costs least) */
 const openaiSize = (ask: Ask) => (ask.size === 'small' ? '1024x1024' : WIDE.includes(ask.ratio) ? '1536x1024' : TALL.includes(ask.ratio) ? '1024x1536' : '1024x1024');
 
+/** the providers that change a picture (a reference, a mask); the others draw from words only */
+const CHANGERS: ImageProvider[] = ['openai', 'gemini'];
+
 /** a provider that draws from words only refuses a picture to change, saying who can */
 const wordsOnly = (provider: string, ask: Ask) => {
   if (ask.reference || ask.mask) throw new HttpError(400, `${provider} draws from words only: change a picture with OpenAI or Gemini`);
@@ -193,7 +196,10 @@ export async function generateImage(req: Request, { keys, fetch }: Reach) {
   const n = Math.max(1, Math.min(4, Math.round(Number(b.n) || 1)));
   const reference = pictureOf(b.reference, 'reference'), mask = pictureOf(b.mask, 'mask');
   if (mask && !reference) throw new HttpError(400, 'a mask goes with the picture it changes (reference)');
-  const provider = (b.provider ?? imageConfig(keys)[0]) as ImageProvider | undefined;
+  // a picture to change goes, unless one is named, to the first provider that changes pictures (the others draw from words only)
+  const configured = imageConfig(keys);
+  const provider = (b.provider ?? (reference ? configured.find((p) => CHANGERS.includes(p)) : configured[0])) as ImageProvider | undefined;
+  if (!provider && reference) throw new HttpError(503, `no provider that changes a picture: ${keys.how(CHANGERS, 'one')}`);
   if (!provider || !IMAGE_PROVIDERS[provider]) {
     throw new HttpError(503, `no provider for pictures: ${keys.how(Object.keys(IMAGE_PROVIDERS) as ImageProvider[], 'one')}`);
   }

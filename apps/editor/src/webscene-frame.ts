@@ -32,6 +32,8 @@ export interface SceneFrameInput {
 }
 
 const RUNTIME = 'scene:runtime';
+/** a file inside a scene folder of the project */
+const SCENE_FILE = /^scenes\/[a-z0-9][a-z0-9-]{0,63}\/.+/;
 const text = (bytes: Uint8Array) => new TextDecoder().decode(bytes);
 
 function base64(bytes: Uint8Array): string {
@@ -67,7 +69,8 @@ export async function buildSceneFrame(input: SceneFrameInput): Promise<string> {
     try { decoded = decodeURIComponent(clean); } catch { return null; }
     const path = decoded.startsWith('/') ? join('', decoded) : join(fromDir, decoded);
     if (!path || pathIssue(path) || /[%#]/.test(path)) return null;
-    return path.startsWith(`${folder}/`) || isAssetFile(path) ? path : null;
+    // its own files, the project's assets, and another scene's files (a kit's fonts and pictures), read only
+    return path.startsWith(`${folder}/`) || isAssetFile(path) || SCENE_FILE.test(path) ? path : null;
   };
 
   const load = async (path: string): Promise<Uint8Array | null> => {
@@ -167,7 +170,9 @@ export async function buildSceneFrame(input: SceneFrameInput): Promise<string> {
     return `<style>${css.replace(/<\/style/gi, '<\\/style')}</style>`;
   });
   html = await replaceAll(html, /(<style\b[^>]*>)([\s\S]*?)(<\/style\s*>)/gi, async (m) => `${m[1]}${await cssUrls(m[2], entryDir)}${m[3]}`);
-  html = await replaceAll(html, /(\bstyle\s*=\s*)(?:"([^"]*)"|'([^']*)')/gi, async (m) => `${m[1]}"${(await cssUrls(m[2] ?? m[3], entryDir)).replaceAll('"', '&quot;')}"`);
+  // a style attribute's quotes may be written as entities (url(&quot;bg.png&quot;), as a serialised page writes them): read as the browser will
+  const unescape = (value: string) => value.replace(/&quot;|&#34;/g, '"').replace(/&apos;|&#39;/g, "'").replace(/&amp;/g, '&');
+  html = await replaceAll(html, /(\bstyle\s*=\s*)(?:"([^"]*)"|'([^']*)')/gi, async (m) => `${m[1]}"${(await cssUrls(unescape(m[2] ?? m[3]), entryDir)).replaceAll('&', '&amp;').replaceAll('"', '&quot;')}"`);
 
   // pictures, sound and video named by an attribute
   html = await replaceAll(html, /(<(?:img|source|video|audio|track|image|use|input)\b[^>]*?\s(?:src|href|poster|xlink:href)\s*=\s*)(?:"([^"]*)"|'([^']*)')/gi, async (m) => {
@@ -187,12 +192,73 @@ export async function buildSceneFrame(input: SceneFrameInput): Promise<string> {
   return open ? html.slice(0, open.index + open[0].length) + head + html.slice(open.index + open[0].length) : `<!doctype html><html><head><meta charset="utf-8">${head}</head><body>${html}</body></html>`;
 }
 
-/** inside the frame: the only door, a message from the parent window */
+/**
+ * inside the frame: the only door, a message from the parent window. Besides 'seek', 'snapshot'
+ * draws the scene at a time as a picture the parent can read (the parent cannot read an iframe's
+ * pixels): the page, frozen at that instant, is serialised into an SVG foreignObject, its canvases
+ * and videos as pictures, and drawn on a canvas of the frame, sent back as an ImageBitmap.
+ */
 const BOOTSTRAP = `(function(){
   var up = window.parent;
+  function frozen(width, height) {
+    var clone = document.documentElement.cloneNode(true);
+    var liveMedia = document.querySelectorAll('canvas, video'), cloneMedia = clone.querySelectorAll('canvas, video');
+    for (var i = 0; i < cloneMedia.length; i++) {
+      var live = liveMedia[i], copy = cloneMedia[i], img = document.createElement('img'), src = '';
+      try {
+        if (live.tagName === 'CANVAS') src = live.toDataURL('image/png');
+        else if (live.poster && !live.currentSrc) src = live.poster;
+        else if (live.videoWidth) { var c = document.createElement('canvas'); c.width = live.videoWidth; c.height = live.videoHeight; c.getContext('2d').drawImage(live, 0, 0); src = c.toDataURL('image/png'); }
+      } catch (err) { src = ''; }
+      if (copy.getAttribute('class')) img.setAttribute('class', copy.getAttribute('class'));
+      if (copy.id) img.id = copy.id;
+      var r = live.getBoundingClientRect();
+      img.setAttribute('style', (copy.getAttribute('style') || '') + ';width:' + r.width + 'px;height:' + r.height + 'px');
+      if (live.tagName === 'VIDEO') img.style.objectFit = getComputedStyle(live).objectFit;
+      if (src) img.src = src;
+      copy.parentNode.replaceChild(img, copy);
+    }
+    var liveFields = document.querySelectorAll('input, textarea, select'), fields = clone.querySelectorAll('input, textarea, select');
+    for (var j = 0; j < fields.length; j++) {
+      var f = fields[j], v = liveFields[j];
+      if (f.tagName === 'TEXTAREA') f.textContent = v.value;
+      else if (f.tagName === 'SELECT') { if (f.options[v.selectedIndex]) f.options[v.selectedIndex].setAttribute('selected', ''); }
+      else { f.setAttribute('value', v.value); if (v.checked) f.setAttribute('checked', ''); }
+    }
+    var gone = clone.querySelectorAll('script, iframe, meta[http-equiv]');
+    for (var k = 0; k < gone.length; k++) gone[k].parentNode.removeChild(gone[k]);
+    // inside the drawing the page is no longer the document's root: what the styles say of :root goes to its html element
+    var sheets = clone.querySelectorAll('style');
+    for (var s = 0; s < sheets.length; s++) sheets[s].textContent = sheets[s].textContent.replace(/:root\\b/g, 'html');
+    clone.style.width = width + 'px'; clone.style.height = height + 'px';
+    return '<svg xmlns="http://www.w3.org/2000/svg" width="' + width + '" height="' + height + '"><foreignObject x="0" y="0" width="' + width + '" height="' + height + '">' + new XMLSerializer().serializeToString(clone) + '</foreignObject></svg>';
+  }
+  async function snapshot(d) {
+    var h = window.__hf;
+    if (!h) throw new Error('the scene installed no window.__hf (sceneController(...).install(window))');
+    if (d.params) h.setParams(d.params);
+    h.seek(d.t);
+    if (h.ready) await h.ready();
+    if (document.fonts && document.fonts.ready) await document.fonts.ready;
+    // drawn again right before the copy: a WebGL canvas keeps its picture only until it is presented
+    h.seek(d.t);
+    var svg = frozen(d.width, d.height);
+    var img = new Image();
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    await img.decode();
+    var canvas = document.createElement('canvas');
+    canvas.width = d.width; canvas.height = d.height;
+    canvas.getContext('2d').drawImage(img, 0, 0, d.width, d.height);
+    return createImageBitmap(canvas);
+  }
   addEventListener('message', function (e) {
     if (e.source !== up) return;
     var d = e.data;
+    if (d && d.kind === 'snapshot' && typeof d.t === 'number' && d.width > 0 && d.height > 0) {
+      snapshot(d).then(function (bitmap) { up.postMessage({ kind: 'snapshot', id: d.id, bitmap: bitmap }, '*', [bitmap]); },
+        function (err) { up.postMessage({ kind: 'error', id: d.id, message: String(err && err.message || err) }, '*'); });
+      return;
+    }
     if (!d || d.kind !== 'seek' || typeof d.t !== 'number') return;
     try {
       var h = window.__hf;

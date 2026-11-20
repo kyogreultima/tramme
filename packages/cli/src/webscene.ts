@@ -23,6 +23,9 @@ export const FRAME_PATTERN = /^frame_\d{5,}\.png$/;
 const CACHE = 'renders/webscene';
 
 const FILE_URL = /\/assets\/[A-Za-z0-9_%.\-/]+\.[A-Za-z0-9]{2,5}/g;
+const SCENE_URL = /(?:\/scenes\/|(?<![\w.])\.\.\/)([a-z0-9][a-z0-9-]{0,63}\/[A-Za-z0-9_.\-/]+\.[A-Za-z0-9]{2,5})/g;
+/** the project folder of a scene folder (…/scenes/<id>) */
+const projectOf = (sceneDir: string) => path.resolve(sceneDir, '..', '..');
 /** the project files a scene names as /assets/..., read from its text files, so the cache notices when one changes */
 export function assetsUsedBy(dir: string, fonts: string[] = []): string[] {
   const found = new Set(fonts.filter(isAssetFile));
@@ -31,10 +34,17 @@ export function assetsUsedBy(dir: string, fonts: string[] = []): string[] {
       const file = path.join(folder, entry.name);
       if (entry.isDirectory()) { if (entry.name !== '.hyperframes') walk(file); continue; }
       if (!/\.(html?|css|js|mjs|json|svg)$/i.test(entry.name) || fs.statSync(file).size > 1024 * 1024) continue;
-      for (const match of fs.readFileSync(file, 'utf8').matchAll(FILE_URL)) {
+      const text = fs.readFileSync(file, 'utf8');
+      for (const match of text.matchAll(FILE_URL)) {
         let decoded: string;
         try { decoded = decodeURIComponent(match[0].slice(1)); } catch { continue; }
         if (isAssetFile(decoded)) found.add(decoded);
+      }
+      // another scene's files (../<id>/... or /scenes/<id>/...): its fonts change this scene too
+      for (const match of text.matchAll(SCENE_URL)) {
+        const rel = `scenes/${match[1]}`;
+        if (/\.\.|%/.test(rel) || !fs.existsSync(path.join(projectOf(dir), rel))) continue;
+        found.add(rel);
       }
     }
   };
@@ -149,6 +159,20 @@ export async function prepareWebScenes(file: string, doc: TrammeDoc, capture: Sc
   return { file: derived, cleanup: () => fs.rmSync(derived, { force: true }), captured, reused };
 }
 
+/**
+ * The file of another scene a page asks for, or null. The scene is served at the root, so
+ * `../<id>/file` arrives as `/<id>/file`: it names a sibling scene when the scene has no such
+ * folder of its own. `/scenes/<id>/file` names one directly.
+ */
+export function otherSceneFile(root: string, projectDir: string, pathname: string): string | null {
+  const scenes = path.resolve(projectDir, 'scenes');
+  const direct = /^\/scenes\/([a-z0-9][a-z0-9-]{0,63}\/.+)$/.exec(pathname);
+  if (direct) return path.resolve(scenes, direct[1]);
+  const sibling = /^\/([a-z0-9][a-z0-9-]{0,63})\/(.+)$/.exec(pathname);
+  if (!sibling || fs.existsSync(path.join(root, sibling[1])) || path.resolve(scenes, sibling[1]) === root) return null;
+  return fs.existsSync(path.join(scenes, sibling[1], 'scene.json')) ? path.resolve(scenes, sibling[1], sibling[2]) : null;
+}
+
 /** a scene video as extracted pictures: its place among the page's media, the folder, how many, at what rate */
 export interface ServedVideo { index: number; dir: string; count: number; fps: number }
 
@@ -169,10 +193,13 @@ export async function serveScene(root: string, css: string, projectDir: string, 
       fs.createReadStream(file).pipe(response);
       return;
     }
-    // the project's own fonts and pictures, by the same /assets/ path the document uses
+    // the project's own fonts and pictures, by the same /assets/ path the document uses;
+    // another scene's files (a kit's fonts), by /scenes/<id>/... or ../<id>/... as the editor reads them
     const shared = pathname.startsWith('/assets/') && isAssetFile(pathname.slice(1)) ? path.resolve(projectDir, pathname.slice(1)) : null;
-    const file = shared ?? path.resolve(root, pathname === '/' ? 'index.html' : pathname.replace(/^\/+/, ''));
-    if (!file.startsWith((shared ? path.resolve(projectDir, 'assets') : root) + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) { response.writeHead(404).end(); return; }
+    const other = shared ? null : otherSceneFile(root, projectDir, pathname);
+    const file = shared ?? other ?? path.resolve(root, pathname === '/' ? 'index.html' : pathname.replace(/^\/+/, ''));
+    const within = shared ? path.resolve(projectDir, 'assets') : other ? path.resolve(projectDir, 'scenes') : root;
+    if (!file.startsWith(within + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) { response.writeHead(404).end(); return; }
     response.writeHead(200, { 'content-type': mimeOf(file) });
     if (/\.html?$/i.test(file)) response.end(injectCss(annotateVideos(fs.readFileSync(file, 'utf8'), media), css));
     else fs.createReadStream(file).pipe(response);

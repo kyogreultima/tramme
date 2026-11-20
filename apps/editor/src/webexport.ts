@@ -22,6 +22,7 @@ import { prefs } from './settings.ts';
 import { sandboxedDoc } from './installed.ts';
 import { t } from './i18n/index.ts';
 import { watermarkStamp } from './watermark-draw.ts';
+import { withSceneCapture } from './webscene-snapshot.ts';
 
 export interface WebExportOptions {
   compId: string;
@@ -38,6 +39,8 @@ export interface WebExportOptions {
   range?: [number, number];
   /** the Tramme logo in a corner of the picture; the plan and the setting decide when it is not given (watermark.ts) */
   watermark?: boolean;
+  /** the project the document belongs to: its web scenes are read from it */
+  projectId?: string;
 }
 
 export interface WebExportResult { blob: Blob; ext: string; warnings: string[] }
@@ -84,8 +87,16 @@ function encoderStep<T>(p: Promise<T>, signal?: AbortSignal): Promise<T> {
 /** an export; on a phone the screen stays on while it runs (device.ts) */
 export async function exportInBrowser(doc: TrammeDoc, base: string, format: WebFormat, opts: WebExportOptions): Promise<WebExportResult> {
   keepAwake(true);
-  try { return await exportOnce(doc, base, format, opts); } finally { keepAwake(false); }
+  try {
+    if (format === 'wav' || !hasWebScene(doc)) return await exportOnce(doc, base, format, opts);
+    // a web scene is drawn from its own frame, frame by frame (webscene-snapshot.ts): a picture, never a vector,
+    // and on the page only (an isolated project draws in its sandbox, which has no frames)
+    if (format === 'lottie' || format === 'svg' || sandboxedDoc(doc) || !opts.projectId) throw new Error(t('export.websceneNotHere'));
+    return await withSceneCapture(opts.projectId, doc, () => exportOnce(doc, base, format, opts));
+  } finally { keepAwake(false); }
 }
+
+const hasWebScene = (doc: TrammeDoc) => Object.values(doc.compositions).some((comp) => Object.values(comp.layers).some((layer) => layer.type === 'webscene'));
 
 /** an isolated project's SVG still or Lottie file, converted in its sandbox */
 async function vectorInSandbox(doc: TrammeDoc, base: string, format: 'svg' | 'lottie', opts: WebExportOptions): Promise<WebExportResult> {
@@ -97,9 +108,6 @@ async function vectorInSandbox(doc: TrammeDoc, base: string, format: 'svg' | 'lo
 }
 
 async function exportOnce(doc: TrammeDoc, base: string, format: WebFormat, opts: WebExportOptions): Promise<WebExportResult> {
-  if (format !== 'wav' && Object.values(doc.compositions).some((comp) => Object.values(comp.layers).some((layer) => layer.type === 'webscene'))) {
-    throw new Error(tauri ? t('export.websceneDesktopApp') : t('export.websceneDesktopOnly'));
-  }
   if (format === 'lottie' || format === 'svg') {
     if (sandboxedDoc(doc)) return vectorInSandbox(doc, base, format, opts);
     const readAsset = await fetchAssetReader(doc, base);

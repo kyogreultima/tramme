@@ -102,6 +102,20 @@ describe('Hydracept as a provider', () => {
   });
 });
 
+describe('a picture to change', () => {
+  const ref = 'data:image/png;base64,iVBORw0KGgo=';
+  it('goes to a provider that changes pictures when none is named, and says which key to add when there is none', async () => {
+    const onlyHydracept = await loadKeys(memory({ keys: { hydracept: 'hk' }, fields: { hydracept: { project: 'cpr_1' } } }));
+    await expect(generateImage(new Request('http://x/api/generate-image', { method: 'POST', body: JSON.stringify({ prompt: 'x', reference: ref }) }), { keys: onlyHydracept, fetch: out }))
+      .rejects.toMatchObject({ status: 503, message: /no provider that changes a picture/ });
+    const withGemini = await loadKeys(memory({ keys: { hydracept: 'hk', gemini: 'gk' }, fields: { hydracept: { project: 'cpr_1' } } }));
+    const seen: string[] = [];
+    const spy = (async (url: string | URL | Request) => { seen.push(String(url)); throw new Error('stop'); }) as typeof fetch;
+    await generateImage(new Request('http://x/api/generate-image', { method: 'POST', body: JSON.stringify({ prompt: 'x', reference: ref }) }), { keys: withGemini, fetch: spy }).catch(() => {});
+    expect(seen[0]).toMatch(/generativelanguage|googleapis/);
+  });
+});
+
 describe('the routes, without Hydracept', () => {
   const none = () => loadKeys(memory());
   it('an unknown provider is a clean error', async () => {
