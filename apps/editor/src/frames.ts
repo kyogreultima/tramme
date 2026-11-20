@@ -83,6 +83,11 @@ export class Stills {
    * passages (prepared.ts). Null when a video frame never came.
    */
   async picture(doc: TrammeDoc, t: number, compId: string, scale: number): Promise<ImageBitmap | null> {
+    // played back as is: its web scenes drawn at the very instant
+    return withSceneCapture(S.project.peek().id, doc, () => this.drawPicture(doc, t, compId, scale));
+  }
+
+  private async drawPicture(doc: TrammeDoc, t: number, compId: string, scale: number): Promise<ImageBitmap | null> {
     const r = await this.rendererFor(doc, compId);
     r.setScale(scale);
     await r.renderComplete(t, { samples: 1, checker: true });

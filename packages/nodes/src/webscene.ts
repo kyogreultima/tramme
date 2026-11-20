@@ -18,8 +18,12 @@ let placeholder: ((folder: string) => string | null) | null = null;
  */
 export function setWebScenePlaceholder(label: ((folder: string) => string | null) | null) { placeholder = label; }
 
-/** what a source gives for a scene at an instant: its picture, a wait for it, a failure, or nothing (the scene is not drawn this way) */
-export type WebSceneShot = CanvasImageSource | Promise<unknown> | Error | null;
+/**
+ * What a source gives for a scene at an instant: its picture, a wait for it, a failure, or nothing
+ * (the scene is not drawn this way). The live view may give the scene's last picture (null: none
+ * yet, its placeholder) while the one at the instant is on its way: drawn now, the frame deferred.
+ */
+export type WebSceneShot = CanvasImageSource | Promise<unknown> | Error | { last: CanvasImageSource | null; wait: Promise<unknown> } | null;
 /** the scene, its time (the composition's, as for captured frames) and its parameters at that time */
 export interface WebSceneAsk { folder: string; t: number; size: Vec2; params: Record<string, number | string | boolean> }
 let source: ((ask: WebSceneAsk) => WebSceneShot) | null = null;
@@ -43,11 +47,12 @@ export const webscene: NodeType<WebSceneProps> = {
   bounds: ({ size: [w, h] }) => ({ x: -w / 2, y: -h / 2, w, h }),
   render: {
     canvas2d(ctx, p, host) {
-      const shot = !p.frames.length && source && p.folder && p.size[0] > 0 && p.size[1] > 0
+      let shot = !p.frames.length && source && p.folder && p.size[0] > 0 && p.size[1] > 0
         ? source({ folder: p.folder, t: host.t, size: p.size, params: ((p as unknown as { $params?: Record<string, number | string | boolean> }).$params) ?? {} })
         : null;
       if (shot instanceof Error) throw new Error(`web scene ${p.folder}: ${shot.message}`);
       if (shot && typeof (shot as Promise<unknown>).then === 'function') { host.defer?.(shot as Promise<unknown>); return; }
+      if (shot && 'wait' in shot) { host.defer?.(shot.wait); shot = shot.last; }
       if (shot) { ctx.drawImage(shot as CanvasImageSource, -p.size[0] / 2, -p.size[1] / 2, p.size[0], p.size[1]); return; }
       if (!p.frames.length && placeholder && p.size[0] > 0 && p.size[1] > 0) {
         const label = placeholder(p.folder || '(unnamed)');

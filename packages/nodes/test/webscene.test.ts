@@ -50,4 +50,22 @@ describe('web scene drawn from its own frame', () => {
       expect(() => draw(ctx, props, { t: 1.5 } as never)).toThrow('has no captured frames');
     } finally { setWebSceneSource(null); }
   });
+
+  it('draws the last picture while the new one comes, and the placeholder before the first', () => {
+    const calls: unknown[][] = [];
+    const ctx = new Proxy({}, { get: (_t, key) => (typeof key === 'string' && ['drawImage', 'fillText'].includes(key) ? (...args: unknown[]) => calls.push([key, args[0]]) : () => {}), set: () => true }) as unknown as CanvasRenderingContext2D;
+    const draw = webscene.render!.canvas2d!;
+    const last = { width: 320 } as unknown as CanvasImageSource, wait = Promise.resolve(), deferred: unknown[] = [];
+    let give: unknown = { last, wait };
+    setWebSceneSource(() => give as never);
+    setWebScenePlaceholder((folder) => `${folder} is loading`);
+    try {
+      draw(ctx, props, { t: 2, defer: (p: unknown) => deferred.push(p) } as never);
+      expect(calls).toEqual([['drawImage', last]]);
+      give = { last: null, wait };
+      draw(ctx, props, { t: 2, defer: (p: unknown) => deferred.push(p) } as never);
+      expect(calls[1]).toEqual(['fillText', 'scenes/title is loading']);
+      expect(deferred).toEqual([wait, wait]);
+    } finally { setWebSceneSource(null); setWebScenePlaceholder(null); }
+  });
 });

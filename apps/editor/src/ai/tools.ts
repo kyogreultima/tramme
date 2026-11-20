@@ -563,7 +563,7 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
     const bad = pathIssue(path) ?? (/%|#/.test(path) ? 'invalid project path' : null);
     if (bad) return text(`${path}: ${bad}`, true);
     const ok = (/^plugins\/.+\.(js|mjs)$/i.test(path)) || (/^assets\/.+\.(json|svg)$/i.test(path));
-    if (!ok) return text('allowed writes: plugins/*.js|mjs and assets/*.json|svg. The document changes through propose_changes.', true);
+    if (!ok) return text(`allowed writes: plugins/*.js|mjs and assets/*.json|svg. ${/^scenes\//i.test(path) ? 'A web scene is written with write_scene and changed with edit_scene.' : 'The document changes through propose_changes.'}`, true);
     // with find, only that part changes: the file is read, the passage replaced, and the whole written back
     let content = given;
     if (find !== undefined) {

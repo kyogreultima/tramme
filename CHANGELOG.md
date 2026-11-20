@@ -11,6 +11,9 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 ### Fixed
 
 - The delivery check of a video counts the audio samples as each frame is decoded, instead of reading a summary at the end that could be missing. When the codec is wrong, it now says so.
+- A web scene inside a nested composition now shows in the viewport, paused and while playing, instead of a "loading" label that never went away. The viewport draws it from the scene's own pictures, the same ones the exports use. The prepared passages draw it too, and they are redrawn when a scene file changes.
+- The hidden frames used to take the pictures of web scenes are released when another project opens.
+- When the assistant tries to write a web scene with the general file tool, the refusal now points it to write_scene and edit_scene.
 
 ## [0.35.0] - 2026-11-20
 

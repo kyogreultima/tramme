@@ -1,8 +1,8 @@
 // A web scene without captured pictures, live in the viewport: its own document in a sandboxed
 // iframe, laid over the canvas where the layer is (position, scale, rotation, opacity), seeked to
 // the playhead with the layer's parameters. An iframe's pixels cannot be read back, so it is not
-// composited with the layers around it: it sits over them, below the handles. Exports capture the
-// scene instead (tramme render) and compose it with everything.
+// composited with the layers around it: it sits over them, below the handles. A scene of a nested
+// composition, the exports and the stills draw the scene's own pictures instead (webscene-snapshot.ts).
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { layerMatrix, staticValue, type TrammeDoc } from '@tramme/core';

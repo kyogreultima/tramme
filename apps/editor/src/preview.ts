@@ -25,7 +25,8 @@ import { attachInstalled, attachIsolated, filterModule, onSandboxStopped, plugin
 import { copiesIn, copyId, counted, installed, installedFor, installedTypes, offIn, permitted, sandboxedDoc, stopped, STRIKES } from './installed.ts';
 import { bindSandbox, blitPicture, blitSandboxFrame, declarationsModule, ensureDeclared, ensureSandboxDoc, moduleItemsOf, renderSandboxFrame, resetSandbox, sandboxDeclaration, type SandboxContext } from './plugins/sandbox-draw.ts';
 import { setWebScenePlaceholder } from '@tramme/nodes';
-import { liveScenes } from './webscene-preview.ts';
+import { liveScenes, sceneRevision } from './webscene-preview.ts';
+import { disposeSceneCapture, setSceneLiveView } from './webscene-snapshot.ts';
 import { t } from './i18n/index.ts';
 import { MASTER_METER_ID, previewMeters } from './audio-meters.ts';
 import { audioEffectsKey } from './audio-key.ts';
@@ -106,6 +107,12 @@ class Preview {
   async start() {
     this.meters.clear(true);
     this.prep.reset();
+    // the scenes of the last project close; the view draws the scenes it does not show live from their own pictures
+    disposeSceneCapture();
+    setSceneLiveView(() => {
+      const projectId = S.project.peek()?.id, doc = this.applied;
+      return projectId && doc ? { projectId, doc } : null;
+    });
     // a new project on the same page: what crossed for the old one is dropped
     resetSandbox();
     // every sandboxed draw goes through the open project's sandbox, fed with this preview's document and assets
@@ -157,6 +164,9 @@ class Preview {
       if (key !== audioKey) { audioKey = key; this.play(); }
     });
     effect(() => { void S.previewScale.value; if (!prefs.value.prepare) this.prep.reset(); this.invalidate(); });
+    // a scene's files changed: the passages prepared with its old pictures go
+    let seenScene = sceneRevision.peek();
+    effect(() => { const r = sceneRevision.value; if (r === seenScene) return; seenScene = r; this.prep.reset(); this.invalidate(); });
     effect(() => { const p = prefs.value; if (this.master) this.master.gain.value = p.previewMuted ? 0 : p.previewVolume; });
     let seenInstalled = installed.peek(), seenStopped = 0;
     // the installed plugins changed, or one was stopped for the session: the registry is built again

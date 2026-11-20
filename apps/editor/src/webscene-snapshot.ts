@@ -5,18 +5,21 @@
 // back as an ImageBitmap (webscene-frame.ts). The webscene node draws it (setWebSceneSource); while
 // a picture is on its way the node defers, and those renders draw the frame again once it has come.
 //
-// The live view keeps its overlay: pictures are given only inside withSceneCapture.
+// The live view shows a scene of the composition on screen in its overlay (WebSceneFrames). Every
+// other scene it draws (one inside a nested composition) is drawn from these pictures too: the last
+// one the scene gave while the next is on its way, one asked at a time per scene, so a playback
+// never piles up requests and the view is drawn again when a picture comes.
 
-import { setWebSceneSource, type WebSceneAsk } from '@tramme/nodes';
+import { setWebSceneSource, type WebSceneAsk, type WebSceneShot } from '@tramme/nodes';
 import type { TrammeDoc } from '@tramme/core';
 import { SCENE_FRAME_SANDBOX } from './webscene-frame.ts';
-import { sceneDocument, sceneRevision } from './webscene-preview.ts';
+import { liveScenes, sceneDocument, sceneRevision } from './webscene-preview.ts';
 
 /** how long a scene may take to load, then to give one picture */
 const LOAD_LIMIT = 30_000;
 const SHOT_LIMIT = 20_000;
-/** pictures kept (an export asks for each frame once; a still asks again for the same instant) */
-const KEEP = 48;
+/** pictures kept (an export asks for each frame once; a still asks again for the same instant), about 8 MB each in 1080p */
+const KEEP = 12;
 
 interface Frame { el: HTMLIFrameElement; loaded: Promise<void>; style: string }
 
@@ -113,39 +116,86 @@ export async function sceneStills(projectId: string, doc: TrammeDoc, folder: str
   return out;
 }
 
-// ── the source the webscene node reads, inside a capture only ──
+// ── the source the webscene node reads ──
 
 let scope: { projectId: string; doc: TrammeDoc } | null = null;
 let depth = 0;
 const shots = new Map<string, ImageBitmap | Error>();
 const coming = new Map<string, Promise<void>>();
+/** per scene (project|folder): the key of the last picture it gave, drawn while the next is on its way */
+const lastOf = new Map<string, string>();
+/** per scene: the picture the live view wants next (only the latest counts), and whether one is being made */
+const nextOf = new Map<string, { view: LiveView; ask: WebSceneAsk; key: string }>();
+const making = new Map<string, Promise<void>>();
+
+/** what the live view gives: the open project and the document on screen */
+export interface LiveView { projectId: string; doc: TrammeDoc }
+let liveView: (() => LiveView | null) | null = null;
+/** the preview says what it shows (preview.ts) */
+export function setSceneLiveView(view: (() => LiveView | null) | null) { liveView = view; }
 
 const shotKey = (projectId: string, a: WebSceneAsk) =>
   `${projectId}|${a.folder}|${sceneRevision.peek()}|${a.t.toFixed(4)}|${Math.round(a.size[0])}x${Math.round(a.size[1])}|${JSON.stringify(a.params)}`;
 
 function keep(key: string, value: ImageBitmap | Error) {
   shots.set(key, value);
-  while (shots.size > KEEP) {
-    const [oldest, v] = shots.entries().next().value!;
+  // the oldest go first, except a scene's last picture: the live view still draws it
+  const lasts = new Set(lastOf.values());
+  for (const [k, v] of shots) {
+    if (shots.size <= KEEP) break;
+    if (lasts.has(k)) continue;
     if (v instanceof ImageBitmap) v.close();
-    shots.delete(oldest);
+    shots.delete(k);
   }
 }
 
-setWebSceneSource((ask) => {
-  if (!scope) return null;
-  const { projectId, doc } = scope;
+/** an export or a still: the picture at that very instant, waited for */
+function exactShot(projectId: string, doc: TrammeDoc, ask: WebSceneAsk): WebSceneShot {
   const key = shotKey(projectId, ask);
   const have = shots.get(key);
   if (have) return have;
   let wait = coming.get(key);
   if (!wait) {
     wait = snapshotScene(projectId, doc, ask)
-      .then((bitmap) => keep(key, bitmap), (error: Error) => keep(key, error))
+      .then((bitmap) => { keep(key, bitmap); lastOf.set(`${projectId}|${ask.folder}`, key); }, (error: Error) => keep(key, error))
       .finally(() => coming.delete(key));
     coming.set(key, wait);
   }
   return wait;
+}
+
+/**
+ * The live view: the picture at the instant if made, else the scene's last one (null the first
+ * time: its placeholder) with the wait for the new one, so the view is drawn again when it comes.
+ */
+function liveShot(view: LiveView, ask: WebSceneAsk): WebSceneShot {
+  const key = shotKey(view.projectId, ask);
+  const have = shots.get(key);
+  if (have) return have;
+  const scene = `${view.projectId}|${ask.folder}`;
+  nextOf.set(scene, { view, ask, key });
+  let wait = making.get(scene);
+  if (!wait) { wait = make(scene).finally(() => making.delete(scene)); making.set(scene, wait); }
+  const last = lastOf.get(scene), stale = last ? shots.get(last) : undefined;
+  return { last: stale instanceof ImageBitmap ? stale : null, wait };
+}
+
+/** one picture at a time per scene, always the latest asked: a playback skips the instants it has passed */
+async function make(scene: string) {
+  for (let n = nextOf.get(scene); n; n = nextOf.get(scene)) {
+    nextOf.delete(scene);
+    if (shots.has(n.key)) continue;
+    try { keep(n.key, await snapshotScene(n.view.projectId, n.view.doc, n.ask)); lastOf.set(scene, n.key); }
+    catch (error) { keep(n.key, error as Error); }
+  }
+}
+
+setWebSceneSource((ask) => {
+  if (scope) return exactShot(scope.projectId, scope.doc, ask);
+  // a scene the view shows in its overlay draws nothing on the canvas
+  if (liveScenes.has(ask.folder)) return null;
+  const view = liveView?.();
+  return view ? liveShot(view, ask) : null;
 });
 
 /**
@@ -171,4 +221,6 @@ export function disposeSceneCapture() {
   frames.clear();
   for (const v of shots.values()) if (v instanceof ImageBitmap) v.close();
   shots.clear();
+  lastOf.clear();
+  nextOf.clear();
 }
