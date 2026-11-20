@@ -8,6 +8,8 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+## [0.35.1] - 2026-11-20
+
 ### Fixed
 
 - The delivery check of a video counts the audio samples as each frame is decoded, instead of reading a summary at the end that could be missing. When the codec is wrong, it now says so.
@@ -1099,7 +1101,8 @@ First public release.
 
 - Cloudflare Worker serving the editor and the API, projects stored in R2, access protected by Cloudflare Access.
 
-[Unreleased]: ../../compare/v0.35.0...HEAD
+[Unreleased]: ../../compare/v0.35.1...HEAD
+[0.35.1]: ../../compare/v0.35.0...v0.35.1
 [0.35.0]: ../../compare/v0.34.0...v0.35.0
 [0.34.0]: ../../compare/v0.33.0...v0.34.0
 [0.33.0]: ../../compare/v0.32.1...v0.33.0
