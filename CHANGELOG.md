@@ -8,6 +8,17 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+## [0.34.0] - 2026-11-20
+
+### Added
+
+- The Assets panel imports whole folders, with an Import a folder button or by dropping a folder. A folder that holds a `scene.json` comes in as a web scene under `scenes/<name>/`, with its files and subfolders kept. A folder dropped on the home screen does the same.
+- PDF and Markdown files imported in the Assets panel join the project's material: the Direction tab lists them and the assistant reads them.
+
+### Fixed
+
+- The assistant can read a web scene's HTML, CSS and text files before it edits them.
+
 ## [0.33.0] - 2026-11-20
 
 ### Added
@@ -1067,7 +1078,8 @@ First public release.
 
 - Cloudflare Worker serving the editor and the API, projects stored in R2, access protected by Cloudflare Access.
 
-[Unreleased]: ../../compare/v0.33.0...HEAD
+[Unreleased]: ../../compare/v0.34.0...HEAD
+[0.34.0]: ../../compare/v0.33.0...v0.34.0
 [0.33.0]: ../../compare/v0.32.1...v0.33.0
 [0.32.1]: ../../compare/v0.32.0...v0.32.1
 [0.32.0]: ../../compare/v0.31.0...v0.32.0
