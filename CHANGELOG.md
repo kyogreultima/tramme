@@ -8,6 +8,8 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+## [0.36.0] - 2026-11-22
+
 ### Added
 
 - The assistant builds a scene from a short script, a scene builder, instead of hundreds of operations. It writes `assets/builds/<name>.js` and runs it with the new `build_scene` tool, in the project's sandbox. The script receives a kit that writes keyframes, entrances, typing and unique ids, and measures text with the project's fonts. To change the scene, the assistant edits the script and builds again. A build replaces only the layers the same script made last time; sounds placed by other tools and layers the user added stay. If a layer the script made was changed by hand since, the build stops and names it. See "Scene builders" in `docs/document.md`.
@@ -1107,7 +1109,8 @@ First public release.
 
 - Cloudflare Worker serving the editor and the API, projects stored in R2, access protected by Cloudflare Access.
 
-[Unreleased]: ../../compare/v0.35.1...HEAD
+[Unreleased]: ../../compare/v0.36.0...HEAD
+[0.36.0]: ../../compare/v0.35.1...v0.36.0
 [0.35.1]: ../../compare/v0.35.0...v0.35.1
 [0.35.0]: ../../compare/v0.34.0...v0.35.0
 [0.34.0]: ../../compare/v0.33.0...v0.34.0
