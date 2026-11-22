@@ -36,6 +36,8 @@ fs.writeFileSync(path.join(OUT, 'package.json'), JSON.stringify({
   description: "Tramme's local companion: the editor's assistant with the agents of this computer (Claude Code, Codex, Antigravity), each on its own login",
   keywords: ['tramme', 'motion design', 'video', 'assistant', 'claude', 'codex', 'antigravity'],
   homepage: site,
+  // npm checks the package's provenance against it: published from a run of another repository, it is refused
+  repository: { ...root.repository, directory: 'packages/companion' },
   license: own.license,
   author: root.author,
   type: 'module',
