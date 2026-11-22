@@ -4,7 +4,7 @@
 
 a.brand { text-decoration: none; border-radius: var(--r-sm); padding: 2px 4px; margin: -2px -4px; }
 a.brand:hover { background: var(--hover); }
-/* a column, the main part filling it: what ends the page (the version) rests at the bottom even when the page is short */
+/* the home fills the window and scrolls when its content grows */
 .home { position: relative; display: flex; flex-direction: column; height: 100vh; height: 100dvh; overflow: auto; background: var(--bg); }
 /* An ambient backdrop, fixed behind the scrolling content. Plain themes leave it off;
    liquid glass turns it on in its own stylesheet, where it has something to bend. */
@@ -67,6 +67,8 @@ a.brand:hover { background: var(--hover); }
   background: var(--stage);
 }
 .card-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.card-cloud { position: absolute; top: 10px; left: 10px; display: grid; place-items: center; width: 24px; height: 24px; border-radius: var(--r-sm); background: var(--surface); color: var(--text); box-shadow: var(--shadow-1); pointer-events: none; }
+.card-cloud .i { width: 14px; height: 14px; }
 .frame {
   display: grid; place-items: center; max-width: 62%; max-height: 62%; width: 62%;
   border-radius: var(--r-xs); background: var(--raised); box-shadow: inset 0 0 0 1px var(--line-strong); color: var(--text-4);
@@ -153,5 +155,3 @@ a.brand:hover { background: var(--hover); }
   .brief-bar .material .label { display: none; }
   .brief-bar .model-pick, .brief-bar > .btn.primary { width: 100%; min-width: 0; max-width: none; padding: 0 8px; justify-content: center; }
 }
-.home-version { margin-top: auto; padding-top: 8px; text-align: center; font-size: var(--fs-xs); }
-.home-version a { color: var(--accent); }

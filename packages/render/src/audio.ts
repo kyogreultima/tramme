@@ -332,6 +332,30 @@ export interface MixOptions {
   master?: boolean;
   /** only these clips (a stem: the effects, the bed) */
   only?: (clip: AudioClip) => boolean;
+  /** reject if a clip that should contribute audio cannot be read */
+  strict?: boolean;
+}
+
+export class ExportAudioError extends Error {
+  readonly asset: string;
+
+  constructor(asset: string, cause: unknown) {
+    super(`Could not read the sound of "${asset}".`, { cause });
+    this.asset = asset;
+  }
+}
+
+/** An export can skip confirmed silent footage, but must surface an unreadable sound source. */
+export function mixExportAudio(
+  r: Pick<import('./renderer.ts').Renderer, 'doc' | 'compId' | 'assets'>,
+  span?: { from: number; to: number },
+): Promise<AudioBuffer | null> {
+  return mixComposition(r.doc, r.compId, (id) => r.assets.url(id), {
+    ...span,
+    strict: true,
+    only: ({ asset }) => r.doc.assets[asset]?.type !== 'video' || !r.assets.has(asset)
+      || r.assets.get<{ hasAudio?: boolean }>(asset).hasAudio !== false,
+  });
 }
 
 /**
@@ -354,7 +378,13 @@ export async function mixComposition(doc: TrammeDoc, compId: string, url: (asset
   for (const c of clips) {
     let p = decoded.get(c.asset);
     if (!p) {
-      p = fetch(url(c.asset)).then((r) => r.arrayBuffer()).then((d) => ctx.decodeAudioData(d)).catch(() => null);
+      p = Promise.resolve().then(() => fetch(url(c.asset))).then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.arrayBuffer();
+      }).then((d) => ctx.decodeAudioData(d)).catch((error) => {
+        if (opts.strict) throw new ExportAudioError(doc.assets[c.asset]?.name ?? c.asset, error);
+        return null;
+      });
       decoded.set(c.asset, p);
     }
     const buf = await p;

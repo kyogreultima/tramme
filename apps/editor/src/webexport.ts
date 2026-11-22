@@ -5,24 +5,24 @@
 // SVG come from @tramme/interop.
 
 import { frameSpan } from './exportspan.ts';
-import { AudioBufferSource, BufferTarget, CanvasSource, canEncodeAudio, getFirstEncodableVideoCodec, Mp4OutputFormat, Output, Quality, VideoSample, VideoSampleSource, WebMOutputFormat } from 'mediabunny';
+import { ALL_FORMATS, AudioBufferSink, AudioBufferSource, BlobSource, BufferTarget, CanvasSource, canEncodeAudio, getFirstEncodableVideoCodec, Input, Mp4OutputFormat, Output, Quality, VideoSample, VideoSampleSource, WebMOutputFormat } from 'mediabunny';
 import { applyPalette, GIFEncoder, quantize } from 'gifenc';
 import { zipSync } from 'fflate';
 import type { TrammeDoc, Registry } from '@tramme/core';
 import { fetchAssetReader, toLottie, toSvg } from '@tramme/interop';
-import { deepCodec, encodeWav, i420p10, mixComposition, Renderer, SETTLE_LIMIT } from '@tramme/render';
-import { containsExpression } from '@tramme/project';
+import { deepCodec, encodeWav, ExportAudioError, i420p10, mixExportAudio, Renderer, SETTLE_LIMIT } from '@tramme/render';
 
 import { AVC_FROM_STREAM } from './avc.ts';
 import { deviceTarget, keepAwake } from './device.ts';
 import { platform, tauri } from './tauri.ts';
 import type { WebFormat } from './formats.ts';
 import { filterModule, pluginHost } from './plugins/index.ts';
-import { blitSandboxFrame, declarationsModule, ensureDeclared, ensureSandboxDoc, moduleItemsOf, primeSandboxExports, sandboxDeclaration, sandboxVideoFrames } from './plugins/sandbox-draw.ts';
+import { blitSandboxFrame, declarationsModule, ensureDeclared, ensureSandboxDoc, moduleItemsOf, primeSandboxExports, renderSandboxFrame, sandboxDeclaration, sandboxVector } from './plugins/sandbox-draw.ts';
 import { prefs } from './settings.ts';
 import { sandboxedDoc } from './installed.ts';
 import { t } from './i18n/index.ts';
 import { watermarkStamp } from './watermark-draw.ts';
+import { withSceneCapture } from './webscene-snapshot.ts';
 
 export interface WebExportOptions {
   compId: string;
@@ -39,12 +39,28 @@ export interface WebExportOptions {
   range?: [number, number];
   /** the Tramme logo in a corner of the picture; the plan and the setting decide when it is not given (watermark.ts) */
   watermark?: boolean;
+  /** the project the document belongs to: its web scenes are read from it */
+  projectId?: string;
 }
 
 export interface WebExportResult { blob: Blob; ext: string; warnings: string[] }
 
-/** the composition's sounds (audio layers, sound of videos), through the mixer of the preview, or null */
-const mixAudio = (r: Renderer, span?: { from: number; to: number }) => mixComposition(r.doc, r.compId, (id) => r.assets.url(id), span ? { from: span.from, to: span.to } : {});
+const mixAudio = async (r: Renderer, span?: { from: number; to: number }) => {
+  try { return await mixExportAudio(r, span); }
+  catch (e) { if (e instanceof ExportAudioError) throw new Error(t('export.soundSourceUnreadable', { asset: e.asset }), { cause: e }); throw e; }
+};
+
+async function verifySound(blob: Blob, codec: 'aac' | 'opus') {
+  const input = new Input({ source: new BlobSource(blob), formats: ALL_FORMATS });
+  try {
+    const track = await input.getPrimaryAudioTrack();
+    if (track && track.codec === codec) {
+      for await (const { buffer } of new AudioBufferSink(track).buffers()) if (buffer.length > 0) return;
+    }
+  } catch (e) { throw new Error(t('export.soundVerificationFailed'), { cause: e }); }
+  finally { input.dispose(); }
+  throw new Error(t('export.soundVerificationFailed'));
+}
 
 const wav = (buf: AudioBuffer) => new Blob([encodeWav(buf) as BlobPart], { type: 'audio/wav' });
 
@@ -71,15 +87,29 @@ function encoderStep<T>(p: Promise<T>, signal?: AbortSignal): Promise<T> {
 /** an export; on a phone the screen stays on while it runs (device.ts) */
 export async function exportInBrowser(doc: TrammeDoc, base: string, format: WebFormat, opts: WebExportOptions): Promise<WebExportResult> {
   keepAwake(true);
-  try { return await exportOnce(doc, base, format, opts); } finally { keepAwake(false); }
+  try {
+    if (format === 'wav' || !hasWebScene(doc)) return await exportOnce(doc, base, format, opts);
+    // a web scene is drawn from its own frame, frame by frame (webscene-snapshot.ts): a picture, never a vector,
+    // and on the page only (an isolated project draws in its sandbox, which has no frames)
+    if (format === 'lottie' || format === 'svg' || sandboxedDoc(doc) || !opts.projectId) throw new Error(t('export.websceneNotHere'));
+    return await withSceneCapture(opts.projectId, doc, () => exportOnce(doc, base, format, opts));
+  } finally { keepAwake(false); }
+}
+
+const hasWebScene = (doc: TrammeDoc) => Object.values(doc.compositions).some((comp) => Object.values(comp.layers).some((layer) => layer.type === 'webscene'));
+
+/** an isolated project's SVG still or Lottie file, converted in its sandbox */
+async function vectorInSandbox(doc: TrammeDoc, base: string, format: 'svg' | 'lottie', opts: WebExportOptions): Promise<WebExportResult> {
+  const { text, warnings } = await sandboxVector(pluginHost(base), doc, base, format, opts.t ?? 0, opts.compId);
+  aborted(opts.signal);
+  return format === 'lottie'
+    ? { blob: new Blob([text], { type: 'application/json' }), ext: 'lottie.json', warnings }
+    : { blob: new Blob([text], { type: 'image/svg+xml' }), ext: 'svg', warnings };
 }
 
 async function exportOnce(doc: TrammeDoc, base: string, format: WebFormat, opts: WebExportOptions): Promise<WebExportResult> {
-  if (format !== 'wav' && Object.values(doc.compositions).some((comp) => Object.values(comp.layers).some((layer) => layer.type === 'webscene'))) {
-    throw new Error(tauri ? t('export.websceneDesktopApp') : t('export.websceneDesktopOnly'));
-  }
   if (format === 'lottie' || format === 'svg') {
-    if (sandboxedDoc(doc) && containsExpression(doc)) throw new Error(t('export.isolatedVectorExpressions'));
+    if (sandboxedDoc(doc)) return vectorInSandbox(doc, base, format, opts);
     const readAsset = await fetchAssetReader(doc, base);
     // the sandboxed nodes' vector exports are computed in the sandbox first: the conversion reads them synchronously
     await primeSandboxExports(doc, opts.registry, opts.t ?? 0);
@@ -130,9 +160,8 @@ async function exportOnce(doc: TrammeDoc, base: string, format: WebFormat, opts:
       const time = f / fps;
       await r.bringImages(time);
       ensureSandboxDoc(sandboxHost(), { doc, docUrl: base, loaded: (id) => { try { return r.assets.get(id); } catch { return null; } } });
-      const videos = await sandboxVideoFrames(r, doc, time);
       const c = doc.compositions[r.compId];
-      const pic = await sandboxHost().renderFrame({ compId: r.compId, t: time, scale: 1, width: c.width, height: c.height, videos });
+      const pic = await renderSandboxFrame(sandboxHost(), r, { compId: r.compId, t: time, scale: 1, width: c.width, height: c.height }, { export: true });
       if (pic.err) throw new Error(pic.err);
       if (!pic.bitmap) throw new Error(t('export.frameNeverReady', { frame: f, time: time.toFixed(2), s: SETTLE_LIMIT / 1000 }));
       return pic.bitmap as ImageBitmap;
@@ -187,7 +216,9 @@ async function exportOnce(doc: TrammeDoc, base: string, format: WebFormat, opts:
     }
 
     if (typeof VideoEncoder === 'undefined') throw new Error(t('export.webcodecsUnavailableInThis'));
-    const webm = format === 'webm';
+    const sound = await mixAudio(r, opts.range && span);
+    const audioFallback = format === 'mp4' && !!sound && !(await canEncodeAudio('aac', { numberOfChannels: sound.numberOfChannels, sampleRate: sound.sampleRate }));
+    const webm = format === 'webm' || audioFallback;
     // 10 bits: a codec this browser encodes so, the frames read at 16 bits; a plugin's sandbox draws at 8, so its films stay at 8
     const tenBit = opts.depth === 10 && (format === 'mp4' || webm);
     const deep = tenBit && !sandboxed ? await deepCodec(webm ? 'webm' : 'mp4', W, H) : null;
@@ -196,8 +227,7 @@ async function exportOnce(doc: TrammeDoc, base: string, format: WebFormat, opts:
     const wide = deep ? new Uint16Array(W * H * 4) : null, planes = deep ? new Uint16Array(W * H * 1.5) : null;
     const codec = await getFirstEncodableVideoCodec(webm ? ['vp9', 'vp8', 'av1'] : ['avc', 'vp9', 'av1'], { width: W, height: H });
     if (!codec) throw new Error(t('export.noVideoCodecAvailable', { w: W, h: H }));
-    const sound = await mixAudio(r, opts.range && span);
-    const audioCodec = webm ? 'opus' : (await canEncodeAudio('aac')) ? 'aac' : 'opus';
+    const audioCodec = webm ? 'opus' : 'aac';
     const encode = async (hardwareAcceleration: 'no-preference' | 'prefer-software'): Promise<Blob> => {
       // on a phone the film goes to a file as it is encoded (a long one would not fit in memory): the MP4 is patched in place, so no fast start
       const device = platform === 'android' ? await deviceTarget(`export-${Date.now().toString(36)}.${webm ? 'webm' : 'mp4'}`) : null;
@@ -249,16 +279,19 @@ async function exportOnce(doc: TrammeDoc, base: string, format: WebFormat, opts:
         output.cancel().catch(() => {});
         throw e;
       }
-      return device ? device.finish() : new Blob([(target as BufferTarget).buffer!], { type: webm ? 'video/webm' : 'video/mp4' });
+      const blob = device ? await device.finish() : new Blob([(target as BufferTarget).buffer!], { type: webm ? 'video/webm' : 'video/mp4' });
+      if (audio) await encoderStep(verifySound(blob, audioCodec), opts.signal);
+      return blob;
     };
     const ext = webm ? 'webm' : 'mp4';
+    const audioWarn = audioFallback ? [t('export.webmForSound')] : [];
     try {
-      return { blob: await encode('no-preference'), ext, warnings: [...deepWarn, ...(deep ? [t('export.tenBitWith', { codec: deep.label })] : [])] };
+      return { blob: await encode('no-preference'), ext, warnings: [...audioWarn, ...deepWarn, ...(deep ? [t('export.tenBitWith', { codec: deep.label })] : [])] };
     } catch (e) {
       if (!(e instanceof EncoderStalled)) throw e;
       // the hardware encoder stalled: the whole film again, encoded in software (slower, but it finishes)
       opts.onProgress?.(0, frames);
-      return { blob: await encode('prefer-software'), ext, warnings: [...deepWarn, t('export.softwareEncoder', { s: ENCODE_LIMIT / 1000 })] };
+      return { blob: await encode('prefer-software'), ext, warnings: [...audioWarn, ...deepWarn, t('export.softwareEncoder', { s: ENCODE_LIMIT / 1000 })] };
     }
   } finally {
     r.dispose();

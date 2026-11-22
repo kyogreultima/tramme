@@ -337,10 +337,16 @@ describe('packing a glTF', () => {
 });
 
 describe('the sound search, through the shared Openverse call', () => {
-  it('still asks Openverse for CC0 recordings from Freesound', async () => {
+  it('asks anonymous Openverse for CC0 and CC BY recordings from Freesound', async () => {
     const find = SOUND_TOOLS.find((x) => x.name === 'sound-find')!;
     await find.run({ query: 'wood tap' } as never, { signal: signal() } as unknown as ToolContext);
     const url = new URL(asked.find((u) => u.startsWith('https://api.openverse.org/v1/audio/'))!);
-    expect(Object.fromEntries(url.searchParams)).toEqual({ q: 'wood tap', license: 'cc0', source: 'freesound', page_size: '20' });
+    expect(Object.fromEntries(url.searchParams)).toEqual({ q: 'wood tap', license: 'cc0,by', source: 'freesound', page_size: '20' });
+  });
+  it('asks anonymous Openverse for Jamendo music', async () => {
+    const find = SOUND_TOOLS.find((x) => x.name === 'music-find')!;
+    await find.run({ query: 'ambient piano' } as never, { signal: signal() } as unknown as ToolContext);
+    const url = new URL(asked.find((u) => u.startsWith('https://api.openverse.org/v1/audio/'))!);
+    expect(Object.fromEntries(url.searchParams)).toEqual({ q: 'ambient piano', license: 'cc0,by', source: 'jamendo', page_size: '20' });
   });
 });

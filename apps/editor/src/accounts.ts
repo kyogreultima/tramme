@@ -11,6 +11,7 @@ import { signal } from '@preact/signals';
 import { locale, m, t } from './i18n/index.ts';
 import { platform } from './tauri.ts';
 import { cloud, personal } from './mode.ts';
+import { forgetProjects } from './project-list.ts';
 
 export interface UserJson {
   id: string;
@@ -116,13 +117,14 @@ export async function providersOn(): Promise<Record<Provider, boolean>> {
   return r.ok ? { google: !!r.data.google, github: !!r.data.github } : { google: false, github: false };
 }
 
-const take = (r: Reply<{ user?: UserJson }>) => { if (r.ok && r.data.user) account.value = { status: 'in', user: r.data.user }; return r; };
+// someone signs in or out: the projects listed before were someone else's, or the device's alone
+const take = (r: Reply<{ user?: UserJson }>) => { if (r.ok && r.data.user) { forgetProjects(); account.value = { status: 'in', user: r.data.user }; } return r; };
 
 export const signIn = async (email: string, password: string) => take(await call<{ user?: UserJson }>('POST', '/api/auth/login', { email, password }));
 export const signUp = async (name: string, email: string, password: string) => take(await call<{ user?: UserJson }>('POST', '/api/auth/signup', { name, email, password, locale }));
 export async function signOut() {
   const r = await call('POST', '/api/auth/logout');
-  if (r.ok) account.value = { status: 'out' };
+  if (r.ok) { forgetProjects(); account.value = { status: 'out' }; }
   return r;
 }
 
@@ -161,7 +163,7 @@ export async function unlinkProvider(provider: Provider) {
 }
 export const deleteAccount = async (proof: { password?: string; email?: string }) => {
   const r = await call('DELETE', '/api/account', proof);
-  if (r.ok) account.value = { status: 'out' };
+  if (r.ok) { forgetProjects(); account.value = { status: 'out' }; }
   return r;
 };
 

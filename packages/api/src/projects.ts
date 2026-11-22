@@ -3,7 +3,7 @@
 // the server (dates, size of the main composition); the editor writes the
 // document and the other files.
 
-import { Zip, ZipDeflate, ZipPassThrough } from 'fflate';
+import { deflateSync, Zip, ZipPassThrough } from 'fflate';
 import { isMedia, upgradeFile, currentPath, LEGACIES, DOCUMENT, isChatPath, LIMITS, MANIFEST, ManifestSchema, mimeOf, newId, newProject, parseDocument, pathIssue, type Manifest } from '@tramme/project';
 import type { Bucket, StoredBody, StoredObject } from './bucket.ts';
 import { HttpError, json, readJson } from './http.ts';
@@ -83,7 +83,7 @@ export async function listProjects(bucket: Bucket) {
   return all.filter((m): m is Manifest => !!m).sort((a, b) => b.modified.localeCompare(a.modified));
 }
 
-interface CreateBody { name?: string; width?: number; height?: number; fps?: number; duration?: number; created?: string; empty?: boolean }
+interface CreateBody { id?: string; name?: string; width?: number; height?: number; fps?: number; duration?: number; created?: string; empty?: boolean }
 
 /**
  * A new project. With `empty`, only the manifest is written: the editor then
@@ -96,8 +96,19 @@ export async function createProject(bucket: Bucket, req: Request) {
   const int = (v: unknown, d: number, max: number) => (Number.isInteger(v) && (v as number) > 0 && (v as number) <= max ? (v as number) : d);
   const width = int(b.width, 1920, 8192), height = int(b.height, 1080, 8192), fps = int(b.fps, 30, 240);
   const duration = typeof b.duration === 'number' && b.duration > 0 && b.duration <= 3600 ? b.duration : 5;
-  const { manifest, doc } = newProject({ name, width, height, fps, duration, id: await freeId(bucket, name), app: 'tramme' });
+  if (b.id !== undefined) {
+    checkId(b.id);
+    if (!b.empty) throw new HttpError(400, 'a requested project id is only for an empty import');
+  }
+  const { manifest, doc } = newProject({ name, width, height, fps, duration, id: b.id ?? await freeId(bucket, name), app: 'tramme' });
   if (b.created && !Number.isNaN(Date.parse(b.created))) manifest.created = b.created;
+  if (b.id !== undefined) {
+    const claimed = await bucket.put(key(manifest.id, MANIFEST), JSON.stringify(manifest, null, 2) + '\n', {
+      httpMetadata: { contentType: mimeOf(MANIFEST) }, onlyIf: new Headers({ 'if-none-match': '*' }),
+    });
+    if (!claimed) throw new HttpError(409, 'project already exists');
+    return json(manifest, 201);
+  }
   if (!b.empty) await bucket.put(key(manifest.id, DOCUMENT), JSON.stringify(doc, null, 2) + '\n', { httpMetadata: { contentType: mimeOf(DOCUMENT) } });
   await writeManifest(bucket, manifest);
   return json(manifest, 201);
@@ -148,6 +159,24 @@ export async function duplicateProject(bucket: Bucket, id: string, req: Request)
   return json(await writeManifest(bucket, m), 201);
 }
 
+/**
+ * A file of the archive compressed in one piece (deflateSync), the archive still
+ * streaming file by file. fflate's streaming deflate (ZipDeflate, 0.8.3) writes
+ * matches further back than its window on some files (a TrueType font, level 6
+ * and 9): the archive could not be opened again ("invalid distance"), the export
+ * in the cloud failed. Each file is pushed whole, in one final chunk.
+ */
+export class ZipWholeDeflate extends ZipPassThrough {
+  constructor(filename: string) {
+    super(filename);
+    this.compression = 8;
+  }
+  override process(chunk: Uint8Array, final: boolean): void {
+    if (!final) throw new Error('ZipWholeDeflate takes a file in one chunk');
+    this.ondata(null, deflateSync(chunk, { level: 6 }), true);
+  }
+}
+
 /** the project as a .tramme archive, zipped while it streams out */
 export async function exportProject(bucket: Bucket, id: string) {
   const m = await readManifest(bucket, id);
@@ -164,10 +193,25 @@ export async function exportProject(bucket: Bucket, id: string) {
         const path = o.key.slice(key(id).length);
         const obj = await bucket.get(o.key);
         if (!obj) continue;
-        // media are already compressed: store them as they are
-        const file = /\.(png|jpe?g|webp|gif|avif|mp3|ogg|m4a|mp4|webm|mov|woff2?)$/i.test(path) ? new ZipPassThrough(path) : new ZipDeflate(path, { level: 6 });
-        zip.add(file);
-        file.push(new Uint8Array(await obj.arrayBuffer()), true);
+        // media are already compressed: stored as they are, and streamed piece by piece, so a
+        // video larger than the Worker's memory (128 MB) never has to be held whole
+        if (/\.(png|jpe?g|webp|gif|avif|mp3|ogg|m4a|mp4|webm|mov|woff2?)$/i.test(path)) {
+          const file = new ZipPassThrough(path);
+          zip.add(file);
+          const reader = (obj.body as ReadableStream<Uint8Array>).getReader();
+          for (;;) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            file.push(value, false);
+            if (failed) throw failed;
+            await flush();
+          }
+          file.push(new Uint8Array(0), true);
+        } else {
+          const file = new ZipWholeDeflate(path);
+          zip.add(file);
+          file.push(new Uint8Array(await obj.arrayBuffer()), true);
+        }
         if (failed) throw failed;
         await flush();
       }
@@ -203,7 +247,8 @@ export async function getFile(bucket: Bucket, id: string, path: string, req: Req
   const headers = new Headers({
     'content-type': mimeOf(path),
     etag: obj.httpEtag,
-    'cache-control': 'no-cache',
+    // an address that names its version (?v=, the home page's thumbnails) is kept by the browser: a new version is a new address
+    'cache-control': new URL(req.url).searchParams.has('v') ? 'private, max-age=31536000, immutable' : 'no-cache',
     'accept-ranges': 'bytes',
     'x-content-type-options': 'nosniff',
     // a file opened on its own (an SVG, a page) runs nothing

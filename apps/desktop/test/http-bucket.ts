@@ -65,15 +65,9 @@ export function httpBucket(base: string, root: string): Bucket {
       return withBody(m, await res.arrayBuffer(), rangeOf(options?.range, m.size));
     }) as Bucket['get'],
     async put(key: string, value: ArrayBuffer | Uint8Array | string, options?: PutOptions): Promise<StoredObject | null> {
-      // the condition holds against the object there now, as R2 reads it
-      if (options?.onlyIf) {
-        const head = await fetch(`${base}/head${qs({ key })}`, { method: 'POST' });
-        const current = head.status === 404 ? null : metaHeader(head).etag;
-        if (!conditionsHold(options.onlyIf, current)) return null;
-      }
       const body: BodyInit = typeof value === 'string' ? value : new Uint8Array(value instanceof ArrayBuffer ? value : value.slice());
       const custom = options?.customMetadata ? JSON.stringify(options.customMetadata) : undefined;
-      const res = await fetch(`${base}/put${qs({ key, custom })}`, { method: 'POST', body });
+      const res = await fetch(`${base}/put${qs({ key, custom, ifMatch: options?.onlyIf?.get('if-match') ?? undefined, ifNoneMatch: options?.onlyIf?.get('if-none-match') ?? undefined })}`, { method: 'POST', body });
       if (res.status !== 200) return null;
       return meta(metaHeader(res));
     },

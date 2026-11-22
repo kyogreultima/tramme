@@ -1,16 +1,20 @@
 // Runtime page driven by the CLI through Puppeteer: loads one document,
 // validates it, loads its assets and exposes window.TRAMME.
 //   /__tramme/?doc=/project/film.tramme.json[&comp=main]
-// With plugins in the project, the whole frame is evaluated and drawn in the
-// plugin sandbox's worker (docs/evaluator-sandbox.md): the page ships the
-// document and each video asset's decoded frame, and one picture comes back.
+// The project's code (plugins, expressions) runs on this page, as a host
+// application runs the plugins it was given: the command line renders the
+// user's own files, and the renderer of the exports in the cloud cuts this
+// Chrome off the network (browser.ts, offline). With &isolate=1 (tramme render
+// --isolate), a project with code is evaluated and drawn in the plugin
+// sandbox's worker instead (docs/evaluator-sandbox.md): the page ships the
+// document and the video frames it asks for, and one picture comes back.
 
-import type { TrammeDoc } from '@tramme/core';
+import { isolateExpressions, type TrammeDoc } from '@tramme/core';
 import { builtinRegistry } from '@tramme/nodes';
-import { addParts, encodeWav, FIRST_SETTLE_LIMIT, formatParts, mixComposition, noParts, perFrame, Renderer, type FrameParts, type RenderOptions } from '@tramme/render';
-import { blitSandboxFrame, declarationsModule, ensureDeclared, ensureSandboxDoc, sandboxDeclaration, sandboxVideoFrames } from '../../../apps/editor/src/plugins/sandbox-draw.ts';
+import { addParts, encodeWav, FIRST_SETTLE_LIMIT, formatParts, mixExportAudio, noParts, perFrame, Renderer, type FrameParts, type RenderOptions } from '@tramme/render';
+import { blitSandboxFrame, declarationsModule, ensureDeclared, ensureSandboxDoc, moduleItemsOf, renderSandboxFrame, sandboxDeclaration, sandboxVector } from '../../../apps/editor/src/plugins/sandbox-draw.ts';
 import { browserHost, type PluginHost } from '../../../apps/editor/src/plugins/host.ts';
-import { containsExpression } from '@tramme/project';
+import { needsIsolation } from '@tramme/project';
 import { watermarkStamp } from '../../../apps/editor/src/watermark-draw.ts';
 
 const q = new URLSearchParams(location.search);
@@ -18,17 +22,20 @@ const docUrl = new URL(q.get('doc') || '', location.href).href;
 let renderer: Renderer;
 let currentDoc: TrammeDoc | null = null;
 let sandbox: PluginHost | null = null;
-const needsIsolation = (doc: TrammeDoc) => Object.values(doc.assets).some((asset) => asset.type === 'module') || containsExpression(doc);
-const moduleItemsOf = (doc: TrammeDoc) => Object.entries(doc.assets).filter(([, asset]) => asset.type === 'module').map(([id, asset]) => ({ id, url: new URL(asset.src, docUrl).href }));
+const isolate = q.get('isolate') === '1';
+/** whether this document is drawn by the sandbox: asked for, and code in it */
+const isolatedDoc = (doc: TrammeDoc) => isolate && needsIsolation(doc);
+// isolated, this page never runs a project's expression: they run in the sandbox
+if (isolate) isolateExpressions();
 
 async function init() {
   const r = await fetch(docUrl);
   if (!r.ok) throw new Error(`document not found: ${docUrl}`);
   currentDoc = (await r.json()) as TrammeDoc;
-  const isolated = needsIsolation(currentDoc);
+  const isolated = isolatedDoc(currentDoc);
   if (isolated) {
     sandbox = browserHost(docUrl);
-    await ensureDeclared(sandbox, moduleItemsOf(currentDoc));
+    await ensureDeclared(sandbox, moduleItemsOf(currentDoc, docUrl));
   }
   renderer = await Renderer.open(currentDoc, builtinRegistry(), docUrl, document.getElementById('out') as HTMLCanvasElement, {
     compId: q.get('comp') || currentDoc.root,
@@ -46,10 +53,10 @@ async function init() {
 /** the sandbox host whenever project code (plugins or expressions) can run */
 async function sandboxReady(): Promise<PluginHost | null> {
   const doc = currentDoc;
-  if (!doc || !needsIsolation(doc)) return null;
+  if (!doc || !isolatedDoc(doc)) return null;
   sandbox ??= browserHost(docUrl);
   // the document's plugins loaded in the worker first (a url it knows is not loaded again), as the editor does
-  await ensureDeclared(sandbox, moduleItemsOf(doc));
+  await ensureDeclared(sandbox, moduleItemsOf(doc, docUrl));
   ensureSandboxDoc(sandbox, {
     doc, docUrl,
     loaded: (id) => { try { return renderer.assets.get(id); } catch { return null; } },
@@ -58,13 +65,14 @@ async function sandboxReady(): Promise<PluginHost | null> {
 }
 
 /** the sandbox's finished picture for frame f, its videos decoded on the page */
-async function sandboxFrame(f: number): Promise<OffscreenCanvas> {
+async function sandboxFrame(f: number, { samples, shutter, motionBlur }: RenderOptions = {}): Promise<OffscreenCanvas> {
+  const time = f / renderer.comp.fps;
+  // the pictures this frame shows, brought in first (a project heavier than the room keeps some aside): the sandbox only has those kept
+  await renderer.bringImages(time);
   const sb = await sandboxReady();
   if (!sb) throw new Error('the sandbox is off');
-  const time = f / renderer.comp.fps;
-  const videos = await sandboxVideoFrames(renderer, currentDoc!, time);
   const c = currentDoc!.compositions[renderer.compId];
-  const pic = await sb.renderFrame({ compId: renderer.compId, t: time, scale: 1, width: c.width, height: c.height, videos });
+  const pic = await renderSandboxFrame(sb, renderer, { compId: renderer.compId, t: time, scale: 1, width: c.width, height: c.height, samples, shutter, motionBlur }, { export: true });
   if (pic.err) throw new Error(pic.err);
   if (!pic.bitmap) throw new Error(`frame ${f} drew nothing in the sandbox`);
   return pic.bitmap as OffscreenCanvas;
@@ -93,11 +101,11 @@ const api = {
   },
   /** switch to another version of the document (validated, new assets loaded) */
   async load(doc: TrammeDoc, compId?: string) {
-    const isolated = needsIsolation(doc);
+    const isolated = isolatedDoc(doc);
     if (isolated !== renderer.sandboxModules) throw new Error('document isolation mode changed; open a new render page');
     if (isolated) {
       sandbox ??= browserHost(docUrl);
-      await ensureDeclared(sandbox, moduleItemsOf(doc));
+      await ensureDeclared(sandbox, moduleItemsOf(doc, docUrl));
     }
     await renderer.setDoc(doc, { compId: compId || doc.root });
     currentDoc = doc;
@@ -106,7 +114,7 @@ const api = {
   /** PNG of one frame as a data URL; maxWidth scales it down (previews for the assistant) */
   async still(t: number, opts: RenderOptions = {}, maxWidth?: number): Promise<string> {
     if (await sandboxReady()) {
-      blitSandboxFrame(renderer, await sandboxFrame(Math.round(t * renderer.comp.fps)), t, false);
+      blitSandboxFrame(renderer, await sandboxFrame(Math.round(t * renderer.comp.fps), opts), t, false);
       const out = canvas();
       if (!maxWidth || out.width <= maxWidth) return dataUrl(out);
       const k = maxWidth / out.width, small = document.createElement('canvas');
@@ -126,9 +134,16 @@ const api = {
     ctx.drawImage(out, 0, 0, small.width, small.height);
     return dataUrl(small);
   },
+  /** a document with code as an SVG still or a Lottie file, converted in its sandbox (the command line's Node process runs no project code) */
+  async vector(format: 'svg' | 'lottie', t: number, compId?: string): Promise<{ text: string; warnings: string[] }> {
+    if (!currentDoc) throw new Error('no document');
+    sandbox ??= browserHost(docUrl);
+    await ensureDeclared(sandbox, moduleItemsOf(currentDoc, docUrl));
+    return sandboxVector(sandbox, currentDoc, docUrl, format, t, compId || currentDoc.root);
+  },
   /** the sound over [from, to] through the mixer of the editor, as a WAV in base64; null when there is none */
   async mix(from: number, to: number): Promise<string | null> {
-    const buf = await mixComposition(renderer.doc, renderer.compId, (id) => renderer.assets.url(id), { from, to });
+    const buf = await mixExportAudio(renderer, { from, to });
     if (!buf) return null;
     const bytes = encodeWav(buf);
     let s = '';
@@ -140,9 +155,21 @@ const api = {
     const { width: W, height: H, fps } = renderer.comp;
     const ws = new WebSocket(`ws://${location.host}/__tramme/ws${sink ? `?sink=${encodeURIComponent(sink)}` : ''}`);
     ws.binaryType = 'arraybuffer';
-    await new Promise((res, rej) => { ws.onopen = res; ws.onerror = rej; });
-    let waiting: (() => void) | null = null;
-    ws.onmessage = () => { const r = waiting; waiting = null; r?.(); };
+    let waiting: ((error?: string) => void) | null = null;
+    let streamError: string | undefined;
+    const received = (error?: string) => {
+      streamError ??= error;
+      const ack = waiting;
+      waiting = null;
+      ack?.(streamError);
+    };
+    await new Promise<void>((resolve, reject) => {
+      ws.onopen = () => resolve();
+      ws.onerror = () => reject(new Error('could not open the encoder stream'));
+      ws.onclose = () => reject(new Error('encoder stream closed before opening'));
+    });
+    ws.onerror = ws.onclose = () => received('encoder stream closed');
+    ws.onmessage = (e) => received(e.data === 'ok' ? undefined : String(e.data));
     const size = kind === 'rgba64' ? W * H * 8 : kind === 'rgba' ? W * H * 4 : (W * H * 3) / 2;
     const bufs = [new Uint8Array(size), new Uint8Array(size)];
     // 16 bits a channel, little-endian as the page's typed arrays are (ffmpeg rgba64le)
@@ -152,39 +179,44 @@ const api = {
     const parts = noParts();
     renderer.times = noParts();
     const progress = (window as any).__trammeProgress as ((done: number, total: number) => void) | undefined;
-    let inflight: Promise<void> | null = null;
-    for (let f = f0; f < f1; f++) {
-      if (await sandboxReady()) {
-        blitSandboxFrame(renderer, await sandboxFrame(f), f / fps, false, true);
-      } else {
-        await renderer.renderComplete(f / fps, { ...opts, toFbo: true, ...(f === f0 ? { settleLimit: FIRST_SETTLE_LIMIT } : {}) });
-        // a frame whose pictures never came (see SETTLE_LIMIT): the export stops rather than carry a wrong picture
-        if (renderer.late) { ws.close(); throw new Error(`frame ${f} (${(f / fps).toFixed(2)} s) never finished: a video frame or a plugin picture did not come`); }
+    let inflight: Promise<string | undefined> | null = null;
+    const waitForEncoder = async () => {
+      const error = await inflight ?? streamError;
+      if (error) throw new Error(error);
+    };
+    try {
+      for (let f = f0; f < f1; f++) {
+        if (await sandboxReady()) {
+          blitSandboxFrame(renderer, await sandboxFrame(f, opts), f / fps, false, true);
+        } else {
+          await renderer.renderComplete(f / fps, { ...opts, toFbo: true, ...(f === f0 ? { settleLimit: FIRST_SETTLE_LIMIT } : {}) });
+          // a frame whose pictures never came (see SETTLE_LIMIT): the export stops rather than carry a wrong picture
+          if (renderer.late) throw new Error(`frame ${f} (${(f / fps).toFixed(2)} s) never finished: a video frame or a plugin picture did not come`);
+        }
+        const buf = bufs[f & 1];
+        const r0 = performance.now();
+        if (wide) renderer.compositor.readRGBA16(wide[f & 1]);
+        else if (kind === 'rgba') renderer.compositor.readRGBA(buf, renderer.lastSeed);
+        else renderer.compositor.readYUV(buf, renderer.lastSeed);
+        const s0 = performance.now();
+        parts.readback += s0 - r0;
+        await waitForEncoder(); // one frame in flight while the next renders
+        parts.send += performance.now() - s0;
+        inflight = new Promise((r) => { waiting = r; });
+        ws.send(buf);
+        progress?.(f - f0 + 1, f1 - f0);
+        if ((f - f0) % 30 === 29 || f === f1 - 1) {
+          const n = f - f0 + 1;
+          const sofar = addParts({ ...parts }, renderer.times);
+          console.log(`image ${f + 1}/${f1}  ${((performance.now() - t0) / n).toFixed(0)} ms/image  (${formatParts(sofar, n)})`);
+        }
       }
-      const buf = bufs[f & 1];
-      const r0 = performance.now();
-      if (wide) renderer.compositor.readRGBA16(wide[f & 1]);
-      else if (kind === 'rgba') renderer.compositor.readRGBA(buf, renderer.lastSeed);
-      else renderer.compositor.readYUV(buf, renderer.lastSeed);
-      const s0 = performance.now();
-      parts.readback += s0 - r0;
-      if (inflight) await inflight; // one frame in flight while the next renders
-      parts.send += performance.now() - s0;
-      inflight = new Promise((r) => { waiting = r; });
-      ws.send(buf);
-      progress?.(f - f0 + 1, f1 - f0);
-      if ((f - f0) % 30 === 29 || f === f1 - 1) {
-        const n = f - f0 + 1;
-        const sofar = addParts({ ...parts }, renderer.times);
-        console.log(`image ${f + 1}/${f1}  ${((performance.now() - t0) / n).toFixed(0)} ms/image  (${formatParts(sofar, n)})`);
-      }
-    }
-    const s1 = performance.now();
-    if (inflight) await inflight;
-    parts.send += performance.now() - s1;
-    ws.close();
-    const n = Math.max(1, f1 - f0);
-    return { ms: (performance.now() - t0) / n, parts: perFrame(addParts(parts, renderer.times), n) };
+      const s1 = performance.now();
+      await waitForEncoder();
+      parts.send += performance.now() - s1;
+      const n = Math.max(1, f1 - f0);
+      return { ms: (performance.now() - t0) / n, parts: perFrame(addParts(parts, renderer.times), n) };
+    } finally { ws.close(); }
   },
 };
 

@@ -5,7 +5,7 @@
 // speeds it up or slows it down (the pitch of its sound with it); looping,
 // the section from `start` to `loopEnd` starts over as long as the layer runs.
 
-import { correctionAt, isStabilization, mediaTime, pictureRect, type NodeType, type Vec2, type VideoAsset } from '@tramme/core';
+import { correctionAt, isStabilization, mediaTime, pictureRect, type Host, type NodeType, type Vec2, type VideoAsset } from '@tramme/core';
 import { RATE_PROP, SOUND_PROPS } from './sound.ts';
 
 interface VideoProps {
@@ -20,6 +20,30 @@ interface VideoProps {
   focus: Vec2;
   gain: number;
   muted: boolean;
+}
+
+/**
+ * The preview while it moves (host.quick): a frame shown at half its size or
+ * less is first made small on the graphics card, at the size it lands on
+ * screen. Drawn whole, the 2D canvas converts every pixel of a 4K frame each
+ * time; measured 2026-11-19, two shots of a 4K take overlapping went from 33
+ * to 43 frames per second. Still frames and exports draw the frame itself.
+ */
+function quick(ctx: CanvasRenderingContext2D, src: VideoAsset, image: CanvasImageSource, w: number, h: number): CanvasImageSource | null {
+  if (!src.quickPicture) return null;
+  const m = ctx.getTransform();
+  const sw = Math.ceil(w * Math.hypot(m.a, m.b)), sh = Math.ceil(h * Math.hypot(m.c, m.d));
+  if (sw < 1 || sh < 1 || sw > src.width / 2 || sh > src.height / 2) return null;
+  return src.quickPicture(image, sw, sh);
+}
+
+/** the file a layer plays and the time in it its frame shows */
+function source(p: VideoProps & { video: string }, host: Host): { src: VideoAsset; t: number } {
+  // slowed down, the file's interpolated copy (more frames, the same time) plays instead of repeating frames
+  const speed = typeof p.rate === 'number' ? Math.abs(p.rate) : 1;
+  const smooth = speed < 0.999 ? host.assetInfo(p.video).interpolated : undefined;
+  // the frame's own picture across the motion blur's shutter: footage carries its own blur, two of its frames never blend
+  return { src: host.asset<VideoAsset>(smooth ?? p.video), t: mediaTime(p, host.t - (host.shutter ?? 0), host.layerIn ?? 0) };
 }
 
 export const video: NodeType<VideoProps> = {
@@ -39,20 +63,21 @@ export const video: NodeType<VideoProps> = {
   },
   path({ size: [w, h] }) { const p = new Path2D(); p.rect(-w / 2, -h / 2, w, h); return p; },
   bounds: ({ size: [w, h] }) => ({ x: -w / 2, y: -h / 2, w, h }),
+  // the next frames decoded while this one shows; the shot after a cut, its decoder started where it begins before the cut comes
+  ahead(p, host) {
+    if (!p.video) return;
+    const { src, t } = source({ ...p, video: p.video }, host);
+    if (!src.frameAt(t).exact) void src.request(t, 'ahead');
+  },
   render: {
     canvas2d(ctx, p, host) {
       if (!p.video) return;
       const [w, h] = p.size;
       if (w <= 0 || h <= 0) return;
-      // slowed down, the file's interpolated copy (more frames, the same time) plays instead of repeating frames
-      const speed = typeof p.rate === 'number' ? Math.abs(p.rate) : 1;
-      const smooth = speed < 0.999 ? host.assetInfo(p.video).interpolated : undefined;
-      const src = host.asset<VideoAsset>(smooth ?? p.video);
-      // the frame's own picture across the motion blur's shutter: footage carries its own blur, two of its frames never blend
-      const t = mediaTime(p, host.t - (host.shutter ?? 0), host.layerIn ?? 0);
+      const { src, t } = source({ ...p, video: p.video }, host);
       const { image, exact } = src.frameAt(t);
       if (!exact) host.defer?.(src.request(t));
-      if (!image || !src.width || !src.height) return;
+      if (!src.width || !src.height || (!image && !src.drawnAt)) return;
       // the frame is centred on the layer origin; cropped, the point named by focus stays at its centre (pictureRect, shared with the tracking and the checks)
       const r = pictureRect(p.fit, w, h, src.width, src.height, p.focus);
       if (p.fit === 'cover') { ctx.beginPath(); ctx.rect(-w / 2, -h / 2, w, h); ctx.clip(); }
@@ -66,7 +91,12 @@ export const video: NodeType<VideoProps> = {
         ctx.scale(c.s, c.s);
         ctx.translate(-cx, -cy);
       }
-      ctx.drawImage(image, r.x, r.y, r.w, r.h);
+      if (src.drawnAt) {
+        const m = ctx.getTransform();
+        src.drawnAt(t, Math.ceil(r.w * Math.hypot(m.a, m.b)), Math.ceil(r.h * Math.hypot(m.c, m.d)));
+      }
+      if (!image) return;
+      ctx.drawImage((host.quick ? quick(ctx, src, image, r.w, r.h) : null) ?? image, r.x, r.y, r.w, r.h);
     },
   },
 };

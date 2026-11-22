@@ -8,6 +8,7 @@ FROM node:24-slim
 RUN apt-get update && apt-get install -y --no-install-recommends chromium fonts-noto fonts-noto-color-emoji ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 ENV CHROME_PATH=/usr/bin/chromium
+ENV TRAMME_HW_ENCODER=off
 RUN npm install -g pnpm@12.18.0
 WORKDIR /repo
 COPY . .

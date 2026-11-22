@@ -447,6 +447,34 @@ A layer's transform has two more properties, `rotationX` and `rotationY` (degree
 
 `push-in` keys the composition camera onto a layer: the zoom that makes it fill 0.6 of the frame (1.1 to 3), raised until its smallest text reads when it can be, the pan that centres it without the frame leaving the composition, held 1.2 s and, by default, back. A composition without a camera gets one at the defaults. A layer that is off the frame, hidden at that time or larger than the frame gets a text and no operation.
 
+## Scene builders
+
+A scene builder is a short script that makes the layers of one composition: `assets/builds/<name>.js`, run by `build_scene` in the project's sandbox. The same call writes it (`content`) or changes it (`edits`: `{ find, content }` pairs, in order) before it builds, so a round of changes is one call. Its default export receives the kit `k`; every layer it adds goes into the composition, bottom first, and replaces the layers the same script built last time (its record, `assets/builds/<name>.json`, keeps their ids and hashes). The composition's other layers — a sound a tool placed, a layer the user added — stay where they are. A layer the script built and someone changed since stops the build, with its id: bring the change into the script, then build with `overwrite: true`. To change the scene, change the script and build again in one call; the script is the scene.
+
+- `k.width`, `k.height`, `k.cx`, `k.cy`, `k.fps`, `k.duration`, `k.tokens` (names), `k.assets` (`{ id: { type, family?, name? } }`).
+- `k.add(type, o)` adds a layer of any type. `o` is one object: `id` or `name` (the id is made from it, unique), the transform's keys (`position`, `anchor`, `scale` — a number is both axes —, `rotation`, `opacity`, `depth`, `rotationX`, `rotationY`), the layer's keys (`in`, `out`, `visible`, `clip`, `blend`, `masks`, `styles`, `params`, `overrides`, `distribute`), `effects` and `fx` (lists of `{ type, props }`, ids made), and everything else is the layer's props. Shorthands: `k.text(text, o)` (baseline `middle` unless given), `k.rect(o)`, `k.ellipse(o)`, `k.path(o)`, `k.image(asset, o)`, `k.video(asset, o)`, `k.comp(compId, o)`, `k.sound(asset, at, o)`. Each returns the id.
+- `k.group(ids, o)` puts layers in a group (they leave the root); its children are drawn in its space.
+- `k.key([t, v, ease?], …)` writes keyframes. A `"hold"` anywhere puts every key between two frames, so the motion blur never blends two values (typed text, a caret's jumps, a colour switch).
+- `k.ease(name)` is the document's token `"@name"` when it has one, else the house curve (`out`, `in`, `std`, `back`).
+- `k.enter(t, { at, dx, dy, from, blur, dur, ease, opacity, drift: { until, dx, dy, scale }, exit: { t, dx, dy, to, blur, dur } })` gives `opacity`, `position`, `scale` and an entrance blur to spread in a layer's options: a fade out of a blur from an offset and a scale, landing at `at`, drifting slowly after it lands until `until` when `drift` is given (a few pixels, a scale to 1.03: a hold is never frozen, and the check counts frozen frames), and leaving from there when `exit` is given.
+- `k.typing(text, t, cps)` gives `{ text, times, end }`: the text's keyframes typed from `t`, the time each prefix appears, the end. `k.measure(text, { font, size, weight, tracking, italic })` is the width in pixels of the widest line, measured with the project's font asset as the engine draws it: place a caret, centre a line made of words, fit a box.
+- `k.blur(radius)`, `k.shadow({ color, blur, offset })` are effects. `k.set({ duration, background, markers, camera, motionBlur })` sets the composition's own fields.
+
+```js
+export default function (k) {
+  const line = 'One prompt away', font = 'display', size = 84;
+  const w = k.measure(line, { font, size, weight: 600 });
+  k.rect({ name: 'Paper', size: [k.width, k.height], position: [k.cx, k.cy], fill: '@paper' });
+  const typed = k.typing(line, 0.4, 24);
+  k.text(typed.text, { name: 'Line', font, size, weight: 600, color: '@ink', position: [k.cx - w / 2, k.cy] });
+  // the caret after each letter typed
+  k.rect({ name: 'Caret', size: [3, 96], fill: '@accent',
+    position: k.key(...typed.times.map((t, i) => [t, [k.cx - w / 2 + k.measure(line.slice(0, i), { font, size, weight: 600 }) + 6, k.cy], 'hold'])) });
+  k.image('logo', { size: [220, 220], ...k.enter(typed.end + 0.2, { at: [k.cx, k.cy - 200], dy: 30, from: 0.9, drift: { until: typed.end + 2, scale: 1.03 } }) });
+  k.set({ duration: typed.end + 2 });
+}
+```
+
 ## Operations
 
 Every change is a list of JSON Patch operations (RFC 6902) on JSON Pointer paths: `add`, `remove`, `replace`, `move`, `test`. For example, animating a layer's opacity:

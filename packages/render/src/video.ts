@@ -2,20 +2,24 @@
 // the file served with range requests, so a long video is never loaded whole.
 // Playback reads forward from decoders kept open, one per play position in
 // use (video-pool.ts); a jump elsewhere starts a new read there. The last few
-// frames of each stay at hand (motion blur sub-frames, small steps back).
+// frames of each stay at hand (motion blur sub-frames, small steps back), as
+// the decoder gave them: a VideoFrame, drawn as it is. Copying each into a
+// canvas of the file's size cost a 4K take a third of its frame rate where
+// two shots of it overlapped; each frame is closed once no reader keeps it.
 
-import { ALL_FORMATS, BlobSource, CanvasSink, Input, UrlSource, type InputVideoTrack, type WrappedCanvas } from 'mediabunny';
+import { ALL_FORMATS, BlobSource, CanvasSink, Input, UrlSource, VideoSampleSink, type InputVideoTrack } from 'mediabunny';
 import type { VideoAsset } from '@tramme/core';
-import { KEEP, ReaderPool } from './video-pool.ts';
-import { previewVideoBlob } from './video-cache.ts';
+import { KEEP, ReaderPool, type PoolFrame, type ReadKind } from './video-pool.ts';
+import { previewVideoBlob, RANGE_PIECE } from './video-cache.ts';
+import { shrinkFrame } from './frame-shrink.ts';
 
-/** Finish small range responses so paused decoders do not hold HTTP connections. */
+/** Finish range responses of bounded size so paused decoders do not hold HTTP connections. */
 export const fetchVideoRange: typeof fetch = async (input, init) => {
   const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
   const range = /^bytes=(\d+)-$/.exec(headers.get('range') ?? '');
   if (!range) return fetch(input, init);
   const start = Number(range[1]);
-  headers.set('range', `bytes=${start}-${start + 256 * 1024 - 1}`);
+  headers.set('range', `bytes=${start}-${start + RANGE_PIECE - 1}`);
   const response = await fetch(input, { ...init, headers });
   if (response.status !== 206) return response;
   // Without the total size a shortened response could look like the whole
@@ -41,8 +45,9 @@ export class VideoFrames implements VideoAsset {
   duration = 0;
   hasAudio = false;
   private input: Input;
-  private pool!: ReaderPool<WrappedCanvas>;
-  private busy: Promise<void> = Promise.resolve();
+  private pool!: ReaderPool<PoolFrame<CanvasImageSource>>;
+  /** requests on their way, by time (ms): asked again, the same wait */
+  private inflight = new Map<number, Promise<void>>();
   /** times asked for and not found (past the end, a gap): not asked again */
   private missed = new Set<number>();
 
@@ -61,7 +66,7 @@ export class VideoFrames implements VideoAsset {
       v.height = track.displayHeight;
       v.duration = await v.input.computeDuration();
       v.hasAudio = !!(await v.input.getPrimaryAudioTrack());
-      v.pool = new ReaderPool(() => readerOf(track));
+      v.pool = new ReaderPool(() => readerOf(track), undefined, (f) => { if (typeof VideoFrame !== 'undefined' && f.picture instanceof VideoFrame) f.picture.close(); });
       return v;
     } catch (error) { v.input.dispose(); throw error; }
   }
@@ -72,22 +77,31 @@ export class VideoFrames implements VideoAsset {
   frameAt(t: number): { image: CanvasImageSource | null; exact: boolean } {
     const time = Math.min(Math.max(0, t), Math.max(0, this.duration - 1e-3));
     const hit = this.pool.find(time);
-    if (hit) return { image: hit.canvas as CanvasImageSource, exact: true };
+    if (hit) return { image: hit.picture, exact: true };
     const missed = this.missed.has(Math.round(time * 1000));
     // the nearest frame decoded, while the right one comes
     const near = this.pool.nearest(time);
-    return { image: (near?.canvas as CanvasImageSource) ?? null, exact: missed };
+    return { image: near?.picture ?? null, exact: missed };
   }
 
-  /** decodes the frame shown at t (one request at a time, in order) */
-  request(t: number): Promise<void> {
+  quickPicture(image: CanvasImageSource, width: number, height: number): CanvasImageSource | null {
+    return typeof VideoFrame !== 'undefined' && image instanceof VideoFrame ? shrinkFrame(image, width, height) : null;
+  }
+
+  /** decodes the frame shown at t (each reader in order, the readers side by side: video-pool.ts) */
+  request(t: number, kind: ReadKind = 'shown'): Promise<void> {
     const time = Math.min(Math.max(0, t), Math.max(0, this.duration - 1e-3));
-    this.busy = this.busy.then(() => this.decode(time)).catch((e) => { console.warn('[tramme] video:', (e as Error).message); });
-    return this.busy;
+    const key = Math.round(time * 1000);
+    let p = this.inflight.get(key);
+    if (!p) {
+      p = this.decode(time, kind).catch((e) => { console.warn('[tramme] video:', (e as Error).message); }).finally(() => this.inflight.delete(key));
+      this.inflight.set(key, p);
+    }
+    return p;
   }
 
-  private async decode(t: number) {
-    await this.pool.read(t);
+  private async decode(t: number, kind: ReadKind) {
+    await this.pool.read(t, kind);
     if (!this.pool.find(t)) {
       if (this.missed.size > 200) this.missed.clear();
       this.missed.add(Math.round(t * 1000));
@@ -100,10 +114,28 @@ export class VideoFrames implements VideoAsset {
   }
 }
 
-/** a reader's decoder: a sink of its own, its canvases a ring larger than the frames it keeps, so a kept canvas is never reused under us */
-function readerOf(track: InputVideoTrack) {
-  const sink = new CanvasSink(track, { poolSize: KEEP + 3 });
-  return (t: number) => sink.canvases(t);
+/**
+ * A reader's decoder: a sink of its own, yielding the decoder's frames from t,
+ * each with its span in the file. A file turned by its metadata (a phone held
+ * upright) is drawn turned into a canvas, its canvases a ring larger than the
+ * frames kept, so a kept canvas is never reused under us.
+ */
+function readerOf(track: InputVideoTrack): (t: number) => AsyncGenerator<PoolFrame<CanvasImageSource>, void, unknown> {
+  if (track.rotation) {
+    const turned = new CanvasSink(track, { poolSize: KEEP + 3 });
+    return async function* (t) {
+      for await (const c of turned.canvases(t)) yield { timestamp: c.timestamp, duration: c.duration, picture: c.canvas as CanvasImageSource };
+    };
+  }
+  const sink = new VideoSampleSink(track);
+  return async function* (t) {
+    for await (const sample of sink.samples(t)) {
+      const picture = sample.toVideoFrame();
+      const frame = { timestamp: sample.timestamp, duration: sample.duration, picture };
+      sample.close();
+      yield frame;
+    }
+  };
 }
 
 /** what a video file holds, read from its header (a new project takes its size, cadence and length) */

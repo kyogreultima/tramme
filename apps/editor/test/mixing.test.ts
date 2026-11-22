@@ -1,6 +1,28 @@
 import { describe, expect, it } from 'vitest';
 import type { AudioClip, SoundFigures } from '@tramme/core';
-import { balance, type Effect } from '../src/mixing.ts';
+import { balance, monoIssue, offCueFrames, rhythmIssues, SOUND_TEXTS, type Effect } from '../src/mixing.ts';
+import { profileOf, type RhythmFigures } from '@tramme/core';
+
+it('keeps the rhythm check silent without a reference profile and reports each outside figure', () => {
+  const f: RhythmFigures = { perTen: 12, gapMedian: 2, gapMax: 4, spreadDb: 3, lowShare: 0.2, floorDb: -30, digitalSilence: 0 };
+  expect(rhythmIssues(f, null)).toEqual([]);
+  const p = profileOf([{ ...f, perTen: 4 }, { ...f, perTen: 8 }]);
+  const issues = rhythmIssues(f, p);
+  expect(issues).toHaveLength(1);
+  expect(issues[0]).toMatchObject({ check: 'sound', severity: 'info', say: { text: SOUND_TEXTS.rhythm } });
+});
+
+describe('mono warning', () => {
+  it('warns at a loss of at least 6 dB', () => {
+    expect(monoIssue({ lossDb: 9.2, at: 1.4 })?.say?.text).toBe(SOUND_TEXTS.mono);
+    expect(monoIssue({ lossDb: 6, at: 1.4 })?.severity).toBe('warning');
+    expect(monoIssue({ lossDb: 3, at: 1.4 })).toBeNull();
+  });
+});
+
+it('accepts a whoosh whose peak follows its cut by 37 ms', () => {
+  expect(offCueFrames({ hit: 2.037, cue: 2, cueShift: 0.037, fps: 30 })).toBe(0);
+});
 
 const figures = (o: Partial<SoundFigures> = {}): SoundFigures => ({ duration: 1, peakAt: 0.01, peakDb: -1, loudDb: -10, rmsDb: -20, start: 0, end: 1, ...o });
 /** an effect whose energy is all in one band (dB at gain 0), over a bed given band by band */

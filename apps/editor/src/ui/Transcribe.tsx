@@ -5,13 +5,13 @@
 
 import { staticValue, type Layer } from '@tramme/core';
 import { S, toast } from '../state.ts';
-import { transcribeAsset, transcribing, transcriptIdOf } from '../speech.ts';
+import { cancelled, transcribeAsset, transcribing, transcriptIdOf } from '../speech.ts';
 import type { MenuEntry } from './controls.tsx';
 import { Icon } from './icons.tsx';
 import { t } from '../i18n/index.ts';
 
 /** starts the transcription of a media asset (or waits for the one under way); a failure is told */
-export const transcribe = (asset: string) => { transcribeAsset(asset).catch((e) => toast(t('common.couldNotTranscribeError', { error: (e as Error).message }), 'error', 9000)); };
+export const transcribe = (asset: string) => { transcribeAsset(asset).catch((e) => { if (!cancelled(e)) toast(t('common.couldNotTranscribeError', { error: (e as Error).message }), 'error', 9000); }); };
 
 /** the media asset a layer plays, when it is a sound or a video of the project */
 export function mediaOf(l: Layer | undefined): string | null {

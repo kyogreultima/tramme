@@ -4,7 +4,7 @@
 // for it; the job waits in the queue (RenderQueue, one at a time, the plans with
 // a priority first) and says where it is until the film is there.
 //
-//   POST /api/projects/<id>/renders {comp?}     a job (above 1080p, a 4K export: the plans that have it)
+//   POST /api/projects/<id>/renders {comp?, profile?}     a job (above 1080p, a 4K export: the plans that have it)
 //   GET  /api/renders                                                  this person's jobs, the newest first
 //   GET  /api/renders/<job>                                            one, and where it is
 //
@@ -29,6 +29,7 @@ export interface Job {
   quality: Quality;
   /** none: the film */
   format?: Format;
+  profile?: 'master';
   comp?: string;
   status: 'queued' | 'rendering' | 'done' | 'failed';
   createdAt: string;
@@ -40,6 +41,9 @@ export interface Job {
   priority: boolean;
   /** the account that asked for it (none on a server of one): told by mail when it is over */
   userId?: string;
+  /** the render under way, as the renderer knows it, and when it started */
+  renderId?: string;
+  startedAt?: string;
 }
 
 const JOB = (id: string) => `renders/${id}.json`;
@@ -62,7 +66,7 @@ export async function renderRoute(req: Request, env: Env, edge: Pick<Edge, 'work
     // the project must be there (its manifest), read through the storage routes
     const info = await storageRoute(new Request(new URL(`/api/projects/${project}`, url)), files, new URL(`/api/projects/${project}`, url)).catch(() => null);
     if (!info?.ok) throw new HttpError(404, 'project not found');
-    const body = await readJson<{ comp?: unknown; format?: unknown }>(req);
+    const body = await readJson<{ comp?: unknown; format?: unknown; profile?: unknown }>(req);
     // the film is rendered at the project's size: above 1080p, it is a 4K export
     const { manifest } = (await info.json()) as { manifest: { width?: number; height?: number } };
     const quality: Quality = (manifest.width ?? 0) * (manifest.height ?? 0) > 1920 * 1080 ? '4k' : '1080p';
@@ -71,6 +75,7 @@ export async function renderRoute(req: Request, env: Env, edge: Pick<Edge, 'work
     const now = new Date().toISOString();
     const job: Job = {
       id: newJob(), project, quality, ...(body.format === 'premiere' ? { format: 'premiere' as const } : {}), ...(typeof body.comp === 'string' && /^[\w-]{1,64}$/.test(body.comp) ? { comp: body.comp } : {}),
+      ...(body.profile === 'master' && body.format !== 'premiere' ? { profile: 'master' as const } : {}),
       status: 'queued', createdAt: now, updatedAt: now, priority: terms.priorityQueue, ...(edge.userId ? { userId: edge.userId } : {}),
     };
     await writeJob(files, job);
@@ -91,8 +96,25 @@ export async function renderRoute(req: Request, env: Env, edge: Pick<Edge, 'work
   throw new HttpError(404, 'unknown route');
 }
 
-/** what renders a project: its archive in, its film out (the renderer container, or a stand-in in the tests); a response is kept as it arrives */
-export type Renderer = (archive: ArrayBuffer, job: Job) => Promise<ArrayBuffer | Response>;
+/** where a render is, as its renderer says */
+export interface RenderState { status: 'rendering' | 'done' | 'failed'; error?: string }
+
+/**
+ * What renders a project (the renderer container, the one started on this machine, or a stand-in in the tests), a
+ * render at a time, without a request held for its length: started with the project's archive, asked where it is,
+ * its film taken (a response is kept as it arrives), then let go.
+ */
+export interface Renderer {
+  start(archive: ArrayBuffer, job: Job): Promise<string>;
+  state(id: string): Promise<RenderState>;
+  film(id: string): Promise<ArrayBuffer | Response>;
+  drop(id: string): Promise<void>;
+}
+
+/** how often the queue asks the renderer where a render is (each question also keeps the container awake) */
+export const POLL_MS = 15_000;
+/** a render still going after this long is taken as stuck */
+const MAX_RENDER_MS = 4 * 60 * 60_000;
 
 /** a response kept without holding it whole (a Premiere export weighs gigabytes): streamed at its announced length */
 function streamed(res: Response): ArrayBuffer | ReadableStream | Promise<ArrayBuffer> {
@@ -110,24 +132,64 @@ export const SERVER = '';
 /** the files of a workspace, or the server's own */
 const filesOf = (bucket: Bucket, workspaceId: string) => (workspaceId === SERVER ? bucket : prefixedBucket(bucket, workspacePrefix(workspaceId)));
 
-/** one job done: the project's archive rendered, the film kept with the project, the record saying so */
-export async function runJob(bucket: Bucket, workspaceId: string, jobId: string, render: Renderer): Promise<Job | null> {
+/** a job and the way to change its record */
+async function jobAt(bucket: Bucket, workspaceId: string, jobId: string) {
   const files = filesOf(bucket, workspaceId);
   const job = await readJob(files, jobId);
-  if (!job || job.status === 'done') return job;
-  const step = async (change: Partial<Job>) => { Object.assign(job, change, { updatedAt: new Date().toISOString() }); await writeJob(files, job); };
-  await step({ status: 'rendering' });
+  const step = async (change: Partial<Job>) => { Object.assign(job!, change, { updatedAt: new Date().toISOString() }); await writeJob(files, job!); };
+  return { files, job, step };
+}
+
+/** a job started: the project's archive handed to the renderer, the record saying it renders (or why it cannot) */
+export async function startJob(bucket: Bucket, workspaceId: string, jobId: string, render: Renderer): Promise<Job | null> {
+  const { files, job, step } = await jobAt(bucket, workspaceId, jobId);
+  if (!job || job.status !== 'queued') return job;
   try {
     const at = new URL(`https://render/api/projects/${job.project}/export`);
     const archive = await storageRoute(new Request(at), files, at);
     if (!archive?.ok) throw new Error('the project cannot be read');
-    const made = await render(await archive.arrayBuffer(), job);
+    const renderId = await render.start(await archive.arrayBuffer(), job);
+    await step({ status: 'rendering', renderId, startedAt: new Date().toISOString() });
+  } catch (e) {
+    await step({ status: 'failed', error: (e as Error).message.slice(0, 500) });
+  }
+  return job;
+}
+
+/** a job that renders asked about: still going, or over (its film kept with the project, or the reason it failed) */
+export async function checkJob(bucket: Bucket, workspaceId: string, jobId: string, render: Renderer): Promise<Job | null> {
+  const { files, job, step } = await jobAt(bucket, workspaceId, jobId);
+  if (!job || job.status !== 'rendering' || !job.renderId) return job;
+  const id = job.renderId;
+  let state: RenderState;
+  // a question that does not come through (the container waking, the network) is asked again at the next round
+  try { state = await render.state(id); } catch (e) {
+    if (Date.now() - Date.parse(job.startedAt ?? job.updatedAt) < MAX_RENDER_MS) return job;
+    state = { status: 'failed', error: (e as Error).message };
+  }
+  if (state.status === 'rendering' && Date.now() - Date.parse(job.startedAt ?? job.updatedAt) > MAX_RENDER_MS) state = { status: 'failed', error: 'the export took too long' };
+  if (state.status === 'rendering') return job;
+  try {
+    if (state.status === 'failed') { await step({ status: 'failed', error: (state.error || 'the export failed').slice(0, 500) }); return job; }
+    const made = await render.film(id);
     const premiere = job.format === 'premiere';
     const file = premiere ? `renders/premiere-${job.id}.zip` : `renders/cloud-${job.id}.mp4`;
     await files.put(`projects/${job.project}/${file}`, made instanceof Response ? await streamed(made) : made, { httpMetadata: { contentType: premiere ? 'application/zip' : 'video/mp4' } });
     await step({ status: 'done', file });
   } catch (e) {
     await step({ status: 'failed', error: (e as Error).message.slice(0, 500) });
+  } finally {
+    await render.drop(id).catch(() => {});
+  }
+  return job;
+}
+
+/** one job from start to end, asked about every `every` ms (the queue does the same across its alarms) */
+export async function runJob(bucket: Bucket, workspaceId: string, jobId: string, render: Renderer, every = POLL_MS): Promise<Job | null> {
+  let job = await startJob(bucket, workspaceId, jobId, render);
+  while (job?.status === 'rendering') {
+    await new Promise((r) => setTimeout(r, every));
+    job = await checkJob(bucket, workspaceId, jobId, render);
   }
   return job;
 }
@@ -136,7 +198,9 @@ interface Waiting { workspaceId: string; job: string; priority: boolean; at: str
 
 /**
  * The queue of the exports: the jobs wait here in order, the plans with a priority first, and are rendered one at
- * a time (one renderer). An alarm takes the next one; a job's record in its workspace says where it is.
+ * a time (one renderer). Each alarm is short: it asks the renderer where the current job is (and comes back
+ * POLL_MS later while it renders), or starts the next one. No alarm waits for a whole render; a job's record in
+ * its workspace says where it is.
  */
 export class RenderQueue extends DurableObject<Env> {
   async fetch(req: Request): Promise<Response> {
@@ -148,13 +212,23 @@ export class RenderQueue extends DurableObject<Env> {
   }
 
   async alarm() {
+    if (!this.env.FILES) return;
+    const render = rendererOf(this.env);
+    const current = await this.ctx.storage.get<Waiting>('current');
+    if (current) {
+      const job = await checkJob(this.env.FILES, current.workspaceId, current.job, render);
+      if (job?.status === 'rendering') { await this.ctx.storage.setAlarm(Date.now() + POLL_MS); return; }
+      await this.ctx.storage.delete('current');
+      if (job) await tellOwner(this.env, job);
+    }
     const list = (await this.ctx.storage.get<Waiting[]>('waiting')) ?? [];
-    if (!list.length || !this.env.FILES) return;
+    if (!list.length) return;
     const next = nextJob(list);
     await this.ctx.storage.put('waiting', list.filter((w) => w !== next));
-    const job = await runJob(this.env.FILES, next.workspaceId, next.job, rendererOf(this.env));
-    if (list.length > 1) await this.ctx.storage.setAlarm(Date.now());
+    const job = await startJob(this.env.FILES, next.workspaceId, next.job, render);
+    if (job?.status === 'rendering') { await this.ctx.storage.put('current', next); await this.ctx.storage.setAlarm(Date.now() + POLL_MS); return; }
     if (job) await tellOwner(this.env, job);
+    if (list.length > 1) await this.ctx.storage.setAlarm(Date.now());
   }
 }
 
@@ -166,16 +240,33 @@ export const renders = (env: Env) => !!env.RENDER_QUEUE && (!!env.RENDERER || !!
 
 /** what renders here: the container behind the Worker (container.ts, RendererContainer), else the renderer at RENDERER_URL (`pnpm renderer`) */
 export function rendererOf(env: Env): Renderer {
-  return async (archive, job) => {
-    const q = new URLSearchParams({ quality: job.quality, ...(job.format ? { format: job.format } : {}), ...(job.comp ? { comp: job.comp } : {}) });
-    const req = (base: string) => new Request(`${base}/render?${q}`, { method: 'POST', body: archive });
-    let res: Response;
-    if (env.RENDERER) res = await env.RENDERER.get(env.RENDERER.idFromName('renderer')).fetch(req('http://renderer'));
-    else if (env.RENDERER_URL) {
-      try { res = await fetch(req(env.RENDERER_URL.replace(/\/+$/, ''))); } catch { throw new Error('the renderer is not running on this machine: start it with pnpm renderer'); }
-    } else throw new Error('no renderer in this deployment');
-    if (!res.ok) throw new Error(`the renderer said ${res.status}: ${(await res.text()).slice(0, 300)}`);
-    return res;
+  const call = async (route: string, init: RequestInit = {}): Promise<Response> => {
+    if (env.RENDERER) return env.RENDERER.get(env.RENDERER.idFromName('renderer')).fetch(new Request(`http://renderer${route}`, init));
+    if (!env.RENDERER_URL) throw new Error('no renderer in this deployment');
+    try { return await fetch(`${env.RENDERER_URL.replace(/\/+$/, '')}${route}`, init); } catch { throw new Error('the renderer is not running on this machine: start it with pnpm renderer'); }
+  };
+  // the renderer's reason as it gave it (the CLI's error, its stack left out); its status only when it gave none
+  const refused = async (res: Response) => new Error((await res.text()).trim().slice(0, 480) || `the renderer answered ${res.status}`);
+  return {
+    async start(archive, job) {
+      const q = new URLSearchParams({ quality: job.quality, ...(job.format ? { format: job.format } : {}), ...(job.profile ? { profile: job.profile } : {}), ...(job.comp ? { comp: job.comp } : {}) });
+      const res = await call(`/render?${q}`, { method: 'POST', body: archive });
+      if (!res.ok) throw await refused(res);
+      return ((await res.json()) as { id: string }).id;
+    },
+    async state(id) {
+      const res = await call(`/render/${encodeURIComponent(id)}`);
+      // a render it does not know: it restarted since (it says so)
+      if (res.status === 404) return { status: 'failed', error: ((await res.json().catch(() => ({}))) as { error?: string }).error ?? 'the renderer stopped during the export' };
+      if (!res.ok) throw await refused(res);
+      return (await res.json()) as RenderState;
+    },
+    async film(id) {
+      const res = await call(`/render/${encodeURIComponent(id)}/film`);
+      if (!res.ok) throw await refused(res);
+      return res;
+    },
+    async drop(id) { await call(`/render/${encodeURIComponent(id)}`, { method: 'DELETE' }); },
   };
 }
 

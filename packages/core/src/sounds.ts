@@ -35,6 +35,8 @@ export interface SoundEntry {
   /** a sound made by a provider: what it was asked */
   prompt?: string;
   provider?: string;
+  /** packed 512-dimensional CLAP audio vector, when the local model was available */
+  clap?: string;
 }
 
 const words = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').split(/[^a-z0-9]+/).filter(Boolean);
@@ -54,16 +56,22 @@ const ALIASES: Record<string, string[]> = {
   pop: ['bubble', 'blip', 'appear'],
 };
 
+export const banKey = (e: SoundEntry): string => e.family ?? e.id;
+const SOURCE_ORDER: Record<SoundSource, number> = { library: 0, 'built-in': 1, preset: 2 };
+export const MEANING_WEIGHT = 4;
+export const MEANING_MIN = 0.35;
+export const MEANING_ONLY_MIN = 0.5;
+
 /**
  * Sounds matching the words of a request, best first: kind, tags, title and
  * family count, the aliases of a kind too. With no words, the first of each kind.
  */
-export function searchSounds(entries: SoundEntry[], query = '', opts: { kind?: string; limit?: number } = {}): SoundEntry[] {
+export function searchSounds(entries: SoundEntry[], query = '', opts: { kind?: string; limit?: number; banned?: ReadonlySet<string>; meaning?: (e: SoundEntry) => number | null } = {}): SoundEntry[] {
   const q = words(query), limit = opts.limit ?? 12;
-  const pool = opts.kind ? entries.filter((e) => e.kind === opts.kind) : entries;
+  const pool = entries.filter((e) => (!opts.kind || e.kind === opts.kind) && !opts.banned?.has(banKey(e)));
   if (!q.length) {
     const seen = new Set<string>();
-    return pool.filter((e) => { const key = e.family ?? e.id; if (seen.has(key)) return false; seen.add(key); return true; }).slice(0, limit);
+    return [...pool].sort((a, b) => SOURCE_ORDER[a.source] - SOURCE_ORDER[b.source] || a.id.localeCompare(b.id)).filter((e) => { const key = e.family ?? e.id; if (seen.has(key)) return false; seen.add(key); return true; }).slice(0, limit);
   }
   const scored = pool.map((e) => {
     const tags = new Set(e.tags.flatMap(words)), title = words(e.title), kindWords = [e.kind, ...(ALIASES[e.kind] ?? [])];
@@ -75,11 +83,13 @@ export function searchSounds(entries: SoundEntry[], query = '', opts: { kind?: s
       if (title.includes(w)) score += 2;
       else if (title.some((x) => x.startsWith(w) && w.length > 2)) score += 1;
     }
+    const similarity = opts.meaning?.(e);
+    if (similarity !== null && similarity !== undefined && similarity >= (score > 0 ? MEANING_MIN : MEANING_ONLY_MIN)) score += MEANING_WEIGHT * (similarity - MEANING_MIN) / (1 - MEANING_MIN);
     return { e, score };
   }).filter((x) => x.score > 0);
   // one sound per family: its variants come with it when it is placed
   const seen = new Set<string>();
-  return scored.sort((a, b) => b.score - a.score || a.e.id.localeCompare(b.e.id))
+  return scored.sort((a, b) => b.score - a.score || SOURCE_ORDER[a.e.source] - SOURCE_ORDER[b.e.source] || a.e.id.localeCompare(b.e.id))
     .map((x) => x.e)
     .filter((e) => { const key = e.family ?? e.id; if (seen.has(key)) return false; seen.add(key); return true; })
     .slice(0, limit);

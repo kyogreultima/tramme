@@ -26,6 +26,7 @@ const REFERENCE_GUIDES: Record<string, Part> = {
   'Interface pieces, finance charts and the comparison': { name: 'interface', line: 'interface pieces (device frames, rows, cards, toasts, tables), finance charts, the comparison with a style frame' },
   'The critic and the takes': { name: 'critic', line: 'the review by the critic and the takes of a scene' },
   'Scene by scene': { name: 'scenes', line: 'a long film built scene by scene, each apart' },
+  'Scene builders': { name: 'builders', line: 'before the first scene builder (assets/builds/*.js, build_scene): the kit, what it owns, an example' },
   'The library of references': { name: 'references', line: 'the library of the craft\'s references and the films kept' },
   'Start from a reference': { name: 'remake', line: 'a video made the same way as a reference the user gives (/remake): its reading, the outline, the plan that follows it and the checks' },
 };

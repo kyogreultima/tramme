@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { memoryRecords, prefixedBucket, recordBucket, signEdge, storageRoute } from '@tramme/api';
 import worker from '../src/index.ts';
 import type { Env } from '../src/http.ts';
-import { nextJob, rendererOf, runJob, SERVER, tellOwner, type Job } from '../src/renders.ts';
+import { checkJob, nextJob, rendererOf, runJob, SERVER, startJob, tellOwner, type Job, type Renderer } from '../src/renders.ts';
 
 const APP = 'https://app.example';
 const SECRET = 'edge-secret';
@@ -23,6 +23,17 @@ function setup(over: Record<string, unknown> = {}) {
 const as = async (plan: 'basic' | 'pro' = 'basic') => `__Host-tramme-edge=${await signEdge({ userId: 'u', workspaceId: WS, sessionVersion: 1, plan }, SECRET)}`;
 const call = (env: Env, path: string, cookie: string, init: RequestInit = {}) =>
   worker.fetch(new Request(`${APP}${path}`, { ...init, headers: { cookie } }), env);
+
+/** a renderer whose renders are over as soon as they start: `make` gives the film, or throws why it failed */
+function stand(make: (archive: ArrayBuffer, job: Job) => Promise<ArrayBuffer | Response>): Renderer {
+  const made = new Map<string, Promise<ArrayBuffer | Response>>();
+  return {
+    async start(archive, job) { const id = `r${made.size}`; const p = make(archive, job); p.catch(() => {}); made.set(id, p); return id; },
+    async state(id) { try { await made.get(id); return { status: 'done' }; } catch (e) { return { status: 'failed', error: (e as Error).message }; } },
+    film: async (id) => made.get(id)!,
+    async drop(id) { made.delete(id); },
+  };
+}
 
 async function project(env: Env, cookie: string) {
   return ((await (await call(env, '/api/projects', cookie, { method: 'POST', body: JSON.stringify({ name: 'Film' }) })).json()) as { id: string }).id;
@@ -57,7 +68,7 @@ describe('export in the cloud', () => {
     const id = await project(env, cookie);
     const job = await (await call(env, `/api/projects/${id}/renders`, cookie, { method: 'POST', body: '{}' })).json() as Job;
     let archiveSize = 0;
-    const done = await runJob(files, WS, job.id, async (archive) => { archiveSize = archive.byteLength; return new Uint8Array([1, 2, 3]).buffer; });
+    const done = await runJob(files, WS, job.id, stand(async (archive) => { archiveSize = archive.byteLength; return new Uint8Array([1, 2, 3]).buffer; }), 1);
     expect(archiveSize).toBeGreaterThan(0);
     expect(done).toMatchObject({ status: 'done', file: `renders/cloud-${job.id}.mp4` });
     const ws = prefixedBucket(files, `w/${WS}/`);
@@ -70,7 +81,7 @@ describe('export in the cloud', () => {
     const cookie = await as();
     const id = await project(env, cookie);
     const job = await (await call(env, `/api/projects/${id}/renders`, cookie, { method: 'POST', body: '{}' })).json() as Job;
-    const failed = await runJob(files, WS, job.id, async () => { throw new Error('Chrome stopped'); });
+    const failed = await runJob(files, WS, job.id, stand(async () => { throw new Error('Chrome stopped'); }), 1);
     expect(failed).toMatchObject({ status: 'failed', error: 'Chrome stopped' });
   });
 
@@ -103,10 +114,39 @@ describe('export on a server of one', () => {
     expect(queued).toEqual([expect.objectContaining({ workspaceId: SERVER, job: job.id })]);
     const asked: string[] = [];
     const real = globalThis.fetch;
-    globalThis.fetch = (async (r: Request) => { asked.push(r.url); return new Response(new Uint8Array([7])); }) as typeof fetch;
-    try { expect(await runJob(files, SERVER, job.id, rendererOf(env))).toMatchObject({ status: 'done', file: `renders/cloud-${job.id}.mp4` }); } finally { globalThis.fetch = real; }
-    expect(asked[0]).toMatch(/^http:\/\/127\.0\.0\.1:8080\/render\?quality=1080p/);
+    // the renderer's routes: the render taken at once, rendering at the first question, done at the second, its film, let go
+    let questions = 0;
+    globalThis.fetch = (async (url: string, init: RequestInit = {}) => {
+      asked.push(`${init.method ?? 'GET'} ${url}`);
+      if (init.method === 'POST') return Response.json({ id: 'r1' }, { status: 202 });
+      if (init.method === 'DELETE') return new Response(null, { status: 204 });
+      if (url.endsWith('/film')) return new Response(new Uint8Array([7]));
+      return Response.json({ status: ++questions > 1 ? 'done' : 'rendering' });
+    }) as typeof fetch;
+    try { expect(await runJob(files, SERVER, job.id, rendererOf(env), 1)).toMatchObject({ status: 'done', file: `renders/cloud-${job.id}.mp4` }); } finally { globalThis.fetch = real; }
+    expect(asked[0]).toMatch(/^POST http:\/\/127\.0\.0\.1:8080\/render\?quality=1080p/);
+    expect(asked.slice(1)).toEqual(['GET http://127.0.0.1:8080/render/r1', 'GET http://127.0.0.1:8080/render/r1', 'GET http://127.0.0.1:8080/render/r1/film', 'DELETE http://127.0.0.1:8080/render/r1']);
     expect(((await (await local(env, `/api/renders/${job.id}`)).json()) as Job).status).toBe('done');
+  });
+
+  it('fails a job whose renderer restarted during it, with that reason, and leaves a renderer that does not answer for a while be', async () => {
+    const { env, files } = server();
+    const id = ((await (await local(env, '/api/projects', { method: 'POST', body: JSON.stringify({ name: 'Film' }) })).json()) as { id: string }).id;
+    const job = await (await local(env, `/api/projects/${id}/renders`, { method: 'POST', body: '{}' })).json() as Job;
+    const real = globalThis.fetch;
+    let reachable = true;
+    globalThis.fetch = (async (_url: string, init: RequestInit = {}) => {
+      if (!reachable) throw new TypeError('fetch failed');
+      if (init.method === 'POST') return Response.json({ id: 'r1' }, { status: 202 });
+      return Response.json({ error: 'the renderer stopped during the export' }, { status: 404 });
+    }) as typeof fetch;
+    try {
+      expect(await startJob(files, SERVER, job.id, rendererOf(env))).toMatchObject({ status: 'rendering', renderId: 'r1' });
+      reachable = false;
+      expect(await checkJob(files, SERVER, job.id, rendererOf(env))).toMatchObject({ status: 'rendering' });
+      reachable = true;
+      expect(await checkJob(files, SERVER, job.id, rendererOf(env))).toMatchObject({ status: 'failed', error: 'the renderer stopped during the export' });
+    } finally { globalThis.fetch = real; }
   });
 
   it('says nothing of it without a renderer', async () => {
@@ -136,7 +176,7 @@ describe('the export for Premiere Pro on the server', () => {
     const job = await (await call(env, `/api/projects/${id}/renders`, cookie, { method: 'POST', body: JSON.stringify({ format: 'premiere' }) })).json() as Job;
     expect(job.format).toBe('premiere');
     let asked = '';
-    const done = await runJob(files, WS, job.id, async (_a, j) => { asked = j.format ?? 'mp4'; return new Response(new Uint8Array([0x50, 0x4b])); });
+    const done = await runJob(files, WS, job.id, stand(async (_a, j) => { asked = j.format ?? 'mp4'; return new Response(new Uint8Array([0x50, 0x4b])); }), 1);
     expect(asked).toBe('premiere');
     expect(done).toMatchObject({ status: 'done', file: `renders/premiere-${job.id}.zip` });
   });

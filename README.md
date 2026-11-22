@@ -49,14 +49,14 @@ On Cloudflare, in personal mode (`pnpm deploy:personal`): a public deployment an
 tramme validate <doc>                                 structure, references, types, plugins included
 tramme check    <doc> [--comp id]                     the picture checks, issues folded by cause
 tramme still    <doc> --t 0.5,1.2 [--samples n]       PNG stills
-tramme render   <doc> [--format mp4|mov|webm|gif|png] [--from s --to s] [--samples n] [--mute] [--pages n] [--depth 8|10]
+tramme render   <doc> [--format mp4|mov|webm|gif|png] [--from s --to s] [--samples n] [--mute] [--pages n] [--depth 8|10] [--master]
 tramme export   <doc> --format lottie|svg|wav [--t s] vector export, or sound only
 tramme import   <animation.json> [--out folder]       Lottie to a Tramme project
 tramme pack     <folder> [--out project.tramme]        a project folder as a .tramme archive (checked)
 tramme unpack   <project.tramme> [--out folder]        a .tramme archive as a project folder (checked)
 tramme nodes    [<doc>]                               the available vocabulary
 tramme agent    [--origin https://…] [--port 4317]    the assistant's local companion
-tramme cloud-export <doc> [--app url] [--token tr_…] [--out film.mp4]   rendered in the cloud of an account (API token from your space)
+tramme cloud-export <doc> [--app url] [--token tr_…] [--out film.mp4] [--master]   rendered in the cloud of an account (API token from your space)
 tramme compare  <ref> <test> [--diff folder]          PSNR and an image of the differences
 tramme check-export <doc> --format lottie|svg --t …   export read back (lottie-web, Chrome) against Tramme
 tramme check-media <file> [--width n --height n --fps n --frames n --duration s] [--json]   decode and verify MP4, MOV or WebM delivery
@@ -66,6 +66,10 @@ tramme schema                                         regenerates the JSON schem
 ```
 
 (`tramme` = `node packages/cli/src/main.ts`, or `pnpm tramme <command>`. `<doc>` is a project folder or a document file.)
+
+The CLI and cloud export use the fast profile by default. For 8-bit MP4, the CLI probes the machine's H.264 hardware encoders and retries with `libx264 veryfast` if the hardware fails. The cloud container uses software encoding. Set `TRAMME_HW_ENCODER=off` to use software locally.
+
+The fast profile draws each frame once and adds directional blur based on layer translation when the composition enables motion blur. `--master` keeps the composition's multisample blur and uses `libx264 slow` for 8-bit MP4. With `tramme render`, `--samples n` selects multisample blur explicitly and `--samples 1` renders a sharp frame. ProRes and 10-bit exports use software encoding and multisample blur by default.
 
 ## Layout
 
@@ -165,7 +169,7 @@ Transcription runs first on the Worker (Workers AI, Whisper large v3 turbo), oth
 - Expressions are isolated to stay deterministic; this is not a security sandbox. Importing a project that carries plugins or expressions asks first, and lists what it would run: they execute with the editor's rights, so only accept projects from someone you trust.
 - Lottie: a single weight per text, no finishing effects, no motion blur, no nodes drawn by code. SVG: the same, as a still image.
 - Browser export: no ProRes (the CLI does it); GIF is computed frame by frame, slow at large sizes.
-- Web scenes: they export from the command line (`tramme render`); the browser editor and the desktop app cannot capture them and say so before starting.
+- Web scenes: the editor and the desktop app export them as video, GIF or PNG frames. Each scene draws its own picture through an SVG `foreignObject`. That drawing differs a little from a browser screenshot: backdrop blurs are approximated. `tramme render` captures scenes with the pinned engine and is the exact path. Lottie and SVG exports, and projects whose modules run isolated, still need `tramme render`. In the editor, a scene's own sounds are not added to the film.
 - A single user, no accounts: access is controlled by Cloudflare Access. Files of 95 MB at most (the Workers request limit), except sounds and videos uploaded in parts (4 GiB).
 - Video: the browser must be able to decode the codec (H.264, VP9, AV1 depending on the case; no ProRes). No crossfade between takes; automatic reframing on the subject (the biggest person, from a subjects analysis) happens in shorts only, not in the editor.
 - Drawn animation: no brush in the editor yet (drawings come from a drawing app), and no bone or mesh deformation. Each loaded drawing takes its own memory: prefer drawings at the size you need.

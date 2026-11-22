@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { addLayer, applyOps, isLocked, layerActive, moveLayer, pointer, propKind, removeLayer, staticValue, type Asset, type KeyframedProp, type Prop, type StaticProp, type Vec2, type TrammeDoc, type Layer, type NodeType, type Op, type PresetType, type TokenType } from '@tramme/core';
 import { clickSelect, comp, commit, foldAll, S, select, toggleFold, viewDoc, toast, uiTime } from '../state.ts';
 import { fitCompOps, flatTree, freshId, layerName, shiftProp, parentOf, SOUND_GROUP, soundGroupOf, subtree, topLayers, commonStem, folderOf, imagesIn, wholeFile } from '../model.ts';
-import { ColorField, longPress, menuMatches, openMenu, phoneLayout, Seg, Swatch, TextInput, resolveColor, type MenuEntry, type MenuItem } from './controls.tsx';
+import { ColorField, longPress, menuMatches, openMenu, phoneLayout, Seg, Swatch, useFit, TextInput, resolveColor, type MenuEntry, type MenuItem } from './controls.tsx';
 import { Icon, kindColor, kindIcon } from './icons.tsx';
 import { ASSET_MIME, chosenAsset, COMP_MIME, sourceOpen } from './timeline/assets-drag.ts';
 import { newSequenceFromAsset } from './timeline/place.ts';
@@ -24,8 +24,10 @@ import { api } from '../api.ts';
 import { fromLottie } from '@tramme/interop';
 import { mediaOf, TranscribeButton, transcribeItem } from './Transcribe.tsx';
 import { fileProject, requireFileProject, sameFileProject, safeName, takenPaths, upload, type FileProject } from '../files.ts';
-import { askUser } from '../confirm.ts';
 import { assetWithHash, contentHash } from '../hash.ts';
+import { kindOf, SOURCES_DIR } from '../sources.ts';
+import { droppedOf, pickedOf, sceneFoldersOf, writeSceneFolders, type Picked } from '../importer.ts';
+import { bumpScene } from '../webscene-preview.ts';
 import { m, t, tr } from '../i18n/index.ts';
 import { listCommands } from '../ai/commands.ts';
 import { projectAssetUrl } from '../project-asset-url.ts';
@@ -522,20 +524,48 @@ async function importLottie(f: File, project: FileProject) {
   }
 }
 
-export async function importFiles(files: FileList | File[]) {
+/** files or whole folders (a folder chosen or dropped keeps its paths) into the project */
+export async function importFiles(picked: FileList | File[] | Picked[]) {
   const project = fileProject();
   const doc = S.doc.peek();
   const ops = [];
   const taken: Record<string, unknown> = { ...doc.assets };
   let paths: Set<string> | null = null;
+  const items = Array.from(picked as ArrayLike<File | Picked>, (x) => (x instanceof File ? pickedOf([x])[0] : x))
+    .filter((it) => !it.path.split('/').some((part) => part.startsWith('.')));
+  // a folder holding a scene.json is a web scene: it comes in whole under scenes/<id>/
+  const { scenes, rest } = sceneFoldersOf(items);
+  if (scenes.length) {
+    try {
+      paths ??= await takenPaths();
+      const target = paths;
+      const { written, refused, skipped } = await writeSceneFolders(scenes, target, (path, f) => upload(target, path, f).then(() => requireFileProject(project)));
+      if (written.length) { bumpScene(); toast(t('panel.scenesImported', { list: written.join(', ') }), 'info', 9000); }
+      if (refused.length) toast(t('panel.scenesRefused', { list: refused.join(', ') }), 'error', 9000);
+      if (skipped.length) toast(t('panel.sceneFilesSkipped', { list: skipped.slice(0, 5).join(', ') }), 'info', 9000);
+    } catch (e) { toast(t('panel.couldNotImportName', { name: scenes.map((s) => s.name).join(', '), error: (e as Error).message }), 'error'); }
+    if (!sameFileProject(project)) return;
+  }
+  const files = rest.map((it) => it.file);
   // numbered drawings (oeil_01.png, oeil_02.png…) go together in a folder of their own
   const images = Array.from(files).filter((f) => typeOfFile(f.name) === 'image');
   const stem = images.length > 1 ? commonStem(images.map((f) => f.name)) : null;
   const folder = stem ? `assets/${safeName(stem)}` : 'assets';
   // a file already in the project (or twice in this import) is answered with its asset, nothing written
-  const added = new Map<string, string>(), already: string[] = [];
+  const added = new Map<string, string>(), already: string[] = [], documents: string[] = [];
   for (const f of Array.from(files)) {
     if (!sameFileProject(project)) return;
+    // a PDF or markdown document is material for the assistant, not an asset a layer shows:
+    // it joins the project's sources, where the Direction tab lists it and the sources tool reads it
+    if (kindOf(f) === 'document') {
+      try {
+        paths ??= await takenPaths();
+        await upload(paths, `${SOURCES_DIR}${safeName(f.name)}`, f);
+        requireFileProject(project);
+        documents.push(f.name);
+      } catch (e) { toast(t('panel.couldNotImportName', { name: f.name, error: (e as Error).message }), 'error'); if (!sameFileProject(project)) return; }
+      continue;
+    }
     if (/\.json$/i.test(f.name)) {
       try { await importLottie(f, project); } catch (e) { toast(t('panel.couldNotImportLottie', { error: (e as Error).message }), 'error'); }
       continue;
@@ -564,24 +594,12 @@ export async function importFiles(files: FileList | File[]) {
     toast(t('panel.nDrawingsInFolder', { n: images.length, folder }), 'info', 9000);
   }
   if (already.length) toast(t('panel.alreadyInProject', { list: already.join(', ') }), 'info', 8000);
+  if (documents.length) toast(t('panel.documentsAsMaterial', { list: documents.join(', ') }), 'info', 8000);
   // a video this machine decodes slower than it plays: a proxy offered (measured on a second of it)
   for (const o of ops) {
     const a = o.value as Asset, f = Array.from(files).find((x) => x.name.replace(/\.[^.]+$/, '') === a.name);
-    if (a.type === 'video' && f) void offerProxy(o.path.split('/').pop()!, f, project);
+    if (a.type === 'video' && f) void import('../proxy-auto.ts').then(({ proxyIfSlow }) => proxyIfSlow(project, o.path.split('/').pop()!, f, f.name));
   }
-}
-
-async function offerProxy(id: string, file: File, project: FileProject) {
-  const { decodeRate, playsPoorly, proxySize } = await import('../proxy.ts');
-  const rate = await decodeRate(file).catch(() => null);
-  if (!sameFileProject(project)) return;
-  if (!rate || !proxySize(rate.width, rate.height) || !playsPoorly(rate.fps, rate.fileFps)) return;
-  if (!(await askUser(t('panel.proxyTitle'), t('panel.proxyText', { name: file.name, fps: Math.round(rate.fps), need: Math.round(rate.fileFps) }), t('panel.makeProxy')))) return;
-  if (!sameFileProject(project)) return;
-  const { listCommands } = await import('../ai/commands.ts'), { runCommand } = await import('../ai/conversation.ts');
-  if (!sameFileProject(project)) return;
-  const cmd = listCommands(S.registry.peek()).find((c) => c.name === 'proxy');
-  if (cmd) await runCommand(cmd, { video: id });
 }
 
 function Compositions() {
@@ -644,6 +662,7 @@ function Assets() {
   const [filter, setFilter] = useState<AssetFilter>({});
   const spoken = useSpoken(doc, !!filter.text);
   const input = useRef<HTMLInputElement>(null);
+  const folderInput = useRef<HTMLInputElement>(null);
   const relink = useRef<HTMLInputElement>(null);
   const offline = S.offline.value;
   // a copy of a shipped pack older than the editor's: offered its update, the way an installed plugin's copy is
@@ -698,14 +717,15 @@ function Assets() {
   return (
     <div class={`panel-body${over ? ' drop' : ''}`} style={over ? { boxShadow: 'inset 0 0 0 2px var(--accent-line)' } : undefined}
       onDragOver={(e) => { e.preventDefault(); setOver(true); }} onDragLeave={() => setOver(false)}
-      onDrop={(e) => { e.preventDefault(); setOver(false); if (e.dataTransfer?.files.length) importFiles(e.dataTransfer.files); }}>
+      onDrop={(e) => { e.preventDefault(); setOver(false); if (e.dataTransfer?.files.length) void droppedOf(e.dataTransfer).then(importFiles); }}>
       <Compositions />
       <input ref={relink} type="file" multiple hidden onChange={(e) => { const f = (e.target as HTMLInputElement).files; if (f) void relinkFiles([...f]); (e.target as HTMLInputElement).value = ''; }} />
       {offline.length > 0 && <div class="missing-note"><Icon name="alert" size={13} /><span>{t('panel.mediaMissing', { n: offline.length })}</span><button class="btn sm" onClick={() => relink.current?.click()}>{t('panel.relinkMissing')}</button></div>}
       {Object.keys(doc.assets).length > 0 && <MediaBar doc={doc} filter={filter} onChange={setFilter} />}
       {Object.keys(doc.assets).length > 0 && shown.length === 0 && <div class="faint tree-none">{t('panel.noMediaMatches')}</div>}
       <input ref={input} type="file" multiple hidden onChange={(e) => { const f = (e.target as HTMLInputElement).files; if (f) importFiles(f); (e.target as HTMLInputElement).value = ''; }} />
-      {byType.size === 0 && <div class="empty"><Icon name="folder" />{t('panel.noAssetsDropFiles')}<button class="btn sm" onClick={() => input.current?.click()}><Icon name="plus" />{t('panel.import')}</button></div>}
+      <input ref={folderInput} type="file" multiple hidden {...{ webkitdirectory: true }} onChange={(e) => { const f = (e.target as HTMLInputElement).files; if (f) importFiles(pickedOf(f)); (e.target as HTMLInputElement).value = ''; }} />
+      {byType.size === 0 && <div class="empty"><Icon name="folder" />{t('panel.noAssetsDropFiles')}<button class="btn sm" onClick={() => input.current?.click()}><Icon name="plus" />{t('panel.import')}</button><button class="btn sm ghost" onClick={() => folderInput.current?.click()}><Icon name="folder" />{t('panel.importFolder')}</button></div>}
       {[...byType].map(([type, list]) => (
         <div key={type}>
           <div class="section-label" style={type === 'module' ? { display: 'flex', alignItems: 'center' } : undefined}>
@@ -732,7 +752,7 @@ function Assets() {
           ))}
         </div>
       ))}
-      {byType.size > 0 && <div style={{ padding: 10 }}><button class="btn sm ghost" onClick={() => input.current?.click()}><Icon name="plus" />{t('panel.importFiles')}</button></div>}
+      {byType.size > 0 && <div style={{ padding: 10 }}><button class="btn sm ghost" onClick={() => input.current?.click()}><Icon name="plus" />{t('panel.importFiles')}</button><button class="btn sm ghost" onClick={() => folderInput.current?.click()}><Icon name="folder" />{t('panel.importFolder')}</button></div>}
       {byType.size === 0 && <div style={{ padding: 10 }}><button class="btn sm ghost" onClick={(e) => packMenu(e, addPack)}><Icon name="plus" />{t('panel.addPack')}</button></div>}
     </div>
   );
@@ -896,14 +916,16 @@ export function FoldButtons() {
 
 export function LeftPanel() {
   const current = tab.value;
+  // a narrow panel keeps the tabs' icons alone rather than pushing the + out (atelier.css, "left-head")
+  const head = useFit<HTMLDivElement>(3);
   return (
     <>
-      <div class="panel-head">
+      <div class="panel-head left-head" ref={head}>
         <Seg value={current} role="tablist"
           options={[
-            { value: 'layers', label: t('common.layers'), tour: 'left-tab-layers' },
-            { value: 'assets', label: t('panel.assets'), tour: 'left-tab-assets' },
-            { value: 'tokens', label: t('panel.tokens'), tour: 'left-tab-tokens' },
+            { value: 'layers', label: t('common.layers'), icon: 'layers', tour: 'left-tab-layers' },
+            { value: 'assets', label: t('panel.assets'), icon: 'folder', tour: 'left-tab-assets' },
+            { value: 'tokens', label: t('panel.tokens'), icon: 'palette', tour: 'left-tab-tokens' },
           ]}
           onChange={(v) => { tab.value = v as 'layers' | 'assets' | 'tokens'; }} />
         <span class="grow" />

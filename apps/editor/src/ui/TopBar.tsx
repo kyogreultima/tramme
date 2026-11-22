@@ -191,6 +191,7 @@ function ExportPop({ anchor, onClose }: { anchor: HTMLElement; onClose: () => vo
       const { exportInBrowser } = await import('../webexport.ts');
       requireExportProject(project);
       const r = await waitExportProject(project, exportInBrowser(doc, base, format, {
+          projectId: project.id,
         compId, registry, t: at, signal: expAbort.current.signal,
         samples: expSamples.value === 'doc' ? undefined : Number(expSamples.value),
         depth: expDeep.value && deepable && deepLabel ? 10 : 8, range,
@@ -220,6 +221,7 @@ function ExportPop({ anchor, onClose }: { anchor: HTMLElement; onClose: () => vo
         expBatch.value = { i: i + 1, n: exportShorts.length, name };
         expState.value = null;
         const r = await waitExportProject(project, exportInBrowser(doc, base, format, {
+          projectId: project.id,
           compId: cid, registry, signal: expAbort.current.signal,
           samples: expSamples.value === 'doc' ? undefined : Number(expSamples.value),
         }));
@@ -235,7 +237,7 @@ function ExportPop({ anchor, onClose }: { anchor: HTMLElement; onClose: () => vo
   // the film as it is now, put in line: the editor goes on while it renders
   const enqueue = () => exportQueue.add({
     id: `${Date.now()}-${exportQueue.jobs.length}`, label: t('topbar.queuedName', { name: S.project.peek().name, format }), format,
-    doc: S.doc.peek(), base: new URL(S.docUrl.peek(), location.href).href, compId: S.compId.peek(), registry: S.registry.peek(), project: S.project.peek().name,
+    doc: S.doc.peek(), base: new URL(S.docUrl.peek(), location.href).href, compId: S.compId.peek(), registry: S.registry.peek(), project: S.project.peek().name, projectId: S.project.peek().id,
     samples: expSamples.value === 'doc' ? undefined : Number(expSamples.value), depth: expDeep.value && deepable && deepLabel ? 10 : 8, range, t: S.time.peek(),
   });
   // a copy in the project's renders/ folder (kept out of .tramme archives)

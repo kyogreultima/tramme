@@ -8,10 +8,11 @@ import type { TrammeDoc } from '@tramme/core';
 import { Renderer } from '@tramme/render';
 import { editorRegistry } from './vocabulary.ts';
 import { attachIsolated, filterModule, pluginHost, pluginToolHost } from './plugins/index.ts';
-import { declarationsModule, ensureDeclared, ensureSandboxDoc, moduleItemsOf, sandboxDeclaration, sandboxVideoFrames } from './plugins/sandbox-draw.ts';
+import { declarationsModule, ensureDeclared, ensureSandboxDoc, moduleItemsOf, renderSandboxFrame, sandboxDeclaration } from './plugins/sandbox-draw.ts';
 import { prefs } from './settings.ts';
 import { sandboxedDoc } from './installed.ts';
 import { S } from './state.ts';
+import { withSceneCapture } from './webscene-snapshot.ts';
 
 /** a renderer of its own (never the preview's) and the stills it draws */
 export class Stills {
@@ -43,8 +44,13 @@ export class Stills {
     return this.renderer;
   }
 
-  /** the frame at t, at most `width` pixels wide, as a JPEG data URL (fitLongest gives the width for a longest side) */
-  async still(doc: TrammeDoc, t: number, compId: string, width: number, quality = 0.86): Promise<string> {
+  /** the frame at t, at most `width` pixels wide, as a data URL (fitLongest gives the width for a longest side) */
+  async still(doc: TrammeDoc, t: number, compId: string, width: number, quality = 0.86, format: 'image/jpeg' | 'image/png' = 'image/jpeg'): Promise<string> {
+    // web scenes drawn from their own frames, not the live view's stand-in
+    return withSceneCapture(S.project.peek().id, doc, () => this.drawStill(doc, t, compId, width, quality, format));
+  }
+
+  private async drawStill(doc: TrammeDoc, t: number, compId: string, width: number, quality: number, format: 'image/jpeg' | 'image/png'): Promise<string> {
     const r = await this.rendererFor(doc, compId);
     const c = doc.compositions[compId];
     const k = Math.min(1, width / c.width);
@@ -53,14 +59,13 @@ export class Stills {
       const docUrl = new URL(S.docUrl.peek(), location.href).href;
       await r.bringImages(t, compId);
       ensureSandboxDoc(pluginHost(docUrl), { doc, docUrl, loaded: (id) => { try { return r.assets.get(id); } catch { return null; } } });
-      const videos = await sandboxVideoFrames(r, doc, t);
-      const pic = await pluginHost(docUrl).renderFrame({ compId, t, scale: k, width: c.width, height: c.height, videos });
+      const pic = await renderSandboxFrame(pluginHost(docUrl), r, { compId, t, scale: k, width: c.width, height: c.height });
       if (pic.err || !pic.bitmap) throw new Error(pic.err ?? 'no picture from the sandbox');
       const small = document.createElement('canvas');
       small.width = Math.round(c.width * k); small.height = Math.round(c.height * k);
       try { small.getContext('2d')!.drawImage(pic.bitmap as OffscreenCanvas, 0, 0, small.width, small.height); }
       finally { (pic.bitmap as ImageBitmap).close(); }
-      return small.toDataURL('image/jpeg', quality);
+      return small.toDataURL(format, quality);
     }
     r.setScale(k);
     await r.renderComplete(t);
@@ -69,7 +74,26 @@ export class Stills {
     const copy = document.createElement('canvas');
     copy.width = this.canvas.width; copy.height = this.canvas.height;
     copy.getContext('2d')!.drawImage(this.canvas, 0, 0);
-    return copy.toDataURL('image/jpeg', quality);
+    return copy.toDataURL(format, quality);
+  }
+
+  /**
+   * The frame at t as the preview draws it while playing (its size, one
+   * sub-frame, the checker behind transparency), as a picture: the prepared
+   * passages (prepared.ts). Null when a video frame never came.
+   */
+  async picture(doc: TrammeDoc, t: number, compId: string, scale: number): Promise<ImageBitmap | null> {
+    // played back as is: its web scenes drawn at the very instant
+    return withSceneCapture(S.project.peek().id, doc, () => this.drawPicture(doc, t, compId, scale));
+  }
+
+  private async drawPicture(doc: TrammeDoc, t: number, compId: string, scale: number): Promise<ImageBitmap | null> {
+    const r = await this.rendererFor(doc, compId);
+    r.setScale(scale);
+    await r.renderComplete(t, { samples: 1, checker: true });
+    if (r.late) return null;
+    r.render(t, { samples: 1, checker: true });
+    return createImageBitmap(this.canvas);
   }
 
   dispose() { this.renderer?.dispose(); this.renderer = null; this.doc = null; }

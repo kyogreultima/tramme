@@ -59,6 +59,8 @@ export interface DrawEnv {
   t?: number;
   /** the composition camera's perspective, px: the distance layers turned around x or y are seen from (1000 without a camera) */
   perspective?: number;
+  /** layer translation at the two edges of the shutter, relative to its current position */
+  motion?: (layer: EvaluatedLayer) => [[number, number], [number, number]] | undefined;
 }
 
 /** a layer that failed: its outline in red, hatched, so the problem shows where it is */
@@ -119,7 +121,7 @@ function layerPicture(like: CanvasRenderingContext2D, id: string, env: DrawEnv):
   const off = env.pool.get(like.canvas.width, like.canvas.height);
   if (env.scale) off.setTransform(env.scale[0], 0, 0, env.scale[1], 0, 0);
   // drawn even when hidden: a matte layer is usually hidden
-  drawLayer(off, { ...L, layer: { ...L.layer, visible: true } }, env);
+  drawLayer(off, { ...L, layer: { ...L.layer, visible: true } }, { ...env, motion: undefined });
   return off;
 }
 
@@ -230,6 +232,18 @@ function warpOf(L: EvaluatedLayer, env: DrawEnv, at: DOMMatrix, parent: DOMMatri
   return { from, to: to as Quad };
 }
 
+const MOTION_SCHEMA = { start: { type: 'vec2', default: [0, 0] }, end: { type: 'vec2', default: [0, 0] } } as const;
+const MOTION_SHADER = `
+vec4 effect(vec2 uv) {
+  vec4 sum = vec4(0.0);
+  for (int i = 0; i < 12; ++i) {
+    vec2 p = uv - mix(u_start, u_end, (float(i) + 0.5) / 12.0) / uRes;
+    if (all(greaterThanEqual(p, vec2(0.0))) && all(lessThanEqual(p, vec2(1.0)))) sum += texture(uImage, p);
+  }
+  return sum / 12.0;
+}
+`;
+
 function drawLayer(ctx: CanvasRenderingContext2D, L: EvaluatedLayer, env: DrawEnv) {
   if (L.transform.opacity <= 0) return;
   if (!L.node.render.canvas2d && !L.node.render.gl && !L.children.length) return;
@@ -249,34 +263,45 @@ function drawLayer(ctx: CanvasRenderingContext2D, L: EvaluatedLayer, env: DrawEn
   const masks = L.masks ?? [];
   // a layer turned around x or y, or pinned, is drawn alone as it would be flat, then carried onto its quad
   const warped = isTilted(L.transform) || !!pinOf(L, env);
-  if (fx.length || masks.length || warped) {
+  const offsets = warped ? undefined : env.motion?.(L);
+  const parent = offsets || fx.length || masks.length || warped ? ctx.getTransform() : null;
+  const motion = offsets?.map(([x, y]) => [parent!.a * x + parent!.c * y, -(parent!.b * x + parent!.d * y)]);
+  const moving = motion?.some(([x, y]) => Math.hypot(x, y) > 0.25);
+  if (fx.length || masks.length || warped || moving) {
     const { width: w, height: h } = ctx.canvas;
-    const off = env.pool.get(w, h);
-    const parent = ctx.getTransform();
-    off.setTransform(parent);
-    off.transform(m.a, m.b, m.c, m.d, m.e, m.f);
-    const at = off.getTransform();
+    const at = parent!.multiply(m);
+    // Keep the texture small for simple, bounded layers. Effects, masks and
+    // children can read or draw outside those bounds and use the full canvas.
+    const crop = moving && motion && !fx.length && !masks.length && !L.children.length
+      ? motionBox(L, env, at, motion, w, h) : null;
+    if (crop && (crop.w <= 0 || crop.h <= 0)) { ctx.restore(); return; }
+    const x = crop?.x ?? 0, y = crop?.y ?? 0;
+    const off = env.pool.get(crop?.w ?? w, crop?.h ?? h);
+    off.setTransform(at.a, at.b, at.c, at.d, at.e - x, at.f - y);
     drawContent(off, L, env);
     // the masks cut the picture before its effects: a feathered mask then blurs with the layer, as in an editor
     if (masks.length) applyMasks(off, masks, at, env);
     // effect sizes are in composition pixels: they follow the render scale
     const k = env.scale ? (env.scale[0] + env.scale[1]) / 2 : 1;
     runEffects(off, fx, L, env, k);
+    if (moving && motion) {
+      glChain(off, [{ code: MOTION_SHADER, schema: MOTION_SCHEMA, props: { start: motion[0], end: motion[1] } }], env.t ?? 0, k);
+    }
     const filter = fx.map(({ e, type }) => type!.canvas2d?.filter?.(e.props, k) ?? '').filter(Boolean).join(' ');
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha *= L.transform.opacity;
     if (L.layer.blend && L.layer.blend !== 'normal') ctx.globalCompositeOperation = BLEND[L.layer.blend];
     if (filter) ctx.filter = filter;
     // a filter runs over what it is given: the layer's box grown by the filters' reach, not the whole frame (outside it the layer is empty)
-    const box = filter ? filterBox(L, env, at, fx, k, w, h) : null;
-    const warp = warped ? warpOf(L, env, at, parent) : 'flat';
+    const box = filter && !moving ? filterBox(L, env, at, fx, k, w, h) : null;
+    const warp = warped ? warpOf(L, env, at, parent!) : 'flat';
     if (warp === null) { /* a corner behind the eye: not drawn */ }
     else if (warp !== 'flat') warpQuad(ctx, off.canvas, warp.from, warp.to);
     else if (box) {
       // clipped too: the filter's own layer is as large as the clip
       if (box.w > 0 && box.h > 0) { ctx.beginPath(); ctx.rect(box.x, box.y, box.w, box.h); ctx.clip(); ctx.drawImage(off.canvas, box.x, box.y, box.w, box.h, box.x, box.y, box.w, box.h); }
     }
-    else ctx.drawImage(off.canvas, 0, 0);
+    else ctx.drawImage(off.canvas, x, y);
     env.pool.release(off);
   } else {
     ctx.transform(m.a, m.b, m.c, m.d, m.e, m.f);
@@ -315,6 +340,18 @@ function canvasBox(L: EvaluatedLayer, env: DrawEnv, at: DOMMatrix): Box | null {
     x0 = Math.min(x0, cb.x); y0 = Math.min(y0, cb.y); x1 = Math.max(x1, cb.x + cb.w); y1 = Math.max(y1, cb.y + cb.h);
   }
   return x0 === Infinity ? { x: 0, y: 0, w: 0, h: 0 } : { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+}
+
+function motionBox(L: EvaluatedLayer, env: DrawEnv, at: DOMMatrix, motion: number[][], w: number, h: number): Box | null {
+  if (!['shape.rect', 'shape.ellipse', 'text'].includes(L.layer.type) || Number(L.props.strokeWidth ?? 0) > INK) return null;
+  const b = canvasBox(L, env, at);
+  if (!b) return null;
+  const dx = Math.ceil(Math.max(...motion.map(([x]) => Math.abs(x)))) + 2;
+  const dy = Math.ceil(Math.max(...motion.map(([, y]) => Math.abs(y)))) + 2;
+  // Round to tiles so neighboring frames reuse sizes during a move.
+  const x = Math.max(-dx, Math.floor((b.x - dx) / 64) * 64);
+  const y = Math.max(-dy, Math.floor((b.y - dy) / 64) * 64);
+  return { x, y, w: Math.min(w + dx, Math.ceil((b.x + b.w + dx) / 64) * 64) - x, h: Math.min(h + dy, Math.ceil((b.y + b.h + dy) / 64) * 64) - y };
 }
 
 /**

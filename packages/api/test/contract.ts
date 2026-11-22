@@ -40,6 +40,21 @@ export function storageContract(name: string, makeBucket: () => Bucket) {
       expect((await call('/api/projects/nope-1234')).status).toBe(404);
     });
 
+    it('keeps a requested import id and refuses a second project with that id', async () => {
+      const { call } = setup();
+      const body = { id: 'local-film-123', name: 'Original', empty: true };
+      const first = await call('/api/projects', { method: 'POST', body: JSON.stringify(body) });
+      expect(first.status).toBe(201);
+      expect(((await first.json()) as Manifest).id).toBe(body.id);
+      const repeated = await call('/api/projects', { method: 'POST', body: JSON.stringify(body) });
+      expect(repeated.status).toBe(409);
+      expect((await (await call('/api/projects')).json()) as Manifest[]).toHaveLength(1);
+      const simultaneous = await Promise.all([1, 2].map(() => call('/api/projects', {
+        method: 'POST', body: JSON.stringify({ ...body, id: 'local-film-456' }),
+      })));
+      expect(simultaneous.map((r) => r.status).sort()).toEqual([201, 409]);
+    });
+
     it('refuses to overwrite a file changed elsewhere (If-Match), and says when nothing changed (If-None-Match)', async () => {
       const { call, create } = setup();
       const m = await create();
@@ -54,6 +69,15 @@ export function storageContract(name: string, makeBucket: () => Bucket) {
       expect(await (await call(path)).text()).toBe('two');
       const now = second.headers.get('etag')!;
       expect((await call(path, { headers: { 'if-none-match': now } })).status).toBe(304);
+    });
+
+    it('lets the browser keep a file whose address names its version, and asks again for one that does not', async () => {
+      const { call, create } = setup();
+      const m = await create();
+      const path = `/api/projects/${m.id}/files/assets/notes.json`;
+      await call(path, { method: 'PUT', body: 'one' });
+      expect((await call(path)).headers.get('cache-control')).toBe('no-cache');
+      expect((await call(`${path}?v=2026-11-22T10%3A00%3A00Z`)).headers.get('cache-control')).toBe('private, max-age=31536000, immutable');
     });
 
     it('stores and reads the editor version index and snapshots', async () => {

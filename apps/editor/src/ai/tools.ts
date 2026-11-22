@@ -29,7 +29,9 @@ import { approvedProjectResource, readLimitedBody } from '../plugins/host.ts';
 import { pluginHost } from '../plugins/index.ts';
 import { ensureDeclared, ensureSandboxDoc, moduleItemsOf } from '../plugins/sandbox-draw.ts';
 import { preview } from '../preview.ts';
-import { checksText } from '../review.ts';
+import { CELL, checksText, sheetOf } from '../review.ts';
+import { BUILDER, buildOps, changedSince, outputIssue, readRecord, recordPathOf, touchedComp } from '../build.ts';
+import type { BuildData, BuildOutput } from '../build-kit.ts';
 import { prefs } from '../settings.ts';
 
 const text =(s: string, isError = false): ToolResult => ({ content: [{ type: 'text', text: s }], isError });
@@ -320,9 +322,14 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
           return text(JSON.stringify(editorEvaluator(doc, reg, { data }).value(String(input.address), Number(input.t), compId)));
         }
         case 'render_still': return await this.still(Number(input.t), input.compId, input.caption);
+        case 'render_sheet': return await this.sheet((input.times as number[]).map(Number), input.compId, input.caption);
+        case 'build_scene': {
+          const { result: r, compId } = await this.build(String(input.script ?? ''), typeof input.comp === 'string' ? input.comp : undefined, !!input.overwrite, typeof input.content === 'string' ? input.content : undefined, Array.isArray(input.edits) ? input.edits : undefined);
+          return r.isError ? r : await this.withChecks(r, compId);
+        }
         case 'propose_changes': {
           const r = await this.propose(String(input.label ?? 'Change'), input.ops as Op[]);
-          return r.isError ? r : await this.withChecks(r);
+          return r.isError ? r : await this.withChecks(r, touchedComp(input.ops as Op[]));
         }
         case 'discard_proposal': {
           // a scene builder drops its own changes: the director's root and the scenes built before it stay proposed
@@ -365,11 +372,11 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
     }
   }
 
-  /** a still of the live document, as a JPEG data URL */
-  private stillUrl(t: number, compId?: string): Promise<string> {
+  /** a still of the live document, as a JPEG data URL by default */
+  private stillUrl(t: number, compId?: string, format?: 'image/jpeg' | 'image/png'): Promise<string> {
     const doc = this.liveDoc();
     const id = compId && doc.compositions[compId] ? compId : this.scoped ? this.compOf(doc) : doc.root, c = doc.compositions[id];
-    return this.stills.still(doc, t, id, c ? fitLongest(c.width, c.height, STILL_SIDE)[0] : STILL_SIDE);
+    return this.stills.still(doc, t, id, c ? fitLongest(c.width, c.height, STILL_SIDE)[0] : STILL_SIDE, undefined, format);
   }
 
   private async still(t: number, compId: string | undefined, caption?: string): Promise<ToolResult> {
@@ -378,6 +385,92 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
     requireFileProject(project);
     this.events.push({ type: 'item', item: { id: uid(), role: 'assistant', image: { url, caption: `${t.toFixed(2)} s${caption ? ` · ${caption}` : ''}` } } });
     return { content: [{ type: 'image', data: url.slice(url.indexOf(',') + 1), mimeType: 'image/jpeg' }] };
+  }
+
+  /** several moments on one labelled picture: one call and one image where a still each would cost one of both */
+  private async sheet(times: number[], compId: string | undefined, caption?: string): Promise<ToolResult> {
+    const project = fileProject();
+    const doc = this.liveDoc(), id = compId && doc.compositions[compId] ? compId : this.compOf(doc), c = doc.compositions[id];
+    const [w, h] = fitLongest(c.width, c.height, CELL);
+    const images: HTMLImageElement[] = [];
+    for (const t of times) {
+      if (this.signal.aborted) return text('render_sheet: stopped by the user', true);
+      const image = new Image();
+      image.src = await this.stills.still(doc, t, id, w);
+      await image.decode();
+      requireFileProject(project);
+      images.push(image);
+    }
+    const cols = times.length <= 4 ? times.length : times.length <= 6 ? 3 : 4;
+    const url = sheetOf(images.map((image, i) => ({ image, label: `${times[i].toFixed(2)} s` })), w, h, cols);
+    this.events.push({ type: 'item', item: { id: uid(), role: 'assistant', image: { url, caption: caption ?? `${id} · ${times.map((t) => t.toFixed(2)).join(', ')} s` } } });
+    return { content: [{ type: 'image', data: url.slice(url.indexOf(',') + 1), mimeType: 'image/jpeg' }] };
+  }
+
+  /**
+   * A scene builder run: its script (assets/builds/<name>.js) runs in the project's sandbox with the
+   * kit, and the layers it makes replace those it made last time in the composition; its record
+   * beside the script says which are its own. A layer of its own changed since is said, not lost.
+   */
+  private async build(script: string, comp: string | undefined, overwrite: boolean, content?: string, edits?: { find: string; content: string }[]): Promise<{ result: ToolResult; compId?: string }> {
+    const r = await this.buildIn(script, comp, overwrite, content, edits);
+    return 'compId' in r ? r : { result: r };
+  }
+
+  private async buildIn(script: string, comp: string | undefined, overwrite: boolean, content?: string, edits?: { find: string; content: string }[]): Promise<ToolResult | { result: ToolResult; compId: string }> {
+    const project = fileProject();
+    if (!BUILDER.test(script)) return text(`a builder is a script at assets/builds/<name>.js (lower case, digits, - and _): not "${script}"`, true);
+    let code = content ?? await readProjectText(project.id, script);
+    requireFileProject(project);
+    if (code === null) return text(`${script} not found: give its content to write it and build it in one call`, true);
+    // the script written and changed in the same call as its build: one request where a write and a build were two
+    if (edits?.length) {
+      try { for (const e of edits) code = replaceOnce(code, String(e.find), String(e.content), script); }
+      catch (e) { return text(`${(e as Error).message}; nothing was written or built`, true); }
+    }
+    if (content !== undefined || edits?.length) {
+      await api.write(project.id, script, code, { type: 'text/javascript' });
+      requireFileProject(project);
+    }
+    const recordPath = recordPathOf(script);
+    const record = readRecord(await readProjectText(project.id, recordPath));
+    requireFileProject(project);
+    const doc = this.liveDoc();
+    const compId = comp ?? (record?.comp && doc.compositions[record.comp] ? record.comp : this.compOf(doc));
+    if (this.scoped && compId !== this.scoped.comp && doc.compositions[compId]) return text(`build into "${this.scoped.comp}": the scene's own composition`, true);
+    const edited = changedSince(doc, record?.comp === compId ? record : null);
+    if (edited.length && !overwrite) {
+      return text(`not built: ${edited.length} layer(s) this builder made were changed or removed since its last build (${edited.slice(0, 12).join(', ')}${edited.length > 12 ? '…' : ''}). Bring the change into the script and build with overwrite: true, or build with overwrite: true to drop it.`, true);
+    }
+    const c = doc.compositions[compId], root = doc.compositions[doc.root];
+    const owned = new Set(record?.comp === compId ? Object.keys(record.hashes) : []);
+    const data: BuildData = {
+      comp: { id: compId, width: c?.width ?? root.width, height: c?.height ?? root.height, fps: c?.fps ?? root.fps, duration: c?.duration ?? 5 },
+      tokens: Object.keys(doc.tokens),
+      assets: Object.fromEntries(Object.entries(doc.assets).map(([id, a]) => [id, { type: a.type, ...(a.type === 'font' ? { family: a.family ?? id } : {}), ...(a.name ? { name: a.name } : {}) }])),
+      taken: c ? Object.keys(c.layers).filter((id) => !owned.has(id)) : [],
+    };
+    // the sandbox holds the document's fonts before the script measures its text with them
+    const base = new URL(project.docUrl, location.href).href, host = pluginHost(base);
+    await ensureDeclared(host, moduleItemsOf(doc, base));
+    requireFileProject(project);
+    const renderer = preview.renderer;
+    ensureSandboxDoc(host, { doc, docUrl: base, loaded: (id) => { try { return renderer?.assets.get(id) ?? null; } catch { return null; } } });
+    let out: unknown;
+    try { out = await host.build(code, data, this.signal); }
+    catch (e) { return text(`${script} failed: ${(e as Error).message}. Correct the script (write_file with find) and build again.`, true); }
+    requireFileProject(project);
+    const issue = outputIssue(out);
+    if (issue) return text(`${script}: ${issue}`, true);
+    const built = out as BuildOutput;
+    const { ops, record: next } = buildOps(doc, compId, built, record?.comp === compId ? record : null, script);
+    const r = await this.propose(`Build ${script.slice('assets/builds/'.length, -3)}`, ops, () => sameFileProject(project));
+    if (r.isError) return text(`${script}: ${r.content[0]?.type === 'text' ? r.content[0].text : 'not proposed'}. Correct the script and build again.`, true);
+    await api.write(project.id, recordPath, JSON.stringify(next), { type: 'application/json' });
+    requireFileProject(project);
+    const count = Object.keys(built.layers).length, kept = c ? Object.keys(c.layers).filter((id) => !owned.has(id)).length : 0;
+    const duration = (built.set.duration as number | undefined) ?? c?.duration ?? 5;
+    return { compId, result: text(`Built "${compId}" from ${script}: ${count} layer(s), ${built.order.length} at the root, ${+duration.toFixed(2)} s${kept ? `; its ${kept} other layer(s) kept` : ''}. ${r.content[0]?.type === 'text' ? r.content[0].text : ''}`) };
   }
 
   // ── tools brought by the project's plugins ───────────────────
@@ -437,7 +530,7 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
         if (isSceneTextPath(path)) bumpScene();
         return path;
       },
-      renderStill: (t, id) => { current(); return this.stillUrl(t, id).then((value) => { current(); return value; }); },
+      renderStill: (t, id, format) => { current(); return this.stillUrl(t, id, format).then((value) => { current(); return value; }); },
       transcript: async (id, opts) => { current(); const value = (await this.readTranscript(id, opts?.ask ?? true)).t; current(); return value; },
       signal: this.signal,
       // a plugin's figures are not trusted: what is not a number is shown as a step without a share
@@ -495,9 +588,11 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
    * stands: the model reads what is wrong without another call. The contact sheet and the
    * sound stay with the check tool. Checks that cannot run leave the answer as it was.
    */
-  private async withChecks(r: ToolResult): Promise<ToolResult> {
+  private async withChecks(r: ToolResult, compId?: string): Promise<ToolResult> {
     try {
-      const doc = this.liveDoc(), ctx = this.toolContext(doc, await this.registry(doc));
+      const doc = this.liveDoc(), base = this.toolContext(doc, await this.registry(doc));
+      // the composition the change touched, not the one on screen: a scene built apart is checked itself
+      const ctx = compId && doc.compositions[compId] ? { ...base, compId, selection: [] } : base;
       const checks = await checksText(ctx);
       const said = r.content[0]?.type === 'text' ? r.content[0].text : '';
       return { ...r, content: [{ type: 'text', text: `${said}\nChecks of "${ctx.compId}" with it: ${checks}` }, ...r.content.slice(1)] };
@@ -546,7 +641,8 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
     if (path === DOCUMENT) return text('read the document with get_document', true);
     const bad = pathIssue(path) ?? (/%|#/.test(path) ? 'invalid project path' : null);
     if (bad) return text(`${path}: ${bad}`, true);
-    if (!TEXT_FILE.test(path) || path === MANIFEST || isChatPath(path)) return text('only .js, .mjs, .json, .svg and .md text files can be read', true);
+    // a web scene's own text files (its HTML and CSS too): the assistant reads one before it edits it with edit_scene
+    if (!(TEXT_FILE.test(path) || isSceneTextPath(path)) || path === MANIFEST || isChatPath(path)) return text('only .js, .mjs, .json, .svg and .md text files, and the text files of a web scene (scenes/<id>/: .html, .css, .txt too), can be read', true);
     const body = await readProjectText(project.id, path);
     requireFileProject(project);
     if (body === null) return text(`file not found: ${path}`, true);
@@ -561,8 +657,8 @@ ${r.content[0].type === 'text' ? r.content[0].text : ''}`);
     const project = fileProject();
     const bad = pathIssue(path) ?? (/%|#/.test(path) ? 'invalid project path' : null);
     if (bad) return text(`${path}: ${bad}`, true);
-    const ok = (/^plugins\/.+\.(js|mjs)$/i.test(path)) || (/^assets\/.+\.(json|svg)$/i.test(path));
-    if (!ok) return text('allowed writes: plugins/*.js|mjs and assets/*.json|svg. The document changes through propose_changes.', true);
+    const ok = (/^plugins\/.+\.(js|mjs)$/i.test(path)) || (/^assets\/.+\.(json|svg)$/i.test(path)) || BUILDER.test(path);
+    if (!ok) return text(`allowed writes: plugins/*.js|mjs, assets/*.json|svg and a scene builder at assets/builds/<name>.js. ${/^scenes\//i.test(path) ? 'A web scene is written with write_scene and changed with edit_scene.' : 'The document changes through propose_changes.'}`, true);
     // with find, only that part changes: the file is read, the passage replaced, and the whole written back
     let content = given;
     if (find !== undefined) {

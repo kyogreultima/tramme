@@ -6,7 +6,7 @@
 import { effect, signal } from '@preact/signals';
 import { MODEL_TASKS, resolveModel, type ModelEntry, type ModelTask } from './models.ts';
 import type { DictationSource } from './speech.ts';
-import { FORMER_PREFERENCES_KEY, GLASS_THEMES, PREFERENCES_KEY, savedTheme, showTheme, VIEWS, type ThemeId, type View } from './theme/pref.ts';
+import { DEFAULT_THEME, FORMER_PREFERENCES_KEY, GLASS_THEMES, PREFERENCES_KEY, savedTheme, showTheme, VIEWS, type ThemeId, type View } from './theme/pref.ts';
 import { installGlassLight } from './theme/liquid-glass.ts';
 import { installRefraction } from './theme/refraction.ts';
 
@@ -35,6 +35,8 @@ export interface Preferences {
   duckDb: number;
   /** a sound placed on several moments alternates its variants */
   varySounds: boolean;
+  /** family ids the user does not want to hear or see again in searches */
+  bannedSounds: string[];
   /** a sound made by a provider (it costs money) waits for the user's yes */
   confirmPaid: boolean;
   /** paid generations a turn of the assistant may make when its changes apply without the user (nothing is asked then) */
@@ -51,6 +53,8 @@ export interface Preferences {
   previewMuted: boolean;
   /** the preview plays a video's proxy when it has one (the exports always read the original) */
   proxies: boolean;
+  /** while nothing moves, the preview draws ahead the passages too heavy to play live, then plays them back as pictures (prepared.ts) */
+  prepare: boolean;
   /** the model each local tool downloads and runs, per task: a model's id, or 'hub:owner/name'; missing, the default (models.ts) */
   models: Partial<Record<ModelTask, string>>;
   /** installed plugins turned off on this device (their file names) */
@@ -81,8 +85,10 @@ export interface Preferences {
   /** clips made by a provider: the one by default (auto: the first connected), and their length in seconds */
   videoProvider: 'auto' | 'hydracept';
   videoSeconds: 4 | 6 | 8;
-  /** where a dictation is transcribed: the downloaded model (this browser, the default), the companion, or the server */
+  /** where a dictation is transcribed: auto (the server live when it hears, else the downloaded model), the downloaded model (this browser), the companion, or the server */
   dictation: DictationSource;
+  /** the dictation's source was picked in the settings (a 'local' saved before 'auto' existed was the default, not a choice) */
+  dictationPicked: boolean;
   /** the Tramme logo in a corner of the exported films; only Plus and Pro can turn it off (watermark.ts) */
   watermark: boolean;
   /** the first export carrying the watermark has said why */
@@ -90,10 +96,10 @@ export interface Preferences {
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
-  language: 'auto', theme: 'studio', view: 'studio', motion: 'auto', still: 'display', blur: 'document', exactFrames: true, scrubAudio: true, sandboxPreview: false,
-  effectsDb: -8, musicDb: -14, duckDb: -12, varySounds: true, confirmPaid: true, paidPerTurn: 10, voiceProvider: 'auto', voiceShortlist: {}, voice: '', voiceModel: '', previewVolume: 1, previewMuted: false, proxies: true, models: {}, pluginsOff: [], areaConfirm: 'always', assistantTranscribes: false, assistantFetchesReal: false, acceptReadings: false, checkUpdates: true, lastUpdateCheck: 0, updateNotified: '', recentCommands: [], quickLauncher: false,
+  language: 'auto', theme: DEFAULT_THEME, view: 'studio', motion: 'auto', still: 'display', blur: 'document', exactFrames: true, scrubAudio: true, sandboxPreview: false,
+  effectsDb: -8, musicDb: -14, duckDb: -12, varySounds: true, bannedSounds: [], confirmPaid: true, paidPerTurn: 10, voiceProvider: 'auto', voiceShortlist: {}, voice: '', voiceModel: '', previewVolume: 1, previewMuted: false, proxies: true, prepare: true, models: {}, pluginsOff: [], areaConfirm: 'always', assistantTranscribes: false, assistantFetchesReal: false, acceptReadings: false, checkUpdates: true, lastUpdateCheck: 0, updateNotified: '', recentCommands: [], quickLauncher: false,
   pictureProvider: 'auto', pictureQuality: 'auto', pictureSize: 'large', styleFrames: 2,
-  videoProvider: 'auto', videoSeconds: 8, dictation: 'local', watermark: true, watermarkTold: false,
+  videoProvider: 'auto', videoSeconds: 8, dictation: 'auto', dictationPicked: false, watermark: true, watermarkTold: false,
 };
 
 // ── themes and views ─────────────────────────────────────────
@@ -126,9 +132,13 @@ try {
 } catch { /* no storage */ }
 
 function load(): Preferences {
+  // the preferences kept under the tool's former name are taken over
+  try { return checked(JSON.parse(localStorage.getItem(PREFERENCES_KEY) ?? localStorage.getItem(FORMER_PREFERENCES_KEY) ?? '{}')); } catch { return { ...DEFAULT_PREFERENCES }; }
+}
+
+/** saved preferences (this browser's, the account's) made whole: each value checked, the defaults where one is missing */
+export function checked(saved: Partial<Preferences>): Preferences {
   try {
-    // the preferences kept under the tool's former name are taken over
-    const saved = JSON.parse(localStorage.getItem(PREFERENCES_KEY) ?? localStorage.getItem(FORMER_PREFERENCES_KEY) ?? '{}') as Partial<Preferences>;
     const p = { ...DEFAULT_PREFERENCES, ...saved };
     if (!['auto', 'full', 'half', 'quarter'].includes(p.motion)) p.motion = DEFAULT_PREFERENCES.motion;
     if (!['display', 'full'].includes(p.still)) p.still = DEFAULT_PREFERENCES.still;
@@ -148,6 +158,7 @@ function load(): Preferences {
     p.duckDb = within(p.duckDb, d.duckDb, -40, -1);
     p.previewVolume = within(p.previewVolume, d.previewVolume, 0, 1);
     p.varySounds = p.varySounds !== false;
+    p.bannedSounds = Array.isArray(p.bannedSounds) ? [...new Set(p.bannedSounds.filter((x) => typeof x === 'string'))] : [];
     p.confirmPaid = p.confirmPaid !== false;
     p.paidPerTurn = Math.round(within(p.paidPerTurn, d.paidPerTurn, 0, 100));
     p.previewMuted = p.previewMuted === true;
@@ -158,6 +169,7 @@ function load(): Preferences {
       : {};
     if (typeof p.voiceModel !== 'string') p.voiceModel = d.voiceModel;
     p.proxies = p.proxies !== false;
+    p.prepare = p.prepare !== false;
     const models = p.models && typeof p.models === 'object' ? p.models : {};
     p.models = Object.fromEntries(MODEL_TASKS.filter((k) => typeof models[k] === 'string').map((k) => [k, models[k]]));
     p.pluginsOff = Array.isArray(p.pluginsOff) ? p.pluginsOff.filter((x) => typeof x === 'string') : [];
@@ -180,7 +192,8 @@ function load(): Preferences {
     p.videoSeconds = ([4, 6, 8] as number[]).includes(seconds)
       ? seconds as Preferences['videoSeconds']
       : DEFAULT_PREFERENCES.videoSeconds;
-    if (!['local', 'companion', 'server'].includes(p.dictation)) p.dictation = DEFAULT_PREFERENCES.dictation;
+    p.dictationPicked = p.dictationPicked === true;
+    if (!['auto', 'local', 'companion', 'server'].includes(p.dictation) || (p.dictation === 'local' && !p.dictationPicked)) p.dictation = DEFAULT_PREFERENCES.dictation;
     return p;
   } catch { return { ...DEFAULT_PREFERENCES }; }
 }

@@ -5,6 +5,7 @@
 // a context bridged over these messages. Everything that crosses is plain
 // data: live objects (elements, Path2D, functions) stay on their own side.
 
+import type { BuildData } from '../build-kit.ts';
 import type { CheckType, NodeType, EffectType, KitType, ModifierType, PluginMeta, PresetType, PromptType, ToolType, EvaluatedTransform, SoundCue, MediaClock, MotionReport, Quad, QualityIssue } from '@tramme/core';
 
 /** plain evaluated values used by selection geometry; node callbacks stay in the worker */
@@ -146,13 +147,33 @@ export interface FramePayload {
   t: number;
   /** canvas pixels per composition pixel (the preview draws smaller) */
   scale: number;
-  /** preview may use fewer motion-blur samples; exports leave this unset */
+  /** overrides the composition's motion blur sample count */
   samples?: number;
+  shutter?: number;
+  motionBlur?: 'velocity';
   width: number;
   height: number;
-  /** the current picture of each video asset, decoded on the page (copied, not transferred) */
+  /** the video frames the page decoded for this frame, under videoKey(id, t) (copied, not transferred) */
   videos?: Record<string, unknown>;
+  /** each video's own size, by asset id: the frames sent while the preview moves are made smaller, the layout keeps the file's */
+  videoSizes?: Record<string, [number, number]>;
 }
+
+/** a frame of a video asset a sandbox frame draws: its asset, its time in the file, and the canvas pixels it lands on when its layer says */
+export interface VideoNeed { id: string; t: number; w?: number; h?: number }
+
+/** what a sandbox frame gives back: its picture and the video frames it drew, or the video frames it still lacks */
+export interface FrameAnswer { bitmap?: unknown; err?: string; need?: VideoNeed[]; drew?: VideoNeed[] }
+
+/** a whole SVG still or Lottie file converted in the sandbox, where the document's expressions may run */
+export type VectorFormat = 'svg' | 'lottie';
+/** an approved asset's bytes for a vector conversion (the sandbox reads no file itself) */
+export interface VectorFile { data: Uint8Array; mime: string; width: number; height: number }
+/** the converted text (SVG markup or Lottie JSON) and what the conversion could not carry */
+export interface VectorAnswer { text: string; warnings: string[] }
+
+/** the key a decoded video frame crosses under: the asset and its time in the file, to the microsecond */
+export const videoKey = (id: string, t: number) => `${id}@${Math.round(t * 1e6)}`;
 
 /** what one item drew: its picture (over its bounds), or why it failed */
 export interface DrawResult {
@@ -176,6 +197,8 @@ export type ToWorker =
   | { kind: 'load'; plugins: { id: string; url: string }[] }
   | { kind: 'tool'; name: string; input: unknown; ctx: ToolCtxData; call: number }
   | { kind: 'check'; name: string; ctx: CheckCtxData; call: number }
+  /** a scene builder's script run with the kit (build-kit.ts); answered by a result holding its BuildOutput */
+  | { kind: 'build'; code: string; data: BuildData; call: number }
   | { kind: 'doc'; doc: SandboxDoc }
   | { kind: 'draw'; call: number; payload: DrawPayload }
   | { kind: 'render'; call: number; payload: FramePayload }
@@ -190,6 +213,7 @@ export type ToWorker =
   | { kind: 'qualityChecks'; call: number; compId: string }
   | { kind: 'samplePlaced'; call: number; t: number; compId: string }
   | { kind: 'export'; call: number; type: string; props: unknown }
+  | { kind: 'vector'; call: number; format: VectorFormat; doc: unknown; t: number; compId: string; files: Record<string, VectorFile> }
   | { kind: 'abort'; call: number }
   | { kind: 'answer'; id: number; ok?: unknown; err?: string };
 
@@ -200,7 +224,7 @@ export type FromWorker =
   | { kind: 'loadFailed'; id: string; url: string; message: string }
   | { kind: 'result'; call: number; ok?: unknown; err?: string }
   | { kind: 'drawn'; call: number; frame: number; results: DrawResult[] }
-  | { kind: 'rendered'; call: number; bitmap?: unknown; err?: string }
+  | { kind: 'rendered'; call: number; bitmap?: unknown; err?: string; need?: VideoNeed[]; drew?: VideoNeed[] }
   | { kind: 'evaluated'; call: number; value?: unknown; err?: string }
   | { kind: 'evaluatedSeries'; call: number; values?: unknown[][]; err?: string }
   | { kind: 'evaluatedLayers'; call: number; values?: LayerSample[]; err?: string }
@@ -212,6 +236,7 @@ export type FromWorker =
   | { kind: 'qualityChecked'; call: number; values?: QualityIssue[]; err?: string }
   | { kind: 'sampledPlaced'; call: number; values?: PlacedSample[]; err?: string }
   | { kind: 'exported'; call: number; svg?: string; lottie?: unknown; err?: string }
+  | { kind: 'vectored'; call: number; text?: string; warnings?: string[]; err?: string }
   | { kind: 'ask'; id: number; call: number; q: Ask }
   | { kind: 'progress'; call: number; done: number; total: number; step?: string };
 

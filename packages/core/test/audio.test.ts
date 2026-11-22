@@ -1,5 +1,22 @@
 import { describe, expect, it } from 'vitest';
-import { audioClips, gainAt, gainMoves, soundFigures, type TrammeDoc } from '../src/index.ts';
+import { audioClips, gainAt, gainMoves, monoLoss, soundFigures, type TrammeDoc } from '../src/index.ts';
+
+describe('mono compatibility', () => {
+  const sine = (phase = 1) => Float32Array.from({ length: 48000 }, (_, i) => phase * 0.5 * Math.sin(2 * Math.PI * 440 * i / 48000));
+
+  it('keeps the level of a centred stereo sound', () => {
+    expect(monoLoss([sine(), sine()], 48000)?.lossDb).toBeLessThan(0.5);
+  });
+
+  it('finds phase cancellation on a phone speaker', () => {
+    expect(monoLoss([sine(), sine(-1)], 48000)?.lossDb).toBeGreaterThan(30);
+  });
+
+  it('has no stereo loss to report for mono or silence', () => {
+    expect(monoLoss([sine()], 48000)).toBeNull();
+    expect(monoLoss([new Float32Array(48000), new Float32Array(48000)], 48000)).toBeNull();
+  });
+});
 
 const doc = (props: Record<string, unknown>, extra: Record<string, unknown> = {}): TrammeDoc => ({
   version: 1, meta: { title: 't' }, root: 'main',

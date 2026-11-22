@@ -1,11 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { cachePrefix, defaultModel, filesOf, HUB_PREFIX, isHubId, madeBy, MODEL_TASKS, MODELS, modelsFor, resolveModel } from '../src/models.ts';
 
+it('lists CLAP as a downloadable model for sound meaning', () => {
+  const model = defaultModel('sound-meaning');
+  expect(model).toMatchObject({ source: 'Xenova/clap-htsat-unfused', licence: 'Apache-2.0', commercial: true });
+  expect(cachePrefix(model)).toBe('https://huggingface.co/Xenova/clap-htsat-unfused/resolve/');
+});
+
 describe('the models of the editor', () => {
   it('have a default per task, the one each tool ran before the settings', () => {
-    expect(MODEL_TASKS.map((t) => defaultModel(t).id)).toEqual(['u2net-human-seg', 'u2netp', 'yolos-tiny', 'depth-anything-v2-small', 'whisper-small', 'silero-vad', 'face-landmarker', 'lanczos-enlarge', 'block-motion']);
+    expect(MODEL_TASKS.map((t) => defaultModel(t).id)).toEqual(['u2net-human-seg', 'u2netp', 'yolos-tiny', 'depth-anything-v2-small', 'whisper-small', 'silero-vad', 'face-landmarker', 'lanczos-enlarge', 'block-motion', 'clap-htsat-unfused']);
     // the voice detector and the face landmarker could not be fetched where they were written: tried on a device first; its tool falls back on the energy of the sound
-    for (const t of MODEL_TASKS) if (t !== 'vad' && t !== 'face') expect(defaultModel(t).checked, t).toBe(true);
+    for (const t of MODEL_TASKS) if (t !== 'vad' && t !== 'face' && t !== 'sound-meaning') expect(defaultModel(t).checked, t).toBe(true);
   });
 
   it('only offer defaults a commercial project may use', () => {

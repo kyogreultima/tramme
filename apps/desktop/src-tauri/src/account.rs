@@ -143,6 +143,11 @@ pub(crate) struct Answer {
     pub body: Vec<u8>,
 }
 
+/// the Cookie header of this app's session, for a request that is not sent by `to_cloud` (the live dictation's socket)
+pub(crate) fn session_cookie() -> Option<String> {
+    Session::new(keys::keychain(), BACKEND).header()
+}
+
 /// whether this app holds a session of its environment's backend
 pub(crate) fn signed_in() -> bool {
     Session::new(keys::keychain(), BACKEND).read().contains_key("__Host-tramme-session")

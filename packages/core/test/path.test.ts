@@ -3,7 +3,14 @@
 // compensation: the layer stays put on screen.
 
 import { describe, expect, it } from 'vitest';
-import { anchorShift, insertPathVertex, layerMatrix, movePathVertex, nearestOnPath, removePathVertex, setPathTangent, applyMat, type PathValue } from '../src/index.ts';
+import { anchorShift, insertPathVertex, layerMatrix, movePathVertex, nearestOnPath, pathLength, removePathVertex, setPathTangent, subdividePath, applyMat, type PathValue } from '../src/index.ts';
+
+it('subdivides a square without changing its outline', () => {
+  const square: PathValue = { v: [[0, 0], [100, 0], [100, 100], [0, 100]], closed: true };
+  const out = subdividePath(square, 4);
+  expect(out.v).toHaveLength(16);
+  expect(pathLength(out)).toBeCloseTo(400, 0);
+});
 
 const square: PathValue = {
   v: [[-100, -100], [100, -100], [100, 100], [-100, 100]],

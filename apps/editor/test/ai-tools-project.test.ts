@@ -85,6 +85,32 @@ describe('built-in assistant tool project boundary', () => {
     }
   });
 
+  it('reads a web scene\'s HTML and CSS, and no HTML outside scenes', async () => {
+    const previous = { project: S.project.peek(), docUrl: S.docUrl.peek(), doc: S.doc.peek() };
+    const fetch = vi.fn(async () => new Response('<div id="stage"></div>', { status: 200 }));
+    vi.stubGlobal('fetch', fetch);
+    const runner = new ToolRunner();
+    try {
+      open(first, 'first');
+      for (const path of ['scenes/ui-home/index.html', 'scenes/ui-home/editor.css']) {
+        const result = await runner.run('read_file', { path });
+        expect(result.isError).toBeFalsy();
+        expect(result.content[0]).toMatchObject({ text: '<div id="stage"></div>' });
+      }
+      const calls = fetch.mock.calls.length;
+      for (const path of ['assets/page.html', 'scenes/ui-home/font.woff2', 'scenes/../assets/page.html']) {
+        expect((await runner.run('read_file', { path })).isError).toBe(true);
+      }
+      expect(fetch.mock.calls).toHaveLength(calls);
+    } finally {
+      runner.dispose();
+      vi.unstubAllGlobals();
+      S.project.value = previous.project;
+      S.docUrl.value = previous.docUrl;
+      S.doc.value = previous.doc;
+    }
+  });
+
   it('refuses a delayed file listing from a closed project', async () => {
     const previous = { project: S.project.peek(), docUrl: S.docUrl.peek(), doc: S.doc.peek() };
     let finish!: (value: any) => void;

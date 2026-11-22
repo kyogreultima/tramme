@@ -2,8 +2,10 @@
 //   tramme validate <doc>
 //   tramme check    <doc> [--comp id]                                  the picture checks, issues folded by cause
 //   tramme still    <doc> --t 0.5,1.2 [--out dir] [--samples n] [--comp id]
-//   tramme cloud-export <doc|project.tramme> [--app url] [--token tr_…] [--out film.mp4] [--comp id]   rendered in the cloud of an account (cloud-export.ts)
-//   tramme render   <doc> [--format mp4|mov|webm|gif|png] [--out file] [--samples n] [--from s] [--to s] [--crf 16] [--mute] [--comp id] [--pages n] [--depth 8|10]
+//   tramme cloud-export <doc|project.tramme> [--app url] [--token tr_…] [--out film.mp4] [--comp id] [--master]   rendered in the cloud of an account (cloud-export.ts)
+//   tramme render   <doc> [--format mp4|mov|webm|gif|png] [--out file] [--samples n] [--from s] [--to s] [--crf n] [--mute] [--comp id] [--pages n] [--depth 8|10] [--master] [--isolate]
+//                   --master: the encoder's slow settings, the best picture for its size (default: fast, for the web)
+//                   --isolate: a project with code drawn in its sandbox, not on the render page (slower)
 //   tramme export   <doc> --format lottie|svg|wav [--t s] [--comp id] [--out file]
 //   tramme premiere <doc> [--out folder] [--comp id] [--zip file]       a Premiere Pro timeline: XML, the footage and sounds, the drawings as ProRes clips with alpha, SRT (premiere.ts)
 //   tramme import   <animation.json> [--out folder]                     Lottie to a Tramme project folder
@@ -21,20 +23,24 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { upgradeDoc, documentJsonSchema, stringifyDoc, validate, type TrammeDoc } from '@tramme/core';
+import { isolateExpressions, upgradeDoc, documentJsonSchema, stringifyDoc, validate, type TrammeDoc } from '@tramme/core';
 import { builtinRegistry } from '@tramme/nodes';
 import { fromLottie, toLottie, toSvg } from '@tramme/interop';
 import { fileAssetReader } from '@tramme/interop/node';
-import { launch, openDoc } from './browser.ts';
+import { isolateProjects, launch, openDoc } from './browser.ts';
 import { compareFiles } from './compare.ts';
 import { formatParts } from '@tramme/render/src/timing.ts';
-import { defaultPages, renderAudio, renderVideo } from './jobs.ts';
+import { defaultPages, renderAudio, renderVideo, vectorInSandbox } from './jobs.ts';
 import { VIDEO_FORMATS, type VideoFormat } from './media.ts';
 import { docRegistry, filesRegistry } from './plugins.ts';
+import { plainError } from './plain-error.ts';
 import { readConfig, resolveMountedPath, Server } from './server.ts';
-import { checkProject, containsExpression, DOCUMENT, isChatPath, MANIFEST, newProject, packProject, unpackProject, LEGACIES, migrateProject } from '@tramme/project';
+import { checkProject, containsExpression, DOCUMENT, needsIsolation, isChatPath, MANIFEST, newProject, packProject, unpackProject, LEGACIES, migrateProject } from '@tramme/project';
 import { lintSceneFiles, MAX_SCENE_SOURCE } from '@tramme/project/src/scene-lint.ts';
 import { engineCapture, prepareWebScenes } from './webscene.ts';
+
+// This native process never runs a project's expression: it converts, checks and renders through the browser sandbox.
+isolateExpressions();
 
 const [cmd, ...rest] = process.argv.slice(2);
 const pos: string[] = [];
@@ -54,6 +60,8 @@ const asDoc = (p?: string) => {
 if (!['compare', 'import', 'pack', 'unpack', 'bench', 'load', 'agent', 'check-media'].includes(cmd)) pos[0] = asDoc(pos[0])!;
 const num = (k: string) => (flags[k] === undefined ? undefined : Number(flags[k]));
 const str = (k: string) => (typeof flags[k] === 'string' ? (flags[k] as string) : undefined);
+// a project's code runs on the render page unless asked otherwise (browser.ts)
+isolateProjects(!!flags.isolate);
 
 function readDoc(file: string): TrammeDoc {
   if (!file || !fs.existsSync(file)) throw new Error(`document not found: ${file ?? '(none)'}`);
@@ -102,7 +110,10 @@ async function cmdStill(file: string) {
   const times = String(flags.t ?? '0').split(',').map(Number);
   const outDir = path.resolve(str('out') ?? path.join('out', stem(file)));
   fs.mkdirSync(outDir, { recursive: true });
-  const s = await session(file);
+  // web scenes are captured to pictures first, as for a render (and reused by the next one)
+  const scenes = await prepareWebScenes(file, readDoc(file), engineCapture, await registryOf(file, readDoc(file)).registry);
+  if (scenes.captured || scenes.reused) console.log(`  web scenes: ${scenes.captured} captured, ${scenes.reused} reused from renders/webscene`);
+  const s = await session(scenes.file).catch((error) => { scenes.cleanup(); throw error; });
   try {
     for (const t0 of times) {
       const t = Math.min(t0, s.info.duration - 1 / s.info.fps);
@@ -111,7 +122,7 @@ async function cmdStill(file: string) {
       fs.writeFileSync(f, Buffer.from(url.split(',')[1], 'base64'));
       console.log('wrote', path.relative(process.cwd(), f));
     }
-  } finally { await s.close(); }
+  } finally { await s.close(); scenes.cleanup(); }
 }
 
 async function cmdRender(file: string) {
@@ -128,7 +139,7 @@ async function cmdRender(file: string) {
     const pages = num('pages') ?? defaultPages(s.info.width, s.info.height);
     console.log(`rendering ${stem(file)} (${format}): ${s.info.width}x${s.info.height} at ${s.info.fps} fps${pages > 1 ? `, up to ${pages} pages at once` : ''}`);
     const r = await renderVideo(s.server, s.page, {
-      docUrl: s.docUrl, doc, compId: str('comp'), format, samples: num('samples'), from: num('from'), to: num('to'), crf: num('crf'), mute: !!flags.mute, out, pages, depth: num('depth') === 10 ? 10 : 8,
+      docUrl: s.docUrl, doc, compId: str('comp'), format, samples: num('samples'), from: num('from'), to: num('to'), crf: num('crf'), quality: flags.master ? 'master' : 'fast', mute: !!flags.mute, out, pages, depth: num('depth') === 10 ? 10 : 8,
     });
     console.log(`${r.frames} frames in ${r.seconds.toFixed(1)} s (${r.msPerFrame.toFixed(0)} ms/frame${'pages' in r ? `, ${r.pages} pages` : ''})${r.audio ? ', with sound' : ''} -> ${path.relative(process.cwd(), out)}`);
     console.log(`  per frame: ${formatParts(r.parts)}`);
@@ -165,24 +176,35 @@ function cmdCompare(ref: string, test: string) {
 async function cmdExport(file: string) {
   const doc = readDoc(file);
   const format = str('format');
-  if ((format === 'lottie' || format === 'svg') && containsExpression(doc)) throw new Error('vector export with expressions requires an isolated renderer; use raster export');
-  const { registry, resolve, dir } = registryOf(file, doc);
   const compId = str('comp') ?? doc.root;
-  const readAsset = fileAssetReader(doc, dir, resolve);
   const report = (w: string[]) => { for (const x of w) console.log(`  attention : ${x}`); };
+  const write = (out: string, text: string) => { fs.mkdirSync(path.dirname(out), { recursive: true }); fs.writeFileSync(out, text); };
+  const t = num('t') ?? 0;
+  const outOf = () => path.resolve(str('out') ?? path.join('out', format === 'lottie' ? `${stem(file)}.lottie.json` : `${stem(file)}_${t.toFixed(3)}.svg`));
+  // a project with code converts in the render page's sandbox: its expressions and plugins never run in this process
+  if ((format === 'lottie' || format === 'svg') && needsIsolation(doc)) {
+    const s = await session(file);
+    try {
+      const { text, warnings } = await vectorInSandbox(s.page, format, t, compId);
+      const out = outOf();
+      write(out, text);
+      console.log(`wrote ${path.relative(process.cwd(), out)}${format === 'lottie' ? ` (${(fs.statSync(out).size / 1024).toFixed(0)} KB)` : ''}`);
+      report(warnings);
+    } finally { await s.close(); }
+    return;
+  }
+  const { registry, resolve, dir } = registryOf(file, doc);
+  const readAsset = fileAssetReader(doc, dir, resolve);
   if (format === 'lottie') {
     const { lottie, warnings } = toLottie(doc, await registry, { compId, readAsset });
-    const out = path.resolve(str('out') ?? path.join('out', `${stem(file)}.lottie.json`));
-    fs.mkdirSync(path.dirname(out), { recursive: true });
-    fs.writeFileSync(out, JSON.stringify(lottie));
+    const out = outOf();
+    write(out, JSON.stringify(lottie));
     console.log(`wrote ${path.relative(process.cwd(), out)} (${(fs.statSync(out).size / 1024).toFixed(0)} KB)`);
     report(warnings);
   } else if (format === 'svg') {
-    const t = num('t') ?? 0;
     const { svg, warnings } = toSvg(doc, await registry, t, { compId, readAsset });
-    const out = path.resolve(str('out') ?? path.join('out', `${stem(file)}_${t.toFixed(3)}.svg`));
-    fs.mkdirSync(path.dirname(out), { recursive: true });
-    fs.writeFileSync(out, svg);
+    const out = outOf();
+    write(out, svg);
     console.log(`wrote ${path.relative(process.cwd(), out)}`);
     report(warnings);
   } else if (format === 'wav') {
@@ -256,10 +278,8 @@ async function reportProject(files: Map<string, Uint8Array>, label: string) {
     try { all.push(...validate(doc, await filesRegistry(doc, files)).map((i) => ({ path: `${DOCUMENT}${i.path}`, message: i.message }))); }
     catch (e) { all.push({ path: `${DOCUMENT}/plugins`, message: (e as Error).message }); }
   }
-  if (all.length) {
-    for (const i of all.slice(0, 40)) console.log(`  ${i.path} : ${i.message}`);
-    throw new Error(`${label}: ${all.length} issue(s)`);
-  }
+  // the issues are the error itself: a caller that keeps only the error (the renderer of the exports in the cloud) says what is wrong
+  if (all.length) throw new Error([`${label}: ${all.length} issue(s)`, ...all.slice(0, 8).map((i) => `  ${i.path} : ${i.message}`), ...(all.length > 8 ? [`  … ${all.length - 8} more`] : [])].join('\n'));
 }
 
 async function cmdPack(dir: string) {
@@ -335,7 +355,7 @@ const COMMANDS: Record<string, () => Promise<void> | void> = {
     const files = fs.statSync(src).isDirectory() ? readFolder(src) : unpackProject(new Uint8Array(fs.readFileSync(src)));
     const token = str('token') ?? process.env.TRAMME_TOKEN;
     if (!token) throw new Error('an API token is needed: --token tr_… or TRAMME_TOKEN (made in the app, Your space, API tokens)');
-    await cloudExport(files, { app: str('app') ?? process.env.TRAMME_APP_URL ?? 'https://app.tramme.dev', token, out: str('out') ?? `${path.basename(src).replace(/\.(tramme|trame|emotion)$/, '')}.mp4`, comp: str('comp') });
+    await cloudExport(files, { app: str('app') ?? process.env.TRAMME_APP_URL ?? 'https://app.tramme.dev', token, out: str('out') ?? `${path.basename(src).replace(/\.(tramme|trame|emotion)$/, '')}.mp4`, comp: str('comp'), ...(flags.master ? { profile: 'master' } : {}) });
   },
   nodes: () => cmdNodes(pos[0]),
   bench: async () => { const { bench } = await import('./bench.ts'); await bench(pos[0], { layer: str('layer'), t: num('t'), width: num('width'), height: num('height'), dpr: num('dpr') }); },
@@ -368,6 +388,7 @@ if (!run) {
 try {
   await run();
 } catch (e) {
-  console.error((e as Error).message);
+  // the reason, not the page's call stack Puppeteer appends to it (TRAMME_DEBUG keeps it)
+  console.error(process.env.TRAMME_DEBUG ? (e as Error).stack ?? (e as Error).message : plainError((e as Error).message));
   process.exit(1);
 }

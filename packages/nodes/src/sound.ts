@@ -28,6 +28,7 @@ export const MIX_PROPS: PropSchema = {
   role: { type: 'enum', default: 'effect', options: ['effect', 'music', 'voice', 'ambience'], label: 'Role', group, animatable: false, description: 'effects share the room of the composition; music and ambience are the bed under the voice' },
   weight: { type: 'enum', default: 'support', options: ['support', 'hero'], label: 'Weight', group, animatable: false, description: 'hero: one of the few moments the film is built around (a logo, a reveal), louder over the bed; support: the others' },
   visual: { type: 'enum', default: 'none', options: ['none', 'cut', 'move', 'land', 'appear'], label: 'Underlines', group, animatable: false, description: 'what it marks in the picture: a cut, a move at its fastest, a landing, an appearance (the checks look for it there)' },
+  cueShift: { type: 'number', default: 0, step: 0.001, unit: 's', label: 'Cue shift', group, animatable: false, description: 'where the audible peak lands relative to the visual cue' },
 };
 
 /** an audio layer's own: its playback speed, the pitch with it */

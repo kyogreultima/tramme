@@ -17,10 +17,11 @@
 import { Evaluator, layerClock, motionReport as coreMotionReport, parseColor, pictureMotion as corePictureMotion, runChecks, sampleAt, soundCues, type Host, type Instance, type NodeType, type PluginModule, type TrammeDoc } from '@tramme/core';
 import { quadAt } from '../quad.ts';
 import { builtinRegistry, setWebScenePlaceholder } from '@tramme/nodes';
-import { CanvasPool, Compositor, drawComposed, drawFrame, drawLayers, finishOf, subTimes } from '@tramme/render/src/index.ts';
+import { CanvasPool, Compositor, drawComposed, drawFrame, drawLayers, finishOf, subTimes, velocityOf } from '@tramme/render/src/index.ts';
 import { nodeContext, resizeNode } from '@tramme/render/src/gpu.ts';
+import { toLottie, toSvg } from '@tramme/interop';
 import { RecordingPath2D } from './recording-path.ts';
-import type { DrawPayload, DrawResult, FramePayload, LayerSample, SandboxDoc } from './protocol.ts';
+import { videoKey, type DrawPayload, type DrawResult, type FramePayload, type LayerSample, type SandboxDoc, type VideoNeed } from './protocol.ts';
 import type { SandboxDrawSide } from './worker-side.ts';
 
 // A web scene not captured yet (its pictures are made by `tramme render`) draws nothing here instead of
@@ -109,16 +110,34 @@ export function makeSandboxDraw(modules: Map<string, PluginModule>): SandboxDraw
 
   const theDoc = () => side.doc as unknown as TrammeDoc | null;
 
-  const sandboxAsset = (id: string, videos: Map<string, unknown>) => {
+  const sandboxAsset = (id: string, videos: Map<string, unknown>, need: Map<string, VideoNeed>, drew: Map<string, VideoNeed>, sizes: Record<string, [number, number]>) => {
     if (side.images.has(id)) return side.images.get(id);
     if (side.json.has(id)) return side.json.get(id);
     if (side.models.has(id)) return side.models.get(id);
     const a = assetInfo(id);
     if (a.type === 'font') return a.family ?? id;
     if (a.type === 'video') {
-      // the page decodes the frame this render asks for and ships it with the request
-      const frame = videos.get(id) as ImageBitmap | undefined;
-      return { width: frame?.width ?? 0, height: frame?.height ?? 0, duration: Number(a.duration ?? 0), frameAt: () => ({ image: frame ?? null, exact: true }), request: () => {} };
+      // the page decodes the frames a render draws (the layer's own time in the file, at each motion-blur
+      // sample) and ships them with the request; one it lacks is asked for, and the frame drawn again
+      const at = (t: number) => videos.get(videoKey(id, t)) as ImageBitmap | undefined;
+      // the file's own size: a frame sent smaller (the preview moving) is drawn over the same rectangle
+      const own = sizes[id], size = own ? null : [...videos.entries()].find(([k]) => k.startsWith(`${id}@`))?.[1] as ImageBitmap | undefined;
+      return {
+        width: own?.[0] ?? size?.width ?? Number(a.width ?? 0), height: own?.[1] ?? size?.height ?? Number(a.height ?? 0), duration: Number(a.duration ?? 0),
+        frameAt: (t: number) => {
+          const frame = at(t), key = videoKey(id, t);
+          if (!need.has(key) && !drew.has(key)) (frame ? drew : need).set(key, { id, t });
+          return { image: frame ?? null, exact: !!frame };
+        },
+        // the size it lands on, the largest when several draws show it: the page sends it no bigger
+        drawnAt: (t: number, w: number, h: number) => {
+          const n = need.get(videoKey(id, t)) ?? drew.get(videoKey(id, t));
+          if (!n || !(w > 0) || !(h > 0)) return;
+          n.w = Math.max(n.w ?? 0, Math.ceil(w));
+          n.h = Math.max(n.h ?? 0, Math.ceil(h));
+        },
+        request: () => Promise.resolve(),
+      };
     }
     if (a.type === 'module') {
       const mod = modules.get(id);
@@ -128,16 +147,29 @@ export function makeSandboxDraw(modules: Map<string, PluginModule>): SandboxDraw
     throw new Error(`host.asset: the asset "${id}" (${String(a.type)}) is not in the sandbox`);
   };
 
+  // One evaluator and one set of simulations for a document snapshot and its
+  // plugins, kept from frame to frame: rebuilt for each frame, an export paid
+  // the registry and the evaluator's caches again at every frame, and stepped
+  // every simulation from its layer's start again (a cost growing with the film).
+  let kept: { doc: TrammeDoc; plugins: number; reg: ReturnType<typeof builtinRegistry>; evaluator: Evaluator; sims: Map<string, { frame: number; state: unknown }> } | null = null;
+  const frameTools = (doc: TrammeDoc) => {
+    if (kept?.doc === doc && kept.plugins === modules.size) return kept;
+    const reg = builtinRegistry().clone();
+    for (const [id, mod] of modules) reg.use(mod, id);
+    kept = { doc, plugins: modules.size, reg, evaluator: new Evaluator(doc, reg, { data: (id) => side.json.get(id) }), sims: new Map() };
+    return kept;
+  };
+
   const renderFrame = async (p: FramePayload) => {
     const doc = theDoc();
     if (!doc) return { err: 'no document in the sandbox' };
     const comp = doc.compositions[p.compId];
     if (!comp) return { err: `unknown composition: ${p.compId}` };
     const videos = new Map(Object.entries(p.videos ?? {}));
-    const reg = builtinRegistry().clone();
-    for (const [id, mod] of modules) reg.use(mod, id);
-    const evaluator = new Evaluator(doc, reg, { data: (id) => side.json.get(id) });
-    const sims = new Map<string, { frame: number; state: unknown }>();
+    const sizes: Record<string, [number, number]> = {};
+    for (const [id, s] of Object.entries(p.videoSizes ?? {})) if (Array.isArray(s) && s.every((v) => Number.isSafeInteger(v) && v > 0 && v <= 16384)) sizes[id] = [s[0], s[1]];
+    const need = new Map<string, VideoNeed>(), drew = new Map<string, VideoNeed>();
+    const { reg, evaluator, sims } = frameTools(doc);
     const layerOf = (id: string, t: number, cid: string) => {
       try { return doc.compositions[cid]?.layers[id] ? evaluator.layerAt(id, t, cid) : null; } catch { return null; }
     };
@@ -150,7 +182,7 @@ export function makeSandboxDraw(modules: Map<string, PluginModule>): SandboxDraw
       width: comp.width,
       height: comp.height,
       duration: comp.duration,
-      asset: ((id: string) => sandboxAsset(id, videos)) as Host['asset'],
+      asset: ((id: string) => sandboxAsset(id, videos, need, drew, sizes)) as Host['asset'],
       assetInfo: (id) => assetInfo(id) as never,
       assetUrl: (id) => new URL(String(assetInfo(id).src), side.docUrl).href,
       compositionSize: (cid2: string) => { const c = doc.compositions[cid2]; return c ? { width: c.width, height: c.height, duration: c.duration } : null; },
@@ -210,26 +242,31 @@ export function makeSandboxDraw(modules: Map<string, PluginModule>): SandboxDraw
         compositor.resize(w, h);
       }
       const frame0 = evaluator.frame(p.t, p.compId);
+      // a request lowers the composition's samples (a fast preview), never raises them: a film without motion blur stays sharp
       const samples = Math.max(1, Math.min(frame0.motionBlur.samples, p.samples ?? frame0.motionBlur.samples));
-      const times = subTimes(p.t, samples, frame0.motionBlur.shutter, comp);
+      const shutter = p.shutter ?? frame0.motionBlur.shutter;
+      const motion = p.motionBlur === 'velocity' && samples > 1 && shutter > 0 ? velocityOf(evaluator, frame0, shutter) : undefined;
+      const times = motion ? [p.t] : subTimes(p.t, samples, shutter, comp);
       compositor.begin();
       for (const ts of times) {
-        const frame = evaluator.frame(ts, p.compId);
+        const frame = ts === p.t ? frame0 : evaluator.frame(ts, p.compId);
         const scratch = pool.get(w, h);
-        drawFrame(scratch, frame, envOf({ t: ts }, p.compId));
+        drawFrame(scratch, frame, { ...envOf({ t: ts }, p.compId), motion });
         compositor.add(scratch.canvas as unknown as OffscreenCanvas, 1 / times.length);
         pool.release(scratch);
       }
-      const frame = evaluator.frame(p.t, p.compId);
+      const frame = frame0;
       const { fx, seed } = finishOf(frame.effects, frame.frame);
       const bg = frame.background ? parseColor(frame.background) : null;
       const passes = frame.effects.flatMap((e) => {
         const type = reg.hasEffect(e.type) ? reg.effect(e.type) : null;
         return type?.stage === 'finish' && type.gl ? [{ code: type.gl.code, schema: type.props, props: e.props }] : [];
       });
+      // video frames missing: the page decodes them and asks for this frame again
+      if (need.size) return { need: [...need.values()].slice(0, 512) };
       compositor.finish(fx, { bg: bg ? [toLin(bg[0] / 255), toLin(bg[1] / 255), toLin(bg[2] / 255)] : null, checker: false }, seed, { passes, t: frame.t, scale: (scaleX + scaleY) / 2, onError: (e: Error) => { throw e; } });
       const bitmap = await createImageBitmap(output);
-      return { bitmap, transfer: [bitmap as unknown as Transferable] };
+      return { bitmap, drew: [...drew.values()].slice(0, 512), transfer: [bitmap as unknown as Transferable] };
     } catch (e) {
       return { err: (e as Error).message };
     }
@@ -325,6 +362,19 @@ export function makeSandboxDraw(modules: Map<string, PluginModule>): SandboxDraw
       if (values.length > 4096) throw new Error('too many sandbox quality issues');
       return values;
     },
+    async vector(format, doc, t, compId, files) {
+      if (!doc.compositions?.[compId]) throw new Error('unknown sandbox composition');
+      await fontsReady;
+      const reg = builtinRegistry().clone();
+      for (const [id, mod] of modules) reg.use(mod, id);
+      const readAsset = (id: string) => (Object.hasOwn(files, id) ? files[id] : null);
+      if (format === 'lottie') {
+        const { lottie, warnings } = toLottie(doc, reg, { compId, readAsset });
+        return { text: JSON.stringify(lottie), warnings };
+      }
+      const { svg, warnings } = toSvg(doc, reg, t, { compId, readAsset });
+      return { text: svg, warnings };
+    },
     async samplePlaced(t, compId) {
       const doc = theDoc();
       if (!doc || !doc.compositions[compId]) throw new Error('unknown sandbox composition');
@@ -342,6 +392,8 @@ export function makeSandboxDraw(modules: Map<string, PluginModule>): SandboxDraw
         for (const frame of Object.values(p.videos ?? {})) (frame as { close?(): void }).close?.();
       }
     },
+    fontsReady: () => fontsReady,
+
     setDoc(d: SandboxDoc) {
       side.doc = d.doc as Record<string, unknown>;
       preparedCode.clear();

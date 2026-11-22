@@ -7,7 +7,7 @@
 import { stringifyDoc, validate, type EffectType, type ModifierType, type NodeType, type TrammeDoc, type Registry } from '@tramme/core';
 import { fromLottie } from '@tramme/interop';
 import { builtinRegistry } from '@tramme/nodes';
-import { checkProject, codeInventory, DOCUMENT, MANIFEST, newProject, pathIssue, srcPath, unpackProject, type CodeInventory, type Issue, type Manifest, type PluginCode } from '@tramme/project';
+import { checkProject, codeInventory, DOCUMENT, MANIFEST, newProject, pathIssue, SceneSchema, srcPath, unpackProject, type CodeInventory, type Issue, type Manifest, type PluginCode, type Scene } from '@tramme/project';
 import { probeVideo } from '@tramme/render';
 import { api } from './api.ts';
 import { confirmWith } from './confirm.ts';
@@ -146,13 +146,13 @@ async function fill(project: Manifest, files: Map<string, Uint8Array | string>, 
 }
 
 /**
- * a .tramme archive as a new project (always a new id: nothing is overwritten); ask null skips the code question;
+ * a .tramme archive as a new project (a new id unless one is reserved for bringing a local project); ask null skips the code question;
  * place 'cloud': in the account, from the desktop app (bring.ts)
  */
-export async function importArchive(file: Blob, progress?: Progress, opts?: { ask?: CodeAsk | null; place?: 'cloud' }): Promise<Manifest> {
+export async function importArchive(file: Blob, progress?: Progress, opts?: { ask?: CodeAsk | null; place?: 'cloud'; id?: string }): Promise<Manifest> {
   const { files, manifest, doc } = await readArchive(new Uint8Array(await file.arrayBuffer()), opts?.ask);
   const root = doc.compositions[doc.root];
-  const project = await api.create({ name: manifest.name, created: manifest.created, width: root?.width, height: root?.height, fps: root?.fps, duration: root?.duration, empty: true }, opts?.place);
+  const project = await api.create({ id: opts?.id, name: manifest.name, created: manifest.created, width: root?.width, height: root?.height, fps: root?.fps, duration: root?.duration, empty: true }, opts?.place);
   return fill(project, files, progress);
 }
 
@@ -271,6 +271,53 @@ export async function droppedOf(dt: DataTransfer): Promise<Picked[]> {
   return out;
 }
 
+/** a web scene among the files brought in: a folder that holds a scene.json, its files with their path inside it */
+export interface SceneFolder { name: string; files: Picked[] }
+
+/** the web scene folders among picked files, and the files that belong to none */
+export function sceneFoldersOf(items: Picked[]): { scenes: SceneFolder[]; rest: Picked[] } {
+  // a scene inside a scene stays its own: the deepest folder holding a scene.json wins
+  const dirs = items.map((it) => it.path.match(/^(.+\/)scene\.json$/i)?.[1]).filter((d): d is string => !!d).sort((a, b) => b.length - a.length);
+  const scenes = new Map<string, Picked[]>(), rest: Picked[] = [];
+  for (const it of items) {
+    const dir = dirs.find((d) => it.path.startsWith(d));
+    if (!dir) { rest.push(it); continue; }
+    scenes.set(dir, [...(scenes.get(dir) ?? []), { file: it.file, path: it.path.slice(dir.length) }]);
+  }
+  return { scenes: [...scenes].map(([dir, files]) => ({ name: dir.slice(0, -1).split('/').pop()!, files })), rest };
+}
+
+/**
+ * Writes web scene folders into a project, each under scenes/<id>/ with its own
+ * paths kept: the id from the folder's name, made free beside the scenes
+ * already there. A folder whose scene.json is not a scene, or whose entry is
+ * missing, is refused whole; a file the format does not allow is left out.
+ * `taken` holds the project's paths and learns the new ones.
+ */
+export async function writeSceneFolders(scenes: SceneFolder[], taken: Set<string>, write: (path: string, file: File) => Promise<unknown>): Promise<{ written: string[]; refused: string[]; skipped: string[] }> {
+  const written: string[] = [], refused: string[] = [], skipped: string[] = [];
+  for (const scene of scenes) {
+    let manifest: Scene;
+    try {
+      const json = scene.files.find((f) => f.path.toLowerCase() === 'scene.json')!;
+      manifest = SceneSchema.parse(JSON.parse(await json.file.text()));
+    } catch { refused.push(scene.name); continue; }
+    if (!scene.files.some((f) => f.path === manifest.entry)) { refused.push(scene.name); continue; }
+    const base = slug(scene.name).replace(/_/g, '-').replace(/^[^a-z0-9]+/, '').slice(0, 60) || 'scene';
+    let id = base;
+    for (let n = 2; [...taken].some((p) => p.startsWith(`scenes/${id}/`)); n++) id = `${base}-${n}`;
+    for (const f of scene.files) {
+      if (f.path.split('/').some((part) => part.startsWith('.'))) continue;
+      const path = `scenes/${id}/${f.path}`;
+      if (pathIssue(path)) { skipped.push(`${scene.name}/${f.path}`); continue; }
+      await write(path, f.file);
+      taken.add(path);
+    }
+    written.push(`scenes/${id}`);
+  }
+  return { written, refused, skipped };
+}
+
 /** a project made from sources starts landscape; the assistant sets the format once it knows the video */
 const SOURCES_FORMAT = { width: 1920, height: 1080, fps: 30, duration: 30 };
 
@@ -295,18 +342,19 @@ async function kitAmong(items: Picked[]): Promise<{ kit: Kit; from: Picked } | n
  * Progress counts bytes sent.
  */
 export async function importSources(items: Picked[], progress?: Progress, opts: { prompt?: string; format?: { width: number; height: number } } = {}): Promise<Manifest> {
-  const visible = items.filter((it) => !it.path.split('/').some((part) => part.startsWith('.')));
+  // web scene folders come in as scenes (scenes/<id>/), the rest as sources
+  const { scenes, rest: visible } = sceneFoldersOf(items.filter((it) => !it.path.split('/').some((part) => part.startsWith('.'))));
   const found = await kitAmong(visible);
   const fonts = new Set(found?.kit.fonts.map((f) => f.file?.split('/').pop()?.toLowerCase()).filter(Boolean));
   const usable = visible.filter((it) => isSourceFile(it.file) || (FONT_FILE.test(it.file.name) && fonts.has(it.file.name.toLowerCase())));
-  if (!usable.length) throw new ImportError(t('importer.noSources'));
+  if (!usable.length && !scenes.length) throw new ImportError(t('importer.noSources'));
   for (const it of usable) {
     const bad = pathIssue(`${SOURCES_DIR}${safeName(it.file.name)}`);
     if (bad) throw new ImportError(`${it.file.name} : ${bad}`);
   }
-  // named by the kit, otherwise after the first document, otherwise after the first file
-  const lead = (usable.find((it) => kindOf(it.file) === 'document') ?? usable[0]).file;
-  const name = found?.kit.name ?? (lead.name.replace(/\.[^.]+$/, '').trim() || t('importer.sources'));
+  // named by the kit, otherwise after the first document, otherwise after the first file or scene
+  const lead = (usable.find((it) => kindOf(it.file) === 'document') ?? usable[0])?.file;
+  const name = found?.kit.name ?? ((lead?.name ?? scenes[0].name).replace(/\.[^.]+$/, '').trim() || t('importer.sources'));
   const format = { ...SOURCES_FORMAT, ...opts.format };
   const project = await api.create({ name, ...format, empty: true });
   try {
@@ -334,6 +382,7 @@ export async function importSources(items: Picked[], progress?: Progress, opts: 
       const kind = kindOf(file), base = file.name.replace(/\.[^.]+$/, '');
       if (kind === 'image' || kind === 'video' || kind === 'audio' || kind === 'model') doc.assets[freshId(doc.assets, slug(base).slice(0, 40) || kind)] = { type: kind, src: path, name: base, hash };
     }
+    await writeSceneFolders(scenes, taken, (path, file) => api.writeAny(project.id, path, file));
     if (found) {
       applyKit(doc, found.kit, moved);
       // the kit whole, for the assistant; the brief it gives, that the assistant follows from the first message

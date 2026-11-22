@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Evaluator, springStep, validate, type TrammeDoc } from '../src/index.ts';
+import { Evaluator, deform, modifierParams, springStep, validate, type PathValue, type TrammeDoc } from '../src/index.ts';
 import { makeDoc, registry } from './fixtures.ts';
 
 function withProp(radius: unknown, extra: (d: TrammeDoc) => void = () => {}): Evaluator {
@@ -10,6 +10,33 @@ function withProp(radius: unknown, extra: (d: TrammeDoc) => void = () => {}): Ev
 }
 
 describe('modifiers', () => {
+  it('deforms a shape path through the evaluator and validates it', () => {
+    const doc = makeDoc();
+    const path: PathValue = { v: [[0, 0], [400, 0]] };
+    const reg = registry().register({ type: 'shape', title: 'Shape', category: 'test', props: { path: { type: 'path', default: path } }, render: { canvas2d() {} } });
+    doc.compositions.main.layers.bg = { type: 'shape', props: { path: { $v: path, $mod: [{ type: 'deform', mode: 'wave', amount: 20, freq: 1, detail: 8 }] } } };
+    expect(validate(doc, reg)).toEqual([]);
+    const out = new Evaluator(doc, reg).value('bg.path', 0) as PathValue;
+    expect(Math.max(...out.v.map((v) => Math.abs(v[1])))).toBeCloseTo(20, 0);
+  });
+
+  it('deform passes numbers through and is deterministic across seeks', () => {
+    const ctx = { t: 1, fps: 30, base: () => null, keys: null, keyValues: null, index: 0, count: 1, seed: 1 };
+    const params = modifierParams(deform, { type: 'deform', mode: 'noise' });
+    expect(deform.apply(5, params, ctx)).toBe(5);
+    const path: PathValue = { v: [[0, 0], [400, 0]] };
+    const a = deform.apply(path, params, ctx);
+    deform.apply(path, params, { ...ctx, t: 0 });
+    expect(deform.apply(path, params, ctx)).toEqual(a);
+  });
+  it('reports an invalid path modifier without throwing', () => {
+    const doc = makeDoc();
+    const path: PathValue = { v: [[0, 0], [10, 0]] };
+    const reg = registry().register({ type: 'shape', title: 'Shape', category: 'test', props: { path: { type: 'path', default: path } }, render: { canvas2d() {} } });
+    doc.compositions.main.layers.bg = { type: 'shape', props: { path: { $v: path, $mod: [null] } } } as never;
+    expect(() => validate(doc, reg)).not.toThrow();
+    expect(validate(doc, reg).length).toBeGreaterThan(0);
+  });
   it('wiggle: deterministic, bounded, varying over time, on a fixed value { $v }', () => {
     const ev = withProp({ $v: 100, $mod: [{ type: 'wiggle', freq: 3, amp: 10 }] });
     const a = ev.value('bg.radius', 1.234) as number;

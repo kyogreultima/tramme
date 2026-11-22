@@ -35,6 +35,7 @@ export function GalleryDialog({ video, onClose }: { video: Blob; onClose: () => 
       const r = await publish({ projectId: project.id, video, title: title.trim(), description: description.trim(), visibility, reusable, width: c.width, height: c.height, duration: c.duration },
         (s) => setStep(s === 'still' ? t('gallery.stepStill') : s === 'archive' ? t('gallery.stepArchive') : t('gallery.stepUpload')));
       setDone(r.url);
+      for (const w of r.warnings) toast(w, 'info', 9000);
     } catch (x) {
       toast(t('gallery.failed', { error: (x as Error).message }), 'error');
     }

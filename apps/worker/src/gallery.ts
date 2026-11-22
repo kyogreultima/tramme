@@ -22,7 +22,7 @@
 //   POST   /api/gallery/mine/<project> {title, description, visibility, reusable, width, height, duration}
 //   DELETE /api/gallery/mine/<project>                unpublish: the entry and its files go
 
-import { HttpError, json, prefixedBucket, purgePrefix, readJson, storageRoute, workspacePrefix, type Bucket, type Edge } from '@tramme/api';
+import { GALLERY_FILE_LIMIT, HttpError, json, prefixedBucket, purgePrefix, readJson, storageRoute, workspacePrefix, type Bucket, type Edge } from '@tramme/api';
 import { termsOf } from '@tramme/plans';
 import { internal } from './accounts.ts';
 import type { Env } from './http.ts';
@@ -58,7 +58,7 @@ type GalleryFile = (typeof GALLERY_FILES)[number];
 const isFile = (f: string): f is GalleryFile => (GALLERY_FILES as readonly string[]).includes(f);
 
 /** the largest film, still or archive one request may bring: the Worker reads it whole */
-export const GALLERY_MAX_BYTES = 60 * 1024 * 1024;
+export const GALLERY_MAX_BYTES = GALLERY_FILE_LIMIT;
 
 const ENTRY = (id: string) => `gallery/entries/${id}.json`;
 /** where each file is kept, as a project's file (the format's places) */

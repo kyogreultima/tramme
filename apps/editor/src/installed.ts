@@ -282,6 +282,8 @@ export function permitted(ctx: ToolContext, p: Installed): ToolContext {
       const u = new URL(url, location.href);
       if (u.origin === location.origin && u.pathname.startsWith('/api/')) {
         const route = u.pathname.split('/')[2] ?? '';
+        // an encoded separator or dot could name another route once the server decodes it
+        if (/%(2f|5c|2e)|\\/i.test(u.pathname)) throw new Error(`${name}: invalid provider path`);
         if (PROVIDER_ROUTES.includes(route) && providers.includes(route)) return reach(u.pathname + u.search, init as RequestInit);
         throw new Error(`${name} did not declare the provider route "${route}" (meta.permissions.providers)`);
       }
@@ -356,10 +358,12 @@ export const copiesIn = (doc: TrammeDoc): Record<string, string> => {
 };
 
 /**
- * The project's plugins drawn by the sandbox, their modules never loaded on
- * the page (step 5): under the experimental flag, and always for a project
+ * The project evaluated and drawn by its sandbox. Trust is given once, at the
+ * door, as a host application does with its plugins: the user's own projects,
+ * the assistant's code and a project whose code the user accepted at import
+ * (importer.ts) run on the page at full speed. The sandbox draws a project
  * that carries a copy of an installed plugin (code from outside the project
- * the user did not write).
+ * the user did not write), and every project under the setting.
  */
 export const sandboxedDoc = (doc: TrammeDoc): boolean => prefs.peek().sandboxPreview || ((doc.plugins ?? []).length > 0 && Object.keys(copiesIn(doc)).length > 0);
 

@@ -51,6 +51,7 @@ import { MOMENT_TOOLS } from './moments.ts';
 import { SKIN_TOOLS } from './faces.ts';
 import { LONG_TOOLS } from './longtools.ts';
 import { PROXY_TOOLS } from './proxy.ts';
+import { GRADE_TOOLS } from './grade-tools.ts';
 import { placeTemplate, TEMPLATES, type TemplateArgs } from './templates.ts';
 
 const at = { type: 'number', minimum: 0, title: 'Start (s)', description: 'composition time; the current time by default' };
@@ -133,5 +134,5 @@ export const EDITOR_PROMPTS: PromptType[] = [
 
 /** the base vocabulary of the editor, before a document's plugins */
 export function editorRegistry() {
-  return builtinRegistry().registerTool(...EDITOR_TOOLS, ...SVG_TOOLS, ...RECIPE_TOOLS, ...TYPEFACE_TOOLS, ...FIGURE_TOOLS, ...EVENT_TOOLS, ...PERCEPTION_TOOLS, ...TRACKING_TOOLS, ...STABILIZE_TOOLS, ...PROXY_TOOLS, ...COMPONENT_TOOLS, ...DENOISE_TOOLS, ...SKIN_TOOLS, ...LONG_TOOLS, ...CUTOUT_TOOLS, ...DEPTH_TOOLS, ...MODEL_TOOLS, ...REMOVEBG_TOOLS, ...LIPSYNC_TOOLS, ...CUTS_TOOLS, ...TAKES_TOOLS, ...MONTAGE_TOOLS, ...FILLERS_TOOLS, ...CHARTER_TOOLS, ...MOMENT_TOOLS, ...REVIEW_TOOLS, ...CRITIC_TOOLS, ...REFERENCE_TOOLS, ...SOUND_TOOLS, ...MIXING_TOOLS, ...IMAGE_TOOLS, ...VIDEO_TOOLS, ...SHORTS_TOOLS, ...SOURCE_TOOLS, ...BLOCK_TOOLS, ...BRIEF_TOOLS, ...SCENE_TOOLS, ...FILM_PLAN_TOOLS, ...READING_TOOLS, ...STYLE_FRAME_TOOLS, ...SURFACE_TOOLS, ...STOCK_TOOLS, ...PIN_TOOLS, ...CAMERA_TOOLS, ...LIBRARY_TOOLS).registerPrompt(...EDITOR_PROMPTS).registerKit(...BUILTIN_KITS).registerPreset(...EDITOR_PRESETS);
+  return builtinRegistry().registerTool(...EDITOR_TOOLS, ...SVG_TOOLS, ...RECIPE_TOOLS, ...TYPEFACE_TOOLS, ...FIGURE_TOOLS, ...EVENT_TOOLS, ...PERCEPTION_TOOLS, ...TRACKING_TOOLS, ...STABILIZE_TOOLS, ...PROXY_TOOLS, ...COMPONENT_TOOLS, ...DENOISE_TOOLS, ...SKIN_TOOLS, ...LONG_TOOLS, ...CUTOUT_TOOLS, ...DEPTH_TOOLS, ...MODEL_TOOLS, ...REMOVEBG_TOOLS, ...LIPSYNC_TOOLS, ...CUTS_TOOLS, ...TAKES_TOOLS, ...MONTAGE_TOOLS, ...GRADE_TOOLS, ...FILLERS_TOOLS, ...CHARTER_TOOLS, ...MOMENT_TOOLS, ...REVIEW_TOOLS, ...CRITIC_TOOLS, ...REFERENCE_TOOLS, ...SOUND_TOOLS, ...MIXING_TOOLS, ...IMAGE_TOOLS, ...VIDEO_TOOLS, ...SHORTS_TOOLS, ...SOURCE_TOOLS, ...BLOCK_TOOLS, ...BRIEF_TOOLS, ...SCENE_TOOLS, ...FILM_PLAN_TOOLS, ...READING_TOOLS, ...STYLE_FRAME_TOOLS, ...SURFACE_TOOLS, ...STOCK_TOOLS, ...PIN_TOOLS, ...CAMERA_TOOLS, ...LIBRARY_TOOLS).registerPrompt(...EDITOR_PROMPTS).registerKit(...BUILTIN_KITS).registerPreset(...EDITOR_PRESETS);
 }

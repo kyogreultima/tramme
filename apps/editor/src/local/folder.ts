@@ -24,6 +24,7 @@ const TYPES: Record<string, string> = { js: 'text/javascript', mjs: 'text/javasc
 const missing = (e: unknown) => (e as { name?: string })?.name === 'NotFoundError' || (e as { name?: string })?.name === 'TypeMismatchError';
 
 export function folderRecords(root: DirHandle): RecordStore {
+  const writes = new Map<string, Promise<void>>();
   /** the folder of a key's file, made on the way when `create` */
   const dirOf = async (parts: string[], create: boolean): Promise<DirHandle | null> => {
     let d = root;
@@ -86,14 +87,24 @@ export function folderRecords(root: DirHandle): RecordStore {
       return f ? recordOf(key, f) : undefined;
     },
     async put(record, check) {
-      if (check) {
-        const f = await readFile(record.key);
-        if (!check(f ? await recordOf(record.key, f) : undefined)) return false;
+      const previous = writes.get(record.key) ?? Promise.resolve();
+      let release!: () => void;
+      const pending = new Promise<void>((resolve) => { release = resolve; });
+      writes.set(record.key, pending);
+      await previous;
+      try {
+        if (check) {
+          const f = await readFile(record.key);
+          if (!check(f ? await recordOf(record.key, f) : undefined)) return false;
+        }
+        await writeFile(record.key, record.data);
+        const f = (await readFile(record.key))!;
+        await writeFile(sideKey(record.key), new Blob([JSON.stringify({ etag: record.etag, size: f.size, modified: f.lastModified, contentType: record.contentType, custom: record.custom })]));
+        return true;
+      } finally {
+        if (writes.get(record.key) === pending) writes.delete(record.key);
+        release();
       }
-      await writeFile(record.key, record.data);
-      const f = (await readFile(record.key))!;
-      await writeFile(sideKey(record.key), new Blob([JSON.stringify({ etag: record.etag, size: f.size, modified: f.lastModified, contentType: record.contentType, custom: record.custom })]));
-      return true;
     },
     async delete(keys) {
       for (const k of keys) { await removeFile(k); await removeFile(sideKey(k)); }

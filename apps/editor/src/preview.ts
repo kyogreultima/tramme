@@ -23,9 +23,10 @@ import { clipChain, liveMaster, loadPitch, masterGainDb, mixTracks, playClip, Re
 import { comp, compIdOf, S, setRegistry, setTime, toast, viewDoc } from './state.ts';
 import { attachInstalled, attachIsolated, filterModule, onSandboxStopped, pluginHost, pluginToolHost } from './plugins/index.ts';
 import { copiesIn, copyId, counted, installed, installedFor, installedTypes, offIn, permitted, sandboxedDoc, stopped, STRIKES } from './installed.ts';
-import { bindSandbox, blitSandboxFrame, declarationsModule, ensureDeclared, ensureSandboxDoc, moduleItemsOf, resetSandbox, sandboxDeclaration, sandboxVideoFrames, type SandboxContext } from './plugins/sandbox-draw.ts';
+import { bindSandbox, blitPicture, blitSandboxFrame, declarationsModule, ensureDeclared, ensureSandboxDoc, moduleItemsOf, renderSandboxFrame, resetSandbox, sandboxDeclaration, type SandboxContext } from './plugins/sandbox-draw.ts';
 import { setWebScenePlaceholder } from '@tramme/nodes';
-import { liveScenes } from './webscene-preview.ts';
+import { liveScenes, sceneRevision } from './webscene-preview.ts';
+import { disposeSceneCapture, setSceneLiveView } from './webscene-snapshot.ts';
 import { t } from './i18n/index.ts';
 import { MASTER_METER_ID, previewMeters } from './audio-meters.ts';
 import { audioEffectsKey } from './audio-key.ts';
@@ -33,12 +34,15 @@ import { prefs } from './settings.ts';
 import { clockTime, scrubWindow, step, Runs, type Clock } from './playclock.ts';
 import { packAsInstalled, packBySrc, packContext, shippedPacks } from './packs.ts';
 import { syncPluginTours } from './tours/index.ts';
+import { Preparer } from './prepare-run.ts';
 // a stopped sandbox leaves the saved project and the open edits as they were; the next call starts a fresh one
 onSandboxStopped((reason) => toast(t('editor.pluginStopped', { reason }), 'error', 9000));
 setWebScenePlaceholder((folder) => (liveScenes.has(folder) ? null : t('viewport.websceneCaptured', { folder })));
 
 /** the slowest pace a media element takes (browsers refuse less): slower, it waits */
 const MIN_ELEMENT_RATE = 0.0625;
+/** the furthest ahead a played sandbox frame is asked for (seconds): past it, the preview is too slow to keep time anyway */
+const SANDBOX_LEAD_MAX = 0.5;
 
 class Preview {
   readonly meters = previewMeters;
@@ -84,12 +88,16 @@ class Preview {
   /** one sandbox frame in flight (the flag's draw path) */
   private sandboxBusy = false;
   private sandboxAgain = false;
+  /** while playing, how long a sandbox frame takes to land (seconds, averaged): the frame asked for is that far ahead */
+  private sandboxLead = 0;
   /** the sharp frame being drawn in steps, cancelled by any change */
   private job: (() => EvaluatedFrame | null) | null = null;
   /** frame of the composition last drawn during playback (exact frames) */
   private playedFrame = -1;
   /** the document's motion blur sub-frames, from the last frame drawn */
   private docSamples = 1;
+  /** the heavy passages, drawn ahead while the preview stays still and played back as pictures (prepared.ts) */
+  private prep = new Preparer(() => !S.playing.peek() && S.draft.peek() === null && performance.now() - this.scrubAt > 1000 && prefs.peek().prepare);
 
   constructor() {
     this.canvas = document.createElement('canvas');
@@ -98,6 +106,13 @@ class Preview {
 
   async start() {
     this.meters.clear(true);
+    this.prep.reset();
+    // the scenes of the last project close; the view draws the scenes it does not show live from their own pictures
+    disposeSceneCapture();
+    setSceneLiveView(() => {
+      const projectId = S.project.peek()?.id, doc = this.applied;
+      return projectId && doc ? { projectId, doc } : null;
+    });
     // a new project on the same page: what crossed for the old one is dropped
     resetSandbox();
     // every sandboxed draw goes through the open project's sandbox, fed with this preview's document and assets
@@ -148,7 +163,10 @@ class Preview {
       const key = JSON.stringify([solo, audioEffectsKey(doc, compIdOf(doc))]);
       if (key !== audioKey) { audioKey = key; this.play(); }
     });
-    effect(() => { void S.previewScale.value; void prefs.value; this.invalidate(); });
+    effect(() => { void S.previewScale.value; if (!prefs.value.prepare) this.prep.reset(); this.invalidate(); });
+    // a scene's files changed: the passages prepared with its old pictures go
+    let seenScene = sceneRevision.peek();
+    effect(() => { const r = sceneRevision.value; if (r === seenScene) return; seenScene = r; this.prep.reset(); this.invalidate(); });
     effect(() => { const p = prefs.value; if (this.master) this.master.gain.value = p.previewMuted ? 0 : p.previewVolume; });
     let seenInstalled = installed.peek(), seenStopped = 0;
     // the installed plugins changed, or one was stopped for the session: the registry is built again
@@ -238,6 +256,7 @@ class Preview {
   /** the installed plugins changed (installed, updated, turned off): the registry is built again without the old ones */
   private async installedChanged() {
     if (!this.renderer || !this.applied) return;
+    this.prep.reset();
     await this.renderer.setDoc(this.applied, { compId: compIdOf(this.applied), fresh: true });
     await this.attachPlugins();
     setRegistry(this.renderer.registry);
@@ -290,6 +309,8 @@ class Preview {
   /** load a module asset again (a plugin edited on disk) */
   async reload(assetIds: string[]) {
     if (!this.renderer) return;
+    // a file changed under the same name: the passages drawn with it are drawn again
+    this.prep.reset();
     if (this.renderer.sandboxModules) {
       const base = new URL(S.docUrl.peek(), location.href).href;
       // A saved edit can keep the same asset URL. Discard the worker's module
@@ -343,8 +364,7 @@ class Preview {
       await r.bringImages(t);
       ensureSandboxDoc(host, { doc, docUrl: base, loaded: (id) => { try { return r.assets.get(id); } catch { return null; } } });
       const scale = Math.min(1, width / r.comp.width);
-      const videos = await sandboxVideoFrames(r, doc, t);
-      const picture = await host.renderFrame({ compId: r.compId, t, scale, width: r.comp.width, height: r.comp.height, videos });
+      const picture = await renderSandboxFrame(host, r, { compId: r.compId, t, scale, width: r.comp.width, height: r.comp.height });
       if (picture.err || !picture.bitmap) throw new Error(picture.err ?? 'no picture from the sandbox');
       const small = document.createElement('canvas');
       small.width = Math.round(r.comp.width * scale); small.height = Math.round(r.comp.height * scale);
@@ -353,6 +373,7 @@ class Preview {
       return new Promise((res) => small.toBlob(res, 'image/webp', 0.82));
     }
     // every video frame exact, then drawn once more right before reading (the canvas keeps nothing between tasks)
+    r.quick = false;
     await r.renderComplete(t);
     r.render(t);
     const k = Math.min(1, width / this.canvas.width);
@@ -423,6 +444,8 @@ class Preview {
     // Resizing clears the displayed canvas. The sandbox replaces it only
     // after asynchronous decoding: keep the old picture until then.
     if (!sandboxed) this.setScale(r, scale, still);
+    // moving: the videos drawn quickly (Host.quick); the sharp picture that follows draws them finely
+    r.quick = moving || scrubbing;
     const t0 = performance.now();
     try {
       if (sandboxed) {
@@ -432,7 +455,14 @@ class Preview {
           this.sandboxAgain = false;
           const blur = prefs.peek().blur;
           const samples = moving || scrubbing || blur === 'off' ? 1 : blur === 'limited' ? 4 : undefined;
-          void this.drawSandboxFrame(t, samples, scale).catch((e) => { S.renderError.value = `sandbox: ${(e as Error).message}`; }).finally(() => {
+          // played, the frame lands a round trip after it is asked for while the sound runs on: the frame asked
+          // is the one due when it lands, so the picture keeps time with the voice
+          const fps = comp.peek().fps, end = comp.peek().duration;
+          const at = playing && this.sandboxLead > 0 ? Math.min(end, prefs.peek().exactFrames ? Math.floor((t + this.sandboxLead) * fps + 1e-6) / fps : t + this.sandboxLead) : t;
+          const asked = performance.now();
+          void this.drawSandboxFrame(at, samples, scale, playing).then(() => {
+            if (playing) this.sandboxLead = Math.min(SANDBOX_LEAD_MAX, this.sandboxLead * 0.8 + 0.2 * (performance.now() - asked) / 1000);
+          }).catch((e) => { S.renderError.value = `sandbox: ${(e as Error).message}`; }).finally(() => {
             this.sandboxBusy = false;
             // Only another invalidation needs another frame. An unconditional
             // redraw here keeps decoding and drawing forever while paused.
@@ -442,9 +472,13 @@ class Preview {
             }
           });
         } else this.sandboxAgain = true;
+      } else if (playing && this.playPrepared(r, t)) {
+        // a prepared passage: its picture, drawn ahead
       } else {
         const frame = r.render(t, { samples: 1, checker: true });
         this.docSamples = frame.motionBlur.samples;
+        // drawn late while playing (a video frame not decoded in time, a frame slower than its span): prepared next time
+        if (playing && prefs.peek().prepare && (r.incomplete || performance.now() - t0 > 1000 / frame.comp.fps)) this.prep.frames.noteLate(r.compId, Math.floor(t * frame.comp.fps + 1e-6));
         // a project heavier than the room: the pictures of the next seconds are brought in
         if (S.playing.peek()) r.prefetch(t);
         // a video frame still decoding: drawn again as soon as it is there
@@ -457,6 +491,9 @@ class Preview {
         if (!moving && (blurred || r.scale < still)) {
           this.refineTimer = setTimeout(() => { this.refineTimer = null; requestAnimationFrame(() => this.refine()); }, 180);
         }
+        // still: the heavy passages are prepared at the size the preview plays at
+        if (!moving && this.applied && prefs.peek().prepare) this.prep.schedule({ doc: this.applied, compId: r.compId, scale: this.motionScale(still), from: Math.floor(t * frame.comp.fps + 1e-6) });
+        else if (moving) this.prep.stop();
       }
     } catch (e) {
       S.renderError.value = `render: ${(e as Error).message}`;
@@ -475,7 +512,7 @@ class Preview {
    * transparency as anywhere. Video frames are still decoded here and travel
    * with the request.
    */
-  private async drawSandboxFrame(t: number, samples?: number, scale = this.renderer!.scale) {
+  private async drawSandboxFrame(t: number, samples?: number, scale = this.renderer!.scale, playing = false) {
     const r = this.renderer!;
     const doc = this.applied ?? S.doc.peek();
     const c = doc.compositions[r.compId];
@@ -488,8 +525,7 @@ class Preview {
     // the pictures this frame shows, brought in first: the sandbox only has those kept
     await r.bringImages(t);
     ensureSandboxDoc(pluginHost(docUrl), ctx);
-    const videos = await sandboxVideoFrames(r, doc, t);
-    const pic = await pluginHost(docUrl).renderFrame({ compId: r.compId, t, scale, samples, width: c.width, height: c.height, videos });
+    const pic = await renderSandboxFrame(pluginHost(docUrl), r, { compId: r.compId, t, scale, samples, width: c.width, height: c.height }, { playing });
     if (pic.err) { S.renderError.value = `sandbox: ${pic.err}`; return; }
     if (!pic.bitmap) return;
     this.setScale(r, scale, this.stillScale());
@@ -506,6 +542,7 @@ class Preview {
     const r = this.renderer;
     if (!r) return;
     const still = this.stillScale(), t = S.time.peek();
+    r.quick = false;
     try {
       // a new size clears the canvas: show a quick frame at that size first
       if (Math.abs(r.scale - still) > 1e-6) { this.setScale(r, still, still); r.render(t, { samples: 1, checker: true }); }
@@ -527,6 +564,26 @@ class Preview {
     } catch (e) {
       S.renderError.value = `render: ${(e as Error).message}`;
     }
+  }
+
+  /**
+   * The frame at t from a prepared passage, when there is one for what the
+   * document shows there at the size playing now. Near the passage's end the
+   * frame is also drawn live underneath, so the videos that go on past it are
+   * decoding by the time it ends.
+   */
+  private playPrepared(r: Renderer, t: number): boolean {
+    const doc = this.applied;
+    if (!doc || !prefs.peek().prepare) return false;
+    const fps = doc.compositions[r.compId]?.fps;
+    if (!fps) return false;
+    const f = Math.floor(t * fps + 1e-6), lead = Math.ceil(fps / 2);
+    const picture = this.prep.frames.get(doc, r.compId, f, r.scale);
+    if (!picture) return false;
+    if (this.prep.frames.ahead(doc, r.compId, f, r.scale, lead) < lead) r.render(t, { samples: 1, checker: true });
+    r.prefetch(t);
+    blitPicture(r, picture, t, false);
+    return true;
   }
 
   /** playback too slow: render smaller; comfortably fast: a little larger again, never back to a size found too slow */

@@ -1,5 +1,5 @@
 // The account's button in the top bars: on the home page "Sign in" for a
-// visitor, the person's initial for someone signed in (a menu: their space, sign
+// visitor (its icon alone on a phone), the person's initial for someone signed in (a menu: their space, sign
 // out); in a project, the initial only, the project saved before leaving it.
 // Nothing at all on a server without accounts.
 
@@ -8,7 +8,9 @@ import { account, landAt, refreshAccount, signOut } from '../accounts.ts';
 import { t } from '../i18n/index.ts';
 import { go } from '../nav.ts';
 import { saveNow } from '../state.ts';
+import { BringStatus } from './BringDialog.tsx';
 import { openMenu } from './controls.tsx';
+import { Icon } from './icons.tsx';
 
 const initial = (name: string) => (name.trim()[0] ?? '?').toUpperCase();
 
@@ -16,11 +18,14 @@ export function AccountMenu({ inProject }: { inProject?: boolean } = {}) {
   useEffect(() => { void refreshAccount(); }, []);
   const state = account.value;
   if (state.status === 'unknown' || state.status === 'unavailable') return null;
-  if (state.status === 'out') return inProject ? null : <a class="btn outline sm" href="/login">{t('account.signIn')}</a>;
+  // on a phone the label goes (screens/home.css): the button keeps its icon, the size of its neighbours
+  if (state.status === 'out') return inProject ? null : <a class="btn outline sm" href="/login" title={t('account.signIn')} aria-label={t('account.signIn')}><Icon name="user" /><span class="label">{t('account.signIn')}</span></a>;
   const { user } = state;
   /** a project's changes saved first; a save that cannot go through keeps the person here (SaveHeld asks) */
   const leaving = async () => { if (!inProject) return true; try { await saveNow(); return true; } catch { return false; } };
   return (
+    <>
+    <BringStatus />
     <button class="avatar-btn" title={t('account.signedInAs', { email: user.email })} aria-haspopup="menu"
       onClick={(e) => openMenu((e.currentTarget as HTMLElement).getBoundingClientRect(), [
         { label: user.name, detail: user.email, icon: 'home', disabled: true, onClick: () => {} },
@@ -31,5 +36,6 @@ export function AccountMenu({ inProject }: { inProject?: boolean } = {}) {
       ])}>
       <span aria-hidden="true">{initial(user.name)}</span>
     </button>
+    </>
   );
 }

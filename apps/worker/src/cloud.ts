@@ -22,6 +22,8 @@ import { limitsOn, withinPlan } from './limits.ts';
 import { forgetWorkspace, myGalleryRoute } from './gallery.ts';
 import { moderationRoute } from './moderation.ts';
 import { enqueue, renderRoute } from './renders.ts';
+import { listen } from './listen.ts';
+import { transcribe } from './speech.ts';
 import { publishRoute } from './market.ts';
 
 /** whether this deployment keeps signed-in people's projects: accounts, the bucket and the secrets */
@@ -70,7 +72,8 @@ const ENDED = [`${EDGE_COOKIE}=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=L
 /** a signed-in person's request: their files, their keys, the editor's page marked as theirs */
 export async function cloud(req: Request, env: Env, signed: Signed, ctx?: ExecutionContext): Promise<Response> {
   const answer = await cloudRoute(req, env, signed.edge, ctx).catch(failure);
-  if (!signed.renewed) return answer;
+  // a WebSocket (a live dictation) goes back as it is: a new Response would lose it; the token is renewed by the next request
+  if (!signed.renewed || answer.webSocket) return answer;
   const headers = new Headers(answer.headers);
   headers.append('set-cookie', signed.renewed);
   return new Response(answer.body, { status: answer.status, statusText: answer.statusText, headers });
@@ -90,7 +93,8 @@ async function cloudRoute(req: Request, env: Env, edge: Edge, ctx?: ExecutionCon
   const m = req.method;
   if (parts[0] === 'config' && m === 'GET') {
     // the keys of this person only: never the Worker's own (what the platform pays for comes with credits)
-    return json({ mode: 'cloud', format: PROJECT_FORMAT, limits: LIMITS, ...providersConfig(await loadKeys(keys)) });
+    const providers = providersConfig(await loadKeys(keys));
+    return json({ mode: 'cloud', format: PROJECT_FORMAT, limits: LIMITS, ...providers, transcribe: !!env.AI || providers.transcribe, listen: !!env.AI });
   }
   if (parts[0] === 'account' && parts.length === 1 && m === 'DELETE') return deleteAccount(req, env, edge, ctx);
   if (parts[0] === 'keys') return keysRoute(req, keys, parts.slice(1).map(decodeURIComponent));
@@ -109,6 +113,16 @@ async function cloudRoute(req: Request, env: Env, edge: Edge, ctx?: ExecutionCon
   if (parts[0] === 'gallery') {
     const res = await myGalleryRoute(req, env, edge, env.FILES!, files);
     if (res) return res;
+  }
+  // Whisper on Workers AI, paid by the platform (cents for hours of speech), within a rate per account; the person's OpenAI key otherwise
+  if (parts[0] === 'transcribe' && m === 'POST' && env.AI) {
+    if (env.RELAY_LIMIT && !(await env.RELAY_LIMIT.limit({ key: `transcribe:${edge.workspaceId}` })).success) throw new HttpError(429, 'transcription: too many requests, wait a minute');
+    return transcribe(req, env);
+  }
+  // a dictation heard as it is said (Deepgram Nova-3 on Workers AI), within the same rate: one per connection
+  if (parts[0] === 'listen' && m === 'GET' && env.AI) {
+    if (env.RELAY_LIMIT && !(await env.RELAY_LIMIT.limit({ key: `transcribe:${edge.workspaceId}` })).success) throw new HttpError(429, 'transcription: too many requests, wait a minute');
+    return listen(req, env);
   }
   if (PROVIDER_ROUTES.includes(parts[0])) {
     const res = await providerRoute(req, { keys: await loadKeys(keys), fetch: (input, init) => fetch(input, init) }, parts);

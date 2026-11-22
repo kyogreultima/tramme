@@ -16,3 +16,4 @@ export * from './providers.ts';
 export * from './records.ts';
 export * from './sealed.ts';
 export * from './storage.ts';
+export { GALLERY_FILE_LIMIT } from './gallery.ts';

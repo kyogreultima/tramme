@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { readingIssues } from '@tramme/core';
-import { readingFromLottie } from '../src/index.ts';
+import { readingIssues, sampleKeyframes } from '@tramme/core';
+import { fromLottie, readingFromLottie } from '../src/index.ts';
 
 const kf = (t: number, s: number[]) => ({ t, s, o: { x: [0.3], y: [0] }, i: { x: [0.2], y: [1] } });
 const ks = (more: Record<string, unknown> = {}) => ({ o: { a: 0, k: 100 }, r: { a: 0, k: 0 }, p: { a: 0, k: [960, 540, 0] }, a: { a: 0, k: [0, 0, 0] }, s: { a: 0, k: [100, 100, 100] }, ...more });
@@ -20,6 +20,39 @@ const lottie = {
     { ind: 5, ty: 1, nm: 'Paper', ip: 60, op: 120, sw: 1920, sh: 1080, sc: '#F2F0EA', ks: ks({ p: { a: 0, k: [0, 0, 0] } }) },
   ],
 };
+
+it('skips placeholders whose out frame equals their in frame', () => {
+  const source = { ...lottie, layers: [{ ind: 1, ty: 4, nm: 'Card', ip: 0, op: 0, ks: ks(), shapes: [] }, { ind: 2, ty: 1, nm: 'Visible', ip: 0, op: 30, sw: 50, sh: 50, sc: '#ffffff', ks: ks() }] };
+  const { doc } = fromLottie(source);
+  expect(Object.values(doc.compositions.main.layers).some((x) => x.name === 'Card')).toBe(false);
+});
+
+it('keeps a zero-length parent as a transform source', () => {
+  const source = { ...lottie, layers: [
+    { ind: 1, ty: 4, nm: 'Parent', ip: 0, op: 0, ks: ks({ p: { a: 0, k: [200, 150] } }), shapes: [] },
+    { ind: 2, ty: 1, nm: 'Visible', parent: 1, ip: 0, op: 30, sw: 50, sh: 50, sc: '#ffffff', ks: ks() },
+  ] };
+  const { doc } = fromLottie(source);
+  expect(doc.compositions.main.layers.Parent.transform?.position).toEqual([200, 150]);
+  expect(Object.values(doc.compositions.main.layers).some((x) => x.children?.includes('Visible'))).toBe(true);
+});
+
+it('combines position axes animated separately when only one is animated', () => {
+  const source = { ...lottie, layers: [{ ind: 1, ty: 4, nm: 'Card', ip: 0, op: 60, ks: ks({ p: { s: true, x: { a: 0, k: 200 }, y: { a: 1, k: [kf(0, [100]), kf(30, [300])] } } }), shapes: [] }] };
+  const { doc } = fromLottie(source);
+  const position = doc.compositions.main.layers.Card.transform!.position as { $k: { t: number; v: number[] }[] };
+  expect(sampleKeyframes('vec2', position.$k, 0, {})).toEqual([200, 100]);
+  expect(sampleKeyframes('vec2', position.$k, 1, {})).toEqual([200, 300]);
+});
+
+it('preserves independent holds and easing on separate position axes', () => {
+  const p = { s: true, x: { a: 1, k: [{ t: 0, s: [100], h: 1 }, { t: 25, s: [300] }] }, y: { a: 1, k: [{ t: 0, s: [100] }, { t: 25, s: [300] }] } };
+  const source = { ...lottie, fr: 25, layers: [{ ind: 1, ty: 4, nm: 'Card', ip: 0, op: 50, ks: ks({ p }), shapes: [] }] };
+  const { doc } = fromLottie(source);
+  const position = doc.compositions.main.layers.Card.transform!.position as { $k: { t: number; v: number[] }[] };
+  expect(sampleKeyframes('vec2', position.$k, 0.48, {})).toEqual([100, 196]);
+  expect(sampleKeyframes('vec2', position.$k, 1, {})).toEqual([300, 300]);
+});
 
 describe('the reading of a Lottie reference', () => {
   const r = readingFromLottie(lottie, 'ref', 'Lumora promo');

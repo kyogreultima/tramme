@@ -257,7 +257,7 @@ export function stageOf(it: ChatItem): Stage | null {
     return 'build';
   }
   if (READING.has(tool.name)) return 'read';
-  if (tool.name === 'render_still') return 'review';
+  if (tool.name === 'render_still' || tool.name === 'render_sheet') return 'review';
   return 'build';
 }
 

@@ -127,3 +127,38 @@ describe('readArchive', () => {
     expect(err.issues.some((i: { path: string }) => i.path.includes('radius'))).toBe(true);
   });
 });
+
+describe('web scene folders brought in', () => {
+  const file = (name: string, text = '') => new File([text], name);
+  const manifest = JSON.stringify({ duration: 10, size: [1920, 1080], entry: 'index.html', parameters: {} });
+
+  it('takes a folder holding a scene.json as a scene, its paths kept, the rest left as files', async () => {
+    const { sceneFoldersOf } = await import('../src/importer.ts');
+    const { scenes, rest } = sceneFoldersOf([
+      { file: file('scene.json', manifest), path: 'kit/ui-home/scene.json' },
+      { file: file('index.html'), path: 'kit/ui-home/index.html' },
+      { file: file('a.woff2'), path: 'kit/ui-home/fonts/a.woff2' },
+      { file: file('logo.svg'), path: 'kit/logo.svg' },
+    ]);
+    expect(scenes).toHaveLength(1);
+    expect(scenes[0].name).toBe('ui-home');
+    expect(scenes[0].files.map((f) => f.path).sort()).toEqual(['fonts/a.woff2', 'index.html', 'scene.json']);
+    expect(rest.map((f) => f.path)).toEqual(['kit/logo.svg']);
+  });
+
+  it('writes each scene under a free scenes/<id>/, refuses an invalid manifest, leaves out a type the format refuses', async () => {
+    const { writeSceneFolders } = await import('../src/importer.ts');
+    const taken = new Set(['scenes/ui-home/index.html']);
+    const written: string[] = [];
+    const result = await writeSceneFolders([
+      { name: 'UI Home', files: [{ file: file('scene.json', manifest), path: 'scene.json' }, { file: file('index.html'), path: 'index.html' }, { file: file('notes.docx'), path: 'notes.docx' }] },
+      { name: 'broken', files: [{ file: file('scene.json', '{"duration":-1}'), path: 'scene.json' }, { file: file('index.html'), path: 'index.html' }] },
+      { name: 'no-entry', files: [{ file: file('scene.json', manifest), path: 'scene.json' }] },
+    ], taken, async (path) => { written.push(path); });
+    expect(result.written).toEqual(['scenes/ui-home-2']);
+    expect(result.refused).toEqual(['broken', 'no-entry']);
+    expect(result.skipped).toEqual(['UI Home/notes.docx']);
+    expect(written.sort()).toEqual(['scenes/ui-home-2/index.html', 'scenes/ui-home-2/scene.json']);
+    expect(taken.has('scenes/ui-home-2/scene.json')).toBe(true);
+  });
+});

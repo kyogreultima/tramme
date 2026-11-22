@@ -8,6 +8,151 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+## [0.36.1] - 2026-11-22
+
+### Changed
+
+- Back from a project, the home page shows the projects at once, as this device last listed them, then updates the list when the server answers. The list is forgotten at each sign-in and sign-out. The thumbnails stay in the browser's cache instead of being asked again on each visit.
+
+### Fixed
+
+- The watermark's shadow follows the shape of the logo. It was cut straight on its left and right sides, like a box.
+- On a small screen or with wide side panels, the bars no longer cut their last items. The timeline's bar, the tabs of the left panel with their +, and the head of the assistant drop their least useful items first, then keep their icons alone. The viewport and the timeline keep at least 480 px, and the side panels give way.
+- In a narrow inspector, pairs of values (W and H, X and Y), colours and lists show their whole value.
+- A page that does not leave after being asked to, for example to open your space from a project, no longer stays hidden behind the loading screen.
+
+## [0.36.0] - 2026-11-22
+
+### Added
+
+- The assistant builds a scene from a short script, a scene builder, instead of hundreds of operations. It writes `assets/builds/<name>.js` and runs it with the new `build_scene` tool, in the project's sandbox. The script receives a kit that writes keyframes, entrances, typing and unique ids, and measures text with the project's fonts. To change the scene, the assistant edits the script and builds again. A build replaces only the layers the same script made last time; sounds placed by other tools and layers the user added stay. If a layer the script made was changed by hand since, the build stops and names it. See "Scene builders" in `docs/document.md`.
+- `render_sheet` shows several moments of a composition on one labelled picture, in one call.
+- Scenes built apart are now built with a scene builder.
+
+## [0.35.1] - 2026-11-20
+
+### Fixed
+
+- The delivery check of a video counts the audio samples as each frame is decoded, instead of reading a summary at the end that could be missing. When the codec is wrong, it now says so.
+- A web scene inside a nested composition now shows in the viewport, paused and while playing, instead of a "loading" label that never went away. The viewport draws it from the scene's own pictures, the same ones the exports use. The prepared passages draw it too, and they are redrawn when a scene file changes.
+- The hidden frames used to take the pictures of web scenes are released when another project opens.
+- When the assistant tries to write a web scene with the general file tool, the refusal now points it to write_scene and edit_scene.
+
+## [0.35.0] - 2026-11-20
+
+### Added
+
+- The editor and the desktop app export web scenes as MP4, WebM, GIF and PNG sequences. Each scene draws its own picture for every frame, and Tramme composites that picture with the rest of the film.
+- The assistant sees web scenes. `check_scene` returns stills of the scene at its start, middle and end, or the error its page raises. Stills, contact sheets, the critic and the storyboard show the scene in the film instead of a placeholder.
+- A web scene can use the files of another scene in the project, such as the fonts of an interface kit, through `../<scene>/...` or `/scenes/<scene>/...`. Those files are read-only. When one of them changes, the scene is captured again.
+
+### Fixed
+
+- `tramme still` captures web scenes, as `tramme render` does.
+- When a picture is changed from a reference without naming a provider, Tramme picks OpenAI or Gemini instead of a provider that only draws from words. If neither key is set, the error says which key to add.
+- The web scene preview loads pictures named in a `style` attribute whose quotes are written as `&quot;`.
+
+## [0.34.0] - 2026-11-20
+
+### Added
+
+- The Assets panel imports whole folders, with an Import a folder button or by dropping a folder. A folder that holds a `scene.json` comes in as a web scene under `scenes/<name>/`, with its files and subfolders kept. A folder dropped on the home screen does the same.
+- PDF and Markdown files imported in the Assets panel join the project's material: the Direction tab lists them and the assistant reads them.
+
+### Fixed
+
+- The assistant can read a web scene's HTML, CSS and text files before it edits them.
+
+## [0.33.0] - 2026-11-20
+
+### Added
+
+- The assistant can read the waveform and vectorscope of a rendered frame, measure near-black and near-white pixels, check RGB clipping and sample a white or grey patch. It can also apply any of the eight built-in colour looks at an adjustable strength, as editable effects.
+
+### Changed
+
+- When grading footage, the assistant checks the source profile, corrects colour balance and exposure, then measures the result again. When refining an existing grade, it starts with the current effects and preserves the intended look.
+
+### Fixed
+
+- The CLI writes AAC-LC audio in MP4 exports and checks that the expected audio track decodes in the finished file.
+- Video exports report an unreadable sound source by name. The editor checks that the finished soundtrack can be decoded and exports WebM with Opus if the browser cannot encode AAC for MP4.
+
+## [0.32.1] - 2026-11-19
+
+### Fixed
+
+- Sandboxed video exports send each decoded picture at its rendered size. When overlapping layers or motion-blur samples exceed the transfer budget, Tramme reduces the resolution of those pictures for that frame so the export can continue.
+
+## [0.32.0] - 2026-11-19
+
+### Added
+
+- A project lives in one place, this computer or your account: on desktop, each card shows where, and its menu moves it either way. A move copies the project with its exports, checks the copy file by file, and only then removes the original; an older, different copy in the account is never taken for it.
+- Prepared passages: while nothing plays, the preview draws ahead the moments too heavy to play live (overlapping videos, frames that came late) and plays them back smoothly. An edit elsewhere keeps them; an edit there prepares them again. A setting turns it off.
+
+### Changed
+
+- Playback decodes the next frames while the current one shows, and starts the next shot 0.6 s before its cut: on a 4K edit cut end to end, 3 frames out of 118 come late instead of all of them.
+- While playing, a video shown at half its size or less is made small on the graphics card: a 4K take plays at 93 frames per second instead of 56, two overlapping shots at 45 instead of 35. Still frames and exports keep the full picture.
+- A video too slow to decode on this computer gets its light copy automatically, without a question; the setting is now called "Light copies for the preview".
+- The timeline's thumbnails decode apart from the preview, so they no longer hold up the frame it waits for.
+- Cloud projects read videos in pieces of 8 MB, and the preview keeps decoded frames as they are, instead of copying each into a canvas.
+- The gallery refuses a film over 60 MB before uploading anything, and publishes a film alone when its project is too large to share.
+
+### Fixed
+
+- Downloading a large project from the cloud streams its videos instead of reading them whole, which cut long archives short.
+- A failed export shows why in the export queue, in plain words.
+
+## [0.31.0] - 2026-11-18
+
+### Added
+
+- Local CLAP sound search and candidate judgment, with precomputed vectors for the shipped catalog; sound family bans and user-library preference.
+- Credited CC BY recordings and Jamendo music through anonymous Openverse, with beat analysis saved for music beds.
+- Sound-specific cue timing, music-key tuning for pitched effects, mono cancellation warnings and rhythm checks against saved reference films.
+- Path deformers (wave, noise, twist and bend).
+- Lottie import of positions animated with X and Y apart (After Effects' Separate Dimensions), and of zero-length layers that serve as parents.
+- SVG and Lottie export of projects with expressions, plugins or Free code, in the editor, the desktop app and the command line: the conversion runs in the project's sandbox.
+
+### Changed
+
+- Projects are trusted once, as a host application trusts its plugins: your own projects, the assistant's code and a project whose code you accepted on import play and export at full speed. The sandbox draws projects that carry a copy of an installed plugin, and every project when the setting asks for it; `tramme render --isolate` does the same on the command line.
+- Exports in the cloud run a project's code at full speed, in a Chrome cut off from the network.
+- A project saved in your account shows a cloud icon on its card, in place of the word.
+- Exports from the command line and in the cloud encode with the quick settings by default, about three times faster for the web and social networks; `tramme render --master` keeps the slow settings for a film edited or archived further.
+- A fast export encodes with the computer's video chip when it has one (NVIDIA, Intel, AMD, Apple), and in software when the chip fails; its motion blur follows each layer's movement in one pass instead of drawing every frame several times. A 15-second showreel exports in 47 s instead of 117 s for the master. Rotations and changes of size stay sharp in a fast export; the master blurs them.
+- A plugin's tool saves files under `assets/` only; the document, plugin code, web scenes, versions and conversations stay out of its reach.
+
+### Fixed
+
+- The preview says plainly when the project's sandbox stopped, and recognizes a memory limit again.
+
+## [0.30.1] - 2026-11-17
+
+### Fixed
+
+- Cloud exports can start Chromium in the renderer container when it runs as root; projects with plugins no longer fail during archive validation for that reason.
+
+## [0.30.0] - 2026-11-17
+
+### Added
+
+- A project brought into an account keeps its original ID, so a second import or another window can recognize the same project.
+- A transcription can be stopped while it is running; its progress shows which service is working and when a local model is downloading.
+
+### Changed
+
+- On desktop, a signed-in transcription can use the account's cloud service. The companion runs its local Whisper model in a separate worker thread so transcription does not block its other work.
+- Projects already brought into an account are hidden from the device's local list and skipped on later imports; an incomplete copy remains visible for retry.
+
+### Fixed
+
+- Simultaneous imports with the same project ID no longer overwrite each other in folder-backed storage.
+
+## [0.29.0] - 2026-11-16
+
 ### Added
 
 - **Blocks of the script**: the prompter's Blocks tab gives each sentence of the script what to show over it (empty: the camera); `/blocks` builds them where each sentence is said, and proposes an idea for the empty ones first.
@@ -19,14 +164,20 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 - **Export on the server, in local**: `pnpm renderer` starts the renderer on this machine, and the export panel of `pnpm dev` offers "Export on the server", rendered as the desktop app renders it.
 - **Told when an export on the server is over**: a notification of the system (browser, desktop, phone) when the app is in the background, a message in it otherwise, followed from any page and after a reload; with an account, a mail too, with the way back to the project.
 - **Several commands in one message**: a `/command` can be written anywhere in a message (at its start or after a space), as many as needed; the assistant gets each of them, in the order written. One tool alone at the start keeps its form and runs at once, as before.
+- **Preferences kept with the account**: signed in, the theme, the view, the language and the other preferences are the account's, the same on the web, the desktop and the phone; an account without any takes those of the device it signs in on, and each change is sent back. What belongs to a device (its update checks, its quick launcher, its dictation's source) stays on it.
+- **Export in the cloud from the apps**: signed in, the desktop and phone apps offer "Export in the cloud" and "For Premiere Pro" for the projects of the account, followed and downloaded as on the web.
 
 ### Changed
 
+- The default theme is Liquid Glass, its surfaces bending the picture behind them; a theme already chosen stays.
+- Bringing the projects of a device into the account goes on behind: the dialog closes once they are chosen, the top bar shows how far it is, the end is told, and those that could not be brought can be tried again from there.
+- On a phone, the home screen's sign-in button is its icon alone, the size of the buttons beside it.
 - In the message boxes (the assistant, the studio, the home screen), the commands and tags the project knows are marked where they are written: a `/command` in the accent, an `@tag` in another colour; an unknown one stays plain words.
 
 ### Fixed
 
 - On the home screen, a file's tag replaced the letters "s" of its name instead of its spaces.
+- An export in the cloud failed with "Could not resolve @tramme/interop": the renderer's container now finds every package the render page takes from the editor.
 
 ## [0.28.0] - 2026-11-16
 
@@ -971,7 +1122,19 @@ First public release.
 
 - Cloudflare Worker serving the editor and the API, projects stored in R2, access protected by Cloudflare Access.
 
-[Unreleased]: ../../compare/v0.28.0...HEAD
+[Unreleased]: ../../compare/v0.36.1...HEAD
+[0.36.1]: ../../compare/v0.36.0...v0.36.1
+[0.36.0]: ../../compare/v0.35.1...v0.36.0
+[0.35.1]: ../../compare/v0.35.0...v0.35.1
+[0.35.0]: ../../compare/v0.34.0...v0.35.0
+[0.34.0]: ../../compare/v0.33.0...v0.34.0
+[0.33.0]: ../../compare/v0.32.1...v0.33.0
+[0.32.1]: ../../compare/v0.32.0...v0.32.1
+[0.32.0]: ../../compare/v0.31.0...v0.32.0
+[0.31.0]: ../../compare/v0.30.1...v0.31.0
+[0.30.1]: ../../compare/v0.30.0...v0.30.1
+[0.30.0]: ../../compare/v0.29.0...v0.30.0
+[0.29.0]: ../../compare/v0.28.0...v0.29.0
 [0.28.0]: ../../compare/v0.27.0...v0.28.0
 [0.27.0]: ../../compare/v0.26.1...v0.27.0
 [0.26.1]: ../../compare/v0.26.0...v0.26.1

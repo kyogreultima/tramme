@@ -1,4 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+const sandbox = vi.hoisted(() => ({ calls: [] as unknown[][] }));
+vi.mock('../src/plugins/index.ts', async (load) => ({
+  ...(await load<typeof import('../src/plugins/index.ts')>()),
+  pluginHost: () => ({
+    ensure: async () => new Map(),
+    vector: async (...args: unknown[]) => { sandbox.calls.push(args); return { text: '<svg>from the sandbox</svg>', warnings: [] }; },
+  }),
+}));
 import { newProject } from '@tramme/project';
 import { builtinRegistry } from '@tramme/nodes';
 import { exportInBrowser } from '../src/webexport.ts';
@@ -14,16 +23,22 @@ describe('browser web scene export', () => {
     })).rejects.toThrow(/tramme render/);
   });
 
-  it('refuses isolated vector export before evaluating an expression on the page', async () => {
+  it('converts an isolated vector export in the sandbox, never on the page', async () => {
+    // isolation is the user's choice: their own projects are trusted, as a host application trusts its plugins
+    const was = prefs.peek();
+    prefs.value = { ...was, sandboxPreview: true };
     const doc = newProject({ name: 'Expression', width: 64, height: 64, fps: 1, duration: 1 }).doc;
-    doc.compositions.main.layers.title = { type: 'text', props: { text: { $expr: '"hello"' } }, transform: {} } as never;
+    // run on the page, this expression would write a global
+    doc.compositions.main.layers.title = { type: 'text', props: { text: { $expr: '(globalThis.__pageRan = true, "hello")' } }, transform: {} } as never;
     doc.compositions.main.order = ['title'];
-    const previous = prefs.peek();
-    prefs.value = { ...previous, sandboxPreview: true };
-    try {
-      await expect(exportInBrowser(doc, 'https://tramme.test/project/document.tramme.json', 'svg', {
-        compId: 'main', registry: builtinRegistry(),
-      })).rejects.toThrow(/raster export/);
-    } finally { prefs.value = previous; }
+    vi.stubGlobal('location', new URL('https://tramme.test/project/document.tramme.json'));
+    const result = await exportInBrowser(doc, 'https://tramme.test/project/document.tramme.json', 'svg', {
+      compId: 'main', registry: builtinRegistry(), t: 0.5,
+    });
+    expect(await result.blob.text()).toBe('<svg>from the sandbox</svg>');
+    expect(sandbox.calls).toEqual([['svg', doc, 0.5, 'main', {}]]);
+    expect((globalThis as { __pageRan?: boolean }).__pageRan).toBeUndefined();
+    vi.unstubAllGlobals();
+    prefs.value = was;
   });
 });

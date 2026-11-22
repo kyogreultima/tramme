@@ -18,7 +18,7 @@ import { preview } from './preview.ts';
 import { comp, commit, hooks, load, S, select, setTime, undo } from './state.ts';
 import { measureRhythm } from './critic/rhythm.ts';
 import { transcribeAsset } from './speech.ts';
-import { aiRoute, chat, chatId, loadChats, runTool, watchCompanion } from './ai/index.ts';
+import { aiRoute, callTool, chat, chatId, loadChats, runTool, watchCompanion } from './ai/index.ts';
 import { running, send, stop } from './ai/conversation.ts';
 import { App } from './ui/App.tsx';
 import { Home } from './ui/Home.tsx';
@@ -46,6 +46,7 @@ import './theme/frost.css';
 import './theme/liquid-glass.css';
 import { offerTours } from './tours/index.ts';
 import { resumeRenders } from './ui/CloudRender.tsx';
+import { startPrefsSync } from './prefs-sync.ts';
 import { startProject } from './start.ts';
 import { t } from './i18n/index.ts';
 import { boot } from './mode.ts';
@@ -96,6 +97,12 @@ async function openProject(id: string) {
   lift();
   loadChats(info.files).catch((e) => console.warn('[tramme] conversations :', (e as Error).message)).finally(startProject);
   await preview.start();
+  // a video too heavy for this machine's preview: a proxy offered, once (proxy-offer.ts)
+  const opened = fileProject();
+  setTimeout(() => {
+    const base = new URL(S.docUrl.peek(), location.href);
+    void import('./proxy-auto.ts').then(({ proxiesIfSlow }) => proxiesIfSlow(opened, (asset) => new URL(S.doc.peek().assets[asset].src, base).href)).catch(() => {});
+  }, 2500);
   // the editor's tour, the first time a project opens
   setTimeout(() => offerTours('editor'), 700);
   hooks.afterSave = () => { thumbnail(); };
@@ -104,8 +111,8 @@ async function openProject(id: string) {
   // a handle for measurements and automated checks (tramme bench, bench/run.ts); runTool runs a tool of the / menu, its events returned;
   // send, running, chat and stop drive a turn of the assistant as the message box does; rhythm measures the composition on screen as the critic does
   const rhythm = () => measureRhythm(comp.peek().duration, (t) => preview.thumbnail(t, 480));
-  // transcribe starts a media's transcription as its Transcribe button does (the proofs, scripts/proofs.ts)
-  (window as any).__tramme = { S, preview, select, setTime, undo, commit, runTool, transcribe: transcribeAsset, exportQueue, send, running, chat, chatId, stop, aiRoute, rhythm };
+  // transcribe starts a media's transcription as its Transcribe button does (the proofs, scripts/proofs.ts); callTool runs one of the assistant's own tools as a model calls it
+  (window as any).__tramme = { S, preview, select, setTime, undo, commit, runTool, callTool, transcribe: transcribeAsset, exportQueue, send, running, chat, chatId, stop, aiRoute, rhythm };
 }
 
 const query = new URLSearchParams(location.search);
@@ -162,6 +169,8 @@ boot().then(() => {
   watchUpdates();
   // the exports on the server asked from this browser, followed until they are told over (CloudRender.tsx)
   resumeRenders();
+  // signed in, the preferences are the account's, the same on every device (prefs-sync.ts)
+  startPrefsSync();
   if (m) {
     trackPage(location.pathname);
     openProject(m[1]).catch((e) => {

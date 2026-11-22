@@ -55,4 +55,40 @@ describe('a video layer', () => {
     // the zoom, then the picture moved by 10 % of its width and turned about its centre
     expect(calls).toEqual(['scale 1.1 1.1', 'translate 64 0', 'rotate 0.02', 'scale 1 1', 'translate 0 0', 'draw']);
   });
+
+  it('gets the first frame of its shot decoding before its cut, once', () => {
+    const asked: number[] = [];
+    let decoded = false;
+    const host = {
+      t: 4, layerIn: 4,
+      asset: () => ({ width: 640, height: 360, frameAt: () => ({ image: null, exact: decoded }), request: async (at: number, kind?: string) => { if (kind === 'ahead') asked.push(at); } }),
+    } as unknown as Host;
+    const p = { video: 'clip', start: 12.5, rate: 1, loop: false, loopEnd: 0, size: [640, 360], fit: 'cover', focus: [0.5, 0.5] };
+    video.ahead!(p as never, host);
+    expect(asked).toEqual([12.5]);
+    // already there: nothing more asked
+    decoded = true;
+    video.ahead!(p as never, host);
+    expect(asked).toEqual([12.5]);
+  });
+
+  it('draws a frame shown at half its size or less from its small copy while the preview moves, the frame itself otherwise', () => {
+    const drawn: unknown[] = [];
+    const frame = { frame: true }, small = { small: true };
+    const ctxAt = (k: number) => ({ beginPath() {}, clip() {}, rect() {}, getTransform: () => ({ a: k, b: 0, c: 0, d: k }), drawImage: (img: unknown) => drawn.push(img) }) as unknown as CanvasRenderingContext2D;
+    const sizes: number[][] = [];
+    const hostFor = (quick: boolean) => ({
+      t: 0, layerIn: 0, quick,
+      asset: () => ({ width: 3840, height: 2160, frameAt: () => ({ image: frame, exact: true }), quickPicture: (_: unknown, w: number, h: number) => { sizes.push([w, h]); return small; } }),
+    }) as unknown as Host;
+    const p = { video: 'clip', start: 0, rate: 1, loop: false, loopEnd: 0, size: [1920, 1080], fit: 'cover', focus: [0.5, 0.5] };
+    // a 4K file in a 1080p frame, the preview at half size while it plays: 960 x 540 on screen
+    video.render.canvas2d!(ctxAt(0.5), p as never, hostFor(true));
+    // the same still (or exported): the frame itself
+    video.render.canvas2d!(ctxAt(0.5), p as never, hostFor(false));
+    // zoomed in so it shows at more than half its size: the frame itself
+    video.render.canvas2d!(ctxAt(1.5), p as never, hostFor(true));
+    expect(drawn).toEqual([small, frame, frame]);
+    expect(sizes).toEqual([[960, 540]]);
+  });
 });

@@ -10,7 +10,7 @@ import { PNG } from 'pngjs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { applyOps, detachPlan, validate, type TrammeDoc } from '@tramme/core';
 import { builtinRegistry } from '@tramme/nodes';
-import { CHROME, launch, openDoc } from '../src/browser.ts';
+import { CHROME, isolateProjects, launch, openDoc } from '../src/browser.ts';
 import { readConfig, Server } from '../src/server.ts';
 
 type Pixel = [number, number, number];
@@ -217,10 +217,14 @@ function smoothed(props: Record<string, unknown>) {
 let dir = '', server: Server, close: () => Promise<void>, page: import('puppeteer-core').Page, still: (kind: string, t: number) => Promise<(x: number, y: number) => Pixel>, mix: (kind: string) => Promise<string>;
 
 describe.skipIf(!CHROME)('effects, rendered', () => {
+  let port: number;
   beforeAll(async () => {
     dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tramme-transitions-'));
     for (const k of KINDS) fs.writeFileSync(path.join(dir, `${k}.tramme.json`), JSON.stringify(doc(k)));
     fs.writeFileSync(path.join(dir, 'key.tramme.json'), JSON.stringify(keyed('result')));
+    // a light, empty frame: the watermark's shadow read around it
+    fs.writeFileSync(path.join(dir, 'light.tramme.json'), JSON.stringify({ schema: 'tramme/1', meta: { title: 'light' }, tokens: {}, assets: {}, root: 'main',
+      compositions: { main: { name: 'Main', width: 1280, height: 720, fps: 30, duration: 3, background: '#F0F0F0', order: [], layers: {} } } }));
     fs.writeFileSync(path.join(dir, 'swap.cube'), SWAP_CUBE);
     fs.writeFileSync(path.join(dir, 'tone.wav'), tone());
     fs.writeFileSync(path.join(dir, 'voice-pitch.tramme.json'), JSON.stringify(voiced({ voice: 'pitch', semitones: 12 })));
@@ -251,8 +255,17 @@ describe.skipIf(!CHROME)('effects, rendered', () => {
     // apart, so no frame covers another
     row.compositions.main.layers.row.distribute = { ...row.compositions.main.layers.row.distribute!, layout: { type: 'list', spacing: 130 }, time: { mode: 'rank', amount: 1 } };
     fs.writeFileSync(path.join(dir, 'badges-wave.tramme.json'), JSON.stringify(row));
+    const moving = doc('crossfade');
+    const c = moving.compositions.main;
+    c.motionBlur = { samples: 8, shutter: 1 };
+    c.order = ['a'];
+    Reflect.deleteProperty(c.layers, 'b');
+    Reflect.deleteProperty(c.layers, 'm');
+    c.layers.a.props = { size: [20, 20], fill: '#FF0000' };
+    c.layers.a.transform = { position: { $expr: '[160 + (t - 1) * 1200, 90]' } } as never;
+    fs.writeFileSync(path.join(dir, 'velocity.tramme.json'), JSON.stringify(moving));
     server = new Server(readConfig(path.join(dir, 'crossfade.tramme.json')));
-    const port = await server.start();
+    port = await server.start();
     const launched = await launch();
     const { browser } = launched;
     page = launched.page;
@@ -273,6 +286,38 @@ describe.skipIf(!CHROME)('effects, rendered', () => {
   afterAll(async () => { await close?.(); if (dir) fs.rmSync(dir, { recursive: true, force: true }); }, 60_000);
 
   const near = (a: Pixel, b: Pixel) => a.every((v, i) => Math.abs(v - b[i]) <= 3);
+  it.each([false, true])('blurs moving layers independently of the sample count (isolation: %s)', async (isolated) => {
+    isolateProjects(isolated);
+    try { await openDoc(page, port, '/project/velocity.tramme.json'); }
+    finally { isolateProjects(false); }
+    await page.evaluate(() => (window as any).TRAMME.watermark(false));
+    const url = await page.evaluate(() => (window as any).TRAMME.still(1, { motionBlur: 'velocity' }));
+    const two = await page.evaluate(() => (window as any).TRAMME.still(1, { motionBlur: 'velocity', samples: 2 }));
+    expect(two).toBe(url);
+    const { width, data } = PNG.sync.read(Buffer.from(url.split(',')[1], 'base64'));
+    const red = (x: number, y: number) => data[(y * width + x) * 4];
+    expect(red(140, 90)).toBeGreaterThan(10);
+    expect(red(140, 90)).toBeLessThan(200);
+    expect(red(160, 70)).toBe(0);
+  });
+
+  it('casts the watermark\'s shadow around the logo\'s own shape, not cut square on its sides', async () => {
+    await openDoc(page, port, '/project/light.tramme.json');
+    await page.evaluate(() => (window as any).TRAMME.watermark(true));
+    // the mark alone (closed), then the whole logo (open)
+    for (const t of [0.5, 2.5]) {
+      const url: string = await page.evaluate((x) => (window as any).TRAMME.still(x), t);
+      const { width, data } = PNG.sync.read(Buffer.from(url.split(',')[1], 'base64'));
+      const g = (x: number, y: number) => data[(y * width + x) * 4 + 1];
+      // 1280 × 720: the logo is 32 px high, 25 px from the top left corner; the mark is 30 px wide, the logo 128
+      const right = t < 1 ? 25 + 30 : 25 + 128;
+      // the darkest pixel of a column beside the logo, over its height: the shadow spills past each side
+      const darkest = (x: number) => Math.min(...Array.from({ length: 32 }, (_, i) => g(x, 25 + i)));
+      expect(darkest(22), `left of the logo at ${t} s`).toBeLessThan(0xF0 - 8);
+      expect(darkest(right + 3), `right of the logo at ${t} s`).toBeLessThan(0xF0 - 8);
+    }
+  }, 60_000);
+
   const RED: Pixel = [255, 0, 0], BLUE: Pixel = [0, 0, 255];
 
   it('crossfades linearly and dips through a colour', async () => {
@@ -435,13 +480,8 @@ describe.skipIf(!CHROME)('effects, rendered', () => {
   }, 120_000);
 
   it('draws a distribution: each instance at its place, its colour from the palette', async () => {
-    let sandboxRequests = 0;
-    const onRequest = (request: import('puppeteer-core').HTTPRequest) => { if (new URL(request.url()).pathname === '/project-sandbox.html') sandboxRequests++; };
-    page.on('request', onRequest);
-    let f: Awaited<ReturnType<typeof still>>;
-    try { f = await still('badges-row', 0.5); }
-    finally { page.off('request', onRequest); }
-    expect(sandboxRequests).toBeGreaterThan(0);
+    // its expression (spin) runs on the render page: the command line renders the user's own project
+    const f = await still('badges-row', 0.5);
     expect(near(f(60, 90), RED)).toBe(true);
     expect(near(f(160, 90), [0, 255, 0])).toBe(true);
     expect(near(f(260, 90), BLUE)).toBe(true);

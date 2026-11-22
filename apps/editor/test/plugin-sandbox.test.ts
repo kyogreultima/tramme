@@ -357,6 +357,21 @@ describe('the plugin sandbox', () => {
       }
     } finally { vi.useRealTimers(); }
   });
+  it('lets an export wait for a heavy frame past the preview\'s limit, and still stops a stuck one', async () => {
+    vi.useFakeTimers();
+    try {
+      const { host } = connectHost(() => {}, () => DOC_URL);
+      let settled = false;
+      const frame = host.renderFrame({ compId: 'root', t: 0, scale: 1, width: 10, height: 10 }, { export: true }).catch((e: Error) => { settled = true; throw e; });
+      const rejected = expect(frame).rejects.toThrow('render call timed out after 300 seconds');
+      await vi.advanceTimersByTimeAsync(30_001);
+      expect(settled).toBe(false);
+      expect(host.closed()).toBe(false);
+      await vi.advanceTimersByTimeAsync(270_000);
+      await rejected;
+      expect(host.closed()).toBe(true);
+    } finally { vi.useRealTimers(); }
+  });
   it('tells the page what a plugin declares, without its code', async () => {
     const { host } = pair(new Map([['blob:stars', plugin()]]));
     const decls = await host.ensure([{ id: 'stars', url: 'blob:stars' }]);
@@ -391,6 +406,25 @@ describe('the plugin sandbox', () => {
     expect(out.ops).toHaveLength(1);
     expect(ctx.wrote).toEqual([['assets/stars.json', '{"count":12,"read":"night"}']]);
     expect(progress).toHaveBeenCalledWith(1, 2, 'placing');
+  });
+
+  it("refuses a plugin tool's write to the document, a module or project state, whatever its context grants", async () => {
+    const targets = ['document.tramme.json', 'tramme.json', 'plugins/other.js', 'scenes/intro/index.html', '.tramme/chats/a.json', 'assets/ok.json'];
+    const writer: PluginModule = { tools: [{ name: 'w.write', description: 'writes', async run(_input, ctx: ToolContext) {
+      const outcome: string[] = [];
+      for (const path of targets) { try { await ctx.writeFile(path, 'x'); outcome.push(`ok ${path}`); } catch { outcome.push(`no ${path}`); } }
+      return outcome.join('\n');
+    } }] };
+    const { host } = pair(new Map([['blob:w', writer]]));
+    const reg = new Registry();
+    const { doc: d } = doc();
+    d.assets.w = { type: 'module', src: 'plugins/w.js' };
+    d.plugins = ['w'];
+    // a context that would write anywhere (a grant of declared files, say)
+    await attachIsolated(reg, host, d, () => 'blob:w', (_id, ctx) => ({ ...ctx, writeFile: async (path) => path }));
+    const ctx = toolCtx(d);
+    const out = toolOutput(await reg.tool('w.write').tool.run({}, ctx)).text!.split('\n');
+    expect(out).toEqual([...targets.slice(0, -1).map((p) => `no ${p}`), 'ok assets/ok.json']);
   });
   it('runs each project plugin tool in a worker containing only that plugin', async () => {
     const a: PluginModule = { tools: [{ name: 'a.tool', description: 'A', run: () => 'A' }] };
@@ -590,6 +624,24 @@ describe('the sandboxed drawing', () => {
     } finally { (globalThis as any).self = oldSelf; }
   });
 
+  it('converts an expression-bearing document to SVG and Lottie in the worker', async () => {
+    const oldSelf = (globalThis as any).self;
+    (globalThis as any).self = { fonts: { add() {} } };
+    try {
+      const project = doc().doc;
+      project.compositions[project.root].layers.box = { type: 'shape.rect', props: { size: { $expr: '[30 + 12, 20]' }, fill: '#ff0000' } } as never;
+      project.compositions[project.root].order.push('box');
+      const { host } = pair(new Map(), undefined, (modules) => makeSandboxDraw(modules));
+      const svg = await host.vector('svg', project, 0, project.root, {});
+      expect(svg.text).toContain('<svg');
+      expect(svg.text).toContain('42');
+      const lottie = await host.vector('lottie', project, 0, project.root, {});
+      expect(JSON.parse(lottie.text)).toMatchObject({ layers: expect.any(Array) });
+      await expect(host.vector('pdf' as never, project, 0, project.root, {})).rejects.toThrow('invalid sandbox vector request');
+      await expect(host.vector('svg', project, 0, 'nowhere', {})).rejects.toThrow('unknown sandbox composition');
+    } finally { (globalThis as any).self = oldSelf; }
+  });
+
   it('waits for a supplied font before drawing the first frame', async () => {
     const oldSelf = (globalThis as any).self, oldFace = (globalThis as any).FontFace;
     let finish!: () => void;
@@ -635,6 +687,7 @@ describe('the sandboxed drawing', () => {
           transfer: [bitmap],
         };
       },
+      vector: async () => ({ text: '', warnings: [] }),
       exportOf: async () => ({ err: 'not this test' }),
       evaluateValue: async () => 0,
       evaluateSeries: async () => [[0]],
@@ -662,6 +715,7 @@ describe('the sandboxed drawing', () => {
     const sandbox: SandboxDrawSide = {
       setDoc: () => {},
       draw: async () => ({ results: [] }),
+      vector: async () => ({ text: '', warnings: [] }),
       exportOf: async (type, props) => {
         const mod = plugin();
         const node = type === 'sky.moon' ? mod.nodes![0] : undefined;
@@ -697,6 +751,7 @@ describe('the sandboxed drawing', () => {
     const { host } = pair(new Map([['blob:stars', plugin()]]), undefined, () => ({
       setDoc: () => {},
       draw: async () => ({ results: [] }),
+      vector: async () => ({ text: '', warnings: [] }),
       exportOf: async () => ({}),
       evaluateValue: async () => 0,
       evaluateSeries: async () => [[0]],
@@ -731,6 +786,7 @@ describe('the sandboxed drawing', () => {
     const { host } = pair(new Map([['blob:stars', plugin()]]), undefined, () => ({
       setDoc: () => {},
       draw: async () => ({ results: [] }),
+      vector: async () => ({ text: '', warnings: [] }),
       exportOf: async () => ({}),
       evaluateValue: async () => 0,
       evaluateSeries: async (addresses, times, compId) => {

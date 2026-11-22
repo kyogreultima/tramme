@@ -2,7 +2,14 @@
 // original in memory. Finished blobs are shared weakly between the preview
 // and storyboard; their server version is checked whenever they reopen.
 const LIMIT = 64 * 1024 * 1024;
-const PART = 256 * 1024;
+/**
+ * The bytes one range request asks for. Each request is a round trip: from a
+ * project in the cloud (150 ms away), 256 KB pieces fed a 4K video of 38 Mb/s
+ * at 1.8 frames a second, so the preview stuttered and an export gave up on a
+ * frame. 8 MB pieces (the part the desktop app asks of the cloud, cloud.rs)
+ * decode as fast as with no delay at all, and each response still finishes.
+ */
+export const RANGE_PIECE = 8 * 1024 * 1024;
 const pending = new Map<string, Promise<Blob | null>>();
 const ready = new Map<string, { version: string; size: number; blob: WeakRef<Blob> }>();
 
@@ -25,11 +32,11 @@ async function read(url: string): Promise<Blob | null> {
     const previous = ready.get(url);
     const cached = previous?.blob.deref();
     if (cached && version && previous?.version === version && previous.size === size) return cached;
-    const chunks: ArrayBuffer[] = new Array(Math.ceil(size / PART));
+    const chunks: ArrayBuffer[] = new Array(Math.ceil(size / RANGE_PIECE));
     let next = 0;
     await Promise.all(Array.from({ length: Math.min(4, chunks.length) }, async () => {
       while (next < chunks.length) {
-        const index = next++, from = index * PART, to = Math.min(size, from + PART) - 1;
+        const index = next++, from = index * RANGE_PIECE, to = Math.min(size, from + RANGE_PIECE) - 1;
         const response = await fetch(url, { headers: { range: `bytes=${from}-${to}`, ...(etag ? { 'if-match': etag } : {}) }, signal: abort.signal });
         if (response.status !== 206 || response.headers.get('content-range') !== `bytes ${from}-${to}/${size}`) {
           await response.body?.cancel();

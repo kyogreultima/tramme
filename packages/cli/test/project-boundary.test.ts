@@ -91,6 +91,9 @@ describe.skipIf(!CHROME)('the served project sandbox', () => {
       frame.src = '/project-sandbox.html';
       document.body.append(frame);
       await new Promise<void>((resolve) => frame.addEventListener('load', () => resolve(), { once: true }));
+      const heard: unknown[] = [];
+      const channel = new BroadcastChannel('tramme');
+      channel.onmessage = (event) => heard.push(event.data);
       const answer = new Promise<Record<string, string>>((resolve, reject) => {
         const timer = setTimeout(() => reject(new Error('sandbox did not answer')), 5000);
         addEventListener('message', function onMessage(event) {
@@ -111,12 +114,28 @@ describe.skipIf(!CHROME)('the served project sandbox', () => {
         result.socket = await new Promise(resolve => { try { const socket = new WebSocket(api.replace('http:', 'ws:')); socket.onopen = () => { socket.close(); resolve('reached'); }; socket.onerror = () => resolve('blocked'); } catch (e) { resolve(e.name); } });
         result.eventSource = await new Promise(resolve => { if (typeof EventSource === 'undefined') { resolve('unsupported'); return; } try { const source = new EventSource(api); const timer = setTimeout(() => { source.close(); resolve('blocked'); }, 500); source.onopen = () => { clearTimeout(timer); source.close(); resolve('reached'); }; source.onerror = () => { clearTimeout(timer); source.close(); resolve('blocked'); }; } catch (e) { resolve(e.name); } });
         result.nested = await new Promise(resolve => { const source = 'fetch(' + JSON.stringify(api) + ').then(() => postMessage("reached")).catch(() => postMessage("blocked"))'; const worker = new Worker('data:text/javascript,' + encodeURIComponent(source), { type: 'module' }); worker.onmessage = e => { worker.terminate(); resolve(e.data); }; worker.onerror = () => resolve('blocked'); });
+        result.transport = await new Promise(resolve => { if (typeof WebTransport === 'undefined') { resolve('unsupported'); return; } try { const wt = new WebTransport(api.replace('http:', 'https:')); wt.ready.then(() => resolve('reached'), () => resolve('blocked')); } catch (e) { resolve(e.name); } });
+        result.blobWorker = await new Promise(resolve => { try { const url = URL.createObjectURL(new Blob(['fetch(' + JSON.stringify(api) + ').then(() => postMessage("reached")).catch(() => postMessage("blocked"))'], { type: 'text/javascript' })); const worker = new Worker(url, { type: 'module' }); const timer = setTimeout(() => resolve('blocked'), 1000); worker.onmessage = e => { clearTimeout(timer); worker.terminate(); resolve(e.data); }; worker.onerror = () => { clearTimeout(timer); resolve('blocked'); }; } catch (e) { resolve(e.name); } });
+        result.importScripts = (() => { try { importScripts(api); return 'reached'; } catch (e) { return e.name; } })();
+        result.beacon = typeof navigator.sendBeacon === 'function' ? (navigator.sendBeacon(api, 'x') ? 'reached' : 'blocked') : 'unsupported';
+        result.shared = (() => { try { new SharedWorker('data:text/javascript,' + encodeURIComponent('fetch(' + JSON.stringify(api) + ')')); return 'reached'; } catch (e) { return e.name; } })();
+        result.serviceWorker = (() => { try { return navigator.serviceWorker ? 'reached' : 'unsupported'; } catch (e) { return e.name; } })();
+        result.peer = typeof RTCPeerConnection === 'undefined' ? 'unsupported' : 'reached';
+        result.channel = await new Promise(resolve => { try { const channel = new BroadcastChannel('tramme'); channel.postMessage('probe'); channel.close(); resolve('opaque'); } catch (e) { resolve(e.name); } });
+        result.native = ['__TAURI__', '__TAURI_INTERNALS__', '__TAURI_IPC__', 'ipc', 'chrome', 'webkit', 'require', 'process'].filter(name => name in globalThis).join(',');
         postMessage(result);`;
       frame.contentWindow!.postMessage({ kind: 'start', code }, '*');
-      return answer;
+      const out = await answer;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      channel.close();
+      return { ...out, heard: String(heard.length) } as Record<string, string>;
     });
     expect(results.storage).toBe('SecurityError');
-    for (const key of ['fetch', 'noCors', 'import', 'xhr', 'socket', 'eventSource', 'nested']) expect(results[key]).not.toBe('reached');
+    for (const key of ['fetch', 'noCors', 'import', 'xhr', 'socket', 'eventSource', 'nested', 'transport', 'blobWorker', 'importScripts', 'beacon', 'shared', 'serviceWorker', 'peer']) expect(results[key], key).not.toBe('reached');
+    // a channel of the opaque origin never reaches the editor's
+    expect(results.heard).toBe('0');
+    // no native bridge, Node or Tauri global reaches project code
+    expect(results.native).toBe('');
     expect(privateReads).toBe(0);
   }, 30_000);
 
@@ -287,7 +306,7 @@ describe.skipIf(!CHROME)('the served project sandbox', () => {
     unsafeDoc = JSON.stringify(doc);
     unsafeModuleReads = 0;
     try {
-      await page.goto(`http://127.0.0.1:${port}/__tramme/?doc=/project/unsafe-code.tramme.json`);
+      await page.goto(`http://127.0.0.1:${port}/__tramme/?doc=/project/unsafe-code.tramme.json&isolate=1`);
       const urls = await page.evaluate(async () => { await (window as any).TRAMME.ready; const first = await (window as any).TRAMME.still(0); const second = await (window as any).TRAMME.still(0); return [first, second]; }) as string[];
       for (const url of urls) {
         const png = PNG.sync.read(Buffer.from(url.split(',')[1], 'base64'));
@@ -306,7 +325,7 @@ describe.skipIf(!CHROME)('the served project sandbox', () => {
     unsafeDoc = JSON.stringify(clean);
     unsafeModuleReads = 0;
     try {
-      await page.goto(`http://127.0.0.1:${port}/__tramme/?doc=/project/unsafe-code.tramme.json`);
+      await page.goto(`http://127.0.0.1:${port}/__tramme/?doc=/project/unsafe-code.tramme.json&isolate=1`);
       const reason = await page.evaluate(async (doc) => {
         await (window as any).TRAMME.ready;
         try { await (window as any).TRAMME.load(doc); return 'loaded'; }
@@ -329,7 +348,7 @@ describe.skipIf(!CHROME)('the served project sandbox', () => {
     doc.compositions.main.order = ['model'];
     unsafeDoc = JSON.stringify(doc);
     try {
-      await page.goto(`http://127.0.0.1:${port}/__tramme/?doc=/project/unsafe-code.tramme.json`);
+      await page.goto(`http://127.0.0.1:${port}/__tramme/?doc=/project/unsafe-code.tramme.json&isolate=1`);
       const touched = await page.evaluate(async () => {
         await (window as any).TRAMME.ready;
         return document.body.dataset.executed ?? null;

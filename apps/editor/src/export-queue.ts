@@ -17,6 +17,8 @@ export interface QueuedExport extends ExportJob {
   registry: Registry;
   /** the project's name, for the file */
   project: string;
+  /** the project's id: its web scenes are read from it */
+  projectId?: string;
   samples?: number;
   depth: 8 | 10;
   range?: [number, number];
@@ -31,7 +33,7 @@ export const queueVersion = signal(0);
 export const exportQueue = new ExportQueue<Exported>(async (job, signal, progress) => {
   const j = job as QueuedExport, t0 = performance.now();
   const { exportInBrowser } = await import('./webexport.ts');
-  const r = await exportInBrowser(j.doc, j.base, j.format, { compId: j.compId, registry: j.registry, samples: j.samples, depth: j.depth, range: j.range, t: j.t, signal, onProgress: progress });
+  const r = await exportInBrowser(j.doc, j.base, j.format, { compId: j.compId, registry: j.registry, samples: j.samples, depth: j.depth, range: j.range, t: j.t, projectId: j.projectId, signal, onProgress: progress });
   const stem = safeName(j.project);
   return { blob: r.blob, name: j.format === 'svg' ? `${stem}_${j.t.toFixed(2)}.svg` : `${stem}.${r.ext}`, seconds: (performance.now() - t0) / 1000, warnings: r.warnings };
 });

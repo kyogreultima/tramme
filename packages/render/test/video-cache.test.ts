@@ -19,14 +19,17 @@ function server(initial: Uint8Array) {
 }
 
 it('loads a small preview in bounded parts and shares simultaneous reads', async () => {
-  const data = new Uint8Array(600000);
-  for (let i = 0; i < data.length; i++) data[i] = i % 251;
+  // two whole pieces and a short last one
+  const P = cache.RANGE_PIECE, data = new Uint8Array(2 * P + 1000);
+  // a 251-byte pattern doubled into the whole array (16 MB filled byte by byte is slow on a busy runner)
+  for (let i = 0; i < 251; i++) data[i] = i;
+  for (let n = 251; n < data.length; n *= 2) data.copyWithin(n, 0, Math.min(n, data.length - n));
   const fixture = server(data);
   const [first, second] = await Promise.all([load('https://tramme.test/preview-a.mp4'), load('https://tramme.test/preview-a.mp4')]);
   expect(first).toBe(second);
-  // compared as bytes: a 600 000-element deep equality is slow enough to time out on a busy runner
+  // compared as bytes: a deep equality this long is slow enough to time out on a busy runner
   expect(Buffer.from(await first!.arrayBuffer()).equals(Buffer.from(data))).toBe(true);
-  expect(fixture.ranges).toEqual(['bytes=0-262143', 'bytes=262144-524287', 'bytes=524288-599999']);
+  expect(fixture.ranges).toEqual([`bytes=0-${P - 1}`, `bytes=${P}-${2 * P - 1}`, `bytes=${2 * P}-${2 * P + 999}`]);
 });
 
 it('invalidates a cached preview when its server version changes', async () => {

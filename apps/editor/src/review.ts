@@ -17,7 +17,7 @@ import { prefs } from './settings.ts';
 import { fitLongest } from './model.ts';
 
 /** the longest side of a cell of a sheet or a strip: a portrait frame costs the model what a landscape one does */
-const CELL = 360;
+export const CELL = 360;
 
 /** Numeric motion figures for the strip, evaluated where project code runs. */
 export async function motionReportOf(ctx: ToolContext, from: number, to: number): Promise<MotionReport> {

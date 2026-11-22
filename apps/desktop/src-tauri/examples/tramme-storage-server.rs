@@ -52,7 +52,8 @@ fn handle(stream: &mut TcpStream, store: &RwLock<Store>) -> std::io::Result<()> 
         serde_json::from_slice(&body).unwrap_or(serde_json::Value::Null)
     };
     let get = |k: &str| json.get(k).cloned().unwrap_or(serde_json::Value::Null);
-    let s = store.read().expect("store lock");
+    // Keep conditional writes atomic across the server's request threads.
+    let s = store.write().expect("store lock");
     match route.as_str() {
         "/health" => respond(stream, 200, None, b"ok"),
         "/reset" => {
@@ -78,8 +79,13 @@ fn handle(stream: &mut TcpStream, store: &RwLock<Store>) -> std::io::Result<()> 
         }
         "/put" => {
             let key = param(&params, "key");
+            let if_match = param(&params, "ifMatch");
+            let if_none_match = param(&params, "ifNoneMatch");
             let custom: Option<serde_json::Map<String, serde_json::Value>> =
                 param(&params, "custom").parse::<serde_json::Value>().ok().and_then(|v| v.as_object().cloned());
+            let current = s.raw_head(&key).map(|o| o.etag);
+            let only_if = web_conditions_hold(&if_match, &if_none_match, current.as_deref());
+            if !only_if { return respond(stream, 412, None, b""); }
             match s.raw_put(&key, &body, None, custom.as_ref()) {
                 Ok(Some(o)) => respond(stream, 200, Some(&meta_json(&key, &o, None)), b""),
                 Ok(None) => respond(stream, 412, None, b""),
@@ -144,6 +150,13 @@ fn handle(stream: &mut TcpStream, store: &RwLock<Store>) -> std::io::Result<()> 
         },
         _ => respond(stream, 404, None, b"unknown route"),
     }
+}
+
+fn web_conditions_hold(if_match: &str, if_none_match: &str, etag: Option<&str>) -> bool {
+    let includes = |header: &str, tag: &str| header.split(',').any(|part| part.trim().trim_start_matches("W/") == tag);
+    if !if_match.is_empty() && !etag.is_some_and(|tag| if_match.trim() == "*" || includes(if_match, tag)) { return false; }
+    if !if_none_match.is_empty() && etag.is_some_and(|tag| if_none_match.trim() == "*" || includes(if_none_match, tag)) { return false; }
+    true
 }
 
 fn strings_of(v: &serde_json::Value) -> Vec<String> {

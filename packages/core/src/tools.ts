@@ -60,8 +60,8 @@ export interface ToolContext {
   fileUrl(path: string): string;
   /** writes a file under assets/ (data the tool computed) or a plugin under plugins/ (.js, .mjs) and returns its path; a new file is declared as an asset by the tool's operations */
   writeFile(path: string, data: Blob | string): Promise<string>;
-  /** a still of a composition at time t (pending proposal included), as a JPEG data URL */
-  renderStill(t: number, compId?: string): Promise<string>;
+  /** a still of a composition at time t (pending proposal included), as a JPEG data URL by default */
+  renderStill(t: number, compId?: string, format?: 'image/jpeg' | 'image/png'): Promise<string>;
   /** the transcript of a sound or video asset, or of a transcript asset; when missing, the user is asked to make it (unless ask is false), and it throws when it is not made */
   transcript(assetId: string, opts?: { ask?: boolean }): Promise<Transcript>;
   /** aborted when the user stops the turn: a long analysis should stop too */

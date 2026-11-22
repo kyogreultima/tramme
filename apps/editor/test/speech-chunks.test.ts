@@ -45,3 +45,59 @@ describe('transcribeSamples', () => {
     expect(seen).toEqual([local]);
   });
 });
+
+describe('transcribeUrl-like runs (chunks of a long sound)', () => {
+  const quiet = (n: number) => new Float32Array(n * 16000);
+
+  it('sends the server several chunks at once after the first, and one at a time on this machine', async () => {
+    let now = 0, most = 0;
+    const words = async (_s: Float32Array, _l: string | undefined, backend: string) => {
+      now++; most = Math.max(most, now);
+      await new Promise((r) => setTimeout(r, 5));
+      now--;
+      return { words: [], backend: backend as 'server', language: 'fr' };
+    };
+    await transcribeSamples(quiet(26 * 9 + 2), 'server', { words });
+    expect(most).toBe(4);
+    most = 0;
+    await transcribeSamples(quiet(26 * 9 + 2), 'local', { words });
+    expect(most).toBe(1);
+  });
+
+  it('says where a chunk is heard while it waits there, not where it was first sent', async () => {
+    const { transcribeChunks } = await import('../src/speech.ts');
+    const stages: string[] = [];
+    const words = async (_s: Float32Array, _l: string | undefined, _b: string, _local: unknown, way?: { tell?: (b: 'server' | 'companion') => void }) => {
+      way?.tell?.('server');
+      // the server failed: the companion takes the chunk, and the label says so while it works
+      way?.tell?.('companion');
+      stages.push('heard');
+      return { words: [], backend: 'companion' as const };
+    };
+    await transcribeChunks(10, async (f, t) => quiet(t - f), { backend: 'server', wordsOf: words as never, onProgress: (_d, _t, stage) => stages.push(stage) });
+    const i = stages.indexOf('heard');
+    expect(stages[i - 1]).toBe('speech.localCompanion');
+    expect(stages.at(-1)).toBe('speech.done');
+  });
+
+  it('stops when the user cancels: no chunk is sent after', async () => {
+    const { transcribeChunks } = await import('../src/speech.ts');
+    const stop = new AbortController();
+    let sent = 0;
+    const words = async (_s: Float32Array, _l: string | undefined, backend: string) => { sent++; stop.abort(); return { words: [], backend: backend as 'browser' }; };
+    await expect(transcribeChunks(26 * 5, async (f, t) => quiet(t - f), { backend: 'browser', wordsOf: words as never, signal: stop.signal })).rejects.toThrow();
+    expect(sent).toBe(1);
+  });
+
+  it('discards a single chunk cancelled while the model is working', async () => {
+    const { transcribeChunks } = await import('../src/speech.ts');
+    const stop = new AbortController();
+    const words = async () => {
+      stop.abort();
+      return { words: [{ w: 'discard me', s: 0, e: 1 }], backend: 'browser' as const };
+    };
+    await expect(transcribeChunks(2, async (f, t) => quiet(t - f), {
+      backend: 'browser', wordsOf: words as never, signal: stop.signal,
+    })).rejects.toMatchObject({ name: 'AbortError' });
+  });
+});

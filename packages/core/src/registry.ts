@@ -85,7 +85,21 @@ export interface VideoAsset {
   duration: number;
   hasAudio: boolean;
   frameAt(t: number): { image: CanvasImageSource | null; exact: boolean };
-  request(t: number): Promise<void>;
+  /**
+   * Decodes the frame at t. 'ahead': asked before it is shown (a playback's
+   * next frames, the next shot before its cut), it never takes over the
+   * reader a playback is on; 'side': from outside the picture (the timeline's
+   * thumbnails), on a decoder of its own.
+   */
+  request(t: number, kind?: 'shown' | 'ahead' | 'side'): Promise<void>;
+  /** a picture of `image` (one frameAt gave) at width x height, made quickly on the graphics card; null when it cannot: draw `image` itself */
+  quickPicture?(image: CanvasImageSource, width: number, height: number): CanvasImageSource | null;
+  /**
+   * The size, in canvas pixels, the frame at t lands on: told before it is
+   * drawn (even while it is still missing). A host that carries the frames
+   * elsewhere (the plugins' sandbox) sends them no bigger than that.
+   */
+  drawnAt?(t: number, width: number, height: number): void;
 }
 
 /** what a node sees while it loads or draws */
@@ -101,6 +115,8 @@ export interface Host {
    * a video reads its picture at t − shutter, or two of its frames would blend.
    */
   shutter?: number;
+  /** the picture may be drawn quickly, a little less finely: the preview while it plays or follows a drag (exports and still frames never) */
+  quick?: boolean;
   frame: number;
   fps: number;
   width: number;
@@ -155,6 +171,8 @@ export interface NodeType<P = any> {
   composes?: 'adjust';
   /** once per layer, before the first frame; props evaluated at the layer's in point */
   load?(props: P, host: Host): Promise<void> | void;
+  /** a playback is about to show the layer at host.t (its next frames, or its first one before its in point): bring in what that frame shows, so it does not wait for it */
+  ahead?(props: P, host: Host): void;
   /** outline of the layer in local space: makes it usable as a clip, and selectable in the viewport */
   path?(props: P, host: Host): Path2D | null;
   /**

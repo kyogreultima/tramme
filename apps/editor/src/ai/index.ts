@@ -8,7 +8,7 @@
 
 import { installed, offIn } from '../installed.ts';
 import { computed, signal } from '@preact/signals';
-import { addUsage, claudeModels, defaultClaudeModel, parseApiModels, setClaudeModels, type ClaudeModel, type Usage, CLI_DEFAULT, COMPANION_PORT, companionStart, EFFORTS, effortFor, effortLevels, ENGINE_MODELS, ENGINES, engineOf, LOCAL_URL, modelLabel, modelName, NO_USAGE, pickModel, PROVIDER_LABEL, providerOf, readableModel, REMOTE, setModelLabels, joinSystem, namedTools, queuedPrompt, setTranslator, slotOf, systemParts, userPrompt, withProject, type Effort, type Engine, type TurnContext } from '@tramme/assistant';
+import { addUsage, claudeModels, defaultClaudeModel, parseApiModels, setClaudeModels, type ClaudeModel, type Usage, CLI_DEFAULT, COMPANION_PORT, companionStart, EFFORTS, effortFor, effortLevels, ENGINE_MODELS, ENGINES, engineOf, LOCAL_URL, modelLabel, modelName, NO_USAGE, pickModel, PROVIDER_LABEL, providerOf, readableModel, REMOTE, setModelLabels, joinSystem, namedTools, queuedPrompt, setTranslator, slotOf, systemParts, userPrompt, withProject, type Effort, type Engine, type TurnContext, type ToolResult } from '@tramme/assistant';
 import { CHAT, CHAT_INDEX, chatPath } from '@tramme/project';
 import type { TrammeDoc } from '@tramme/core';
 import reference from '../../../../docs/document.md';
@@ -505,6 +505,11 @@ export async function* runTool(name: string, input: Record<string, unknown>, sig
   else if (runner.notice) yield { type: 'item', item: { id: uid(), role: 'assistant', text: runner.notice } };
   ranAlone.push(`The user ran the tool "${name}" from the / menu with ${JSON.stringify(input)}${r.isError ? ', which failed' : ''}: ${said || 'no message'}`);
   yield { type: 'done' };
+}
+
+/** one of the assistant's own tools run as a model would call it, its events then its result (automated checks: __tramme.callTool) */
+export async function* callTool(name: string, input: Record<string, unknown>, signal?: AbortSignal): AsyncGenerator<AiEvent, ToolResult> {
+  return yield* runCall(runner, name, input, signal);
 }
 
 /** the note that tells the assistant which command the message comes with */

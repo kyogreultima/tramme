@@ -41,6 +41,15 @@ export function containsExpression(value: unknown): boolean {
   return hasExpr(value) || Object.values(value).some(containsExpression);
 }
 
+/**
+ * The document carries code: a module (a plugin, Free code) or an expression.
+ * Such a project is evaluated and drawn in its sandbox, in the editor, the
+ * desktop app and the CLI alike; a project without code has nothing to isolate.
+ */
+export function needsIsolation(doc: TrammeDoc): boolean {
+  return (doc.plugins ?? []).length > 0 || Object.values(doc.assets ?? {}).some((asset) => asset?.type === 'module') || containsExpression(doc);
+}
+
 /** the kinds a plugin module declares to bring, in the order the vocabulary presents them */
 const KINDS = ['nodes', 'effects', 'modifiers', 'tools', 'prompts', 'checks', 'kits', 'presets', 'tours'] as const;
 const EXPORTED_KIND = /export\s+(?:const|let|var)\s+(nodes|effects|modifiers|tools|prompts|checks|kits|presets|tours)\b/g;

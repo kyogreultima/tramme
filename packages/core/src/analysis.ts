@@ -6,6 +6,7 @@
 // every frame stays a function of time.
 
 import { lastIndex } from './math.ts';
+import type { MusicKey } from './tonality.ts';
 
 export interface AudioAnalysis {
   version: 1;
@@ -24,6 +25,8 @@ export interface AudioAnalysis {
   beats: number[];
   /** the first beat of each bar (4 beats) */
   downbeats: number[];
+  /** the detected music key, absent when ambiguous or not yet analysed with tonal detection */
+  key?: MusicKey | null;
   /** where the energy changes for good (verse, chorus, drop), with the loudness that follows */
   sections: { t: number; level: number }[];
   /** the energy of 32 log bands (40 Hz to 16 kHz), sampled at `bandsRate` (every fourth frame of the 50 Hz rate), each band normalised on its own loudest frame — the audiogram's wave reads them; absent from analyses made before 0.14 */

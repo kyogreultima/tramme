@@ -4,8 +4,10 @@
 // validated and proposed like any tool's (ai/tools.ts calls the wrappers the
 // registry carries — plugins/vocabulary.ts puts them there).
 
-import { toolOutput, type CheckContext, type MotionReport, type NodeType, type PlacedLayer, type Quad, type QualityIssue, type SoundCue, type ToolContext, type ToolOutput } from '@tramme/core';
-import type { Ask, ClockSample, DrawPayload, DrawResult, FramePayload, FromWorker, LayerSample, MotionSample, PlacedSample, PluginDecl, SandboxDoc, ToWorker } from './protocol.ts';
+import { readBounded, toolOutput, type CheckContext, type MotionReport, type NodeType, type PlacedLayer, type Quad, type QualityIssue, type SoundCue, type ToolContext, type ToolOutput } from '@tramme/core';
+import type { VectorAnswer, VectorFile, VectorFormat } from './protocol.ts';
+import type { BuildData } from '../build-kit.ts';
+import type { Ask, ClockSample, DrawPayload, DrawResult, FrameAnswer, FramePayload, FromWorker, LayerSample, MotionSample, PlacedSample, PluginDecl, SandboxDoc, ToWorker } from './protocol.ts';
 
 /** the schema of a node without its code: what a check's samples may cross */
 const schemaOf = (n: NodeType) => ({ type: n.type, title: n.title, category: n.category, description: n.description, ai: n.ai, props: n.props, ...(n.container ? { container: true } : {}) });
@@ -36,6 +38,12 @@ const OUTBOUND_LIMIT = 64 * 1024 * 1024;
 /** the values an outbound message may hold: room for a long film's document, bounded so a walk of it stays short */
 const OUTBOUND_COUNT = 4_000_000;
 const GRAPHICS_LIMIT = 256 * 1024 * 1024;
+/** a converted SVG or Lottie file, embedded pictures and fonts included */
+const VECTOR_LIMIT = 64 * 1024 * 1024;
+/** how long an export waits for one frame of the sandbox before taking it as stuck (the preview: 30 s) */
+const EXPORT_FRAME_SECONDS = 300;
+/** the video frames one sandbox frame may ask for (each video layer, at each motion-blur sample) */
+const MAX_VIDEO_NEEDS = 512;
 const canvasSize = (width: number, height: number, scale = 1) => {
   if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 || !Number.isFinite(scale) || scale <= 0) throw new Error('invalid sandbox canvas');
   if (width > 8192 || height > 8192 || width * scale > 8192 || height * scale > 8192) throw new Error('sandbox canvas exceeds 8192 pixels');
@@ -99,30 +107,7 @@ function graphicsTooLarge(value: unknown): boolean {
 }
 
 /** Read only approved bytes; cancel a slow or oversized response before it fills memory. */
-export async function readLimitedBody(response: Response, max: number, label: string): Promise<Uint8Array> {
-  const tooLarge = () => new Error(`${label} exceeds ${max / (1024 * 1024)} MB`);
-  const length = response.headers.get('content-length');
-  if (length && Number(length) > max) { await response.body?.cancel(); throw tooLarge(); }
-  if (!response.body) return new Uint8Array();
-  const reader = response.body.getReader(), chunks: Uint8Array[] = [];
-  let total = 0;
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      total += value.byteLength;
-      if (total > max) throw tooLarge();
-      chunks.push(value);
-    }
-  } catch (error) {
-    await reader.cancel().catch(() => {});
-    throw error;
-  } finally { reader.releaseLock(); }
-  const out = new Uint8Array(total);
-  let offset = 0;
-  for (const chunk of chunks) { out.set(chunk, offset); offset += chunk.byteLength; }
-  return out;
-}
+export const readLimitedBody = readBounded;
 
 export interface PluginHost {
   /**
@@ -135,14 +120,21 @@ export interface PluginHost {
   runTool(name: string, input: unknown, ctx: ToolContext): Promise<ToolOutput>;
   /** run a plugin's check against the page's context */
   runCheck(name: string, ctx: CheckContext): Promise<QualityIssue[]>;
+  /** run a scene builder's script with the kit; resolves with what it built (BuildOutput), rejects with its error */
+  build(code: string, data: BuildData, signal?: AbortSignal): Promise<unknown>;
   /** the document's side of the sandbox (assets, fonts): sent when it changes */
   setDoc(doc: SandboxDoc): void;
   /** draw a frame's sandboxed layers; resolves with one result per item */
   draw(payload: DrawPayload): Promise<DrawResult[]>;
   /** a node's vector export, computed in the sandbox */
   exportOf(type: string, props: unknown): Promise<{ svg?: string; lottie?: unknown; err?: string }>;
-  /** a whole composition evaluated and drawn in the sandbox; one picture comes back */
-  renderFrame(payload: FramePayload): Promise<{ bitmap?: unknown; err?: string }>;
+  /**
+   * A whole composition evaluated and drawn in the sandbox; one picture comes
+   * back, or the video frames it lacks (`need`: drawn again once the page has
+   * decoded them, sandboxFrame). An export waits for a heavy frame (all its
+   * motion-blur samples, pages rendering at once) longer than the preview does.
+   */
+  renderFrame(payload: FramePayload, opts?: { export?: boolean }): Promise<FrameAnswer>;
   /** an evaluated property, computed in the worker */
   evaluateValue(address: string, t: number, compId: string): Promise<unknown>;
   /** values[address][time], sampled together in one isolated evaluator */
@@ -155,6 +147,8 @@ export interface PluginHost {
   sampleQuads(layerId: string, compId: string, times: number[]): Promise<Quad[]>;
   samplePlaced(t: number, compId: string): Promise<PlacedSample[]>;
   qualityChecks(compId: string): Promise<QualityIssue[]>;
+  /** a whole SVG still or Lottie file converted in the sandbox, from approved asset bytes */
+  vector(format: VectorFormat, doc: unknown, t: number, compId: string, files: Record<string, VectorFile>): Promise<VectorAnswer>;
   /** stop: every call waiting is refused, with `reason` when there is one */
   dispose(reason?: string): void;
   /** disposed (its worker stopped): the next project's or call's sandbox is a new one */
@@ -308,12 +302,17 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
     }
     if (m.kind === 'rendered') {
       if (m.err !== undefined && typeof m.err !== 'string') { invalid(); return; }
+      const needs = (list: unknown) => list === undefined || (Array.isArray(list) && list.length <= MAX_VIDEO_NEEDS && list.every((n) => n && typeof n.id === 'string' && n.id.length <= 256 && Number.isFinite(n.t)));
+      if (!needs(m.need) || !needs(m.drew)) { invalid(); return; }
       if (responseTooLarge(m.bitmap) || responseTooLarge(m.err) || graphicsTooLarge(m.bitmap)) { timeout('sandbox response exceeds its data or graphics budget'); return; }
       const w = waits.get(m.call);
       if (!w) return;
       waits.delete(m.call);
       if (m.err) w.reject(new Error(m.err));
-      else w.resolve({ bitmap: m.bitmap });
+      else {
+        const plain = (list: { id: string; t: number }[]) => list.map((n) => ({ id: n.id, t: n.t }));
+        w.resolve(m.need?.length ? { need: plain(m.need) } : { bitmap: m.bitmap, drew: plain(m.drew ?? []) });
+      }
       return;
     }
     if (m.kind === 'evaluated') {
@@ -419,6 +418,18 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
       else w.resolve(m.values);
       return;
     }
+    if (m.kind === 'vectored') {
+      if ((m.err !== undefined && (typeof m.err !== 'string' || m.err.length > 4096)) || (m.text !== undefined && typeof m.text !== 'string') ||
+          (m.warnings !== undefined && (!Array.isArray(m.warnings) || m.warnings.length > 1000 || m.warnings.some((w) => typeof w !== 'string' || w.length > 4096)))) { invalid(); return; }
+      if (responseTooLarge(m.text, VECTOR_LIMIT, 1)) { timeout(`sandbox response exceeds ${VECTOR_LIMIT / (1024 * 1024)} MB`); return; }
+      const w = waits.get(m.call);
+      if (!w) return;
+      waits.delete(m.call);
+      if (m.err) w.reject(new Error(m.err));
+      else if (typeof m.text !== 'string') w.reject(new Error('invalid sandbox vector response'));
+      else w.resolve({ text: m.text, warnings: m.warnings ?? [] });
+      return;
+    }
     if (m.kind === 'progress') {
       if (!Number.isFinite(m.done) || !Number.isFinite(m.total) || (m.step !== undefined && (typeof m.step !== 'string' || m.step.length > 4096))) { invalid(); return; }
       const ctx = bridges.get(m.call);
@@ -447,7 +458,7 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
     else invalid();
   };
 
-  const run = (msg: ToWorker & { call: number }, ctx?: ToolContext | CheckContext, signal?: AbortSignal): Promise<unknown> => {
+  const run = (msg: ToWorker & { call: number }, ctx?: ToolContext | CheckContext, signal?: AbortSignal, patience?: number): Promise<unknown> => {
     if (responseTooLarge(msg, OUTBOUND_LIMIT, OUTBOUND_COUNT)) return Promise.reject(new Error('sandbox message exceeds 64 MB'));
     if (graphicsTooLarge(msg)) return Promise.reject(new Error('sandbox graphics exceed 256 MB'));
     if (waits.size >= 64) return Promise.reject(new Error('too many pending sandbox calls'));
@@ -456,7 +467,7 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
     const stop = () => send({ kind: 'abort', call: c });
     signal?.addEventListener('abort', stop, { once: true });
     return new Promise((resolve, reject) => {
-      const seconds = msg.kind === 'tool' ? 120 : msg.kind === 'check' ? 30 : 30;
+      const seconds = patience ?? (msg.kind === 'tool' ? 120 : 30);
       const timer = setTimeout(() => timeout(`${msg.kind} call timed out after ${seconds} seconds`), seconds * 1000);
       waits.set(c, {
         resolve: (v) => { clearTimeout(timer); signal?.removeEventListener('abort', stop); resolve(v); },
@@ -495,6 +506,10 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
       const out = await run({ kind: 'tool', name, input, call: ++call, ctx: { doc: ctx.doc, compId: ctx.compId, time: ctx.time, selection: ctx.selection, docUrl: docUrl() } }, ctx, ctx.signal);
       return toolOutput(out);
     },
+    build(code, data, signal) {
+      // a script that loops stops the sandbox after this long, as a tool that never answers does
+      return run({ kind: 'build', code, data, call: ++call }, undefined, signal, 30);
+    },
     async runCheck(name, ctx) {
       // the samples cross as plain data: each layer's node becomes its schema
       const samples = ctx.samples.map((s) => ({ ...s, layers: s.layers.map((p: PlacedLayer) => ({ ...p, node: schemaShipped(p.node) })) }));
@@ -514,11 +529,11 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
       const r = await run({ kind: 'export', call: ++call, type, props });
       return (r ?? {}) as { svg?: string; lottie?: unknown; err?: string };
     },
-    async renderFrame(payload) {
+    async renderFrame(payload, opts) {
       try {
         canvasSize(payload.width, payload.height, payload.scale);
-        const r = await run({ kind: 'render', call: ++call, payload });
-        return (r ?? {}) as { bitmap?: unknown; err?: string };
+        const r = await run({ kind: 'render', call: ++call, payload }, undefined, undefined, opts?.export ? EXPORT_FRAME_SECONDS : undefined);
+        return (r ?? {}) as FrameAnswer;
       } finally {
         // the frames shipped were copied by the message: the page's bitmaps are done with
         for (const v of Object.values(payload.videos ?? {})) (v as { close?(): void }).close?.();
@@ -613,6 +628,10 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
           (v.layers !== undefined && (!Array.isArray(v.layers) || v.layers.length > 256 || v.layers.some((id) => typeof id !== 'string' || id.length > 256))) ||
           !validSay(v.say))) throw new Error('invalid sandbox quality response');
       return values;
+    },
+    async vector(format, doc, t, compId, files) {
+      if ((format !== 'svg' && format !== 'lottie') || !Number.isFinite(t) || typeof compId !== 'string' || compId.length > 256) throw new Error('invalid sandbox vector request');
+      return await run({ kind: 'vector', call: ++call, format, doc, t, compId, files }, undefined, undefined, EXPORT_FRAME_SECONDS) as VectorAnswer;
     },
     dispose(reason) {
       const wasOpen = !closed;
