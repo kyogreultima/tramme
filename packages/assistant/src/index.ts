@@ -215,6 +215,28 @@ export const TOOLS: ToolDef[] = [
     label: (i) => t("Rendering the frame at {t} s", { t: Number(i.t).toFixed(2) }),
   },
   {
+    name: 'render_sheet',
+    description: 'Renders several moments of the composition (your proposal included) on one labelled picture: a scene\'s beats, entrances and holds seen in one call instead of a render_still each. The user sees it too.',
+    schema: z.object({
+      times: z.array(z.number().min(0)).min(2).max(12).describe('times in seconds, in the order to show them'),
+      compId: z.string().optional(),
+      caption: z.string().optional().describe('what you are checking, in a few words'),
+    }),
+    label: (i) => t('Rendering {n} frames', { n: Array.isArray(i.times) ? i.times.length : 0 }),
+  },
+  {
+    name: 'build_scene',
+    description: 'Builds a composition from a scene builder: a script at assets/builds/<name>.js whose default export receives the kit k and adds the layers (read_guide builders before the first one). Write the script and build in the same call (content), and change it the same way (edits: every change of a round at once), rather than a write_file then a build. Its layers replace the ones it built last time; the composition\'s other layers (sounds, the user\'s) stay. A layer it built that was changed since by hand or by operations stops the build: bring the change into the script, then overwrite. Adds up to your pending proposal; the answer carries the checks.',
+    schema: z.object({
+      script: z.string().describe('the builder, e.g. assets/builds/opening.js'),
+      content: z.string().optional().describe('the whole script, written before the build'),
+      edits: z.array(z.object({ find: z.string().describe('text copied exactly from the script, which must occur once'), content: z.string().describe('the text that replaces it') })).optional().describe('changes made to the script before the build, in order'),
+      comp: z.string().optional().describe('the composition it builds: by default the one it built last time, else the scene\'s or the one on screen; a new id makes the composition'),
+      overwrite: z.boolean().optional().describe('build even over its layers changed since its last build'),
+    }),
+    label: (i) => t('Building {script}', { script: String(i.script ?? '').replace(/^assets\/builds\//, '') }),
+  },
+  {
     name: 'propose_changes',
     description: 'Proposes changes to the document: JSON Patch operations (RFC 6902) on JSON Pointer paths. They add up to your pending proposal; the whole is validated, then shown to the user, who applies or rejects it.',
     schema: z.object({
@@ -333,6 +355,8 @@ const INSTRUCTIONS = `You are the assistant built into Tramme, a motion design e
 Rules:
 - Every change to the document goes through the propose_changes tool (JSON Patch operations). The user sees your proposal as a preview, then applies or rejects it.
 - propose_changes adds up to your pending proposal (operations chain on the validated document plus your previous operations of this turn). discard_proposal starts over.
+- Build a scene of more than a few animated layers with a scene builder, not with operations: a short script at assets/builds/<scene>.js (read_guide builders before the first) written and built in one build_scene call. The kit writes the keyframes, the entrances, the typing and the ids, and measures text with the project's fonts, so a scene costs one file instead of hundreds of operations; change it with build_scene's edits, every change of a round in one call. Keep propose_changes for small changes, the root, and what a tool places.
+- Look at several moments in one call with render_sheet (a scene's beats, its entrances and holds); render_still for one precise frame.
 - When the request is about "this", "this layer", "here", "now": it means the selection and the current time given in the message context.
 - Check your work: a proposal's answer carries the quality checks of its composition; fix the warnings that matter. Look at the picture (use_tool "check": the contact sheet of the key moments, and the sound) once a scene or a change is built, not after every proposal; the motion tool judges an entrance or a transition, render_still one precise frame. Be thrifty: no more pictures than needed.
 - Direct motion before building: in film-plan, give each important scene timed motion beats (subject, start/end in scene-local seconds, measurable travel and destination, easing, settle time and optional sound cue). Name anticipation, overshoot and reading holds precisely; include camera and light moves when they carry the shot. A single-shot loop needs one kind of picture and loop: true. Read the saved beats before building; review their start, peak and settled result, then make timestamped corrections. The brief wins over stock rules about palette, depth, cut frequency and constant motion.

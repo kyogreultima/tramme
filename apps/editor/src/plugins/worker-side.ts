@@ -6,6 +6,7 @@
 
 import { Registry, type TrammeDoc, type CheckContext, type CheckType, type EffectType, type ModifierType, type MotionReport, type NodeType, type PluginModule, type Quad, type QualityIssue, type SoundCue, type ToolContext, type ToolOutput } from '@tramme/core';
 import type { VectorAnswer, VectorFile, VectorFormat } from './protocol.ts';
+import { estimate, makeKit, type Measure } from '../build-kit.ts';
 import type { Ask, CheckCtxData, ClockSample, DrawPayload, DrawResult, FrameAnswer, FramePayload, FromWorker, LayerSample, MotionSample, PlacedSample, PluginDecl, SandboxDoc, SchemaEffect, SchemaModifier, SchemaNode, ToWorker, ToolCtxData } from './protocol.ts';
 
 /** the sandbox id of an installed plugin (installed:<file>): the project's own plugins have the document's asset ids */
@@ -39,6 +40,28 @@ export interface SandboxDrawSide {
   samplePlaced(t: number, compId: string): Promise<PlacedSample[]>;
   /** a whole SVG still or Lottie file of the document, converted here with the project's modules */
   vector(format: VectorFormat, doc: TrammeDoc, t: number, compId: string, files: Record<string, VectorFile>): Promise<VectorAnswer>;
+  /** settled once the document's fonts are loaded here: a scene builder measures its text with them */
+  fontsReady?(): Promise<void>;
+}
+
+/** the width of a line as the engine draws it, on this side's canvas; the kit's estimate where there is none */
+function canvasMeasure(): Measure {
+  if (typeof OffscreenCanvas === 'undefined') return estimate;
+  const g = new OffscreenCanvas(8, 8).getContext('2d') as OffscreenCanvasRenderingContext2D | null;
+  if (!g) return estimate;
+  return (text, family, size, weight, tracking, italic) => {
+    g.font = `${italic ? 'italic ' : ''}${Math.round(weight)} ${size}px "${family}", sans-serif`;
+    (g as unknown as { letterSpacing: string }).letterSpacing = `${tracking * size}px`;
+    return g.measureText(text).width;
+  };
+}
+
+/** a scene builder's module source as a URL the sandbox imports (its CSP allows data: scripts) */
+function moduleUrl(code: string): string {
+  const bytes = new TextEncoder().encode(code);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return `data:text/javascript;base64,${btoa(bin)}`;
 }
 
 export interface WorkerSideOptions {
@@ -299,6 +322,25 @@ export function startWorkerSide({ post, importModule, sandbox: makeSandbox }: Wo
         void sandbox.vector(m.format, m.doc as TrammeDoc, m.t, m.compId, m.files)
           .then((r) => post({ kind: 'vectored', call: m.call, text: r.text, warnings: r.warnings }))
           .catch((e: Error) => post({ kind: 'vectored', call: m.call, err: e.message }));
+        return;
+      }
+      if (m.kind === 'build') {
+        if (typeof m.code !== 'string' || m.code.length > 512 * 1024 || !m.data || typeof m.data !== 'object' || !m.data.comp) { post({ kind: 'result', call: m.call, err: 'invalid build request' }); return; }
+        void (async () => {
+          try {
+            await sandbox?.fontsReady?.().catch(() => {});
+            const mod = await importModule(moduleUrl(m.code)) as { default?: unknown; build?: unknown };
+            const run = typeof mod.default === 'function' ? mod.default : mod.build;
+            if (typeof run !== 'function') throw new Error('the script exports no function: write export default function (k) { … }');
+            const { kit, finish } = makeKit(m.data, canvasMeasure());
+            await run(kit);
+            // plain data only: a function or a live object left in a layer fails here, not in postMessage
+            post({ kind: 'result', call: m.call, ok: JSON.parse(JSON.stringify(finish())) });
+          } catch (e) {
+            const err = e as Error, where = /<anonymous>:(\d+):(\d+)|base64,[^:]*:(\d+):(\d+)/.exec(err.stack ?? '');
+            post({ kind: 'result', call: m.call, err: `${err.message}${where ? ` (line ${where[1] ?? where[3]})` : ''}` });
+          }
+        })();
         return;
       }
       if (m.kind === 'abort') {

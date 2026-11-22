@@ -5,6 +5,7 @@
 // a context bridged over these messages. Everything that crosses is plain
 // data: live objects (elements, Path2D, functions) stay on their own side.
 
+import type { BuildData } from '../build-kit.ts';
 import type { CheckType, NodeType, EffectType, KitType, ModifierType, PluginMeta, PresetType, PromptType, ToolType, EvaluatedTransform, SoundCue, MediaClock, MotionReport, Quad, QualityIssue } from '@tramme/core';
 
 /** plain evaluated values used by selection geometry; node callbacks stay in the worker */
@@ -196,6 +197,8 @@ export type ToWorker =
   | { kind: 'load'; plugins: { id: string; url: string }[] }
   | { kind: 'tool'; name: string; input: unknown; ctx: ToolCtxData; call: number }
   | { kind: 'check'; name: string; ctx: CheckCtxData; call: number }
+  /** a scene builder's script run with the kit (build-kit.ts); answered by a result holding its BuildOutput */
+  | { kind: 'build'; code: string; data: BuildData; call: number }
   | { kind: 'doc'; doc: SandboxDoc }
   | { kind: 'draw'; call: number; payload: DrawPayload }
   | { kind: 'render'; call: number; payload: FramePayload }

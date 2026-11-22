@@ -392,6 +392,8 @@ export function makeSandboxDraw(modules: Map<string, PluginModule>): SandboxDraw
         for (const frame of Object.values(p.videos ?? {})) (frame as { close?(): void }).close?.();
       }
     },
+    fontsReady: () => fontsReady,
+
     setDoc(d: SandboxDoc) {
       side.doc = d.doc as Record<string, unknown>;
       preparedCode.clear();

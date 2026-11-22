@@ -8,6 +8,12 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+### Added
+
+- The assistant builds a scene from a short script, a scene builder, instead of hundreds of operations. It writes `assets/builds/<name>.js` and runs it with the new `build_scene` tool, in the project's sandbox. The script receives a kit that writes keyframes, entrances, typing and unique ids, and measures text with the project's fonts. To change the scene, the assistant edits the script and builds again. A build replaces only the layers the same script made last time; sounds placed by other tools and layers the user added stay. If a layer the script made was changed by hand since, the build stops and names it. See "Scene builders" in `docs/document.md`.
+- `render_sheet` shows several moments of a composition on one labelled picture, in one call.
+- Scenes built apart are now built with a scene builder.
+
 ## [0.35.1] - 2026-11-20
 
 ### Fixed

@@ -6,6 +6,7 @@
 
 import { readBounded, toolOutput, type CheckContext, type MotionReport, type NodeType, type PlacedLayer, type Quad, type QualityIssue, type SoundCue, type ToolContext, type ToolOutput } from '@tramme/core';
 import type { VectorAnswer, VectorFile, VectorFormat } from './protocol.ts';
+import type { BuildData } from '../build-kit.ts';
 import type { Ask, ClockSample, DrawPayload, DrawResult, FrameAnswer, FramePayload, FromWorker, LayerSample, MotionSample, PlacedSample, PluginDecl, SandboxDoc, ToWorker } from './protocol.ts';
 
 /** the schema of a node without its code: what a check's samples may cross */
@@ -119,6 +120,8 @@ export interface PluginHost {
   runTool(name: string, input: unknown, ctx: ToolContext): Promise<ToolOutput>;
   /** run a plugin's check against the page's context */
   runCheck(name: string, ctx: CheckContext): Promise<QualityIssue[]>;
+  /** run a scene builder's script with the kit; resolves with what it built (BuildOutput), rejects with its error */
+  build(code: string, data: BuildData, signal?: AbortSignal): Promise<unknown>;
   /** the document's side of the sandbox (assets, fonts): sent when it changes */
   setDoc(doc: SandboxDoc): void;
   /** draw a frame's sandboxed layers; resolves with one result per item */
@@ -502,6 +505,10 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
     async runTool(name, input, ctx) {
       const out = await run({ kind: 'tool', name, input, call: ++call, ctx: { doc: ctx.doc, compId: ctx.compId, time: ctx.time, selection: ctx.selection, docUrl: docUrl() } }, ctx, ctx.signal);
       return toolOutput(out);
+    },
+    build(code, data, signal) {
+      // a script that loops stops the sandbox after this long, as a tool that never answers does
+      return run({ kind: 'build', code, data, call: ++call }, undefined, signal, 30);
     },
     async runCheck(name, ctx) {
       // the samples cross as plain data: each layer's node becomes its schema
