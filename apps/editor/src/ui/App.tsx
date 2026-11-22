@@ -30,7 +30,8 @@ function Atelier() {
   return (
     <div class="app" data-tab={S.mobileTab.value}>
       <TopBar />
-      <div class="workspace" style={{ gridTemplateColumns: `${leftW}px var(--gutter) minmax(0, 1fr) var(--gutter) ${rightW}px` }}>
+      {/* the viewport and the timeline keep 480 px when the screen has them: the side panels give way, down to their least */}
+      <div class="workspace" style={{ gridTemplateColumns: `minmax(180px, ${leftW}px) var(--gutter) minmax(min(480px, calc(100% - 440px - 6 * var(--gutter))), 1fr) var(--gutter) minmax(260px, ${rightW}px)` }}>
         <aside class="col left panel" data-tour="left-panel"><LeftPanel /></aside>
         <div class="resizer v" title={t('app.dragToResize')} {...leftHandle('x', 1)} />
         <main class="center">

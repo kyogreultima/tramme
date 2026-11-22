@@ -46,26 +46,31 @@ const logoImage = () => (picture ??= (async () => {
  */
 export async function watermarkStamp(w: number, h: number): Promise<(t: number) => HTMLCanvasElement> {
   const img = await logoImage(), c = Object.assign(document.createElement('canvas'), { width: w, height: h }), g = c.getContext('2d')!;
+  // the logo as open as it is, without its shadow: a clip cuts a shadow drawn through it, so the shadow is cast after, from this shape
+  const whole = watermarkBox(w, h, 1);
+  const shape = Object.assign(document.createElement('canvas'), { width: Math.ceil(whole.full), height: whole.h }), s = shape.getContext('2d')!;
   let drawn = -1;
   return (t) => {
     const p = watermarkOpening(t);
     if (p === drawn) return c;
     drawn = p;
     const b = watermarkBox(w, h, p);
-    g.clearRect(0, 0, w, h);
-    g.shadowColor = 'rgba(0, 0, 0, 0.45)';
-    g.shadowBlur = Math.max(2, b.h * 0.25);
+    s.clearRect(0, 0, shape.width, shape.height);
     // the mark, then the word as far as it has opened, fading in with it
     for (const [from, to, alpha] of [[0, b.mark, 0.85], [b.mark, b.w, 0.85 * p]] as const) {
       if (to <= from || alpha <= 0) continue;
-      g.save();
-      g.beginPath();
-      g.rect(b.x + from, b.y - b.h, to - from, b.h * 3);
-      g.clip();
-      g.globalAlpha = alpha;
-      g.drawImage(img, b.x, b.y, b.full, b.h);
-      g.restore();
+      s.save();
+      s.beginPath();
+      s.rect(from, 0, to - from, b.h);
+      s.clip();
+      s.globalAlpha = alpha;
+      s.drawImage(img, 0, 0, b.full, b.h);
+      s.restore();
     }
+    g.clearRect(0, 0, w, h);
+    g.shadowColor = 'rgba(0, 0, 0, 0.45)';
+    g.shadowBlur = Math.max(2, b.h * 0.25);
+    g.drawImage(shape, b.x, b.y);
     return c;
   };
 }

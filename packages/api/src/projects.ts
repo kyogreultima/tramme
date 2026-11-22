@@ -247,7 +247,8 @@ export async function getFile(bucket: Bucket, id: string, path: string, req: Req
   const headers = new Headers({
     'content-type': mimeOf(path),
     etag: obj.httpEtag,
-    'cache-control': 'no-cache',
+    // an address that names its version (?v=, the home page's thumbnails) is kept by the browser: a new version is a new address
+    'cache-control': new URL(req.url).searchParams.has('v') ? 'private, max-age=31536000, immutable' : 'no-cache',
     'accept-ranges': 'bytes',
     'x-content-type-options': 'nosniff',
     // a file opened on its own (an SVG, a page) runs nothing

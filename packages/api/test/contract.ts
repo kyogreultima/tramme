@@ -71,6 +71,15 @@ export function storageContract(name: string, makeBucket: () => Bucket) {
       expect((await call(path, { headers: { 'if-none-match': now } })).status).toBe(304);
     });
 
+    it('lets the browser keep a file whose address names its version, and asks again for one that does not', async () => {
+      const { call, create } = setup();
+      const m = await create();
+      const path = `/api/projects/${m.id}/files/assets/notes.json`;
+      await call(path, { method: 'PUT', body: 'one' });
+      expect((await call(path)).headers.get('cache-control')).toBe('no-cache');
+      expect((await call(`${path}?v=2026-11-22T10%3A00%3A00Z`)).headers.get('cache-control')).toBe('private, max-age=31536000, immutable');
+    });
+
     it('stores and reads the editor version index and snapshots', async () => {
       const { call, create } = setup();
       const m = await create();

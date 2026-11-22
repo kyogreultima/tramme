@@ -16,7 +16,7 @@ import { ago } from '../model.ts';
 import { Icon } from './icons.tsx';
 import { Access, CompanionCommand, Lightbox, useStatusWatch } from './chat.tsx';
 import { Composer, join } from './composer.tsx';
-import { Popover, Seg } from './controls.tsx';
+import { Popover, Seg, useFit } from './controls.tsx';
 import { LogoMark } from './Logo.tsx';
 import { Thread } from './thread.tsx';
 import { m, t } from '../i18n/index.ts';
@@ -133,6 +133,8 @@ export function Assistant({ style }: { style?: Record<string, string | number> }
   useStatusWatch();
   const ctx = contextLine(true);
   const [dropping, setDropping] = useState(false);
+  // a narrow panel drops the head's title, then the route, before its tools (atelier.css)
+  const head = useFit<HTMLDivElement>(4);
   const empty = (
     <div class="notes-empty">
       <div class="notes-empty-mark"><LogoMark /></div>
@@ -153,7 +155,7 @@ export function Assistant({ style }: { style?: Record<string, string | number> }
       onDragOver={(e) => { if (available && e.dataTransfer?.types.includes('Files')) { e.preventDefault(); setDropping(true); } }}
       onDragLeave={(e) => { if (e.target === e.currentTarget) setDropping(false); }}
       onDrop={(e) => { if (!e.dataTransfer?.files.length) return; e.preventDefault(); e.stopPropagation(); setDropping(false); join(e.dataTransfer.files); }}>
-      <div class="panel-head">
+      <div class="panel-head" ref={head}>
         <span class="mark"><LogoMark /></span>
         <span class="title">{t('common.assistant')}</span>
         <span class="grow" />

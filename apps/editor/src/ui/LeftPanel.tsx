@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { addLayer, applyOps, isLocked, layerActive, moveLayer, pointer, propKind, removeLayer, staticValue, type Asset, type KeyframedProp, type Prop, type StaticProp, type Vec2, type TrammeDoc, type Layer, type NodeType, type Op, type PresetType, type TokenType } from '@tramme/core';
 import { clickSelect, comp, commit, foldAll, S, select, toggleFold, viewDoc, toast, uiTime } from '../state.ts';
 import { fitCompOps, flatTree, freshId, layerName, shiftProp, parentOf, SOUND_GROUP, soundGroupOf, subtree, topLayers, commonStem, folderOf, imagesIn, wholeFile } from '../model.ts';
-import { ColorField, longPress, menuMatches, openMenu, phoneLayout, Seg, Swatch, TextInput, resolveColor, type MenuEntry, type MenuItem } from './controls.tsx';
+import { ColorField, longPress, menuMatches, openMenu, phoneLayout, Seg, Swatch, useFit, TextInput, resolveColor, type MenuEntry, type MenuItem } from './controls.tsx';
 import { Icon, kindColor, kindIcon } from './icons.tsx';
 import { ASSET_MIME, chosenAsset, COMP_MIME, sourceOpen } from './timeline/assets-drag.ts';
 import { newSequenceFromAsset } from './timeline/place.ts';
@@ -916,14 +916,16 @@ export function FoldButtons() {
 
 export function LeftPanel() {
   const current = tab.value;
+  // a narrow panel keeps the tabs' icons alone rather than pushing the + out (atelier.css, "left-head")
+  const head = useFit<HTMLDivElement>(3);
   return (
     <>
-      <div class="panel-head">
+      <div class="panel-head left-head" ref={head}>
         <Seg value={current} role="tablist"
           options={[
-            { value: 'layers', label: t('common.layers'), tour: 'left-tab-layers' },
-            { value: 'assets', label: t('panel.assets'), tour: 'left-tab-assets' },
-            { value: 'tokens', label: t('panel.tokens'), tour: 'left-tab-tokens' },
+            { value: 'layers', label: t('common.layers'), icon: 'layers', tour: 'left-tab-layers' },
+            { value: 'assets', label: t('panel.assets'), icon: 'folder', tour: 'left-tab-assets' },
+            { value: 'tokens', label: t('panel.tokens'), icon: 'palette', tour: 'left-tab-tokens' },
           ]}
           onChange={(v) => { tab.value = v as 'layers' | 'assets' | 'tokens'; }} />
         <span class="grow" />

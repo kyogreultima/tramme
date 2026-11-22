@@ -10,6 +10,7 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { Manifest } from '@tramme/project';
 import { api, ApiError } from '../api.ts';
+import { lastProjects } from '../project-list.ts';
 import { saveBlob } from '../download.ts';
 import { safeName } from '../files.ts';
 import { ago } from '../model.ts';
@@ -292,7 +293,8 @@ export function DirectionBox({ busy, onStart }: { busy: boolean; onStart: (words
 }
 
 export function Home() {
-  const [projects, setProjects] = useState<Manifest[] | null>(null);
+  // the list this device last saw, drawn at once; the one asked below replaces it when it answers
+  const [projects, setProjects] = useState<Manifest[] | null>(lastProjects);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [examples, setExamples] = useState<Example[]>([]);
   const [dialog, setDialog] = useState<null | { kind: 'new' } | { kind: 'rename' | 'remove'; m: Manifest } | { kind: 'failure'; error: Error }>(null);

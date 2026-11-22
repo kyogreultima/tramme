@@ -222,6 +222,9 @@ describe.skipIf(!CHROME)('effects, rendered', () => {
     dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tramme-transitions-'));
     for (const k of KINDS) fs.writeFileSync(path.join(dir, `${k}.tramme.json`), JSON.stringify(doc(k)));
     fs.writeFileSync(path.join(dir, 'key.tramme.json'), JSON.stringify(keyed('result')));
+    // a light, empty frame: the watermark's shadow read around it
+    fs.writeFileSync(path.join(dir, 'light.tramme.json'), JSON.stringify({ schema: 'tramme/1', meta: { title: 'light' }, tokens: {}, assets: {}, root: 'main',
+      compositions: { main: { name: 'Main', width: 1280, height: 720, fps: 30, duration: 3, background: '#F0F0F0', order: [], layers: {} } } }));
     fs.writeFileSync(path.join(dir, 'swap.cube'), SWAP_CUBE);
     fs.writeFileSync(path.join(dir, 'tone.wav'), tone());
     fs.writeFileSync(path.join(dir, 'voice-pitch.tramme.json'), JSON.stringify(voiced({ voice: 'pitch', semitones: 12 })));
@@ -297,6 +300,23 @@ describe.skipIf(!CHROME)('effects, rendered', () => {
     expect(red(140, 90)).toBeLessThan(200);
     expect(red(160, 70)).toBe(0);
   });
+
+  it('casts the watermark\'s shadow around the logo\'s own shape, not cut square on its sides', async () => {
+    await openDoc(page, port, '/project/light.tramme.json');
+    await page.evaluate(() => (window as any).TRAMME.watermark(true));
+    // the mark alone (closed), then the whole logo (open)
+    for (const t of [0.5, 2.5]) {
+      const url: string = await page.evaluate((x) => (window as any).TRAMME.still(x), t);
+      const { width, data } = PNG.sync.read(Buffer.from(url.split(',')[1], 'base64'));
+      const g = (x: number, y: number) => data[(y * width + x) * 4 + 1];
+      // 1280 × 720: the logo is 32 px high, 25 px from the top left corner; the mark is 30 px wide, the logo 128
+      const right = t < 1 ? 25 + 30 : 25 + 128;
+      // the darkest pixel of a column beside the logo, over its height: the shadow spills past each side
+      const darkest = (x: number) => Math.min(...Array.from({ length: 32 }, (_, i) => g(x, 25 + i)));
+      expect(darkest(22), `left of the logo at ${t} s`).toBeLessThan(0xF0 - 8);
+      expect(darkest(right + 3), `right of the logo at ${t} s`).toBeLessThan(0xF0 - 8);
+    }
+  }, 60_000);
 
   const RED: Pixel = [255, 0, 0], BLUE: Pixel = [0, 0, 255];
 

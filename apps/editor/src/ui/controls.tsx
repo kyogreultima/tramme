@@ -504,8 +504,43 @@ export function ColorField({ value, tokens, onCommit, onDraft, onPick }: { value
   );
 }
 
+// ── bars that fit their width ────────────────────────────────
+/**
+ * A bar whose items never run past its edge: while its content is wider than it,
+ * it takes the next of its `levels`, and `data-fit` lists those taken ("1 2 …");
+ * its CSS hides or tightens items by `[data-fit~="n"]`, the least useful first.
+ * The widths that matter are the bar's own (the side panels set it, not the
+ * screen), its items' (a tab added, a longer translation) and none other: it is
+ * measured again when one of them changes, never on a timer. The last level
+ * should let the bar scroll, so that whatever is left stays within reach.
+ */
+export function useFit<T extends HTMLElement>(levels: number) {
+  const ref = useRef<T>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    let frame = 0;
+    const fit = () => {
+      frame = 0;
+      el.removeAttribute('data-fit');
+      for (let n = 1; n <= levels && el.scrollWidth > el.clientWidth + 1; n++) el.dataset.fit = Array.from({ length: n }, (_, i) => i + 1).join(' ');
+    };
+    // measured once per frame at most, after the change that asked for it
+    const later = () => { if (!frame) frame = requestAnimationFrame(fit); };
+    const sizes = new ResizeObserver(later);
+    const watch = () => { sizes.disconnect(); sizes.observe(el); for (const c of Array.from(el.children)) sizes.observe(c); later(); };
+    // an item added or removed (a tab, the recording state): its width counts
+    const items = new MutationObserver(watch);
+    items.observe(el, { childList: true });
+    watch();
+    fit();
+    return () => { sizes.disconnect(); items.disconnect(); if (frame) cancelAnimationFrame(frame); };
+  }, [levels]);
+  return ref;
+}
+
 // ── resizable panes ──────────────────────────────────────────
-const stored = (key: string, d: number) => { try { const v = Number(localStorage.getItem('tramme.' + key)); return v > 0 ? v : d; } catch { return d; } };
+const stored =(key: string, d: number) => { try { const v = Number(localStorage.getItem('tramme.' + key)); return v > 0 ? v : d; } catch { return d; } };
 
 /** a size in px persisted per viewer, and the handle that changes it */
 export function useSize(key: string, initial: number, min: number, max: number) {

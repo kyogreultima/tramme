@@ -9,7 +9,7 @@ import { useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { chapterList, chaptersOf, cutsOf, isLocked, layerActive, pointer, rippleTrimOps, rollOps, slideOps, slipOps, staticValue, toSequenceOps, type Composition, type Keyframe, type Layer, type Op, type SequenceTrack } from '@tramme/core';
 import { clickSelect, comp, commit, draft, cancelDraft, S, select, selectAll, setTime, frameStep, toast, toggleFold, uiTime, viewDoc } from '../state.ts';
 import { animatedProps, contentEnd, crossfadeOps, flatTree, freshId, keysOf, layerName, parentOf, parseTime, propPath, rawProp, rulerLabel, shiftLayerOps, snap, splitLayerOps, subtree, timecode, topLayers, trimInOps, type TreeItem } from '../model.ts';
-import { bandOf, longPress, noBrowserMenu, openMenu, Popover, Seg, useSize } from './controls.tsx';
+import { bandOf, longPress, noBrowserMenu, openMenu, Popover, Seg, useFit, useSize } from './controls.tsx';
 import { VoiceoverPanel } from './VoiceoverPanel.tsx';
 import { Icon, kindColor, kindIcon } from './icons.tsx';
 import { assetData, fileLength, preview } from '../preview.ts';
@@ -62,8 +62,10 @@ export function Transport() {
   const [voiceover, setVoiceover] = useState<HTMLElement | null>(null);
   const frames = Math.round(c.duration * c.fps);
   const tab = S.bottomTab.value;
+  // the bar drops its least useful items while it is too narrow (atelier.css, "transport")
+  const bar = useFit<HTMLDivElement>(9);
   return (
-    <div class="transport" data-tour="transport" onContextMenu={noBrowserMenu}>
+    <div class="transport" ref={bar} data-tour="transport" onContextMenu={noBrowserMenu}>
       <div class="controls">
         <button class="icon-btn" data-step="start" title={t('timeline.startHome')} onClick={() => setTime(0)}><Icon name="start" /></button>
         <button class="icon-btn" title={t('timeline.previousFrame')} onClick={() => frameStep(-1)}><Icon name="prev" /></button>

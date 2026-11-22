@@ -201,28 +201,44 @@
 .transport { white-space: nowrap; }
 .transport > :not(.grow) { flex: none; }
 .transport .grow { flex: 1; }
-/* the side panels set the bar's width, not the screen: the least useful items go first */
-@container (max-width: 880px) { .transport .render-ms { display: none; } }
-@container (max-width: 800px) {
-  .transport .total .fps { display: none; }
-  .transport .tl-zoom input[type=range] { width: 60px; }
-}
-@container (max-width: 720px) { .transport .tl-zoom { display: none; } }
-@container (max-width: 640px) {
-  .transport { gap: 4px; padding: 0 6px; }
-  .transport .total { display: none; }
-  .transport .controls .icon-btn:not(.play) { width: 26px; }
-  .timecode input { width: 92px; font-size: var(--fs-md); }
-  .transport .seg button { padding: 0 6px; }
-  .transport .seg button svg.i { display: none; }
-}
-/* a phone: first and last frame go (the timecode reaches them), the tabs keep their icons alone */
-@container (max-width: 480px) {
-  .transport .controls .icon-btn:is([data-step="start"], [data-step="end"]) { display: none; }
-  .transport .seg button svg.i { display: block; }
-  .transport .seg .seg-label { display: none; }
-  .transport .seg button { padding: 0 9px; }
-}
+/* the side panels set the bar's width, not the screen: while its items run past its edge, it takes the
+   next level (useFit, data-fit), the least useful items first; the last one scrolls what is left */
+.transport[data-fit~="1"] .render-ms { display: none; }
+.transport[data-fit~="2"] .total .fps { display: none; }
+.transport[data-fit~="3"] .total { display: none; }
+.transport[data-fit~="4"] .tl-zoom input[type=range] { width: 60px; }
+.transport[data-fit~="5"] { gap: 4px; padding: 0 6px; }
+.transport[data-fit~="5"] .controls .icon-btn:not(.play) { width: 26px; }
+.transport[data-fit~="5"] .timecode input { width: 92px; font-size: var(--fs-md); }
+.transport[data-fit~="5"] .seg button { padding: 0 6px; }
+.transport[data-fit~="5"] .seg button svg.i { display: none; }
+/* the tabs keep their icons alone */
+.transport[data-fit~="6"] .seg button svg.i { display: block; }
+.transport[data-fit~="6"] .seg .seg-label { display: none; }
+.transport[data-fit~="6"] .seg button { padding: 0 9px; }
+/* the zoom stays on Ctrl and the wheel; first and last frame on the timecode */
+.transport[data-fit~="7"] .tl-zoom { display: none; }
+.transport[data-fit~="8"] .controls .icon-btn:is([data-step="start"], [data-step="end"]) { display: none; }
+.transport[data-fit~="9"] { overflow-x: auto; scrollbar-width: thin; }
+
+/* the left panel's tabs and its +: the labels while they fit, then the icons alone (useFit) */
+.left-head > :not(.grow) { flex: none; }
+.left-head .seg button svg.i { display: none; }
+.left-head[data-fit~="1"] { gap: 4px; padding: 0 4px 0 8px; }
+.left-head[data-fit~="1"] .seg button { padding: 0 8px; }
+.left-head[data-fit~="2"] .seg button svg.i { display: block; }
+.left-head[data-fit~="2"] .seg .seg-label { display: none; }
+.left-head[data-fit~="2"] .seg button { padding: 0 10px; }
+.left-head[data-fit~="3"] { overflow-x: auto; scrollbar-width: thin; }
+
+/* the assistant's head: its title, then where it runs, go before its tools (useFit) */
+.assistant > .panel-head { white-space: nowrap; }
+.assistant > .panel-head > :not(.grow, .model-pick) { flex: none; }
+.assistant > .panel-head .model-pick { min-width: 76px; }
+.assistant > .panel-head[data-fit~="1"] .title { display: none; }
+.assistant > .panel-head[data-fit~="2"] .route { display: none; }
+.assistant > .panel-head[data-fit~="3"] { gap: 2px; padding: 0 4px 0 8px; }
+.assistant > .panel-head[data-fit~="4"] { overflow-x: auto; scrollbar-width: thin; }
 
 /* the zoom slider: a pill track and a round thumb */
 .tl-zoom { display: flex; align-items: center; gap: 4px; }
@@ -459,6 +475,22 @@
 .section-head .grow { flex: 1; }
 .section-body { padding: 0 14px 12px; display: flex; flex-direction: column; gap: 4px; }
 .prop { display: grid; grid-template-columns: 18px minmax(64px, 92px) minmax(0, 1fr) 22px; align-items: center; gap: 8px; min-height: 32px; }
+/* a narrow inspector: the labels' column and the fields' margins give their room to the values, so a pair
+   (W and H, X and Y) still shows four digits and more; the axis letters go last (the label drags too) */
+.inspector-wrap { container: inspector / inline-size; }
+@container inspector (max-width: 340px) {
+  .prop { gap: 6px; grid-template-columns: 18px minmax(52px, 72px) minmax(0, 1fr) 22px; }
+  .prop .pvalue { gap: 4px; }
+  .prop .pvalue .field { padding: 0 7px; gap: 4px; }
+  .mod-param { grid-template-columns: 72px minmax(0, 1fr); }
+}
+@container inspector (max-width: 290px) {
+  .prop { grid-template-columns: 18px minmax(44px, 56px) minmax(0, 1fr) 22px; }
+  .prop .pvalue .field { padding: 0 4px; }
+  .prop .pvalue > .icon-btn.sm { width: 22px; }
+  .prop .pvalue .field .axis { display: none; }
+  .mod-param { grid-template-columns: 64px minmax(0, 1fr); }
+}
 .prop .plabel { color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-sm); cursor: ew-resize; }
 .prop .plabel.static { cursor: default; }
 .prop.keyed .plabel { color: var(--key); }
