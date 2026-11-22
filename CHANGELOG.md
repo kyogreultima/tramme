@@ -8,6 +8,19 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+## [0.36.1] - 2026-11-22
+
+### Changed
+
+- Back from a project, the home page shows the projects at once, as this device last listed them, then updates the list when the server answers. The list is forgotten at each sign-in and sign-out. The thumbnails stay in the browser's cache instead of being asked again on each visit.
+
+### Fixed
+
+- The watermark's shadow follows the shape of the logo. It was cut straight on its left and right sides, like a box.
+- On a small screen or with wide side panels, the bars no longer cut their last items. The timeline's bar, the tabs of the left panel with their +, and the head of the assistant drop their least useful items first, then keep their icons alone. The viewport and the timeline keep at least 480 px, and the side panels give way.
+- In a narrow inspector, pairs of values (W and H, X and Y), colours and lists show their whole value.
+- A page that does not leave after being asked to, for example to open your space from a project, no longer stays hidden behind the loading screen.
+
 ## [0.36.0] - 2026-11-22
 
 ### Added
@@ -1109,7 +1122,8 @@ First public release.
 
 - Cloudflare Worker serving the editor and the API, projects stored in R2, access protected by Cloudflare Access.
 
-[Unreleased]: ../../compare/v0.36.0...HEAD
+[Unreleased]: ../../compare/v0.36.1...HEAD
+[0.36.1]: ../../compare/v0.36.0...v0.36.1
 [0.36.0]: ../../compare/v0.35.1...v0.36.0
 [0.35.1]: ../../compare/v0.35.0...v0.35.1
 [0.35.0]: ../../compare/v0.34.0...v0.35.0
