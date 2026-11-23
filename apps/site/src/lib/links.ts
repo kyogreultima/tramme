@@ -1,10 +1,12 @@
 // Where the site and the app are, for the environment this runs in (local, beta,
 // production): brand/environments.ts. A dev server means local, a build
-// production, TRAMME_ENV says otherwise.
+// production, TRAMME_ENV says otherwise. Chosen once, when the site is built or
+// its dev server starts (astro.config.mjs writes them as __ORIGINS__): the pages
+// rendered when asked run in a Worker, which knows neither TRAMME_ENV nor `dev`.
 import { originsFromEnv } from '../../../../brand/environments';
 
 const running = typeof process !== 'undefined';
-export const ORIGINS = originsFromEnv(running ? process.env : {}, running && process.argv.includes('dev'));
+export const ORIGINS = typeof __ORIGINS__ !== 'undefined' ? __ORIGINS__ : originsFromEnv(running ? process.env : {}, running && process.argv.includes('dev'));
 
 /** Qualris, who publishes Tramme: its production site (the beta is beta.qualris.com) */
 export const QUALRIS = 'https://qualris.com';

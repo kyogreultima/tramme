@@ -1,8 +1,9 @@
 {
   "$schema": "../../node_modules/wrangler/config-schema.json",
   // The project's site (apps/site): an Astro build with the Cloudflare adapter
-  // (landing, platform pages, Starlight docs). Every page is prerendered today and
-  // served as static assets; the adapter writes the deployed configuration to
+  // (landing, platform pages, Starlight docs). The pages are prerendered and served
+  // as static assets, but the gallery's (/explore/, /p/<id>/, the landing's
+  // community island), rendered by the Worker from the app's gallery; the adapter writes the deployed configuration to
   // dist/client/wrangler.json and .wrangler/deploy/config.json, which `wrangler deploy`
   // follows when run from this folder: pnpm site:deploy (build, then deploy).
   // See docs/deploy.md for the editor Worker.

@@ -5,7 +5,6 @@ Each video slot on the page (`components/Media.astro`) shows a placeholder until
 | Slot | Files | Size |
 |---|---|---|
 | hero | `tramme.webm` and/or `tramme.mp4`, `tramme.webp` | 1920×1080 |
-| examples | `launch-film`, `anime`, `showreel` (same extensions) | the example's own |
 | assistant | `assistant.webm` and/or `assistant.mp4`, `assistant.webp` | 1600×1000 (16:10) |
 | proofs (features page, `lib/proofs.ts`) | `proof-<id>.webm` and/or `.mp4`, `.webp`; its two stills in `assets/proofs/` | the footage's own |
 
@@ -13,7 +12,7 @@ Each video slot on the page (`components/Media.astro`) shows a placeholder until
 - **The poster** (`.webp`, or `.jpg`) shows before the clip loads: a frame of it, at the clip's size.
 - **Keep them light**: no sound track, 2 to 4 Mb/s for 1080p, a few seconds that loop cleanly (the ones here: 10 s, cut and encoded with the commands below).
 
-The examples render with the command line, for example:
+A project renders with the command line, for example:
 
 ```sh
 pnpm tramme render examples/launch-film --format webm --mute
