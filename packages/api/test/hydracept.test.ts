@@ -177,6 +177,7 @@ describe('hydracept jobs', () => {
     const calls = stubHydraceptJob(MP3, 'audio/mpeg');
     const run = await hydraceptSfx(media.hydracept, { prompt: 'whoosh', duration: 2 }, out);
     const job = calls.find((c) => c.url.includes('/audio.sfx.generate.v1/jobs') && c.method === 'POST');
+    expect((job?.body?.input as Record<string, unknown>)?.prompt).toBe('whoosh. Sound effect only: no speech, spoken words, narration, or vocals.');
     expect((job?.body?.input as Record<string, unknown>)?.outputFormatPreference).toBe(HYDRACEPT_AUDIO_MP3);
     expect(run.model).toBe('eleven_text_to_sound_v2');
     expect(run.type).toBe('audio/mpeg');

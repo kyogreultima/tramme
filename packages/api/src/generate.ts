@@ -8,7 +8,7 @@
 //     kind: 'sfx' | 'music' | 'voice'; prompt: what to make, or the text to say
 //   GET  /api/voices?provider=&search=&language=&accent=&gender=   the voices a voice-over can take
 
-import { fetchHydraceptVoices, hydraceptHeaders, hydraceptMusic, hydraceptOf, hydraceptSfx, hydraceptVoice, mapHydraceptVoices } from './hydracept.ts';
+import { fetchHydraceptVoices, hydraceptHeaders, hydraceptMusic, hydraceptOf, hydraceptSfx, hydraceptVoice, mapHydraceptVoices, nonVoicePrompt } from './hydracept.ts';
 import { HttpError, json, readJson } from './http.ts';
 import type { Keys } from './keys.ts';
 import type { Reach } from './providers.ts';
@@ -51,7 +51,7 @@ const PROVIDERS: Record<Provider, { kinds: SoundKind[]; make(key: string, ask: A
       let res: Response, model: string, voice: string | undefined;
       if (ask.kind === 'sfx') {
         model = 'eleven_text_to_sound_v2';
-        res = await post(`${ELEVEN}/sound-generation?${MP3}`, { text: ask.prompt, model_id: model, prompt_influence: 0.5, ...(ask.duration ? { duration_seconds: clamp(ask.duration, 0.5, 30) } : {}) });
+        res = await post(`${ELEVEN}/sound-generation?${MP3}`, { text: nonVoicePrompt(ask.prompt), model_id: model, prompt_influence: 0.5, ...(ask.duration ? { duration_seconds: clamp(ask.duration, 0.5, 30) } : {}) });
       } else if (ask.kind === 'music') {
         model = 'music_v2_5';
         res = await post(`${ELEVEN}/music?${MP3}`, ask.plan
@@ -138,7 +138,13 @@ function musicPlan(value: unknown, duration: unknown): MusicPlan {
   if (!Array.isArray(chunks) || chunks.length < 1 || chunks.length > 30 || !chunks.every((c) => c && typeof c.text === 'string' && c.text.trim().length > 0 && c.text.length <= 500 && Number.isInteger(c.duration_ms) && c.duration_ms >= 3000 && c.duration_ms <= 120000 && styles(c.positive_styles) && styles(c.negative_styles) && c.context_adherence === 'high')) throw new HttpError(400, 'invalid music composition plan');
   const total = chunks.reduce((sum, c) => sum + c.duration_ms, 0);
   if (total < 3000 || total > 600000 || (duration !== undefined && (typeof duration !== 'number' || !Number.isFinite(duration) || Math.abs(Math.round(duration * 1000) - total) > 1))) throw new HttpError(400, 'music plan duration does not match');
-  return plan;
+  return {
+    ...plan,
+    chunks: chunks.map((chunk) => ({
+      ...chunk,
+      negative_styles: [...new Set([...chunk.negative_styles, 'speech', 'spoken words', 'narration'])],
+    })),
+  };
 }
 
 export async function generate(req: Request, { keys, fetch }: Reach) {
