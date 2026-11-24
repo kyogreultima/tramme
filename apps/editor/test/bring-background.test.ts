@@ -4,6 +4,7 @@ import type { Manifest } from '@tramme/project';
 
 let release: () => void = () => {};
 const calls: string[][] = [];
+const movedHere: string[] = [];
 vi.mock('../src/bring.ts', async (original) => ({
   ...(await original<typeof import('../src/bring.ts')>()),
   bring: vi.fn(async (projects: Manifest[], progress: (done: number, total: number, name: string) => void) => {
@@ -14,9 +15,14 @@ vi.mock('../src/bring.ts', async (original) => ({
     const failed = projects.filter((p) => p.id === 'b').map((p) => ({ id: p.id, name: p.name, error: 'quota' }));
     return { brought: projects.filter((p) => p.id !== 'b'), failed };
   }),
+  moveHere: vi.fn(async (project: Manifest) => {
+    movedHere.push(project.id);
+    if (project.id === 'cloud-b') throw new Error('disk full');
+    return project;
+  }),
 }));
 
-const { bringing, bringInBackground } = await import('../src/ui/BringDialog.tsx');
+const { bringing, bringInBackground, moveInBackground } = await import('../src/ui/BringDialog.tsx');
 
 const m = (id: string) => ({ id, name: id.toUpperCase() }) as Manifest;
 
@@ -40,5 +46,23 @@ describe('bringing projects into the account behind the page', () => {
     await vi.waitFor(() => expect(bringing.value.at).toBeNull());
     // the list is shown again after a retry too
     expect(done).toHaveBeenCalledTimes(2);
+  });
+
+  it('moves an account project to the computer without keeping a modal open', async () => {
+    const done = vi.fn();
+    moveInBackground({ ...m('cloud-a'), cloud: true } as Manifest, done);
+
+    expect(bringing.value.at).toEqual({ done: 0, total: 1, name: 'CLOUD-A' });
+    await vi.waitFor(() => expect(bringing.value.at).toBeNull());
+    expect(movedHere).toEqual(['cloud-a']);
+    expect(bringing.value.failed).toEqual([]);
+    expect(done).toHaveBeenCalledOnce();
+  });
+
+  it('keeps a failed account-to-computer move available for retry', async () => {
+    moveInBackground({ ...m('cloud-b'), cloud: true } as Manifest);
+
+    await vi.waitFor(() => expect(bringing.value.at).toBeNull());
+    expect(bringing.value.failed.map((project) => project.id)).toEqual(['cloud-b']);
   });
 });

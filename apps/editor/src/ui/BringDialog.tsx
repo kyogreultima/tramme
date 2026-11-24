@@ -6,7 +6,7 @@ import { signal } from '@preact/signals';
 import { useEffect, useState } from 'preact/hooks';
 import type { Manifest } from '@tramme/project';
 import { account } from '../accounts.ts';
-import { bring, localProjects, markOffered, wasOffered } from '../bring.ts';
+import { bring, inAccount, localProjects, markOffered, moveHere, wasOffered } from '../bring.ts';
 import { t } from '../i18n/index.ts';
 import { cloud } from '../mode.ts';
 import { notify } from '../notify.ts';
@@ -19,6 +19,7 @@ export interface Bringing { at: { done: number; total: number; name: string } | 
 export const bringing = signal<Bringing>({ at: null, failed: [] });
 /** what shows the account's projects again once a copy is over */
 let refresh: (() => void) | undefined;
+let retry: (() => void) | undefined;
 
 /**
  * The chosen projects copied while the person goes on: the dialog closes at once,
@@ -29,6 +30,7 @@ export function bringInBackground(projects: Manifest[], onDone?: () => void) {
   if (bringing.peek().at || !projects.length) return;
   // what shows the account's projects again at the end; a retry from the top bars keeps the last one
   if (onDone) refresh = onDone;
+  retry = () => bringInBackground(projects);
   bringing.value = { at: { done: 0, total: projects.length, name: projects[0].name }, failed: [] };
   void bring(projects, (done, total, name) => { if (done < total) bringing.value = { ...bringing.peek(), at: { done, total, name } }; }).then((r) => {
     const failed = projects.filter((p) => r.failed.some((f) => f.id === p.id));
@@ -37,6 +39,25 @@ export function bringInBackground(projects: Manifest[], onDone?: () => void) {
     else notify(t('account.bring.title'), r.brought.length ? t('account.bring.done', { count: r.brought.length }) : t('account.bring.already'));
     refresh?.();
   });
+}
+
+/** Move one desktop project in either direction while the rest of the app stays usable. */
+export function moveInBackground(project: Manifest, onDone?: () => void) {
+  if (bringing.peek().at) return;
+  if (!inAccount(project)) {
+    bringInBackground([project], onDone);
+    return;
+  }
+  if (onDone) refresh = onDone;
+  retry = () => moveInBackground(project);
+  bringing.value = { at: { done: 0, total: 1, name: project.name }, failed: [] };
+  void moveHere(project).then(() => {
+    bringing.value = { at: null, failed: [] };
+    notify(t('home.moving', { name: project.name }), t('home.movedHere', { name: project.name }));
+  }).catch((error: unknown) => {
+    bringing.value = { at: null, failed: [project] };
+    notify(t('home.moving', { name: project.name }), t('home.couldNotMove', { name: project.name, error: (error as Error).message }), 'error');
+  }).finally(() => refresh?.());
 }
 
 export function BringDialog({ projects, onClose, onDone }: { projects: Manifest[]; onClose: () => void; onDone: () => void }) {
@@ -80,7 +101,7 @@ export function BringStatus() {
   if (!failed.length) return null;
   const said = t('account.bring.failed', { names: failed.map((p) => p.name).join(', ') });
   return (
-    <button class="btn outline sm bring-status failed" type="button" title={said} aria-label={`${said}. ${t('account.bring.retry')}`} onClick={() => bringInBackground(failed)}>
+    <button class="btn outline sm bring-status failed" type="button" title={said} aria-label={`${said}. ${t('account.bring.retry')}`} onClick={() => retry?.()}>
       <Icon name="alert" /><span class="label">{t('account.bring.retry')}</span>
     </button>
   );

@@ -38,12 +38,12 @@ import { prefs, settingsOpen } from '../settings.ts';
 import { GLASS_THEMES } from '../theme/pref.ts';
 import { downloadOf, update } from '../version.ts';
 import { tauri } from '../tauri.ts';
-import { bring, inAccount, moveHere } from '../bring.ts';
+import { inAccount } from '../bring.ts';
 import { IDEAS } from '../ideas.ts';
 import { t } from '../i18n/index.ts';
 import { go } from '../nav.ts';
 import { AccountMenu } from './AccountMenu.tsx';
-import { BringOffer } from './BringDialog.tsx';
+import { BringOffer, moveInBackground } from './BringDialog.tsx';
 import { account, resendVerification } from '../accounts.ts';
 
 interface Example { file: string; name: string; description: string; width: number; height: number; duration: number; thumbnail?: string }
@@ -391,26 +391,12 @@ export function Home() {
     // the desktop app, signed in: a project moves between this computer and the account (bring.ts), it is never in both
     ...(tauri && account.value.status === 'in' ? [{
       label: inAccount(m) ? t('home.moveHere') : t('home.moveToAccount'), icon: inAccount(m) ? 'folder' : 'cloud',
-      onClick: () => void move(m),
+      onClick: () => move(m),
     }] : []),
     'sep',
     { label: t('common.delete'), icon: 'trash', danger: true, onClick: () => setDialog({ kind: 'remove', m }) },
   ]);
-  const move = async (m: Manifest) => {
-    setBusy({ label: t('home.moving', { name: m.name }), done: 0, total: 1 });
-    try {
-      if (inAccount(m)) {
-        await moveHere(m);
-        toast(t('home.movedHere', { name: m.name }));
-      } else {
-        const r = await bring([m], () => {});
-        if (r.failed.length) throw new Error(r.failed[0].error);
-        toast(t('home.moved', { name: m.name }));
-      }
-    } catch (x) { toast(t('home.couldNotMove', { name: m.name, error: (x as Error).message }), 'error', 9000); }
-    setBusy(null);
-    refresh();
-  };
+  const move = (m: Manifest) => moveInBackground(m, refresh);
 
   return (
     <div class={`home${drag ? ' dragging' : ''}`}
