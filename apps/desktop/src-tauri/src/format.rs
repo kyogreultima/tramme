@@ -79,7 +79,7 @@ pub fn is_chat_path(path: &str) -> bool {
         && name.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
 }
 
-const EXT: [(&str, &[&str]); 4] = [
+const EXT: [(&str, &[&str]); 5] = [
     (
         "assets",
         &[
@@ -98,6 +98,7 @@ const EXT: [(&str, &[&str]); 4] = [
         ],
     ),
     ("renders", &["mp4", "webm", "mov", "gif", "png", "zip", "json", "svg", "wav"]),
+    ("versions", &["json"]),
 ];
 
 pub fn mime_of(path: &str) -> &'static str {
@@ -178,10 +179,10 @@ pub fn path_issue(path: &str) -> Option<String> {
         return Some("invalid scene folder".into());
     }
     let Some((place, allowed)) = EXT.iter().find(|(p, _)| *p == parts[0]) else {
-        return Some("location not allowed by the format (assets/, plugins/, scenes/, renders/)".into());
+        return Some("location not allowed by the format (assets/, plugins/, scenes/, renders/, versions/)".into());
     };
     if parts.len() < 2 {
-        return Some("location not allowed by the format (assets/, plugins/, scenes/, renders/)".into());
+        return Some("location not allowed by the format (assets/, plugins/, scenes/, renders/, versions/)".into());
     }
     let ext = extension(path);
     if allowed.contains(&ext.as_str()) {
@@ -369,6 +370,10 @@ mod tests {
         assert!(path_issue("renders/x.mp4").is_none());
         assert!(path_issue("renders/x.svg").is_none());
         assert!(path_issue("renders/renders/x.png").is_none());
+        assert!(path_issue("versions/index.json").is_none());
+        assert!(path_issue("versions/2026-11-24T17-23-30-102Z.json").is_none());
+        assert!(path_issue("versions/../document.tramme.json").is_some());
+        assert!(path_issue("versions/snapshot.js").is_some());
         assert!(path_issue("elsewhere/x.png").is_some());
         assert!(path_issue("assets").is_some());
     }
