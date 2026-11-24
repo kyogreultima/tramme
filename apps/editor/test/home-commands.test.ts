@@ -19,5 +19,6 @@ describe('the home page box', () => {
     const rows = [...host.querySelectorAll('.command-row')];
     expect(rows.length).toBeGreaterThan(0);
     expect(rows.some((r) => /captions/.test(r.textContent ?? ''))).toBe(true);
+    expect(host.querySelector('.brief-input > .command-menu')).not.toBeNull();
   });
 });

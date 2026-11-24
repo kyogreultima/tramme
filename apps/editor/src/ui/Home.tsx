@@ -248,17 +248,19 @@ export function DirectionBox({ busy, onStart }: { busy: boolean; onStart: (words
       <form class="brief-box" data-tour="home-new" onSubmit={(e) => { e.preventDefault(); start(); }}
         onDragOver={(e) => { if (e.dataTransfer?.types.includes('Files')) { e.preventDefault(); e.stopPropagation(); } }}
         onDrop={(e) => { if (!e.dataTransfer) return; e.preventDefault(); e.stopPropagation(); droppedOf(e.dataTransfer).then((list) => add(list.filter((p) => isSourceFile(p.file)))); }}>
-        <MarkedField area={area} text={words} isCommand={isCommand} isTag={isTag}>
-          <textarea ref={area} value={words} placeholder={t('home.heroPlaceholder')}
-            // ready to type with a keyboard; on a touch screen the keyboard would cover the page as soon as it opens
-            autoFocus={!handheld()}
-            aria-autocomplete="list"
-            onInput={(e) => { setWords((e.target as HTMLTextAreaElement).value); commandMenu.sync(); mention.sync(); }}
-            onClick={() => { commandMenu.sync(); mention.sync(); }}
-            onKeyDown={(e) => { if (commandMenu.keyDown(e) || mention.keyDown(e)) return; if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); start(); } }} />
-        </MarkedField>
-        {commandMenu.view}
-        {mention.view}
+        <div class="brief-input">
+          <MarkedField area={area} text={words} isCommand={isCommand} isTag={isTag}>
+            <textarea ref={area} value={words} placeholder={t('home.heroPlaceholder')}
+              // ready to type with a keyboard; on a touch screen the keyboard would cover the page as soon as it opens
+              autoFocus={!handheld()}
+              aria-autocomplete="list"
+              onInput={(e) => { setWords((e.target as HTMLTextAreaElement).value); commandMenu.sync(); mention.sync(); }}
+              onClick={() => { commandMenu.sync(); mention.sync(); }}
+              onKeyDown={(e) => { if (commandMenu.keyDown(e) || mention.keyDown(e)) return; if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); start(); } }} />
+          </MarkedField>
+          {commandMenu.view}
+          {mention.view}
+        </div>
         {material.length > 0 && (
           <div class="brief-files">
             {material.map((p) => (
