@@ -15,7 +15,8 @@ import { openMenu, Popover, Select, Toggle, type MenuItem } from './controls.tsx
 import { PublishPanel } from './PublishPanel.tsx';
 import { GalleryDialog } from './GalleryDialog.tsx';
 import { CloudRender, serverRender } from './CloudRender.tsx';
-import { cloud } from '../mode.ts';
+import { canPublishExport } from '../gallery.ts';
+import { account } from '../accounts.ts';
 import { hdrCapability } from '../hdr.ts';
 import { ExportQueueList } from './ExportQueueList.tsx';
 import { exportQueue } from '../export-queue.ts';
@@ -292,7 +293,7 @@ function ExportPop({ anchor, onClose }: { anchor: HTMLElement; onClose: () => vo
         {state.warnings.length > 0 && <ul class="export-warn">{state.warnings.map((w) => <li key={w}>{w}</li>)}</ul>}
         <div class="export-saves">
           <button class="btn sm" onClick={() => saveBlob(state.blob, state.name)}><Icon name="download" />{saveLabel()}</button>
-          {cloud && state.name.endsWith('.mp4') && <button class="btn sm" onClick={() => { galleryVideo.value = state.blob; }}><Icon name="upload" />{t('gallery.publishButton')}</button>}
+          {canPublishExport(state.name, account.value.status === 'in') && <button class="btn sm" onClick={() => { galleryVideo.value = state.blob; }}><Icon name="upload" />{t('gallery.publishButton')}</button>}
           {state.saved
             ? <span class="faint" style={{ fontSize: 11 }}>{t('topbar.keptInPath', { path: state.saved })}</span>
             : <button class="btn sm" onClick={() => keep(state)}><Icon name="folder" />{t('topbar.keepInTheProject')}</button>}

@@ -337,6 +337,8 @@
     "archiveTooLarge": "Le projet fait {size} Mo avec ses rushes, plus que les {limit} Mo que garde la galerie : le film est publié seul, et le projet reste le vôtre.",
     "title": "Publier dans la galerie",
     "publishButton": "Publier dans la galerie",
+    "listFailed": "La galerie est inaccessible : {error}",
+    "retry": "Réessayer",
     "lead": "Ce film part dans la galerie avec une image prise en son milieu. Votre projet reste tel quel dans votre compte.",
     "leadAgain": "Le film de ce projet est déjà dans la galerie : publier le remplace par cet export.",
     "filmTitle": "Titre",

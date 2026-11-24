@@ -26,6 +26,10 @@ export interface PublishInput {
 
 const mine = (path = '') => `/api/gallery/mine${path}`;
 
+/** The gallery accepts an exported MP4 once an account session can own it. */
+export const canPublishExport = (name: string, signedIn: boolean): boolean =>
+  signedIn && name.toLowerCase().endsWith('.mp4');
+
 async function sent(r: Response): Promise<Response> {
   if (r.ok) return r;
   let body: { error?: string } = {};
@@ -35,7 +39,7 @@ async function sent(r: Response): Promise<Response> {
 
 /** what this person published, by project */
 export async function myFilms(): Promise<Published[]> {
-  try { return (await (await sent(await fetch(mine()))).json()) as Published[]; } catch { return []; }
+  return (await (await sent(await fetch(mine()))).json()) as Published[];
 }
 
 /**

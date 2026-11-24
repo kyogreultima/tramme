@@ -337,6 +337,8 @@
     "archiveTooLarge": "The project is {size} MB with its footage, more than the {limit} MB the gallery keeps: the film is published alone, and the project stays yours to open.",
     "title": "Publish in the gallery",
     "publishButton": "Publish in the gallery",
+    "listFailed": "The gallery could not be reached: {error}",
+    "retry": "Retry",
     "lead": "This film goes to the gallery with a still taken in its middle. Your project in your account stays as it is.",
     "leadAgain": "This project's film is already in the gallery: publishing replaces it with this export.",
     "filmTitle": "Title",
