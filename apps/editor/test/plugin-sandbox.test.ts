@@ -101,6 +101,16 @@ describe('the plugin sandbox', () => {
     connectHost(() => {}, () => DOC_URL).host.dispose('after unsubscribing');
     expect(heard).toEqual(['render timed out']);
   });
+  it('keeps a deliberate reload reason for pending calls without reporting a failure', async () => {
+    const heard: string[] = [];
+    const off = onSandboxStopped((reason) => heard.push(reason));
+    const host = connectHost(() => {}, () => DOC_URL).host;
+    const pending = expect(host.renderFrame({ compId: 'main', t: 0, scale: 1, width: 10, height: 10 })).rejects.toThrow('project module changed');
+    host.dispose('project module changed', false);
+    await pending;
+    off();
+    expect(heard).toEqual([]);
+  });
   it('refuses invalid canvas dimensions before sending a render to the worker', async () => {
     const sent: unknown[] = [];
     const { host } = connectHost((message) => sent.push(message), () => DOC_URL);

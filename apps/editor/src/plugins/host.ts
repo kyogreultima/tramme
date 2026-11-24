@@ -149,8 +149,8 @@ export interface PluginHost {
   qualityChecks(compId: string): Promise<QualityIssue[]>;
   /** a whole SVG still or Lottie file converted in the sandbox, from approved asset bytes */
   vector(format: VectorFormat, doc: unknown, t: number, compId: string, files: Record<string, VectorFile>): Promise<VectorAnswer>;
-  /** stop: every call waiting is refused, with `reason` when there is one */
-  dispose(reason?: string): void;
+  /** stop: every call waiting is refused, with `reason` when there is one; a deliberate reload does not report a failure */
+  dispose(reason?: string, reportFailure?: boolean): void;
   /** disposed (its worker stopped): the next project's or call's sandbox is a new one */
   closed(): boolean;
 }
@@ -633,10 +633,10 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
       if ((format !== 'svg' && format !== 'lottie') || !Number.isFinite(t) || typeof compId !== 'string' || compId.length > 256) throw new Error('invalid sandbox vector request');
       return await run({ kind: 'vector', call: ++call, format, doc, t, compId, files }, undefined, undefined, EXPORT_FRAME_SECONDS) as VectorAnswer;
     },
-    dispose(reason) {
+    dispose(reason, reportFailure = true) {
       const wasOpen = !closed;
       closed = true;
-      if (wasOpen && reason) for (const listen of [...stopListeners]) { try { listen(reason); } catch { /* a listener never blocks the cleanup */ } }
+      if (wasOpen && reason && reportFailure) for (const listen of [...stopListeners]) { try { listen(reason); } catch { /* a listener never blocks the cleanup */ } }
       const e = new Error(reason ? `the plugin sandbox stopped: ${reason}` : 'the plugin sandbox is closed');
       for (const w of [...waits.values(), ...answers.values()]) w.reject(e);
       waits.clear();

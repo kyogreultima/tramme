@@ -96,7 +96,7 @@ const check = (doc: TrammeDoc) => validate(doc, S.registry.peek()).map((i) => `$
 let toastId = 0;
 export function toast(text: string, kind: Toast['kind'] = 'info', ms = 4200) {
   const t = { id: ++toastId, text, kind };
-  S.toasts.value = [...S.toasts.value, t];
+  S.toasts.value = [...S.toasts.value.filter((x) => x.text !== text || x.kind !== kind), t];
   setTimeout(() => { S.toasts.value = S.toasts.value.filter((x) => x.id !== t.id); }, ms);
 }
 

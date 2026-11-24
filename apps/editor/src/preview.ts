@@ -316,7 +316,7 @@ class Preview {
       // A saved edit can keep the same asset URL. Discard the worker's module
       // cache so the next load reads the new source and declarations.
       if (assetIds.some((id) => this.applied!.assets[id]?.type === 'module')) {
-        pluginHost(base).dispose('project module changed');
+        pluginHost(base).dispose('project module changed', false);
         resetSandbox();
       }
       await ensureDeclared(pluginHost(base), moduleItemsOf(this.applied!, base));
