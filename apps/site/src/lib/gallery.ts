@@ -27,6 +27,20 @@ export interface PublicProject {
 
 export interface ListOptions { sort?: 'recent' | 'popular'; limit?: number }
 
+const searchable = (value: string): string => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase();
+
+/** Match the words shown on an Explore card without turning the query into a path. */
+export function filterProjects(projects: PublicProject[], query: string): PublicProject[] {
+  const needle = searchable(query.trim());
+  if (!needle) return projects;
+  return projects.filter((project) => searchable([
+    project.title,
+    project.description,
+    project.author.name,
+    project.author.handle,
+  ].join(' ')).includes(needle));
+}
+
 /** the app's answer, its files' addresses made whole; null when the app has no gallery or does not answer */
 async function fromApp<T>(path: string): Promise<T | null> {
   try {

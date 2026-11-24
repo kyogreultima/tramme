@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { getProject, listProjects, type PublicProject } from '../src/lib/gallery';
+import { filterProjects, getProject, listProjects, type PublicProject } from '../src/lib/gallery';
 import { APP } from '../src/lib/links';
 
 const film = (id: string, publishedAt: string, views?: number): PublicProject => ({
@@ -48,5 +48,16 @@ describe('the gallery', () => {
     expect(p?.poster).toBe(`${APP}/api/gallery/aaaaaaaaaaaa/poster.webp`);
     expect(await getProject('anime')).toBeUndefined();
     expect(await getProject('zzzzzzzzzzzz')).toBeUndefined();
+  });
+
+  it('filters films by title, description, author, or handle without changing routes', () => {
+    const first = { ...film('aaaaaaaaaaaa', '2026-11-01'), title: 'Été graphique', description: 'Rythme solaire' };
+    const second = { ...film('bbbbbbbbbbbb', '2026-11-20'), title: 'Night', author: { name: 'Bilal', handle: 'moving-bilal' } };
+    const projects = [first, second];
+
+    expect(filterProjects(projects, 'ete').map((p) => p.id)).toEqual(['aaaaaaaaaaaa']);
+    expect(filterProjects(projects, 'solaire').map((p) => p.id)).toEqual(['aaaaaaaaaaaa']);
+    expect(filterProjects(projects, 'moving').map((p) => p.id)).toEqual(['bbbbbbbbbbbb']);
+    expect(filterProjects(projects, '   ')).toEqual(projects);
   });
 });
