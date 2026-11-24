@@ -818,7 +818,6 @@
     "moveToAccount": "Move to your account",
     "moveHere": "Move to this computer",
     "moving": "Moving {name}…",
-    "moved": "{name} is now in your account.",
     "movedHere": "{name} is now on this computer.",
     "couldNotMove": "{name} stays where it was: {error}",
     "installApp": "Install the app",

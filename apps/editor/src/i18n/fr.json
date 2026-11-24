@@ -818,7 +818,6 @@
     "moveToAccount": "Déplacer dans votre compte",
     "moveHere": "Déplacer sur cet ordinateur",
     "moving": "Déplacement de {name}…",
-    "moved": "{name} est maintenant dans votre compte.",
     "movedHere": "{name} est maintenant sur cet ordinateur.",
     "couldNotMove": "{name} reste où il était : {error}",
     "installApp": "Installer l'app",
