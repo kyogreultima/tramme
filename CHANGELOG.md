@@ -8,6 +8,35 @@ Until 1.0.0, the document format and the APIs may still change between minor ver
 
 ## [Unreleased]
 
+## [0.37.0] - 2026-11-25
+
+### Added
+
+- The desktop app publishes films in the gallery, updates them, takes them off and copies the projects of others. A project of the account keeps one film, published from the web or from the desktop app.
+- The export says what publishing in the gallery still needs (an account, the MP4 format, the export itself). Once the MP4 is ready, publishing is the main button.
+- The site's Explore page has a search, by title, description or creator, with or without accents.
+- A sound effect or a music bed that comes back with a voice talking in it is refused before it enters the project, where the server transcribes speech. The assistant does not pay for another try unless asked.
+- Notifications can carry an action: open a project once it has moved, or try a failed move again.
+
+### Changed
+
+- Moving a project between the account and the computer runs in the background, with its progress in the top bar. If a project is opened meanwhile, the move carries on from the page that opens, without sending again the media already copied.
+- A project being moved cannot be opened until it arrives. If it was edited during the move all the same, it stays where it was.
+- The block of export destinations is now called "Prepare for a destination".
+- Sound effects and music are asked of the providers without speech or narration.
+- The site's Explore page, film pages and landing show only the films people published. The repository's examples are no longer shown there.
+
+### Fixed
+
+- The desktop app saves project versions. They were refused with "location not allowed by the format".
+- A plugin read again after an edit is no longer announced as stopped, and the picture stays in the viewport without an error. Identical notifications show once.
+- The `/` and `@` menus of the home page open beside the words, on the side that has room, and stay in the window with many files attached. The row chosen with the keyboard stays in view. Long lists of files scroll on their own.
+- A move interrupted halfway is taken up instead of asking to delete the partial copy.
+- When the gallery does not answer, the publishing dialog says so and offers to try again. It looked as if nothing had been published.
+- On the site, an unknown film address answers with the 404 page instead of an error 500, and the beta site reads the beta gallery.
+- In the desktop app on macOS and Linux, links to the site no longer point to a local address.
+- The companion's published package names its repository.
+
 ## [0.36.1] - 2026-11-22
 
 ### Changed
@@ -1122,7 +1151,8 @@ First public release.
 
 - Cloudflare Worker serving the editor and the API, projects stored in R2, access protected by Cloudflare Access.
 
-[Unreleased]: ../../compare/v0.36.1...HEAD
+[Unreleased]: ../../compare/v0.37.0...HEAD
+[0.37.0]: ../../compare/v0.36.1...v0.37.0
 [0.36.1]: ../../compare/v0.36.0...v0.36.1
 [0.36.0]: ../../compare/v0.35.1...v0.36.0
 [0.35.1]: ../../compare/v0.35.0...v0.35.1
