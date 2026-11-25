@@ -14,6 +14,7 @@
 // same way (moveHere).
 
 import { recordBucket, storageRoute } from '@tramme/api';
+import { stringifyDoc, upgradeDoc } from '@tramme/core';
 import { DOCUMENT } from '@tramme/project';
 import type { Manifest } from '@tramme/project';
 import { api, ApiError, type ProjectFile } from './api.ts';
@@ -26,7 +27,7 @@ import { t } from './i18n/index.ts';
 export const inAccount = (m: Manifest): boolean => (m as Manifest & { cloud?: boolean }).cloud === true;
 
 /** The account's name for a desktop project's id. */
-const cloudId = (id: string) => id.startsWith('cloud--') ? id.slice('cloud--'.length) : id;
+export const cloudId = (id: string) => id.startsWith('cloud--') ? id.slice('cloud--'.length) : id;
 export const sameOrigin = (local: Manifest, remote: Manifest): boolean => cloudId(remote.id) === local.id;
 
 /** A claimed id can be left behind by an interrupted import; the document is written last. */
@@ -36,11 +37,15 @@ const completeCopy = async (remote: Manifest): Promise<boolean> =>
 /** An old copy has a new id. Only identical documents, with the same name and creation date, count as the same copy. */
 async function sameLegacyCopy(source: Manifest, remote: Manifest): Promise<boolean> {
   if (source.created !== remote.created || source.name !== remote.name) return false;
-  const original = tauri
-    ? (await api.readText(source.id, DOCUMENT))?.text
-    : await (await local(`/api/projects/${encodeURIComponent(source.id)}/files/${DOCUMENT}`)).text();
-  const copy = (await api.readText(remote.id, DOCUMENT))?.text;
-  return !!original && original === copy;
+  return sameDocument(await here.document(source.id), (await api.readText(remote.id, DOCUMENT))?.text);
+}
+
+/** two documents that say the same: an import may have brought one to the current format */
+function sameDocument(a: string | undefined, b: string | undefined): boolean {
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const plain = (text: string) => stringifyDoc(upgradeDoc(JSON.parse(text)));
+  try { return plain(a) === plain(b); } catch { return false; }
 }
 
 /** The desktop lists local and cloud projects together; the web account lists only its cloud projects. */
@@ -96,6 +101,9 @@ const here = {
   file: async (id: string, path: string): Promise<Blob> => tauri
     ? served(id, path)
     : (await local(`/api/projects/${encodeURIComponent(id)}/files/${path.split('/').map(encodeURIComponent).join('/')}`)).blob(),
+  document: async (id: string): Promise<string | undefined> => tauri
+    ? (await api.readText(id, DOCUMENT))?.text
+    : (await local(`/api/projects/${encodeURIComponent(id)}/files/${DOCUMENT}`)).text(),
   remove: async (id: string) => {
     if (tauri) await api.remove(id);
     else await local(`/api/projects/${encodeURIComponent(id)}`, { method: 'DELETE' });
@@ -129,33 +137,57 @@ function checkWhole(from: ProjectFile[], to: ProjectFile[]) {
   throw new Error(t('account.bring.notWhole'));
 }
 
-/** a project of this computer or browser into the account: copied (archive, then renders), checked, then removed here */
-async function moveOne(m: Manifest, cloud: Manifest[]): Promise<{ made: Manifest; fresh: boolean }> {
-  let target = cloud.find((r) => sameOrigin(m, r)), fresh = false;
+/** the archive of a project the app's server holds; an answer that is not one is never taken for it */
+async function archiveOf(id: string): Promise<Blob> {
+  const r = await fetch(api.exportUrl(id));
+  if (!r.ok) throw new Error(t('account.bring.unread'));
+  return r.blob();
+}
+
+/** whether a project still is where a move took it from (a page may have gone just after the move, before saying so) */
+export async function stillThere(m: Manifest): Promise<boolean> {
+  try { await (inAccount(m) ? api.info(m.id) : here.files(m.id)); return true; }
+  catch (e) { return !(e instanceof ApiError ? e.status === 404 : /\b404\b/.test((e as Error).message)); }
+}
+
+/**
+ * a project of this computer or browser into the account: copied (archive, then renders), checked, then removed here.
+ * `resume`: an import of it that stopped halfway (its page went) is taken up rather than reported
+ */
+async function moveOne(m: Manifest, cloud: Manifest[], resume: boolean): Promise<{ made: Manifest; fresh: boolean }> {
+  // edited while it was copied, the copy is an older one: it is compared again before the project here goes
+  const before = await here.document(m.id);
+  let target = cloud.find((r) => sameOrigin(m, r)), fresh = false, into: Manifest | undefined;
+  if (target && resume && !await completeCopy(target)) { into = target; target = undefined; }
   if (target) {
     if (!await completeCopy(target)) throw new Error(t('account.bring.incomplete'));
     // a copy made earlier stands for this project only while the documents are the same
     if (!await sameLegacyCopy({ ...m, created: target.created, name: target.name }, target)) throw new Error(t('account.bring.differs'));
-  } else {
+  } else if (!into) {
     for (const r of cloud) if (await sameLegacyCopy(m, r)) { target = r; break; }
   }
   if (!target) {
     const archive = tauri
-      ? await (await fetch(api.exportUrl(m.id))).blob()
+      ? await archiveOf(m.id)
       : await (await local(`/api/projects/${encodeURIComponent(m.id)}/export`)).blob();
     // the person's own projects: their code was accepted when they came into this browser or this computer
-    target = await importArchive(archive, undefined, { ask: null, id: m.id, ...(tauri ? { place: 'cloud' as const } : {}) });
+    target = await importArchive(archive, undefined, { ask: null, id: m.id, ...(into ? { into } : {}), ...(tauri ? { place: 'cloud' as const } : {}) });
     fresh = true;
   }
-  const into = target.id, files = await here.files(m.id);
-  await copyRenders(files, (path) => here.file(m.id, path), into, (path, blob) => api.writeAny(into, path, blob));
-  checkWhole(files, (await api.info(into)).files);
+  const copy = target.id;
+  await copyRenders(await here.files(m.id), (path) => here.file(m.id, path), copy, (path, blob) => api.writeAny(copy, path, blob));
+  checkWhole(await here.files(m.id), (await api.info(copy)).files);
+  if (await here.document(m.id) !== before) {
+    // the older copy just made goes, so the next move starts from what the project is now
+    if (fresh) await api.remove(copy).catch(() => {});
+    throw new Error(t('account.bring.changed'));
+  }
   await here.remove(m.id);
   return { made: target, fresh };
 }
 
 /** the chosen projects moved into the account, one after the other; a failure does not stop the others, and leaves that project here */
-export async function bring(projects: Manifest[], progress: (done: number, total: number, name: string) => void): Promise<Brought> {
+export async function bring(projects: Manifest[], progress: (done: number, total: number, name: string) => void, resume = false): Promise<Brought> {
   const out: Brought = { brought: [], skipped: [], failed: [] };
   let cloud: Manifest[];
   try { cloud = await accountProjects(); }
@@ -170,12 +202,12 @@ export async function bring(projects: Manifest[], progress: (done: number, total
   for (const [i, m] of projects.entries()) {
     progress(i, projects.length, m.name);
     try {
-      record(await moveOne(m, cloud), m);
+      record(await moveOne(m, cloud, resume), m);
     } catch (e) {
       let error = e as Error;
       // another window may have made the same copy since the first listing: taken again from a fresh one
       if (e instanceof ApiError && e.status === 409) {
-        try { cloud = await accountProjects(); record(await moveOne(m, cloud), m); continue; } catch (again) { error = again as Error; }
+        try { cloud = await accountProjects(); record(await moveOne(m, cloud, false), m); continue; } catch (again) { error = again as Error; }
       }
       out.failed.push({ id: m.id, name: m.name, error: error.message });
     }
@@ -188,17 +220,20 @@ export async function bring(projects: Manifest[], progress: (done: number, total
  * The desktop app: a project of the account moved to this computer, the same
  * way as the other way round (its archive, its renders, checked, then removed
  * from the account). When a project of this computer already has its id, the
- * moved one takes a new id.
+ * moved one takes a new id. `resume`: the copy a page left halfway is taken up.
  */
-export async function moveHere(m: Manifest): Promise<Manifest> {
+export async function moveHere(m: Manifest, resume = false): Promise<Manifest> {
   if (!tauri || !inAccount(m)) throw new Error('only the desktop app moves a project of the account here');
-  const archive = await (await fetch(api.exportUrl(m.id))).blob();
-  const id = cloudId(m.id), taken = (await api.list()).some((x) => !inAccount(x) && x.id === id);
-  const made = await importArchive(archive, undefined, { ask: null, ...(taken ? {} : { id }) });
+  const documentOf = async (id: string) => (await api.readText(id, DOCUMENT))?.text;
+  const before = await documentOf(m.id);
+  const id = cloudId(m.id), taken = (await api.list()).find((x) => !inAccount(x) && x.id === id);
+  const halfway = resume && taken && !await completeCopy(taken) ? taken : undefined;
+  const copied = resume && taken && !halfway && sameDocument(before, await documentOf(taken.id)) ? taken : undefined;
+  const made = copied ?? await importArchive(await archiveOf(m.id), undefined, { ask: null, ...(halfway ? { into: halfway } : taken ? {} : { id }) });
   try {
-    const files = (await api.info(m.id)).files;
-    await copyRenders(files, (path) => served(m.id, path), made.id, (path, blob) => api.write(made.id, path, blob));
-    checkWhole(files, (await api.info(made.id)).files);
+    await copyRenders((await api.info(m.id)).files, (path) => served(m.id, path), made.id, (path, blob) => api.write(made.id, path, blob));
+    checkWhole((await api.info(m.id)).files, (await api.info(made.id)).files);
+    if (await documentOf(m.id) !== before) throw new Error(t('account.bring.changed'));
   } catch (e) {
     // the account keeps it: the partial copy here goes
     await api.remove(made.id).catch(() => {});

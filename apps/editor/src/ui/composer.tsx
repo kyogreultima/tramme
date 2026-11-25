@@ -17,6 +17,7 @@ import { S, toast } from '../state.ts';
 import { FileChip } from './chat.tsx';
 import { MicButton, writeInto } from './MicButton.tsx';
 import { QueueList } from './QueueList.tsx';
+import { BoxMenu, type MenuSide } from './BoxMenu.tsx';
 import { Select, Toggle } from './controls.tsx';
 import { Icon } from './icons.tsx';
 import { t, tr } from '../i18n/index.ts';
@@ -40,7 +41,7 @@ const caretAt = (area: RefObject<HTMLTextAreaElement | null>, at: number) => req
  * (the order the keys move in). `keyDown` says whether the key was the menu's;
  * `sync` reads the caret again after the user typed or moved it.
  */
-export function useCommandMenu(area: RefObject<HTMLTextAreaElement | null>, text: string, setText: (v: string) => void, commands: Command[], onPick?: (c: Command) => void) {
+export function useCommandMenu(area: RefObject<HTMLTextAreaElement | null>, text: string, setText: (v: string) => void, commands: Command[], onPick?: (c: Command) => void, prefer: MenuSide = 'above') {
   const [read, setQ] = useState<{ from: number; query: string } | null>(null);
   const [hi, setHi] = useState(0);
   const q = still(text, read, '/');
@@ -64,7 +65,7 @@ export function useCommandMenu(area: RefObject<HTMLTextAreaElement | null>, text
     e.preventDefault();
     return true;
   };
-  const view = open ? <CommandMenu list={matches} hi={at} onHover={setHi} onPick={pick} /> : null;
+  const view = open ? <CommandMenu list={matches} hi={at} prefer={prefer} onHover={setHi} onPick={pick} /> : null;
   return { open, view, keyDown, sync };
 }
 
@@ -74,7 +75,7 @@ export function useCommandMenu(area: RefObject<HTMLTextAreaElement | null>, text
  * says whether the key was the menu's; `sync` reads the caret again after the
  * user typed or moved it.
  */
-export function useMentionMenu(area: RefObject<HTMLTextAreaElement | null>, text: string, setText: (v: string) => void, list: Mentionable[]) {
+export function useMentionMenu(area: RefObject<HTMLTextAreaElement | null>, text: string, setText: (v: string) => void, list: Mentionable[], prefer: MenuSide = 'above') {
   const [read, setQ] = useState<{ from: number; query: string } | null>(null);
   const [hi, setHi] = useState(0);
   const q = still(text, read, '@');
@@ -97,7 +98,7 @@ export function useMentionMenu(area: RefObject<HTMLTextAreaElement | null>, text
     return true;
   };
   const view = open ? (
-    <div class="command-menu mention-menu">
+    <BoxMenu hi={at} prefer={prefer} class="mention-menu">
       <div class="command-list" role="listbox">
         <div class="command-section">{t('assistant.mentions')}</div>
         {matches.map((m, i) => (
@@ -107,7 +108,7 @@ export function useMentionMenu(area: RefObject<HTMLTextAreaElement | null>, text
           </button>
         ))}
       </div>
-    </div>
+    </BoxMenu>
   ) : null;
   return { open, view, keyDown, sync };
 }
@@ -150,9 +151,7 @@ export function MarkedField({ area, text, isCommand, isTag, children }: { area: 
 }
 
 /** the commands matching what follows the /, tools first then workflows (the order the keys move in) */
-function CommandMenu({ list, hi, onHover, onPick }: { list: Command[]; hi: number; onHover: (i: number) => void; onPick: (c: Command) => void }) {
-  const ref = useRef<HTMLDivElement>(null);
-  useLayoutEffect(() => { ref.current?.querySelector('.command-row.on')?.scrollIntoView({ block: 'nearest' }); }, [hi]);
+function CommandMenu({ list, hi, prefer, onHover, onPick }: { list: Command[]; hi: number; prefer: MenuSide; onHover: (i: number) => void; onPick: (c: Command) => void }) {
   const row = (c: Command, i: number) => (
     <button key={c.name} role="option" aria-selected={i === hi} class={`command-row${i === hi ? ' on' : ''}`}
       onMouseDown={(e) => { e.preventDefault(); onPick(c); }} onMouseEnter={() => onHover(i)}>
@@ -166,15 +165,15 @@ function CommandMenu({ list, hi, onHover, onPick }: { list: Command[]; hi: numbe
   );
   const tools = list.filter((c) => c.kind === 'tool').length;
   return (
-    <div class="command-menu">
-      <div class="command-list" role="listbox" ref={ref}>
+    <BoxMenu hi={hi} prefer={prefer}>
+      <div class="command-list" role="listbox">
         {tools > 0 && <div class="command-section">{t('assistant.tools')}</div>}
         {list.slice(0, tools).map((c, i) => row(c, i))}
         {tools < list.length && <div class="command-section">{t('assistant.workflows')}</div>}
         {list.slice(tools).map((c, i) => row(c, tools + i))}
       </div>
       <div class="command-keys"><span><kbd>↑</kbd><kbd>↓</kbd> {t('assistant.keysMove')}</span><span><kbd>↵</kbd> {t('assistant.keysPick')}</span><span><kbd>Esc</kbd> {t('assistant.keysClose')}</span></div>
-    </div>
+    </BoxMenu>
   );
 }
 

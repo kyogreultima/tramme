@@ -115,6 +115,14 @@ fn route_inner(parts: &[String], req: Request<Vec<u8>>) -> Result<Body, store::H
             let q = req.uri().query().map(|q| format!("?{q}")).unwrap_or_default();
             to_cloud(&req, &format!("{}{q}", req.uri().path()))
         }
+        // the gallery: the films of the community, and the ones published from here (apps/worker/src/gallery.ts)
+        ("gallery", _) => {
+            if let Some((status, error)) = gallery_refusal(parts, crate::account::signed_in()) {
+                return Ok(json_response(status, &json!({ "error": error })));
+            }
+            let q = req.uri().query().map(|q| format!("?{q}")).unwrap_or_default();
+            to_cloud(&req, &format!("{}{q}", req.uri().path()))
+        }
         // signed in, speech to text is the cloud's (Whisper on Workers AI, apps/worker/src/cloud.ts): seconds, where this machine takes minutes
         ("transcribe", "POST") if crate::account::signed_in() => to_cloud(&req, "/api/transcribe"),
         // the provider routes are the page's (api.reach), never asked here
@@ -124,6 +132,17 @@ fn route_inner(parts: &[String], req: Request<Vec<u8>>) -> Result<Body, store::H
         )),
         _ => Ok(json_response(404, &json!({ "error": format!("unknown route: {method} /api/{}", parts.join("/")) }))),
     }
+}
+
+/// why a request about the gallery does not leave this device: an address that climbs out of it, or one's own films without an account
+fn gallery_refusal(parts: &[String], signed_in: bool) -> Option<(u16, &'static str)> {
+    if parts.iter().any(|p| p == "." || p == ".." || p.contains('%')) {
+        return Some((400, "unreadable address"));
+    }
+    if parts.get(1).map(String::as_str) == Some("mine") && !signed_in {
+        return Some((401, "signed_out"));
+    }
+    None
 }
 
 /// the exports folder of a phone (exports.rs): `/api/device/exports/<name>`
@@ -519,6 +538,15 @@ mod tests {
         assert_eq!(encode_uri_component("a/b:c"), "a%2Fb%3Ac");
     }
 
+    #[test]
+    fn the_gallery_is_reached_but_never_climbed_out_of() {
+        let parts = |path: &str| path.split('/').map(str::to_string).collect::<Vec<_>>();
+        assert_eq!(gallery_refusal(&parts("gallery/mine/film-a1b2c3/video.mp4"), true), None);
+        assert_eq!(gallery_refusal(&parts("gallery/abcdefghijkl/project.tramme"), false), None);
+        assert_eq!(gallery_refusal(&parts("gallery/mine"), false), Some((401, "signed_out")));
+        assert_eq!(gallery_refusal(&parts("gallery/../projects"), true), Some((400, "unreadable address")));
+        assert_eq!(gallery_refusal(&parts("gallery/mine/%2e%2e"), true), Some((400, "unreadable address")));
+    }
     #[test]
     fn shelf_names_validated() {
         assert_eq!(decode_name("plugins", "tool.js").unwrap(), "tool.js");

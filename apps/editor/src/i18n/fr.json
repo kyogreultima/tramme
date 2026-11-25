@@ -118,6 +118,7 @@
     "cliNotInstalled": "{cli} n'est pas installé sur cet ordinateur : installez-le, connectez-vous une fois avec votre compte, puis réessayez."
   },
   "sound": {
+    "talks": "Le son reçu ({kind}) contient une voix qui parle : il n'a pas été ajouté au projet.",
     "banned": "{name} n'apparaîtra plus dans les recherches de sons.",
     "unbanned": "{name} peut à nouveau apparaître dans les recherches de sons.",
     "banText": "{name} ({key}) retiré des recherches de sons.",
@@ -337,7 +338,10 @@
     "archiveTooLarge": "Le projet fait {size} Mo avec ses rushes, plus que les {limit} Mo que garde la galerie : le film est publié seul, et le projet reste le vôtre.",
     "title": "Publier dans la galerie",
     "publishButton": "Publier dans la galerie",
-    "listFailed": "La galerie est inaccessible : {error}",
+    "listFailed": "La galerie ne répond pas pour le moment.",
+    "needsAccount": "Publier dans la galerie : connectez-vous à votre compte, puis exportez le film en MP4.",
+    "needsMp4": "Publier dans la galerie : choisissez le format MP4, puis exportez.",
+    "needsExport": "Publier dans la galerie : exportez le film, le bouton apparaît avec le fichier.",
     "retry": "Réessayer",
     "lead": "Ce film part dans la galerie avec une image prise en son milieu. Votre projet reste tel quel dans votre compte.",
     "leadAgain": "Le film de ce projet est déjà dans la galerie : publier le remplace par cet export.",
@@ -817,7 +821,9 @@
     "placeAccount": "Dans votre compte",
     "moveToAccount": "Déplacer dans votre compte",
     "moveHere": "Déplacer sur cet ordinateur",
-    "moving": "Déplacement de {name}…",
+    "moved": "{name} est maintenant dans votre compte.",
+    "moveBusy": "Un autre déplacement est en cours : celui-ci pourra suivre une fois terminé.",
+    "movingThis": "Ce projet est en cours de déplacement. Il s'ouvrira une fois arrivé.",
     "movedHere": "{name} est maintenant sur cet ordinateur.",
     "couldNotMove": "{name} reste où il était : {error}",
     "installApp": "Installer l'app",
@@ -1836,7 +1842,7 @@
     "needRange": "Posez d'abord un point d'entrée et un point de sortie"
   },
   "publish": {
-    "title": "Publier pour",
+    "title": "Préparer pour une destination",
     "short": "Court vertical · 1080×1920, 60 s",
     "square": "Carré · 1080×1080, 60 s",
     "landscape": "Paysage · 1920×1080",
@@ -3035,6 +3041,7 @@
     "Voices": "Voix",
     "lists the voices a voice-over can take: the account's and the shared library's for ElevenLabs (filtered by language, accent, gender, age), the fixed sets of OpenAI and Gemini": "liste les voix possibles pour une voix off : celles du compte et de la bibliothèque partagée pour ElevenLabs (filtrées par langue, accent, genre, âge), les jeux fixes d'OpenAI et de Gemini",
     "voice-over: a voice of the provider, as the voices tool lists it (ElevenLabs: its id; Gemini: Kore, Puck, Charon…; OpenAI: alloy, coral, sage…)": "voix off : une voix du fournisseur, telle que l'outil Voix la liste (ElevenLabs : son id ; Gemini : Kore, Puck, Charon… ; OpenAI : alloy, coral, sage…)",
+    "sfx or music for anything described (a riser, a beat that builds, a whoosh); voice only for words to be said aloud, exactly as written": "sfx ou music pour tout ce qui se décrit (une montée, un rythme qui grandit, un souffle) ; voice seulement pour des mots à dire à voix haute, tels quels",
     "voice-over: how it is said (\"warm and calm\", \"energetic\"); with ElevenLabs v4 or v3 it becomes an audio tag, an accent included (\"said warmly in a Beninese French accent\", \"whispers\")": "voix off : comment c'est dit (« chaleureux et calme », « énergique ») ; avec ElevenLabs v4 ou v3, cela devient un tag audio, accent compris (« said warmly in a Beninese French accent », « whispers »)",
     "the one of the Sound settings by default": "celui des réglages Son par défaut",
     "words of its name or description: \"narrator\", \"warm\", \"deep\"": "des mots de son nom ou de sa description : « narrator », « warm », « deep »",
@@ -3756,7 +3763,9 @@
       "busy": "Un déplacement vers votre compte est en cours ; ceux-ci pourront suivre une fois terminé.",
       "retry": "Réessayer",
       "differs": "Votre compte garde une copie plus ancienne de ce projet, et les deux diffèrent : ouvrez les deux, gardez la bonne, puis supprimez l'autre.",
-      "notWhole": "La copie dans votre compte est incomplète, le projet reste donc ici. Relancez le déplacement.",
+      "notWhole": "La copie est incomplète, le projet reste donc où il était. Relancez le déplacement.",
+      "unread": "le projet n'a pas pu être lu. Vérifiez votre connexion, puis réessayez.",
+      "changed": "le projet a été modifié pendant son déplacement. Relancez-le pour emporter cette version.",
       "incomplete": "Une copie précédente dans votre compte s'est arrêtée en route : supprimez-la de votre compte, puis déplacez ce projet de nouveau."
     },
     "signedInAs": "Connecté en tant que {email}",

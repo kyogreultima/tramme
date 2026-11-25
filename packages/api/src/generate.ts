@@ -51,13 +51,13 @@ const PROVIDERS: Record<Provider, { kinds: SoundKind[]; make(key: string, ask: A
       let res: Response, model: string, voice: string | undefined;
       if (ask.kind === 'sfx') {
         model = 'eleven_text_to_sound_v2';
-        res = await post(`${ELEVEN}/sound-generation?${MP3}`, { text: nonVoicePrompt(ask.prompt), model_id: model, prompt_influence: 0.5, ...(ask.duration ? { duration_seconds: clamp(ask.duration, 0.5, 30) } : {}) });
+        res = await post(`${ELEVEN}/sound-generation?${MP3}`, { text: nonVoicePrompt(ask.prompt, 'sfx'), model_id: model, prompt_influence: 0.5, ...(ask.duration ? { duration_seconds: clamp(ask.duration, 0.5, 30) } : {}) });
       } else if (ask.kind === 'music') {
         model = 'music_v2_5';
         res = await post(`${ELEVEN}/music?${MP3}`, ask.plan
           // the provider takes force_instrumental with a prompt only: a plan says instrumental in its styles and keeps vocals out
           ? { composition_plan: ask.plan, model_id: model }
-          : { prompt: ask.prompt, model_id: model, force_instrumental: true, ...(ask.duration ? { music_length_ms: Math.round(clamp(ask.duration, 3, 600) * 1000) } : {}) });
+          : { prompt: nonVoicePrompt(ask.prompt, 'music'), model_id: model, force_instrumental: true, ...(ask.duration ? { music_length_ms: Math.round(clamp(ask.duration, 3, 600) * 1000) } : {}) });
       } else {
         model = ask.model && ask.model in ELEVEN_VOICE_MODELS ? ask.model : ELEVEN_VOICE_DEFAULT;
         // a voice of the shared library comes as owner/voice: it is added to the account when the provider does not know it yet
@@ -142,7 +142,8 @@ function musicPlan(value: unknown, duration: unknown): MusicPlan {
     ...plan,
     chunks: chunks.map((chunk) => ({
       ...chunk,
-      negative_styles: [...new Set([...chunk.negative_styles, 'speech', 'spoken words', 'narration'])],
+      // a section holds 50 styles at most: these first, so a long list never pushes them out
+      negative_styles: [...new Set(['speech', 'spoken words', 'narration', ...chunk.negative_styles])].slice(0, 50),
     })),
   };
 }

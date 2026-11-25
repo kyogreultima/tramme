@@ -75,7 +75,7 @@ type Backend = 'server' | 'companion' | 'browser';
 type Asr = ((audio: Float32Array, opts: Record<string, unknown>) => Promise<{ text: string; chunks?: { text: string; timestamp: [number, number | null] }[] }>) & WhisperParts;
 
 /** how a chunk goes: told where it goes before it waits there (the label says the truth), and dropped when the user cancels */
-export interface ChunkWay { tell?: (backend: Backend) => void; signal?: AbortSignal }
+export interface ChunkWay { tell?: (backend: Backend) => void; signal?: AbortSignal; /** this backend or none: no other is tried */ only?: boolean }
 
 /** where the server's transcription is asked: an app signed in sends it to the cloud (its api.rs), elsewhere the page's route (api.reach) */
 const serverRoute = (init: RequestInit) => (tauri && account.peek().status === 'in' ? fetch('/api/transcribe', init) : reach('/api/transcribe', init));
@@ -111,7 +111,7 @@ async function wordsOf(samples: Float32Array, language: string | undefined, pref
   if (prefer === 'browser') return viaBrowser();
   try { return await viaServer(); }
   catch (e) {
-    if (way.signal?.aborted) throw e;
+    if (way.signal?.aborted || way.only) throw e;
     if (aiStatus.peek().companion === 'checking') await refreshStatus();
     if (aiStatus.peek().companion === 'ok') return viaCompanion();
     // no server route and no companion: Whisper here, the slowest way, never a dead end
@@ -140,7 +140,7 @@ const stageOf = (b: Backend) => (b === 'companion' ? m('speech.localCompanion') 
  */
 export async function transcribeChunks(
   duration: number, audioOf: (from: number, to: number) => Promise<Float32Array>,
-  opts: { language?: string; backend: Backend; onProgress?: (done: number, total: number, stage: string) => void; wordsOf?: typeof wordsOf; local?: PipelineRun; signal?: AbortSignal },
+  opts: { language?: string; backend: Backend; onProgress?: (done: number, total: number, stage: string) => void; wordsOf?: typeof wordsOf; local?: PipelineRun; signal?: AbortSignal; only?: boolean },
 ) {
   const starts = chunkStarts(duration), words = opts.wordsOf ?? wordsOf;
   const chunks: { start: number; end: number; words: TranscriptWord[] }[] = new Array(starts.length), models = new Set<string>();
@@ -151,7 +151,7 @@ export async function transcribeChunks(
     const start = starts[i], end = Math.min(duration, start + CHUNK);
     const audio = await audioOf(start, end);
     opts.signal?.throwIfAborted();
-    const r = await words(audio, language, backend, opts.local, { tell, signal: opts.signal });
+    const r = await words(audio, language, backend, opts.local, { tell, signal: opts.signal, only: opts.only });
     opts.signal?.throwIfAborted();
     backend = r.backend;
     language ??= r.language;
@@ -196,9 +196,9 @@ export async function serverHears(): Promise<boolean> {
 }
 
 /** what was said in 16 kHz mono samples (a dictation), as text; the language is detected */
-export async function transcribeSamples(samples: Float32Array, source: Exclude<DictationSource, 'auto'>, opts: { local?: PipelineRun; words?: typeof wordsOf } = {}): Promise<string> {
+export async function transcribeSamples(samples: Float32Array, source: Exclude<DictationSource, 'auto'>, opts: { local?: PipelineRun; words?: typeof wordsOf; only?: boolean } = {}): Promise<string> {
   const backend: Backend = source === 'local' ? 'browser' : source;
-  const { words: said } = await transcribeChunks(samples.length / RATE, async (from, to) => samples.subarray(Math.round(from * RATE), Math.round(to * RATE)), { backend, wordsOf: opts.words, local: opts.local });
+  const { words: said } = await transcribeChunks(samples.length / RATE, async (from, to) => samples.subarray(Math.round(from * RATE), Math.round(to * RATE)), { backend, wordsOf: opts.words, local: opts.local, only: opts.only });
   return said.map((w) => w.w).join(' ').trim();
 }
 

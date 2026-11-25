@@ -163,14 +163,17 @@ export const channelsOf = (b: AudioBuffer) => Array.from({ length: b.numberOfCha
 const wavBlob = (b: AudioBuffer) => new Blob([encodeWav(b) as BlobPart], { type: 'audio/wav' });
 
 /** Match the existing beats tool's mono 16 kHz input using the browser's resampler. */
-async function generatedAnalysis(buffer: AudioBuffer) {
+async function mono16k(buffer: AudioBuffer): Promise<Float32Array> {
   const rate = 16000;
   const ctx = new OfflineAudioContext(1, Math.max(1, Math.ceil(buffer.duration * rate)), rate);
   const source = ctx.createBufferSource();
   source.buffer = buffer;
   source.connect(ctx.destination);
   source.start();
-  const mono = (await ctx.startRendering()).getChannelData(0);
+  return (await ctx.startRendering()).getChannelData(0);
+}
+async function generatedAnalysis(buffer: AudioBuffer) {
+  const rate = 16000, mono = await mono16k(buffer);
   return { ...analyseAudio(mono, rate), key: keyOf(mono, rate) };
 }
 const generatedBeats = async (buffer: AudioBuffer) => (await generatedAnalysis(buffer)).beats;
@@ -562,7 +565,7 @@ const generateSound: ToolType<{ kind: 'sfx' | 'music' | 'voice'; prompt: string;
   input: {
     type: 'object',
     properties: {
-      kind: { enum: ['sfx', 'music', 'voice'], title: 'Kind' },
+      kind: { enum: ['sfx', 'music', 'voice'], title: 'Kind', description: 'sfx or music for anything described (a riser, a beat that builds, a whoosh); voice only for words to be said aloud, exactly as written' },
       prompt: { type: 'string', title: 'Prompt', description: 'sfx and music: what it sounds like ("deep cinematic boom with a long tail", "calm lo-fi piano bed, 80 bpm"); voice: the text to say' },
       name: { type: 'string', title: 'Name', description: 'of the file, lower case' },
       duration: { type: 'number', minimum: 0.5, maximum: 600, title: 'Length (s)', description: 'sfx up to 30 s; music from 3 s' },
@@ -596,6 +599,9 @@ const generateSound: ToolType<{ kind: 'sfx' | 'music' | 'voice'; prompt: string;
     const made = await api.generate({ kind, prompt, duration, voice, style, model, provider, plan }, ctx.signal);
     const times = await timesOf(ctx, { at, on: on ?? (at === undefined ? 'now' : undefined), layers });
     const { buffer, figures } = await measure(made.blob);
+    // an effect or a bed that talks is refused before it enters the project; another try is the user's to pay for
+    const said = kind === 'voice' ? null : await (await import('./spoken.ts')).speechIn(await mono16k(buffer), prompt);
+    if (said) throw new Error(`${t('sound.talks', { kind: KIND_LABEL[kind]() })} Heard: "${clip(said, 140)}" (${made.provider}, ${made.model}). Do not generate again unless the user asks: it costs money. Offer the library (sfx, music-find) or synth.`);
     const musicAlignment = film ? alignMusicBeats(film, await generatedBeats(buffer), times[0]?.t ?? 0) : null;
     const label = name ?? `${kind}-${prompt.toLowerCase().split(/\s+/).slice(0, 4).join('-')}`;
     const record = { kind, prompt, provider: made.provider, model: made.model, voice: made.voice, style, duration,

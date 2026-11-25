@@ -43,7 +43,7 @@ import { IDEAS } from '../ideas.ts';
 import { t } from '../i18n/index.ts';
 import { go } from '../nav.ts';
 import { AccountMenu } from './AccountMenu.tsx';
-import { BringOffer, moveInBackground } from './BringDialog.tsx';
+import { BringOffer, isMoving, moveInBackground, onMoved } from './BringDialog.tsx';
 import { account, resendVerification } from '../accounts.ts';
 
 interface Example { file: string; name: string; description: string; width: number; height: number; duration: number; thumbnail?: string }
@@ -59,7 +59,10 @@ const PRESETS: [string, string, number, number][] = [
 const FILM_FORMATS = PRESETS.filter(([id]) => id !== '4k');
 
 
-const open = (id: string) => go(`/p/${encodeURIComponent(id)}`);
+const open = (id: string) => {
+  if (isMoving(id)) { toast(t('home.movingThis')); return; }
+  go(`/p/${encodeURIComponent(id)}`);
+};
 
 const dims = (m: { width?: number; height?: number; duration?: number }) =>
   [m.width && m.height ? `${m.width}×${m.height}` : null, m.duration ? `${+m.duration.toFixed(2)} s` : null].filter(Boolean).join(' · ');
@@ -235,10 +238,10 @@ export function DirectionBox({ busy, onStart }: { busy: boolean; onStart: (words
   const [packCmds, setPackCmds] = useState<Command[]>([]);
   useEffect(() => { void shippedPacks().then((p) => setPackCmds(packCommands(p))); }, []);
   const commands = useMemo(() => [...listCommands(S.registry.value), ...packCmds], [S.registry.value, packCmds]);
-  const commandMenu = useCommandMenu(area, words, setWords, commands);
+  const commandMenu = useCommandMenu(area, words, setWords, commands, undefined, 'below');
   // the @ menu: the material added so far, tagged in the words
   const tags = useMemo(() => material.map((p) => ({ token: tagOf(p), label: p.file.name, kind: kindOf(p.file) })), [material]);
-  const mention = useMentionMenu(area, words, setWords, tags);
+  const mention = useMentionMenu(area, words, setWords, tags, 'below');
   const isCommand = (name: string) => commands.some((c) => c.name === name), isTag = (token: string) => tags.some((x) => x.token === token);
   const chosen = (e: Event) => { const input = e.target as HTMLInputElement, list = pickedOf(input.files ?? []); input.value = ''; add(list); };
   return (
@@ -321,6 +324,7 @@ export function Home() {
     addEventListener('keydown', key);
     return () => removeEventListener('keydown', key);
   }, []);
+  useEffect(() => onMoved(refresh), []);
   useEffect(() => {
     document.title = `${t('home.projects')} · Tramme`;
     refresh();
@@ -379,7 +383,7 @@ export function Home() {
       }
     });
   }, []);
-  const menu = (e: MouseEvent | { clientX: number; clientY: number }, m: Manifest) => openMenu(e, [
+  const menu = (e: MouseEvent | { clientX: number; clientY: number }, m: Manifest) => isMoving(m.id) ? toast(t('home.movingThis')) : openMenu(e, [
     { label: t('common.open'), icon: 'folder', onClick: () => open(m.id) },
     { label: t('common.rename'), icon: 'edit', onClick: () => setDialog({ kind: 'rename', m }) },
     { label: t('common.duplicate'), icon: 'copy', onClick: async () => { try { await api.duplicate(m.id); refresh(); } catch (x) { toast(t('home.couldNotDuplicateError', { error: (x as Error).message }), 'error'); } } },

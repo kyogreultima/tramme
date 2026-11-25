@@ -7,6 +7,7 @@ const { preview } = await import('../src/preview.ts');
 const { load, S } = await import('../src/state.ts');
 const { newProject } = await import('@tramme/project');
 const { Stills } = await import('../src/frames.ts');
+const { SandboxClosed } = await import('../src/plugins/host.ts');
 
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); preview.renderer = null; });
 
@@ -64,4 +65,24 @@ it('keeps the displayed canvas size while an asynchronous sandbox frame is pendi
   frames.shift()!(performance.now());
   try { expect(setScale).not.toHaveBeenCalled(); }
   finally { finish(); await new Promise((resolve) => setTimeout(resolve, 0)); }
+});
+
+it('asks again for a frame whose sandbox was closed on purpose, without an error on the picture', async () => {
+  const project = newProject({ name: 'Reloaded', width: 1920, height: 1080, fps: 24, duration: 10 });
+  load(project.doc, project.manifest, 'http://localhost/api/projects/p/files/document.tramme.json', '');
+  S.playing.value = false;
+  S.previewScale.value = 0.5;
+  S.renderError.value = null;
+  preview.renderer = { scale: 0.5, sandboxModules: true, setScale() {} } as unknown as Renderer;
+  const frames: FrameRequestCallback[] = [];
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => { frames.push(callback); return frames.length; });
+  const draw = vi.spyOn(preview as unknown as { drawSandboxFrame(t: number): Promise<void> }, 'drawSandboxFrame')
+    .mockRejectedValueOnce(new SandboxClosed('project module changed')).mockResolvedValue();
+  preview.invalidate();
+  for (let i = 0; i < 5 && frames.length; i++) {
+    frames.shift()!(performance.now());
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+  expect(draw).toHaveBeenCalledTimes(2);
+  expect(S.renderError.value).toBeNull();
 });

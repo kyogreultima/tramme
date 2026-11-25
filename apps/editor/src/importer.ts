@@ -119,9 +119,11 @@ export async function readArchive(data: Uint8Array, ask?: CodeAsk | null, opts?:
   return { files, manifest, doc };
 }
 
-/** write files into a new project, the document last; the project is removed if anything fails */
-async function fill(project: Manifest, files: Map<string, Uint8Array | string>, progress?: Progress): Promise<Manifest> {
-  const rest = [...files.keys()].filter((p) => p !== MANIFEST && p !== DOCUMENT);
+/** write files into a new project, the document last (those `held` already at their size are left); the project is removed if anything fails */
+async function fill(project: Manifest, files: Map<string, Uint8Array | string>, progress?: Progress, held: { path: string; size: number }[] = []): Promise<Manifest> {
+  // the media alone: a small file (a conversation, a scene) is written again, its size says too little
+  const there = new Map(held.filter((f) => f.path.startsWith('assets/')).map((f) => [f.path, f.size]));
+  const rest = [...files.keys()].filter((p) => p !== MANIFEST && p !== DOCUMENT && there.get(p) !== files.get(p)!.length);
   const total = rest.length + 1;
   let done = 0;
   try {
@@ -147,10 +149,11 @@ async function fill(project: Manifest, files: Map<string, Uint8Array | string>, 
 
 /**
  * a .tramme archive as a new project (a new id unless one is reserved for bringing a local project); ask null skips the code question;
- * place 'cloud': in the account, from the desktop app (bring.ts)
+ * place 'cloud': in the account, from the desktop app (bring.ts); into: a project whose import was interrupted, taken up where it stopped
  */
-export async function importArchive(file: Blob, progress?: Progress, opts?: { ask?: CodeAsk | null; place?: 'cloud'; id?: string }): Promise<Manifest> {
+export async function importArchive(file: Blob, progress?: Progress, opts?: { ask?: CodeAsk | null; place?: 'cloud'; id?: string; into?: Manifest }): Promise<Manifest> {
   const { files, manifest, doc } = await readArchive(new Uint8Array(await file.arrayBuffer()), opts?.ask);
+  if (opts?.into) return fill(opts.into, files, progress, (await api.info(opts.into.id)).files);
   const root = doc.compositions[doc.root];
   const project = await api.create({ id: opts?.id, name: manifest.name, created: manifest.created, width: root?.width, height: root?.height, fps: root?.fps, duration: root?.duration, empty: true }, opts?.place);
   return fill(project, files, progress);

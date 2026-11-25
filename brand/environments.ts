@@ -58,7 +58,9 @@ export function siteOfApp(origin: string): string | undefined {
   const o = bare(origin);
   for (const name of ENV_NAMES) if (ENVIRONMENTS[name].app === o) return ENVIRONMENTS[name].site;
   try {
-    const host = new URL(o).hostname;
+    const { hostname: host, protocol } = new URL(o);
+    // the desktop app's own address on macOS and Linux (tauri://localhost) is not a server on this machine
+    if (!/^https?:$/.test(protocol)) return undefined;
     if (host === 'localhost' || host === '127.0.0.1') return ENVIRONMENTS.local.site;
   } catch { /* not an address */ }
   return undefined;

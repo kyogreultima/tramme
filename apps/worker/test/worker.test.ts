@@ -336,11 +336,11 @@ describe('sounds made by a provider', () => {
       expect(sfx.headers.get('x-tramme-provider')).toBe('elevenlabs');
       expect(p.seen[0].url).toBe('https://api.elevenlabs.io/v1/sound-generation?output_format=mp3_44100_128');
       expect(p.seen[0].headers.get('xi-api-key')).toBe('el-key');
-      expect(p.seen[0].body).toMatchObject({ text: 'a deep whoosh. Sound effect only: no speech, spoken words, narration, or vocals.', duration_seconds: 30 });
+      expect(p.seen[0].body).toMatchObject({ text: 'a deep whoosh. Sound effect only: no intelligible speech, spoken words or narration.', duration_seconds: 30 });
 
       await call('/api/generate', ask({ kind: 'music', prompt: 'calm piano bed', duration: 20 }));
       expect(p.seen[1].url).toContain('/v1/music');
-      expect(p.seen[1].body).toMatchObject({ prompt: 'calm piano bed', music_length_ms: 20000, force_instrumental: true });
+      expect(p.seen[1].body).toMatchObject({ prompt: 'calm piano bed. Instrumental only: no speech, spoken words, narration or vocals.', music_length_ms: 20000, force_instrumental: true });
 
       const voice = await call('/api/generate', ask({ kind: 'voice', prompt: 'Bonjour à tous', provider: 'gemini', voice: 'Puck', style: 'warm' }));
       expect(voice.headers.get('content-type')).toBe('audio/wav');
@@ -363,7 +363,7 @@ describe('sounds made by a provider', () => {
       expect(made.status).toBe(200);
       expect(p.seen[0].body).toMatchObject({ model_id: 'music_v2_5' });
       expect(p.seen[0].body.composition_plan.chunks).toHaveLength(plan.chunks.length);
-      expect(p.seen[0].body.composition_plan.chunks[0].negative_styles).toEqual(['vocals', 'speech', 'spoken words', 'narration']);
+      expect(p.seen[0].body.composition_plan.chunks[0].negative_styles).toEqual(['speech', 'spoken words', 'narration', 'vocals']);
       // the provider refuses force_instrumental beside a plan: the plan's styles say instrumental
       expect(p.seen[0].body).not.toHaveProperty('force_instrumental');
       expect(p.seen[0].body).not.toHaveProperty('prompt');

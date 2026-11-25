@@ -251,12 +251,16 @@ export const HYDRACEPT_VIDEO_MODEL = 'veo-3.1-fast-generate-001';
 export const HYDRACEPT_VIDEO_SECONDS = [4, 6, 8] as const;
 export type HydraceptVideoSeconds = (typeof HYDRACEPT_VIDEO_SECONDS)[number];
 
-const NO_SPEECH = '. Sound effect only: no speech, spoken words, narration, or vocals.';
+// a crowd may cheer in an effect: only words are kept out; a music bed is instrumental
+const NO_SPEECH = {
+  sfx: '. Sound effect only: no intelligible speech, spoken words or narration.',
+  music: '. Instrumental only: no speech, spoken words, narration or vocals.',
+};
 
 /** Keep descriptive sound prompts out of the speech channel providers may infer. */
-export function nonVoicePrompt(prompt: string, max = 4000): string {
-  const room = Math.max(1, max - NO_SPEECH.length);
-  return `${prompt.trim().replace(/[.!?]+$/, '').slice(0, room).trimEnd()}${NO_SPEECH}`;
+export function nonVoicePrompt(prompt: string, kind: 'sfx' | 'music', max = 4000): string {
+  const room = Math.max(1, max - NO_SPEECH[kind].length);
+  return `${prompt.trim().replace(/[.!?]+$/, '').slice(0, room).trimEnd()}${NO_SPEECH[kind]}`;
 }
 
 /** a length Veo takes: its nearest (half up), 8 when none is asked */
@@ -301,7 +305,7 @@ export async function hydraceptSfx(
   }
   const durationMs = ask.duration ? Math.round(Math.min(30, Math.max(0.5, ask.duration)) * 1000) : undefined;
   const input: Record<string, unknown> = {
-    prompt: nonVoicePrompt(ask.prompt, SFX_PROMPT_MAX),
+    prompt: nonVoicePrompt(ask.prompt, 'sfx', SFX_PROMPT_MAX),
     modelId: 'eleven_text_to_sound_v2',
     promptInfluence: 0.5,
     outputFormatPreference: HYDRACEPT_AUDIO_MP3,
@@ -319,7 +323,7 @@ export async function hydraceptMusic(
 ): Promise<HydraceptRun> {
   const durationMs = ask.duration ? Math.round(clampMusicSeconds(ask.duration) * 1000) : undefined;
   const input: Record<string, unknown> = {
-    prompt: ask.prompt,
+    prompt: nonVoicePrompt(ask.prompt, 'music'),
     modelId: MUSIC_MODEL,
     forceInstrumental: true,
     outputFormatPreference: HYDRACEPT_AUDIO_MP3,

@@ -26,6 +26,11 @@ export function approvedProjectResource(url: URL, projectRoot: string, origin: s
   const normalized = new URL(path, origin);
   return normalized.origin === origin && normalized.pathname.startsWith(projectRoot);
 }
+/** a call refused because the sandbox was closed on purpose (a module read again, another project): asked again, never a failure to show */
+export class SandboxClosed extends Error {
+  constructor(reason?: string) { super(reason ? `the plugin sandbox was closed: ${reason}` : 'the plugin sandbox is closed'); this.name = 'SandboxClosed'; }
+}
+
 const stopListeners = new Set<(reason: string) => void>();
 /** told when a sandbox stops for a reason (a deadline, a crash, a refused message), never for a deliberate close */
 export function onSandboxStopped(listen: (reason: string) => void): () => void {
@@ -637,7 +642,7 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
       const wasOpen = !closed;
       closed = true;
       if (wasOpen && reason && reportFailure) for (const listen of [...stopListeners]) { try { listen(reason); } catch { /* a listener never blocks the cleanup */ } }
-      const e = new Error(reason ? `the plugin sandbox stopped: ${reason}` : 'the plugin sandbox is closed');
+      const e = reason && reportFailure ? new Error(`the plugin sandbox stopped: ${reason}`) : new SandboxClosed(reason);
       for (const w of [...waits.values(), ...answers.values()]) w.reject(e);
       waits.clear();
       answers.clear();

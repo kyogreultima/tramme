@@ -8,7 +8,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { newProject, type Manifest } from '@tramme/project';
 import { Registry, toolOutput, type Host, type PluginModule, type ToolContext, type CheckContext, type TrammeDoc } from '@tramme/core';
-import { connectHost, onSandboxStopped, readLimitedBody, type PluginHost } from '../src/plugins/host.ts';
+import { connectHost, onSandboxStopped, SandboxClosed, readLimitedBody, type PluginHost } from '../src/plugins/host.ts';
 import { guardRealm, startWorkerSide, type SandboxDrawSide } from '../src/plugins/worker-side.ts';
 import { bindSandbox, declarationsModule, noteSandboxDeclaration, resetSandbox, primeSandboxExports, sandboxDeclaration, sandboxNode } from '../src/plugins/sandbox-draw.ts';
 import { RecordingPath2D } from '../src/plugins/recording-path.ts';
@@ -105,7 +105,7 @@ describe('the plugin sandbox', () => {
     const heard: string[] = [];
     const off = onSandboxStopped((reason) => heard.push(reason));
     const host = connectHost(() => {}, () => DOC_URL).host;
-    const pending = expect(host.renderFrame({ compId: 'main', t: 0, scale: 1, width: 10, height: 10 })).rejects.toThrow('project module changed');
+    const pending = expect(host.renderFrame({ compId: 'main', t: 0, scale: 1, width: 10, height: 10 })).rejects.toBeInstanceOf(SandboxClosed);
     host.dispose('project module changed', false);
     await pending;
     off();

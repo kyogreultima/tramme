@@ -2,6 +2,7 @@ import 'fake-indexeddb/auto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { recordBucket, storageRoute } from '@tramme/api';
 import { DOCUMENT } from '@tramme/project';
+import { t } from '../src/i18n/index.ts';
 import { idbRecords } from '../src/local/idb.ts';
 
 const imported: Blob[] = [];
@@ -144,6 +145,42 @@ describe('bringing this browser\'s projects into the account', () => {
       info.mockResolvedValue({ manifest: local, files: [{ path: DOCUMENT, size: 1, etag: '', modified: '' }] });
       expect((await localProjects()).some((p) => p.id === local.id)).toBe(false);
     } finally { list.mockRestore(); info.mockRestore(); }
+  });
+
+  it('takes up an import of its own that its page left halfway', async () => {
+    const source = await made('Left halfway');
+    const local = (await localProjects()).find((p) => p.id === source.id)!;
+    const list = vi.spyOn(api, 'list').mockResolvedValue([{ ...local }]);
+    const info = vi.spyOn(api, 'info').mockResolvedValueOnce({ manifest: local, files: [] }).mockResolvedValue({ manifest: local, files: whole });
+    vi.mocked(importArchive).mockClear();
+    vi.mocked(importArchive).mockResolvedValueOnce(local);
+    try {
+      const r = await bring([local], () => {}, true);
+      expect(r.failed).toEqual([]);
+      expect(vi.mocked(importArchive).mock.calls[0][2]).toMatchObject({ into: { id: local.id } });
+      expect(await kept(local.id)).toBe(false);
+    } finally { list.mockRestore(); info.mockRestore(); }
+  });
+
+  it('keeps a project edited while it was copied, and drops the older copy', async () => {
+    const source = await made('Edited meanwhile');
+    const local = (await localProjects()).find((p) => p.id === source.id)!;
+    const list = vi.spyOn(api, 'list').mockResolvedValue([]);
+    const info = vi.spyOn(api, 'info').mockResolvedValue({ manifest: local, files: whole });
+    const remove = vi.spyOn(api, 'remove').mockResolvedValue(undefined as never);
+    vi.mocked(importArchive).mockImplementationOnce(async () => {
+      const url = new URL(`http://local/api/projects/${local.id}/files/${DOCUMENT}`);
+      const was = await (await storageRoute(new Request(url), recordBucket(idbRecords()), url))!.json() as { meta?: object };
+      const res = await storageRoute(new Request(url, { method: 'PUT', body: JSON.stringify({ ...was, meta: { ...was.meta, title: 'Edited' } }), headers: { 'content-type': 'application/json' } }), recordBucket(idbRecords()), url);
+      expect(res!.ok).toBe(true);
+      return { ...local, id: 'the-copy' };
+    });
+    try {
+      const r = await bring([local], () => {});
+      expect(r.failed).toEqual([{ id: local.id, name: local.name, error: t('account.bring.changed') }]);
+      expect(remove).toHaveBeenCalledWith('the-copy');
+      expect(await kept(local.id)).toBe(true);
+    } finally { list.mockRestore(); info.mockRestore(); remove.mockRestore(); }
   });
 
   it('treats a completed import in another window as already copied', async () => {
