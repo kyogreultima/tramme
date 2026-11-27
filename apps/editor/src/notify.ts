@@ -5,7 +5,7 @@
 // them through its notification plugin (apps/desktop/src-tauri), which the
 // system's own settings allow or not.
 
-import { toast } from './state.ts';
+import { toast, type ToastAction } from './state.ts';
 import { tauri } from './tauri.ts';
 
 const supported = () => !!tauri || typeof Notification !== 'undefined';
@@ -23,20 +23,24 @@ export const notificationState = (): NotificationPermission | 'unsupported' => (
 /** the user is elsewhere: another tab, another window */
 export const away = () => document.hidden || !document.hasFocus();
 
-export function notify(title: string, body: string, kind: 'info' | 'error' = 'info', opts?: { attention?: boolean }) {
+export function notify(title: string, body: string, kind: 'info' | 'error' = 'info', opts?: { attention?: boolean; action?: ToastAction }) {
+  // a notification of the system carries no button: what can be done next waits in the editor as well
+  const inEditor = () => toast(body, kind, opts?.action ? 12_000 : 6000, opts?.action);
   if (away() && notificationState() === 'granted') {
     if (tauri) {
-      tauri.core.invoke('plugin:notification|notify', { options: { title, body } }).catch(() => toast(body, kind, 6000));
+      tauri.core.invoke('plugin:notification|notify', { options: { title, body } }).catch(inEditor);
       // a notification alone does not bring the user back (its click is not reported): the window asks for attention too
       if (opts?.attention) tauri.window.getCurrentWindow().requestUserAttention(2).catch(() => {});
+      if (opts?.action) inEditor();
       return;
     }
     // one at a time: a new one replaces the previous (same tag)
     const n = new Notification(title, { body, tag: 'tramme' });
     n.onclick = () => { focus(); n.close(); };
+    if (opts?.action) inEditor();
     return;
   }
-  toast(body, kind, 6000);
+  inEditor();
 }
 
 /**

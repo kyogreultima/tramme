@@ -15,7 +15,8 @@ import { openMenu, Popover, Select, Toggle, type MenuItem } from './controls.tsx
 import { PublishPanel } from './PublishPanel.tsx';
 import { GalleryDialog } from './GalleryDialog.tsx';
 import { CloudRender, serverRender } from './CloudRender.tsx';
-import { cloud } from '../mode.ts';
+import { galleryNeeds } from '../gallery.ts';
+import { account } from '../accounts.ts';
 import { hdrCapability } from '../hdr.ts';
 import { ExportQueueList } from './ExportQueueList.tsx';
 import { exportQueue } from '../export-queue.ts';
@@ -29,7 +30,7 @@ import { setView, VIEW_LABEL, ViewSwitch } from './views.tsx';
 import { HelpButton, helpMenu } from './Help.tsx';
 import { WindowControls, windowBar } from './WindowControls.tsx';
 import { AccountMenu } from './AccountMenu.tsx';
-import { locale, t } from '../i18n/index.ts';
+import { locale, m, t } from '../i18n/index.ts';
 import { go } from '../nav.ts';
 
 const FORMATS: [string, string, number, number][] = [
@@ -44,6 +45,7 @@ interface Done { blob: Blob; name: string; seconds: number; warnings: string[]; 
 
 /** a film just exported, on its way to the gallery (accounts in the cloud only): its dialog outlives the export popover */
 const galleryVideo = signal<Blob | null>(null);
+const GALLERY_NEEDS = { account: m('gallery.needsAccount'), mp4: m('gallery.needsMp4'), export: m('gallery.needsExport') };
 
 // ── the project's versions: named points one can come back to ──
 /** the saved document itself is the current version; the snapshots live beside it */
@@ -249,6 +251,8 @@ function ExportPop({ anchor, onClose }: { anchor: HTMLElement; onClose: () => vo
       expState.value = { ...done, saved: path };
     } catch (e) { toast(t('topbar.couldNotSaveTo', { error: (e as Error).message }), 'error'); }
   };
+  // what publishing in the gallery still asks for, said before the export rather than after
+  const gallery = galleryNeeds(account.value.status, format, state && 'blob' in state ? state.name : null);
   return (
     <Popover anchor={anchor} onClose={running() ? () => {} : onClose} class="export-pop" align="right">
       <div style={{ fontWeight: 600 }}>{t('common.export')}</div>
@@ -292,13 +296,14 @@ function ExportPop({ anchor, onClose }: { anchor: HTMLElement; onClose: () => vo
         {state.warnings.length > 0 && <ul class="export-warn">{state.warnings.map((w) => <li key={w}>{w}</li>)}</ul>}
         <div class="export-saves">
           <button class="btn sm" onClick={() => saveBlob(state.blob, state.name)}><Icon name="download" />{saveLabel()}</button>
-          {cloud && state.name.endsWith('.mp4') && <button class="btn sm" onClick={() => { galleryVideo.value = state.blob; }}><Icon name="upload" />{t('gallery.publishButton')}</button>}
+          {gallery === 'ready' && <button class="btn sm primary" onClick={() => { galleryVideo.value = state.blob; }}><Icon name="upload" />{t('gallery.publishButton')}</button>}
           {state.saved
             ? <span class="faint" style={{ fontSize: 11 }}>{t('topbar.keptInPath', { path: state.saved })}</span>
             : <button class="btn sm" onClick={() => keep(state)}><Icon name="folder" />{t('topbar.keepInTheProject')}</button>}
         </div>
       </div>}
       {state && 'error' in state && <div class="prop-note err">{state.error}</div>}
+      {gallery && gallery !== 'ready' && <div class="faint export-gallery">{t(GALLERY_NEEDS[gallery])}</div>}
       {serverRender.value && <CloudRender disabled={running()} />}
       <ExportQueueList />
       </div>

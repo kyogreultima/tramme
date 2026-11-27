@@ -98,7 +98,13 @@ export function Toasts() {
           <div class="progress"><i style={{ width: `${(100 * u.sent) / Math.max(1, u.total)}%` }} /></div>
         </div>
       ))}
-      {S.toasts.value.map((x) => <div key={x.id} class={`toast ${x.kind ?? ''}`}>{x.text}</div>)}
+      {S.toasts.value.map((x) => (
+        <div key={x.id} class={`toast ${x.kind ?? ''}`}>
+          {x.action
+            ? <span class="toast-line"><span>{x.text}</span><button class="btn ghost sm" type="button" onClick={() => { S.toasts.value = S.toasts.peek().filter((y) => y.id !== x.id); x.action!.run(); }}>{x.action.label}</button></span>
+            : x.text}
+        </div>
+      ))}
     </div>
   );
 }

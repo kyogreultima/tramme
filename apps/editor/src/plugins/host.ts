@@ -26,6 +26,11 @@ export function approvedProjectResource(url: URL, projectRoot: string, origin: s
   const normalized = new URL(path, origin);
   return normalized.origin === origin && normalized.pathname.startsWith(projectRoot);
 }
+/** a call refused because the sandbox was closed on purpose (a module read again, another project): asked again, never a failure to show */
+export class SandboxClosed extends Error {
+  constructor(reason?: string) { super(reason ? `the plugin sandbox was closed: ${reason}` : 'the plugin sandbox is closed'); this.name = 'SandboxClosed'; }
+}
+
 const stopListeners = new Set<(reason: string) => void>();
 /** told when a sandbox stops for a reason (a deadline, a crash, a refused message), never for a deliberate close */
 export function onSandboxStopped(listen: (reason: string) => void): () => void {
@@ -149,8 +154,8 @@ export interface PluginHost {
   qualityChecks(compId: string): Promise<QualityIssue[]>;
   /** a whole SVG still or Lottie file converted in the sandbox, from approved asset bytes */
   vector(format: VectorFormat, doc: unknown, t: number, compId: string, files: Record<string, VectorFile>): Promise<VectorAnswer>;
-  /** stop: every call waiting is refused, with `reason` when there is one */
-  dispose(reason?: string): void;
+  /** stop: every call waiting is refused, with `reason` when there is one; a deliberate reload does not report a failure */
+  dispose(reason?: string, reportFailure?: boolean): void;
   /** disposed (its worker stopped): the next project's or call's sandbox is a new one */
   closed(): boolean;
 }
@@ -633,11 +638,11 @@ export function connectHost(send: (m: ToWorker) => void, docUrl: () => string, o
       if ((format !== 'svg' && format !== 'lottie') || !Number.isFinite(t) || typeof compId !== 'string' || compId.length > 256) throw new Error('invalid sandbox vector request');
       return await run({ kind: 'vector', call: ++call, format, doc, t, compId, files }, undefined, undefined, EXPORT_FRAME_SECONDS) as VectorAnswer;
     },
-    dispose(reason) {
+    dispose(reason, reportFailure = true) {
       const wasOpen = !closed;
       closed = true;
-      if (wasOpen && reason) for (const listen of [...stopListeners]) { try { listen(reason); } catch { /* a listener never blocks the cleanup */ } }
-      const e = new Error(reason ? `the plugin sandbox stopped: ${reason}` : 'the plugin sandbox is closed');
+      if (wasOpen && reason && reportFailure) for (const listen of [...stopListeners]) { try { listen(reason); } catch { /* a listener never blocks the cleanup */ } }
+      const e = reason && reportFailure ? new Error(`the plugin sandbox stopped: ${reason}`) : new SandboxClosed(reason);
       for (const w of [...waits.values(), ...answers.values()]) w.reject(e);
       waits.clear();
       answers.clear();

@@ -1,7 +1,8 @@
 ---
 // The reference-led landing, in both languages: hero, the features, motion, the toolbox, the
-// formats, the platform and the closing call. (The pictures of the app, the
-// film and the community's projects are paused.)
+// formats, the platform, the community's projects and the closing call. (The
+// pictures of the app and the film are paused.) The page is static; the
+// community's projects come in a server island, read when the page is asked.
 import Page from '../../components/Page.astro';
 import Hero from '../../components/Hero.astro';
 import Showcase from '../../components/Showcase.astro';
@@ -38,8 +39,6 @@ const data = landingData(Astro.site!, previewUrl(Astro.site), systems, locale);
   <Tools locale={locale} />
   <Render locale={locale} />
   <Bento locale={locale} />
-  {/* paused until Tramme's own visuals are good enough: reopen by restoring this block
-  <Community locale={locale} />
-  */}
+  <Community server:defer locale={locale} />
   <LandingClosing locale={locale} />
 </Page>

@@ -118,6 +118,7 @@
     "cliNotInstalled": "{cli} is not installed on this computer: install it, sign in once with your account, then retry."
   },
   "sound": {
+    "talks": "The sound received ({kind}) has a voice talking in it: it was not added to the project.",
     "banned": "{name} will not appear in sound searches.",
     "unbanned": "{name} can appear in sound searches again.",
     "banText": "{name} ({key}) removed from sound searches.",
@@ -337,6 +338,11 @@
     "archiveTooLarge": "The project is {size} MB with its footage, more than the {limit} MB the gallery keeps: the film is published alone, and the project stays yours to open.",
     "title": "Publish in the gallery",
     "publishButton": "Publish in the gallery",
+    "listFailed": "The gallery does not answer for now.",
+    "needsAccount": "Publish in the gallery: sign in to your account, then export the film as MP4.",
+    "needsMp4": "Publish in the gallery: choose the MP4 format, then export.",
+    "needsExport": "Publish in the gallery: export the film, the button comes with the file.",
+    "retry": "Retry",
     "lead": "This film goes to the gallery with a still taken in its middle. Your project in your account stays as it is.",
     "leadAgain": "This project's film is already in the gallery: publishing replaces it with this export.",
     "filmTitle": "Title",
@@ -815,8 +821,9 @@
     "placeAccount": "In your account",
     "moveToAccount": "Move to your account",
     "moveHere": "Move to this computer",
-    "moving": "Moving {name}…",
     "moved": "{name} is now in your account.",
+    "moveBusy": "Another move is under way: this one can go once it is over.",
+    "movingThis": "This project is being moved. It opens once it has arrived.",
     "movedHere": "{name} is now on this computer.",
     "couldNotMove": "{name} stays where it was: {error}",
     "installApp": "Install the app",
@@ -2291,7 +2298,7 @@
     "needRange": "Set an in point and an out point first"
   },
   "publish": {
-    "title": "Publish for",
+    "title": "Prepare for a destination",
     "short": "Vertical short · 1080×1920, 60 s",
     "square": "Square · 1080×1080, 60 s",
     "landscape": "Landscape · 1920×1080",
@@ -2344,7 +2351,9 @@
       "busy": "A move into your account is under way; these can go once it is over.",
       "retry": "Try again",
       "differs": "Your account holds an older copy of this project, and the two differ: open both, keep the right one, then delete the other.",
-      "notWhole": "The copy in your account came out incomplete, so the project stays here. Try the move again.",
+      "notWhole": "The copy came out incomplete, so the project stays where it was. Try the move again.",
+      "unread": "the project could not be read. Check your connection, then try again.",
+      "changed": "the project was edited while it moved. Move it again to take this version along.",
       "incomplete": "An earlier copy in your account stopped halfway: delete it from your account, then move this project again."
     },
     "signedInAs": "Signed in as {email}",

@@ -1,38 +1,43 @@
 ---
 // The community's public projects, every one in a grid, most recent first.
 // Read through lib/gallery.ts when the page is asked: the films published in the
-// app's gallery, and the repository's examples.
+// app's gallery, and nothing else.
 import Page from '../../components/Page.astro';
 import PageHead from '../../components/PageHead.astro';
 import ProjectCard from '../../components/ProjectCard.astro';
 import Closing from '../../components/Closing.astro';
-import { listProjects } from '../../lib/gallery';
+import { filterProjects, listProjects } from '../../lib/gallery';
 import { localeOf, t } from '../../lib/i18n';
 
 // rendered when asked: a film published a minute ago is there
 export const prerender = false;
 
 const locale = localeOf(Astro.url.pathname);
-const projects = await listProjects({ sort: 'recent' });
+const query = Astro.url.searchParams.get('q')?.trim() ?? '';
+const projects = filterProjects(await listProjects({ sort: 'recent' }), query);
 ---
 
 <Page title={t(locale, 'explore.metaTitle')} description={t(locale, 'explore.metaDescription')}>
   <PageHead title={t(locale, 'explore.title')} lead={t(locale, 'explore.lead')} />
   <section class="wrap list">
-    {/* paused until Tramme's own visuals are good enough: reopen by restoring this block
+    <form class="explore-search" method="get" action={Astro.url.pathname} role="search">
+      <input type="search" name="q" value={query} placeholder={t(locale, 'explore.search')} aria-label={t(locale, 'explore.search')} />
+      <button class="btn btn-accent" type="submit">{t(locale, 'explore.searchButton')}</button>
+    </form>
     {projects.length > 0
       ? <div class="grid gallery">{projects.map((project) => <ProjectCard project={project} locale={locale} />)}</div>
-      : <p class="none">{t(locale, 'card.empty')}</p>}
-    */}
-    <p class="none">{t(locale, 'card.empty')}</p>
+      : <p class="none">{query ? t(locale, 'explore.noResults') : t(locale, 'card.empty')}</p>}
   </section>
   <Closing locale={locale} />
 </Page>
 
 <style>
   .list { margin-top: clamp(40px, 5vw, 64px); }
+  .explore-search { display: flex; gap: 10px; max-width: 680px; margin: 0 auto clamp(32px, 4vw, 48px); }
+  .explore-search input { flex: 1; min-width: 0; border: 1px solid var(--line-2); border-radius: var(--r); padding: 0 16px; background: var(--panel); color: var(--ink); font: inherit; }
   .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px 20px; }
   .none { text-align: center; color: var(--ink-3); }
   @media (max-width: 960px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   @media (max-width: 560px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+  @media (max-width: 560px) { .explore-search { align-items: stretch; flex-direction: column; } .explore-search input { min-height: 48px; } }
 </style>

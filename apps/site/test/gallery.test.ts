@@ -1,32 +1,63 @@
-import { describe, expect, it } from 'vitest';
-import { getProject, listProjects } from '../src/lib/gallery';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { filterProjects, getProject, listProjects, type PublicProject } from '../src/lib/gallery';
+import { APP } from '../src/lib/links';
+
+const film = (id: string, publishedAt: string, views?: number): PublicProject => ({
+  id, title: id, description: '', author: { name: 'Ada', handle: 'ada' },
+  video: { mp4: `/api/gallery/${id}/video.mp4` }, poster: `/api/gallery/${id}/poster.webp`,
+  width: 1920, height: 1080, duration: 10, reusable: true, publishedAt, views,
+});
+
+/** the app's gallery answering with these films, or failing */
+function app(films: PublicProject[] | 'down') {
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+    if (films === 'down') throw new Error('offline');
+    const path = url.slice(APP.length);
+    if (path.startsWith('/api/gallery?')) return Response.json(films);
+    const one = films.find((f) => path === `/api/gallery/${f.id}`);
+    return one ? Response.json(one) : new Response('{}', { status: 404 });
+  }));
+}
+
+afterEach(() => vi.unstubAllGlobals());
 
 describe('the gallery', () => {
-  it('lists the seed projects, most recent first', async () => {
-    const list = await listProjects();
-    expect(list.map((p) => p.id)).toEqual(['launch-film', 'anime', 'showreel']);
-    expect(list.every((p) => p.author.name === 'Tramme')).toBe(true);
+  it('lists only what the community published, most recent first', async () => {
+    app([film('aaaaaaaaaaaa', '2026-11-01'), film('bbbbbbbbbbbb', '2026-11-20')]);
+    expect((await listProjects()).map((p) => p.id)).toEqual(['bbbbbbbbbbbb', 'aaaaaaaaaaaa']);
   });
 
-  it('honours the limit', async () => {
-    expect(await listProjects({ limit: 2 })).toHaveLength(2);
-    expect(await listProjects({ limit: 0 })).toHaveLength(0);
+  it('shows nothing when nothing is published or the app does not answer', async () => {
+    app([]);
+    expect(await listProjects()).toEqual([]);
+    app('down');
+    expect(await listProjects()).toEqual([]);
+    expect(await getProject('aaaaaaaaaaaa')).toBeUndefined();
   });
 
-  it('invents no view count, so the popular sort is the recent one', async () => {
-    expect((await listProjects()).every((p) => p.views === undefined)).toBe(true);
-    expect(await listProjects({ sort: 'popular' })).toEqual(await listProjects());
+  it('honours the limit and sorts by views once they are counted', async () => {
+    app([film('aaaaaaaaaaaa', '2026-11-01', 9), film('bbbbbbbbbbbb', '2026-11-20', 2)]);
+    expect(await listProjects({ limit: 1 })).toHaveLength(1);
+    expect((await listProjects({ sort: 'popular' })).map((p) => p.id)).toEqual(['aaaaaaaaaaaa', 'bbbbbbbbbbbb']);
   });
 
-  it('finds a project by id, and none for an unknown id', async () => {
-    expect((await getProject('anime'))?.title).toBeTruthy();
-    expect(await getProject('nope')).toBeUndefined();
+  it('finds a film by id at the app\'s address, and none for an id the gallery cannot give', async () => {
+    app([film('aaaaaaaaaaaa', '2026-11-01')]);
+    const p = await getProject('aaaaaaaaaaaa');
+    expect(p?.video.mp4).toBe(`${APP}/api/gallery/aaaaaaaaaaaa/video.mp4`);
+    expect(p?.poster).toBe(`${APP}/api/gallery/aaaaaaaaaaaa/poster.webp`);
+    expect(await getProject('anime')).toBeUndefined();
+    expect(await getProject('zzzzzzzzzzzz')).toBeUndefined();
   });
 
-  it('gives each project a video and a poster', async () => {
-    for (const p of await listProjects()) {
-      expect(p.video.webm ?? p.video.mp4, p.id).toBeTruthy();
-      expect(p.poster, p.id).toBeTruthy();
-    }
+  it('filters films by title, description, author, or handle without changing routes', () => {
+    const first = { ...film('aaaaaaaaaaaa', '2026-11-01'), title: 'Été graphique', description: 'Rythme solaire' };
+    const second = { ...film('bbbbbbbbbbbb', '2026-11-20'), title: 'Night', author: { name: 'Bilal', handle: 'moving-bilal' } };
+    const projects = [first, second];
+
+    expect(filterProjects(projects, 'ete').map((p) => p.id)).toEqual(['aaaaaaaaaaaa']);
+    expect(filterProjects(projects, 'solaire').map((p) => p.id)).toEqual(['aaaaaaaaaaaa']);
+    expect(filterProjects(projects, 'moving').map((p) => p.id)).toEqual(['bbbbbbbbbbbb']);
+    expect(filterProjects(projects, '   ')).toEqual(projects);
   });
 });

@@ -177,6 +177,7 @@ describe('hydracept jobs', () => {
     const calls = stubHydraceptJob(MP3, 'audio/mpeg');
     const run = await hydraceptSfx(media.hydracept, { prompt: 'whoosh', duration: 2 }, out);
     const job = calls.find((c) => c.url.includes('/audio.sfx.generate.v1/jobs') && c.method === 'POST');
+    expect((job?.body?.input as Record<string, unknown>)?.prompt).toBe('whoosh. Sound effect only: no intelligible speech, spoken words or narration.');
     expect((job?.body?.input as Record<string, unknown>)?.outputFormatPreference).toBe(HYDRACEPT_AUDIO_MP3);
     expect(run.model).toBe('eleven_text_to_sound_v2');
     expect(run.type).toBe('audio/mpeg');
@@ -204,7 +205,7 @@ describe('hydracept jobs', () => {
     expect(response.status).toBe(200);
     expect(response.headers.get('x-tramme-provider')).toBe('hydracept');
     const job = calls.find((c) => c.url.includes('/audio.music.generate.v1/jobs') && c.method === 'POST');
-    expect(job?.body?.input).toMatchObject({ prompt: 'quiet piano', durationMs: 12000, forceInstrumental: true });
+    expect(job?.body?.input).toMatchObject({ prompt: 'quiet piano. Instrumental only: no speech, spoken words, narration or vocals.', durationMs: 12000, forceInstrumental: true });
     expect(job?.body?.input).not.toHaveProperty('compositionPlan');
   });
 

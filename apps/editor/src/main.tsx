@@ -46,6 +46,7 @@ import './theme/frost.css';
 import './theme/liquid-glass.css';
 import { offerTours } from './tours/index.ts';
 import { resumeRenders } from './ui/CloudRender.tsx';
+import { resumeMoves } from './ui/BringDialog.tsx';
 import { startPrefsSync } from './prefs-sync.ts';
 import { startProject } from './start.ts';
 import { t } from './i18n/index.ts';
@@ -169,6 +170,8 @@ boot().then(() => {
   watchUpdates();
   // the exports on the server asked from this browser, followed until they are told over (CloudRender.tsx)
   resumeRenders();
+  // the projects the last page of this window was moving
+  void resumeMoves();
   // signed in, the preferences are the account's, the same on every device (prefs-sync.ts)
   startPrefsSync();
   if (m) {

@@ -219,6 +219,9 @@
     "metaDescription": "The community's public projects: open a film made with Tramme and see how it is built.",
     "title": "Explore what is made with Tramme.",
     "lead": "Every public project, with its layers and its timeline to look at.",
+    "search": "Search films, descriptions, or creators",
+    "searchButton": "Search",
+    "noResults": "No published film matches this search.",
     "recent": "Most recent",
     "sort": "Order"
   },

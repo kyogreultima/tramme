@@ -16,7 +16,8 @@ export interface Proposal {
   status: 'pending' | 'accepted' | 'rejected';
 }
 
-export interface Toast { id: number; text: string; kind?: 'error' | 'info' }
+export interface ToastAction { label: string; run: () => void }
+export interface Toast { id: number; text: string; kind?: 'error' | 'info'; action?: ToastAction }
 
 let history: History<TrammeDoc> | null = null;
 
@@ -94,9 +95,9 @@ export const redoLabel = computed(() => (S.version.value, history?.redoLabel ?? 
 const check = (doc: TrammeDoc) => validate(doc, S.registry.peek()).map((i) => `${i.path || '/'} : ${i.message}`);
 
 let toastId = 0;
-export function toast(text: string, kind: Toast['kind'] = 'info', ms = 4200) {
-  const t = { id: ++toastId, text, kind };
-  S.toasts.value = [...S.toasts.value, t];
+export function toast(text: string, kind: Toast['kind'] = 'info', ms = 4200, action?: ToastAction) {
+  const t = { id: ++toastId, text, kind, action };
+  S.toasts.value = [...S.toasts.value.filter((x) => x.text !== text || x.kind !== kind), t];
   setTimeout(() => { S.toasts.value = S.toasts.value.filter((x) => x.id !== t.id); }, ms);
 }
 

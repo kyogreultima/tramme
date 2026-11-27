@@ -38,12 +38,12 @@ import { prefs, settingsOpen } from '../settings.ts';
 import { GLASS_THEMES } from '../theme/pref.ts';
 import { downloadOf, update } from '../version.ts';
 import { tauri } from '../tauri.ts';
-import { bring, inAccount, moveHere } from '../bring.ts';
+import { inAccount } from '../bring.ts';
 import { IDEAS } from '../ideas.ts';
 import { t } from '../i18n/index.ts';
 import { go } from '../nav.ts';
 import { AccountMenu } from './AccountMenu.tsx';
-import { BringOffer } from './BringDialog.tsx';
+import { BringOffer, isMoving, moveInBackground, onMoved } from './BringDialog.tsx';
 import { account, resendVerification } from '../accounts.ts';
 
 interface Example { file: string; name: string; description: string; width: number; height: number; duration: number; thumbnail?: string }
@@ -59,7 +59,10 @@ const PRESETS: [string, string, number, number][] = [
 const FILM_FORMATS = PRESETS.filter(([id]) => id !== '4k');
 
 
-const open = (id: string) => go(`/p/${encodeURIComponent(id)}`);
+const open = (id: string) => {
+  if (isMoving(id)) { toast(t('home.movingThis')); return; }
+  go(`/p/${encodeURIComponent(id)}`);
+};
 
 const dims = (m: { width?: number; height?: number; duration?: number }) =>
   [m.width && m.height ? `${m.width}×${m.height}` : null, m.duration ? `${+m.duration.toFixed(2)} s` : null].filter(Boolean).join(' · ');
@@ -235,10 +238,10 @@ export function DirectionBox({ busy, onStart }: { busy: boolean; onStart: (words
   const [packCmds, setPackCmds] = useState<Command[]>([]);
   useEffect(() => { void shippedPacks().then((p) => setPackCmds(packCommands(p))); }, []);
   const commands = useMemo(() => [...listCommands(S.registry.value), ...packCmds], [S.registry.value, packCmds]);
-  const commandMenu = useCommandMenu(area, words, setWords, commands);
+  const commandMenu = useCommandMenu(area, words, setWords, commands, undefined, 'below');
   // the @ menu: the material added so far, tagged in the words
   const tags = useMemo(() => material.map((p) => ({ token: tagOf(p), label: p.file.name, kind: kindOf(p.file) })), [material]);
-  const mention = useMentionMenu(area, words, setWords, tags);
+  const mention = useMentionMenu(area, words, setWords, tags, 'below');
   const isCommand = (name: string) => commands.some((c) => c.name === name), isTag = (token: string) => tags.some((x) => x.token === token);
   const chosen = (e: Event) => { const input = e.target as HTMLInputElement, list = pickedOf(input.files ?? []); input.value = ''; add(list); };
   return (
@@ -248,17 +251,19 @@ export function DirectionBox({ busy, onStart }: { busy: boolean; onStart: (words
       <form class="brief-box" data-tour="home-new" onSubmit={(e) => { e.preventDefault(); start(); }}
         onDragOver={(e) => { if (e.dataTransfer?.types.includes('Files')) { e.preventDefault(); e.stopPropagation(); } }}
         onDrop={(e) => { if (!e.dataTransfer) return; e.preventDefault(); e.stopPropagation(); droppedOf(e.dataTransfer).then((list) => add(list.filter((p) => isSourceFile(p.file)))); }}>
-        <MarkedField area={area} text={words} isCommand={isCommand} isTag={isTag}>
-          <textarea ref={area} value={words} placeholder={t('home.heroPlaceholder')}
-            // ready to type with a keyboard; on a touch screen the keyboard would cover the page as soon as it opens
-            autoFocus={!handheld()}
-            aria-autocomplete="list"
-            onInput={(e) => { setWords((e.target as HTMLTextAreaElement).value); commandMenu.sync(); mention.sync(); }}
-            onClick={() => { commandMenu.sync(); mention.sync(); }}
-            onKeyDown={(e) => { if (commandMenu.keyDown(e) || mention.keyDown(e)) return; if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); start(); } }} />
-        </MarkedField>
-        {commandMenu.view}
-        {mention.view}
+        <div class="brief-input">
+          <MarkedField area={area} text={words} isCommand={isCommand} isTag={isTag}>
+            <textarea ref={area} value={words} placeholder={t('home.heroPlaceholder')}
+              // ready to type with a keyboard; on a touch screen the keyboard would cover the page as soon as it opens
+              autoFocus={!handheld()}
+              aria-autocomplete="list"
+              onInput={(e) => { setWords((e.target as HTMLTextAreaElement).value); commandMenu.sync(); mention.sync(); }}
+              onClick={() => { commandMenu.sync(); mention.sync(); }}
+              onKeyDown={(e) => { if (commandMenu.keyDown(e) || mention.keyDown(e)) return; if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); start(); } }} />
+          </MarkedField>
+          {commandMenu.view}
+          {mention.view}
+        </div>
         {material.length > 0 && (
           <div class="brief-files">
             {material.map((p) => (
@@ -319,6 +324,7 @@ export function Home() {
     addEventListener('keydown', key);
     return () => removeEventListener('keydown', key);
   }, []);
+  useEffect(() => onMoved(refresh), []);
   useEffect(() => {
     document.title = `${t('home.projects')} · Tramme`;
     refresh();
@@ -377,7 +383,7 @@ export function Home() {
       }
     });
   }, []);
-  const menu = (e: MouseEvent | { clientX: number; clientY: number }, m: Manifest) => openMenu(e, [
+  const menu = (e: MouseEvent | { clientX: number; clientY: number }, m: Manifest) => isMoving(m.id) ? toast(t('home.movingThis')) : openMenu(e, [
     { label: t('common.open'), icon: 'folder', onClick: () => open(m.id) },
     { label: t('common.rename'), icon: 'edit', onClick: () => setDialog({ kind: 'rename', m }) },
     { label: t('common.duplicate'), icon: 'copy', onClick: async () => { try { await api.duplicate(m.id); refresh(); } catch (x) { toast(t('home.couldNotDuplicateError', { error: (x as Error).message }), 'error'); } } },
@@ -391,26 +397,12 @@ export function Home() {
     // the desktop app, signed in: a project moves between this computer and the account (bring.ts), it is never in both
     ...(tauri && account.value.status === 'in' ? [{
       label: inAccount(m) ? t('home.moveHere') : t('home.moveToAccount'), icon: inAccount(m) ? 'folder' : 'cloud',
-      onClick: () => void move(m),
+      onClick: () => move(m),
     }] : []),
     'sep',
     { label: t('common.delete'), icon: 'trash', danger: true, onClick: () => setDialog({ kind: 'remove', m }) },
   ]);
-  const move = async (m: Manifest) => {
-    setBusy({ label: t('home.moving', { name: m.name }), done: 0, total: 1 });
-    try {
-      if (inAccount(m)) {
-        await moveHere(m);
-        toast(t('home.movedHere', { name: m.name }));
-      } else {
-        const r = await bring([m], () => {});
-        if (r.failed.length) throw new Error(r.failed[0].error);
-        toast(t('home.moved', { name: m.name }));
-      }
-    } catch (x) { toast(t('home.couldNotMove', { name: m.name, error: (x as Error).message }), 'error', 9000); }
-    setBusy(null);
-    refresh();
-  };
+  const move = (m: Manifest) => moveInBackground(m, refresh);
 
   return (
     <div class={`home${drag ? ' dragging' : ''}`}

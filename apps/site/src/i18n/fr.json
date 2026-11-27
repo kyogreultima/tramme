@@ -219,6 +219,9 @@
     "metaDescription": "Les projets publics de la communauté : ouvrez un film fait avec Tramme et voyez comment il est construit.",
     "title": "Explorez ce qui se fait avec Tramme.",
     "lead": "Chaque projet public, avec ses calques et sa timeline à regarder.",
+    "search": "Rechercher un film, une description ou un créateur",
+    "searchButton": "Rechercher",
+    "noResults": "Aucun film publié ne correspond à cette recherche.",
     "recent": "Les plus récents",
     "sort": "Ordre"
   },

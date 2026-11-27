@@ -280,7 +280,7 @@ describe('sounds made by a provider', () => {
       const url = String(input);
       seen.push({ url, headers: new Headers(init?.headers), body: JSON.parse(String(init?.body ?? '{}')) });
       if (url.includes('generativelanguage')) return Response.json({ steps: [{ content: [{ type: 'audio', mime_type: 'audio/wav', data: btoa('RIFFwav') }] }] });
-      if (url.includes('/sound-generation') && seen.at(-1)!.body.text === 'refused') return Response.json({ detail: { message: 'quota exceeded' } }, { status: 401 });
+      if (url.includes('/sound-generation') && seen.at(-1)!.body.text.startsWith('refused')) return Response.json({ detail: { message: 'quota exceeded' } }, { status: 401 });
       if (url.includes('/v2/voices')) return Response.json({ voices: [{ voice_id: 'own1', name: 'Mine', labels: { accent: 'african', language: 'fr', gender: 'male' } }, { voice_id: 'own2', name: 'Other', labels: { accent: 'british' } }] });
       if (url.includes('/shared-voices')) return Response.json({ voices: [{ public_owner_id: 'owner', voice_id: 'lib1', name: 'Shared', accent: 'african', gender: 'female', age: 'young', preview_url: 'https://x/p.mp3' }] });
       if (url.includes('/voices/add/')) return Response.json({ voice_id: 'added1' });
@@ -336,11 +336,11 @@ describe('sounds made by a provider', () => {
       expect(sfx.headers.get('x-tramme-provider')).toBe('elevenlabs');
       expect(p.seen[0].url).toBe('https://api.elevenlabs.io/v1/sound-generation?output_format=mp3_44100_128');
       expect(p.seen[0].headers.get('xi-api-key')).toBe('el-key');
-      expect(p.seen[0].body).toMatchObject({ text: 'a deep whoosh', duration_seconds: 30 });
+      expect(p.seen[0].body).toMatchObject({ text: 'a deep whoosh. Sound effect only: no intelligible speech, spoken words or narration.', duration_seconds: 30 });
 
       await call('/api/generate', ask({ kind: 'music', prompt: 'calm piano bed', duration: 20 }));
       expect(p.seen[1].url).toContain('/v1/music');
-      expect(p.seen[1].body).toMatchObject({ prompt: 'calm piano bed', music_length_ms: 20000, force_instrumental: true });
+      expect(p.seen[1].body).toMatchObject({ prompt: 'calm piano bed. Instrumental only: no speech, spoken words, narration or vocals.', music_length_ms: 20000, force_instrumental: true });
 
       const voice = await call('/api/generate', ask({ kind: 'voice', prompt: 'Bonjour à tous', provider: 'gemini', voice: 'Puck', style: 'warm' }));
       expect(voice.headers.get('content-type')).toBe('audio/wav');
@@ -361,7 +361,9 @@ describe('sounds made by a provider', () => {
     try {
       const made = await call('/api/generate', ask({ kind: 'music', prompt: 'warm piano', duration: 12, plan }));
       expect(made.status).toBe(200);
-      expect(p.seen[0].body).toMatchObject({ model_id: 'music_v2_5', composition_plan: plan });
+      expect(p.seen[0].body).toMatchObject({ model_id: 'music_v2_5' });
+      expect(p.seen[0].body.composition_plan.chunks).toHaveLength(plan.chunks.length);
+      expect(p.seen[0].body.composition_plan.chunks[0].negative_styles).toEqual(['speech', 'spoken words', 'narration', 'vocals']);
       // the provider refuses force_instrumental beside a plan: the plan's styles say instrumental
       expect(p.seen[0].body).not.toHaveProperty('force_instrumental');
       expect(p.seen[0].body).not.toHaveProperty('prompt');

@@ -1,5 +1,5 @@
 // The project's site: a static Astro build. The landing page (src/pages)
-// runs no engine: the examples are videos (src/videos, see
+// runs no engine: its films are videos (src/videos, see
 // components/Media.astro), loaded only near the screen. The docs (/docs/) are
 // Starlight, over the repository's own Markdown (src/lib/docs.ts). With the
 // site's address, Starlight writes the sitemap of every page.
@@ -19,12 +19,12 @@ const release = await latestRelease(console.log, ORIGINS.env === 'beta' ? 'beta'
 export default defineConfig({
   // the address of this environment (local, beta, production: brand/environments.ts), for the canonical links, the sitemap and the preview image
   site: SITE.url,
-  // every page is prerendered today; the adapter lets /explore/ and /p/<id>/ switch to
-  // server rendering (export const prerender = false) once the gallery API exists
+  // the pages are prerendered, but /explore/, /p/<id>/ and the landing's community
+  // island (server:defer), rendered when asked from the app's gallery
   adapter: cloudflare({ imageService: 'compile', prerenderEnvironment: 'node' }),
   // the gallery moved from /examples/ to /explore/
   redirects: { '/examples': '/explore/', '/fr/examples': '/fr/explore/' },
-  vite: { define: { __RELEASE__: JSON.stringify(release) } },
+  vite: { define: { __RELEASE__: JSON.stringify(release), __ORIGINS__: JSON.stringify(ORIGINS) } },
   fonts: [
     { provider: fontProviders.fontsource(), name: 'Geist', cssVariable: '--font-sans', weights: ['300 700'], styles: ['normal'] },
     { provider: fontProviders.fontsource(), name: 'Bricolage Grotesque', cssVariable: '--font-display', weights: ['300 800'], styles: ['normal'] },

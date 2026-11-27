@@ -21,7 +21,7 @@ import { audioClips, clipFileTime, curveAt, needsPitch, soundMix, type TrammeDoc
 import { editorRegistry } from './vocabulary.ts';
 import { clipChain, liveMaster, loadPitch, masterGainDb, mixTracks, playClip, Renderer } from '@tramme/render';
 import { comp, compIdOf, S, setRegistry, setTime, toast, viewDoc } from './state.ts';
-import { attachInstalled, attachIsolated, filterModule, onSandboxStopped, pluginHost, pluginToolHost } from './plugins/index.ts';
+import { attachInstalled, attachIsolated, filterModule, onSandboxStopped, pluginHost, pluginToolHost, SandboxClosed } from './plugins/index.ts';
 import { copiesIn, copyId, counted, installed, installedFor, installedTypes, offIn, permitted, sandboxedDoc, stopped, STRIKES } from './installed.ts';
 import { bindSandbox, blitPicture, blitSandboxFrame, declarationsModule, ensureDeclared, ensureSandboxDoc, moduleItemsOf, renderSandboxFrame, resetSandbox, sandboxDeclaration, type SandboxContext } from './plugins/sandbox-draw.ts';
 import { setWebScenePlaceholder } from '@tramme/nodes';
@@ -87,6 +87,8 @@ class Preview {
   private bust = 0;
   /** one sandbox frame in flight (the flag's draw path) */
   private sandboxBusy = false;
+  /** modules being read again: the picture on screen stays until the sandbox holds them */
+  private reloading = 0;
   private sandboxAgain = false;
   /** while playing, how long a sandbox frame takes to land (seconds, averaged): the frame asked for is that far ahead */
   private sandboxLead = 0;
@@ -309,24 +311,29 @@ class Preview {
   /** load a module asset again (a plugin edited on disk) */
   async reload(assetIds: string[]) {
     if (!this.renderer) return;
+    this.reloading++;
+    try { await this.reloadNow(this.renderer, assetIds); }
+    finally { this.reloading--; this.invalidate(); }
+  }
+
+  private async reloadNow(r: Renderer, assetIds: string[]) {
     // a file changed under the same name: the passages drawn with it are drawn again
     this.prep.reset();
-    if (this.renderer.sandboxModules) {
+    if (r.sandboxModules) {
       const base = new URL(S.docUrl.peek(), location.href).href;
       // A saved edit can keep the same asset URL. Discard the worker's module
       // cache so the next load reads the new source and declarations.
       if (assetIds.some((id) => this.applied!.assets[id]?.type === 'module')) {
-        pluginHost(base).dispose('project module changed');
+        pluginHost(base).dispose('project module changed', false);
         resetSandbox();
       }
       await ensureDeclared(pluginHost(base), moduleItemsOf(this.applied!, base));
     }
-    await this.renderer.setDoc(this.applied!, { compId: compIdOf(this.applied!), reload: assetIds });
+    await r.setDoc(this.applied!, { compId: compIdOf(this.applied!), reload: assetIds });
     await this.attachPlugins(assetIds);
-    setRegistry(this.renderer.registry);
+    setRegistry(r.registry);
     this.pluginTours();
     this.noteOffline();
-    this.invalidate();
   }
 
   /** the media whose file is missing, for the panels: written only when the list changes */
@@ -450,7 +457,7 @@ class Preview {
     try {
       if (sandboxed) {
         // the whole picture comes from the sandbox (docs/evaluator-sandbox.md): modifiers, effects and simulations never run here
-        if (!this.sandboxBusy) {
+        if (!this.sandboxBusy && !this.reloading) {
           this.sandboxBusy = true;
           this.sandboxAgain = false;
           const blur = prefs.peek().blur;
@@ -462,7 +469,11 @@ class Preview {
           const asked = performance.now();
           void this.drawSandboxFrame(at, samples, scale, playing).then(() => {
             if (playing) this.sandboxLead = Math.min(SANDBOX_LEAD_MAX, this.sandboxLead * 0.8 + 0.2 * (performance.now() - asked) / 1000);
-          }).catch((e) => { S.renderError.value = `sandbox: ${(e as Error).message}`; }).finally(() => {
+          }).catch((e) => {
+            // closed on purpose under this frame: asked again of the next sandbox, nothing to report
+            if (e instanceof SandboxClosed) this.sandboxAgain = true;
+            else S.renderError.value = `sandbox: ${(e as Error).message}`;
+          }).finally(() => {
             this.sandboxBusy = false;
             // Only another invalidation needs another frame. An unconditional
             // redraw here keeps decoding and drawing forever while paused.
@@ -524,8 +535,11 @@ class Preview {
     };
     // the pictures this frame shows, brought in first: the sandbox only has those kept
     await r.bringImages(t);
-    ensureSandboxDoc(pluginHost(docUrl), ctx);
-    const pic = await renderSandboxFrame(pluginHost(docUrl), r, { compId: r.compId, t, scale, samples, width: c.width, height: c.height }, { playing });
+    const host = pluginHost(docUrl);
+    // a sandbox made anew after a stop holds no module yet (one that does answers at once)
+    await ensureDeclared(host, moduleItemsOf(doc, docUrl));
+    ensureSandboxDoc(host, ctx);
+    const pic = await renderSandboxFrame(host, r, { compId: r.compId, t, scale, samples, width: c.width, height: c.height }, { playing });
     if (pic.err) { S.renderError.value = `sandbox: ${pic.err}`; return; }
     if (!pic.bitmap) return;
     this.setScale(r, scale, this.stillScale());

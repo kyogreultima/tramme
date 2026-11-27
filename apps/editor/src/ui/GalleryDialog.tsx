@@ -4,7 +4,7 @@
 // is updated, or taken off.
 
 import { useEffect, useState } from 'preact/hooks';
-import { myFilms, publish, unpublish, type Published } from '../gallery.ts';
+import { myFilms, publish, publishedAs, unpublish, type Published } from '../gallery.ts';
 import { t } from '../i18n/index.ts';
 import { comp, S, toast } from '../state.ts';
 import { Modal, Seg, Toggle } from './controls.tsx';
@@ -19,14 +19,18 @@ export function GalleryDialog({ video, onClose }: { video: Blob; onClose: () => 
   const [reusable, setReusable] = useState(true);
   const [step, setStep] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState(false);
 
-  useEffect(() => {
+  const load = () => {
+    setBefore(undefined);
+    setLoadError(false);
     void myFilms().then((list) => {
-      const p = list.find((f) => f.project === project.id) ?? null;
+      const p = list.find((f) => f.project === publishedAs(project.id)) ?? null;
       setBefore(p);
       if (p) { setTitle(p.title); setDescription(p.description); setVisibility(p.visibility); setReusable(p.reusable); }
-    });
-  }, []);
+    }).catch((error: unknown) => { console.warn('[tramme] gallery:', error); setLoadError(true); });
+  };
+  useEffect(load, []);
 
   const submit = async (e: Event) => {
     e.preventDefault();
@@ -68,6 +72,7 @@ export function GalleryDialog({ video, onClose }: { video: Blob; onClose: () => 
           options={[['public', t('gallery.public')], ['unlisted', t('gallery.unlisted')]]} />
         <span class="faint">{visibility === 'public' ? t('gallery.publicHint') : t('gallery.unlistedHint')}</span>
         <label class="gallery-toggle"><span>{t('gallery.reusable')}</span><Toggle on={reusable} onChange={setReusable} /></label>
+        {loadError && <div class="prop-note err">{t('gallery.listFailed')} <button class="btn sm" type="button" onClick={load}>{t('gallery.retry')}</button></div>}
         {step && <span class="faint">{step}</span>}
         <div class="modal-foot">
           {before && <button class="btn ghost danger" type="button" disabled={!!step} onClick={takeOff}>{t('gallery.takeOff')}</button>}
